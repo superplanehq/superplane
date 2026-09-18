@@ -259,6 +259,7 @@ type IssueEventDetail struct {
 	Culprit     string            `json:"culprit" mapstructure:"culprit"`
 	Type        string            `json:"type" mapstructure:"type"`
 	WebURL      string            `json:"web_url" mapstructure:"web_url"`
+	Release     string            `json:"release" mapstructure:"release"`
 	Tags        []IssueTag        `json:"tags" mapstructure:"tags"`
 	User        map[string]any    `json:"user" mapstructure:"user"`
 	Contexts    map[string]any    `json:"contexts" mapstructure:"contexts"`

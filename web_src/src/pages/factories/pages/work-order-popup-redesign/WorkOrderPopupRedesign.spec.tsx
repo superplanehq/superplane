@@ -137,11 +137,15 @@ describe("Line board job popup", () => {
         name: "Open Show a clearer empty state on the billing page",
       }),
     ).toBeInTheDocument();
+    const cardVerdict = (id: string) => screen.getByTestId(`work-order-card-score-${id}`).getAttribute("aria-label");
     await waitFor(() => {
-      expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toHaveAttribute("aria-valuenow", "5");
+      expect(cardVerdict("wo-review-pay-842")).toContain("Confidence score 5 of 5");
     });
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-844")).toHaveAttribute("aria-valuenow", "4");
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("aria-valuenow", "3");
+    expect(cardVerdict("wo-review-pay-842")).toContain("Clarity score 5 of 5");
+    expect(cardVerdict("wo-review-pay-844")).toContain("Confidence score 4 of 5");
+    expect(cardVerdict("wo-review-pay-845")).toContain("Confidence score 3 of 5");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("data-tone", "caution");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("Confidence3");
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
     expect(
@@ -278,7 +282,10 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     const waitingNote = within(dialog).getByTestId("split-run-attention-note");
-    expect(within(waitingNote).getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(within(waitingNote).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(
+      within(within(dialog).getByRole("banner")).getByRole("button", { name: "More actions" }),
+    ).toBeInTheDocument();
     expect(within(waitingNote).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();

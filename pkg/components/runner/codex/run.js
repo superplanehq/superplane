@@ -269,13 +269,13 @@ function tomlStringArray(values) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model]\n");
     process.exit(2);
   }
   runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
@@ -323,18 +323,18 @@ async function runPrompt(promptFile, model) {
   );
   const codexArgs = codexExecArgs(process.env, model, mcpScript, sessionID);
   if (planning) {
-    process.stdout.write("Planning session tools enabled\n");
-    process.stdout.write("sandbox: read-only\n");
+    writeStdout("Planning session tools enabled\n");
+    writeStdout("sandbox: read-only\n");
   }
   if (promptCount > 0) {
-    process.stdout.write("Continuing Codex session in the current directory\n");
+    writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);
 
   const child = spawn("codex", codexArgs, {
     stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stderr.pipe(process.stderr);
+  const stderrDone = pipeRedactedStderr(child.stderr);
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
@@ -374,7 +374,7 @@ async function runPrompt(promptFile, model) {
         return;
       }
     } catch (_err) {
-      process.stdout.write(`${line}\n`);
+      writeStdout(`${line}\n`);
     }
   });
 
@@ -384,6 +384,7 @@ async function runPrompt(promptFile, model) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
   ]).then(([code]) => code);
 
   formatter.flush(exitCode !== 0);
@@ -400,19 +401,21 @@ async function runPrompt(promptFile, model) {
     usage,
   };
   telemetry.attachToResult(payload);
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
+  const activityModule = loadActivityStreamModule();
+  const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
     await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
-      payload.result,
+      safePayload.result,
     );
   }
   formatTurnResult({
     is_error: exitCode !== 0,
     num_turns:
-      payload.telemetry && payload.telemetry.num_turns
-        ? payload.telemetry.num_turns
+      safePayload.telemetry && safePayload.telemetry.num_turns
+        ? safePayload.telemetry.num_turns
         : 1,
     duration_ms: Date.now() - startedAt,
   });
@@ -440,10 +443,16 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function extractUsage(event) {
@@ -473,7 +482,29 @@ function accumulateLLMUsage(payload) {
 }
 
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogValue ? activity.sanitizeLogValue(rec) : rec;
+  process.stdout.write(`${JSON.stringify(safe)}\n`);
+}
+
+function writeStdout(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stdout.write(safe);
+}
+
+function writeStderr(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stderr.write(safe);
+}
+
+function pipeRedactedStderr(stream) {
+  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  lines.on("line", (line) => {
+    writeStderr(`${line}\n`);
+  });
+  return new Promise((resolve) => lines.on("close", resolve));
 }
 
 function createCodexFormatter(telemetry, activityOverride) {
@@ -588,7 +619,7 @@ function createCodexFormatter(telemetry, activityOverride) {
           toolFailed(item) ? "stderr" : "stdout",
         );
       } else {
-        process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+        writeStdout(`${output.replace(/\s+$/, "")}\n`);
       }
     }
     const tracked = open.get(id) || {
@@ -650,7 +681,7 @@ function createCodexFormatter(telemetry, activityOverride) {
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
             lastText = text.replace(/\s+$/, "");
             if (!activity.enabled) {
-              process.stdout.write(`${lastText}\n`);
+              writeStdout(`${lastText}\n`);
             }
           }
         }
@@ -818,7 +849,7 @@ function formatTurnResult(event) {
       parts.push(`${(ms / 1000).toFixed(1)}s`);
     }
   }
-  process.stdout.write(`${parts.join(" · ")}\n`);
+  writeStdout(`${parts.join(" · ")}\n`);
 }
 
 function formatCodexJsonLines(rawLines) {
@@ -831,7 +862,7 @@ function formatCodexJsonLines(rawLines) {
     try {
       formatter.handleEvent(JSON.parse(trimmed));
     } catch (_err) {
-      process.stdout.write(`${trimmed}\n`);
+      writeStdout(`${trimmed}\n`);
     }
   }
   formatter.flush();

@@ -1,4 +1,5 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
+import type { ReactNode } from "react";
 
 import { SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { WorkOrderArtifactsList } from "../../WorkOrderArtifactsList";
@@ -17,6 +18,7 @@ export function WorkOrderSplitRunOverviewSidebar({
   pullRequests = [],
   pullRequestsLoading = false,
   pullRequestsError = null,
+  sidebarNote,
 }: {
   source?: SplitRunSource;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -24,6 +26,7 @@ export function WorkOrderSplitRunOverviewSidebar({
   pullRequests?: FactoriesFactoryPullRequest[];
   pullRequestsLoading?: boolean;
   pullRequestsError?: Error | null;
+  sidebarNote?: ReactNode;
 }) {
   return (
     <aside className="h-full overflow-y-auto px-6 py-6" data-testid="split-run-overview-sidebar">
@@ -42,6 +45,7 @@ export function WorkOrderSplitRunOverviewSidebar({
           isLoading={pullRequestsLoading}
           error={pullRequestsError}
         />
+        {sidebarNote}
       </div>
     </aside>
   );

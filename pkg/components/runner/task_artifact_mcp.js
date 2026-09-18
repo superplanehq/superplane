@@ -2,9 +2,13 @@
 "use strict";
 
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const path = require("node:path");
 
 const MAX_ARTIFACT_BYTES = 100 * 1024 * 1024;
+const MAX_INSPECTABLE_SCREENSHOT_BYTES = 5 * 1024 * 1024;
+const ATTEMPT_TYPES = new Set(["preview", "playwright", "upload"]);
+const REQUIRED_ATTEMPT_TYPES = ["preview", "playwright"];
 const CONTENT_TYPES = new Map([
   [".png", "image/png"],
   [".jpg", "image/jpeg"],
@@ -13,6 +17,7 @@ const CONTENT_TYPES = new Map([
   [".webm", "video/webm"],
   [".mp4", "video/mp4"],
 ]);
+const SCREENSHOT_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 function requiredEnv(name, env = process.env) {
   const value = String(env[name] || "").trim();
@@ -26,6 +31,7 @@ function artifactPaths(env = process.env) {
     taskDir,
     evidenceDir: path.join(taskDir, "evidence"),
     manifest: path.join(taskDir, "visual-evidence.json"),
+    inspections: path.join(taskDir, "visual-evidence-inspections.json"),
   };
 }
 
@@ -33,11 +39,15 @@ function readManifest(env = process.env) {
   const { manifest } = artifactPaths(env);
   try {
     const parsed = JSON.parse(fs.readFileSync(manifest, "utf8"));
-    return {
+    const result = {
       status: String(parsed.status || "not_applicable"),
       reason: String(parsed.reason || ""),
       artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [],
     };
+    if (Array.isArray(parsed.attempts)) {
+      result.attempts = parsed.attempts;
+    }
+    return result;
   } catch (_error) {
     return { status: "not_applicable", reason: "", artifacts: [] };
   }
@@ -45,12 +55,81 @@ function readManifest(env = process.env) {
 
 function writeManifest(manifest, env = process.env) {
   const paths = artifactPaths(env);
-  fs.mkdirSync(paths.taskDir, { recursive: true });
-  const temporary = `${paths.manifest}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, {
+  writeJSONAtomically(paths.manifest, manifest, paths.taskDir);
+}
+
+function writeJSONAtomically(destination, value, parentDirectory) {
+  fs.mkdirSync(parentDirectory, { recursive: true });
+  const temporary = `${destination}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
     mode: 0o600,
   });
-  fs.renameSync(temporary, paths.manifest);
+  fs.renameSync(temporary, destination);
+}
+
+function readInspections(env = process.env) {
+  const { inspections } = artifactPaths(env);
+  try {
+    const parsed = JSON.parse(fs.readFileSync(inspections, "utf8"));
+    return { inspections: Array.isArray(parsed.inspections) ? parsed.inspections : [] };
+  } catch (_error) {
+    return { inspections: [] };
+  }
+}
+
+function writeInspections(value, env = process.env) {
+  const paths = artifactPaths(env);
+  writeJSONAtomically(paths.inspections, value, paths.taskDir);
+}
+
+function screenshotPath(file, env = process.env) {
+  return path.relative(fs.realpathSync(artifactPaths(env).evidenceDir), file.absolute);
+}
+
+function fileSHA256(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function inspectScreenshot(input, env = process.env) {
+  const file = resolveArtifactFile(input && input.path, env);
+  if (!SCREENSHOT_CONTENT_TYPES.has(file.contentType)) {
+    throw new Error("screenshot must be a PNG, JPEG, or WebP file");
+  }
+  if (file.sizeBytes > MAX_INSPECTABLE_SCREENSHOT_BYTES) {
+    throw new Error(`screenshot exceeds ${MAX_INSPECTABLE_SCREENSHOT_BYTES} bytes; capture a smaller or more focused image`);
+  }
+
+  const bytes = fs.readFileSync(file.absolute);
+  const metadata = {
+    path: screenshotPath(file, env),
+    filename: file.filename,
+    mimeType: file.contentType,
+    sizeBytes: file.sizeBytes,
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  };
+  const inspections = readInspections(env).inspections.filter((inspection) => inspection.path !== metadata.path);
+  inspections.push(metadata);
+  writeInspections({ inspections }, env);
+  return {
+    content: [
+      { type: "text", text: JSON.stringify(metadata) },
+      { type: "image", data: bytes.toString("base64"), mimeType: file.contentType },
+    ],
+    structuredContent: metadata,
+  };
+}
+
+function requireInspectedScreenshot(file, env = process.env) {
+  if (!SCREENSHOT_CONTENT_TYPES.has(file.contentType)) return;
+
+  const relativePath = screenshotPath(file, env);
+  const inspection = readInspections(env).inspections.find((entry) => entry.path === relativePath);
+  if (!inspection) {
+    throw new Error("call inspect_screenshot before upload_artifact for every screenshot");
+  }
+  if (inspection.sizeBytes !== file.sizeBytes || inspection.sha256 !== fileSHA256(file.absolute)) {
+    throw new Error("screenshot changed after inspection; inspect the final file again before upload");
+  }
 }
 
 function resolveArtifactFile(inputPath, env = process.env) {
@@ -91,6 +170,7 @@ function resolveArtifactFile(inputPath, env = process.env) {
 
 async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
   const file = resolveArtifactFile(input && input.path, env);
+  requireInspectedScreenshot(file, env);
   const baseURL = requiredEnv("SUPERPLANE_BASE_URL", env).replace(/\/$/, "");
   const token = requiredEnv("SUPERPLANE_ARTIFACT_TOKEN", env);
   const title = String((input && input.title) || "").trim();
@@ -134,17 +214,61 @@ async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
 function reportVisualEvidenceUnavailable(input, env = process.env) {
   const reason = String((input && input.reason) || "").trim();
   if (!reason) throw new Error("reason is required");
+  const attempts = normalizeEvidenceAttempts(input && input.attempts);
   const manifest = readManifest(env);
   const result = {
     status: "unavailable",
     reason,
+    attempts,
     artifacts: manifest.artifacts,
   };
   writeManifest(result, env);
   return result;
 }
 
+function normalizeEvidenceAttempts(value) {
+  if (!Array.isArray(value) || value.length < 2) {
+    throw new Error(
+      "attempts is required and must include one preview and one playwright attempt",
+    );
+  }
+
+  const attempts = value.map((attempt, index) => {
+    if (!attempt || typeof attempt !== "object" || Array.isArray(attempt)) {
+      throw new Error(`attempts[${index}] must be an object`);
+    }
+    const type = String(attempt.type || "").trim();
+    const command = String(attempt.command || "").trim();
+    const outcome = String(attempt.outcome || "").trim();
+    if (!ATTEMPT_TYPES.has(type)) {
+      throw new Error(
+        `attempts[${index}].type must be preview, playwright, or upload`,
+      );
+    }
+    if (!command) throw new Error(`attempts[${index}].command is required`);
+    if (!outcome) throw new Error(`attempts[${index}].outcome is required`);
+    return { type, command, outcome };
+  });
+
+  const attemptTypes = new Set(attempts.map((attempt) => attempt.type));
+  if (REQUIRED_ATTEMPT_TYPES.some((type) => !attemptTypes.has(type))) {
+    throw new Error(
+      "attempts must include one preview and one playwright attempt",
+    );
+  }
+  return attempts;
+}
+
 const TOOLS = [
+  {
+    name: "inspect_screenshot",
+    description: "Inspect a screenshot before upload. Returns the image with its filename, MIME type, size, and SHA-256 hash.",
+    inputSchema: {
+      type: "object",
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
   {
     name: "upload_artifact",
     description:
@@ -158,11 +282,32 @@ const TOOLS = [
   {
     name: "report_visual_evidence_unavailable",
     description:
-      "Record why required visual evidence could not be captured or uploaded.",
+      "Record why required visual evidence could not be produced after trying an isolated preview and a Playwright capture.",
     inputSchema: {
       type: "object",
-      properties: { reason: { type: "string" } },
-      required: ["reason"],
+      properties: {
+        reason: { type: "string" },
+        attempts: {
+          type: "array",
+          description:
+            "Concrete preview and Playwright attempts. Add an upload attempt when upload fails.",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["preview", "playwright", "upload"],
+              },
+              command: { type: "string", minLength: 1 },
+              outcome: { type: "string", minLength: 1 },
+            },
+            required: ["type", "command", "outcome"],
+            additionalProperties: false,
+          },
+          minItems: 2,
+        },
+      },
+      required: ["reason", "attempts"],
     },
   },
 ];
@@ -215,16 +360,19 @@ async function handleRequest(message) {
     const name = params && params.name;
     const args = (params && params.arguments) || {};
     let result;
-    if (name === "upload_artifact") result = await uploadArtifact(args);
+    if (name === "inspect_screenshot") result = inspectScreenshot(args);
+    else if (name === "upload_artifact") result = await uploadArtifact(args);
     else if (name === "report_visual_evidence_unavailable")
       result = reportVisualEvidenceUnavailable(args);
     else throw new Error(`Unknown tool: ${name}`);
+    const content = result.content || [{ type: "text", text: JSON.stringify(result) }];
+    const structuredContent = result.structuredContent || result;
     writeMessage({
       jsonrpc: "2.0",
       id,
       result: {
-        content: [{ type: "text", text: JSON.stringify(result) }],
-        structuredContent: result,
+        content,
+        structuredContent,
       },
     });
   } catch (error) {
@@ -310,7 +458,9 @@ if (require.main === module) start();
 
 module.exports = {
   MAX_ARTIFACT_BYTES,
+  MAX_INSPECTABLE_SCREENSHOT_BYTES,
   artifactPaths,
+  inspectScreenshot,
   readManifest,
   reportVisualEvidenceUnavailable,
   resolveArtifactFile,

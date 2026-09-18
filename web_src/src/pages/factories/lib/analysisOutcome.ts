@@ -1,4 +1,4 @@
-import { CONFIDENCE_CHECK_NAME } from "./confidenceScore";
+import { CLARITY_CHECK_KEY, CONFIDENCE_CHECK_KEY, isScoreCheckName } from "./confidenceScore";
 import { INTENT_ARTIFACT_NAME, SPEC_ARTIFACT_NAME } from "./intentDocument";
 import {
   extractArtifactMarkdownBody,
@@ -7,11 +7,12 @@ import {
   toArtifactDataRecord,
 } from "./workOrderArtifact";
 
-const CONFIDENCE_CHECK_KEY = "confidence";
+const SCORE_CHECK_KEYS: readonly string[] = [CLARITY_CHECK_KEY, CONFIDENCE_CHECK_KEY];
 
+/** True when the analysis published Clarity or Confidence. */
 export function hasAnalysisScore(checks?: Array<{ name?: string; key?: string; score?: number | null }>): boolean {
   return (checks ?? []).some((check) => {
-    const named = check.name === CONFIDENCE_CHECK_NAME || check.key === CONFIDENCE_CHECK_KEY;
+    const named = isScoreCheckName(check.name) || (check.key != null && SCORE_CHECK_KEYS.includes(check.key));
     return named && check.score != null;
   });
 }
@@ -49,7 +50,7 @@ type AnalysisScoreCheck = {
 
 function analysisScoreRunId(checks?: AnalysisScoreCheck[]): string | undefined {
   const check = (checks ?? []).find((entry) => {
-    const named = entry.name === CONFIDENCE_CHECK_NAME || entry.key === CONFIDENCE_CHECK_KEY;
+    const named = isScoreCheckName(entry.name) || (entry.key != null && SCORE_CHECK_KEYS.includes(entry.key));
     return named && entry.score != null && Boolean(entry.runId);
   });
   return check?.runId;

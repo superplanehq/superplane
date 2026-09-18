@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
-import { CONFIDENCE_CHECK_NAME } from "../../lib/confidenceScore";
+import { CLARITY_CHECK_NAME, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
@@ -34,6 +34,7 @@ export function WorkOrderSplitRunOverview({
   analysis,
   source,
   showContextSidebar = false,
+  sidebarNote,
 }: {
   title: string;
   description: string;
@@ -54,9 +55,11 @@ export function WorkOrderSplitRunOverview({
   analysis?: IntentAnalysisChat;
   source?: SplitRunSource;
   showContextSidebar?: boolean;
+  sidebarNote?: ReactNode;
 }) {
+  const clarity = checks.find((check) => check.name === CLARITY_CHECK_NAME);
   const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
-  const otherChecks = checks.filter((check) => check.name !== CONFIDENCE_CHECK_NAME);
+  const otherChecks = checks.filter((check) => !isScoreCheckName(check.name));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-work-order-tab">
@@ -66,6 +69,7 @@ export function WorkOrderSplitRunOverview({
         streamKey={orderId ?? orderNumber}
         streamReady={!artifactsLoading}
         artifacts={artifacts}
+        clarity={clarity}
         confidence={confidence}
         isAnalyzing={isAnalyzing}
         files={files}
@@ -102,6 +106,7 @@ export function WorkOrderSplitRunOverview({
               pullRequests={pullRequests}
               pullRequestsLoading={pullRequestsLoading}
               pullRequestsError={pullRequestsError}
+              sidebarNote={sidebarNote}
             />
           ) : undefined
         }

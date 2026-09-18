@@ -23,8 +23,10 @@ func IssueDescription(issue any, event *IssueEventDetail) string {
 	var b strings.Builder
 	writeIssueLink(&b, issueMap, event)
 	writeHighlights(&b, issueMap, event)
+	writeMessage(&b, event)
 	writeStackTrace(&b, event)
 	writeHTTPRequest(&b, event)
+	writeUser(&b, event)
 	writeTags(&b, issueMap, event)
 	writeContexts(&b, event)
 	writeBreadcrumbs(&b, event)
@@ -36,15 +38,29 @@ func IssueDescription(issue any, event *IssueEventDetail) string {
 }
 
 func writeIssueLink(b *strings.Builder, issue map[string]any, event *IssueEventDetail) {
-	link := firstNonEmpty(
-		mapString(issue, "permalink"),
-		mapString(issue, "web_url"),
-		eventString(event, func(e *IssueEventDetail) string { return e.WebURL }),
-	)
+	link := sentryIssueLink(issue, event)
 	if link == "" {
 		return
 	}
-	fmt.Fprintf(b, "%s\n\n", link)
+	fmt.Fprintf(b, "[View in Sentry](%s)\n\n", link)
+}
+
+func sentryIssueLink(issue map[string]any, event *IssueEventDetail) string {
+	if eventURL := eventString(event, func(e *IssueEventDetail) string { return e.WebURL }); eventURL != "" {
+		return eventURL
+	}
+
+	issueLink := firstNonEmpty(mapString(issue, "permalink"), mapString(issue, "web_url"))
+	eventID := eventString(event, func(e *IssueEventDetail) string {
+		return firstNonEmpty(e.EventID, e.ID)
+	})
+	if issueLink == "" {
+		return ""
+	}
+	if eventID == "" {
+		return issueLink
+	}
+	return strings.TrimRight(issueLink, "/") + "/events/" + eventID + "/"
 }
 
 func writeHighlights(b *strings.Builder, issue map[string]any, event *IssueEventDetail) {
@@ -56,9 +72,11 @@ func writeHighlights(b *strings.Builder, issue map[string]any, event *IssueEvent
 		lines = append(lines, fmt.Sprintf("- **%s:** %s", label, value))
 	}
 
-	addHighlight("Title", firstNonEmpty(mapString(issue, "title"), eventString(event, func(e *IssueEventDetail) string { return e.Title })))
+	title := firstNonEmpty(mapString(issue, "title"), eventString(event, func(e *IssueEventDetail) string { return e.Title }))
+	addHighlight("Title", title)
 	addHighlight("Culprit", firstNonEmpty(mapString(issue, "culprit"), eventString(event, func(e *IssueEventDetail) string { return e.Culprit })))
 	addHighlight("Project", projectLabel(issue))
+	addHighlight("Short ID", mapString(issue, "shortId"))
 	addHighlight("Level", firstNonEmpty(mapString(issue, "level"), tagValue(issue, event, "level")))
 	addHighlight("Environment", tagValue(issue, event, "environment"))
 	status := mapString(issue, "status")
@@ -71,9 +89,16 @@ func writeHighlights(b *strings.Builder, issue map[string]any, event *IssueEvent
 	default:
 		addHighlight("Status", substatus)
 	}
+	addHighlight("Priority", mapString(issue, "priority"))
+	addHighlight("Event type", eventString(event, func(e *IssueEventDetail) string { return e.Type }))
+	if message := eventMessage(event); message != "" && message != title {
+		addHighlight("Message", message)
+	}
+	addHighlight("Release", releaseLabel(issue, event))
 	addHighlight("First seen", mapString(issue, "firstSeen"))
 	addHighlight("Last seen", mapString(issue, "lastSeen"))
 	addHighlight("Count", mapString(issue, "count"))
+	addHighlight("Users affected", nonzeroScalar(issue["userCount"]))
 	if assigned := assignedLabel(issue); assigned != "" {
 		addHighlight("Assigned to", assigned)
 	}
@@ -85,6 +110,20 @@ func writeHighlights(b *strings.Builder, issue map[string]any, event *IssueEvent
 	b.WriteString("## Highlights\n\n")
 	b.WriteString(strings.Join(lines, "\n"))
 	b.WriteString("\n\n")
+}
+
+func writeMessage(b *strings.Builder, event *IssueEventDetail) {
+	if event == nil || event.HasStack() {
+		return
+	}
+
+	message := eventMessage(event)
+	if message == "" {
+		return
+	}
+
+	b.WriteString("## Message\n\n")
+	fmt.Fprintf(b, "%s\n\n", message)
 }
 
 func writeStackTrace(b *strings.Builder, event *IssueEventDetail) {
@@ -121,8 +160,10 @@ func writeHTTPRequest(b *strings.Builder, event *IssueEventDetail) {
 	if query == "" {
 		query = formatAny(request["queryString"])
 	}
+	headers := safeRequestHeaders(request["headers"])
+	body := formatAny(request["data"])
 
-	if line == "" && query == "" && request["headers"] == nil {
+	if line == "" && query == "" && len(headers) == 0 && body == "" {
 		return
 	}
 
@@ -133,7 +174,40 @@ func writeHTTPRequest(b *strings.Builder, event *IssueEventDetail) {
 	if query != "" {
 		fmt.Fprintf(b, "\nQuery: %s\n", query)
 	}
+	if len(headers) > 0 {
+		if line != "" || query != "" {
+			b.WriteString("\n")
+		}
+		for _, header := range headers {
+			fmt.Fprintf(b, "- **%s:** %s\n", header.name, header.value)
+		}
+	}
+	if body != "" {
+		b.WriteString("\n```\n")
+		b.WriteString(body)
+		b.WriteString("\n```\n")
+	}
 	b.WriteString("\n")
+}
+
+func writeUser(b *strings.Builder, event *IssueEventDetail) {
+	if event == nil || len(event.User) == 0 {
+		return
+	}
+
+	lines := make([]string, 0, 3)
+	for _, key := range []string{"username", "email", "id"} {
+		if value := mapString(event.User, key); value != "" {
+			lines = append(lines, fmt.Sprintf("- **%s:** %s", key, value))
+		}
+	}
+	if len(lines) == 0 {
+		return
+	}
+
+	b.WriteString("## User\n\n")
+	b.WriteString(strings.Join(lines, "\n"))
+	b.WriteString("\n\n")
 }
 
 func writeTags(b *strings.Builder, issue map[string]any, event *IssueEventDetail) {
@@ -411,6 +485,122 @@ func inApp(frame map[string]any) bool {
 	return false
 }
 
+func eventMessage(event *IssueEventDetail) string {
+	if event == nil {
+		return ""
+	}
+	if message := strings.TrimSpace(event.Message); message != "" {
+		return message
+	}
+	data := entryData(event, "message")
+	return firstNonEmpty(mapString(data, "formatted"), mapString(data, "message"))
+}
+
+func releaseLabel(issue map[string]any, event *IssueEventDetail) string {
+	return firstNonEmpty(
+		eventString(event, func(e *IssueEventDetail) string { return e.Release }),
+		tagValue(issue, event, "release"),
+	)
+}
+
+func nonzeroScalar(value any) string {
+	text := strings.TrimSpace(formatScalar(value))
+	if text == "" || text == "0" {
+		return ""
+	}
+	return text
+}
+
+type requestHeader struct {
+	name  string
+	value string
+}
+
+var sensitiveHeaderParts = []string{
+	"authorization",
+	"cookie",
+	"token",
+	"secret",
+	"password",
+	"api-key",
+	"apikey",
+}
+
+func isSensitiveHeader(name string) bool {
+	lower := strings.ToLower(name)
+	for _, part := range sensitiveHeaderParts {
+		if strings.Contains(lower, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func safeRequestHeaders(raw any) []requestHeader {
+	headers := make([]requestHeader, 0)
+	for _, header := range requestHeaders(raw) {
+		if header.name == "" || header.value == "" || isSensitiveHeader(header.name) {
+			continue
+		}
+		headers = append(headers, header)
+	}
+	return headers
+}
+
+func requestHeaders(raw any) []requestHeader {
+	switch typed := raw.(type) {
+	case []any:
+		headers := make([]requestHeader, 0, len(typed))
+		for _, item := range typed {
+			if header, ok := headerFromValue(item); ok {
+				headers = append(headers, header)
+			}
+		}
+		return headers
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		headers := make([]requestHeader, 0, len(keys))
+		for _, key := range keys {
+			value := strings.TrimSpace(formatScalar(typed[key]))
+			if key == "" || value == "" {
+				continue
+			}
+			headers = append(headers, requestHeader{name: key, value: value})
+		}
+		return headers
+	default:
+		return nil
+	}
+}
+
+func headerFromValue(value any) (requestHeader, bool) {
+	switch typed := value.(type) {
+	case []any:
+		if len(typed) < 2 {
+			return requestHeader{}, false
+		}
+		name := strings.TrimSpace(formatScalar(typed[0]))
+		headerValue := strings.TrimSpace(formatScalar(typed[1]))
+		if name == "" || headerValue == "" {
+			return requestHeader{}, false
+		}
+		return requestHeader{name: name, value: headerValue}, true
+	case map[string]any:
+		name := firstNonEmpty(mapString(typed, "name"), mapString(typed, "key"))
+		headerValue := mapString(typed, "value")
+		if name == "" || headerValue == "" {
+			return requestHeader{}, false
+		}
+		return requestHeader{name: name, value: headerValue}, true
+	default:
+		return requestHeader{}, false
+	}
+}
+
 func eventEntries(event *IssueEventDetail) []IssueEventEntry {
 	if event == nil {
 		return nil
@@ -616,6 +806,10 @@ func formatScalar(value any) string {
 		return typed
 	case json.Number:
 		return typed.String()
+	case int:
+		return fmt.Sprintf("%d", typed)
+	case int64:
+		return fmt.Sprintf("%d", typed)
 	case float64:
 		if typed == float64(int64(typed)) {
 			return fmt.Sprintf("%d", int64(typed))

@@ -13,7 +13,7 @@ export const COLUMN_AUTOMATIONS_COPY = {
   agentTab: "Agent",
   automationTab: "Automation",
   viewLoading: "The automation is loading.",
-  viewEmpty: "This automation has no canvas yet.",
+  viewEmpty: "This automation has no steps yet.",
   viewError: "SuperPlane could not load the automation.",
   viewRetry: "Try again",
   rowsEmpty: "No automations",

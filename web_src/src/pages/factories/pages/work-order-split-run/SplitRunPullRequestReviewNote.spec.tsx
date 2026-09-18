@@ -15,7 +15,6 @@ const PR_NOTE: SplitRunFooterNote = {
 };
 
 const ACTIONS: SplitRunFooterAction[] = [
-  { id: "back-to-draft", kind: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
   { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" },
   { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" },
 ];
@@ -38,23 +37,13 @@ function renderNote(props: Partial<Parameters<typeof SplitRunAttentionNote>[0]> 
 }
 
 describe("SplitRunAttentionNote for a pull request", () => {
-  it("says the pull request is ready and lists the three review steps", () => {
+  it("says the pull request is ready without a numbered guide", () => {
     renderNote();
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
-
-    const steps = within(within(note).getByRole("list", { name: "Next steps" })).getAllByRole("listitem");
-    expect(steps).toHaveLength(3);
-    expect(steps[0]).toHaveTextContent("1");
-    expect(steps[0]).toHaveTextContent("Review the pull request");
-    expect(steps[1]).toHaveTextContent("2");
-    expect(steps[1]).toHaveTextContent("Leave comments");
-    expect(steps[1]).toHaveTextContent("@superplaneagent");
-    expect(steps[2]).toHaveTextContent("3");
-    expect(steps[2]).toHaveTextContent("SuperPlane addresses them");
-
+    expect(within(note).queryByRole("list")).not.toBeInTheDocument();
     expect(note).not.toHaveTextContent("Waiting for user review");
     expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
   });
@@ -72,13 +61,13 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).getAllByRole("link")).toHaveLength(1);
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
   });
 
-  it("keeps the close actions behind a More menu", async () => {
+  it("shows the close actions in an actions-only More menu", async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();
-    renderNote({ onAction });
+    renderNote({ actionsOnly: true, onAction });
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
     const menu = await screen.findByRole("menu");
@@ -86,21 +75,20 @@ describe("SplitRunAttentionNote for a pull request", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["To Backlog", "Reject", "Approve"]);
+    ).toEqual(["Reject", "Approve"]);
 
     await user.click(within(menu).getByRole("menuitem", { name: "Approve" }));
-    expect(onAction).toHaveBeenCalledWith(ACTIONS[2]);
+    expect(onAction).toHaveBeenCalledWith(ACTIONS[1]);
   });
 
   it("hides the More menu when there are no actions", () => {
-    renderNote({ actions: [] });
+    renderNote({ actions: [], actionsOnly: true });
 
     expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-pull-request-cta")).toBeInTheDocument();
   });
 
   it("disables the More menu while an action is in flight", () => {
-    renderNote({ actionBusy: true });
+    renderNote({ actionBusy: true, actionsOnly: true });
 
     expect(screen.getByRole("button", { name: "More actions" })).toBeDisabled();
   });

@@ -601,6 +601,7 @@ CREATE TABLE public.factory_pull_request_runs (
     access_requested_at timestamp with time zone,
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    title text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
@@ -2457,13 +2458,6 @@ CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider ON public.accou
 
 
 --
--- Name: idx_account_linked_accounts_provider_identity; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_account_linked_accounts_provider_identity ON public.account_linked_accounts USING btree (provider, provider_id);
-
-
---
 -- Name: idx_account_linked_accounts_provider_username; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2902,6 +2896,13 @@ CREATE INDEX idx_factory_work_order_artifacts_work_order_created ON public.facto
 --
 
 CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_order_assignees USING btree (user_id);
+
+
+--
+-- Name: idx_factory_work_order_assignees_work_order_created_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_assignees_work_order_created_user ON public.factory_work_order_assignees USING btree (work_order_id, created_at, user_id);
 
 
 --
@@ -4658,7 +4659,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918022728	f
+20260918103038	f
 \.
 
 

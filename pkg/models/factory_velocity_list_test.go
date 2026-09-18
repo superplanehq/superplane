@@ -116,3 +116,69 @@ func Test__ListFactoryVelocityPullRequests__OrdersTiedAssigneesByUserID(t *testi
 	}
 	assert.Equal(t, want, rows[0].AssigneeIDs)
 }
+
+func Test__ListFactoryVelocityPullRequests__KeepsAssigneesOnTheirWorkOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	first := support.CreateUser(t, r, r.Organization.ID)
+	second := support.CreateUser(t, r, r.Organization.ID)
+	third := support.CreateUser(t, r, r.Organization.ID)
+	fourth := support.CreateUser(t, r, r.Organization.ID)
+
+	alpha, err := factory.CreateWorkOrder(db, "Alpha", "", nil, nil, nil)
+	require.NoError(t, err)
+	beta, err := factory.CreateWorkOrder(db, "Beta", "", nil, nil, nil)
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, db.Create(&models.FactoryWorkOrderAssignee{
+		WorkOrderID: alpha.ID,
+		UserID:      first.ID,
+		CreatedAt:   now.Add(-4 * time.Minute),
+	}).Error)
+	require.NoError(t, db.Create(&models.FactoryWorkOrderAssignee{
+		WorkOrderID: beta.ID,
+		UserID:      third.ID,
+		CreatedAt:   now.Add(-3 * time.Minute),
+	}).Error)
+	require.NoError(t, db.Create(&models.FactoryWorkOrderAssignee{
+		WorkOrderID: alpha.ID,
+		UserID:      second.ID,
+		CreatedAt:   now.Add(-2 * time.Minute),
+	}).Error)
+	require.NoError(t, db.Create(&models.FactoryWorkOrderAssignee{
+		WorkOrderID: beta.ID,
+		UserID:      fourth.ID,
+		CreatedAt:   now.Add(-time.Minute),
+	}).Error)
+
+	mergedAt := now.Add(-time.Hour)
+	_, err = alpha.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/21",
+		State:    models.FactoryPullRequestStateMerged,
+		MergedAt: &mergedAt,
+	})
+	require.NoError(t, err)
+	_, err = beta.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/22",
+		State:    models.FactoryPullRequestStateMerged,
+		MergedAt: &mergedAt,
+	})
+	require.NoError(t, err)
+
+	rows, err := models.ListFactoryVelocityPullRequests(db, factory.ID, now.Add(-24*time.Hour), now.Add(time.Hour))
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+
+	byOrder := map[uuid.UUID]models.FactoryVelocityPullRequest{}
+	for _, row := range rows {
+		byOrder[row.WorkOrderID] = row
+	}
+
+	assert.Equal(t, []uuid.UUID{first.ID, second.ID}, byOrder[alpha.ID].AssigneeIDs)
+	assert.Equal(t, []uuid.UUID{third.ID, fourth.ID}, byOrder[beta.ID].AssigneeIDs)
+}

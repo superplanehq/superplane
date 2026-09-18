@@ -12,53 +12,49 @@ describe("refineLayoutPreference", () => {
     vi.restoreAllMocks();
   });
 
-  it("defaults to Clarity open and the plan closed", () => {
-    expect(readStoredRefineLayout()).toEqual({ clarityExpanded: true, planOpen: false });
+  it("defaults to the plan closed", () => {
+    expect(readStoredRefineLayout()).toEqual({ planOpen: false });
 
     const { result } = renderHook(() => useRefineLayoutPreference());
-    expect(result.current.clarityExpanded).toBe(true);
     expect(result.current.planOpen).toBe(false);
   });
 
   it("reads a stored layout on init", () => {
-    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ clarityExpanded: false, planOpen: true }));
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ planOpen: true }));
 
     const { result } = renderHook(() => useRefineLayoutPreference());
-    expect(result.current.clarityExpanded).toBe(false);
     expect(result.current.planOpen).toBe(true);
   });
 
-  it("keeps the other field when only one value is valid", () => {
-    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ clarityExpanded: false, planOpen: "yes" }));
+  it("ignores the legacy summary keys", () => {
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ clarityExpanded: false, planOpen: true }));
+    expect(readStoredRefineLayout()).toEqual({ planOpen: true });
 
-    expect(readStoredRefineLayout()).toEqual({ clarityExpanded: false, planOpen: false });
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ openSummary: "clarity", planOpen: false }));
+    expect(readStoredRefineLayout()).toEqual({ planOpen: false });
   });
 
-  it("falls back when the stored value is not JSON", () => {
+  it("falls back when the stored value is invalid", () => {
+    window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, JSON.stringify({ planOpen: "yes" }));
+    expect(readStoredRefineLayout()).toEqual({ planOpen: false });
+
     window.localStorage.setItem(REFINE_LAYOUT_STORAGE_KEY, "not-json");
-    expect(readStoredRefineLayout()).toEqual({ clarityExpanded: true, planOpen: false });
+    expect(readStoredRefineLayout()).toEqual({ planOpen: false });
   });
 
-  it("toggles and persists each pane", () => {
+  it("persists the plan pane toggle", () => {
     const { result } = renderHook(() => useRefineLayoutPreference());
-
-    act(() => {
-      result.current.toggleClarity();
-    });
-    expect(result.current.clarityExpanded).toBe(false);
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      clarityExpanded: false,
-      planOpen: false,
-    });
 
     act(() => {
       result.current.togglePlan();
     });
     expect(result.current.planOpen).toBe(true);
-    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({
-      clarityExpanded: false,
-      planOpen: true,
+    expect(JSON.parse(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY) || "{}")).toEqual({ planOpen: true });
+
+    act(() => {
+      result.current.togglePlan();
     });
+    expect(result.current.planOpen).toBe(false);
   });
 
   it("keeps state when localStorage.setItem throws", () => {

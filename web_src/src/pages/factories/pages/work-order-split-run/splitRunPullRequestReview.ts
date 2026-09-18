@@ -1,4 +1,4 @@
-import type { SplitRunFooterNote } from "./splitRunFooter";
+import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
 
 /** `https://github.com/<owner>/<repo>/pull/<number>` with an optional tail. */
 const PULL_REQUEST_URL = /^https?:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/(\d+)(?:[/?#]|$)/;
@@ -25,20 +25,14 @@ export function pullRequestReviewNote(note: SplitRunFooterNote): PullRequestRevi
   return { href, number: Number(match[1]) };
 }
 
-export interface PullRequestReviewStep {
-  title: string;
-  text: string;
+export function isPullRequestReviewFooter(footer: SplitRunFooter): boolean {
+  return Boolean(
+    footer.kind === "waiting" && footer.attentionCard && footer.note && pullRequestReviewNote(footer.note),
+  );
 }
 
 export const PULL_REQUEST_REVIEW_COPY = {
   headline: "The pull request is ready for review",
-  steps: [
-    { title: "Review the pull request.", text: "Open it on GitHub and read the changes." },
-    { title: "Leave comments.", text: "Mention @superplaneagent in a comment or review to request changes." },
-    { title: "SuperPlane addresses them.", text: "It updates the pull request and asks you to review again." },
-  ] satisfies PullRequestReviewStep[],
-  stepsLabel: "Next steps",
   closing: "This task closes when the pull request is merged or closed.",
   moreActions: "More actions",
-  more: "More",
 } as const;

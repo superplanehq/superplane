@@ -6,6 +6,7 @@ import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
+import type { StartEmphasis } from "../lib/draftReadiness";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
 /** Actions callable from list and table rows. Cards do not change the owner. */
@@ -114,6 +115,8 @@ interface StartDraftButtonProps {
   canDispatch: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+  /** Filled when the verdict says go. Outline keeps Start available but quiet. */
+  emphasis?: StartEmphasis;
 }
 
 /**
@@ -128,6 +131,7 @@ export function StartDraftButton({
   canDispatch,
   isDispatching,
   onDispatch,
+  emphasis = "filled",
 }: StartDraftButtonProps) {
   if (entry.displayStatus !== "draft") {
     return null;
@@ -140,6 +144,7 @@ export function StartDraftButton({
     <LoadingButton
       type="button"
       size="xs"
+      variant={emphasis === "filled" ? "default" : "outline"}
       disabled={disabled}
       loading={isDispatching}
       loadingText="Starting..."

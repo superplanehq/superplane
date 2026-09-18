@@ -19,7 +19,7 @@ export function useAccountSettingsAuthResults(refreshAccount: () => Promise<void
     }
 
     if (error === "linked_account_in_use") {
-      showErrorToast("Another SuperPlane account already uses this GitHub account.");
+      showErrorToast("Another member in one of your organizations already uses this GitHub account.");
     }
     if (linkedAccount === "linked") {
       showSuccessToast("GitHub account linked.");

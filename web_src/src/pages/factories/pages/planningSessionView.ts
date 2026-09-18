@@ -1,7 +1,9 @@
 import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
+import { planningTaskMessageFromPayload } from "./planningTaskMessage";
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "./work-order-split-run/agentActivity";
+import { composerChipsWorking } from "./work-order-split-run/planChipStatus";
 
 export type PlanningSessionPayload = {
   id?: string;
@@ -17,7 +19,7 @@ export type PlanningSessionPayload = {
   messages?: PlanningSessionMessagePayload[];
   activities?: PlanningSessionActivityPayload[];
   draft?: { title?: string; description?: string; workOrderId?: string } | null;
-  created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
+  created?: Array<{ id?: string; key?: string; title?: string; description?: string; number?: string | number }>;
   survey?: PlanningSessionSurveyPayload | null;
 };
 
@@ -158,7 +160,7 @@ export function createWithAgentViewFromSession(
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
-    messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
+    messages: planningSessionMessagesFromPayload(session),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
     created: createdOrdersFromSession(session),
@@ -172,15 +174,29 @@ export function createWithAgentViewFromSession(
 
 function createdOrdersFromSession(session: PlanningSessionPayload): CreateWithAgentCreatedOrder[] {
   return (session.created ?? [])
-    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
-      Boolean(order.id && order.key && order.title),
+    .filter(
+      (order): order is { id: string; key: string; title: string; description?: string; number?: string | number } =>
+        Boolean(order.id && order.key && order.title),
     )
-    .map((order) => ({
-      id: order.id,
-      key: order.key,
-      title: order.title,
-      description: order.description ?? "",
-    }));
+    .map((order) => {
+      const number = Number(order.number);
+      return {
+        id: order.id,
+        key: order.key,
+        title: order.title,
+        description: order.description ?? "",
+        ...(Number.isFinite(number) && number > 0 ? { number } : {}),
+      };
+    });
+}
+
+function planningSessionMessagesFromPayload(session: PlanningSessionPayload): CreateWithAgentMessage[] {
+  const createdByID = new Map(createdOrdersFromSession(session).map((order) => [order.id, order]));
+  return (session.messages ?? []).flatMap((message) =>
+    message.role === "task"
+      ? planningTaskMessageFromPayload(message, createdByID)
+      : planningSessionMessageFromPayload(message),
+  );
 }
 
 function planningSessionRightPane(
@@ -235,15 +251,21 @@ export function planningSessionIsWorking(
 }
 
 /**
- * Draft cards show thinking states while the agent works, including
- * follow-up work after a score exists. The meter returns when the
- * session waits for the user.
+ * Draft cards follow the refine strip rule so both surfaces leave the
+ * thinking state at the same moment: the agent works while the session
+ * machine starts or runs, and a Backlog analysis counts only until the
+ * first score arrives.
  */
 export function draftCardAgentIsWorking(
-  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+  session: PlanningSessionMachineInput | null | undefined,
   backlogAnalyzing: boolean,
+  score?: number,
 ): boolean {
-  return planningSessionIsWorking(session) || (backlogAnalyzing && !planningSessionIsWaiting(session));
+  return composerChipsWorking({
+    isAnalyzing: backlogAnalyzing,
+    score,
+    machineStatus: session ? createWithAgentMachineStatus(session) : undefined,
+  });
 }
 
 export function isFailedPlanningCanvasRun(run: { result?: string } | null | undefined): boolean {
@@ -271,8 +293,10 @@ function analysisStopStatus(analysisDelivered: boolean): CreateWithAgentView["ma
   return analysisDelivered ? "passed" : "failed";
 }
 
+export type PlanningSessionMachineInput = Pick<PlanningSessionPayload, "state" | "waitState" | "executionId">;
+
 function createWithAgentMachineStatus(
-  session: PlanningSessionPayload,
+  session: PlanningSessionMachineInput,
   analysisDelivered?: boolean,
 ): CreateWithAgentView["machineStatus"] {
   if (session.state === "ended") {

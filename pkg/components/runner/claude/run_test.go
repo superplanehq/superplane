@@ -26,6 +26,7 @@ func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	assert.NotContains(t, tools, "mcp__superplane")
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 	assert.Contains(t, tools, "Edit")
 	assert.Contains(t, tools, "Write")
@@ -46,9 +47,11 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "Bash")
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_spec")
+	assert.Contains(t, tools, "mcp__superplane__propose_clarity")
 	assert.Contains(t, tools, "mcp__superplane__propose_confidence")
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.Contains(t, tools, "mcp__superplane__create_task")
 	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
 	assert.NotContains(t, tools, "Edit")
 	assert.NotContains(t, tools, "Write")
@@ -85,6 +88,7 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	assert.Contains(t, analysis, "propose_spec")
+	assert.Contains(t, analysis, "propose_clarity")
 	assert.Contains(t, analysis, "propose_confidence")
 	assert.NotContains(t, analysis, "propose_plan")
 	assert.Contains(t, analysis, "Follow the task prompt")
@@ -135,9 +139,26 @@ func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
 	})
 
 	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__inspect_screenshot")
 	assert.Contains(t, tools, "mcp__superplane__upload_artifact")
 	assert.Contains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+}
+
+func TestFormatStreamJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-claude-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("a", 2048)
+	output := runClaudeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"text","text":%q},{"type":"thinking","thinking":%q},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":%q}}]}}`, token, token, "git remote set-url origin https://x-access-token:"+token+"@github.com/acme/app.git"),
+		fmt.Sprintf(`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"image","data":%q,"mimeType":"image/png"},{"type":"text","text":%q}]}]}}`, image, token),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "[image: image/png; content omitted from logs]")
 }
 
 func TestClaudePermissionModeUsesDefaultModeForAnalysisSession(t *testing.T) {

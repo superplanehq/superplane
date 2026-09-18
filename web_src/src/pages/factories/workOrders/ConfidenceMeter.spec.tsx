@@ -23,8 +23,17 @@ describe("ConfidenceMeter", () => {
     await user.hover(screen.getByTestId("confidence-meter"));
 
     const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("Clarity score");
+    expect(tip).toHaveTextContent("Confidence score");
     expect(tip).toHaveTextContent("3/5");
+  });
+
+  it("uses the label for the meter name and tooltip", async () => {
+    const user = userEvent.setup();
+    render(<ConfidenceMeter score={2} label="Clarity score" testId="clarity-meter" />);
+
+    expect(screen.getByTestId("clarity-meter")).toHaveAttribute("aria-label", "Clarity score");
+    await user.hover(screen.getByTestId("clarity-meter"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Clarity score");
   });
 });
 

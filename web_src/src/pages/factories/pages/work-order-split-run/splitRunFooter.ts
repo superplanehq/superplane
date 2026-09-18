@@ -1,5 +1,6 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
+import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
@@ -7,15 +8,7 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "s
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind =
-  | "start"
-  | "archive"
-  | "reject"
-  | "refine"
-  | "approve"
-  | "rerun"
-  | "reopen"
-  | "back-to-draft";
+export type SplitRunFooterActionKind = "start" | "archive" | "reject" | "refine" | "approve" | "rerun" | "reopen";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -127,7 +120,6 @@ export interface SplitRunFooterAction {
   kind: SplitRunFooterActionKind;
   label: string;
   emphasis: "primary" | "quiet";
-  icon?: "undo-2" | "sparkles";
   tooltip?: string;
   disabled?: boolean;
 }
@@ -151,8 +143,14 @@ export interface SplitRunFooter {
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
-  /** Draft Start readiness. 0–5. Missing while analysis has not scored yet. */
+  /** Draft Clarity. 0–5. Missing while analysis has not scored yet. */
+  clarityScore?: number;
+  /** Draft Confidence. 0–5. Missing while analysis has not scored yet. */
   confidenceScore?: number;
+}
+
+export function isTaskResultFooter(footer: SplitRunFooter): boolean {
+  return footer.status === "completed" || footer.status === "rejected";
 }
 
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
@@ -161,13 +159,6 @@ const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
-const BACK_TO_DRAFT: SplitRunFooterAction = {
-  id: "back-to-draft",
-  kind: "back-to-draft",
-  label: "To Backlog",
-  emphasis: "quiet",
-  icon: "undo-2",
-};
 
 export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
   headline: "This task needs a decision",
@@ -188,10 +179,7 @@ export const SPLIT_RUN_REJECTED_HEADLINE = "This task did not succeed";
 export const SPLIT_RUN_COMPLETED_HEADLINE_ACTOR = "marked this task as successful";
 export const SPLIT_RUN_REJECTED_HEADLINE_ACTOR = "marked this task as unsuccessful";
 
-export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
-  headline: "This task is ready to start",
-  text: "Review the summary and the plan. Then click Start to send it to the line.",
-};
+export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.pending };
 
 export const SPLIT_RUN_CLASSIC_DRAFT_NOTE: SplitRunFooterNote = {
   headline: "This task is ready to start",
@@ -207,25 +195,16 @@ export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
     ...footer,
     sentence: "This task is a draft.",
     note: { ...SPLIT_RUN_CLASSIC_DRAFT_NOTE },
+    clarityScore: undefined,
     confidenceScore: undefined,
     actions: [ARCHIVE, START],
   };
 }
 
-export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = {
-  headline: "SuperPlane is currently analyzing this task",
-  text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
-};
-
-export const SPLIT_RUN_DRAFT_BLOCKED_NOTE: SplitRunFooterNote = {
-  headline: "This task is not ready to start",
-  text: "The analysis is not clear enough. Add more context in the chat, or archive this task.",
-};
-
-export const SPLIT_RUN_DRAFT_CAUTION_NOTE: SplitRunFooterNote = {
-  headline: "Review the plan before you start",
-  text: "The work is still uncertain. Add more context, or start if you accept the risk.",
-};
+export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.analyzing };
+export const SPLIT_RUN_DRAFT_BLOCKED_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.unclear };
+export const SPLIT_RUN_DRAFT_AGENT_FIT_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.agentFit };
+export const SPLIT_RUN_DRAFT_CAUTION_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.uncertain };
 
 export type SplitRunDecisionTone =
   | "draft"
@@ -237,9 +216,14 @@ export type SplitRunDecisionTone =
   | "done"
   | "rejected";
 
+/** Both draft scores in the shape `draftReadiness` and `startConfirm` read. */
+export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore" | "confidenceScore">) {
+  return { clarity: footer.clarityScore, confidence: footer.confidenceScore };
+}
+
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
   if (footer.kind === "draft") {
-    return draftDecisionTone(footer.confidenceScore);
+    return draftDecisionTone(draftReadiness(splitRunFooterScores(footer)).tone);
   }
   if (footer.kind === "waiting") {
     return "waiting";
@@ -313,7 +297,7 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
- * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
+ * waiting shows Reject and Approve. Failed and stopped show Reject and Rerun.
  * Draft keeps Archive in the header. Build follows the confidence band. Closed
  * failed keeps Reopen. Completed and rejected explain the result only.
  */
@@ -329,39 +313,32 @@ type FooterInput = {
   automationName?: string;
   /** True while the Backlog automation still scores this draft. */
   isAnalyzing?: boolean;
+  clarityScore?: number;
   confidenceScore?: number;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
   const next = input.status ? { ...footer, status: input.status } : footer;
   const withRun = input.run ? { ...next, run: input.run } : next;
-  return input.confidenceScore == null ? withRun : { ...withRun, confidenceScore: input.confidenceScore };
+  const withClarity = input.clarityScore == null ? withRun : { ...withRun, clarityScore: input.clarityScore };
+  return input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
 }
 
-function draftDecisionTone(score?: number): SplitRunDecisionTone {
-  if (score == null) {
-    return "draft";
-  }
-  if (score <= 1) {
-    return "draft-blocked";
-  }
-  if (score <= 3) {
-    return "draft-caution";
-  }
-  return "draft-ready";
+const DRAFT_TONE: Record<DraftReadinessTone, SplitRunDecisionTone> = {
+  analyzing: "draft",
+  pending: "draft",
+  blocked: "draft-blocked",
+  caution: "draft-caution",
+  ready: "draft-ready",
+};
+
+function draftDecisionTone(tone: DraftReadinessTone): SplitRunDecisionTone {
+  return DRAFT_TONE[tone];
 }
 
-function draftReadinessNote(score?: number, isAnalyzing?: boolean): SplitRunFooterNote {
-  if (score == null) {
-    return isAnalyzing ? { ...SPLIT_RUN_ANALYZING_NOTE } : { ...SPLIT_RUN_DRAFT_NOTE };
-  }
-  if (score <= 1) {
-    return { ...SPLIT_RUN_DRAFT_BLOCKED_NOTE };
-  }
-  if (score <= 3) {
-    return { ...SPLIT_RUN_DRAFT_CAUTION_NOTE };
-  }
-  return { ...SPLIT_RUN_DRAFT_NOTE };
+function draftReadinessNote(input: FooterInput): SplitRunFooterNote {
+  const readiness = draftReadiness({ ...splitRunFooterScores(input), isAnalyzing: input.isAnalyzing });
+  return { headline: readiness.headline, text: readiness.text };
 }
 
 function draftDecisionActions(): SplitRunFooterAction[] {
@@ -378,13 +355,12 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 }
 
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
-  const score = input.confidenceScore;
-  const analyzing = Boolean(input.isAnalyzing) && score == null;
+  const hasScore = input.clarityScore != null || input.confidenceScore != null;
+  const analyzing = Boolean(input.isAnalyzing) && !hasScore;
   return withFooterMeta(input, {
     kind: "draft",
     sentence: analyzing ? "SuperPlane is analyzing this task." : "This task is a draft.",
-    note:
-      analyzing || score != null ? draftReadinessNote(score, input.isAnalyzing) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
+    note: analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
     attentionCard: true,
     actions: draftDecisionActions(),
   });
@@ -443,12 +419,12 @@ function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): S
     sentence: "This task needs attention.",
     note: stoppedNote(note, input.actor),
     attentionCard: true,
-    actions: [BACK_TO_DRAFT, REJECT, RERUN],
+    actions: [REJECT, RERUN],
   });
 }
 
 function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
-  const actions = input.kind === "failed" ? [BACK_TO_DRAFT, REJECT, RERUN] : [BACK_TO_DRAFT, REJECT, APPROVE];
+  const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
   return withFooterMeta(input, {
     kind: input.kind,
     sentence: "This task needs attention.",

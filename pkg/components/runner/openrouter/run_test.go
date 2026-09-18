@@ -224,6 +224,44 @@ func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Contains(t, output, `"type":"turn"`)
 }
 
+func TestFormatOpenCodeJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-openrouter-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("c", 2048)
+	imageResult := fmt.Sprintf(`{"content":[{"type":"image","data":%q,"mimeType":"image/png"}]}`, image)
+	output := runOpenCodeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"completed","input":{"command":%q},"output":%q}}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git", imageResult),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "image content omitted from logs")
+}
+
+func TestRunPromptRedactsSecretsFromStderrAndResult(t *testing.T) {
+	token := "github-token-from-openrouter-process"
+	result := runOpenRouterPrompt(t, promptHarness{
+		env: map[string]string{"GITHUB_TOKEN": token},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stderr:   "Bearer " + token,
+			Stdout: []string{
+				fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
+				`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+
+	assert.NotContains(t, result.output, token)
+	assert.NotContains(t, result.stderr, token)
+	assert.Contains(t, result.stderr, "Bearer [REDACTED]")
+	assert.NotContains(t, fmt.Sprint(resultPayload(t, result.resultFile)), token)
+}
+
 func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	output := runOpenCodeFormatterWithActivity(t, []string{
 		`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":"Inspect the repository.","time":{"start":1000,"end":13500}}}`,
@@ -1038,6 +1076,7 @@ type promptHarness struct {
 type openRouterPromptResult struct {
 	exitCode      int
 	output        string
+	stderr        string
 	resultFile    string
 	taskDir       string
 	spawns        [][]string
@@ -1209,6 +1248,7 @@ runPrompt(%q, %q, helpers)
 	return openRouterPromptResult{
 		exitCode:      exitCode,
 		output:        stdout.String(),
+		stderr:        stderr.String(),
 		resultFile:    resultFile,
 		taskDir:       dir,
 		spawns:        recorded.Calls,

@@ -42,6 +42,12 @@ describe("analysisFirstResultDelivered", () => {
     expect(hasAnalysisScore([{ key: "confidence", score: 0 }])).toBe(true);
   });
 
+  it("accepts the Clarity check as an analysis score", () => {
+    expect(hasAnalysisScore([{ key: "clarity", score: 3 }])).toBe(true);
+    expect(hasAnalysisScore([{ name: "Clarity score", score: 3 }])).toBe(true);
+    expect(hasAnalysisScore([{ name: "Risk score", score: 3 }])).toBe(false);
+  });
+
   it("accepts intent.md as the plan", () => {
     expect(hasAnalysisPlan([{ data: { title: "intent.md", body: "A retry loop." } }])).toBe(true);
     expect(analysisPlanBody([{ data: { title: "intent.md", body: "A retry loop." } }])).toBe("A retry loop.");

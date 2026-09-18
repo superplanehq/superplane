@@ -38,13 +38,28 @@ const LOOKS: { look: PlanStripLook; label: string; note: string }[] = [
   },
   {
     look: "chips",
-    label: "Chips",
-    note: "Clarity, Show plan, Archive, and Start chips.",
+    label: "Decision strip, ready",
+    note: "Verdict and the draft actions on top. Clarity, Confidence, and the Plan toggle below. Hover a score to read its summary.",
   },
   {
     look: "chipsOpen",
-    label: "Chips, plan open",
-    note: "Hide plan stays on the chips. Clarity, Archive, and Start stay.",
+    label: "Decision strip, plan open",
+    note: "The Plan toggle shows the open state. No unread dot while the plan is visible.",
+  },
+  {
+    look: "stripBlocked",
+    label: "Decision strip, blocked",
+    note: "Clarity 2 blocks Start with a red verdict and one line of help. Start stays available.",
+  },
+  {
+    look: "stripCaution",
+    label: "Decision strip, caution",
+    note: "Confidence 2 warns about agent fit. Clarity is fine.",
+  },
+  {
+    look: "stripAnalyzing",
+    label: "Decision strip, analyzing",
+    note: "The verdict and both score slots show the matrix while the agent works.",
   },
 ];
 
@@ -71,14 +86,29 @@ export const OneBarOpen: Story = {
   render: () => <PlanStripPreview look="oneBarOpen" />,
 };
 
-export const Chips: Story = {
-  name: "Chips",
+export const StripReady: Story = {
+  name: "Decision strip, ready",
   render: () => <PlanStripPreview look="chips" />,
 };
 
-export const ChipsOpen: Story = {
-  name: "Chips, plan open",
+export const StripPlanOpen: Story = {
+  name: "Decision strip, plan open",
   render: () => <PlanStripPreview look="chipsOpen" />,
+};
+
+export const StripBlocked: Story = {
+  name: "Decision strip, blocked",
+  render: () => <PlanStripPreview look="stripBlocked" />,
+};
+
+export const StripCaution: Story = {
+  name: "Decision strip, caution",
+  render: () => <PlanStripPreview look="stripCaution" />,
+};
+
+export const StripAnalyzing: Story = {
+  name: "Decision strip, analyzing",
+  render: () => <PlanStripPreview look="stripAnalyzing" />,
 };
 
 export const TryOneBar: Story = {
@@ -86,8 +116,8 @@ export const TryOneBar: Story = {
   render: () => <PlanStripPreviewToggle look="oneBar" />,
 };
 
-export const TryChips: Story = {
-  name: "Try chips",
+export const TryStrip: Story = {
+  name: "Try the decision strip",
   render: () => <PlanStripPreviewToggle look="chips" />,
 };
 

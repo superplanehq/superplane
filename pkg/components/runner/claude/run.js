@@ -102,10 +102,13 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 const ANALYSIS_ALLOWED_TOOLS = [
   "mcp__superplane__propose_spec",
+  "mcp__superplane__propose_clarity",
   "mcp__superplane__propose_confidence",
   "mcp__superplane__survey",
+  "mcp__superplane__create_task",
 ];
 const ARTIFACT_ALLOWED_TOOLS = [
+  "mcp__superplane__inspect_screenshot",
   "mcp__superplane__upload_artifact",
   "mcp__superplane__report_visual_evidence_unavailable",
 ];
@@ -290,13 +293,13 @@ function claudeSessionIDFromEvent(event) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model]\n");
     process.exit(2);
   }
   runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
@@ -383,7 +386,7 @@ async function runPrompt(promptFile, model) {
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stderr.pipe(process.stderr);
+  const stderrDone = pipeRedactedStderr(child.stderr);
 
   const rl = readline.createInterface({
     input: child.stdout,
@@ -397,6 +400,7 @@ async function runPrompt(promptFile, model) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
   ]).then(([code]) => code);
 
   // A nonzero exit code always means failure. But `claude -p` exits 0 even
@@ -462,10 +466,16 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function promptSeriesName(promptFile) {
@@ -618,7 +628,8 @@ function createFormatter(promptFile, onSession, activityOverride) {
         parsed = {};
       }
       telemetry.attachToResult(parsed, { name: promptSeriesName(promptFile) });
-      return JSON.stringify(parsed);
+      const activity = loadActivityStreamModule();
+      return JSON.stringify(activity.sanitizeLogValue ? activity.sanitizeLogValue(parsed) : parsed);
     },
     // Claude Code's own "result" event is the authoritative verdict: headless
     // (-p) mode exits 0 even when the turn ended in an error (e.g. the API
@@ -632,11 +643,29 @@ function createFormatter(promptFile, onSession, activityOverride) {
 }
 
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogValue ? activity.sanitizeLogValue(rec) : rec;
+  process.stdout.write(`${JSON.stringify(safe)}\n`);
 }
 
 function println(text = "") {
-  process.stdout.write(`${text}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text);
+  process.stdout.write(`${safe}\n`);
+}
+
+function writeStderr(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stderr.write(safe);
+}
+
+function pipeRedactedStderr(stream) {
+  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  lines.on("line", (line) => {
+    writeStderr(`${line}\n`);
+  });
+  return new Promise((resolve) => lines.on("close", resolve));
 }
 
 function createToolTracker(telemetry) {
@@ -1189,6 +1218,9 @@ function toolResultText(content) {
     return content
       .map((item) => {
         if (item && typeof item === "object") {
+          if (item.type === "image") {
+            return `[image: ${item.mimeType || "unknown type"}; content omitted from logs]`;
+          }
           if (typeof item.text === "string") {
             return item.text;
           }
@@ -1202,6 +1234,8 @@ function toolResultText(content) {
 }
 
 function truncateText(text) {
+  const activity = loadActivityStreamModule();
+  text = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text);
   let lines = text.split(/\r?\n/);
   if (lines.length > TOOL_RESULT_MAX_LINES) {
     const kept = lines.slice(0, TOOL_RESULT_MAX_LINES);

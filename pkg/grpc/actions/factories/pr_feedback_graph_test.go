@@ -20,6 +20,26 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 		assert.Equal(t, prFeedbackFindNodeID, graph.FindNodeID)
 		assert.Equal(t, prFeedbackActivityNodeID, graph.ActivityNodeID)
 		assert.Equal(t, prFeedbackRunnerNodeID, graph.RunnerNodeID)
+		assert.Equal(t, []resolvedPRFeedbackDiscussionFlow{
+			{
+				TriggerNodeID:  prFeedbackCommentTriggerNodeID,
+				FindNodeID:     prFeedbackFindNodeID,
+				ActivityNodeID: prFeedbackActivityNodeID,
+				RunnerNodeID:   prFeedbackRunnerNodeID,
+			},
+			{
+				TriggerNodeID:  prFeedbackReviewTriggerNodeID,
+				FindNodeID:     prFeedbackReviewFindNodeID,
+				ActivityNodeID: prFeedbackReviewActivityNodeID,
+				RunnerNodeID:   prFeedbackReviewRunnerNodeID,
+			},
+			{
+				TriggerNodeID:  prFeedbackReplyTriggerNodeID,
+				FindNodeID:     prFeedbackReplyFindNodeID,
+				ActivityNodeID: prFeedbackReplyActivityNodeID,
+				RunnerNodeID:   prFeedbackReplyRunnerNodeID,
+			},
+		}, graph.discussionFlows(spec))
 		assert.True(t, graph.Healthy(spec))
 	})
 
@@ -60,6 +80,34 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 		assert.False(t, graph.Healthy(spec))
 	})
 
+	t.Run("a canvas without a comment reaction is still healthy", func(t *testing.T) {
+		spec := prFeedbackSpecFromTemplate(t, "acme/app")
+		spec = withoutPRFeedbackAcknowledgeComment(spec)
+
+		graph := resolvePRFeedbackGraph(spec)
+		assert.True(t, graph.Healthy(spec))
+		assert.Equal(t, []resolvedPRFeedbackDiscussionFlow{
+			{
+				TriggerNodeID:  prFeedbackCommentTriggerNodeID,
+				FindNodeID:     prFeedbackFindNodeID,
+				ActivityNodeID: prFeedbackActivityNodeID,
+				RunnerNodeID:   prFeedbackRunnerNodeID,
+			},
+			{
+				TriggerNodeID:  prFeedbackReviewTriggerNodeID,
+				FindNodeID:     prFeedbackReviewFindNodeID,
+				ActivityNodeID: prFeedbackReviewActivityNodeID,
+				RunnerNodeID:   prFeedbackReviewRunnerNodeID,
+			},
+			{
+				TriggerNodeID:  prFeedbackReplyTriggerNodeID,
+				FindNodeID:     prFeedbackReplyFindNodeID,
+				ActivityNodeID: prFeedbackReplyActivityNodeID,
+				RunnerNodeID:   prFeedbackReplyRunnerNodeID,
+			},
+		}, graph.discussionFlows(spec))
+	})
+
 	t.Run("resolves a generated checks graph", func(t *testing.T) {
 		spec := prFeedbackChecksSpecFromTemplate(t, "acme/app")
 
@@ -83,16 +131,36 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		assert.Equal(t, []string{
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
 			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
+			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackAcknowledgeCommentNodeID,
+			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
+			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
+			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
+			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
+			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
+			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
 			assert.NotEqual(t, "noop", node.Component)
 			assert.NotEqual(t, "finish", node.ID)
 		}
+
+		acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
+		assert.Equal(t, "github.addReaction", acknowledge.Component)
+		assert.Equal(t, "{{ root().data.repository.full_name }}", acknowledge.Configuration["repository"])
+		assert.Equal(t, "{{ root().data.comment.id }}", acknowledge.Configuration["commentId"])
+		assert.Equal(t, "eyes", acknowledge.Configuration["content"])
+		assert.Equal(t, "issueComment", acknowledge.Configuration["target"])
+		assert.Equal(t, yaml.Position{X: 360, Y: -40}, acknowledge.Position)
+		var reactionIDs []string
+		for _, node := range canvas.Spec.Nodes {
+			if node.Component == "github.addReaction" {
+				reactionIDs = append(reactionIDs, node.ID)
+			}
+		}
+		assert.Equal(t, []string{prFeedbackAcknowledgeCommentNodeID}, reactionIDs)
 
 		reply := findSpecNode(t, canvas, prFeedbackReplyTriggerNodeID)
 		assert.Equal(t, false, reply.Configuration["includeReviewSubmissions"])
@@ -102,7 +170,18 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
 		assert.Equal(t, `{{ $["Find Pull Request"].data.pullRequest.id }}`, activity.Configuration["pullRequestId"])
-		assert.Equal(t, prFeedbackActivityDescriptionExpression(), activity.Configuration["description"])
+		assert.Equal(t, prFeedbackCommentActivityTitleExpression(), activity.Configuration["title"])
+		assert.Equal(t, prFeedbackCommentActivityDescriptionExpression(), activity.Configuration["description"])
+
+		reviewActivity := findSpecNode(t, canvas, prFeedbackReviewActivityNodeID)
+		assert.Equal(t, `{{ $["Find Pull Request For Review"].data.pullRequest.id }}`, reviewActivity.Configuration["pullRequestId"])
+		assert.Equal(t, prFeedbackReviewActivityTitleExpression(), reviewActivity.Configuration["title"])
+		assert.Equal(t, prFeedbackReviewActivityDescriptionExpression(), reviewActivity.Configuration["description"])
+
+		replyActivity := findSpecNode(t, canvas, prFeedbackReplyActivityNodeID)
+		assert.Equal(t, `{{ $["Find Pull Request For Review Reply"].data.pullRequest.id }}`, replyActivity.Configuration["pullRequestId"])
+		assert.Equal(t, prFeedbackReplyActivityTitleExpression(), replyActivity.Configuration["title"])
+		assert.Equal(t, prFeedbackCommentActivityDescriptionExpression(), replyActivity.Configuration["description"])
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
@@ -255,12 +334,22 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
 		assert.Equal(t, "concurrent", activity.Configuration["access"])
 		assert.Equal(t, prFeedbackPRHeadSHAExpression(), activity.Configuration["revision"])
+		assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), activity.Configuration["title"])
+		assert.Nil(t, activity.Configuration["description"])
+
+		passed := findSpecNode(t, canvas, prFeedbackMarkPassedNodeID)
+		assert.Equal(t, prFeedbackChecksPassedTitleExpression(), passed.Configuration["title"])
+		assert.Equal(t, prFeedbackChecksPassedDescriptionExpression(), passed.Configuration["description"])
+
+		repair := findSpecNode(t, canvas, prFeedbackStartRepairNodeID)
+		assert.Equal(t, prFeedbackChecksRepairTitleExpression(), repair.Configuration["title"])
+		assert.Equal(t, prFeedbackChecksRepairDescriptionExpression(), repair.Configuration["description"])
 
 		wait := findSpecNode(t, canvas, prFeedbackWaitChecksNodeID)
 		assert.Equal(t, []any{"lint", "unit"}, wait.Configuration["checkNames"])
 
 		pause := findSpecNode(t, canvas, prFeedbackPauseFixesNodeID)
-		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["description"])
+		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["title"])
 
 		note := findSpecNode(t, canvas, prFeedbackAnnounceLimitNodeID)
 		assert.Equal(t, prFeedbackSetStatusNoteComponent, note.Component)
@@ -328,6 +417,26 @@ func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
 	}
 	require.Failf(t, "step not found", "runner has no step %q", name)
 	return ""
+}
+
+func withoutPRFeedbackAcknowledgeComment(spec models.LiveCanvasSpec) models.LiveCanvasSpec {
+	nodes := make([]models.Node, 0, len(spec.Nodes))
+	for _, node := range spec.Nodes {
+		if node.ID == prFeedbackAcknowledgeCommentNodeID {
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+	edges := make([]models.Edge, 0, len(spec.Edges))
+	for _, edge := range spec.Edges {
+		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+			continue
+		}
+		edges = append(edges, edge)
+	}
+	spec.Nodes = nodes
+	spec.Edges = edges
+	return spec
 }
 
 func prFeedbackSpecFromTemplate(t *testing.T, repository string) models.LiveCanvasSpec {

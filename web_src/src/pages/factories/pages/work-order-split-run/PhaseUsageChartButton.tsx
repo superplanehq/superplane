@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AgentRunUsageChart } from "@/ui/agentRun/AgentRunUsageChart";
 import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
@@ -14,14 +14,12 @@ export const LOADING_USAGE_LABEL = "Loading usage...";
 
 export function PhaseUsageSpendButton({
   phaseId,
-  phaseName,
   spendLabel,
   live = false,
   className,
   onOpenChange,
 }: {
   phaseId: string;
-  phaseName: string;
   spendLabel: string;
   live?: boolean;
   className?: string;
@@ -58,10 +56,7 @@ export function PhaseUsageSpendButton({
           className="max-h-[min(90vh,52rem)] w-[min(72rem,calc(100vw-2rem))] max-w-[min(72rem,calc(100vw-2rem))] min-w-0 overflow-x-hidden overflow-y-auto [grid-template-columns:minmax(0,1fr)]"
           onClick={(event) => event.stopPropagation()}
         >
-          <DialogHeader>
-            <DialogTitle>{phaseName} usage</DialogTitle>
-            <DialogDescription>Token usage and tool calls for each agent in this automation.</DialogDescription>
-          </DialogHeader>
+          <DialogTitle className="sr-only">Usage</DialogTitle>
           <PhaseUsageDialogBody agents={agents} usageLoading={usageLoading} live={live} />
         </DialogContent>
       </Dialog>

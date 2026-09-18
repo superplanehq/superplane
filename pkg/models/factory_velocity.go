@@ -76,7 +76,6 @@ func ListFactoryVelocityPullRequests(
 		factory.EventTypeOrderStatusUpdated,
 		FactoryWorkOrderStateClosed,
 		factoryID,
-		factoryID,
 		from, to,
 		from, to,
 	).Scan(&scanned).Error
@@ -119,15 +118,6 @@ latest_close AS (
 		AND e.type = ?
 		AND e.data->>'toState' = ?
 	ORDER BY e.work_order_id, e.created_at DESC
-),
-assignees AS (
-	SELECT
-		a.work_order_id,
-		array_agg(a.user_id ORDER BY a.created_at ASC, a.user_id ASC) AS ids
-	FROM factory_work_order_assignees a
-	INNER JOIN factory_work_orders wo ON wo.id = a.work_order_id
-	WHERE wo.factory_id = ?
-	GROUP BY a.work_order_id
 )
 SELECT
 	p.work_order_id,
@@ -151,7 +141,11 @@ INNER JOIN factory_work_orders wo ON wo.id = p.work_order_id
 LEFT JOIN intake_source ins ON ins.work_order_id = wo.id
 LEFT JOIN first_execution fe ON fe.work_order_id = wo.id
 LEFT JOIN latest_close lc ON lc.work_order_id = wo.id
-LEFT JOIN assignees asn ON asn.work_order_id = wo.id
+LEFT JOIN LATERAL (
+	SELECT array_agg(a.user_id ORDER BY a.created_at ASC, a.user_id ASC) AS ids
+	FROM factory_work_order_assignees a
+	WHERE a.work_order_id = p.work_order_id
+) asn ON true
 WHERE p.factory_id = ?
 	AND (
 		(p.merged_at IS NOT NULL AND p.merged_at >= ? AND p.merged_at < ?)

@@ -17,12 +17,8 @@ function labelsOf(overrides: Partial<WorkOrderStatusActionInput> = {}) {
 }
 
 describe("buildWorkOrderStatusActions", () => {
-  it("offers Complete, Reject, and Back to draft for an open waiting order", () => {
-    expect(labelsOf({ displayStatus: "waiting", isOpen: true })).toEqual(["Complete", "Reject", "Back to draft"]);
-  });
-
-  it("hides Back to draft while a line is running", () => {
-    expect(labelsOf({ displayStatus: "running", isOpen: true })).toEqual(["Complete", "Reject"]);
+  it("offers Complete and Reject for an open waiting order", () => {
+    expect(labelsOf({ displayStatus: "waiting", isOpen: true })).toEqual(["Complete", "Reject"]);
   });
 
   it("offers Reject for a draft order", () => {

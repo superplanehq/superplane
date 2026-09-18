@@ -5,12 +5,14 @@ import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
-import { workOrderCardSource, type WorkOrderCardSource } from "../lib/workOrderCardSource";
+import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
-import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
+import { draftReadiness, startEmphasisForTone } from "../lib/draftReadiness";
+import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
+import { CardScoreBadges } from "./ReadinessMark";
+import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
@@ -21,6 +23,7 @@ const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
 const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
+const EMPTY_CHECKS_PASSED_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
 const EMPTY_PULL_REQUESTS: FactoriesFactoryPullRequest[] = [];
 
@@ -44,6 +47,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   waitingOnChecksOrderIds?: ReadonlySet<string>;
   /** Tasks whose latest check wait finished with passing checks. */
   checksPassedOrderIds?: ReadonlySet<string>;
+  /** Completed check-wait title, keyed by task id. */
+  checksPassedLabels?: ReadonlyMap<string, string>;
   /** Tasks whose check handler stopped at the attempt limit. */
   fixesPausedOrderIds?: ReadonlySet<string>;
   /** Pull requests attached to tasks on this board. */
@@ -59,6 +64,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
+  /** Clarity score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  clarityScore?: number;
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
   /**
@@ -78,9 +85,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * The canonical task card.
  *
  * Every board uses this complete component. Status is an icon next
- * to the title. Optional pills sit on a middle row: a source icon,
- * an attached pull request, then attention such as Waiting on
- * status checks. The
+ * to the title, with the intake source icon on the right. Optional
+ * pills sit on a middle row: an attached pull request, then
+ * attention such as Waiting on status checks. The
  * footer shows when the task was created on the left, and the owner
  * given name plus avatar on the right (except on drafts). Drafts show
  * a Start button. Reviewed drafts also show a score to the left of
@@ -98,11 +105,13 @@ export function WorkOrderCard({
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
   checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
+  checksPassedLabels = EMPTY_CHECKS_PASSED_LABELS,
   fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   pullRequests = EMPTY_PULL_REQUESTS,
   onDispatch,
   href,
   onOpen,
+  clarityScore,
   confidenceScore,
   isAnalyzing = false,
   className,
@@ -139,18 +148,19 @@ export function WorkOrderCard({
       <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 
       <div className="relative z-10 pointer-events-none">
-        <div className="flex min-w-0 items-center gap-2">
-          <WorkOrderStatusIcon status={entry.displayStatus} title={meta.label} aria-label={meta.label} />
-          <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
-            {entry.title}
-          </h3>
-        </div>
+        <WorkOrderCardTitleRow
+          entryId={entry.id}
+          displayStatus={entry.displayStatus}
+          statusLabel={meta.label}
+          title={entry.title}
+          source={source}
+        />
 
         <WorkOrderCardStatusRow
           entryId={entry.id}
-          source={source}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
+          checksPassedLabel={checksPassedLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
         />
@@ -165,11 +175,34 @@ export function WorkOrderCard({
           createdAt={createdAt}
           isDraft={isDraft}
           showStart={showStart}
+          clarityScore={clarityScore}
           confidenceScore={confidenceScore}
           isAnalyzing={agentWorking}
         />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardTitleRow({
+  entryId,
+  displayStatus,
+  statusLabel,
+  title,
+  source,
+}: {
+  entryId: string;
+  displayStatus: WorkOrderListEntry["displayStatus"];
+  statusLabel: string;
+  title: string;
+  source: ReturnType<typeof workOrderCardSource>;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <WorkOrderStatusIcon status={displayStatus} title={statusLabel} aria-label={statusLabel} />
+      <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">{title}</h3>
+      {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
+    </div>
   );
 }
 
@@ -192,43 +225,52 @@ function WorkOrderCardOpenControl({
 
 function WorkOrderCardStatusRow({
   entryId,
-  source,
   reasons,
   feedbackLabel,
+  checksPassedLabel,
   cardPullRequest,
   hasAgentQuestion,
 }: {
   entryId: string;
-  source: WorkOrderCardSource | null;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
+  checksPassedLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
 }) {
-  if (!source && reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
-      {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
       {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
         <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
       ) : null}
-      {reasons.map((reason) =>
-        reason === "checksPassed" ? (
-          <WorkOrderChecksPassedMark key={reason} />
-        ) : (
-          <WorkOrderAttentionChip
-            key={reason}
-            reason={reason}
-            label={reason === "feedback" ? feedbackLabel : undefined}
-          />
-        ),
-      )}
+      {reasons.map((reason) => (
+        <WorkOrderAttentionChip
+          key={reason}
+          reason={reason}
+          label={attentionChipLabel(reason, feedbackLabel, checksPassedLabel)}
+        />
+      ))}
     </div>
   );
+}
+
+function attentionChipLabel(
+  reason: WorkOrderAttentionReason,
+  feedbackLabel?: string,
+  checksPassedLabel?: string,
+): string | undefined {
+  if (reason === "feedback") {
+    return feedbackLabel;
+  }
+  if (reason === "checksPassed") {
+    return checksPassedLabel;
+  }
+  return undefined;
 }
 
 function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
@@ -255,6 +297,7 @@ function WorkOrderCardMetaRow({
   createdAt,
   isDraft,
   showStart,
+  clarityScore,
   confidenceScore,
   isAnalyzing,
 }: {
@@ -268,11 +311,13 @@ function WorkOrderCardMetaRow({
   createdAt: Date | null;
   isDraft: boolean;
   showStart: boolean;
+  clarityScore?: number;
   confidenceScore?: number;
   isAnalyzing: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
-  const showActions = confidenceScore != null || isAnalyzing || showStart;
+  const hasScore = clarityScore != null || confidenceScore != null;
+  const showActions = hasScore || isAnalyzing || showStart;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -286,7 +331,12 @@ function WorkOrderCardMetaRow({
         {isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
         {showActions ? (
           <>
-            <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
+            <CardScores
+              entryId={entry.id}
+              clarity={clarityScore}
+              confidence={confidenceScore}
+              isAnalyzing={isAnalyzing}
+            />
             {showStart ? (
               <StartDraftButton
                 entry={entry}
@@ -295,6 +345,9 @@ function WorkOrderCardMetaRow({
                 canDispatch={canDispatch}
                 isDispatching={isDispatching}
                 onDispatch={onDispatch}
+                emphasis={startEmphasisForTone(
+                  draftReadiness({ clarity: clarityScore, confidence: confidenceScore }).tone,
+                )}
               />
             ) : null}
           </>
@@ -312,9 +365,21 @@ function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQu
 
 /**
  * Thinking states while the agent still works, even after a score exists.
- * The meter returns when the agent waits for the user.
+ * When the agent waits for the user the card shows one verdict word with a
+ * tone dot. The two scores stay in the tooltip. Intake-only drafts have
+ * Confidence alone; the verdict uses the scores that exist.
  */
-function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
+function CardScores({
+  entryId,
+  clarity,
+  confidence,
+  isAnalyzing,
+}: {
+  entryId: string;
+  clarity?: number;
+  confidence?: number;
+  isAnalyzing: boolean;
+}) {
   if (isAnalyzing) {
     return (
       <ConfidenceAnalyzingIndicator
@@ -325,8 +390,8 @@ function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; scor
       />
     );
   }
-  if (score != null) {
-    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
+  if (clarity == null && confidence == null) {
+    return null;
   }
-  return null;
+  return <CardScoreBadges clarity={clarity} confidence={confidence} testId={`work-order-card-score-${entryId}`} />;
 }

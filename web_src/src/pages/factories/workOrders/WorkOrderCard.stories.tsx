@@ -89,13 +89,15 @@ export const ReviewPullRequest: Story = {
 };
 
 /**
- * Review pill plus the compact checks-passed mark. The mark keeps the
- * meaning through its color, icon, tooltip, and accessible name.
+ * Review pill plus the completed check-wait title.
  */
 export const ChecksPassedWithReview: Story = {
   name: "Review #2323 + checks passed",
   args: {
     checksPassedOrderIds: new Set(["wo-waiting"]),
+    checksPassedLabels: new Map([
+      ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+    ]),
   },
 };
 
@@ -172,6 +174,9 @@ export const ChecksPassedLongTitle: Story = {
       factory,
     ),
     checksPassedOrderIds: new Set(["wo-waiting"]),
+    checksPassedLabels: new Map([
+      ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+    ]),
   },
 };
 
@@ -223,6 +228,90 @@ export const DraftAnalyzingWithScore: Story = {
     ),
     pullRequests: [],
     isAnalyzing: true,
+    clarityScore: 4,
+    confidenceScore: 3,
+  },
+};
+
+/** Refine finished with a mid Confidence: the card says Review and Start is an outline. */
+export const DraftScoredPair: Story = {
+  name: "Draft with Clarity and Confidence (Review)",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-pair",
+        number: "3",
+        title: "Retry webhook delivery after provider timeouts",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 3,
+  },
+};
+
+/** Both scores high: the card says Ready and Start is filled. */
+export const DraftScoredReady: Story = {
+  name: "Draft ready to start",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-ready",
+        number: "5",
+        title: "Show the model name on the task card",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 4,
+  },
+};
+
+/** Low Clarity: the card says Not ready. Start stays available as an outline. */
+export const DraftScoredBlocked: Story = {
+  name: "Draft not ready",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-blocked",
+        number: "6",
+        title: "Make it better",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 2,
+    confidenceScore: 4,
+  },
+};
+
+/** Intake only: the verdict uses Confidence alone until a refine session scores Clarity. */
+export const DraftScoredIntakeOnly: Story = {
+  name: "Draft with Confidence only",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-intake",
+        number: "4",
+        title: "Reconcile settled ledger entries",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
     confidenceScore: 4,
   },
 };
@@ -244,8 +333,8 @@ export const OpenOwned: Story = {
 };
 
 /**
- * GitHub origin on the card. The source icon is first in the pill
- * row and opens the issue in a new tab.
+ * GitHub origin on the card. The source icon sits in the title row
+ * and opens the issue in a new tab.
  */
 export const GitHubOrigin: Story = {
   name: "GitHub origin",
@@ -263,8 +352,8 @@ export const GitHubOrigin: Story = {
 };
 
 /**
- * Manual origin on the card. The product logo sits first in the pill
- * row and is not a link.
+ * Manual origin on the card. The product logo sits in the title row
+ * and is not a link.
  */
 export const ManualOrigin: Story = {
   name: "Manual origin",

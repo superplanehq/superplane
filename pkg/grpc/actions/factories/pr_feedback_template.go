@@ -8,12 +8,19 @@ import (
 )
 
 const (
-	prFeedbackCommentTriggerNodeID = "on-pr-comment"
-	prFeedbackReviewTriggerNodeID  = "on-pr-review"
-	prFeedbackReplyTriggerNodeID   = "on-pr-review-reply"
-	prFeedbackFindNodeID           = "find-pull-request"
-	prFeedbackActivityNodeID       = "add-pr-activity"
-	prFeedbackRunnerNodeID         = "address-pr-feedback"
+	prFeedbackCommentTriggerNodeID     = "on-pr-comment"
+	prFeedbackAcknowledgeCommentNodeID = "acknowledge-pr-comment"
+	prFeedbackReviewTriggerNodeID      = "on-pr-review"
+	prFeedbackReplyTriggerNodeID       = "on-pr-review-reply"
+	prFeedbackFindNodeID               = "find-pull-request"
+	prFeedbackActivityNodeID           = "add-pr-activity"
+	prFeedbackRunnerNodeID             = "address-pr-feedback"
+	prFeedbackReviewFindNodeID         = "find-pull-request-for-review"
+	prFeedbackReviewActivityNodeID     = "add-pr-review-activity"
+	prFeedbackReviewRunnerNodeID       = "address-pr-review-feedback"
+	prFeedbackReplyFindNodeID          = "find-pull-request-for-review-reply"
+	prFeedbackReplyActivityNodeID      = "add-pr-review-reply-activity"
+	prFeedbackReplyRunnerNodeID        = "address-pr-review-reply-feedback"
 
 	prFeedbackFindComponent     = "findPullRequest"
 	prFeedbackActivityComponent = "addPullRequestActivity"
@@ -71,6 +78,86 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 	mention := strings.TrimSpace(request.Mention)
 
 	includeReviewSubmissions := false
+	commentFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:            prFeedbackCommentTriggerNodeID,
+			Name:          "On PR Comment",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     "github.onPRComment",
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Integration:   request.Binding.integrationRef(),
+		},
+		FindID:       prFeedbackFindNodeID,
+		FindName:     "Find Pull Request",
+		ActivityID:   prFeedbackActivityNodeID,
+		ActivityName: "Add Comment Activity",
+		RunnerID:     prFeedbackRunnerNodeID,
+		Title:        prFeedbackCommentActivityTitleExpression(),
+		Description:  prFeedbackCommentActivityDescriptionExpression(),
+		Y:            80,
+	}, request)
+	commentFlow.nodes = append(commentFlow.nodes, yaml.Node{
+		ID:        prFeedbackAcknowledgeCommentNodeID,
+		Name:      "Acknowledge PR Comment",
+		Type:      yaml.NodeTypeAction,
+		Component: "github.addReaction",
+		Configuration: map[string]any{
+			"repository": "{{ root().data.repository.full_name }}",
+			"commentId":  "{{ root().data.comment.id }}",
+			"content":    "eyes",
+			"target":     "issueComment",
+		},
+		Integration: request.Binding.integrationRef(),
+		Position:    yaml.Position{X: 360, Y: -40},
+	})
+	commentFlow.edges = append(commentFlow.edges, yaml.Edge{
+		Channel:  "default",
+		SourceID: prFeedbackCommentTriggerNodeID,
+		TargetID: prFeedbackAcknowledgeCommentNodeID,
+	})
+	reviewFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:            prFeedbackReviewTriggerNodeID,
+			Name:          "On PR Review",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     "github.onPRReview",
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Integration:   request.Binding.integrationRef(),
+		},
+		FindID:       prFeedbackReviewFindNodeID,
+		FindName:     "Find Pull Request For Review",
+		ActivityID:   prFeedbackReviewActivityNodeID,
+		ActivityName: "Add Review Activity",
+		RunnerID:     prFeedbackReviewRunnerNodeID,
+		Title:        prFeedbackReviewActivityTitleExpression(),
+		Description:  prFeedbackReviewActivityDescriptionExpression(),
+		Y:            260,
+	}, request)
+	replyFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:        prFeedbackReplyTriggerNodeID,
+			Name:      "On PR Review Reply",
+			Type:      yaml.NodeTypeTrigger,
+			Component: "github.onPRReviewComment",
+			Configuration: prFeedbackReplyTriggerConfiguration(
+				request.Repository,
+				mention,
+				request.IgnoreBots,
+				request.AllowedBots,
+				includeReviewSubmissions,
+			),
+			Integration: request.Binding.integrationRef(),
+		},
+		FindID:       prFeedbackReplyFindNodeID,
+		FindName:     "Find Pull Request For Review Reply",
+		ActivityID:   prFeedbackReplyActivityNodeID,
+		ActivityName: "Add Review Reply Activity",
+		RunnerID:     prFeedbackReplyRunnerNodeID,
+		Title:        prFeedbackReplyActivityTitleExpression(),
+		Description:  prFeedbackCommentActivityDescriptionExpression(),
+		Y:            440,
+	}, request)
+
 	return &yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
@@ -79,75 +166,76 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Description: prFeedbackDefaultDescription,
 		},
 		Spec: &yaml.CanvasSpec{
-			Edges: []yaml.Edge{
-				{Channel: "default", SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "default", SourceID: prFeedbackReviewTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "default", SourceID: prFeedbackReplyTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "found", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID},
-				{Channel: "default", SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackRunnerNodeID},
+			Edges: append(append(commentFlow.edges, reviewFlow.edges...), replyFlow.edges...),
+			Nodes: append(append(commentFlow.nodes, reviewFlow.nodes...), replyFlow.nodes...),
+		},
+	}
+}
+
+type prFeedbackDiscussionFlowRequest struct {
+	Trigger      yaml.Node
+	FindID       string
+	FindName     string
+	ActivityID   string
+	ActivityName string
+	RunnerID     string
+	Title        string
+	Description  string
+	Y            int
+}
+
+type prFeedbackDiscussionFlowSpec struct {
+	nodes []yaml.Node
+	edges []yaml.Edge
+}
+
+func prFeedbackDiscussionFlowNodes(
+	flow prFeedbackDiscussionFlowRequest,
+	request prFeedbackBuildRequest,
+) prFeedbackDiscussionFlowSpec {
+	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
+	return prFeedbackDiscussionFlowSpec{
+		nodes: []yaml.Node{
+			flow.Trigger,
+			{
+				ID:        flow.FindID,
+				Name:      flow.FindName,
+				Type:      yaml.NodeTypeAction,
+				Component: prFeedbackFindComponent,
+				Configuration: map[string]any{
+					"provider":   "github",
+					"repository": "{{ root().data.repository.full_name }}",
+					"number":     prFeedbackPRNumberExpression(),
+					"url":        prFeedbackPRURLExpression(),
+				},
+				Position: yaml.Position{X: 360, Y: flow.Y},
 			},
-			Nodes: []yaml.Node{
-				{
-					ID:            prFeedbackCommentTriggerNodeID,
-					Name:          "On PR Comment",
-					Type:          yaml.NodeTypeTrigger,
-					Component:     "github.onPRComment",
-					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 80, Y: 80},
+			{
+				ID:        flow.ActivityID,
+				Name:      flow.ActivityName,
+				Type:      yaml.NodeTypeAction,
+				Component: prFeedbackActivityComponent,
+				Configuration: map[string]any{
+					"pullRequestId": `{{ $["` + flow.FindName + `"].data.pullRequest.id }}`,
+					"title":         flow.Title,
+					"description":   flow.Description,
+					"access":        "exclusive",
 				},
-				{
-					ID:            prFeedbackReviewTriggerNodeID,
-					Name:          "On PR Review",
-					Type:          yaml.NodeTypeTrigger,
-					Component:     "github.onPRReview",
-					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 80, Y: 260},
-				},
-				{
-					ID:            prFeedbackReplyTriggerNodeID,
-					Name:          "On PR Review Reply",
-					Type:          yaml.NodeTypeTrigger,
-					Component:     "github.onPRReviewComment",
-					Configuration: prFeedbackReplyTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, includeReviewSubmissions),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 80, Y: 440},
-				},
-				{
-					ID:        prFeedbackFindNodeID,
-					Name:      "Find Pull Request",
-					Type:      yaml.NodeTypeAction,
-					Component: prFeedbackFindComponent,
-					Configuration: map[string]any{
-						"provider":   "github",
-						"repository": "{{ root().data.repository.full_name }}",
-						"number":     prFeedbackPRNumberExpression(),
-						"url":        prFeedbackPRURLExpression(),
-					},
-					Position: yaml.Position{X: 360, Y: 260},
-				},
-				{
-					ID:        prFeedbackActivityNodeID,
-					Name:      "Add Pull Request Activity",
-					Type:      yaml.NodeTypeAction,
-					Component: prFeedbackActivityComponent,
-					Configuration: map[string]any{
-						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
-						"description":   prFeedbackActivityDescriptionExpression(),
-						"access":        "exclusive",
-					},
-					Position: yaml.Position{X: 500, Y: 260},
-				},
-				{
-					ID:            prFeedbackRunnerNodeID,
-					Name:          prFeedbackRunnerNodeName,
-					Type:          yaml.NodeTypeAction,
-					Component:     request.Agent.component(),
-					Configuration: prFeedbackRunnerConfiguration(request),
-					Position:      yaml.Position{X: 640, Y: 260},
-				},
+				Position: yaml.Position{X: 640, Y: flow.Y},
 			},
+			{
+				ID:            flow.RunnerID,
+				Name:          prFeedbackRunnerNodeName,
+				Type:          yaml.NodeTypeAction,
+				Component:     request.Agent.component(),
+				Configuration: prFeedbackRunnerConfiguration(request),
+				Position:      yaml.Position{X: 920, Y: flow.Y},
+			},
+		},
+		edges: []yaml.Edge{
+			{Channel: "default", SourceID: flow.Trigger.ID, TargetID: flow.FindID},
+			{Channel: "found", SourceID: flow.FindID, TargetID: flow.ActivityID},
+			{Channel: "default", SourceID: flow.ActivityID, TargetID: flow.RunnerID},
 		},
 	}
 }
@@ -173,8 +261,46 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 	return configuration
 }
 
-func prFeedbackActivityDescriptionExpression() string {
-	return "{{ root().data.comment?.body ?? root().data.review?.body ?? join(map(root().data.review_comments ?? [], .body), \"\\n\\n\") ?? \"\" }}"
+func prFeedbackCommentActivityDescriptionExpression() string {
+	return `{{ root().data.comment.body }}`
+}
+
+func prFeedbackReviewActivityDescriptionExpression() string {
+	reviewBody := `(root().data.review?.body ?? "")`
+	reviewComments := `root().data.review_comments ?? []`
+	reviewCommentSections := `join(map(` + reviewComments + `, "· [" + .path + "](" + .html_url + ")\n" + .body), "\n\n")`
+	return `{{ ` + reviewBody +
+		` + (` + reviewBody + ` != "" && len(` + reviewComments + `) > 0 ? "\n\n" : "")` +
+		` + ` + reviewCommentSections + ` }}`
+}
+
+func prFeedbackCommentActivityTitleExpression() string {
+	return `{{ "[@" + root().data.comment.user.login + "](" + root().data.comment.user.html_url` +
+		` + ") left a [comment](" + root().data.comment.html_url + ")" }}`
+}
+
+func prFeedbackReplyActivityTitleExpression() string {
+	return `{{ "[@" + root().data.comment.user.login + "](" + root().data.comment.user.html_url` +
+		` + ") left a [comment](" + root().data.comment.html_url + ")"` +
+		" + \" in `\" + root().data.comment.path + \"`\" }}"
+}
+
+func prFeedbackReviewActivityTitleExpression() string {
+	return `{{ "[@" + root().data.review.user.login + "](" + root().data.review.user.html_url` +
+		` + ") left a [review](" + root().data.review.html_url + ")" }}`
+}
+
+func prFeedbackDiscussionActivityExpressions(nodeID string) (string, string, bool) {
+	switch nodeID {
+	case prFeedbackActivityNodeID:
+		return prFeedbackCommentActivityTitleExpression(), prFeedbackCommentActivityDescriptionExpression(), true
+	case prFeedbackReviewActivityNodeID:
+		return prFeedbackReviewActivityTitleExpression(), prFeedbackReviewActivityDescriptionExpression(), true
+	case prFeedbackReplyActivityNodeID:
+		return prFeedbackReplyActivityTitleExpression(), prFeedbackCommentActivityDescriptionExpression(), true
+	default:
+		return "", "", false
+	}
 }
 
 func prFeedbackPRURLExpression() string {

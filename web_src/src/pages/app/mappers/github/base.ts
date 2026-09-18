@@ -93,7 +93,7 @@ export function getDetailsForIssue(issue: Issue): Record<string, string> {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as any;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
     metadata.push({ icon: "book", label: nodeMetadata.repository.name });
