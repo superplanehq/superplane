@@ -18,6 +18,7 @@ type RunOpenRouterSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 	// MaxTurns is kept so old node JSON still decodes. OpenCode does not
 	// take a turn cap; the wrapper ignores this value.
 	MaxTurns int `mapstructure:"maxTurns"`
