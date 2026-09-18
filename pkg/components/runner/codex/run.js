@@ -131,14 +131,18 @@ function codexExecArgs(
       "-c",
       'approval_policy="never"',
     );
-    args.push(...mcpConfigOverrides(mcpScriptPath));
+    args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol())}`,
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (artifactEnabled(env)) args.push(...mcpConfigOverrides(mcpScriptPath));
+    if (artifactEnabled(env)) {
+      args.push(...mcpConfigOverrides(mcpScriptPath, env));
+    } else {
+      args.push(...workspaceMCPConfigOverrides(env));
+    }
   }
   if (model) {
     args.push("-m", model);
@@ -178,13 +182,56 @@ function codexSessionIDFromEvent(event) {
   ).trim();
 }
 
-function mcpConfigOverrides(mcpScriptPath) {
+function mcpConfigOverrides(mcpScriptPath, env = process.env) {
   return [
     "-c",
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    ...workspaceMCPConfigOverrides(env),
   ];
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  if (!configPath || !fs.existsSync(configPath)) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    return Array.isArray(parsed.servers) ? parsed.servers : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function workspaceMCPConfigOverrides(env = process.env) {
+  const args = [];
+  for (const server of workspaceMCPServers(env)) {
+    const name = String((server && server.name) || "").trim();
+    const url = String((server && server.url) || "").trim();
+    if (!name || name === "superplane" || !url) {
+      continue;
+    }
+    const serverKey = tomlKey(name);
+    args.push("-c", `mcp_servers.${serverKey}.url=${tomlString(url)}`);
+    const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+    for (const [headerName, headerValue] of Object.entries(headers)) {
+      if (!headerName) {
+        continue;
+      }
+      args.push("-c", `mcp_servers.${serverKey}.http_headers.${tomlKey(headerName)}=${tomlString(String(headerValue))}`);
+    }
+  }
+  return args;
+}
+
+function tomlKey(value) {
+  const key = String(value);
+  if (/^[A-Za-z0-9_]+$/.test(key)) {
+    return key;
+  }
+  return tomlString(key);
 }
 
 function tomlString(value) {
@@ -785,4 +832,5 @@ module.exports = {
   planningEnabled,
   planningSystemPrompt,
   planningAnalysisEnabled,
+  workspaceMCPConfigOverrides,
 };
