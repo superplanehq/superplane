@@ -1527,7 +1527,18 @@ describe("LinesPage board editing", () => {
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
     expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("lists Source in the filter menu from configured intakes", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toHaveTextContent("Source");
+    expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {

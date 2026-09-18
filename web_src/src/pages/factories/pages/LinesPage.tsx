@@ -101,7 +101,7 @@ import {
 } from "../lib/workOrderListModel";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
-import { buildAssigneeFilterOptions } from "../lib/workOrderFilterOptions";
+import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills } from "../workOrders/header/ScopePills";
@@ -587,6 +587,7 @@ export function LinesPage() {
               ) : undefined
             }
             hostedCreditEmptyBanner={hostedCreditEmptyBanner}
+            intakes={factoryIntakes}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
           />
@@ -689,6 +690,7 @@ function LineDetailHeader({
   hostedCreditHeaderKicker,
   nextStepsRestore,
   hostedCreditEmptyBanner,
+  intakes,
   automationView,
   onAutomationViewChange,
 }: {
@@ -702,12 +704,14 @@ function LineDetailHeader({
   hostedCreditHeaderKicker?: ReactNode;
   nextStepsRestore?: ReactNode;
   hostedCreditEmptyBanner?: ReactNode;
+  intakes: FactoriesFactoryIntake[];
   automationView?: ColumnAutomationView;
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
 }) {
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
+  const sourceOptions = useMemo(() => buildSourceFilterOptions(intakes, entries), [entries, intakes]);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
   const title = humanizeLineName(line.name);
 
@@ -753,7 +757,7 @@ function LineDetailHeader({
             options={WORK_ORDER_SCOPES}
             testIdPrefix="work-orders-scope"
           />
-          <FilterMenu state={state} assigneeOptions={assigneeOptions} />
+          <FilterMenu state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -771,7 +775,9 @@ function LineDetailHeader({
         hostedCreditEmptyBanner || state.filterCount > 0 ? (
           <>
             {hostedCreditEmptyBanner}
-            {state.filterCount > 0 ? <FilterChips state={state} assigneeOptions={assigneeOptions} /> : null}
+            {state.filterCount > 0 ? (
+              <FilterChips state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
+            ) : null}
           </>
         ) : undefined
       }

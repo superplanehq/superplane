@@ -1,6 +1,17 @@
-import type { FactoriesFactoryLine } from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryLine } from "@/api-client";
 import type { WorkOrderFilterDimension } from "./useWorkOrderListState";
-import { UNASSIGNED_FILTER_VALUE, type WorkOrderFilters, type WorkOrderListEntry } from "./workOrderListModel";
+import { lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
+import {
+  CREATED_MANUALLY,
+  INTAKE_PRESENTATION,
+  type SplitRunIntakeKind,
+} from "../pages/work-order-split-run/splitRunSource";
+import {
+  MANUAL_FILTER_VALUE,
+  UNASSIGNED_FILTER_VALUE,
+  type WorkOrderFilters,
+  type WorkOrderListEntry,
+} from "./workOrderListModel";
 import { WORK_ORDER_DISPLAY_STATUSES, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
 /** One selectable value in a Filter submenu. */
@@ -50,15 +61,62 @@ export function buildAssigneeFilterOptions(entries: WorkOrderListEntry[]): WorkO
 }
 
 /**
+ * Sources the factory can receive tasks from, plus Created manually.
+ * Configured intakes drive the list so a tool with no tasks still appears.
+ * Two intakes on the same tool collapse to one entry.
+ */
+export function buildSourceFilterOptions(
+  intakes: FactoriesFactoryIntake[],
+  entries: WorkOrderListEntry[],
+): WorkOrderFilterOption[] {
+  const ids = new Set<string>();
+  for (const intake of intakes) {
+    const source = lineIntakeSourceForApiSource(intake.source);
+    if (source) {
+      ids.add(source.id);
+    }
+  }
+  for (const entry of entries) {
+    ids.add(entry.sourceId);
+  }
+  ids.delete(MANUAL_FILTER_VALUE);
+
+  const tools = [...ids]
+    .map((value) => ({ value, label: sourceFilterLabel(value) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  return [...tools, { value: MANUAL_FILTER_VALUE, label: CREATED_MANUALLY }];
+}
+
+export function sourceFilterLabel(sourceId: string): string {
+  if (sourceId === MANUAL_FILTER_VALUE) {
+    return CREATED_MANUALLY;
+  }
+  if (isSplitRunIntakeKind(sourceId)) {
+    return INTAKE_PRESENTATION[sourceId].name;
+  }
+  return sourceId;
+}
+
+function isSplitRunIntakeKind(value: string): value is SplitRunIntakeKind {
+  return value in INTAKE_PRESENTATION;
+}
+
+/**
  * Chip labels for every applied filter. Reads the labels back from the same
  * option lists the menu renders, so a chip can never disagree with the menu
  * entry that created it.
  */
 export function buildWorkOrderFilterChips(
   filters: WorkOrderFilters,
-  options: { lines: WorkOrderFilterOption[]; assignees: WorkOrderFilterOption[] },
+  options: {
+    lines: WorkOrderFilterOption[];
+    sources: WorkOrderFilterOption[];
+    assignees: WorkOrderFilterOption[];
+  },
 ): WorkOrderFilterChip[] {
   const lineLabels = toLabelMap(options.lines);
+  const sourceLabels = toLabelMap(options.sources);
   const assigneeLabels = toLabelMap(options.assignees);
 
   return [
@@ -71,6 +129,14 @@ export function buildWorkOrderFilterChips(
       dimension: "lineIds" as const,
       value: lineId,
       label: `Line is ${lineLabels.get(lineId) ?? "Unknown line"}`,
+    })),
+    ...filters.sourceIds.map((sourceId) => ({
+      dimension: "sourceIds" as const,
+      value: sourceId,
+      label:
+        sourceId === MANUAL_FILTER_VALUE
+          ? CREATED_MANUALLY
+          : `Source is ${sourceLabels.get(sourceId) ?? sourceFilterLabel(sourceId)}`,
     })),
     ...filters.assigneeIds.map((assigneeId) => ({
       dimension: "assigneeIds" as const,
