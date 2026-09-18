@@ -710,14 +710,30 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
       resolve();
       return;
     }
-    child.stderr.on("data", (chunk) => {
-      stderrText += String(chunk);
-    });
-    child.stderr.on("end", () => {
-      if (stderrText) writeStderr(stderrText);
+    let pending = "";
+    let finished = false;
+    const flush = () => {
+      if (pending) {
+        writeStderr(pending);
+        pending = "";
+      }
+    };
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      flush();
       resolve();
+    };
+    child.stderr.on("data", (chunk) => {
+      const text = String(chunk);
+      stderrText += text;
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() || "";
+      for (const line of lines) writeStderr(`${line}\n`);
     });
-    child.stderr.on("error", resolve);
+    child.stderr.on("end", finish);
+    child.stderr.on("error", finish);
   });
 
   const stdout = child.stdout;
