@@ -629,6 +629,63 @@
   --sidebar-accent-foreground: #e6edf3;
 }
 
+/*
+ * Rainbow overlay for the workspace overview page only.
+ * Use with `theme-factories-palette-rainbow` on the same node as `theme-factories`.
+ */
+.theme-factories.theme-factories-palette-rainbow {
+  --background: oklch(0.995 0.02 25);
+  --foreground: oklch(0.25 0.04 25);
+  --card: oklch(0.94 0.07 250);
+  --card-foreground: oklch(0.2 0.04 250);
+  --popover: oklch(0.93 0.08 275);
+  --popover-foreground: oklch(0.2 0.04 275);
+  --primary: oklch(0.5 0.21 25);
+  --primary-foreground: oklch(0.99 0.01 25);
+  --secondary: oklch(0.88 0.11 55);
+  --secondary-foreground: oklch(0.24 0.06 55);
+  --muted: oklch(0.93 0.11 95);
+  --muted-foreground: oklch(0.32 0.06 95);
+  --accent: oklch(0.9 0.11 145);
+  --accent-foreground: oklch(0.22 0.06 145);
+  --border: oklch(0.75 0.1 195);
+  --input: oklch(0.78 0.1 175);
+  --field: oklch(0.95 0.06 350);
+  --ring: oklch(0.58 0.18 330);
+  --sidebar: oklch(0.93 0.08 300);
+  --sidebar-foreground: oklch(0.22 0.05 300);
+  --sidebar-border: oklch(0.78 0.08 300);
+  --sidebar-accent: oklch(0.87 0.1 300);
+  --sidebar-accent-foreground: oklch(0.22 0.05 300);
+}
+
+.dark .theme-factories.theme-factories-palette-rainbow,
+.theme-factories.theme-factories-palette-rainbow.dark {
+  --background: oklch(0.18 0.03 25);
+  --foreground: oklch(0.94 0.02 25);
+  --card: oklch(0.25 0.08 250);
+  --card-foreground: oklch(0.96 0.02 250);
+  --popover: oklch(0.26 0.09 275);
+  --popover-foreground: oklch(0.96 0.02 275);
+  --primary: oklch(0.65 0.2 25);
+  --primary-foreground: oklch(0.18 0.03 25);
+  --secondary: oklch(0.32 0.1 55);
+  --secondary-foreground: oklch(0.96 0.02 55);
+  --muted: oklch(0.28 0.09 95);
+  --muted-foreground: oklch(0.86 0.05 95);
+  --accent: oklch(0.3 0.1 145);
+  --accent-foreground: oklch(0.96 0.03 145);
+  --border: oklch(0.45 0.1 195);
+  --input: oklch(0.4 0.1 175);
+  --field: oklch(0.22 0.06 350);
+  --ring: oklch(0.7 0.16 330);
+  --sidebar: oklch(0.22 0.08 300);
+  --sidebar-foreground: oklch(0.95 0.02 300);
+  --sidebar-border: oklch(0.4 0.08 300);
+  --sidebar-accent: oklch(0.3 0.1 300);
+  --sidebar-accent-foreground: oklch(0.96 0.02 300);
+}
+
 .theme-factories [data-slot="input"],
 .theme-factories [data-slot="select-trigger"],
 .theme-factories [data-slot="textarea"] {

@@ -1,12 +1,14 @@
 import { useState } from "react";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { useRainbowPaletteClass } from "../../lib/useRainbowPaletteClass";
 import { OverviewPage } from "../OverviewPage";
 import { GettingStartedWireframe } from "./GettingStartedWireframe";
 import { dismissWorkspaceGettingStarted, shouldShowWorkspaceGettingStarted } from "./gettingStartedState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 export function WorkspaceOverviewPage() {
+  useRainbowPaletteClass();
   const { organizationId, factoryId } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
   const [showGettingStarted, setShowGettingStarted] = useState(
