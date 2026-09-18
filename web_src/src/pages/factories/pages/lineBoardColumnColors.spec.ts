@@ -4,6 +4,7 @@ import {
   LINE_BOARD_COLUMN_COLORS,
   lineBoardColumnColorById,
   lineBoardColumnLaneClassName,
+  lineBoardColumnLaneProps,
   normalizeColumnColors,
   serializeColumnColors,
 } from "./lineBoardColumnColors";
@@ -13,6 +14,7 @@ describe("lineBoardColumnColors", () => {
     expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:bg-\S+\/\d+/.test(color.laneClassName))).toBe(true);
+    expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:border-\S+\/\d+/.test(color.borderClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
   });
 
@@ -33,5 +35,16 @@ describe("lineBoardColumnColors", () => {
       backlog: "lime",
       done: "teal",
     });
+  });
+
+  it("maps the board view to fill, outline, or no color", () => {
+    expect(lineBoardColumnLaneProps("lime", "fill")).toEqual({
+      surfaceClassName: lineBoardColumnColorById("lime")?.laneClassName,
+    });
+    expect(lineBoardColumnLaneProps("lime", "off", { mutedFallback: true })).toEqual({ className: "bg-muted" });
+    expect(lineBoardColumnLaneProps("lime", "borders", { mutedFallback: true })).toEqual({
+      className: `bg-muted ${lineBoardColumnColorById("lime")?.borderClassName}`,
+    });
+    expect(lineBoardColumnLaneProps(null, "fill", { mutedFallback: true })).toEqual({ className: "bg-muted" });
   });
 });

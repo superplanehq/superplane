@@ -18,7 +18,8 @@ import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
-import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
+import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
+import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
@@ -38,6 +39,7 @@ export type BacklogColumnProps = {
   onCloseSettings: () => void;
   onSaveSettings: (settings: { name: string; size: number | null }) => void;
   colorId: LineBoardColumnColorId | null;
+  colorView?: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canCreateWorkOrder: boolean;
   canRename: boolean;
@@ -82,6 +84,7 @@ export function BacklogColumn({
   onCloseSettings,
   onSaveSettings,
   colorId,
+  colorView,
   onColorChange,
   canCreateWorkOrder,
   canRename,
@@ -98,7 +101,7 @@ export function BacklogColumn({
   automationRowCount,
   onAutomationRowAction,
 }: BacklogColumnProps) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
@@ -123,11 +126,11 @@ export function BacklogColumn({
         titleTestId="lines-column-title-backlog"
         count={orders.length}
         tone="neutral"
-        surfaceClassName={surfaceClassName}
+        surfaceClassName={lane.surfaceClassName}
         emptyDescription="No tasks in the backlog."
         emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
         keepChildrenWhenEmpty
-        className={surfaceClassName ? undefined : "bg-muted"}
+        className={lane.className}
         actions={
           <BacklogColumnHeaderActions
             title={title}
