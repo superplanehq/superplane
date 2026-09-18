@@ -76,7 +76,7 @@ export const PULL_REQUEST_REVIEW_COPY = {
   merge: "Merge",
   mergeMethod: "Merge method",
   merged: "The pull request is merged.",
-  permission: "You don't have permission to manage this task.",
+  permission: "You do not have permission to manage this task.",
   methods: {
     MERGE_METHOD_SQUASH: "Squash and merge",
     MERGE_METHOD_MERGE: "Create a merge commit",
