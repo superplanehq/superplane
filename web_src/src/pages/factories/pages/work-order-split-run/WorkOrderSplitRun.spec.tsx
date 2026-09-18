@@ -336,7 +336,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
     expect(row).toHaveTextContent("$0.73");
     expect(row).toHaveTextContent("2.7k tokens");
-    expect(row).toHaveTextContent("claude-sonnet-4-6");
+    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
     expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
     const close = screen.getByRole("button", { name: "Close" });
     const views = screen.getByRole("tablist", { name: "Task views" });
@@ -345,11 +345,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(views).getByRole("tab", { name: "Automations" })).toHaveClass("sp-popup-view-tab");
   });
 
-  it("shows the implement model next to spend while the task is running", () => {
+  it("keeps the implement model off the header line while the task is running", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
 
     const row = screen.getByTestId("popup-owner-time-cost");
-    expect(row).toHaveTextContent("$0.73 · 2.7k tokens · claude-sonnet-4-6");
+    expect(row).toHaveTextContent("$0.73 · 2.7k tokens");
+    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
     expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
   });
 

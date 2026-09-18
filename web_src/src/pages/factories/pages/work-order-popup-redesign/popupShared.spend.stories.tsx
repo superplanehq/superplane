@@ -28,7 +28,6 @@ export const HeaderSpendHover: Story = {
   render: () => (
     <OwnerTimeCostRow
       fixture={{ owner, costUsd: "$0.73", tokensLabel: "2.7k tokens" }}
-      modelLabel="claude-sonnet-4-6"
       usageByModel={[{ provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" }]}
       usageByMachineType={[{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }]}
     />
