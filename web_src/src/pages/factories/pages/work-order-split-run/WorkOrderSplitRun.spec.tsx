@@ -697,7 +697,6 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task needs a decision" })).toBeInTheDocument();
     expect(within(note).getByText("Every automation finished. This task is ready to complete.")).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
@@ -740,7 +739,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(moreActions.closest("header")).not.toBeNull();
     await user.click(moreActions);
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: "To Backlog" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Reject" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
@@ -826,7 +824,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
 
-  it("offers To Backlog, Reject, and Rerun on a failed open implement", () => {
+  it("offers Reject and Rerun on a failed open implement", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         id: "wo-2",
@@ -854,7 +852,6 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
@@ -862,7 +859,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Choose how to stop" })).not.toBeInTheDocument();
   });
 
-  it("offers To Backlog, Reject, and Rerun after a person stops the run", () => {
+  it("offers Reject and Rerun after a person stops the run", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         id: "wo-stopped",
@@ -892,9 +889,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(note).getByText("This automation did not finish. This task still needs a decision."),
     ).toBeInTheDocument();
-    const toBacklog = within(note).getByRole("button", { name: "To Backlog" });
-    expect(toBacklog).toBeInTheDocument();
-    expect(toBacklog.querySelector("svg.lucide-undo-2")).toBeTruthy();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
     expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
@@ -1284,14 +1278,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   });
 
-  it("shows a failed implement stream with To Backlog, Reject, and Rerun on the note", async () => {
+  it("shows a failed implement stream with Reject and Rerun on the note", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
     await openLogTab(user);
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();

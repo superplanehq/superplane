@@ -11,9 +11,7 @@ import {
   Loader2,
   Play,
   RotateCcw,
-  Sparkles,
   TriangleAlert,
-  Undo2,
 } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
@@ -413,21 +411,7 @@ function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "b
   );
 }
 
-function ActionIcon({
-  icon,
-  kind,
-  capsule,
-}: {
-  icon?: SplitRunFooterAction["icon"];
-  kind?: SplitRunFooterAction["kind"];
-  capsule?: boolean;
-}) {
-  if (icon === "undo-2") {
-    return <Undo2 className="size-3.5" aria-hidden />;
-  }
-  if (icon === "sparkles") {
-    return <Sparkles className="size-3.5" aria-hidden />;
-  }
+function ActionIcon({ kind, capsule }: { kind?: SplitRunFooterAction["kind"]; capsule?: boolean }) {
   if (capsule && kind === "archive") {
     return <Archive className="size-3.5 opacity-60" aria-hidden />;
   }
@@ -476,7 +460,7 @@ function NoteAction({
       {busy ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
       ) : (
-        <ActionIcon icon={action.icon} kind={action.kind} capsule={capsule} />
+        <ActionIcon kind={action.kind} capsule={capsule} />
       )}
       {action.label}
     </Button>

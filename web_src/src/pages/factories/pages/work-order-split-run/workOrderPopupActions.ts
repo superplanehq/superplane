@@ -27,7 +27,6 @@ export function footerMutationHandlers(
       }
     },
     onReject: () => void footerActions.handleReject(),
-    onBackToDraft: () => footerActions.handleBackToDraft(),
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
       void footerActions.handleStop(choice, {
         ...fixture.footer,
@@ -49,21 +48,5 @@ export function draftStartAction(
   return async () => {
     await onDispatch?.(draftStartModelPayload(selectedModel));
     openAutomations();
-  };
-}
-
-export function returnToBacklogAction(
-  onBackToDraft: (() => void | Promise<boolean | void>) | undefined,
-  openDescription: () => void,
-) {
-  if (!onBackToDraft) {
-    return undefined;
-  }
-  return async () => {
-    const returned = await onBackToDraft();
-    if (returned === false) {
-      return;
-    }
-    openDescription();
   };
 }

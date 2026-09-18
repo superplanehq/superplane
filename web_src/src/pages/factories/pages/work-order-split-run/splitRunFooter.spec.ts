@@ -33,13 +33,6 @@ const DRAFT_NOTE = {
   text: "From GitHub issue PAY-842. Confidence 5/5.",
 };
 
-const BACK_TO_DRAFT = {
-  id: "back-to-draft",
-  kind: "back-to-draft",
-  label: "To Backlog",
-  emphasis: "quiet",
-  icon: "undo-2",
-};
 const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const ARCHIVE = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
@@ -135,7 +128,7 @@ describe("buildSplitRunFooter", () => {
     ]);
   });
 
-  it("keeps a waiting note on the decision strip with To Backlog, Reject, and Approve", () => {
+  it("keeps a waiting note on the decision strip with Reject and Approve", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
     expect(footer.attentionCard).toBe(true);
@@ -146,7 +139,7 @@ describe("buildSplitRunFooter", () => {
       cta: PR_NOTE.cta,
     });
     expect(footer.sentence).toBe("This task needs attention.");
-    expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, APPROVE]);
+    expect(footer.actions).toEqual([REJECT, APPROVE]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
@@ -159,7 +152,7 @@ describe("buildSplitRunFooter", () => {
         text: "Every automation finished. This task is ready to complete.",
       },
       attentionCard: true,
-      actions: [BACK_TO_DRAFT, REJECT, APPROVE],
+      actions: [REJECT, APPROVE],
     });
   });
 
@@ -171,7 +164,7 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
-  it("treats a stopped open implement as To Backlog, Reject, and Rerun", () => {
+  it("treats a stopped open implement as Reject and Rerun", () => {
     const footer = buildSplitRunFooter({ kind: "stopped" });
 
     expect(footer.attentionCard).toBe(true);
@@ -179,9 +172,8 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.text).toBe("This automation did not finish. This task still needs a decision.");
     expect(footer.note?.cta).toBeUndefined();
     expect(footer.note?.actor).toBeUndefined();
-    expect(footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
-    expect(footer.actions[0]?.icon).toBe("undo-2");
-    expect(footer.actions.map((action) => action.kind)).toEqual(["back-to-draft", "reject", "rerun"]);
+    expect(footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
+    expect(footer.actions.map((action) => action.kind)).toEqual(["reject", "rerun"]);
     expect(splitRunCloseNeedsConfirm("stopped")).toBe(false);
   });
 
@@ -193,14 +185,14 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.actor).toEqual(actor);
   });
 
-  it("treats a failed open implement as a decision strip with To Backlog, Reject, and Rerun", () => {
+  it("treats a failed open implement as a decision strip with Reject and Rerun", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Debug");
     expect(footer.sentence).toBe("This task needs attention.");
-    expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, RERUN]);
+    expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 
