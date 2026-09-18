@@ -1,0 +1,30 @@
+## Visual evidence protocol
+
+- Changes that are not related to the UI do not require visual evidence.
+- Rendered markup, styles, layout, and interaction behavior are UI changes. Unit tests do not replace visual evidence.
+- For a visual-only change, capture and upload at least one screenshot.
+- If an interaction was added or changed, record and upload a short WebM video. Capture a focused representative screenshot and pass it as `posterPath` when you upload the video.
+- Save screenshots and videos in `$SUPERPLANE_TASK_DIR/evidence`. Do not add them to the repository.
+- For a named Playwright output, use an absolute path under `$SUPERPLANE_TASK_DIR/evidence`. Automatic Playwright outputs already use this directory.
+- Read repository setup instructions and package scripts before you start a preview.
+- Start Storybook or the project preview according to the repository instructions. Run it in the repository container when required. Retain its server log.
+- Poll the preview URL with a bounded timeout before you start Playwright.
+- Run the installed `playwright cli` on the runner host, not in the repository container.
+- A signed-in application is not required when an isolated preview can show the change.
+- Use an existing Storybook story or component preview first. If it does not show the changed state, create a focused temporary story or fixture.
+- Open the direct Storybook iframe or the focused preview route. Render the actual component instead of recreating it as static HTML.
+- Use `snapshot` or `find`. Then use the returned element references instead of guessed selectors.
+- Use `eval` to verify computed styles or state when the change has a testable visual property.
+- Check the browser console for errors before capture.
+- Capture the changed element or a focused viewport. Do not capture a mostly empty full page.
+- Call `inspect_screenshot` for every screenshot, including a video poster. Review the returned image and verify that the intended state is visible.
+- Upload an unchanged inspected screenshot with `upload_artifact`. For video evidence, call `upload_artifact` once with the video `path` and inspected screenshot `posterPath`.
+- Do not use file size, custom PNG decoding, or pixel-color counting as a substitute for visual inspection.
+- Upload the smallest useful set. Usually, use one focused image for each affected theme or state.
+- If the repository has no component preview, start the application with local or mock data. Create a temporary preview route or harness when needed.
+- Remove temporary preview files before you commit unless they are useful regression coverage.
+- Close the Playwright session and stop temporary preview processes after capture.
+- Do not report evidence as unavailable only because the main application requires authentication or production data.
+- Before you report evidence as unavailable, attempt at least one isolated preview and one Playwright capture. Include each command and concrete outcome in the `report_visual_evidence_unavailable` attempts field. Set each attempt type to `preview`, `playwright`, or `upload`.
+- Keep the evidence focused. Do not capture secrets or unrelated user data.
+- If preview, capture, inspection, or upload still fails after these attempts, call `report_visual_evidence_unavailable` with the reason and attempts. Continue the task.

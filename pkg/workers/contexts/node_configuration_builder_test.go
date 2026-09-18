@@ -376,7 +376,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, false, hasGitHubIssueOrigin)
 	})
 
-	t.Run("exposes the organization visual evidence feature", func(t *testing.T) {
+	t.Run("keeps the retired visual evidence expression disabled", func(t *testing.T) {
 		configuration := map[string]any{
 			"prompt": `Implement the task.{{ task().visual_evidence_enabled ? "\nCapture visual evidence." : "" }}`,
 		}
@@ -384,12 +384,6 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		built, err := builder.Build(configuration)
 		require.NoError(t, err)
 		assert.Equal(t, "Implement the task.", built["prompt"])
-
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryVisualEvidence))
-
-		built, err = builder.Build(configuration)
-		require.NoError(t, err)
-		assert.Equal(t, "Implement the task.\nCapture visual evidence.", built["prompt"])
 	})
 
 	t.Run("exposes origin for GitHub closing keywords", func(t *testing.T) {

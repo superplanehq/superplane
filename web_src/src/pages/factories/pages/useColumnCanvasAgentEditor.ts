@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { planningReviewDraftFromCanvas, primaryAgentNode, serializeColumnAgentCanvas } from "../lib/columnCanvasAgent";
+import { resolveFactoryAppTemplate } from "../lib/factoryAppTemplate";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
@@ -27,6 +28,7 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
   const preferredAgentNodeId = features.has(FEATURE_FACTORY_CREATE_WITH_AGENT) ? REFINEMENT_AGENT_NODE_ID : undefined;
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
+  const showVisualEvidenceSetting = resolveFactoryAppTemplate(canvas)?.id === "line-implementation";
 
   const save = async (nextDraft: PlanningReviewDraft) => {
     await persistColumnAgent({
@@ -44,6 +46,7 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
     agentNode,
     isLoading: enabled && (canvasQuery.isPending || features.isLoading),
     draft,
+    showVisualEvidenceSetting,
     editorOpen,
     openEditor: agentNode ? () => setEditorOpen(true) : undefined,
     closeEditor: () => setEditorOpen(false),
