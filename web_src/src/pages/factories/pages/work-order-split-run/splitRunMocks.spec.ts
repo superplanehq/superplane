@@ -1055,6 +1055,30 @@ describe("line board work-order examples", () => {
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
+  it("does not count pending analysis queue time as execution time", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_PENDING",
+            createdAt: "2026-08-28T12:00:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      status: "pending",
+      duration: "<1s",
+      durationRunning: false,
+    });
+  });
+
   it("shows spend, tokens, and model on the Analysis step when the run has usage", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,

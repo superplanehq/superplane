@@ -693,7 +693,7 @@ function analysisAttemptsToPhase(
   }
 
   const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
-  const durationRunning = isActiveCanvasRun(latest.run);
+  const durationRunning = latest.run.state === "STATE_STARTED";
   const componentName = CONFIDENCE_CHECK_NAME;
   const latestDuration = analysisAttemptsDuration([latest], durationRunning);
   const line: SplitRunStreamLine = {
