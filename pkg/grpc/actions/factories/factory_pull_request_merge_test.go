@@ -651,7 +651,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		assert.Equal(t, mergeBlockedChecksUnfinished, got.GetMessage())
 	})
 
-	t.Run("allows a cancelled check", func(t *testing.T) {
+	t.Run("reports a cancelled check as failed", func(t *testing.T) {
 		factory := newFactory(t)
 		pr := createPR(t, factory)
 		useGitHub(t, &fakeFactoryGitHub{
@@ -667,7 +667,9 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		})
 
 		got := describe(t, factory, pr)
-		assert.True(t, got.GetCanMerge())
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedCheckFailed, got.GetMessage())
 	})
 
 	t.Run("reports a failed check", func(t *testing.T) {

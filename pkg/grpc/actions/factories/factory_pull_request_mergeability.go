@@ -295,9 +295,9 @@ func classifyCheckRun(run *github.CheckRun) (unfinished bool, failed bool) {
 		return true, false
 	}
 	switch strings.ToLower(strings.TrimSpace(run.GetConclusion())) {
-	case "success", "neutral", "skipped", "cancelled":
+	case "success", "neutral", "skipped":
 		return false, false
-	case "failure", "error", "timed_out", "action_required":
+	case "failure", "error", "timed_out", "action_required", "cancelled", "canceled":
 		return false, true
 	default:
 		return true, false
