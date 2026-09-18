@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const MAX_ARTIFACT_BYTES = 100 * 1024 * 1024;
+const ATTEMPT_TYPES = new Set(["preview", "playwright", "upload"]);
+const REQUIRED_ATTEMPT_TYPES = ["preview", "playwright"];
 const CONTENT_TYPES = new Map([
   [".png", "image/png"],
   [".jpg", "image/jpeg"],
@@ -33,11 +35,15 @@ function readManifest(env = process.env) {
   const { manifest } = artifactPaths(env);
   try {
     const parsed = JSON.parse(fs.readFileSync(manifest, "utf8"));
-    return {
+    const result = {
       status: String(parsed.status || "not_applicable"),
       reason: String(parsed.reason || ""),
       artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [],
     };
+    if (Array.isArray(parsed.attempts)) {
+      result.attempts = parsed.attempts;
+    }
+    return result;
   } catch (_error) {
     return { status: "not_applicable", reason: "", artifacts: [] };
   }
@@ -134,14 +140,49 @@ async function uploadArtifact(input, env = process.env, fetchImpl = fetch) {
 function reportVisualEvidenceUnavailable(input, env = process.env) {
   const reason = String((input && input.reason) || "").trim();
   if (!reason) throw new Error("reason is required");
+  const attempts = normalizeEvidenceAttempts(input && input.attempts);
   const manifest = readManifest(env);
   const result = {
     status: "unavailable",
     reason,
+    attempts,
     artifacts: manifest.artifacts,
   };
   writeManifest(result, env);
   return result;
+}
+
+function normalizeEvidenceAttempts(value) {
+  if (!Array.isArray(value) || value.length < 2) {
+    throw new Error(
+      "attempts is required and must include one preview and one playwright attempt",
+    );
+  }
+
+  const attempts = value.map((attempt, index) => {
+    if (!attempt || typeof attempt !== "object" || Array.isArray(attempt)) {
+      throw new Error(`attempts[${index}] must be an object`);
+    }
+    const type = String(attempt.type || "").trim();
+    const command = String(attempt.command || "").trim();
+    const outcome = String(attempt.outcome || "").trim();
+    if (!ATTEMPT_TYPES.has(type)) {
+      throw new Error(
+        `attempts[${index}].type must be preview, playwright, or upload`,
+      );
+    }
+    if (!command) throw new Error(`attempts[${index}].command is required`);
+    if (!outcome) throw new Error(`attempts[${index}].outcome is required`);
+    return { type, command, outcome };
+  });
+
+  const attemptTypes = new Set(attempts.map((attempt) => attempt.type));
+  if (REQUIRED_ATTEMPT_TYPES.some((type) => !attemptTypes.has(type))) {
+    throw new Error(
+      "attempts must include one preview and one playwright attempt",
+    );
+  }
+  return attempts;
 }
 
 const TOOLS = [
@@ -158,11 +199,32 @@ const TOOLS = [
   {
     name: "report_visual_evidence_unavailable",
     description:
-      "Record why required visual evidence could not be captured or uploaded.",
+      "Record why required visual evidence could not be produced after trying an isolated preview and a Playwright capture.",
     inputSchema: {
       type: "object",
-      properties: { reason: { type: "string" } },
-      required: ["reason"],
+      properties: {
+        reason: { type: "string" },
+        attempts: {
+          type: "array",
+          description:
+            "Concrete preview and Playwright attempts. Add an upload attempt when upload fails.",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["preview", "playwright", "upload"],
+              },
+              command: { type: "string", minLength: 1 },
+              outcome: { type: "string", minLength: 1 },
+            },
+            required: ["type", "command", "outcome"],
+            additionalProperties: false,
+          },
+          minItems: 2,
+        },
+      },
+      required: ["reason", "attempts"],
     },
   },
 ];

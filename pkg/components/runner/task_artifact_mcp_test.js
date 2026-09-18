@@ -117,15 +117,74 @@ test("uploadArtifact streams metadata and records the returned artifact", async 
   assert.equal(readManifest(value.env).artifacts.length, 1);
 });
 
-test("reportVisualEvidenceUnavailable preserves uploaded artifacts", () => {
+test("reportVisualEvidenceUnavailable requires documented attempts", () => {
   const value = fixture();
+
+  assert.throws(
+    () =>
+      reportVisualEvidenceUnavailable(
+        { reason: "The preview did not start." },
+        value.env,
+      ),
+    /attempts is required/,
+  );
+
+  assert.throws(
+    () =>
+      reportVisualEvidenceUnavailable(
+        {
+          reason: "The preview did not start.",
+          attempts: [
+            {
+              type: "preview",
+              command: "npm run storybook",
+              outcome: "The command exited with status 1.",
+            },
+            {
+              type: "preview",
+              command: "npm run storybook -- --port 6007",
+              outcome: "The command exited with status 1.",
+            },
+          ],
+        },
+        value.env,
+      ),
+    /one preview and one playwright attempt/,
+  );
+
   reportVisualEvidenceUnavailable(
-    { reason: "The preview did not start." },
+    {
+      reason: "The preview did not start.",
+      attempts: [
+        {
+          type: "preview",
+          command: "npm run storybook",
+          outcome: "The command exited with status 1.",
+        },
+        {
+          type: "playwright",
+          command: "playwright screenshot http://localhost:6006",
+          outcome: "The command could not connect to localhost:6006.",
+        },
+      ],
+    },
     value.env,
   );
   assert.deepEqual(readManifest(value.env), {
     status: "unavailable",
     reason: "The preview did not start.",
+    attempts: [
+      {
+        type: "preview",
+        command: "npm run storybook",
+        outcome: "The command exited with status 1.",
+      },
+      {
+        type: "playwright",
+        command: "playwright screenshot http://localhost:6006",
+        outcome: "The command could not connect to localhost:6006.",
+      },
+    ],
     artifacts: [],
   });
 });
