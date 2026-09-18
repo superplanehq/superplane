@@ -52,6 +52,11 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
 	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
 	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
+	assert.Contains(t, result.canvasYAML, "task().visual_evidence_enabled")
+	assert.Contains(t, result.canvasYAML, "For a visual-only change, capture and upload at least one screenshot.")
+	assert.Contains(t, result.canvasYAML, "record and upload a short WebM video that shows the interaction works")
+	assert.Contains(t, result.canvasYAML, "report_visual_evidence_unavailable")
+	assert.Contains(t, result.canvasYAML, "$SUPERPLANE_TASK_DIR/evidence")
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
@@ -64,6 +69,11 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
 	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
 	assert.NotContains(t, body, "[Task](")
+
+	commentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence")
+	assert.Equal(t, "github.createIssueComment", commentEvidence.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, commentEvidence.Integration)
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "attach-pr-artifact", TargetID: "has-visual-evidence", Channel: "default"})
 
 	updatePR := findYAMLNode(t, canvas, "update-pr")
 	updateBody, ok := updatePR.Configuration["body"].(string)

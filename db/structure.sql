@@ -841,6 +841,9 @@ CREATE TABLE public.files (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    purpose character varying(32) DEFAULT 'attachment'::character varying NOT NULL,
+    public_id uuid,
+    CONSTRAINT files_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['attachment'::character varying, 'artifact'::character varying])::text[]))),
     CONSTRAINT files_scope_check CHECK (((scope)::text = ANY ((ARRAY['app'::character varying, 'organization'::character varying, 'workspace'::character varying, 'task'::character varying])::text[]))),
     CONSTRAINT files_scope_fks_check CHECK (((((scope)::text = 'app'::text) AND (organization_id IS NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'organization'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'workspace'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'task'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NOT NULL)))),
     CONSTRAINT files_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
@@ -2383,6 +2386,13 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 --
 
 CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_work_orders USING btree (factory_id, number);
+
+
+--
+-- Name: files_public_id_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX files_public_id_unique ON public.files USING btree (public_id) WHERE (public_id IS NOT NULL);
 
 
 --
@@ -4534,7 +4544,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260917100300	f
+20260917154232	f
 \.
 
 

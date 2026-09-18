@@ -58,6 +58,7 @@ const (
 	ArtifactTypeMarkdown = "markdown"
 	ArtifactTypeBranch   = "branch"
 	ArtifactTypeLink     = "link"
+	ArtifactTypeFile     = "file"
 )
 
 // Check levels. The reporting component computes the level from its

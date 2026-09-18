@@ -83,6 +83,32 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestStorePendingUploadLeavesFilePending(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeOrganization,
+		OrganizationID: r.Organization.ID,
+		Filename:       "evidence.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+
+	upload, err := storedfiles.StorePendingUpload(t.Context(), provider, file, bytes.NewReader([]byte("png-bytes")))
+	require.NoError(t, err)
+	assert.Equal(t, int64(9), upload.SizeBytes)
+	assert.NotEmpty(t, upload.Checksum)
+
+	loaded, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FileStatePending, loaded.State)
+	_, err = provider.Head(t.Context(), file.StorageKey)
+	require.NoError(t, err)
+}
+
 func TestBindDescriptionFilesRejectsForeignWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	provider := setupFileStore(t)
