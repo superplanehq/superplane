@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func MergeFactoryPullRequest(
@@ -60,23 +61,33 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
 	}
 
-	_, _, err = result.Client.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), "", &github.PullRequestOptions{
-		MergeMethod: method,
-		SHA:         expectedSHA,
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := assertNoActiveAutomationLocked(tx, factory, pullRequest); err != nil {
+			return err
+		}
+
+		_, _, err := result.Client.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), "", &github.PullRequestOptions{
+			MergeMethod: method,
+			SHA:         expectedSHA,
+		})
+		if err != nil {
+			return err
+		}
+
+		state := models.FactoryPullRequestStateMerged
+		mergedAt := time.Now()
+		return pullRequest.Update(tx, models.FactoryPullRequestPatch{
+			State:    &state,
+			MergedAt: &mergedAt,
+		})
 	})
 	if err != nil {
+		if errors.Is(err, errFactoryPullRequestNotMergeable) {
+			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
+		}
 		if isGitHubHeadMovedError(err) {
 			return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
 		}
-		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
-	}
-
-	state := models.FactoryPullRequestStateMerged
-	mergedAt := time.Now()
-	if err := pullRequest.Update(db, models.FactoryPullRequestPatch{
-		State:    &state,
-		MergedAt: &mergedAt,
-	}); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
@@ -97,6 +108,27 @@ func MergeFactoryPullRequest(
 	}
 
 	return &pb.MergeFactoryPullRequestResponse{PullRequest: serialized[0]}, nil
+}
+
+func assertNoActiveAutomationLocked(tx *gorm.DB, factory *models.Factory, pullRequest *models.FactoryPullRequest) error {
+	order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
+	if err != nil {
+		return err
+	}
+	if err := order.LockForUpdate(tx); err != nil {
+		return err
+	}
+	if err := pullRequest.LockForUpdate(tx); err != nil {
+		return err
+	}
+	active, err := factoryPullRequestHasActiveAutomation(tx, factory, pullRequest)
+	if err != nil {
+		return err
+	}
+	if active {
+		return errFactoryPullRequestNotMergeable
+	}
+	return nil
 }
 
 func isGitHubHeadMovedError(err error) bool {

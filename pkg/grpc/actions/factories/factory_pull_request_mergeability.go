@@ -87,7 +87,7 @@ func evaluateFactoryPullRequestMergeability(
 	}
 	result.Client = client
 
-	active, err := workOrderHasActiveRun(db, factory, pullRequest.WorkOrderID)
+	active, err := factoryPullRequestHasActiveAutomation(db, factory, pullRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +146,13 @@ func blockedMergeability(
 	return result
 }
 
+func factoryPullRequestHasActiveAutomation(db *gorm.DB, factory *models.Factory, pullRequest *models.FactoryPullRequest) (bool, error) {
+	if pullRequest.ActiveMutationRunID != nil {
+		return true, nil
+	}
+	return workOrderHasActiveRun(db, factory, pullRequest.WorkOrderID)
+}
+
 func workOrderHasActiveRun(db *gorm.DB, factory *models.Factory, workOrderID uuid.UUID) (bool, error) {
 	order, err := factory.FindWorkOrder(db, workOrderID)
 	if err != nil {
@@ -178,45 +185,94 @@ func evaluatePullRequestChecks(
 		return true, false, nil
 	}
 
-	combined, _, err := client.GetCombinedStatus(ctx, repository, sha, &github.ListOptions{PerPage: 100})
+	unfinished, failed, err = evaluateCombinedStatuses(ctx, client, repository, sha)
 	if err != nil {
 		return false, false, err
 	}
-	unfinished, failed = combinedStatusGate(combined)
 
-	checks, _, err := client.ListCheckRunsForRef(ctx, repository, sha, &github.ListCheckRunsOptions{
+	checkUnfinished, checkFailed, err := evaluateCheckRuns(ctx, client, repository, sha)
+	if err != nil {
+		return false, false, err
+	}
+	return unfinished || checkUnfinished, failed || checkFailed, nil
+}
+
+func evaluateCombinedStatuses(
+	ctx context.Context,
+	client factoryGitHubAPI,
+	repository string,
+	sha string,
+) (unfinished bool, failed bool, err error) {
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		combined, response, err := client.GetCombinedStatus(ctx, repository, sha, opts)
+		if err != nil {
+			return false, false, err
+		}
+		pageUnfinished, pageFailed := combinedStatusGate(combined)
+		unfinished = unfinished || pageUnfinished
+		failed = failed || pageFailed
+		if response == nil || response.NextPage == 0 {
+			return unfinished, failed, nil
+		}
+		opts.Page = response.NextPage
+	}
+}
+
+func evaluateCheckRuns(
+	ctx context.Context,
+	client factoryGitHubAPI,
+	repository string,
+	sha string,
+) (unfinished bool, failed bool, err error) {
+	opts := &github.ListCheckRunsOptions{
 		Filter:      github.Ptr("latest"),
 		ListOptions: github.ListOptions{PerPage: 100},
-	})
-	if err != nil {
-		return false, false, err
 	}
-	checkUnfinished, checkFailed := checkRunGate(checks)
-	return unfinished || checkUnfinished, failed || checkFailed, nil
+	for {
+		checks, response, err := client.ListCheckRunsForRef(ctx, repository, sha, opts)
+		if err != nil {
+			return false, false, err
+		}
+		pageUnfinished, pageFailed := checkRunGate(checks)
+		unfinished = unfinished || pageUnfinished
+		failed = failed || pageFailed
+		if response == nil || response.NextPage == 0 {
+			return unfinished, failed, nil
+		}
+		opts.Page = response.NextPage
+	}
 }
 
 func combinedStatusGate(combined *github.CombinedStatus) (unfinished bool, failed bool) {
 	if combined == nil {
 		return false, false
 	}
-	switch strings.ToLower(combined.GetState()) {
-	case "pending":
-		unfinished = true
-	case "failure", "error":
-		failed = true
-	}
+	stateUnfinished, stateFailed := classifyCommitStatus(combined.GetState())
+	unfinished = stateUnfinished
+	failed = stateFailed
 	for _, status := range combined.Statuses {
 		if status == nil {
 			continue
 		}
-		switch strings.ToLower(status.GetState()) {
-		case "pending":
-			unfinished = true
-		case "failure", "error":
-			failed = true
-		}
+		statusUnfinished, statusFailed := classifyCommitStatus(status.GetState())
+		unfinished = unfinished || statusUnfinished
+		failed = failed || statusFailed
 	}
 	return unfinished, failed
+}
+
+func classifyCommitStatus(state string) (unfinished bool, failed bool) {
+	switch strings.ToLower(strings.TrimSpace(state)) {
+	case "", "success":
+		return false, false
+	case "pending":
+		return true, false
+	case "failure", "error":
+		return false, true
+	default:
+		return true, false
+	}
 }
 
 func checkRunGate(results *github.ListCheckRunsResults) (unfinished bool, failed bool) {
@@ -227,19 +283,25 @@ func checkRunGate(results *github.ListCheckRunsResults) (unfinished bool, failed
 		if run == nil {
 			continue
 		}
-		switch strings.ToLower(run.GetStatus()) {
-		case "queued", "in_progress", "waiting", "requested", "pending":
-			unfinished = true
-		}
-		if !strings.EqualFold(run.GetStatus(), "completed") {
-			continue
-		}
-		switch strings.ToLower(run.GetConclusion()) {
-		case "failure", "timed_out", "cancelled", "canceled":
-			failed = true
-		}
+		runUnfinished, runFailed := classifyCheckRun(run)
+		unfinished = unfinished || runUnfinished
+		failed = failed || runFailed
 	}
 	return unfinished, failed
+}
+
+func classifyCheckRun(run *github.CheckRun) (unfinished bool, failed bool) {
+	if !strings.EqualFold(run.GetStatus(), "completed") {
+		return true, false
+	}
+	switch strings.ToLower(strings.TrimSpace(run.GetConclusion())) {
+	case "success", "neutral", "skipped", "cancelled":
+		return false, false
+	case "failure", "error", "timed_out", "action_required":
+		return false, true
+	default:
+		return true, false
+	}
 }
 
 func allowedMergeMethods(repository *github.Repository) []pb.FactoryPullRequestMergeability_MergeMethod {

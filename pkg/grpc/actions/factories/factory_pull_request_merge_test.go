@@ -21,7 +21,9 @@ import (
 type fakeFactoryGitHub struct {
 	pullRequest   *github.PullRequest
 	combined      *github.CombinedStatus
+	combinedPages []*github.CombinedStatus
 	checkRuns     *github.ListCheckRunsResults
+	checkRunPages []*github.ListCheckRunsResults
 	repository    *github.Repository
 	mergeErr      error
 	mergedMethod  string
@@ -40,18 +42,47 @@ func (f *fakeFactoryGitHub) GetPullRequest(context.Context, string, int) (*githu
 	return f.pullRequest, nil, nil
 }
 
-func (f *fakeFactoryGitHub) GetCombinedStatus(context.Context, string, string, *github.ListOptions) (*github.CombinedStatus, *github.Response, error) {
+func (f *fakeFactoryGitHub) GetCombinedStatus(_ context.Context, _ string, _ string, opts *github.ListOptions) (*github.CombinedStatus, *github.Response, error) {
 	if f.combinedErr != nil {
 		return nil, nil, f.combinedErr
 	}
-	return f.combined, nil, nil
+	if len(f.combinedPages) > 0 {
+		page, next := fakeGitHubPage(opts, len(f.combinedPages))
+		return f.combinedPages[page], &github.Response{NextPage: next}, nil
+	}
+	return f.combined, &github.Response{}, nil
 }
 
-func (f *fakeFactoryGitHub) ListCheckRunsForRef(context.Context, string, string, *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
+func (f *fakeFactoryGitHub) ListCheckRunsForRef(_ context.Context, _ string, _ string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
 	if f.checkRunsErr != nil {
 		return nil, nil, f.checkRunsErr
 	}
-	return f.checkRuns, nil, nil
+	if len(f.checkRunPages) > 0 {
+		listOpts := github.ListOptions{}
+		if opts != nil {
+			listOpts = opts.ListOptions
+		}
+		page, next := fakeGitHubPage(&listOpts, len(f.checkRunPages))
+		return f.checkRunPages[page], &github.Response{NextPage: next}, nil
+	}
+	return f.checkRuns, &github.Response{}, nil
+}
+
+func fakeGitHubPage(opts *github.ListOptions, pageCount int) (index int, nextPage int) {
+	index = 0
+	if opts != nil && opts.Page > 1 {
+		index = opts.Page - 1
+	}
+	if index < 0 {
+		index = 0
+	}
+	if index >= pageCount {
+		return pageCount - 1, 0
+	}
+	if index+1 < pageCount {
+		return index, index + 2
+	}
+	return index, 0
 }
 
 func (f *fakeFactoryGitHub) FindRepository(string) (*github.Repository, error) {
@@ -216,6 +247,23 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, 0, api.mergeCalls)
+	})
+
+	t.Run("refuses while exclusive mutation access is held", func(t *testing.T) {
+		factory := newFactory(t)
+		order := createOrder(t, factory)
+		pr := createGitHubPR(t, factory, order)
+		grantExclusivePullRequestAccess(t, db, r, factory, pr)
+		api := readyAPI()
+		useGitHub(t, api)
+
+		_, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, mergeBlockedActiveRun, message)
 		assert.Equal(t, 0, api.mergeCalls)
 	})
 
@@ -421,6 +469,32 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		return resp.GetMergeability()
 	}
 
+	t.Run("reports exclusive mutation access", func(t *testing.T) {
+		factory := newFactory(t)
+		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		resp, err := CreateFactoryPullRequest(ctx, orgID, &pb.CreateFactoryPullRequestRequest{
+			FactoryId:   factory.ID.String(),
+			WorkOrderId: order.ID.String(),
+			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
+			Repository:  "acme/app",
+			Number:      42,
+			Url:         "https://github.com/acme/app/pull/42",
+			State:       pb.FactoryPullRequest_STATE_OPEN,
+		})
+		require.NoError(t, err)
+		grantExclusivePullRequestAccess(t, db, r, factory, resp.GetPullRequest())
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			repository:  allMethodsRepository(),
+		})
+
+		got := describe(t, factory, resp.GetPullRequest())
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedActiveRun, got.GetMessage())
+	})
+
 	t.Run("reports an active run", func(t *testing.T) {
 		factory := newFactory(t)
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
@@ -474,6 +548,126 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		assert.False(t, got.GetCanMerge())
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, got.GetBlockedReason())
 		assert.Equal(t, mergeBlockedChecksUnfinished, got.GetMessage())
+	})
+
+	t.Run("reports a failed check on a later page", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combinedPages: []*github.CombinedStatus{
+				{State: github.Ptr("success"), Statuses: []*github.RepoStatus{{Context: github.Ptr("lint"), State: github.Ptr("success")}}},
+				{State: github.Ptr("failure"), Statuses: []*github.RepoStatus{{Context: github.Ptr("e2e"), State: github.Ptr("failure")}}},
+			},
+			checkRuns:  &github.ListCheckRunsResults{},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedCheckFailed, got.GetMessage())
+	})
+
+	t.Run("reports an unfinished check on a later page", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    &github.CombinedStatus{State: github.Ptr("success")},
+			checkRunPages: []*github.ListCheckRunsResults{
+				{CheckRuns: []*github.CheckRun{{Status: github.Ptr("completed"), Conclusion: github.Ptr("success")}}},
+				{CheckRuns: []*github.CheckRun{{Status: github.Ptr("in_progress")}}},
+			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedChecksUnfinished, got.GetMessage())
+	})
+
+	t.Run("reports an action_required check as failed", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    &github.CombinedStatus{State: github.Ptr("success")},
+			checkRuns: &github.ListCheckRunsResults{
+				CheckRuns: []*github.CheckRun{{
+					Status:     github.Ptr("completed"),
+					Conclusion: github.Ptr("action_required"),
+				}},
+			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedCheckFailed, got.GetMessage())
+	})
+
+	t.Run("reports an error check as failed", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    &github.CombinedStatus{State: github.Ptr("success")},
+			checkRuns: &github.ListCheckRunsResults{
+				CheckRuns: []*github.CheckRun{{
+					Status:     github.Ptr("completed"),
+					Conclusion: github.Ptr("error"),
+				}},
+			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedCheckFailed, got.GetMessage())
+	})
+
+	t.Run("reports an unknown check conclusion as unfinished", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    &github.CombinedStatus{State: github.Ptr("success")},
+			checkRuns: &github.ListCheckRunsResults{
+				CheckRuns: []*github.CheckRun{{
+					Status:     github.Ptr("completed"),
+					Conclusion: github.Ptr("stale"),
+				}},
+			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedChecksUnfinished, got.GetMessage())
+	})
+
+	t.Run("allows a cancelled check", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    &github.CombinedStatus{State: github.Ptr("success")},
+			checkRuns: &github.ListCheckRunsResults{
+				CheckRuns: []*github.CheckRun{{
+					Status:     github.Ptr("completed"),
+					Conclusion: github.Ptr("cancelled"),
+				}},
+			},
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.True(t, got.GetCanMerge())
 	})
 
 	t.Run("reports a failed check", func(t *testing.T) {
@@ -568,4 +762,26 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		}, got.GetAllowedMethods())
 		assert.Equal(t, headSHA, got.GetHeadSha())
 	})
+}
+
+func grantExclusivePullRequestAccess(
+	t *testing.T,
+	db *gorm.DB,
+	r *support.ResourceRegistry,
+	factory *models.Factory,
+	pr *pb.FactoryPullRequest,
+) {
+	t.Helper()
+	canvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, support.RandomName("feedback"), "start")
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, entrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+	require.NoError(t, err)
+	result, err := stored.CreateActivity(db, models.FactoryPullRequestActivityParams{
+		RunID:       run.ID,
+		Access:      models.FactoryPullRequestAccessExclusive,
+		Description: "Address review comment",
+	})
+	require.NoError(t, err)
+	require.Equal(t, models.FactoryPullRequestActivityOutcomeReady, result.Outcome)
 }
