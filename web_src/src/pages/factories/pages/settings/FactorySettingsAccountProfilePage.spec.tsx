@@ -74,7 +74,9 @@ describe("FactorySettingsAccountProfilePage associated accounts", () => {
     renderPage("/settings/account/profile?auth_error=linked_account_in_use");
 
     await waitFor(() => {
-      expect(showErrorToast).toHaveBeenCalledWith("Another SuperPlane account already uses this GitHub account.");
+      expect(showErrorToast).toHaveBeenCalledWith(
+        "Another member in one of your organizations already uses this GitHub account.",
+      );
     });
   });
 

@@ -10,7 +10,8 @@ import (
 )
 
 // ErrLinkedAccountInUse reports that the external identity is already linked to
-// a different SuperPlane account. Two members must not claim the same author.
+// another member in a shared organization. Velocity credits one GitHub login to
+// one member per organization.
 var ErrLinkedAccountInUse = errors.New("linked account belongs to another account")
 
 // AccountLinkedAccount is an identity a member owns on another service. It is
@@ -68,6 +69,24 @@ func FindAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string)
 	return &linked, nil
 }
 
+func accountLinkedIdentityConflictsInSharedOrganization(tx *gorm.DB, ownerAccountID, claimantAccountID uuid.UUID) (bool, error) {
+	var exists bool
+	err := tx.Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM users owner_user
+			INNER JOIN users claimant_user ON owner_user.organization_id = claimant_user.organization_id
+			WHERE owner_user.account_id = ?
+				AND claimant_user.account_id = ?
+				AND owner_user.type = ?
+				AND claimant_user.type = ?
+				AND owner_user.deleted_at IS NULL
+				AND claimant_user.deleted_at IS NULL
+		)
+	`, ownerAccountID, claimantAccountID, UserTypeHuman, UserTypeHuman).Scan(&exists).Error
+	return exists, err
+}
+
 // SaveAccountLinkedAccount links the identity to the account. It replaces the
 // identity the account previously linked for the same provider, so a member can
 // correct a wrong link without an extra step.
@@ -79,7 +98,13 @@ func SaveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
 			First(&owner).
 			Error
 		if err == nil && owner.AccountID != linked.AccountID {
-			return ErrLinkedAccountInUse
+			conflicts, conflictErr := accountLinkedIdentityConflictsInSharedOrganization(tx, owner.AccountID, linked.AccountID)
+			if conflictErr != nil {
+				return conflictErr
+			}
+			if conflicts {
+				return ErrLinkedAccountInUse
+			}
 		}
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err

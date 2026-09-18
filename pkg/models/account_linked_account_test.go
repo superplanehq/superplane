@@ -42,20 +42,44 @@ func TestAccountLinkedAccount(t *testing.T) {
 		assert.Equal(t, "2", linked[0].ProviderID)
 	})
 
-	t.Run("refuses an identity another account already linked", func(t *testing.T) {
-		owner, err := CreateAccount("Owner", "owner@example.com")
+	t.Run("allows the same identity on accounts that share no organization", func(t *testing.T) {
+		owner, err := CreateAccount("Owner", "owner-shared@example.com")
 		require.NoError(t, err)
-		other, err := CreateAccount("Other", "other@example.com")
+		other, err := CreateAccount("Other", "other-shared@example.com")
 		require.NoError(t, err)
 
 		require.NoError(t, SaveAccountLinkedAccount(
 			database.Conn(),
-			NewAccountLinkedAccount(owner.ID, ProviderGitHub, "9", "taken-login", "", ""),
+			NewAccountLinkedAccount(owner.ID, ProviderGitHub, "9", "shared-login", "", ""),
+		))
+
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(other.ID, ProviderGitHub, "9", "shared-login", "", ""),
+		))
+	})
+
+	t.Run("refuses an identity when both accounts belong to the same organization", func(t *testing.T) {
+		owner, err := CreateAccount("Owner", "owner-org@example.com")
+		require.NoError(t, err)
+		other, err := CreateAccount("Other", "other-org@example.com")
+		require.NoError(t, err)
+
+		org, err := CreateOrganization("Shared Org", "")
+		require.NoError(t, err)
+		_, err = CreateUser(org.ID, owner.ID, owner.Email, owner.Name)
+		require.NoError(t, err)
+		_, err = CreateUser(org.ID, other.ID, other.Email, other.Name)
+		require.NoError(t, err)
+
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(owner.ID, ProviderGitHub, "10", "taken-login", "", ""),
 		))
 
 		err = SaveAccountLinkedAccount(
 			database.Conn(),
-			NewAccountLinkedAccount(other.ID, ProviderGitHub, "9", "taken-login", "", ""),
+			NewAccountLinkedAccount(other.ID, ProviderGitHub, "10", "taken-login", "", ""),
 		)
 		assert.ErrorIs(t, err, ErrLinkedAccountInUse)
 	})

@@ -2404,13 +2404,6 @@ CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider ON public.accou
 
 
 --
--- Name: idx_account_linked_accounts_provider_identity; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_account_linked_accounts_provider_identity ON public.account_linked_accounts USING btree (provider, provider_id);
-
-
---
 -- Name: idx_account_linked_accounts_provider_username; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4552,7 +4545,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918090357	f
+20260918103038	f
 \.
 
 
