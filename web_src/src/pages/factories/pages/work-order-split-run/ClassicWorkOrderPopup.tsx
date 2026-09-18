@@ -69,8 +69,11 @@ export function ClassicWorkOrderPopup({
   const reviewProps = {
     footer: classicFixture.footer,
     organizationId,
+    factoryId,
     factoryKey,
+    orderId,
     orderNumber,
+    pullRequests: popupData.pullRequests,
     canAct: canUpdate,
     onStart: draftStart,
     onArchive: mutations.onArchive,
