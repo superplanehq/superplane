@@ -17,7 +17,6 @@ import { SplitRunReview } from "./SplitRunReview";
 import { isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
-import { useImplementationRunnerModel } from "./useImplementationRunnerModel";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -115,7 +114,6 @@ function AnalysisWorkOrderPopup({
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
-  const modelLabel = useImplementationRunnerModel(organizationId, fixture.phases);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
@@ -201,8 +199,9 @@ function AnalysisWorkOrderPopup({
           >
             <OwnerTimeCostRow
               fixture={{ ...fixture, owner: edits.owner }}
-              modelLabel={modelLabel}
               assigneeIds={edits.assigneeIds}
+              usageByModel={fixture.usageByModel}
+              usageByMachineType={fixture.usageByMachineType}
             />
           </PopupHeader>
         )}

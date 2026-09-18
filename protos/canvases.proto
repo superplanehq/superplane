@@ -906,6 +906,11 @@ message CanvasRun {
   CanvasRunRef parent = 13;
   repeated string errors = 14;
   UserRef cancelled_by = 15;
+  // Ledger totals for this run tree. UI hides zero values.
+  int64 total_tokens = 16;
+  int64 cost_cents = 17;
+  // Models that recorded spend on this run tree.
+  repeated string models = 18;
 }
 
 message CanvasRunRef {
