@@ -15,6 +15,7 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
 import { ComposerPlanStack, type ComposerScore } from "./ComposerPlanControls";
+import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
@@ -52,6 +53,8 @@ export type IntentAnalysisChat = {
   closedDecision?: ReactNode;
   /** Model select for Start. The strip shows it on the settings row. */
   modelSelect?: ReactNode;
+  /** Permalink for a task the agent split off this draft. */
+  taskHref?: CreatedTaskHref;
 };
 
 type WorkOrderIntentRequestProps = {
@@ -137,6 +140,7 @@ function AnalysisRequestChat({
               streaming={state.active}
               files={transcriptFiles}
               activities={analysis.view.activities}
+              taskHref={analysis.taskHref}
             />
             {state.active ? (
               <AnalysisLiveWork

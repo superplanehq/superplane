@@ -8,6 +8,7 @@ import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
+import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
@@ -24,7 +25,7 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
+import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
@@ -151,7 +152,8 @@ function AnalysisWorkOrderPopup({
   };
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const stripAnalysis = fixture.footer.kind === "draft" ? { ...analysis, modelSelect: modelSelects.strip } : undefined;
+  const taskHref = createdTaskHref(organizationId, factoryKey, lineId);
+  const stripAnalysis = draftStripAnalysis(fixture.footer.kind, analysis, modelSelects.strip, taskHref);
 
   return (
     <PopupShell
@@ -266,6 +268,22 @@ function analysisPopupReview(args: {
       modelSelect={args.modelSelect}
     />
   );
+}
+
+/**
+ * The refine strip only shows for a draft. It gets the ghost model select
+ * and a permalink builder for tasks the agent splits off this one.
+ */
+function draftStripAnalysis(
+  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
+  analysis: ReturnType<typeof useAnalysisPlanningSession>,
+  modelSelect: ReactNode | undefined,
+  taskHref: CreatedTaskHref,
+) {
+  if (footerKind !== "draft") {
+    return undefined;
+  }
+  return { ...analysis, modelSelect, taskHref };
 }
 
 /**

@@ -202,6 +202,34 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(text, "Keep the existing retry helper."))
 }
 
+func TestAnalysisContinuationTextListsSplitTasks(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-split")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, session.SendUserMessage(db, "Yes, split it.", uuid.Nil))
+	created, err := session.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Add the retry table", Description: "Schema only."}, uuid.Nil)
+	require.NoError(t, err)
+
+	text, err := AnalysisContinuationText(db, session)
+	require.NoError(t, err)
+	key := factoryModel.WorkOrderKey(created.Number)
+	assert.Contains(t, text, "SuperPlane: Created task "+key+": Add the retry table")
+	assert.Contains(t, text, "Do not create a task that this session already created")
+	assert.NotContains(t, text, created.ID.String(), "the raw JSON body stays out of the prompt")
+}
+
 func TestAnalysisConversationWindowKeepsRecentMessagesWithHeadroom(t *testing.T) {
 	messages := []PlanningSessionMessage{
 		{Role: PlanningSessionMessageRoleUser, Text: "oldest context"},

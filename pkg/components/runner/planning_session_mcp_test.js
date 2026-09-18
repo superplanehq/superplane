@@ -12,6 +12,7 @@ const {
   proposeSpec,
   proposeClarity,
   proposeConfidence,
+  createTask,
   recordAgentMessage,
   writeAnalysisOutputs,
 } = require("./planning_session_mcp");
@@ -39,6 +40,10 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /does not publish the specification or the score/);
   assert.match(pack, /only after those calls/);
   assert.match(pack, /Do not leave a written plan unpublished/);
+  assert.match(pack, /Call create_task only after the user confirms a split/);
+  assert.match(pack, /Never create a task the user did not confirm/);
+  assert.match(pack, /narrow the specification to the part that stays/);
+  assert.match(pack, /If create_task fails, say that SuperPlane could not create the task/);
   assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
   assert.match(pack, /Do not name files/);
   assert.match(pack, /Answer the questions in this session/);
@@ -72,6 +77,12 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /### Raise Confidence through refinement/);
   assert.match(pack, /Split into two or three tasks that each fit one run/);
   assert.match(pack, /Be direct when the task is too big or too complex for one run/);
+  assert.match(pack, /### Split the task/);
+  assert.match(pack, /propose it in a survey question/);
+  assert.match(pack, /When the user confirms, create the other parts as new tasks/);
+  assert.doesNotMatch(pack, /create_task/);
+  assert.match(pack, /This task stays as the first part/);
+  assert.match(pack, /Do not create a task the user did not confirm/);
   assert.doesNotMatch(pack, /Do not push Confidence to 5/);
   assert.doesNotMatch(pack, /Do not ask a survey question to raise it/);
   assert.match(pack, /Confidence is provisional/);
@@ -265,9 +276,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const tools = replies[1].result.tools;
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task"],
   );
-  const [spec, clarity, confidence, survey] = tools;
+  const [spec, clarity, confidence, survey, createTaskTool] = tools;
   assert.deepEqual(spec.inputSchema.required, ["body"]);
   assert.match(spec.description, /Do not leave a written plan unpublished/);
   assert.match(clarity.description, /how well the task is defined/);
@@ -288,6 +299,10 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
     undefined,
   );
   assert.doesNotMatch(clarity.description, /check copy/);
+  assert.deepEqual(createTaskTool.inputSchema.required, ["title", "description"]);
+  assert.match(createTaskTool.description, /only after the user confirms/i);
+  assert.match(createTaskTool.description, /one call per task/i);
+  assert.match(createTaskTool.inputSchema.properties.description.description, /self-contained/i);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -302,8 +317,56 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task"],
   );
+});
+
+test("createTask posts the new task with the activity id and rejects empty input", async () => {
+  const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
+  const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
+  const previousActivityID = process.env.SUPERPLANE_ACTIVITY_ID;
+  const previousFetch = global.fetch;
+  const calls = [];
+  process.env.SUPERPLANE_BASE_URL = "https://superplane.example";
+  process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
+  process.env.SUPERPLANE_ACTIVITY_ID = "activity-1";
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      text: async () =>
+        '{"status":"created","work_order_id":"wo-1","key":"NEW-12","title":"Add the retry table"}',
+    };
+  };
+
+  try {
+    const result = await createTask({
+      title: "  Add the retry table ",
+      description: " Schema and migration only. ",
+    });
+    assert.equal(result.status, "created");
+    assert.equal(result.key, "NEW-12");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/tasks");
+    assert.equal(calls[0].options.method, "POST");
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      title: "Add the retry table",
+      description: "Schema and migration only.",
+      activity_id: "activity-1",
+    });
+    await assert.rejects(() => createTask({ title: "", description: "x" }), /title is required/);
+    await assert.rejects(() => createTask({ title: "x", description: "  " }), /description is required/);
+    assert.equal(calls.length, 1, "invalid input never reaches the server");
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
+    else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
+    if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
+    else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+    if (previousActivityID === undefined)
+      delete process.env.SUPERPLANE_ACTIVITY_ID;
+    else process.env.SUPERPLANE_ACTIVITY_ID = previousActivityID;
+  }
 });
 
 async function exchangeMCP(format, messages) {

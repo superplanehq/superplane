@@ -1,6 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
@@ -282,6 +283,48 @@ describe("WorkOrderIntentTranscript", () => {
     );
 
     expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("shows a created task as a card with its key, title, and an Open link", () => {
+    render(
+      <MemoryRouter>
+        <WorkOrderIntentTranscript
+          organizationId="org-1"
+          messages={[
+            { id: "agent-1", kind: "text", role: "agent", text: "Splitting the task as agreed." },
+            {
+              id: "task-1",
+              kind: "task",
+              role: "task",
+              workOrderId: "wo-2",
+              key: "NEW-2",
+              title: "Add the retry table",
+              number: 2,
+            },
+          ]}
+          taskHref={(task) => `/org-1/workspaces/acme/task/${task.number}`}
+        />
+      </MemoryRouter>,
+    );
+
+    const card = screen.getByTestId("split-run-intent-created-task");
+    expect(within(card).getByText("NEW-2")).toBeInTheDocument();
+    expect(within(card).getByText("Add the retry table")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: /open new-2/i })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/acme/task/2",
+    );
+    expect(within(card).getByText("New task")).toBeInTheDocument();
+  });
+
+  it("shows a created task without a link when there is no permalink yet", () => {
+    renderTranscript([
+      { id: "task-1", kind: "task", role: "task", workOrderId: "wo-2", key: "NEW-2", title: "Add the retry table" },
+    ]);
+
+    const card = screen.getByTestId("split-run-intent-created-task");
+    expect(within(card).getByText("Add the retry table")).toBeInTheDocument();
+    expect(within(card).queryByRole("link")).not.toBeInTheDocument();
   });
 
   it("hides plan-updated rows so the sticky control can own the latest plan", () => {

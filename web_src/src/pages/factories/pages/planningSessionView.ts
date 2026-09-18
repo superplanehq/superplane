@@ -1,6 +1,7 @@
 import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
+import { planningTaskMessageFromPayload } from "./planningTaskMessage";
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "./work-order-split-run/agentActivity";
 import { composerChipsWorking } from "./work-order-split-run/planChipStatus";
 
@@ -18,7 +19,7 @@ export type PlanningSessionPayload = {
   messages?: PlanningSessionMessagePayload[];
   activities?: PlanningSessionActivityPayload[];
   draft?: { title?: string; description?: string; workOrderId?: string } | null;
-  created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
+  created?: Array<{ id?: string; key?: string; title?: string; description?: string; number?: string | number }>;
   survey?: PlanningSessionSurveyPayload | null;
 };
 
@@ -159,7 +160,7 @@ export function createWithAgentViewFromSession(
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
-    messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
+    messages: planningSessionMessagesFromPayload(session),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
     created: createdOrdersFromSession(session),
@@ -173,15 +174,29 @@ export function createWithAgentViewFromSession(
 
 function createdOrdersFromSession(session: PlanningSessionPayload): CreateWithAgentCreatedOrder[] {
   return (session.created ?? [])
-    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
-      Boolean(order.id && order.key && order.title),
+    .filter(
+      (order): order is { id: string; key: string; title: string; description?: string; number?: string | number } =>
+        Boolean(order.id && order.key && order.title),
     )
-    .map((order) => ({
-      id: order.id,
-      key: order.key,
-      title: order.title,
-      description: order.description ?? "",
-    }));
+    .map((order) => {
+      const number = Number(order.number);
+      return {
+        id: order.id,
+        key: order.key,
+        title: order.title,
+        description: order.description ?? "",
+        ...(Number.isFinite(number) && number > 0 ? { number } : {}),
+      };
+    });
+}
+
+function planningSessionMessagesFromPayload(session: PlanningSessionPayload): CreateWithAgentMessage[] {
+  const createdByID = new Map(createdOrdersFromSession(session).map((order) => [order.id, order]));
+  return (session.messages ?? []).flatMap((message) =>
+    message.role === "task"
+      ? planningTaskMessageFromPayload(message, createdByID)
+      : planningSessionMessageFromPayload(message),
+  );
 }
 
 function planningSessionRightPane(

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -363,12 +364,11 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 			)
 		}
 		for _, message := range window.Messages {
-			role := "User"
-			if message.Role == PlanningSessionMessageRoleAgent {
-				role = "Agent"
-			}
-			fmt.Fprintf(&b, "\n%s: %s\n", role, strings.TrimSpace(message.Text))
+			fmt.Fprintf(&b, "\n%s: %s\n", rewindMessageRole(message), rewindMessageText(message))
 		}
+	}
+	if hasTaskMessage(window.Messages) {
+		b.WriteString("\nDo not create a task that this session already created. Create a task only for a part that is not listed above.\n")
 	}
 	b.WriteString("\nApply the latest user message. Do not rewrite the specification from scratch unless the new context requires it.\n")
 	return b.String(), nil
@@ -426,15 +426,43 @@ func analysisMessagesContextCharacters(messages []PlanningSessionMessage) int {
 }
 
 func analysisMessageContextCharacters(message PlanningSessionMessage) int {
-	return analysisMessageEnvelopeCharacters(message) + len([]rune(strings.TrimSpace(message.Text)))
+	return analysisMessageEnvelopeCharacters(message) + len([]rune(rewindMessageText(message)))
 }
 
 func analysisMessageEnvelopeCharacters(message PlanningSessionMessage) int {
-	role := "User"
-	if message.Role == PlanningSessionMessageRoleAgent {
-		role = "Agent"
+	return len([]rune(rewindMessageRole(message))) + len(": \n")
+}
+
+// rewindMessageRole names the speaker of a message in the rewind prompt.
+// Task messages come from SuperPlane, not from either side of the chat.
+func rewindMessageRole(message PlanningSessionMessage) string {
+	switch message.Role {
+	case PlanningSessionMessageRoleAgent:
+		return "Agent"
+	case PlanningSessionMessageRoleTask:
+		return "SuperPlane"
+	default:
+		return "User"
 	}
-	return len([]rune(role)) + len(": \n")
+}
+
+// rewindMessageText renders a message for the rewind prompt. A task message
+// becomes a short sentence, so the agent sees the key and title, not JSON.
+func rewindMessageText(message PlanningSessionMessage) string {
+	if message.Role != PlanningSessionMessageRoleTask {
+		return strings.TrimSpace(message.Text)
+	}
+	task, ok := ParsePlanningTaskMessage(message.Text)
+	if !ok {
+		return "Created a task."
+	}
+	return fmt.Sprintf("Created task %s: %s", task.Key, task.Title)
+}
+
+func hasTaskMessage(messages []PlanningSessionMessage) bool {
+	return slices.ContainsFunc(messages, func(message PlanningSessionMessage) bool {
+		return message.Role == PlanningSessionMessageRoleTask
+	})
 }
 
 func truncateAnalysisMessageForRewind(text string, limit int) string {

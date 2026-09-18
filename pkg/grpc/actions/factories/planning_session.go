@@ -313,6 +313,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 			Key:         factoryModel.WorkOrderKey(order.Number),
 			Title:       order.Title,
 			Description: order.Description,
+			Number:      order.Number,
 		})
 	}
 

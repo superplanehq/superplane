@@ -28,6 +28,8 @@ var defaultRefinePromptDigests = map[string]struct{}{
 	"3ced312559cb5a5b07b8df0be27242940be17aae0bb1e9b89df9f085d0876d33": {},
 	// Calibrated Confidence; refinement may raise Confidence.
 	"50eae06fb6d645a9ca446d234920f780fbd579975a5edfd96fb6da6be0348aed": {},
+	// Split the task: propose a split in a survey, create the parts on confirm.
+	"fe98c9788445b9c1444cccd44762dbd30ceecae6ef0185855e879d646017c51b": {},
 }
 
 func refinePromptDigest(prompt string) string {
