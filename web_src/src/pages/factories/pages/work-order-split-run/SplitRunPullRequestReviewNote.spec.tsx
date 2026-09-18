@@ -1,9 +1,18 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it, vi } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeability } from "@/api-client";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
+const mergeMutate = vi.fn();
+
+vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
+  useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
+  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+}));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
@@ -19,6 +28,14 @@ const ACTIONS: SplitRunFooterAction[] = [
   { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" },
 ];
 
+const GITHUB_PR: FactoriesFactoryPullRequest = {
+  id: "pr-6812",
+  provider: "PROVIDER_GITHUB",
+  url: "https://github.com/acme/payments/pull/6812",
+  number: "6812",
+  state: "STATE_OPEN",
+};
+
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
   Element.prototype.setPointerCapture ??= () => {};
@@ -26,11 +43,29 @@ beforeAll(() => {
   Element.prototype.scrollIntoView ??= () => {};
 });
 
+beforeEach(() => {
+  mergeMutate.mockReset();
+  mergeability.current = {
+    canMerge: true,
+    allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_MERGE"],
+    headSha: "abc123",
+  };
+});
+
 function renderNote(props: Partial<Parameters<typeof SplitRunAttentionNote>[0]> = {}) {
   return render(
     <MemoryRouter>
       <TooltipProvider>
-        <SplitRunAttentionNote note={PR_NOTE} tone="waiting" actions={ACTIONS} {...props} />
+        <SplitRunAttentionNote
+          note={PR_NOTE}
+          tone="waiting"
+          actions={ACTIONS}
+          organizationId="org-1"
+          factoryId="factory-1"
+          orderId="wo-1"
+          canAct
+          {...props}
+        />
       </TooltipProvider>
     </MemoryRouter>,
   );
@@ -103,5 +138,111 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).not.toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  });
+
+  it("enables merge when mergeability is true", () => {
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeEnabled();
+    expect(screen.queryByTestId("split-run-merge-reason")).not.toBeInTheDocument();
+  });
+
+  it("disables merge and shows the reason on hover when automation is running", async () => {
+    const user = userEvent.setup();
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
+      message: "Automation is still running.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
+  });
+
+  it("disables merge and shows the reason on hover when checks are still running", async () => {
+    const user = userEvent.setup();
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
+      message: "Checks are still running.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR], compact: true });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Checks are still running.");
+  });
+
+  it("lists only allowed merge methods", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-method"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
+  });
+
+  it("merges with the method the person picks in the menu", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-method"));
+    await user.click(await screen.findByTestId("split-run-merge-method-MERGE_METHOD_MERGE"));
+
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-6812",
+      mergeMethod: "MERGE_METHOD_MERGE",
+      expectedHeadSha: "abc123",
+    });
+  });
+
+  it("does not offer merge methods while merge is blocked", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECK_FAILED",
+      message: "A check failed.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+  });
+
+  it("sends the selected method once on click", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-button"));
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-6812",
+      mergeMethod: "MERGE_METHOD_SQUASH",
+      expectedHeadSha: "abc123",
+    });
+  });
+
+  it("hides merge for a merged pull request", () => {
+    renderNote({
+      pullRequests: [{ ...GITHUB_PR, state: "STATE_MERGED" }],
+    });
+
+    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
   });
 });
