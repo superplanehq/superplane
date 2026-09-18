@@ -131,7 +131,6 @@ describe("PhaseLogCard title line", () => {
 
   it("keeps a waiting timeout duration fixed", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
 
     render(
       <PhaseLogCard

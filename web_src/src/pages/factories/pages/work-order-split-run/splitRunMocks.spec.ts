@@ -1056,6 +1056,7 @@ describe("line board work-order examples", () => {
   });
 
   it("does not count pending analysis queue time as execution time", () => {
+    const queuedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       analysisRuns: [
@@ -1066,7 +1067,7 @@ describe("line board work-order examples", () => {
             id: "run-analysis",
             canvasId: "canvas-backlog",
             state: "STATE_PENDING",
-            createdAt: "2026-08-28T12:00:00Z",
+            createdAt: queuedAt,
           },
         },
       ],
@@ -1110,6 +1111,10 @@ describe("line board work-order examples", () => {
   });
 
   it("aggregates analysis usage across attempts without counting idle time", () => {
+    const firstStartedAt = Date.now() - 3 * 60 * 60 * 1000;
+    const firstFinishedAt = firstStartedAt + 10 * 60 * 1000 + 19 * 1000;
+    const retryStartedAt = firstFinishedAt + 2 * 60 * 60 * 1000;
+    const retryFinishedAt = retryStartedAt + 47 * 1000;
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       analysisRuns: [
@@ -1121,8 +1126,8 @@ describe("line board work-order examples", () => {
             canvasId: "canvas-backlog-first",
             state: "STATE_FINISHED",
             result: "RESULT_FAILED",
-            createdAt: "2026-09-18T12:56:00Z",
-            finishedAt: "2026-09-18T13:06:19Z",
+            createdAt: new Date(firstStartedAt).toISOString(),
+            finishedAt: new Date(firstFinishedAt).toISOString(),
             totalTokens: "329500",
             costCents: "71",
             models: ["anthropic/claude-opus-5"],
@@ -1136,8 +1141,8 @@ describe("line board work-order examples", () => {
             canvasId: "canvas-backlog-retry",
             state: "STATE_FINISHED",
             result: "RESULT_PASSED",
-            createdAt: "2026-09-18T16:21:00Z",
-            finishedAt: "2026-09-18T16:21:47Z",
+            createdAt: new Date(retryStartedAt).toISOString(),
+            finishedAt: new Date(retryFinishedAt).toISOString(),
             totalTokens: "34000",
             costCents: "19",
             models: ["anthropic/claude-opus-5", "openai/gpt-5"],
@@ -1151,7 +1156,7 @@ describe("line board work-order examples", () => {
       appId: "canvas-backlog-retry",
       runId: "run-passed",
       status: "passed",
-      startedAt: "2026-09-18T12:56:00Z",
+      startedAt: new Date(firstStartedAt).toISOString(),
       duration: "11m 6s",
       totalTokens: "363500",
       costCents: "90",
