@@ -106,4 +106,16 @@ describe("CardScoreBadges", () => {
     expect(tip).toHaveTextContent("Confidence score");
     expect(tip).toHaveTextContent("5/5");
   });
+
+  it("opens the tooltip from keyboard focus", async () => {
+    const user = userEvent.setup();
+    render(<CardScoreBadges clarity={2} confidence={5} testId="badges" />);
+
+    await user.tab();
+
+    expect(screen.getByTestId("badges")).toHaveFocus();
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Clarity score");
+    expect(tip).toHaveTextContent("Confidence score");
+  });
 });

@@ -72,6 +72,7 @@ export function CardScoreBadges({
       <TooltipTrigger asChild>
         <span
           role="img"
+          tabIndex={0}
           aria-label={speech}
           data-testid={testId}
           data-tone={readiness.tone}
