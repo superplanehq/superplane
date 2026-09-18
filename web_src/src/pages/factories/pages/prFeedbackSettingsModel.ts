@@ -347,7 +347,9 @@ export function waitingOnChecksWorkOrderIds(pullRequests: FactoriesFactoryPullRe
   return prFeedbackWorkOrderIds(pullRequests, "checks-wait");
 }
 
-export function isChecksPassedActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
+export function isChecksPassedActivity(
+  activity: FactoriesFactoryPullRequestActivity | undefined,
+): activity is FactoriesFactoryPullRequestActivity {
   if (!activity || isActivePRFeedbackActivity(activity)) {
     return false;
   }

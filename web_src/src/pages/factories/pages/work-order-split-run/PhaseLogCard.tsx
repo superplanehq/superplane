@@ -549,8 +549,9 @@ export function PhaseLogCard({
     onToggle,
   });
   const rootRef = useRef<HTMLDivElement>(null);
+  const streamNodeId = selectedNodeId ?? undefined;
   useLastRunningLine(rootRef, layout.followRunning);
-  useScrollSelectedStreamNode(selectedNodeId);
+  useScrollSelectedStreamNode(streamNodeId);
 
   return (
     <div ref={rootRef} className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={layout.current}>
@@ -587,7 +588,7 @@ export function PhaseLogCard({
             <PhaseLogCardStream
               phase={phase}
               groups={groups}
-              selectedNodeId={selectedNodeId}
+              selectedNodeId={streamNodeId}
               onSelectNode={onSelectNode}
               organizationId={organizationId}
               canvasId={canvasId}

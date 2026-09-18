@@ -185,7 +185,8 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    await openLogTab(user);
+    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-log-tab-dot")).toHaveAttribute("data-status-mark", "running");
     const activity = screen.getByTestId("split-run-phase-pr-feedback-run-queued");
     expect(within(activity).getByRole("link", { name: "@lucaspin" })).toBeInTheDocument();
     expect(within(activity).getByRole("link", { name: "review" })).toBeInTheDocument();

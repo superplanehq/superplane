@@ -169,6 +169,25 @@ describe("splitRunPopupModel", () => {
             {
               canvasId: "canvas-pr-feedback",
               pullRequestNumber: "12",
+              waitingForAccess: true,
+              run: {
+                id: "run-pr-feedback-queued",
+                canvasId: "canvas-pr-feedback",
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("log");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+          prFeedbackRuns: [
+            {
+              canvasId: "canvas-pr-feedback",
+              pullRequestNumber: "12",
               run: {
                 id: "run-pr-feedback",
                 canvasId: "canvas-pr-feedback",

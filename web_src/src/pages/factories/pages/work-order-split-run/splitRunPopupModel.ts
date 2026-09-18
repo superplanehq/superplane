@@ -55,7 +55,9 @@ export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopup
 
 export function hasActivePullRequestActivity(fixture: SplitRunFixture): boolean {
   return fixture.phases.some(
-    (phase) => Boolean(phase.pullRequestActivity) && (phase.status === "running" || phase.status === "pending"),
+    (phase) =>
+      Boolean(phase.pullRequestActivity) &&
+      (phase.status === "running" || phase.status === "pending" || phase.status === "waiting"),
   );
 }
 
