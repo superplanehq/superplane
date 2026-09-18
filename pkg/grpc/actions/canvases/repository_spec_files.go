@@ -21,6 +21,17 @@ func IsRepositorySpecFilePath(path string) bool {
 	return normalized == CanvasYAMLRepositoryPath || normalized == ConsoleYAMLRepositoryPath
 }
 
+func requireStagedSpecFilePath(path string) (string, error) {
+	normalized := normalizeRepositoryFilePath(path)
+	if normalized == "" {
+		return "", grpcerrors.InvalidArgument(nil, "file path is required")
+	}
+	if !IsRepositorySpecFilePath(normalized) {
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("only canvas.yaml and console.yaml can be staged; %q is not supported", path))
+	}
+	return normalized, nil
+}
+
 func normalizeRepositoryFilePath(path string) string {
 	return strings.TrimLeft(strings.TrimSpace(strings.ReplaceAll(path, "\\", "/")), "/")
 }
