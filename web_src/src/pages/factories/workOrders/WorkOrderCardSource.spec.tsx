@@ -128,22 +128,18 @@ describe("WorkOrderCard source icon", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("places the source icon before the agent question chip", () => {
-    renderCard(
-      {
-        ...baseOrder,
-        id: "wo-draft",
-        state: "STATE_DRAFT",
-        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
-      },
-      { hasAgentQuestion: true },
-    );
+  it("places the source icon in the title row", () => {
+    renderCard({
+      ...baseOrder,
+      id: "wo-draft",
+      state: "STATE_DRAFT",
+      origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+    });
 
     const source = screen.getByTestId("work-order-card-source-wo-draft");
-    const question = screen.getByTestId("work-order-card-agent-question-wo-draft");
-    const row = question.parentElement;
-    expect(row).not.toBeNull();
-    const children = [...(row?.children ?? [])];
-    expect(children.indexOf(source.closest("div") ?? source)).toBeLessThan(children.indexOf(question));
+    const title = screen.getByText("Ship refund retries");
+    const titleRow = title.parentElement;
+    expect(titleRow).not.toBeNull();
+    expect(titleRow?.contains(source)).toBe(true);
   });
 });

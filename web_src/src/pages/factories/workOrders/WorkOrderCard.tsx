@@ -5,7 +5,7 @@ import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
 import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
-import { workOrderCardSource, type WorkOrderCardSource } from "../lib/workOrderCardSource";
+import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
@@ -81,9 +81,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * The canonical task card.
  *
  * Every board uses this complete component. Status is an icon next
- * to the title. Optional pills sit on a middle row: a source icon,
- * an attached pull request, then attention such as Waiting on
- * status checks. The
+ * to the title, with the intake source icon on the right. Optional
+ * pills sit on a middle row: an attached pull request, then
+ * attention such as Waiting on status checks. The
  * footer shows when the task was created on the left, and the owner
  * given name plus avatar on the right (except on drafts). Drafts show
  * a Start button. Reviewed drafts also show a score to the left of
@@ -148,11 +148,11 @@ export function WorkOrderCard({
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
             {entry.title}
           </h3>
+          {source ? <WorkOrderSourceIcon entryId={entry.id} source={source} /> : null}
         </div>
 
         <WorkOrderCardStatusRow
           entryId={entry.id}
-          source={source}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           checksPassedLabel={checksPassedLabels.get(entry.id)}
@@ -197,7 +197,6 @@ function WorkOrderCardOpenControl({
 
 function WorkOrderCardStatusRow({
   entryId,
-  source,
   reasons,
   feedbackLabel,
   checksPassedLabel,
@@ -205,20 +204,18 @@ function WorkOrderCardStatusRow({
   hasAgentQuestion,
 }: {
   entryId: string;
-  source: WorkOrderCardSource | null;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   checksPassedLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
 }) {
-  if (!source && reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
-      {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
       {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
         <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
