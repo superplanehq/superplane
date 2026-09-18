@@ -144,7 +144,7 @@ spec:
               2/ Make long term fixes, not fast patches.
               3/ Add tests where it makes sense.
 
-              {{ task().visual_evidence_enabled ? "Visual evidence:\n\n- Changes that are not related to the UI do not require visual evidence.\n- For a visual-only change, capture and upload at least one screenshot.\n- If an interaction was added or changed, record and upload a short WebM video that shows the interaction works. A screenshot is optional.\n- Use `playwright cli` to capture the evidence.\n- Upload each evidence file with the SuperPlane upload_artifact tool.\n- Save screenshots and videos in $SUPERPLANE_TASK_DIR/evidence. Do not add them to the repository.\n- For a named Playwright output, use an absolute path under $SUPERPLANE_TASK_DIR/evidence. Automatic Playwright outputs already use this directory.\n- Keep the evidence focused. Do not capture secrets or unrelated user data.\n- If the preview, capture, or upload is unavailable, call report_visual_evidence_unavailable with a specific reason. Continue the task." : "" }}
+              {{ task().visual_evidence_enabled ? "Visual evidence:\n\n- Changes that are not related to the UI do not require visual evidence.\n- Rendered markup, styles, layout, and interaction behavior are UI changes. Unit tests do not replace visual evidence.\n- For a visual-only change, capture and upload at least one screenshot.\n- If an interaction was added or changed, record and upload a short WebM video that shows the interaction works. A screenshot is optional.\n- Use `playwright cli` to capture the evidence.\n- Upload each evidence file with the SuperPlane upload_artifact tool.\n- Save screenshots and videos in $SUPERPLANE_TASK_DIR/evidence. Do not add them to the repository.\n- For a named Playwright output, use an absolute path under $SUPERPLANE_TASK_DIR/evidence. Automatic Playwright outputs already use this directory.\n- A signed-in application is not required when an isolated preview can show the change.\n- Use an existing Storybook story or component preview first. If it does not show the changed state, create a focused temporary story or fixture.\n- Read repository setup instructions and package scripts before starting a preview. Run the preview in the background and wait until its URL responds.\n- Open the Storybook story iframe directly. Render the actual component instead of recreating it as static HTML.\n- If the repository has no component preview, start the application with local or mock data. Create a temporary preview route or harness when needed.\n- Remove temporary preview files before committing unless they are useful regression coverage.\n- Do not report evidence as unavailable only because the main application requires authentication or production data.\n- Before reporting evidence as unavailable, attempt at least one isolated preview and one Playwright capture. Include each command and concrete outcome in the report_visual_evidence_unavailable attempts field. Set each attempt type to preview, playwright, or upload.\n- Keep the evidence focused. Do not capture secrets or unrelated user data.\n- If preview, capture, or upload still fails after these attempts, call report_visual_evidence_unavailable with the reason and attempts. Continue the task." : "" }}
           - name: Commit and Push
             type: bash
             workingDirectory: repo
@@ -205,11 +205,8 @@ spec:
               fi
 
               EVIDENCE_COMMENT="$(jq -r '
-                if .status == "captured" then
+                if (.artifacts | length) > 0 then
                   "## Visual evidence\n\n" + ([.artifacts[].markdown] | join("\n\n"))
-                elif .status == "unavailable" then
-                  "## Visual evidence\n\nVisual evidence is unavailable: " + .reason +
-                  (if (.artifacts | length) > 0 then "\n\n" + ([.artifacts[].markdown] | join("\n\n")) else "" end)
                 else
                   ""
                 end
@@ -226,6 +223,8 @@ spec:
                   description: ($description | @base64),
                   visualEvidence: {
                     status: $evidence[0].status,
+                    reason: ($evidence[0].reason // ""),
+                    attempts: ($evidence[0].attempts // []),
                     artifacts: $evidence[0].artifacts,
                     comment: ($evidenceComment | @base64)
                   }
@@ -355,7 +354,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Implement From Task Description"].data.result.visualEvidence.status != "not_applicable"
+        expression: len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
       position:
         x: 1160
         "y": 1320
@@ -414,7 +413,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Implement From Task Description"].data.result.visualEvidence.status != "not_applicable"
+        expression: len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
       position:
         x: 1724
         "y": 1320
