@@ -2,6 +2,7 @@ import React from "react";
 import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
 import { resolveNodeIconColorClass } from "@/lib/colors";
 import { FACTORY_NODE_CARD_WIDTH, FACTORY_NODE_STEP_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn, resolveIcon } from "@/lib/utils";
 import { toTestId } from "@/lib/testID";
 import { NodeStatusFooter } from "./NodeStatusFooter";
@@ -108,7 +109,11 @@ export function FactoryNodeCardShell({
               <img
                 src={iconSrc}
                 alt=""
-                className={cn("size-4 object-contain opacity-90", invertMonoIcon && "dark:invert")}
+                className={cn(
+                  "size-4 object-contain opacity-90",
+                  invertMonoIcon && "dark:invert",
+                  logoDarkInvertClass(iconSrc),
+                )}
               />
             ) : (
               <Icon size={16} className={resolveNodeIconColorClass(iconColor)} />
