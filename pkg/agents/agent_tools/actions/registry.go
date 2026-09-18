@@ -41,7 +41,7 @@ func NewDefaultRegistry(deps Dependencies) *Registry {
 		newAccessAction(deps),
 		newReadAction(deps),
 		newReadRuntimeAction(deps),
-		newListFilesAction(deps),
+		newListFilesAction(),
 		newReadFileAction(deps),
 		writeFileAction{},
 		deleteFileAction{},

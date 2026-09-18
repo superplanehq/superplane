@@ -137,7 +137,7 @@ func createPRFeedbackCanvas(
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build PR feedback automation")
 	}
 
-	response, err := canvases.CreateCanvasWithSeedFiles(
+	response, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
 		deps.Encryptor,
@@ -151,7 +151,6 @@ func createPRFeedbackCanvas(
 		nodes,
 		edges,
 		deps.UsageService,
-		nil,
 	)
 	if err != nil {
 		return uuid.Nil, err

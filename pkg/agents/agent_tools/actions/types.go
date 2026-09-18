@@ -121,10 +121,9 @@ type runtimeReadResult struct {
 }
 
 type fileListResult struct {
-	Action       string   `json:"action"`
-	CanvasID     string   `json:"canvas_id"`
-	Files        []string `json:"files"`
-	ContextFiles []string `json:"context_files,omitempty"`
+	Action   string   `json:"action"`
+	CanvasID string   `json:"canvas_id"`
+	Files    []string `json:"files"`
 }
 
 type fileReadResult struct {

@@ -183,7 +183,7 @@ func createCurrentBacklogForUpgrade(
 		customize(nodes)
 	}
 
-	created, err := canvases.CreateCanvasWithSeedFiles(
+	created, err := canvases.CreateCanvas(
 		ctx,
 		r.Registry,
 		r.Encryptor,
@@ -196,7 +196,6 @@ func createCurrentBacklogForUpgrade(
 		&factoryID,
 		nodes,
 		edges,
-		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -222,7 +221,7 @@ func createLegacyBacklogForUpgrade(
 		customize(legacyNodes)
 	}
 
-	created, err := canvases.CreateCanvasWithSeedFiles(
+	created, err := canvases.CreateCanvas(
 		ctx,
 		r.Registry,
 		r.Encryptor,
@@ -235,7 +234,6 @@ func createLegacyBacklogForUpgrade(
 		&factoryID,
 		legacyNodes,
 		legacyEdges,
-		nil,
 		nil,
 	)
 	require.NoError(t, err)
