@@ -2,6 +2,7 @@ package factories
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -29,6 +30,29 @@ func (g intakeGraph) Healthy(edges []models.Edge) bool {
 	}
 
 	return hasCanvasPath(edges, g.TriggerNodeID, g.CreateNodeID)
+}
+
+// TriggerIntegrationReady reports whether the trigger still points at a live
+// integration. An unbound trigger (no integration id) stays ready so a GitHub
+// intake created before VCS setup can be finished later. A set id must be in
+// readyIDs: a deleted or not-ready integration cannot receive items.
+func (g intakeGraph) TriggerIntegrationReady(spec models.LiveCanvasSpec, readyIDs map[string]struct{}) bool {
+	trigger := findIntakeNode(spec.Nodes, g.TriggerNodeID)
+	if trigger == nil {
+		return false
+	}
+
+	if trigger.IntegrationID == nil {
+		return true
+	}
+
+	integrationID := strings.TrimSpace(*trigger.IntegrationID)
+	if integrationID == "" {
+		return true
+	}
+
+	_, ready := readyIDs[integrationID]
+	return ready
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls

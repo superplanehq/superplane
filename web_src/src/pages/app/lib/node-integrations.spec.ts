@@ -148,6 +148,65 @@ describe("overlayIntegrationWarnings", () => {
 
     expect((result[0].data as { component: { error?: string } }).component.error).toBe("Existing error");
   });
+
+  it("adds an error when the saved integration id is missing and other integrations remain", () => {
+    const nodes = [
+      {
+        id: "node-4",
+        position: { x: 0, y: 0 },
+        data: {
+          trigger: {},
+        },
+      } as CanvasNode,
+    ];
+
+    const result = overlayIntegrationWarnings(
+      nodes,
+      [
+        {
+          metadata: { id: "integration-other" },
+          status: { state: "ready" },
+        },
+      ],
+      [
+        {
+          id: "node-4",
+          integration: { id: "integration-deleted" },
+        },
+      ],
+    );
+
+    expect((result[0].data as { trigger: { error?: string } }).trigger.error).toBe(
+      "This integration does not exist. Choose another integration.",
+    );
+  });
+
+  it("adds an error when the saved integration id is missing and the org has no integrations", () => {
+    const nodes = [
+      {
+        id: "node-5",
+        position: { x: 0, y: 0 },
+        data: {
+          trigger: {},
+        },
+      } as CanvasNode,
+    ];
+
+    const result = overlayIntegrationWarnings(
+      nodes,
+      [],
+      [
+        {
+          id: "node-5",
+          integration: { id: "integration-deleted" },
+        },
+      ],
+    );
+
+    expect((result[0].data as { trigger: { error?: string } }).trigger.error).toBe(
+      "This integration does not exist. Choose another integration.",
+    );
+  });
 });
 
 describe("stripCanvasNodeSetupWarningsForRunsView", () => {
