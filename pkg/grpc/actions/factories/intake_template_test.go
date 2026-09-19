@@ -67,6 +67,16 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.NotContains(t, create.Configuration["description"], "fields.description")
 	})
 
+	t.Run("a Sentry work order reads the formatted issue payload, not the permalink", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.data.issue.title }}", create.Configuration["title"])
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.NotContains(t, create.Configuration["description"], "permalink")
+	})
+
 	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {
 		for _, source := range []string{
 			models.FactoryIntakeSourceSentryExceptions,

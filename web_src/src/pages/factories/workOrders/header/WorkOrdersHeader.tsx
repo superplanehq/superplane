@@ -1,4 +1,4 @@
-import type { FactoriesFactoryLine } from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -7,7 +7,11 @@ import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
 import { factorySectionHeaderClassName } from "../../pages/factoryPageLayoutStyles";
-import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
+import {
+  buildAssigneeFilterOptions,
+  buildLineFilterOptions,
+  buildSourceFilterOptions,
+} from "../../lib/workOrderFilterOptions";
 import { WORK_ORDER_SCOPES, type WorkOrderListEntry } from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
 import { FilterChips } from "./FilterChips";
@@ -20,6 +24,7 @@ interface WorkOrdersHeaderProps {
   /** Every entry before scope/filters, used to build the assignee options. */
   entries: WorkOrderListEntry[];
   factoryLines: FactoriesFactoryLine[];
+  intakes?: FactoriesFactoryIntake[];
   onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
@@ -39,6 +44,7 @@ export function WorkOrdersHeader({
   state,
   entries,
   factoryLines,
+  intakes = [],
   onCreateWorkOrder,
   canCreate,
   permissionsLoading,
@@ -48,6 +54,7 @@ export function WorkOrdersHeader({
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const lineOptions = buildLineFilterOptions(factoryLines);
+  const sourceOptions = buildSourceFilterOptions(intakes, entries);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
 
   return (
@@ -64,7 +71,12 @@ export function WorkOrdersHeader({
             options={WORK_ORDER_SCOPES}
             testIdPrefix="work-orders-scope"
           />
-          <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+          <FilterMenu
+            state={state}
+            lineOptions={lineOptions}
+            sourceOptions={sourceOptions}
+            assigneeOptions={assigneeOptions}
+          />
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -97,7 +109,12 @@ export function WorkOrdersHeader({
             {hostedCreditEmptyBanner}
             {brokenIntegrationsBanner}
             {state.filterCount > 0 ? (
-              <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+              <FilterChips
+                state={state}
+                lineOptions={lineOptions}
+                sourceOptions={sourceOptions}
+                assigneeOptions={assigneeOptions}
+              />
             ) : null}
           </>
         ) : undefined

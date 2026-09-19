@@ -43,6 +43,10 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
+import {
+  useLineBoardColumnColorViewPreference,
+  type LineBoardColumnColorView,
+} from "../lib/lineBoardColumnColorViewPreference";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
@@ -101,7 +105,7 @@ import {
 } from "../lib/workOrderListModel";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
-import { buildAssigneeFilterOptions } from "../lib/workOrderFilterOptions";
+import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills } from "../workOrders/header/ScopePills";
@@ -123,6 +127,7 @@ import {
   factoryAppRunPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryJiraIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -133,7 +138,10 @@ import {
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
+  isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
+  jiraIntakeIntegrationIdFromSearch,
+  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -187,7 +195,7 @@ import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./us
 import {
   normalizeColumnColors,
   serializeColumnColors,
-  lineBoardColumnLaneClassName,
+  lineBoardColumnLaneProps,
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
@@ -232,11 +240,12 @@ export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
-  const { search, state: locationState } = useLocation();
+  const { pathname, search, state: locationState } = useLocation();
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
   const { view: columnAutomationView, setView: setColumnAutomationView } = useColumnAutomationViewPreference();
+  const { view: columnColorView, setView: setColumnColorView } = useLineBoardColumnColorViewPreference();
   const showAutomationRows = canChooseAutomationView && columnAutomationView === "names";
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
@@ -281,7 +290,8 @@ export function LinesPage() {
   const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake || canAddJiraIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
-  const [jiraIntakeSetupOpen, setJiraIntakeSetupOpen] = useState(false);
+  const jiraIntakeSetupOpen = isJiraIntakeSetupSearchOpen(search);
+  const returnedJiraIntegrationId = jiraIntakeIntegrationIdFromSearch(search);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -299,6 +309,7 @@ export function LinesPage() {
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
@@ -340,6 +351,24 @@ export function LinesPage() {
 
   usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
 
+  const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
+  const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const nextSteps = workspaceNextSteps({
+    onboardingComplete: isFactoryOnboardingComplete(factory),
+    canConfigure: canUpdate,
+    takenPRFeedbackSources,
+    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+  });
+  const nextStepBanner = workspaceNextStepBanner(nextSteps);
+  const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
+  const nextStepsCollapsed = isWorkspaceNextStepDeferred(nextStepBanner, nextStepDeferral.deferredStepId);
+
+  useEffect(() => {
+    if (shouldForgetDeferredWorkspaceNextStep(nextStepDeferral.deferredStepId, takenPRFeedbackSources)) {
+      nextStepDeferral.forget();
+    }
+  }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
+
   const canonicalNumber = canonicalWorkOrderNumber(permalink.order);
   if (routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber)) {
     return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
@@ -368,24 +397,6 @@ export function LinesPage() {
           navigate(factoryIntakePath(organizationId, factoryKey, selectedLine.id, intake.intakeId)),
         onAddIntake: () => setAddIntakeOpen(true),
       };
-
-  const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
-  const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
-  const nextSteps = workspaceNextSteps({
-    onboardingComplete: isFactoryOnboardingComplete(factory),
-    canConfigure: canUpdate,
-    takenPRFeedbackSources,
-    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
-  });
-  const nextStepBanner = workspaceNextStepBanner(nextSteps);
-  const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
-  const nextStepsCollapsed = isWorkspaceNextStepDeferred(nextStepBanner, nextStepDeferral.deferredStepId);
-
-  useEffect(() => {
-    if (shouldForgetDeferredWorkspaceNextStep(nextStepDeferral.deferredStepId, takenPRFeedbackSources)) {
-      nextStepDeferral.forget();
-    }
-  }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
 
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
@@ -432,7 +443,7 @@ export function LinesPage() {
       return;
     }
     if (template.id === "jira-issues") {
-      setJiraIntakeSetupOpen(true);
+      navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       return;
     }
     if (!isLineIntakeSourceId(template.id)) {
@@ -524,7 +535,9 @@ export function LinesPage() {
         open={jiraIntakeSetupOpen}
         organizationId={organizationId}
         factoryId={factoryId}
-        onClose={() => setJiraIntakeSetupOpen(false)}
+        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id)}
+        selectIntegrationId={returnedJiraIntegrationId}
+        onClose={() => navigate(withoutJiraIntakeSetupSearch(pathname, search), { replace: true })}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
@@ -579,8 +592,11 @@ export function LinesPage() {
               ) : undefined
             }
             hostedCreditEmptyBanner={hostedCreditEmptyBanner}
+            intakes={factoryIntakes}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
+            colorView={columnColorView}
+            onColorViewChange={setColumnColorView}
           />
           <NextStepsPanel
             steps={nextSteps}
@@ -622,7 +638,11 @@ export function LinesPage() {
                 ? () => navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, sentrySetupLineId))
                 : undefined
             }
-            onSetupJira={canSetupJira ? () => setJiraIntakeSetupOpen(true) : undefined}
+            onSetupJira={
+              canSetupJira
+                ? () => navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id))
+                : undefined
+            }
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations && customAutomationsEnabled
@@ -639,6 +659,7 @@ export function LinesPage() {
             githubIntegrationId={githubIntegrationId}
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
+            colorView={columnColorView}
             workOrderCardContext={{
               organizationId,
               factoryId,
@@ -651,6 +672,7 @@ export function LinesPage() {
               addressingFeedbackLabels,
               waitingOnChecksOrderIds,
               checksPassedOrderIds,
+              checksPassedLabels,
               fixesPausedOrderIds,
               pullRequests,
               ...cardActions,
@@ -676,8 +698,11 @@ function LineDetailHeader({
   hostedCreditHeaderKicker,
   nextStepsRestore,
   hostedCreditEmptyBanner,
+  intakes,
   automationView,
   onAutomationViewChange,
+  colorView,
+  onColorViewChange,
 }: {
   organizationId: string;
   factoryId: string;
@@ -689,12 +714,16 @@ function LineDetailHeader({
   hostedCreditHeaderKicker?: ReactNode;
   nextStepsRestore?: ReactNode;
   hostedCreditEmptyBanner?: ReactNode;
+  intakes: FactoriesFactoryIntake[];
   automationView?: ColumnAutomationView;
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
+  colorView: LineBoardColumnColorView;
+  onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
+  const sourceOptions = useMemo(() => buildSourceFilterOptions(intakes, entries), [entries, intakes]);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
   const title = humanizeLineName(line.name);
 
@@ -740,7 +769,7 @@ function LineDetailHeader({
             options={WORK_ORDER_SCOPES}
             testIdPrefix="work-orders-scope"
           />
-          <FilterMenu state={state} assigneeOptions={assigneeOptions} />
+          <FilterMenu state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -749,16 +778,21 @@ function LineDetailHeader({
             onChange={state.setSearch}
             onClose={state.closeSearch}
           />
-          {automationView && onAutomationViewChange ? (
-            <LineBoardViewMenu view={automationView} onViewChange={onAutomationViewChange} />
-          ) : null}
+          <LineBoardViewMenu
+            view={automationView}
+            onViewChange={onAutomationViewChange}
+            colorView={colorView}
+            onColorViewChange={onColorViewChange}
+          />
         </>
       }
       belowRow={
         hostedCreditEmptyBanner || state.filterCount > 0 ? (
           <>
             {hostedCreditEmptyBanner}
-            {state.filterCount > 0 ? <FilterChips state={state} assigneeOptions={assigneeOptions} /> : null}
+            {state.filterCount > 0 ? (
+              <FilterChips state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
+            ) : null}
           </>
         ) : undefined
       }
@@ -790,6 +824,7 @@ function LineDetail({
   githubIntegrationId,
   showColumnAutomations,
   showAutomationRows,
+  colorView,
   workOrderCardContext,
   peekOrder,
   onOpenWorkOrder,
@@ -818,6 +853,7 @@ function LineDetail({
   githubIntegrationId: string;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
+  colorView: LineBoardColumnColorView;
   workOrderCardContext: WorkOrderCardContext;
   peekOrder?: FactoriesWorkOrder | null;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
@@ -920,6 +956,7 @@ function LineDetail({
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
           showColumnAutomations={showColumnAutomations}
           showAutomationRows={showAutomationRows}
+          colorView={colorView}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
@@ -1166,6 +1203,7 @@ function PhaseBoard({
   analyzingOrderIds,
   showColumnAutomations,
   showAutomationRows,
+  colorView,
   automationsFor,
   onAutomationRowAction,
   onAddVerifyAutomation,
@@ -1193,6 +1231,7 @@ function PhaseBoard({
   analyzingOrderIds: ReadonlySet<string>;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
+  colorView: LineBoardColumnColorView;
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
@@ -1316,6 +1355,7 @@ function PhaseBoard({
             setBacklogSettingsOpen(false);
           }}
           colorId={columnColors.backlog ?? null}
+          colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canRename}
@@ -1352,6 +1392,7 @@ function PhaseBoard({
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
+              colorView={colorView}
               onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
               canRename={canRename}
               onRename={(title) => setColumnTitle(columnKey, title)}
@@ -1372,6 +1413,7 @@ function PhaseBoard({
           listeners={verifyListeners}
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
+          colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("verify", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("verify", title)}
@@ -1389,6 +1431,7 @@ function PhaseBoard({
           orders={doneOrders}
           title={doneTitle}
           colorId={columnColors.done ?? null}
+          colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("done", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("done", title)}
@@ -1410,6 +1453,7 @@ function VerifyColumn({
   listeners,
   onAdd,
   colorId,
+  colorView,
   onColorChange,
   canRename,
   onRename,
@@ -1425,6 +1469,7 @@ function VerifyColumn({
   listeners: LaneListener[];
   onAdd?: () => void;
   colorId: LineBoardColumnColorId | null;
+  colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -1435,7 +1480,7 @@ function VerifyColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
 }) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
 
   return (
     <WorkOrderBoardLane
@@ -1446,9 +1491,9 @@ function VerifyColumn({
       titleTestId="lines-column-title-verify"
       count={orders.length}
       tone="neutral"
-      surfaceClassName={surfaceClassName}
+      surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Verify."
-      className={surfaceClassName ? undefined : "bg-muted"}
+      className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
           {automationRowCount ? null : (
@@ -1510,6 +1555,7 @@ function DoneColumn({
   orders,
   title,
   colorId,
+  colorView,
   onColorChange,
   canRename,
   onRename,
@@ -1523,6 +1569,7 @@ function DoneColumn({
   orders: FactoriesWorkOrder[];
   title: string;
   colorId: LineBoardColumnColorId | null;
+  colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -1533,7 +1580,7 @@ function DoneColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
 }) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
 
   return (
     <WorkOrderBoardLane
@@ -1544,9 +1591,9 @@ function DoneColumn({
       titleTestId="lines-column-title-done"
       count={orders.length}
       tone="done"
-      surfaceClassName={surfaceClassName}
+      surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Done."
-      className={surfaceClassName ? undefined : "bg-muted"}
+      className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
           {automationRowCount ? null : (
@@ -1611,6 +1658,7 @@ function PhaseColumn({
   parallelism,
   onSaveParallelism,
   colorId,
+  colorView,
   onColorChange,
   canRename,
   onRename,
@@ -1628,6 +1676,7 @@ function PhaseColumn({
   parallelism: number;
   onSaveParallelism: (value: number) => void;
   colorId: LineBoardColumnColorId | null;
+  colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
   onRename: (title: string) => void;
@@ -1671,7 +1720,7 @@ function PhaseColumn({
       ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
       : null;
   const glyph = resolveColumnGlyph(column);
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView);
 
   return (
     <>
@@ -1680,7 +1729,8 @@ function PhaseColumn({
         label={`${title} phase`}
         count={totalRuns}
         tone={PHASE_LANE_TONE[glyph]}
-        surfaceClassName={surfaceClassName}
+        surfaceClassName={lane.surfaceClassName}
+        className={lane.className}
         emptyDescription="Nothing here."
         canRename={canRename}
         onRename={onRename}

@@ -2,6 +2,7 @@
 "use strict";
 
 const fs = require("fs");
+const { isCompactStatusText } = require("./analysis_protocol");
 
 /**
  * Stdio MCP server for task refinement.
@@ -118,12 +119,28 @@ async function proposeSpec(input) {
   return result;
 }
 
-async function proposeConfidence(input) {
+function scoreInput(input) {
   const score = Number(input && input.score);
   if (!Number.isFinite(score)) {
     throw new Error("score is required");
   }
   const summary = String((input && input.summary) || "").trim();
+  return { score, summary };
+}
+
+// Clarity: how well the task is defined. Publishes the clarity check only.
+async function proposeClarity(input) {
+  const { score, summary } = scoreInput(input);
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/clarity", {
+    score,
+    summary,
+  });
+}
+
+// Confidence: how likely a coding agent completes the task in one run. The
+// exit graph reads the score file as agent fit, so only Confidence writes it.
+async function proposeConfidence(input) {
+  const { score, summary } = scoreInput(input);
   const result = await requestJSON(
     "POST",
     "/api/v1/runner/planning-sessions/confidence",
@@ -136,9 +153,31 @@ async function proposeConfidence(input) {
   return result;
 }
 
+function currentActivityID() {
+  return String(process.env.SUPERPLANE_ACTIVITY_ID || "").trim() || undefined;
+}
+
+// Splits one task off the draft under refinement. SuperPlane creates the
+// draft, links it to this session, and shows it in the chat.
+async function createTask(input) {
+  const title = String((input && input.title) || "").trim();
+  if (!title) {
+    throw new Error("title is required");
+  }
+  const description = String((input && input.description) || "").trim();
+  if (!description) {
+    throw new Error("description is required");
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/tasks", {
+    title,
+    description,
+    activity_id: currentActivityID(),
+  });
+}
+
 async function recordAgentMessage(text) {
   const body = String(text || "").trim();
-  if (!body) {
+  if (!body || isCompactStatusText(body)) {
     return { status: "ignored" };
   }
   return requestJSON(
@@ -146,8 +185,7 @@ async function recordAgentMessage(text) {
     "/api/v1/runner/planning-sessions/agent-messages",
     {
       text: body,
-      activity_id:
-        String(process.env.SUPERPLANE_ACTIVITY_ID || "").trim() || undefined,
+      activity_id: currentActivityID(),
     },
   );
 }
@@ -155,7 +193,7 @@ async function recordAgentMessage(text) {
 const TOOLS = [
   {
     name: "propose_spec",
-    description: "Publish the full spec.md markdown for the open task. Call this only when Clarity is 3 or higher. Include the title, the brief (goal paragraph, Problem, Proposed outcome, Constraints), and the expanded plan. Do not add Open questions. Do not change the original request. Call this after you write the specification.",
+    description: "Publish the specification markdown for the open task. Call this before you stop whenever you write or update a specification this turn. Do not leave a written plan unpublished. Pass the full markdown body.",
     inputSchema: {
       type: "object",
       properties: {
@@ -165,9 +203,9 @@ const TOOLS = [
     },
   },
   {
-    name: "propose_confidence",
+    name: "propose_clarity",
     description:
-      "Publish the 1 through 5 Clarity score and a short summary. The score is how well you understand the task and how likely implementation is to succeed if it starts now. Write to the user in two short sentences or fewer. Use you. Do not name files. Do not describe agent fit. Score 5: The plan is ready. Review it and start if you are happy. Below 5: sentence 1 says why Clarity is not 5. Sentence 2 says what the user must add, decide, or answer. Keep asking until Clarity is 5. Scores 1 and 2: say there is not enough Clarity to write a plan. Call survey. Do not call propose_spec. Scores 3 and 4: write the plan, say how to raise Clarity, and call survey. If you also call survey, start with: Answer the questions in this session. Do not write a test or an acceptance check. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -177,8 +215,26 @@ const TOOLS = [
         },
         summary: {
           type: "string",
-          description:
-            "Write to the user. Use you. Two sentences or fewer. Score 5: The plan is ready. Review it and start if you are happy. Below 5: why Clarity is not 5, then what to add, decide, or answer. If you ask a survey, start with: Answer the questions in this session. Good: Clarity is 2 because a different prompt and the copy scope are not defined. Answer the questions in this session so I know what to duplicate and what the new agent setup must cover.",
+          description: "Short Clarity summary for the user. Follow the task prompt for length and shape.",
+        },
+      },
+      required: ["score", "summary"],
+    },
+  },
+  {
+    name: "propose_confidence",
+    description:
+      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        score: {
+          type: "number",
+          description: "Confidence from 1 through 5.",
+        },
+        summary: {
+          type: "string",
+          description: "Short Confidence summary for the user. Follow the task prompt for length and shape.",
         },
       },
       required: ["score", "summary"],
@@ -187,7 +243,7 @@ const TOOLS = [
   {
     name: "survey",
     description:
-      "Ask one plain question when Clarity is below 5, or when two valid readings exist. Use 2 to 4 short everyday options. Then stop and wait. Do not ask the same question in chat. Do not mention files, protos, or reuse paths. Good option: Title and description only. Bad option: Only a different model, chosen at Start (reuse the existing model override).",
+      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. Then stop and wait. Do not ask the same question in chat.",
     inputSchema: {
       type: "object",
       properties: {
@@ -210,6 +266,26 @@ const TOOLS = [
         },
       },
       required: ["questions"],
+    },
+  },
+  {
+    name: "create_task",
+    description:
+      "Split one part of this task into a new draft task in the same backlog. Call this only after the user confirms the split in chat or in a survey answer. One call per task. Do not create a task that this session already created. After you create the tasks, narrow this task to the part that stays, then call propose_spec, propose_clarity, and propose_confidence again.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short imperative title for the new task. Under 12 words.",
+        },
+        description: {
+          type: "string",
+          description:
+            "Markdown description of the new task. Self-contained: a reader who has not seen this chat must understand the goal, the scope, and what done looks like. Do not refer to this conversation.",
+        },
+      },
+      required: ["title", "description"],
     },
   },
 ];
@@ -266,10 +342,14 @@ async function handleRequest(message) {
       let result;
       if (name === "propose_spec") {
         result = await proposeSpec(args);
+      } else if (name === "propose_clarity") {
+        result = await proposeClarity(args);
       } else if (name === "propose_confidence") {
         result = await proposeConfidence(args);
       } else if (name === "survey") {
         result = await proposeSurvey(args);
+      } else if (name === "create_task") {
+        result = await createTask(args);
       } else {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
@@ -296,12 +376,30 @@ async function handleRequest(message) {
   }
 }
 
+const CONTENT_LENGTH_HEADER = "content-length:";
+
+function isContentLengthPrefix(buffer) {
+  const peek = buffer
+    .toString(
+      "utf8",
+      0,
+      Math.min(buffer.length, CONTENT_LENGTH_HEADER.length),
+    )
+    .toLowerCase();
+  return (
+    CONTENT_LENGTH_HEADER.startsWith(peek) ||
+    peek.startsWith(CONTENT_LENGTH_HEADER)
+  );
+}
+
 function parseFrames(buffer) {
   const messages = [];
   let rest = skipASCIIWhitespace(buffer);
   while (rest.length > 0) {
-    const peek = rest.toString("utf8", 0, Math.min(rest.length, 16));
-    if (/^content-length:/i.test(peek)) {
+    if (isContentLengthPrefix(rest)) {
+      if (rest.length < CONTENT_LENGTH_HEADER.length) {
+        break;
+      }
       const parsed = parseContentLengthFrame(rest);
       if (!parsed) {
         break;
@@ -412,11 +510,14 @@ if (require.main === module) {
 
 module.exports = {
   proposeSpec,
+  proposeClarity,
   proposeConfidence,
   proposeSurvey,
+  createTask,
   recordAgentMessage,
   surveyQuestions,
   TOOLS,
   writeAnalysisOutputs,
   analysisOutputPaths,
+  parseFrames,
 };

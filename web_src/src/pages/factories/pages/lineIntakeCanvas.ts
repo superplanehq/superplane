@@ -33,7 +33,7 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
     createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: "{{ root().data.data.issue.permalink }}",
+    createDescription: "{{ root().data.description }}",
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {

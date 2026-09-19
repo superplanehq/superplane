@@ -35,6 +35,7 @@ export type PlanningReviewAgentSlot = {
   isLoading?: boolean;
   organizationId?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
+  showVisualEvidenceSetting?: boolean;
 };
 
 /** Agent editor body. The column menu popup and the automation view Agent tab share this. */
@@ -47,6 +48,7 @@ export function PlanningReviewEditor({
   isLoading = false,
   showAutomationNote = true,
   showCancel = true,
+  showVisualEvidenceSetting = false,
 }: {
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
@@ -56,6 +58,7 @@ export function PlanningReviewEditor({
   isLoading?: boolean;
   showAutomationNote?: boolean;
   showCancel?: boolean;
+  showVisualEvidenceSetting?: boolean;
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
@@ -87,7 +90,12 @@ export function PlanningReviewEditor({
         </PopupBody>
       ) : (
         <PopupBody className="min-h-0 min-w-0 flex-1 bg-muted px-6 py-5">
-          <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} />
+          <PlanningReviewForm
+            draft={draft}
+            onChange={setDraft}
+            organizationId={organizationId}
+            showVisualEvidenceSetting={showVisualEvidenceSetting}
+          />
         </PopupBody>
       )}
       <footer className="flex shrink-0 items-center gap-4 border-t border-border px-6 py-4">

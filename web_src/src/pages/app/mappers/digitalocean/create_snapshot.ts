@@ -73,7 +73,7 @@ export const createSnapshotMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as DropletNodeMetadata | undefined;
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { droplet?: string; name?: string } | undefined;
 
   if (nodeMetadata?.dropletName) {
     metadata.push({ icon: "server", label: nodeMetadata.dropletName });

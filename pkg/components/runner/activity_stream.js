@@ -11,7 +11,7 @@ const DEFAULT_LIMITS = Object.freeze({
   toolOutputHeadBytes: 8 * 1024,
   snapshotBytes: 256 * 1024,
 });
-const SECRET_NAME_PATTERN = /(api[_-]?key|access[_-]?token|auth[_-]?token|run[_-]?token|secret|password|credential)/i;
+const SECRET_NAME_PATTERN = /(api[_-]?key|token|secret|password|credential)/i;
 const ANSI_PATTERN = /[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*)?\u0007)|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g;
 const UNSAFE_CONTROL_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001A\u001C-\u001F\u007F]/g;
 
@@ -54,6 +54,34 @@ function redactSensitiveText(value, env = process.env) {
     )
     .replace(/(https?:\/\/)[^/@\s]+:[^/@\s]+@/gi, "$1[REDACTED]@");
   return text;
+}
+
+function sanitizeLogValue(value, env = process.env) {
+  if (typeof value === "string") return sanitizeLogText(value, env);
+  if (Array.isArray(value)) return value.map((item) => sanitizeLogValue(item, env));
+  if (!value || typeof value !== "object") return value;
+  if (value.type === "image") {
+    return {
+      type: "image",
+      ...(value.mimeType ? { mimeType: String(value.mimeType) } : {}),
+      summary: "[image content omitted from logs]",
+    };
+  }
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeLogValue(item, env)]));
+}
+
+function sanitizeLogText(value, env = process.env) {
+  const text = String(value || "");
+  const trimmed = text.trim();
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+    try {
+      const start = text.indexOf(trimmed);
+      return `${text.slice(0, start)}${JSON.stringify(sanitizeLogValue(JSON.parse(trimmed), env))}${text.slice(start + trimmed.length)}`;
+    } catch (_error) {
+      // The value is normal text that happens to look like JSON.
+    }
+  }
+  return redactSensitiveText(text, env);
 }
 
 function byteLength(value) {
@@ -317,7 +345,7 @@ function createActivityStream(options = {}) {
     if (!item || item.status !== "running" || !rawText) {
       return;
     }
-    const text = redactSensitiveText(rawText, env);
+    const text = sanitizeLogText(rawText, env);
     const output = boundedOutput(item.output + text, limits.toolOutputBytes, limits.toolOutputHeadBytes);
     item.output = output.text;
     item.truncated ||= output.truncated;
@@ -592,4 +620,6 @@ module.exports = {
   createActivityStream,
   normalizeTerminalText,
   redactSensitiveText,
+  sanitizeLogText,
+  sanitizeLogValue,
 };

@@ -43,7 +43,9 @@ export const createDropletMapper: ComponentBaseMapper = {
     const droplet = outputs?.default?.[0]?.data as Record<string, any> | undefined;
     if (!droplet) return details;
 
-    const ip = droplet.networks?.v4?.find((n: any) => n.type === "public")?.ip_address;
+    const ip = droplet.networks?.v4?.find(
+      (n: { type?: string; ip_address?: string }) => n.type === "public",
+    )?.ip_address;
 
     details["Droplet ID"] = droplet.id?.toString() || "-";
     details["Name"] = droplet.name || "-";
@@ -66,7 +68,7 @@ export const createDropletMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { region?: string; size?: string } | undefined;
 
   if (configuration?.region) {
     metadata.push({ icon: "map-pin", label: `Region: ${configuration.region}` });

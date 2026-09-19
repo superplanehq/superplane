@@ -87,6 +87,8 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		req.GetName(),
 		req.GetDescription(),
 		factoryID,
+		nil,
+		nil,
 		s.usageService,
 	)
 }
@@ -406,24 +408,6 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 	}
 
 	return canvases.ResolveExecutionErrors(ctx, db, canvas, executionIDs)
-}
-
-func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanvasRepositoryRequest) (*pb.GetCanvasRepositoryResponse, error) {
-	db := database.DB(ctx)
-	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
-	if err != nil {
-		return nil, err
-	}
-	return canvases.GetCanvasRepository(ctx, s.gitProvider, canvas)
-}
-
-func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
-	db := database.DB(ctx)
-	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
-	if err != nil {
-		return nil, err
-	}
-	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, canvas)
 }
 
 func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasStagingRequest) (*pb.PutCanvasStagingResponse, error) {

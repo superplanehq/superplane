@@ -34,7 +34,7 @@ export function AnalysisLiveWork({
 
   if (!active) return null;
   return (
-    <div data-testid="split-run-intent-live-work">
+    <div className="mt-3" data-testid="split-run-intent-live-work">
       {activity ? <AgentActivityView activity={activity} live /> : null}
       {status ? (
         <p

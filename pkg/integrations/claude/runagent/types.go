@@ -49,7 +49,6 @@ type Spec struct {
 	Environment string          `json:"environmentId" mapstructure:"environmentId"`
 	Prompt      string          `json:"prompt" mapstructure:"prompt"`
 	VaultIDs    []string        `json:"vaultIds" mapstructure:"vaultIds"`
-	Files       []string        `json:"files" mapstructure:"files"`
 	Secrets     []SecretBinding `json:"secrets" mapstructure:"secrets"`
 	// PersistSession keeps the Managed Agents session after the run finishes so
 	// its transcript stays readable in the Anthropic Console.
@@ -138,8 +137,7 @@ func CollectSessionArtifacts(client *Client, sessionID string, expectsArtifacts 
 
 	artifacts := make([]SessionArtifact, 0, len(files))
 	for _, f := range files {
-		// Input files mounted into the session are listed too, but only
-		// agent-generated outputs are downloadable.
+		// Only agent-generated outputs are downloadable.
 		if !f.Downloadable || f.ID == "" {
 			continue
 		}

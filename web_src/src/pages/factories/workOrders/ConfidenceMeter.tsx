@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 import {
   clampConfidenceScore,
-  CLARITY_SCORE_LABEL,
+  CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   type ConfidenceBand,
@@ -20,8 +20,31 @@ const FILLED_TONE: Record<ConfidenceBand, string> = {
   Low: "bg-red-500",
 };
 
+type MeterSize = "sm" | "lg";
+
+const BAR_CLASS: Record<MeterSize, string> = {
+  lg: "h-2.5 w-2 rounded-[2px]",
+  sm: "h-2 w-1.5 rounded-[1px]",
+};
+
+function MeterBars({ value, size }: { value: number; size: MeterSize }) {
+  const band = confidenceBandForScore(value);
+  return (
+    <>
+      {Array.from({ length: CONFIDENCE_SCORE_MAX }, (_, index) => (
+        <span
+          key={index}
+          data-filled={index < value ? "true" : "false"}
+          className={cn("sp-meter-bar", BAR_CLASS[size], index < value ? FILLED_TONE[band] : "bg-muted-foreground/25")}
+        />
+      ))}
+    </>
+  );
+}
+
 export function ConfidenceMeter({
   score,
+  label = CONFIDENCE_CHECK_NAME,
   className,
   testId,
   showTooltip = true,
@@ -29,6 +52,8 @@ export function ConfidenceMeter({
   size = "sm",
 }: {
   score: number;
+  /** Check name read by screen readers and the tooltip. */
+  label?: string;
   className?: string;
   testId?: string;
   showTooltip?: boolean;
@@ -36,15 +61,13 @@ export function ConfidenceMeter({
   size?: "sm" | "lg";
 }) {
   const value = clampConfidenceScore(score);
-  const band = confidenceBandForScore(value);
   const scoreLabel = `${value}/${CONFIDENCE_SCORE_MAX}`;
-  const barClass = size === "lg" ? "h-2.5 w-2 rounded-[2px]" : "h-2 w-1.5 rounded-[1px]";
 
   const meter = (
     <span
       role={decorative ? undefined : "meter"}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : CLARITY_SCORE_LABEL}
+      aria-label={decorative ? undefined : label}
       aria-valuemin={decorative ? undefined : 0}
       aria-valuemax={decorative ? undefined : CONFIDENCE_SCORE_MAX}
       aria-valuenow={decorative ? undefined : value}
@@ -52,13 +75,7 @@ export function ConfidenceMeter({
       data-testid={testId}
       className={cn("pointer-events-auto inline-flex items-center gap-0.5", size === "lg" && "gap-1", className)}
     >
-      {Array.from({ length: CONFIDENCE_SCORE_MAX }, (_, index) => (
-        <span
-          key={index}
-          data-filled={index < value ? "true" : "false"}
-          className={cn("sp-meter-bar", barClass, index < value ? FILLED_TONE[band] : "bg-muted-foreground/25")}
-        />
-      ))}
+      <MeterBars value={value} size={size} />
     </span>
   );
 
@@ -70,12 +87,14 @@ export function ConfidenceMeter({
     <Tooltip>
       <TooltipTrigger asChild>{meter}</TooltipTrigger>
       <TooltipContent>
-        <span>{CLARITY_SCORE_LABEL}</span>
+        <span>{label}</span>
         <span className="ml-1.5 tabular-nums">{scoreLabel}</span>
       </TooltipContent>
     </Tooltip>
   );
 }
+
+export const SCORE_PAIR_LABEL = "Clarity and Confidence";
 
 export const CONFIDENCE_ANALYZING_LABEL = "Analyzing";
 export const CONFIDENCE_ANALYZING_TOOLTIP = "Agent is analyzing, refining, and planning this task.";

@@ -5,6 +5,8 @@ export type CreateWithAgentCreatedOrder = {
   key: string;
   title: string;
   description: string;
+  /** Factory-scoped sequence number; builds the task permalink. */
+  number?: number;
 };
 
 export type CreateWithAgentDraft = {
@@ -41,7 +43,26 @@ export type CreateWithAgentPlanMessage = {
   createdAtMs?: number;
 };
 
-export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentPlanMessage;
+/**
+ * A task the agent split off this draft. The transcript shows it as a card
+ * at the moment it was created, so the user can open it right away.
+ */
+export type CreateWithAgentTaskMessage = {
+  id: string;
+  kind: "task";
+  role: "task";
+  workOrderId: string;
+  key: string;
+  title: string;
+  number?: number;
+  activityId?: string;
+  createdAtMs?: number;
+};
+
+export type CreateWithAgentMessage =
+  | CreateWithAgentTextMessage
+  | CreateWithAgentPlanMessage
+  | CreateWithAgentTaskMessage;
 
 export type CreateWithAgentSurveyQuestion = {
   prompt: string;

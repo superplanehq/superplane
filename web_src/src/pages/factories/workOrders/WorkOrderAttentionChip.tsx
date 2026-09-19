@@ -1,4 +1,4 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarkdownContent } from "@/pages/app/Markdown";
 import { cn } from "@/lib/utils";
 
 import {
@@ -8,7 +8,8 @@ import {
   type WorkOrderAttentionReason,
 } from "../lib/workOrderAttention";
 
-const CHECKS_PASSED_TOOLTIP = "All checks on the pull request have passed.";
+const CHIP_MARKDOWN_LINK =
+  "pointer-events-auto relative z-10 font-semibold text-current !underline !decoration-current underline-offset-2";
 
 export function WorkOrderAttentionChip({
   reason,
@@ -28,46 +29,27 @@ export function WorkOrderAttentionChip({
         WORK_ORDER_ATTENTION_CHIP_CLASSNAME[reason],
         className,
       )}
-      title={text}
+      title={plainChipLabel(text)}
     >
       <Icon
         className={cn("size-3 shrink-0", (reason === "feedback" || reason === "checks") && "animate-spin")}
         aria-hidden
       />
-      <span className="truncate">{text}</span>
+      <MarkdownContent
+        content={text}
+        variant="workspace"
+        openLinksInNewTab
+        linkClassName={CHIP_MARKDOWN_LINK}
+        className="min-w-0 truncate text-[10px] leading-none text-current [&_p]:m-0 [&_p]:inline"
+      />
     </span>
   );
 }
 
-/**
- * Compact, icon-only mark for the "checksPassed" attention reason.
- *
- * getWorkOrderAttentionReasons only emits "checksPassed" alongside
- * "approval", so this mark sits next to the full Waiting for user review
- * pill. A second full-labeled pill would crowd a narrow card, so this
- * keeps the same color and icon but drops the visible label. The label
- * stays available as the accessible name (aria-label) so the meaning is
- * still announced to screen readers, and it is shown on hover/focus via
- * the Tooltip component.
- */
-export function WorkOrderChecksPassedMark() {
-  const Icon = WORK_ORDER_ATTENTION_ICON.checksPassed;
-  const text = WORK_ORDER_ATTENTION_LABEL.checksPassed;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5",
-            WORK_ORDER_ATTENTION_CHIP_CLASSNAME.checksPassed,
-          )}
-          aria-label={text}
-          tabIndex={0}
-        >
-          <Icon className="size-3 shrink-0" aria-hidden />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top">{CHECKS_PASSED_TOOLTIP}</TooltipContent>
-    </Tooltip>
-  );
+function plainChipLabel(value: string): string {
+  return value
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
 }

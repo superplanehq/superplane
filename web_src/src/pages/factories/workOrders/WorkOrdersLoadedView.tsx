@@ -4,6 +4,7 @@ import type {
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
 } from "@/api-client";
+import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
 import {
@@ -57,14 +58,17 @@ interface WorkOrdersLoadedViewProps {
  * and the shell page only handles fetching + mutations.
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
-  const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const { organizationId, workOrders, factory, state, currentUserId, pullRequests = [] } = props;
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
+  const { data: factoryIntakes } = useFactoryIntakes(organizationId, factory.id ?? "");
+  const intakes = factoryIntakes ?? [];
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -121,6 +125,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           addressingFeedbackLabels={addressingFeedbackLabels}
           waitingOnChecksOrderIds={waitingOnChecksOrderIds}
           checksPassedOrderIds={checksPassedOrderIds}
+          checksPassedLabels={checksPassedLabels}
           fixesPausedOrderIds={fixesPausedOrderIds}
           pullRequests={pullRequests}
         />
@@ -139,6 +144,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           state={state}
           entries={entries}
           factoryLines={props.factoryLines}
+          intakes={intakes}
           onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}

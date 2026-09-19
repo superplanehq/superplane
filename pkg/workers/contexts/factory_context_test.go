@@ -701,12 +701,7 @@ func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
 		Body:    "Ready for review",
 	}))
 
-	require.Len(t, notifications, 1)
-	assert.Equal(t, factory.ID.String(), notifications[0].FactoryID)
-	assert.Equal(t, order.ID.String(), notifications[0].OrderID)
-	assert.Equal(t, factoryevents.EventTypeOrderCommentAdded, notifications[0].EventType)
-	assert.Equal(t, "Ready for review", notifications[0].CommentBody)
-	assert.NotEmpty(t, notifications[0].ActorName)
+	assert.Empty(t, notifications)
 }
 
 func TestFactoryContext_SetWorkOrderStatusNote_EmitsNotification(t *testing.T) {
@@ -802,6 +797,75 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	assert.Equal(t, nodeExecution.NodeID, artifactAutomation.NodeID)
 	assert.Equal(t, line.Name, artifactAutomation.LineName)
 	assert.Equal(t, "component-under-test", artifactAutomation.StepName)
+}
+
+func TestFactoryContext_AddWorkOrderArtifact_KeyedRefresh(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Keyed artifact target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	var reasons []string
+	var notifications []messages.FactoryWorkOrderNotificationMessage
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			reasons = append(reasons, reason)
+		}).
+		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+			notifications = append(notifications, notification)
+		})
+
+	first, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url":   "https://preview.example.com/v1",
+			"title": "Preview",
+		},
+		Key: "storybook-preview",
+	})
+	require.NoError(t, err)
+
+	second, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url": "https://preview.example.com/v2",
+		},
+		Key: "storybook-preview",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, "https://preview.example.com/v2", second.Data["url"])
+	_, hasTitle := second.Data["title"]
+	assert.False(t, hasTitle)
+
+	assert.Equal(t, []string{
+		factoryevents.EventTypeOrderArtifactAdded,
+		factoryevents.EventTypeOrderArtifactUpdated,
+	}, reasons)
+	assert.Empty(t, notifications)
+
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+
+	events, err := order.ListEvents(database.Conn(), 50, nil)
+	require.NoError(t, err)
+	addedCount := 0
+	for _, event := range events {
+		if event.Type == factoryevents.EventTypeOrderArtifactAdded {
+			addedCount++
+		}
+		assert.NotEqual(t, factoryevents.EventTypeOrderArtifactUpdated, event.Type)
+	}
+	assert.Equal(t, 1, addedCount)
 }
 
 type automationPayload struct {

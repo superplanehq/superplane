@@ -11,6 +11,8 @@ WHISPER_MODEL="${WHISPER_MODEL:-/usr/local/share/whisper/ggml-tiny.bin}"
 MAX_DURATION_SECONDS="${VIDEO_MAX_DURATION_SECONDS:-900}"
 MAX_FRAMES="${VIDEO_MAX_FRAMES:-24}"
 MAX_WIDTH="${VIDEO_MAX_FRAME_WIDTH:-1280}"
+MAX_HEIGHT="${VIDEO_MAX_FRAME_HEIGHT:-1280}"
+MAX_SOURCE_PIXELS="${VIDEO_MAX_SOURCE_PIXELS:-16777216}"
 PROCESS_TIMEOUT="${VIDEO_PROCESS_TIMEOUT_SECONDS:-120}"
 DISK_BUDGET_BYTES="${VIDEO_DISK_BUDGET_BYTES:-2147483648}"
 
@@ -42,7 +44,7 @@ export ATTACHMENTS_DIR="$attachments"
 export MANIFEST_PATH="$manifest"
 export INDEX_PATH="$index"
 export WHISPER_MODEL
-export MAX_DURATION_SECONDS MAX_FRAMES MAX_WIDTH PROCESS_TIMEOUT DISK_BUDGET_BYTES
+export MAX_DURATION_SECONDS MAX_FRAMES MAX_WIDTH MAX_HEIGHT MAX_SOURCE_PIXELS PROCESS_TIMEOUT DISK_BUDGET_BYTES
 
 python3 - <<'PY'
 import json
@@ -60,6 +62,8 @@ whisper_model = os.environ["WHISPER_MODEL"]
 max_duration = float(os.environ["MAX_DURATION_SECONDS"])
 max_frames = int(os.environ["MAX_FRAMES"])
 max_width = int(os.environ["MAX_WIDTH"])
+max_height = int(os.environ["MAX_HEIGHT"])
+max_source_pixels = int(os.environ["MAX_SOURCE_PIXELS"])
 process_timeout = int(os.environ["PROCESS_TIMEOUT"])
 disk_budget = int(os.environ["DISK_BUDGET_BYTES"])
 
@@ -150,6 +154,12 @@ def usable_video_stream(stream) -> bool:
     return width > 0 and height > 0
 
 
+def source_dimensions_allowed(stream) -> bool:
+    width = int(stream.get("width") or 0)
+    height = int(stream.get("height") or 0)
+    return width <= max_source_pixels // height
+
+
 def unique_timestamps(duration: float) -> list[float]:
     stamps = [0.0]
     if duration > 0:
@@ -193,7 +203,7 @@ def extract_frame(path: Path, stamp: float, dest: Path) -> bool:
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-ss", f"{stamp:.3f}", "-i", str(path),
         "-frames:v", "1",
-        "-vf", f"scale='min({max_width},iw)':-2",
+        "-vf", f"scale=w='min({max_width},iw)':h='min({max_height},ih)':force_original_aspect_ratio=decrease",
         str(dest),
     ], timeout=30)
     return result.returncode == 0 and dest.is_file() and dest.stat().st_size > 0
@@ -203,6 +213,8 @@ def transcribe(path: Path, dest: Path, duration: float) -> str:
     wav = dest.with_suffix(".wav")
     try:
         cap = min(duration if duration > 0 else max_duration, max_duration)
+        if dir_size(attachments) + math.ceil(cap * 32000) > disk_budget:
+            return "disk_budget_exceeded"
         result = run([
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-i", str(path), "-vn", "-ac", "1", "-ar", "16000",
@@ -224,6 +236,9 @@ def transcribe(path: Path, dest: Path, duration: float) -> str:
         if dest.stat().st_size == 0:
             dest.write_text("Transcription failed.\n", encoding="utf-8")
             return "transcription_failed"
+        if dir_size(attachments) > disk_budget:
+            dest.unlink(missing_ok=True)
+            return "disk_budget_exceeded"
         return ""
     except subprocess.TimeoutExpired:
         dest.write_text("Transcription timed out.\n", encoding="utf-8")
@@ -247,6 +262,8 @@ def write_index(manifest):
         f"- Maximum media duration: {int(policy.get('max_duration_seconds', max_duration))} seconds",
         f"- Maximum frames per video: {policy.get('max_frames', max_frames)}",
         f"- Maximum frame width: {policy.get('max_frame_width', max_width)} pixels",
+        f"- Maximum frame height: {policy.get('max_frame_height', max_height)} pixels",
+        f"- Maximum source pixels: {policy.get('max_source_pixels', max_source_pixels)}",
         f"- Per-file processing timeout: {policy.get('process_timeout_seconds', process_timeout)} seconds",
         f"- Task disk budget: {int(policy.get('disk_budget_bytes', disk_budget))} bytes",
         "",
@@ -319,6 +336,12 @@ for item, dest in videos:
         print(f"{dest.name}: no video stream")
         continue
 
+    if any(not source_dimensions_allowed(stream) for stream in video_streams):
+        item["status"] = "failed"
+        item["reason"] = "dimensions_exceed_limit"
+        print(f"{dest.name}: video dimensions exceed limit")
+        continue
+
     duration = duration_seconds(payload)
     item["duration_seconds"] = duration
     item["has_audio"] = bool(audio_streams)
@@ -345,12 +368,24 @@ for item, dest in videos:
     if frames_dir.exists():
         shutil.rmtree(frames_dir)
     frames = []
+    budget_exceeded = False
     for stamp in stamps:
         filename = f"frame-{stamp:07.3f}.jpg".replace(":", "-")
         frame_path = frames_dir / filename
         if extract_frame(dest, stamp, frame_path):
+            if dir_size(attachments) > disk_budget:
+                budget_exceeded = True
+                shutil.rmtree(frames_dir)
+                frames = []
+                break
             rel = f"{frames_dir_name}/{filename}"
             frames.append({"path": rel, "timestamp_seconds": round(stamp, 3)})
+
+    if budget_exceeded:
+        item["status"] = "failed"
+        item["reason"] = "disk_budget_exceeded"
+        print(f"{dest.name}: disk budget exceeded", file=sys.stderr)
+        continue
 
     if not frames:
         item["status"] = "failed"
@@ -370,7 +405,8 @@ for item, dest in videos:
     transcript_name = dest.name + ".transcript.txt"
     transcript_path = attachments / transcript_name
     transcribe_reason = transcribe(dest, transcript_path, duration)
-    item["transcript"] = transcript_name
+    if transcript_path.is_file():
+        item["transcript"] = transcript_name
     if transcribe_reason:
         item["status"] = "partial"
         item["reason"] = transcribe_reason

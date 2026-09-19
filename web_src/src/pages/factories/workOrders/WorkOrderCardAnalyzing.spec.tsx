@@ -28,7 +28,12 @@ function liveThinkingCopy(testId: string): string | undefined {
   )?.textContent;
 }
 
-function renderCard(props: { isAnalyzing?: boolean; confidenceScore?: number; hasAgentQuestion?: boolean }) {
+function renderCard(props: {
+  isAnalyzing?: boolean;
+  clarityScore?: number;
+  confidenceScore?: number;
+  hasAgentQuestion?: boolean;
+}) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -94,12 +99,52 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows the meter after analysis finishes", () => {
+  it("calls an intake-only draft ready without a Start button", () => {
     renderCard({ confidenceScore: 4 });
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
-    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    const mark = screen.getByTestId("work-order-card-score-wo-1");
+    expect(mark).toHaveAttribute("data-tone", "ready");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveTextContent("Clarity–");
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveTextContent("Confidence4");
+    expect(mark).toHaveAttribute(
+      "aria-label",
+      "This task is ready to start. Clarity score no score yet. Confidence score 4 of 5",
+    );
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("asks for a review when only a mid Clarity exists", () => {
+    renderCard({ clarityScore: 3 });
+
+    const mark = screen.getByTestId("work-order-card-score-wo-1");
+    expect(mark).toHaveAttribute("data-tone", "caution");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveClass("text-orange-700");
+  });
+
+  it("shows both scores as badges after a refine session scores twice", () => {
+    renderCard({ clarityScore: 5, confidenceScore: 3 });
+
+    const mark = screen.getByTestId("work-order-card-score-wo-1");
+    expect(mark).toHaveAttribute("data-tone", "caution");
+    const clarity = screen.getByTestId("work-order-card-score-wo-1-clarity");
+    const confidence = screen.getByTestId("work-order-card-score-wo-1-confidence");
+    expect(clarity).toHaveTextContent("Clarity5");
+    expect(clarity).toHaveClass("text-emerald-700");
+    expect(confidence).toHaveTextContent("Confidence3");
+    expect(confidence).toHaveClass("text-orange-700");
+    expect(mark).toHaveAttribute(
+      "aria-label",
+      "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
+    );
+  });
+
+  it("keeps the blocked verdict without a Start button", () => {
+    renderCard({ clarityScore: 2, confidenceScore: 5 });
+
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("data-tone", "blocked");
+    expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveClass("text-red-700");
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
   it("stays quiet when no automation analyzes the task", () => {
@@ -120,8 +165,8 @@ describe("Confidence score on a backlog card", () => {
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
-    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("data-tone", "ready");
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
   it("hides Agent question after the task leaves the backlog", () => {

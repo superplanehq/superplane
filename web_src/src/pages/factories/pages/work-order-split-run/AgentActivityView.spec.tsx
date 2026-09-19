@@ -252,17 +252,33 @@ describe("AgentActivityView", () => {
           { ...completedTool("git-1", "bash", "Bash"), input: "git status --short" },
           { ...completedTool("git-2", "bash", "Bash"), input: "git log -1" },
           completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
-          completedTool("mcp-2", "propose_confidence", "mcp_tool_call"),
-          completedTool("mcp-3", "mcp__superplane__survey", "mcp__superplane__survey"),
+          completedTool("mcp-2", "propose_clarity", "mcp_tool_call"),
+          completedTool("mcp-3", "propose_confidence", "mcp_tool_call"),
+          completedTool("mcp-4", "mcp__superplane__survey", "mcp__superplane__survey"),
+          completedTool("mcp-5", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+          completedTool("mcp-6", "create_task", "mcp_tool_call"),
         ])}
       />,
     );
 
     expect(
       screen.getByRole("button", {
-        name: "Explored 2 files, explored repository 2 times, inspected Git 2 times, prepared specification, scored task, prepared questions",
+        name: "Explored 2 files, explored repository 2 times, inspected Git 2 times, prepared specification, scored task 2 times, prepared questions, created 2 tasks",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("folds created tasks into the completed task summary", () => {
+    render(
+      <AgentActivityView
+        activity={activityWithItems([
+          completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
+          completedTool("mcp-2", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Prepared task, created tasks" })).toBeInTheDocument();
   });
 
   it("keeps chronological tool batches collapsed inside a completed turn", async () => {

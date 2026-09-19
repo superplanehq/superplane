@@ -349,6 +349,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, repository, payload["repository"])
 		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
 		assert.Equal(t, defaultBranch, payload["default_branch"])
+		assert.Equal(t, false, payload["visual_evidence_enabled"])
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
@@ -373,6 +374,16 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.Equal(t, false, hasGitHubIssueOrigin)
+	})
+
+	t.Run("keeps the retired visual evidence expression disabled", func(t *testing.T) {
+		configuration := map[string]any{
+			"prompt": `Implement the task.{{ task().visual_evidence_enabled ? "\nCapture visual evidence." : "" }}`,
+		}
+
+		built, err := builder.Build(configuration)
+		require.NoError(t, err)
+		assert.Equal(t, "Implement the task.", built["prompt"])
 	})
 
 	t.Run("exposes origin for GitHub closing keywords", func(t *testing.T) {

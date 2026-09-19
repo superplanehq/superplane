@@ -23,9 +23,11 @@ type BacklogTemplateUpgradeResult struct {
 	Skipped  int
 }
 
-// UpgradeDefaultBacklogTemplates upgrades only generated version 1 Backlog
-// graphs. A behavioral change to the graph makes it user-owned and leaves it
-// on the runtime compatibility path.
+// UpgradeDefaultBacklogTemplates upgrades generated version 1 Backlog graphs
+// to the current template, and refreshes a Refine Task prompt that still
+// matches an earlier default. A behavioral change to the graph makes it
+// user-owned and leaves it on the runtime compatibility path; an edited prompt
+// stays as the user wrote it.
 func UpgradeDefaultBacklogTemplates(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -98,54 +100,93 @@ func upgradeBacklogTemplate(
 			return err
 		}
 		backlog = models.IsBacklogFactoryApp(liveVersion.Nodes, liveVersion.Edges)
-		if !backlog || !isDefaultLegacyBacklog(liveVersion.Nodes, liveVersion.Edges) {
+		if !backlog {
 			return nil
 		}
-
-		next := buildBacklogCanvas(backlogCanvasRequest{
-			Name:       locked.Name,
-			Agent:      intakeAgentFromCanvasNodes(liveVersion.Nodes),
-			GitHubName: backlogGitHubIntegrationName(liveVersion.Nodes),
-		})
-		nodes, edges, err := next.Parse(deps.Registry, locked.OrganizationID.String())
-		if err != nil {
-			return fmt.Errorf("parse Backlog template version %d: %w", backlogTemplateVersion, err)
+		if isDefaultLegacyBacklog(liveVersion.Nodes, liveVersion.Edges) {
+			upgraded = true
+			return upgradeLegacyBacklog(ctx, tx, deps, locked, liveVersion)
 		}
-		preserveBacklogNodePositions(liveVersion.Nodes, nodes)
-
-		err = canvases.PublishGeneratedCanvasNodesWithOwner(
-			ctx,
-			tx,
-			locked,
-			liveVersion.OwnerID,
-			"Upgrade Backlog task refinement",
-			nodes,
-			edges,
-			changesets.CanvasPublisherOptions{
-				Registry:       deps.Registry,
-				OrgID:          locked.OrganizationID,
-				Encryptor:      deps.Encryptor,
-				AuthService:    deps.AuthService,
-				WebhookBaseURL: deps.WebhookBaseURL,
-				GitProvider:    deps.GitProvider,
-			},
-		)
-		if err != nil {
-			return err
+		nodes := cloneBacklogNodes(liveVersion.Nodes)
+		if !refreshBacklogRefinePrompt(nodes) {
+			return nil
 		}
-		if err := locked.StampFactoryAppTemplate(
-			tx,
-			backlogTriggerNodeID,
-			models.FactoryAppTemplateBacklogID,
-			backlogTemplateVersion,
-		); err != nil {
-			return err
-		}
-
 		upgraded = true
-		return nil
+		return publishBacklogUpgrade(ctx, tx, deps, locked, liveVersion.OwnerID, "Refresh Backlog refine prompt", nodes, liveVersion.Edges)
 	})
-	return upgraded, backlog, err
+	if err != nil {
+		return false, backlog, err
+	}
+	return upgraded, backlog, nil
+}
+
+// upgradeLegacyBacklog replaces an untouched version 1 graph with the current
+// template and stamps the new version on the trigger.
+func upgradeLegacyBacklog(
+	ctx context.Context,
+	tx *gorm.DB,
+	deps IntakeDependencies,
+	locked *models.Canvas,
+	liveVersion *models.CanvasVersion,
+) error {
+	next := buildBacklogCanvas(backlogCanvasRequest{
+		Name:       locked.Name,
+		Agent:      intakeAgentFromCanvasNodes(liveVersion.Nodes),
+		GitHubName: backlogGitHubIntegrationName(liveVersion.Nodes),
+	})
+	nodes, edges, err := next.Parse(deps.Registry, locked.OrganizationID.String())
+	if err != nil {
+		return fmt.Errorf("parse Backlog template version %d: %w", backlogTemplateVersion, err)
+	}
+	preserveBacklogNodePositions(liveVersion.Nodes, nodes)
+
+	if err := publishBacklogUpgrade(ctx, tx, deps, locked, liveVersion.OwnerID, "Upgrade Backlog task refinement", nodes, edges); err != nil {
+		return err
+	}
+	return locked.StampFactoryAppTemplate(
+		tx,
+		backlogTriggerNodeID,
+		models.FactoryAppTemplateBacklogID,
+		backlogTemplateVersion,
+	)
+}
+
+func publishBacklogUpgrade(
+	ctx context.Context,
+	tx *gorm.DB,
+	deps IntakeDependencies,
+	locked *models.Canvas,
+	ownerID *uuid.UUID,
+	message string,
+	nodes []models.Node,
+	edges []models.Edge,
+) error {
+	return canvases.PublishGeneratedCanvasNodesWithOwner(
+		ctx,
+		tx,
+		locked,
+		ownerID,
+		message,
+		nodes,
+		edges,
+		changesets.CanvasPublisherOptions{
+			Registry:       deps.Registry,
+			OrgID:          locked.OrganizationID,
+			Encryptor:      deps.Encryptor,
+			AuthService:    deps.AuthService,
+			WebhookBaseURL: deps.WebhookBaseURL,
+			GitProvider:    deps.GitProvider,
+		},
+	)
+}
+
+// cloneBacklogNodes deep-copies nodes so a prompt refresh does not write into
+// the live version that is still referenced by the caller.
+func cloneBacklogNodes(nodes []models.Node) []models.Node {
+	encoded, _ := json.Marshal(nodes)
+	var cloned []models.Node
+	_ = json.Unmarshal(encoded, &cloned)
+	return cloned
 }
 
 func isDefaultLegacyBacklog(nodes []models.Node, edges []models.Edge) bool {

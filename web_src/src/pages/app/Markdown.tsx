@@ -117,6 +117,8 @@ interface MarkdownContentProps {
   organizationId?: string;
   mentionPeople?: WorkOrderMentionCandidate[];
   files?: WorkOrderFileRef[];
+  openLinksInNewTab?: boolean;
+  linkClassName?: string;
   "data-testid"?: string;
 }
 
@@ -138,6 +140,8 @@ export function MarkdownContent({
   organizationId,
   mentionPeople,
   files,
+  openLinksInNewTab = false,
+  linkClassName,
   "data-testid": dataTestId,
 }: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
@@ -200,8 +204,15 @@ export function MarkdownContent({
               {children}
             </b>
           ),
-          a: ({ children, href, node: _node, ...props }) => (
-            <MarkdownLink href={href} canvasId={canvasId} organizationId={organizationId} {...props}>
+          a: ({ children, href, className: anchorClassName, node: _node, ...props }) => (
+            <MarkdownLink
+              href={href}
+              canvasId={canvasId}
+              organizationId={organizationId}
+              openInNewTab={openLinksInNewTab}
+              className={cn(linkClassName, anchorClassName)}
+              {...props}
+            >
               {children}
             </MarkdownLink>
           ),
@@ -308,8 +319,11 @@ function MarkdownLink({
   children,
   canvasId,
   organizationId,
+  openInNewTab = false,
+  target,
+  rel,
   ...props
-}: ComponentProps<"a"> & { canvasId?: string; organizationId?: string }) {
+}: ComponentProps<"a"> & { canvasId?: string; organizationId?: string; openInNewTab?: boolean }) {
   const label = typeof children === "string" ? children : undefined;
 
   const integrationMatch = href?.match(/^integration:(.+)$/);
@@ -329,7 +343,12 @@ function MarkdownLink({
   }
 
   return (
-    <a href={href} {...props}>
+    <a
+      {...props}
+      href={href}
+      target={openInNewTab ? "_blank" : target}
+      rel={openInNewTab ? "noopener noreferrer" : rel}
+    >
       {children}
     </a>
   );

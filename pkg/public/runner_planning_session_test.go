@@ -19,8 +19,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -55,6 +57,14 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	server.Router.ServeHTTP(specRec, spec)
 	require.Equal(t, http.StatusOK, specRec.Code, specRec.Body.String())
 
+	clarity := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
+		`{"score":5,"summary":"The plan is ready."}`,
+	)))
+	clarity.Header.Set("Authorization", "Bearer "+token)
+	clarityRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(clarityRec, clarity)
+	require.Equal(t, http.StatusOK, clarityRec.Code, clarityRec.Body.String())
+
 	confidence := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
 		`{"score":4,"summary":"This issue is a good fit for an agent."}`,
 	)))
@@ -71,11 +81,16 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	assert.Equal(t, 4.0, checks[0].Score)
+	require.Len(t, checks, 2)
+	scores := map[string]float64{}
+	for _, check := range checks {
+		scores[check.Key] = check.Score
+	}
+	assert.Equal(t, 5.0, scores[models.PlanningClarityCheckKey])
+	assert.Equal(t, 4.0, scores[models.PlanningConfidenceCheckKey])
 }
 
-func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
+func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
@@ -83,7 +98,7 @@ func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
 		`{"score":2,"summary":"The request is still missing the failing path."}`,
 	)))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -98,6 +113,7 @@ func TestRunnerPlanningSessionConfidenceWithoutSpec(t *testing.T) {
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
+	assert.Equal(t, models.PlanningClarityCheckKey, checks[0].Key)
 	assert.Equal(t, 2.0, checks[0].Score)
 	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
 }
@@ -141,6 +157,55 @@ func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {
 	assert.Equal(t, models.PlanningSessionMessageRoleAgent, messages[0].Role)
 	assert.Equal(t, "I found the retry seam in billing/retry.go.", messages[0].Text)
 	assert.True(t, messages[0].Delivered)
+}
+
+func TestRunnerPlanningSessionCreatesSplitTask(t *testing.T) {
+	r := support.Setup(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+
+	body := `{"title":"Add the retry table","description":"Schema and migration only."}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code, "no user reply yet, so nothing confirms a split")
+	assert.Contains(t, rec.Body.String(), "user has not replied")
+
+	require.NoError(t, session.SendUserMessage(db, "Split: table first. Yes.", r.User))
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var response struct {
+		Status      string `json:"status"`
+		WorkOrderID string `json:"work_order_id"`
+		Key         string `json:"key"`
+		Title       string `json:"title"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Equal(t, "created", response.Status)
+	assert.Equal(t, "Add the retry table", response.Title)
+
+	split, err := session.SplitTaskOrders(db)
+	require.NoError(t, err)
+	require.Len(t, split, 1)
+	assert.Equal(t, split[0].ID.String(), response.WorkOrderID)
+	assert.Equal(t, factoryModel.WorkOrderKey(split[0].Number), response.Key)
+	assert.Equal(t, "Schema and migration only.", split[0].Description)
+
+	messages, err := models.ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
+	assert.Equal(t, models.PlanningSessionMessageRoleTask, messages[1].Role)
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(`{"title":"","description":"x"}`)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
 
 func TestRunnerPlanningSessionStoresActivityAndLinksAgentMessage(t *testing.T) {
@@ -255,6 +320,7 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 	}{
 		{name: "wait", method: http.MethodGet, path: "/api/v1/runner/planning-sessions/wait?hold_seconds=1"},
 		{name: "spec", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Plan"}`},
+		{name: "clarity", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/clarity", body: `{"score":4,"summary":"Clear"}`},
 		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},
 		{name: "agent message", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
@@ -437,6 +503,28 @@ func TestRunnerPlanningWaitCancelDoesNotConsumeUserMessage(t *testing.T) {
 	assert.Equal(t, "hello", delivered["text"])
 }
 
+func TestRunnerPlanningWaitIncludesAnalysisContinuation(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "Narrow the retry plan.", uuid.Nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "Narrow the retry plan.", delivered["text"])
+	continuation, _ := delivered["continuation"].(string)
+	assert.Contains(t, continuation, "Continue this SuperPlane analysis session")
+	assert.Contains(t, continuation, "Narrow the retry plan.")
+}
+
 func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
 	r := support.Setup(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)
@@ -563,6 +651,194 @@ func mustPlanningRunnerToken(t *testing.T, signer *jwt.Signer, session *models.F
 	}, time.Hour)
 	require.NoError(t, err)
 	return token
+}
+
+func TestBeginPlanningWaitAndNotify_PublishesAfterWaitCommits(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{
+			{Prompt: "Which service owns retries?", Options: []string{"Payments", "Billing"}},
+		},
+	}))
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.PlanningWaitPending, reloaded.WaitState)
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	require.Len(t, published, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderAgentQuestion, published[0].EventType)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[0].OrderID)
+	assert.Equal(t, "Which service owns retries?", published[0].QuestionPrompt)
+	assert.Empty(t, published[0].ActorUserID)
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	require.Len(t, published, 1)
+}
+
+func TestBeginPlanningWaitAndNotify_SkipsSessionWithoutTask(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{
+			{Prompt: "Which service owns retries?", Options: []string{"Payments", "Billing"}},
+		},
+	}))
+	session.DraftWorkOrderID = nil
+	session.WaitWorkOrderID = nil
+	require.NoError(t, db.Model(session).Updates(map[string]any{
+		"draft_work_order_id": nil,
+		"wait_work_order_id":  nil,
+	}).Error)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	assert.Empty(t, published)
+}
+
+func TestBeginPlanningWaitAndNotify_SkipsFollowUpWaitWithoutQuestion(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	assert.Empty(t, published)
+	assert.Equal(t, models.PlanningWaitPending, session.WaitState)
+}
+
+func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	orderID := *session.DraftWorkOrderID
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n"))
+	require.Len(t, published, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[0].EventType)
+	assert.Equal(t, orderID.String(), published[0].OrderID)
+	assert.Equal(t, factoryModel.ID.String(), published[0].FactoryID)
+	assert.Empty(t, published[0].ActorUserID)
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges again.\n"))
+	require.Len(t, published, 1)
+
+	require.NoError(t, session.End(db))
+	require.Len(t, published, 1)
+}
+
+func TestProposePlanningSpecAndNotify_PublishesAgainAfterResume(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	require.NotNil(t, session.CanvasID)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n"))
+	require.Len(t, published, 1)
+
+	require.NoError(t, session.End(db))
+	require.NoError(t, session.Reopen(db))
+	run, err := models.CreateCanvasRunInTransaction(db, *session.CanvasID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, session.AttachAgentRun(db, run.ID, ""))
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges again.\n"))
+	require.Len(t, published, 2)
+	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[1].EventType)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[1].OrderID)
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges a third time.\n"))
+	require.Len(t, published, 2)
+}
+
+func TestProposePlanningSpecAndNotify_PublishesWhenLegacySpecLacksRun(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	_, err = order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Key:  models.PlanningSpecArtifactKey + ":" + order.ID.String(),
+		Data: map[string]any{
+			"name":  models.PlanningSpecArtifactTitle,
+			"title": models.PlanningSpecArtifactTitle,
+			"body":  "# Retry refunds\n\nStop double charges.\n",
+		},
+	})
+	require.NoError(t, err)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges again.\n"))
+	require.Len(t, published, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[0].EventType)
+}
+
+func TestProposePlanningSpecAndNotify_SilentWithoutTask(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	session.DraftWorkOrderID = nil
+	session.WaitWorkOrderID = nil
+	require.NoError(t, db.Model(session).Updates(map[string]any{
+		"draft_work_order_id": nil,
+		"wait_work_order_id":  nil,
+	}).Error)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	err := proposePlanningSpecAndNotify(db, session, "# Retry refunds\n\nStop double charges.\n")
+	require.Error(t, err)
+	assert.Empty(t, published)
 }
 
 func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {

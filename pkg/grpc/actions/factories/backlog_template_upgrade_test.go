@@ -102,6 +102,109 @@ func Test__UpgradeDefaultBacklogTemplatesSkipsCustomizedBacklog(t *testing.T) {
 	assert.Len(t, versions, 1)
 }
 
+func Test__UpgradeDefaultBacklogTemplatesRefreshesStaleRefinePrompt(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+
+	stalePrompt := "## 3. Score\n\nScore Clarity from 1 through 5.\n\nTask:\n{{ root().data.workOrder }}"
+	staleDigest := refinePromptDigest(stalePrompt)
+	defaultRefinePromptDigests[staleDigest] = struct{}{}
+	t.Cleanup(func() { delete(defaultRefinePromptDigests, staleDigest) })
+
+	canvasModel, seededNodes, seededEdges := createCurrentBacklogForUpgrade(ctx, t, r, factoryModel.ID, func(nodes []models.Node) {
+		backlogRefineStep(findModelNode(t, nodes, backlogRefinementNodeID).Configuration)["prompt"] = stalePrompt
+	})
+	previousVersionID := *canvasModel.LiveVersionID
+
+	deps := backlogUpgradeDependencies(r)
+	result, err := UpgradeDefaultBacklogTemplates(ctx, deps, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, BacklogTemplateUpgradeResult{Upgraded: 1}, result)
+
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvasModel.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, previousVersionID, *reloaded.LiveVersionID)
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvasModel.ID)
+	require.NoError(t, err)
+	refreshed := backlogRefineStep(findModelNode(t, liveVersion.Nodes, backlogRefinementNodeID).Configuration)
+	assert.Equal(t, intakeRefinementPrompt(), refreshed["prompt"])
+	assert.Contains(t, refreshed["prompt"], "## 4. Score Confidence")
+
+	// Only the prompt changed. The rest of the graph is the user's.
+	expected := cloneBacklogNodes(seededNodes)
+	require.True(t, refreshBacklogRefinePrompt(expected))
+	assert.Equal(t, backlogBehaviorNodes(expected), backlogBehaviorNodes(liveVersion.Nodes))
+	assert.Equal(t, sortedBacklogEdges(seededEdges), sortedBacklogEdges(liveVersion.Edges))
+
+	result, err = UpgradeDefaultBacklogTemplates(ctx, deps, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, BacklogTemplateUpgradeResult{Skipped: 1}, result)
+}
+
+func Test__UpgradeDefaultBacklogTemplatesKeepsEditedRefinePrompt(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+
+	canvasModel, _, _ := createCurrentBacklogForUpgrade(ctx, t, r, factoryModel.ID, func(nodes []models.Node) {
+		backlogRefineStep(findModelNode(t, nodes, backlogRefinementNodeID).Configuration)["prompt"] = "Use the team's scoring rules."
+	})
+	previousVersionID := *canvasModel.LiveVersionID
+
+	result, err := UpgradeDefaultBacklogTemplates(ctx, backlogUpgradeDependencies(r), r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, BacklogTemplateUpgradeResult{Skipped: 1}, result)
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvasModel.ID)
+	require.NoError(t, err)
+	assert.Equal(t, previousVersionID, *reloaded.LiveVersionID)
+}
+
+// createCurrentBacklogForUpgrade seeds a Backlog from the current template, the
+// way ensureBacklogCanvas does, then lets the test age or edit it.
+func createCurrentBacklogForUpgrade(
+	ctx context.Context,
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	customize func([]models.Node),
+) (*models.Canvas, []models.Node, []models.Edge) {
+	t.Helper()
+	document := buildBacklogCanvas(backlogCanvasRequest{Name: "Backlog"})
+	nodes, edges, err := document.Parse(r.Registry, r.Organization.ID.String())
+	require.NoError(t, err)
+	if customize != nil {
+		customize(nodes)
+	}
+
+	created, err := canvases.CreateCanvas(
+		ctx,
+		r.Registry,
+		r.Encryptor,
+		r.AuthService,
+		r.GitProvider,
+		"http://localhost:8000",
+		r.Organization.ID,
+		document.Metadata.Name,
+		document.Metadata.Description,
+		&factoryID,
+		nodes,
+		edges,
+		nil,
+	)
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(created.GetCanvas().GetMetadata().GetId())
+	canvasModel, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	return canvasModel, nodes, edges
+}
+
 func createLegacyBacklogForUpgrade(
 	ctx context.Context,
 	t *testing.T,
@@ -118,7 +221,7 @@ func createLegacyBacklogForUpgrade(
 		customize(legacyNodes)
 	}
 
-	created, err := canvases.CreateCanvasWithSeedFiles(
+	created, err := canvases.CreateCanvas(
 		ctx,
 		r.Registry,
 		r.Encryptor,
@@ -131,7 +234,6 @@ func createLegacyBacklogForUpgrade(
 		&factoryID,
 		legacyNodes,
 		legacyEdges,
-		nil,
 		nil,
 	)
 	require.NoError(t, err)

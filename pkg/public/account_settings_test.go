@@ -300,7 +300,7 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
-	_, err = models.FindAccountByProvider(models.ProviderGitHub, "testuser")
+	_, err = models.FindAccountByProvider(database.Conn(), models.ProviderGitHub, "testuser")
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	replacement, err := models.CreateAccount("Other", originalEmail)
@@ -511,22 +511,36 @@ func TestLinkProviderToAccount_RefusesForeignIdentity(t *testing.T) {
 	other, err := models.CreateAccount("Other", "other-sso@example.com")
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(r.Encryptor, other, testGothUser("google", "google-1", "other-sso@example.com"))
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, other, testGothUser("google", "google-1", "other-sso@example.com"))
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(r.Encryptor, r.Account, testGothUser("google", "google-1", "other-sso@example.com"))
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, r.Account, testGothUser("google", "google-1", "other-sso@example.com"))
 	assert.ErrorIs(t, err, models.ErrSignInIdentityInUse)
 }
 
 func TestLinkProviderToAccount_AttachesUnusedIdentity(t *testing.T) {
 	r := support.Setup(t)
 
-	err := authentication.LinkProviderToAccount(r.Encryptor, r.Account, testGothUser("google", "google-2", "ada@example.com"))
+	err := authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, r.Account, testGothUser("google", "google-2", "ada@example.com"))
 	require.NoError(t, err)
 
-	linked, err := models.FindAccountByProvider(models.ProviderGoogle, "google-2")
+	linked, err := models.FindAccountByProvider(database.Conn(), models.ProviderGoogle, "google-2")
 	require.NoError(t, err)
 	assert.Equal(t, r.Account.ID, linked.ID)
+}
+
+func TestLinkProviderToAccount_RefusesSharedGitHubIdentity(t *testing.T) {
+	r := support.Setup(t)
+	first, err := models.CreateAccount("First GitHub", "first-github-sso@example.com")
+	require.NoError(t, err)
+	second, err := models.CreateAccount("Second GitHub", "second-github-sso@example.com")
+	require.NoError(t, err)
+
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, first, testGothUser(models.ProviderGitHub, "github-shared", first.Email))
+	require.NoError(t, err)
+
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, second, testGothUser(models.ProviderGitHub, "github-shared", second.Email))
+	assert.ErrorIs(t, err, models.ErrSignInIdentityInUse)
 }
 
 func testGothUser(provider, providerID, email string) goth.User {

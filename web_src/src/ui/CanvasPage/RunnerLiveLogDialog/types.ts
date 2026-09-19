@@ -1,9 +1,13 @@
+import type { AgentActivity, AgentActivityState } from "@/lib/agentActivity";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 
 export type RunnerLiveLogDialogProps = {
   title: string;
   canvasMode: "live" | "edit";
   execution: ExecutionInfo | null;
+  component?: string;
+  iconSlug?: string;
+  session?: { organizationId?: string; canvasId?: string };
 };
 
 export function isExecutionInFlight(execution: ExecutionInfo): boolean {
@@ -40,6 +44,7 @@ export type CommandSection = {
   preview?: string;
   lines: string[];
   events: CommandSectionEvent[];
+  activities?: AgentActivity[];
   status: "running" | "passed" | "failed";
   duration_ms: number | null;
   started_at: number | null;
@@ -55,6 +60,7 @@ export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
   pendingRecords?: PendingLiveLogRecord[];
+  activityState?: AgentActivityState;
   error: string | null;
   isLoading: boolean;
   isStreaming: boolean;

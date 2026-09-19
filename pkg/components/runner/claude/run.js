@@ -18,7 +18,10 @@ const SESSION_FILE = "claude_session";
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
-  const candidates = [path.join(taskDir, "activity_stream.js"), path.join(__dirname, "..", "activity_stream.js")];
+  const candidates = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ];
   for (const file of candidates) {
     if (file && fs.existsSync(file)) {
       return require(file);
@@ -52,7 +55,10 @@ const SYSTEM_PROMPT =
   "Prefer plain paths, shell commands, and simple indentation.";
 
 function loadAnalysisProtocolModule() {
-  const candidates = [path.join(__dirname, "analysis_protocol.js"), path.join(__dirname, "..", "analysis_protocol.js")];
+  const candidates = [
+    path.join(__dirname, "analysis_protocol.js"),
+    path.join(__dirname, "..", "analysis_protocol.js"),
+  ];
   for (const file of candidates) {
     try {
       return require(file);
@@ -65,7 +71,9 @@ function loadAnalysisProtocolModule() {
 
 function loadAnalysisProtocol() {
   const mod = loadAnalysisProtocolModule();
-  return typeof mod.analysisProtocol === "function" ? mod.analysisProtocol() : "";
+  return typeof mod.analysisProtocol === "function"
+    ? mod.analysisProtocol()
+    : "";
 }
 
 function withoutEmbeddedAnalysisProtocol(prompt) {
@@ -94,8 +102,15 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 const ANALYSIS_ALLOWED_TOOLS = [
   "mcp__superplane__propose_spec",
+  "mcp__superplane__propose_clarity",
   "mcp__superplane__propose_confidence",
   "mcp__superplane__survey",
+  "mcp__superplane__create_task",
+];
+const ARTIFACT_ALLOWED_TOOLS = [
+  "mcp__superplane__inspect_screenshot",
+  "mcp__superplane__upload_artifact",
+  "mcp__superplane__report_visual_evidence_unavailable",
 ];
 
 function envFlag(env, name) {
@@ -111,14 +126,33 @@ function planningSystemPrompt(env = process.env) {
 }
 
 function allowedClaudeTools(env = process.env) {
-  if (mcpToolsEnabled(env)) {
-    return [PLANNING_READONLY_TOOLS, "mcp__superplane", ...ANALYSIS_ALLOWED_TOOLS].join(",");
+  const workspaceAllow = Object.keys(workspaceMCPServers(env)).map(
+    (name) => `mcp__${name}`,
+  );
+  if (planningMCPEnabled(env)) {
+    return [
+      PLANNING_READONLY_TOOLS,
+      "mcp__superplane",
+      ...workspaceAllow,
+      ...ANALYSIS_ALLOWED_TOOLS,
+    ].join(",");
   }
-  return BASE_ALLOWED_TOOLS;
+  if (artifactMCPEnabled(env)) {
+    return [
+      BASE_ALLOWED_TOOLS,
+      "mcp__superplane",
+      ...workspaceAllow,
+      ...ARTIFACT_ALLOWED_TOOLS,
+    ].join(",");
+  }
+  if (workspaceAllow.length === 0) {
+    return BASE_ALLOWED_TOOLS;
+  }
+  return [BASE_ALLOWED_TOOLS, ...workspaceAllow].join(",");
 }
 
 function claudePermissionMode(env = process.env) {
-  if (mcpToolsEnabled(env)) {
+  if (planningMCPEnabled(env)) {
     // Planning sessions stay read-only by restricting allowedClaudeTools to
     // Read/Bash plus the planning MCP tools. We intentionally do NOT use
     // "plan" mode here: Claude Code blocks every non-read-only tool call in
@@ -132,7 +166,98 @@ function claudePermissionMode(env = process.env) {
 }
 
 function mcpToolsEnabled(env = process.env) {
-  return planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return planningMCPEnabled(env) || artifactMCPEnabled(env);
+}
+
+function planningMCPEnabled(env = process.env) {
+  return (
+    planningAnalysisEnabled(env) &&
+    envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")
+  );
+}
+
+function artifactMCPEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+}
+
+function artifactMCPPath(taskDir, env = process.env) {
+  return path.join(
+    taskDir,
+    planningMCPEnabled(env)
+      ? "planning_session_mcp.js"
+      : "task_artifact_mcp.js",
+  );
+}
+
+function configureArtifactOutput(taskDir, env = process.env) {
+  if (!artifactMCPEnabled(env)) return;
+  const outputDir = path.join(taskDir, "evidence");
+  fs.mkdirSync(outputDir, { recursive: true });
+  env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
+  env.PLAYWRIGHT_MCP_BROWSER = env.PLAYWRIGHT_MCP_BROWSER || "chromium";
+}
+
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const servers = Array.isArray(parsed.servers) ? parsed.servers : [];
+    const out = {};
+    for (const server of servers) {
+      const name = String((server && server.name) || "").trim();
+      if (!name || name === "superplane") {
+        continue;
+      }
+      out[name] = {
+        type: "http",
+        url: String((server && server.url) || "").trim(),
+        headers: server && server.headers && typeof server.headers === "object" ? server.headers : {},
+      };
+    }
+    return out;
+  } catch (_err) {
+    return {};
+  }
+}
+
+function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = false) {
+  const mcpServers = { ...workspaceMCPServers(env) };
+  if (includeSuperplane) {
+    mcpServers.superplane = {
+      command: "node",
+      args: [artifactMCPPath(taskDir, env)],
+    };
+  }
+  const names = Object.keys(mcpServers);
+  if (names.length === 0) {
+    return "";
+  }
+  const mcpConfigPath = path.join(taskDir, "mcp.runtime.json");
+  fs.writeFileSync(mcpConfigPath, `${JSON.stringify({ mcpServers })}\n`);
+  return mcpConfigPath;
 }
 
 function readSessionID(taskDir) {
@@ -150,7 +275,10 @@ function writeSessionID(taskDir, sessionID) {
   }
 }
 
-function claudeContinuationArgs(promptCount, sessionID) {
+function claudeContinuationArgs(promptCount, sessionID, env = process.env) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
+    return [];
+  }
   if (Number(promptCount) < 1) {
     return [];
   }
@@ -168,13 +296,13 @@ function claudeSessionIDFromEvent(event) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model]\n");
     process.exit(2);
   }
   runPrompt(args[0], args[1] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
@@ -190,13 +318,21 @@ async function runPrompt(promptFile, model) {
   }
 
   const promptCountPath = path.join(sp, "prompt_count");
-  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
-  let prompt = applyAnalysisContinuation(sp, promptCount, fs.readFileSync(promptFile, "utf8"));
+  const promptCount =
+    Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const sessionID = readSessionID(sp);
+  const continuationArgs = claudeContinuationArgs(promptCount, sessionID);
+  let prompt = applyAnalysisContinuation(
+    sp,
+    continuationArgs.length > 0 ? promptCount : 0,
+    fs.readFileSync(promptFile, "utf8"),
+  );
   if (planningAnalysisEnabled()) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
-  const sessionID = readSessionID(sp);
-  const planningToolsEnabled = mcpToolsEnabled();
+  const planningToolsEnabled = planningMCPEnabled();
+  const toolsEnabled = mcpToolsEnabled();
+  configureArtifactOutput(sp);
 
   const claudeArgs = [
     "--bare",
@@ -215,20 +351,14 @@ async function runPrompt(promptFile, model) {
   if (planningToolsEnabled) {
     println("Planning session tools enabled");
     println(`permission mode: ${claudePermissionMode()}`);
-    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + planningSystemPrompt();
-    const mcpConfigPath = path.join(sp, "mcp.runtime.json");
-    fs.writeFileSync(
-      mcpConfigPath,
-      `${JSON.stringify({
-        mcpServers: {
-          superplane: {
-            command: "node",
-            args: [path.join(sp, "planning_session_mcp.js")],
-          },
-        },
-      })}\n`,
-    );
+    claudeArgs[claudeArgs.length - 1] =
+      SYSTEM_PROMPT + planningSystemPrompt();
+  }
+  const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, toolsEnabled);
+  if (mcpConfigPath) {
     claudeArgs.push("--mcp-config", mcpConfigPath);
+  }
+  if (planningToolsEnabled) {
     claudeArgs.push("--allowedTools", allowedClaudeTools());
     println(`allowed tools: ${allowedClaudeTools()}`);
   } else {
@@ -237,7 +367,7 @@ async function runPrompt(promptFile, model) {
   if (model) {
     claudeArgs.push("--model", model);
   }
-  claudeArgs.push(...claudeContinuationArgs(promptCount, sessionID));
+  claudeArgs.push(...continuationArgs);
   claudeArgs.push("--", prompt);
 
   let command = "claude";
@@ -247,15 +377,25 @@ async function runPrompt(promptFile, model) {
     args = ["-oL", "-eL", "claude", ...claudeArgs];
   }
 
-  const activity = loadActivityStreamModule().createActivityStream({ provider: "claude", turn: promptCount + 1 });
+  const activity = loadActivityStreamModule().createActivityStream({
+    provider: "claude",
+    turn: promptCount + 1,
+  });
   activity.start();
-  const formatter = createFormatter(promptFile, (id) => writeSessionID(sp, id), activity);
+  const formatter = createFormatter(
+    promptFile,
+    (id) => writeSessionID(sp, id),
+    activity,
+  );
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stderr.pipe(process.stderr);
+  const stderrDone = pipeRedactedStderr(child.stderr);
 
-  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  const rl = readline.createInterface({
+    input: child.stdout,
+    crlfDelay: Infinity,
+  });
   rl.on("line", (raw) => formatter.handleLine(raw));
 
   const exitCode = await Promise.all([
@@ -264,6 +404,7 @@ async function runPrompt(promptFile, model) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
   ]).then(([code]) => code);
 
   // A nonzero exit code always means failure. But `claude -p` exits 0 even
@@ -279,9 +420,11 @@ async function runPrompt(promptFile, model) {
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
-  if (planningToolsEnabled) {
+  if (planningMCPEnabled()) {
     const result = JSON.parse(resultJSON);
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(result.result);
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+      result.result,
+    );
   }
   if (failed) {
     return exitCode !== 0 ? exitCode : 1;
@@ -290,7 +433,9 @@ async function runPrompt(promptFile, model) {
 }
 
 function commandExists(name) {
-  const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
+  const result = spawnSync("sh", ["-c", `command -v ${name}`], {
+    encoding: "utf8",
+  });
   return result.status === 0;
 }
 
@@ -325,10 +470,16 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function promptSeriesName(promptFile) {
@@ -337,7 +488,9 @@ function promptSeriesName(promptFile) {
   if (words.length === 0) {
     return "";
   }
-  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function createFormatter(promptFile, onSession, activityOverride) {
@@ -350,7 +503,9 @@ function createFormatter(promptFile, onSession, activityOverride) {
   let resultFailed = false;
   const telemetry = loadTurnTelemetry();
   const tools = createToolTracker(telemetry);
-  const activity = activityOverride || loadActivityStreamModule().createActivityStream({ provider: "claude" });
+  const activity =
+    activityOverride ||
+    loadActivityStreamModule().createActivityStream({ provider: "claude" });
   const activityBlocks = new Map();
 
   return {
@@ -384,9 +539,24 @@ function createFormatter(promptFile, onSession, activityOverride) {
           }
           break;
         case "stream_event": {
-          streamMessageId = applyStreamTelemetry(event, telemetry, streamMessageId);
-          handleClaudeActivityEvent(event.event, activity, activityBlocks, streamMessageId);
-          const next = formatStreamEvent(event, streamedText, inText, textBuf, activity.enabled);
+          streamMessageId = applyStreamTelemetry(
+            event,
+            telemetry,
+            streamMessageId,
+          );
+          handleClaudeActivityEvent(
+            event.event,
+            activity,
+            activityBlocks,
+            streamMessageId,
+          );
+          const next = formatStreamEvent(
+            event,
+            streamedText,
+            inText,
+            textBuf,
+            activity.enabled,
+          );
           streamedText = next.streamedText;
           inText = next.inText;
           textBuf = next.textBuf;
@@ -396,12 +566,18 @@ function createFormatter(promptFile, onSession, activityOverride) {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
-          const message = event.message && typeof event.message === "object" ? event.message : {};
+          const message =
+            event.message && typeof event.message === "object"
+              ? event.message
+              : {};
           telemetry.beginTurn(message.usage || event.usage, {
             messageId: message.id || event.uuid || "",
             message: assistantTextFromMessage(message),
             hasTools:
-              Array.isArray(message.content) && message.content.some((block) => block && block.type === "tool_use"),
+              Array.isArray(message.content) &&
+              message.content.some(
+                (block) => block && block.type === "tool_use",
+              ),
           });
           formatAssistant(event, streamedText, tools, activity);
           streamedText = false;
@@ -456,7 +632,8 @@ function createFormatter(promptFile, onSession, activityOverride) {
         parsed = {};
       }
       telemetry.attachToResult(parsed, { name: promptSeriesName(promptFile) });
-      return JSON.stringify(parsed);
+      const activity = loadActivityStreamModule();
+      return JSON.stringify(activity.sanitizeLogValue ? activity.sanitizeLogValue(parsed) : parsed);
     },
     // Claude Code's own "result" event is the authoritative verdict: headless
     // (-p) mode exits 0 even when the turn ended in an error (e.g. the API
@@ -470,11 +647,29 @@ function createFormatter(promptFile, onSession, activityOverride) {
 }
 
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogValue ? activity.sanitizeLogValue(rec) : rec;
+  process.stdout.write(`${JSON.stringify(safe)}\n`);
 }
 
 function println(text = "") {
-  process.stdout.write(`${text}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text);
+  process.stdout.write(`${safe}\n`);
+}
+
+function writeStderr(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stderr.write(safe);
+}
+
+function pipeRedactedStderr(stream) {
+  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  lines.on("line", (line) => {
+    writeStderr(`${line}\n`);
+  });
+  return new Promise((resolve) => lines.on("close", resolve));
 }
 
 function createToolTracker(telemetry) {
@@ -500,7 +695,12 @@ function createToolTracker(telemetry) {
     start(kind, text, id) {
       const key = resolveKey(id, true);
       const startedAt = Date.now();
-      openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
+      openTools.set(key, {
+        kind,
+        text: text || kind,
+        startedAt,
+        emitted: false,
+      });
     },
     emitStart(id) {
       let key = id != null && String(id).trim() ? String(id).trim() : "";
@@ -576,9 +776,17 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
-  const tools = Array.isArray(event.tools) ? event.tools.map((tool) => String(tool)) : [];
-  const planningTools = tools.filter((tool) => tool.includes("mcp__superplane"));
-  println(planningTools.length > 0 ? `planning tools: ${planningTools.join(", ")}` : "planning tools: none");
+  const tools = Array.isArray(event.tools)
+    ? event.tools.map((tool) => String(tool))
+    : [];
+  const planningTools = tools.filter((tool) =>
+    tool.includes("mcp__superplane"),
+  );
+  println(
+    planningTools.length > 0
+      ? `planning tools: ${planningTools.join(", ")}`
+      : "planning tools: none",
+  );
   if (event.mcp_server_errors) {
     println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
   }
@@ -591,8 +799,14 @@ function applyStreamTelemetry(event, telemetry, streamMessageId) {
     return streamMessageId;
   }
   if (payload.type === "message_start") {
-    const message = payload.message && typeof payload.message === "object" ? payload.message : {};
-    const messageId = message.id != null && String(message.id).trim() ? String(message.id).trim() : "";
+    const message =
+      payload.message && typeof payload.message === "object"
+        ? payload.message
+        : {};
+    const messageId =
+      message.id != null && String(message.id).trim()
+        ? String(message.id).trim()
+        : "";
     telemetry.beginTurn(message.usage || payload.usage, { messageId });
     return messageId;
   }
@@ -606,7 +820,13 @@ function applyStreamTelemetry(event, telemetry, streamMessageId) {
   return streamMessageId;
 }
 
-function formatStreamEvent(event, streamedText, inText, textBuf, structuredActivity = false) {
+function formatStreamEvent(
+  event,
+  streamedText,
+  inText,
+  textBuf,
+  structuredActivity = false,
+) {
   const payload = event.event;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return { streamedText, inText, textBuf };
@@ -651,13 +871,25 @@ function formatStreamEvent(event, streamedText, inText, textBuf, structuredActiv
 }
 
 function handleClaudeActivityEvent(payload, activity, blocks, messageId) {
-  if (!activity.enabled || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+  if (
+    !activity.enabled ||
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
     return;
   }
-  const index = Number.isFinite(Number(payload.index)) ? Number(payload.index) : blocks.size;
+  const index = Number.isFinite(Number(payload.index))
+    ? Number(payload.index)
+    : blocks.size;
   if (payload.type === "content_block_start") {
-    const block = payload.content_block && typeof payload.content_block === "object" ? payload.content_block : {};
-    const id = String(block.id || `${messageId || activity.activityId}-block-${index}`);
+    const block =
+      payload.content_block && typeof payload.content_block === "object"
+        ? payload.content_block
+        : {};
+    const id = String(
+      block.id || `${messageId || activity.activityId}-block-${index}`,
+    );
     if (block.type === "text" || block.type === "thinking") {
       const kind = block.type === "thinking" ? "reasoning" : "assistant";
       blocks.set(index, { id, kind });
@@ -681,10 +913,14 @@ function handleClaudeActivityEvent(payload, activity, blocks, messageId) {
     return;
   }
   if (payload.type === "content_block_delta") {
-    const delta = payload.delta && typeof payload.delta === "object" ? payload.delta : {};
+    const delta =
+      payload.delta && typeof payload.delta === "object" ? payload.delta : {};
     if (delta.type === "text_delta" && tracked.kind === "assistant") {
       activity.appendContent("assistant", tracked.id, delta.text || "");
-    } else if (delta.type === "thinking_delta" && tracked.kind === "reasoning") {
+    } else if (
+      delta.type === "thinking_delta" &&
+      tracked.kind === "reasoning"
+    ) {
       activity.appendContent("reasoning", tracked.id, delta.thinking || "");
     } else if (delta.type === "input_json_delta" && tracked.kind === "tool") {
       tracked.partialInput += String(delta.partial_json || "");
@@ -697,9 +933,16 @@ function handleClaudeActivityEvent(payload, activity, blocks, messageId) {
   }
   if (tracked.kind === "tool") {
     if (tracked.partialInput && !validJSONObject(tracked.partialInput)) {
-      activity.notice("malformed_tool_input", `Claude returned malformed input for ${tracked.name}.`);
+      activity.notice(
+        "malformed_tool_input",
+        `Claude returned malformed input for ${tracked.name}.`,
+      );
     }
-    activity.updateToolInput(tracked.id, normalizedToolInput(tracked.partialInput, tracked.name), true);
+    activity.updateToolInput(
+      tracked.id,
+      normalizedToolInput(tracked.partialInput, tracked.name),
+      true,
+    );
   } else {
     activity.endContent(tracked.id);
   }
@@ -738,7 +981,8 @@ function normalizeClaudeToolKind(name) {
   if (kind === "write") return "write";
   if (kind === "websearch") return "web_search";
   if (kind === "webfetch") return "web_fetch";
-  if (kind.includes("search") || kind === "grep" || kind === "glob") return "search";
+  if (kind.includes("search") || kind === "grep" || kind === "glob")
+    return "search";
   return kind;
 }
 
@@ -785,15 +1029,24 @@ function endTextStream(inText, textBuf) {
 }
 
 function assistantTextFromMessage(message) {
-  const content = message && Array.isArray(message.content) ? message.content : [];
+  const content =
+    message && Array.isArray(message.content) ? message.content : [];
   return content
-    .filter((block) => block && block.type === "text" && typeof block.text === "string")
+    .filter(
+      (block) =>
+        block && block.type === "text" && typeof block.text === "string",
+    )
     .map((block) => block.text.replace(/\s+$/, ""))
     .filter((text) => text.trim())
     .join("\n\n");
 }
 
-function formatAssistant(event, streamedText, tools, activity = createDisabledActivityStream()) {
+function formatAssistant(
+  event,
+  streamedText,
+  tools,
+  activity = createDisabledActivityStream(),
+) {
   const message = event.message;
   if (!message || typeof message !== "object") {
     return;
@@ -817,7 +1070,11 @@ function formatAssistant(event, streamedText, tools, activity = createDisabledAc
       formatToolUse(block, tools);
     } else if (block.type === "thinking") {
       const thinking = block.thinking;
-      if (!activity.enabled && typeof thinking === "string" && thinking.trim()) {
+      if (
+        !activity.enabled &&
+        typeof thinking === "string" &&
+        thinking.trim()
+      ) {
         println("Thinking");
         println(truncateText(thinking.trim()));
         println();
@@ -844,12 +1101,18 @@ function formatUser(event, tools, activity = createDisabledActivityStream()) {
     tools.emitStart(block.tool_use_id);
     if (body.trim()) {
       if (activity.enabled) {
-        activity.appendToolOutput(block.tool_use_id, body.replace(/\s+$/, ""), block.is_error ? "stderr" : "stdout");
+        activity.appendToolOutput(
+          block.tool_use_id,
+          body.replace(/\s+$/, ""),
+          block.is_error ? "stderr" : "stdout",
+        );
       } else {
         println(truncateText(body.replace(/\s+$/, "")));
       }
     }
-    activity.endTool(block.tool_use_id, { status: block.is_error ? "failed" : "passed" });
+    activity.endTool(block.tool_use_id, {
+      status: block.is_error ? "failed" : "passed",
+    });
     tools.end(Boolean(block.is_error), block.tool_use_id);
   }
 }
@@ -864,7 +1127,11 @@ function formatResult(event) {
   }
   if (event.total_cost_usd != null) {
     const cost = Number(event.total_cost_usd);
-    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+    parts.push(
+      Number.isFinite(cost)
+        ? `$${cost.toFixed(4)}`
+        : `$${event.total_cost_usd}`,
+    );
   }
   if (event.duration_ms != null) {
     const ms = Number(event.duration_ms);
@@ -888,7 +1155,11 @@ function formatToolUse(block, tools) {
 }
 
 function toolInputDetail(name, rawInput) {
-  if (rawInput == null || typeof rawInput !== "object" || Array.isArray(rawInput)) {
+  if (
+    rawInput == null ||
+    typeof rawInput !== "object" ||
+    Array.isArray(rawInput)
+  ) {
     if (rawInput == null) {
       return "";
     }
@@ -899,10 +1170,7 @@ function toolInputDetail(name, rawInput) {
   if (lowered === "bash") {
     const command = rawInput.command;
     if (typeof command === "string" && command.trim()) {
-      return command
-        .trim()
-        .split(/\r?\n/)
-        .join(" ");
+      return command.trim().split(/\r?\n/).join(" ");
     }
   }
   if (["read", "write", "edit", "notebookedit"].includes(lowered)) {
@@ -910,7 +1178,10 @@ function toolInputDetail(name, rawInput) {
       const value = rawInput[key];
       if (typeof value === "string" && value.trim()) {
         let detail = value.trim();
-        if ((lowered === "write" || lowered === "edit") && typeof rawInput.content === "string") {
+        if (
+          (lowered === "write" || lowered === "edit") &&
+          typeof rawInput.content === "string"
+        ) {
           detail += ` (${rawInput.content.length} chars)`;
         }
         return detail;
@@ -951,6 +1222,9 @@ function toolResultText(content) {
     return content
       .map((item) => {
         if (item && typeof item === "object") {
+          if (item.type === "image") {
+            return `[image: ${item.mimeType || "unknown type"}; content omitted from logs]`;
+          }
           if (typeof item.text === "string") {
             return item.text;
           }
@@ -964,6 +1238,8 @@ function toolResultText(content) {
 }
 
 function truncateText(text) {
+  const activity = loadActivityStreamModule();
+  text = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text);
   let lines = text.split(/\r?\n/);
   if (lines.length > TOOL_RESULT_MAX_LINES) {
     const kept = lines.slice(0, TOOL_RESULT_MAX_LINES);
@@ -998,4 +1274,6 @@ module.exports = {
   claudeSessionIDFromEvent,
   formatStreamJsonLines,
   planningSystemPrompt,
+  workspaceMCPServers,
+  writeClaudeMCPConfig,
 };

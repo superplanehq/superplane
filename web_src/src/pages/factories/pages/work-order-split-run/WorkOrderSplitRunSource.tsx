@@ -1,9 +1,11 @@
 import { ExternalLink } from "lucide-react";
 
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
+import { cn } from "@/lib/utils";
 
 import { OrgUserReference } from "../../OrgUserReference";
-import type { SplitRunSource } from "./splitRunSource";
+import { isMonochromeSourceLogo, type SplitRunSource } from "./splitRunSource";
 
 export function WorkOrderSplitRunSource({ source, compact = false }: { source: SplitRunSource; compact?: boolean }) {
   if (compact) {
@@ -28,7 +30,7 @@ function IntakeSource({ source }: { source: Extract<SplitRunSource, { kind: "int
   return (
     <>
       <p className="flex min-w-0 items-center gap-1.5 text-foreground">
-        <img src={source.iconSrc} alt={source.iconAlt} className="size-4 shrink-0" />
+        <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
         <span className="truncate">{source.name}</span>
       </p>
       <IntakeTicket ticket={source.ticket} />
@@ -72,9 +74,29 @@ function ManualSource({ source }: { source: Extract<SplitRunSource, { kind: "man
 function CompactIntakeSource({ source }: { source: Extract<SplitRunSource, { kind: "intake" }> }) {
   return (
     <>
-      <img src={source.iconSrc} alt={source.iconAlt} className="size-4 shrink-0" />
+      <IntakeSourceLogo source={source} className="brightness-0 invert dark:invert-0" />
       {source.ticket ? <IntakeTicket ticket={source.ticket} /> : <span className="truncate">{source.name}</span>}
     </>
+  );
+}
+
+function IntakeSourceLogo({
+  source,
+  className,
+}: {
+  source: Extract<SplitRunSource, { kind: "intake" }>;
+  className: string;
+}) {
+  return (
+    <img
+      src={source.iconSrc}
+      alt={source.iconAlt}
+      className={cn(
+        "size-4 shrink-0",
+        isMonochromeSourceLogo(source.iconAlt) && className,
+        logoDarkInvertClass(source.iconSrc),
+      )}
+    />
   );
 }
 

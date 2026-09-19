@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
+import { draftReadiness, startEmphasisForTone, type DraftReadinessTone } from "../../lib/draftReadiness";
 import {
   formatCheckScore,
   LEVEL_LABEL,
@@ -17,6 +19,7 @@ import { StartConfirmDialog } from "./StartConfirmDialog";
 import { needsStartConfirm, persistSkipStartConfirm } from "./startConfirm";
 import {
   splitRunDecisionTone,
+  splitRunFooterScores,
   type SplitRunFooter,
   type SplitRunFooterAction,
   type SplitRunStopChoice,
@@ -48,6 +51,52 @@ function reviewRunHref(
   return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId, { orderNumber });
 }
 
+type FooterCallback = (() => void | Promise<void>) | undefined;
+
+const STOP_CHOICE: Partial<Record<SplitRunFooterAction["kind"], SplitRunStopChoice>> = {
+  approve: "completed",
+  rerun: "rerun-step",
+  reopen: "reopen",
+};
+
+/** Maps a footer action to its callback. Start goes through the confirm gate. */
+function footerActionHandler({
+  requestStart,
+  onArchive,
+  onReject,
+  onStop,
+}: {
+  requestStart: () => void;
+  onArchive: FooterCallback;
+  onReject: FooterCallback;
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+}) {
+  const directActions: Partial<Record<SplitRunFooterAction["kind"], FooterCallback>> = {
+    archive: onArchive,
+    reject: onReject,
+  };
+  return (action: SplitRunFooterAction) => {
+    if (action.kind === "start") {
+      requestStart();
+      return;
+    }
+    const directAction = directActions[action.kind];
+    if (directAction) {
+      void directAction();
+      return;
+    }
+    const stopChoice = STOP_CHOICE[action.kind];
+    if (stopChoice) {
+      void onStop?.(stopChoice);
+    }
+  };
+}
+
+/** Start weight follows the given verdict, or the verdict the footer scores produce. */
+function reviewStartEmphasis(footer: SplitRunFooter, startTone?: DraftReadinessTone) {
+  return startEmphasisForTone(startTone ?? draftReadiness(splitRunFooterScores(footer)).tone);
+}
+
 /**
  * Decision note under the plan on Description, and under Automations.
  */
@@ -55,13 +104,15 @@ export function SplitRunReview({
   footer,
   className,
   organizationId,
+  factoryId,
   factoryKey,
+  orderId,
   orderNumber,
+  pullRequests,
   canAct = true,
   onStart,
   onArchive,
   onReject,
-  onBackToDraft,
   onStop,
   startBusy = false,
   actionBusy = false,
@@ -70,17 +121,20 @@ export function SplitRunReview({
   compact = false,
   actionsOnly = false,
   confirmUnclearStart = false,
+  startTone,
 }: {
   footer: SplitRunFooter;
   className?: string;
   organizationId?: string;
+  factoryId?: string;
   factoryKey?: string;
+  orderId?: string;
   orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
   canAct?: boolean;
   onStart?: () => void | Promise<void>;
   onArchive?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
-  onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
   actionBusy?: boolean;
@@ -89,17 +143,20 @@ export function SplitRunReview({
   compact?: boolean;
   actionsOnly?: boolean;
   confirmUnclearStart?: boolean;
+  /** Verdict that sets the Start weight on the refine strip. Defaults to the footer scores. */
+  startTone?: DraftReadinessTone;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
+  const startEmphasis = reviewStartEmphasis(footer, startTone);
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
   const actions = canAct
     ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
     : [];
   const requestStart = () => {
-    if (confirmUnclearStart && needsStartConfirm(footer.confidenceScore)) {
+    if (confirmUnclearStart && needsStartConfirm(splitRunFooterScores(footer))) {
       setConfirmOpen(true);
       return;
     }
@@ -112,39 +169,12 @@ export function SplitRunReview({
     setConfirmOpen(false);
     void onStart?.();
   };
-  const directActions: Partial<Record<SplitRunFooterAction["kind"], (() => void | Promise<void>) | undefined>> = {
-    archive: onArchive,
-    reject: onReject,
-    "back-to-draft": onBackToDraft,
-  };
-  const onAction = (action: SplitRunFooterAction) => {
-    if (action.kind === "start") {
-      requestStart();
-      return;
-    }
-    const directAction = directActions[action.kind];
-    if (directAction) {
-      void directAction();
-      return;
-    }
-    if (action.kind === "approve") {
-      void onStop?.("completed");
-      return;
-    }
-    if (action.kind === "rerun") {
-      void onStop?.("rerun-step");
-      return;
-    }
-    if (action.kind === "reopen") {
-      void onStop?.("reopen");
-      return;
-    }
-  };
+  const onAction = footerActionHandler({ requestStart, onArchive, onReject, onStop });
 
   return (
     <div
       className={cn(compact && !actionsOnly ? "min-w-0 flex-1" : "shrink-0", className)}
-      data-testid="split-run-review"
+      data-testid={actionsOnly ? undefined : "split-run-review"}
     >
       <SplitRunAttentionNote
         note={footer.note}
@@ -157,12 +187,18 @@ export function SplitRunReview({
         modelSelect={modelSelect}
         compact={compact}
         actionsOnly={actionsOnly}
+        startEmphasis={startEmphasis}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        pullRequests={pullRequests}
+        canAct={canAct}
         onAction={onAction}
       />
       {confirmUnclearStart ? (
         <StartConfirmDialog
           open={confirmOpen}
-          score={footer.confidenceScore}
+          scores={splitRunFooterScores(footer)}
           onOpenChange={setConfirmOpen}
           onConfirm={confirmStart}
         />

@@ -88,6 +88,11 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, "line-implementation", response.GetTemplateId())
 		assert.NotEmpty(t, response.GetCanvasYaml())
 		assert.NotEmpty(t, response.GetConsoleYaml())
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		_, _, err = materialized.Parse(r.Registry, orgID)
+		require.NoError(t, err)
 	})
 
 	t.Run("an app from another factory reports not found", func(t *testing.T) {
@@ -236,7 +241,13 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 			"id":      prFeedbackDiscussionTemplateID,
 			"version": float64(factoryTemplateVersion),
 		}, trigger.Metadata[factoryTemplateMetadataKey])
-		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, prFeedbackRunnerNodeID))
+		for _, runnerID := range []string{
+			prFeedbackRunnerNodeID,
+			prFeedbackReviewRunnerNodeID,
+			prFeedbackReplyRunnerNodeID,
+		} {
+			assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, runnerID))
+		}
 	})
 
 	t.Run("a checks PR feedback handler resets to its generated graph", func(t *testing.T) {

@@ -495,6 +495,19 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	return o, nil
 }
 
+func (o *FactoryWorkOrder) LockForUpdate(tx *gorm.DB) error {
+	var locked FactoryWorkOrder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", o.ID).
+		First(&locked).
+		Error
+	if err != nil {
+		return err
+	}
+	*o = locked
+	return nil
+}
+
 // TransitionOnDispatch promotes a draft order to open; open is a no-op.
 // Any other state rejects the dispatch.
 func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) error {
@@ -511,6 +524,26 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 		Actor:   actor,
 	})
 	return err
+}
+
+// AddAssignee adds one person to the owners and keeps the others. It reports
+// whether the list changed; it is a no-op when the person is already
+// assigned. Used when someone takes part in refining a draft: a reply in the
+// chat makes them an owner.
+func (o *FactoryWorkOrder) AddAssignee(tx *gorm.DB, userID uuid.UUID, actor uuid.UUID) (bool, error) {
+	assignees, err := o.ListAssignees(tx)
+	if err != nil {
+		return false, err
+	}
+	if slices.ContainsFunc(assignees, func(assignee FactoryWorkOrderAssignee) bool { return assignee.UserID == userID }) {
+		return false, nil
+	}
+	o.Assignees = assignees
+	ids := append(o.AssigneeIDs(), userID)
+	if err := o.UpdateAssignees(tx, ids, actor); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {

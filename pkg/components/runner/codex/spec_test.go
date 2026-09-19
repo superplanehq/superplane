@@ -14,7 +14,8 @@ func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunCodexSpec(map[string]any{
-		"machineType": "e1-large-amd64",
+		"machineType":           "e1-large-amd64",
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Clone", "type": "bash", "command": "git clone"},
 		},
@@ -24,6 +25,7 @@ func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	assert.True(t, spec.IncludeVisualEvidence)
 	err = validateRunCodexSpec(spec)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "prompt")

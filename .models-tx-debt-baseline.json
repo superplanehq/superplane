@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 157,
-  "maxAllowedDatabaseConnCalls": 175,
+  "maxAllowedInTransactionDefinitions": 154,
+  "maxAllowedDatabaseConnCalls": 171,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -132,9 +132,6 @@
     "pkg/models/organization.go:DisableExperimentalFeatureInTransaction",
     "pkg/models/repository.go:FindRepositoryInTransaction",
     "pkg/models/repository.go:CreatePendingRepositoryInTransaction",
-    "pkg/models/repository_seed_file.go:CreateRepositorySeedFilesInTransaction",
-    "pkg/models/repository_seed_file.go:ListRepositorySeedFilesInTransaction",
-    "pkg/models/repository_seed_file.go:DeleteRepositorySeedFilesInTransaction",
     "pkg/models/role_metadata.go:CreateInTransaction",
     "pkg/models/role_metadata.go:UpdateInTransaction",
     "pkg/models/role_metadata.go:CreateInTransaction",
@@ -169,7 +166,6 @@
     "pkg/models/account.go:FindAccountByEmail:database.Conn()#1",
     "pkg/models/account.go:GetAccountProvider:database.Conn()#1",
     "pkg/models/account.go:FindAccountProviderByID:database.Conn()#1",
-    "pkg/models/account.go:FindAccountByProvider:database.Conn()#1",
     "pkg/models/account.go:UpdateEmail:database.Conn()#1",
     "pkg/models/account.go:UpdateEmailForProvider:database.Conn()#1",
     "pkg/models/account_magic_code.go:CreateAccountMagicCode:database.Conn()#1",
@@ -289,9 +285,6 @@
     "pkg/models/repository.go:FindRepositoryUnscoped:database.Conn()#1",
     "pkg/models/repository.go:CreatePendingRepository:database.Conn()#1",
     "pkg/models/repository.go:ListPendingRepositories:database.Conn()#1",
-    "pkg/models/repository_seed_file.go:CreateRepositorySeedFiles:database.Conn()#1",
-    "pkg/models/repository_seed_file.go:ListRepositorySeedFiles:database.Conn()#1",
-    "pkg/models/repository_seed_file.go:DeleteRepositorySeedFiles:database.Conn()#1",
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
     "pkg/models/role_metadata.go:Update:database.Conn()#1",
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
@@ -337,5 +330,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-09-04T00:40:19Z"
+  "updatedAt": "2026-09-18T21:13:06Z"
 }

@@ -20,7 +20,8 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunClaudeCodeSpec(map[string]any{
-		"machineType": testRunnerMachineType,
+		"machineType":           testRunnerMachineType,
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Fix bug", "type": "prompt", "prompt": "fix the bug"},
 		},
@@ -31,6 +32,7 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, runner.DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
+	assert.True(t, spec.IncludeVisualEvidence)
 	require.Len(t, spec.Steps, 1)
 	assert.Equal(t, "Fix bug", spec.Steps[0].Name)
 	assert.Equal(t, runner.AgentStepPrompt, spec.Steps[0].Type)
@@ -136,6 +138,8 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", task.Commands[2].Preview)
 	assert.Contains(t, task.Commands[2].Command, `cd '/tmp/workspace'`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`)
+	assert.Contains(t, task.Commands[2].Command, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
+	assert.Contains(t, task.Commands[2].Command, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 	assert.Equal(t, "Fix tests", task.Commands[3].Name)
 	assert.Contains(t, task.Commands[3].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`)
@@ -178,9 +182,11 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "planning_session_mcp.js")
 	assert.NotContains(t, runScript, "mcp__superplane__propose_draft")
 	assert.Contains(t, runScript, "mcp__superplane__propose_spec")
+	assert.Contains(t, runScript, "mcp__superplane__propose_clarity")
 	assert.Contains(t, runScript, "mcp__superplane__propose_confidence")
 	assert.NotContains(t, runScript, "mcp__superplane__propose_plan")
 	assert.Contains(t, runScript, "mcp__superplane__survey")
+	assert.Contains(t, runScript, "mcp__superplane__create_task")
 	assert.NotContains(t, runScript, "mcp__superplane__say")
 	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")

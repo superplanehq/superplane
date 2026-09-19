@@ -16,6 +16,24 @@ type NodeMetadata struct {
 	Status    string   `json:"status,omitempty"`
 }
 
+func siteURLFromIntegration(integration core.IntegrationContext) string {
+	if integration == nil {
+		return ""
+	}
+	return SiteURLFromMetadata(integration.GetMetadata())
+}
+
+func SiteURLFromMetadata(raw any) string {
+	if raw == nil {
+		return ""
+	}
+	metadata := Metadata{}
+	if err := mapstructure.Decode(raw, &metadata); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(metadata.SiteURL)
+}
+
 func requireProject(httpCtx core.HTTPContext, integration core.IntegrationContext, projectKey string) (*Project, error) {
 	if httpCtx != nil {
 		client, err := NewClient(httpCtx, integration)

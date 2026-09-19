@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -18,7 +20,8 @@ import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
-import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
+import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
+import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
@@ -38,6 +41,7 @@ export type BacklogColumnProps = {
   onCloseSettings: () => void;
   onSaveSettings: (settings: { name: string; size: number | null }) => void;
   colorId: LineBoardColumnColorId | null;
+  colorView?: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canCreateWorkOrder: boolean;
   canRename: boolean;
@@ -82,6 +86,7 @@ export function BacklogColumn({
   onCloseSettings,
   onSaveSettings,
   colorId,
+  colorView,
   onColorChange,
   canCreateWorkOrder,
   canRename,
@@ -98,7 +103,7 @@ export function BacklogColumn({
   automationRowCount,
   onAutomationRowAction,
 }: BacklogColumnProps) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
@@ -123,11 +128,11 @@ export function BacklogColumn({
         titleTestId="lines-column-title-backlog"
         count={orders.length}
         tone="neutral"
-        surfaceClassName={surfaceClassName}
+        surfaceClassName={lane.surfaceClassName}
         emptyDescription="No tasks in the backlog."
         emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
         keepChildrenWhenEmpty
-        className={surfaceClassName ? undefined : "bg-muted"}
+        className={lane.className}
         actions={
           <BacklogColumnHeaderActions
             title={title}
@@ -270,7 +275,11 @@ function BacklogSetupSentryButton({ onClick }: { onClick: () => void }) {
       data-testid="lines-backlog-setup-sentry"
       className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
     >
-      <img src={sentryIcon} alt="" className="size-3.5 shrink-0 object-contain" />
+      <img
+        src={sentryIcon}
+        alt=""
+        className={cn("size-3.5 shrink-0 object-contain", logoDarkInvertClass(sentryIcon))}
+      />
       {SENTRY_INTAKE_SETUP_COPY.setupButton}
     </Button>
   );

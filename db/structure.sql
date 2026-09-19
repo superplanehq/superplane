@@ -385,6 +385,44 @@ CREATE TABLE public.factories (
 
 
 --
+-- Name: factory_agent_resource_secrets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_resource_secrets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    resource_id uuid NOT NULL,
+    name text NOT NULL,
+    value bytea NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_agent_resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    kind text NOT NULL,
+    name text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    oauth_status text DEFAULT ''::text NOT NULL,
+    oauth_error text DEFAULT ''::text NOT NULL,
+    oauth_connected_by uuid,
+    oauth_connected_at timestamp with time zone,
+    oauth_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    oauth_pending_state text DEFAULT ''::text NOT NULL,
+    oauth_pending_expiry timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -563,6 +601,7 @@ CREATE TABLE public.factory_pull_request_runs (
     access_requested_at timestamp with time zone,
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    title text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
@@ -841,6 +880,9 @@ CREATE TABLE public.files (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    purpose character varying(32) DEFAULT 'attachment'::character varying NOT NULL,
+    public_id uuid,
+    CONSTRAINT files_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['attachment'::character varying, 'artifact'::character varying])::text[]))),
     CONSTRAINT files_scope_check CHECK (((scope)::text = ANY ((ARRAY['app'::character varying, 'organization'::character varying, 'workspace'::character varying, 'task'::character varying])::text[]))),
     CONSTRAINT files_scope_fks_check CHECK (((((scope)::text = 'app'::text) AND (organization_id IS NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'organization'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'workspace'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NULL)) OR (((scope)::text = 'task'::text) AND (organization_id IS NOT NULL) AND (factory_id IS NOT NULL) AND (work_order_id IS NOT NULL)))),
     CONSTRAINT files_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
@@ -1053,19 +1095,6 @@ CREATE TABLE public.repositories (
 
 
 --
--- Name: repository_seed_files; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.repository_seed_files (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    repository_id uuid NOT NULL,
-    path text NOT NULL,
-    content bytea NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1212,7 +1241,11 @@ CREATE TABLE public.user_notification_settings (
     workspace_filters jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    event_types jsonb DEFAULT '[]'::jsonb NOT NULL
+    event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
+    browser_workspace_scope character varying(50) DEFAULT 'none'::character varying NOT NULL,
+    browser_workspace_filters jsonb DEFAULT '[]'::jsonb NOT NULL,
+    browser_event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
+    browser_show_while_viewing boolean DEFAULT true NOT NULL
 );
 
 
@@ -1724,6 +1757,22 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factory_agent_resource_secrets factory_agent_resource_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_secrets
+    ADD CONSTRAINT factory_agent_resource_secrets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2084,22 +2133,6 @@ ALTER TABLE ONLY public.repositories
 
 
 --
--- Name: repository_seed_files repository_seed_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repository_seed_files
-    ADD CONSTRAINT repository_seed_files_pkey PRIMARY KEY (id);
-
-
---
--- Name: repository_seed_files repository_seed_files_repository_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repository_seed_files
-    ADD CONSTRAINT repository_seed_files_repository_id_path_key UNIQUE (repository_id, path);
-
-
---
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2382,17 +2415,17 @@ CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_
 
 
 --
+-- Name: files_public_id_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX files_public_id_unique ON public.files USING btree (public_id) WHERE (public_id IS NOT NULL);
+
+
+--
 -- Name: idx_account_linked_accounts_account_provider; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider ON public.account_linked_accounts USING btree (account_id, provider);
-
-
---
--- Name: idx_account_linked_accounts_provider_identity; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_account_linked_accounts_provider_identity ON public.account_linked_accounts USING btree (provider, provider_id);
 
 
 --
@@ -2582,6 +2615,34 @@ CREATE INDEX idx_factories_deleted_at ON public.factories USING btree (deleted_a
 --
 
 CREATE INDEX idx_factories_organization_id ON public.factories USING btree (organization_id);
+
+
+--
+-- Name: idx_factory_agent_resource_secrets_resource_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_agent_resource_secrets_resource_name ON public.factory_agent_resource_secrets USING btree (resource_id, name);
+
+
+--
+-- Name: idx_factory_agent_resources_factory_kind; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agent_resources_factory_kind ON public.factory_agent_resources USING btree (factory_id, kind);
+
+
+--
+-- Name: idx_factory_agent_resources_factory_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_agent_resources_factory_name ON public.factory_agent_resources USING btree (factory_id, name);
+
+
+--
+-- Name: idx_factory_agent_resources_oauth_pending_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_agent_resources_oauth_pending_state ON public.factory_agent_resources USING btree (oauth_pending_state) WHERE (oauth_pending_state <> ''::text);
 
 
 --
@@ -2809,6 +2870,13 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 
 
 --
+-- Name: idx_factory_work_order_assignees_work_order_created_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_assignees_work_order_created_user ON public.factory_work_order_assignees USING btree (work_order_id, created_at, user_id);
+
+
+--
 -- Name: idx_factory_work_order_checks_factory_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3009,13 +3077,6 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
-
-
---
--- Name: idx_repository_seed_files_repository_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_files USING btree (repository_id);
 
 
 --
@@ -3552,6 +3613,38 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.canvas_subscriptions
     ADD CONSTRAINT canvas_subscriptions_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_agent_resource_secrets factory_agent_resource_secrets_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_secrets
+    ADD CONSTRAINT factory_agent_resource_secrets_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.factory_agent_resources(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_oauth_connected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_oauth_connected_by_fkey FOREIGN KEY (oauth_connected_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_agent_resources factory_agent_resources_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resources
+    ADD CONSTRAINT factory_agent_resources_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
@@ -4123,14 +4216,6 @@ ALTER TABLE ONLY public.repositories
 
 
 --
--- Name: repository_seed_files repository_seed_files_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repository_seed_files
-    ADD CONSTRAINT repository_seed_files_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id) ON DELETE CASCADE;
-
-
---
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4530,7 +4615,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260916172910	f
+20260918231901	f
 \.
 
 

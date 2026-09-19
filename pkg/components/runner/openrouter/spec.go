@@ -18,6 +18,7 @@ type RunOpenRouterSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 	// MaxTurns is kept so old node JSON still decodes. OpenCode does not
 	// take a turn cap; the wrapper ignores this value.
 	MaxTurns int `mapstructure:"maxTurns"`
@@ -143,7 +144,7 @@ func planningFollowUpCommand(spec RunOpenRouterSpec) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
-			runner.WrapCommandInWorkingDirectory(
+			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
 				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
 			),

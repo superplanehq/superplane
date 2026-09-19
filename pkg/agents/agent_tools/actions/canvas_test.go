@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -658,26 +659,11 @@ func TestAppAgentTool_ReadOmitsCanvasYAMLByDefault(t *testing.T) {
 	assert.Equal(t, liveVersion.ID.String(), read.VersionID)
 }
 
-func TestAppAgentTool_ListFilesReportsContextFiles(t *testing.T) {
+func TestAppAgentTool_ListFilesWithoutRepositoryReturnsSpecFiles(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
-	require.NoError(t, err)
-	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: head,
-		Message:         "Add context",
-		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
-		Operations: []gitprovider.FileOperation{
-			{Path: "AGENTS.md", Content: strings.NewReader("Use pnpm.\n"), SizeBytes: int64(len("Use pnpm.\n"))},
-			{Path: "scripts/run.py", Content: strings.NewReader("print('ok')\n"), SizeBytes: int64(len("print('ok')\n"))},
-		},
-	})
-	require.NoError(t, err)
-
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
 	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
 		SessionID:      "session-1",
@@ -689,10 +675,7 @@ func TestAppAgentTool_ListFilesReportsContextFiles(t *testing.T) {
 	require.NoError(t, err)
 	list, ok := result.(fileListResult)
 	require.True(t, ok)
-	assert.Contains(t, list.Files, "AGENTS.md")
-	assert.Contains(t, list.Files, "README.md")
-	assert.Contains(t, list.ContextFiles, "AGENTS.md")
-	assert.Contains(t, list.ContextFiles, "README.md")
+	assert.Equal(t, []string{files.CanvasYAMLPath, files.ConsoleYAMLPath}, list.Files)
 }
 
 func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {
@@ -705,17 +688,15 @@ func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
 
-	_, err := registry.Execute(ctx, agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}, Input{
-		Action:    "write_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "README.md",
-		Content:   "draft readme\n",
-	})
+	_, err := models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		liveVersion.ID,
+		canvas.OrganizationID,
+		"README.md",
+		"draft readme\n",
+	)
 	require.NoError(t, err)
 
 	result, err := registry.Execute(ctx, agents.AgentSessionContext{
@@ -754,12 +735,15 @@ func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 		CanvasID:       canvas.ID.String(),
 	}
 
-	_, err := registry.Execute(ctx, session, Input{
-		Action:    "write_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "README.md",
-		Content:   "draft readme\n",
-	})
+	_, err := models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		liveVersion.ID,
+		canvas.OrganizationID,
+		"README.md",
+		"draft readme\n",
+	)
 	require.NoError(t, err)
 
 	result, err := registry.Execute(ctx, session, Input{
@@ -774,31 +758,6 @@ func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 	assert.Equal(t, liveVersion.ID.String(), read.Files[0].VersionID)
 	assert.Equal(t, "draft readme\n", read.Files[0].Content)
 	assert.Equal(t, "staging", read.Files[0].Source)
-}
-
-func TestAppAgentTool_WriteFileRejectsSpecFiles(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	liveVersion := requireLiveVersion(t, canvas.ID)
-
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
-	_, err := registry.Execute(ctx, agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}, Input{
-		Action:    "write_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "canvas.yaml",
-		Content:   "name: invalid\n",
-	})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "use patch_staging")
 }
 
 func TestAppAgentTool_ReadFileReturnsLiveCommittedContent(t *testing.T) {
@@ -873,59 +832,6 @@ func TestAppAgentTool_ReadFileReturnsStagedSpecFileContent(t *testing.T) {
 	assert.Equal(t, liveVersion.ID.String(), read.Files[0].VersionID)
 }
 
-func TestAppAgentTool_DeleteFileStagesDeletion(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	liveVersion := requireLiveVersion(t, canvas.ID)
-	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
-	require.NoError(t, err)
-	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: head,
-		Message:         "Add notes",
-		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
-		Operations: []gitprovider.FileOperation{
-			{Path: "notes.md", Content: strings.NewReader("delete me\n"), SizeBytes: int64(len("delete me\n"))},
-		},
-	})
-	require.NoError(t, err)
-
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
-	session := agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}
-
-	result, err := registry.Execute(ctx, session, Input{
-		Action:    "delete_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "notes.md",
-	})
-	require.NoError(t, err)
-
-	deleted, ok := result.(fileStageResult)
-	require.True(t, ok)
-	assert.Equal(t, "delete_file", deleted.Action)
-	assert.True(t, deleted.Deleted)
-	assert.Equal(t, "notes.md", deleted.Path)
-	assert.True(t, deleted.StagingSummary.HasStaging)
-	assert.Contains(t, deleted.StagingSummary.StagedPaths, "notes.md")
-
-	_, err = registry.Execute(ctx, session, Input{
-		Action:    "read_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "notes.md",
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "staged for deletion")
-}
-
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	organizationID := uuid.NewString()
 	userID := uuid.NewString()
@@ -973,10 +879,8 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.True(t, toolActions["list_files"].Allowed)
 	require.Contains(t, toolActions, "read_file")
 	assert.True(t, toolActions["read_file"].Allowed)
-	require.Contains(t, toolActions, "write_file")
-	assert.True(t, toolActions["write_file"].Allowed)
-	require.Contains(t, toolActions, "delete_file")
-	assert.True(t, toolActions["delete_file"].Allowed)
+	assert.NotContains(t, toolActions, "write_file")
+	assert.NotContains(t, toolActions, "delete_file")
 }
 
 func TestAccessAction_ReportsLegacyDraftUpdateAccess(t *testing.T) {
@@ -1011,10 +915,8 @@ func TestAccessAction_ReportsLegacyDraftUpdateAccess(t *testing.T) {
 	toolActions := toolAccessByAction(result.ToolActions)
 	require.Contains(t, toolActions, "patch_staging")
 	assert.True(t, toolActions["patch_staging"].Allowed)
-	require.Contains(t, toolActions, "write_file")
-	assert.True(t, toolActions["write_file"].Allowed)
-	require.Contains(t, toolActions, "delete_file")
-	assert.True(t, toolActions["delete_file"].Allowed)
+	assert.NotContains(t, toolActions, "write_file")
+	assert.NotContains(t, toolActions, "delete_file")
 	require.Contains(t, toolActions, "read_runtime")
 	assert.True(t, toolActions["read_runtime"].Allowed)
 }

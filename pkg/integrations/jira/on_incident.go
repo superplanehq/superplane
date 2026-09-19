@@ -68,6 +68,7 @@ This is provisioned automatically, sharing the same webhook registration ` + "`j
 
 Emits one event per matching incident webhook with:
 - **action**: ` + "`created`" + `, ` + "`updated`" + `, or ` + "`deleted`" + `
+- **url**: The issue page (` + "`<site>/browse/<key>`" + `). Present when the Jira site address is known
 - **issue**: The full issue (id, key, self, fields)
 - **description**: The issue description as plain text. Use this instead of ` + "`issue.fields.description`" + `, which Jira sends as an Atlassian Document Format object
 - **user**: The user who triggered the event
@@ -230,7 +231,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusOK, nil, nil
 	}
 
-	event := NewIssueEvent(action, payload.Issue, payload.User, payload.Changelog)
+	event := NewIssueEvent(action, payload.Issue, payload.User, payload.Changelog, siteURLFromIntegration(ctx.Integration))
 
 	if err := ctx.Events.Emit(IncidentEventPayloadType, event); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)

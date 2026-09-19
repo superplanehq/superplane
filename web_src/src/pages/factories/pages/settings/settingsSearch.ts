@@ -38,15 +38,17 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "sso",
     "login",
   ]),
+  entry("account", "profile", "Associated accounts", "account-redesign-associated-accounts", [
+    "linked accounts",
+    "github",
+    "velocity",
+    "pull requests",
+    "pr credit",
+  ]),
   entry("account", "profile", "Sign in methods", "account-redesign-signin", [
     "security",
     "password",
     "change password",
-    "github",
-    "google",
-    "sso",
-    "velocity",
-    "pull requests",
   ]),
   entry("account", "profile", "Personal tokens", "account-redesign-tokens", [
     "create token",
@@ -86,6 +88,17 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "git",
     "github",
     "issue intake",
+  ]),
+
+  // Workspace · Agent resources
+  entry("workspace", "agent-resources", "Agent resources", undefined, [
+    "mcp server",
+    "mcp",
+    "skill",
+    "oauth",
+    "header",
+    "agent",
+    "sign-in",
   ]),
 
   // Workspace · Models

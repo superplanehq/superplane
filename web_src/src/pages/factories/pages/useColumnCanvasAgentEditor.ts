@@ -7,13 +7,42 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { planningReviewDraftFromCanvas, primaryAgentNode, serializeColumnAgentCanvas } from "../lib/columnCanvasAgent";
+import {
+  findAgentNodes,
+  planningReviewDraftFromCanvas,
+  primaryAgentNode,
+  serializeColumnAgentCanvasNodes,
+} from "../lib/columnCanvasAgent";
+import { resolveFactoryAppTemplate } from "../lib/factoryAppTemplate";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
 const REFINEMENT_AGENT_NODE_ID = "refine-task";
 
-export function useColumnCanvasAgentEditor(organizationId: string, appId: string | undefined) {
+interface ColumnCanvasAgentEditorOptions {
+  showVisualEvidenceSetting?: boolean;
+  synchronizedAgentNodeIds?: readonly string[];
+}
+
+function editableAgentNodeIds(
+  canvas: CanvasesCanvas | undefined,
+  primaryNodeId: string | undefined,
+  synchronizedNodeIds: readonly string[] | undefined,
+): string[] {
+  if (!synchronizedNodeIds) {
+    return primaryNodeId ? [primaryNodeId] : [];
+  }
+  const synchronizedNodeIdSet = new Set(synchronizedNodeIds);
+  return findAgentNodes(canvas?.spec)
+    .map((node) => node.id)
+    .filter((id): id is string => Boolean(id && synchronizedNodeIdSet.has(id)));
+}
+
+export function useColumnCanvasAgentEditor(
+  organizationId: string,
+  appId: string | undefined,
+  options: ColumnCanvasAgentEditorOptions = {},
+) {
   const enabled = Boolean(appId);
   const canvasId = appId ?? "";
   const canvasQuery = useCanvas(organizationId, canvasId, { enabled });
@@ -26,13 +55,16 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
   const canvas = canvasQuery.data;
   const preferredAgentNodeId = features.has(FEATURE_FACTORY_CREATE_WITH_AGENT) ? REFINEMENT_AGENT_NODE_ID : undefined;
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
+  const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizedAgentNodeIds);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
+  const showVisualEvidenceSetting =
+    options.showVisualEvidenceSetting ?? resolveFactoryAppTemplate(canvas)?.id === "line-implementation";
 
   const save = async (nextDraft: PlanningReviewDraft) => {
     await persistColumnAgent({
       appId: canvasId,
       canvas,
-      agentNodeId: agentNode?.id,
+      agentNodeIds,
       draft: nextDraft,
       stageYaml: (input) => updateVersion.mutateAsync(input),
       commit: (message) => commitStaging.mutateAsync(message),
@@ -42,8 +74,10 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
 
   return {
     agentNode,
+    agentNodeIds,
     isLoading: enabled && (canvasQuery.isPending || features.isLoading),
     draft,
+    showVisualEvidenceSetting,
     editorOpen,
     openEditor: agentNode ? () => setEditorOpen(true) : undefined,
     closeEditor: () => setEditorOpen(false),
@@ -54,14 +88,16 @@ export function useColumnCanvasAgentEditor(organizationId: string, appId: string
 export async function persistColumnAgent(args: {
   appId: string;
   canvas: CanvasesCanvas | undefined;
-  agentNodeId: string | undefined;
+  agentNodeId?: string;
+  agentNodeIds?: string[];
   draft: PlanningReviewDraft;
   stageYaml: (input: { versionId: string; canvasYaml: string }) => Promise<unknown>;
   commit: (message: string) => Promise<unknown>;
   invalidate: () => Promise<unknown> | unknown;
 }) {
-  const { canvas, agentNodeId, appId, draft, stageYaml, commit, invalidate } = args;
-  if (!canvas || !agentNodeId || !appId) {
+  const { canvas, agentNodeId, agentNodeIds, appId, draft, stageYaml, commit, invalidate } = args;
+  const targetNodeIds = agentNodeIds?.length ? agentNodeIds : agentNodeId ? [agentNodeId] : [];
+  if (!canvas || targetNodeIds.length === 0 || !appId) {
     throw new Error("Agent canvas is not loaded");
   }
   const liveVersionId = canvas.metadata?.liveVersionId;
@@ -72,7 +108,7 @@ export async function persistColumnAgent(args: {
   try {
     await stageYaml({
       versionId: liveVersionId,
-      canvasYaml: serializeColumnAgentCanvas(canvas, agentNodeId, draft),
+      canvasYaml: serializeColumnAgentCanvasNodes(canvas, targetNodeIds, draft),
     });
     await commit(UPDATE_AGENT_COMMIT_MESSAGE);
     await invalidate();

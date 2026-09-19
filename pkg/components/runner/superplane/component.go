@@ -162,16 +162,20 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
+	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
 	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched.Steps, dispatched.Attachments)
 	if err != nil {
 		return err
 	}
 	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
+	environment, files = runner.AttachWorkspaceAgentResources(ctx, environment, files)
+	files = runner.AppendTaskArtifactMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
 		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)

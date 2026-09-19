@@ -1086,7 +1086,6 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, err
 	}
-
 	payload := map[string]any{
 		"id":             order.ID.String(),
 		"title":          order.Title,
@@ -1097,6 +1096,8 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"repository":     repository,
 		"repository_url": githubRepositoryURL(repository),
 		"default_branch": defaultBranch,
+		// Keep this compatibility value until stored canvases no longer reference it.
+		"visual_evidence_enabled": false,
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {

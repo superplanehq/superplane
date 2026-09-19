@@ -12,7 +12,7 @@ import {
 } from "./workOrderListModel";
 import { WORK_ORDER_DISPLAY_STATUSES, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
-/** One of the three dimensions the Filter menu can narrow. */
+/** One of the dimensions the Filter menu can narrow. */
 export type WorkOrderFilterDimension = keyof WorkOrderFilters;
 
 /**
@@ -132,6 +132,7 @@ function readPersistedFilters(key: string): WorkOrderFilters {
     return {
       statuses: sanitizeStatuses(parsed.statuses),
       lineIds: sanitizeIds(parsed.lineIds),
+      sourceIds: sanitizeIds(parsed.sourceIds),
       assigneeIds: sanitizeIds(parsed.assigneeIds),
     };
   } catch {

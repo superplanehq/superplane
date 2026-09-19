@@ -1,6 +1,5 @@
 import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import {
-  Archive,
   Bug,
   CheckCircle2,
   CircleAlert,
@@ -11,11 +10,10 @@ import {
   Loader2,
   Play,
   RotateCcw,
-  Sparkles,
   TriangleAlert,
-  Undo2,
 } from "lucide-react";
 
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -24,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
+import type { StartEmphasis } from "../../lib/draftReadiness";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
 import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
@@ -107,6 +106,82 @@ export function SplitRunAttentionNote({
   modelSelect,
   compact = false,
   actionsOnly = false,
+  startEmphasis = "filled",
+  organizationId,
+  factoryId,
+  orderId,
+  pullRequests,
+  canAct = true,
+  onAction,
+}: {
+  note: SplitRunFooterNote;
+  tone?: SplitRunDecisionTone;
+  actions?: SplitRunFooterAction[];
+  runHref?: string | null;
+  actionBusy?: boolean;
+  startBusy?: boolean;
+  startDisabled?: boolean;
+  modelSelect?: ReactNode;
+  compact?: boolean;
+  /** Refine strip: actions only, no note. The strip shows its own verdict. */
+  actionsOnly?: boolean;
+  /** Weight of Start on the refine strip. The verdict decides it. */
+  startEmphasis?: StartEmphasis;
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canAct?: boolean;
+  onAction?: (action: SplitRunFooterAction) => void;
+}) {
+  const pullRequestNote = WaitingPullRequestReview({
+    note,
+    tone,
+    actions,
+    actionBusy,
+    compact,
+    actionsOnly,
+    organizationId,
+    factoryId,
+    orderId,
+    pullRequests,
+    canAct,
+    onAction,
+  });
+  if (pullRequestNote) {
+    return pullRequestNote;
+  }
+
+  return (
+    <StandardAttentionNote
+      note={note}
+      tone={tone}
+      actions={actions}
+      runHref={runHref}
+      actionBusy={actionBusy}
+      startBusy={startBusy}
+      startDisabled={startDisabled}
+      modelSelect={modelSelect}
+      compact={compact}
+      actionsOnly={actionsOnly}
+      startEmphasis={startEmphasis}
+      onAction={onAction}
+    />
+  );
+}
+
+function StandardAttentionNote({
+  note,
+  tone = "waiting",
+  actions = [],
+  runHref,
+  actionBusy = false,
+  startBusy = false,
+  startDisabled = false,
+  modelSelect,
+  compact = false,
+  actionsOnly = false,
+  startEmphasis = "filled",
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -119,17 +194,20 @@ export function SplitRunAttentionNote({
   modelSelect?: ReactNode;
   compact?: boolean;
   actionsOnly?: boolean;
+  startEmphasis?: StartEmphasis;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  const pullRequestNote = WaitingPullRequestReview({
-    note,
-    tone,
-    actions,
-    actionBusy,
-    onAction,
-  });
-  if (pullRequestNote) {
-    return pullRequestNote;
+  if (actionsOnly) {
+    return (
+      <StripActions
+        actions={actions}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        startEmphasis={startEmphasis}
+        onAction={onAction}
+      />
+    );
   }
 
   if (compact) {
@@ -142,7 +220,6 @@ export function SplitRunAttentionNote({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
-        actionsOnly={actionsOnly}
         onAction={onAction}
       />
     );
@@ -198,7 +275,6 @@ function CompactAttentionNote({
   startBusy,
   startDisabled,
   modelSelect,
-  actionsOnly,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -208,24 +284,20 @@ function CompactAttentionNote({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
-  actionsOnly: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
-    <div
-      className={cn("flex items-center gap-3", actionsOnly ? "shrink-0" : "min-w-0 flex-1")}
-      data-testid="split-run-attention-note"
-    >
-      {actionsOnly ? null : (
-        <div
-          key={`${note.headline}-${note.text ?? ""}`}
-          className="sp-stream-text min-w-0 flex-1"
-          data-testid="split-run-intent-decision-tip"
-        >
-          <p className="text-[13px] font-medium leading-5 text-foreground">{note.headline}</p>
-          {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
-        </div>
-      )}
+    <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
+      <div
+        key={`${note.headline}-${note.text ?? ""}`}
+        className="sp-stream-text min-w-0 flex-1"
+        data-testid="split-run-intent-decision-tip"
+      >
+        <h3 className="text-[13px] font-medium leading-5 text-foreground">
+          <StoppedHeadline note={note} />
+        </h3>
+        {note.text ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{note.text}</p> : null}
+      </div>
       <NoteActionRow
         note={note}
         actions={actions}
@@ -234,7 +306,6 @@ function CompactAttentionNote({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
-        capsule={actionsOnly}
         onAction={onAction}
       />
     </div>
@@ -249,7 +320,6 @@ function NoteActionRow({
   startBusy,
   startDisabled,
   modelSelect,
-  capsule = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -259,26 +329,12 @@ function NoteActionRow({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
-  capsule?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const href = note.cta?.href ?? runHref ?? undefined;
   const showCta = Boolean(note.cta && href);
   if (!showCta && actions.length === 0 && !modelSelect) {
     return null;
-  }
-
-  if (capsule) {
-    return (
-      <DraftActionCapsule
-        actions={actions}
-        actionBusy={actionBusy}
-        startBusy={startBusy}
-        startDisabled={startDisabled}
-        modelSelect={modelSelect}
-        onAction={onAction}
-      />
-    );
   }
 
   return (
@@ -315,52 +371,38 @@ function NoteActionRow({
   );
 }
 
-function DraftActionCapsule({
+/**
+ * Draft actions on the refine strip verdict row. No capsule, no border: the
+ * verdict owns the row. Start is filled only when the verdict says go. The
+ * model select lives on the strip settings row, not here.
+ */
+function StripActions({
   actions,
   actionBusy,
   startBusy,
   startDisabled,
-  modelSelect,
+  startEmphasis,
   onAction,
 }: {
   actions: SplitRunFooterAction[];
   actionBusy: boolean;
   startBusy: boolean;
   startDisabled: boolean;
-  modelSelect?: ReactNode;
+  startEmphasis: StartEmphasis;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  const archive = actions.find((action) => action.kind === "archive");
+  if (actions.length === 0) {
+    return null;
+  }
   const start = actions.find((action) => action.kind === "start");
-  const rest = actions.filter((action) => action.kind !== "archive" && action.kind !== "start");
-  const startLocked = Boolean(start && (startDisabled || startBusy || start.disabled));
-  const select = isValidElement(modelSelect)
-    ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
-    : modelSelect;
+  const rest = actions.filter((action) => action.kind !== "start");
 
   return (
-    <ButtonGroup
-      className="overflow-hidden rounded-md border border-input"
+    <div
+      className="flex shrink-0 items-center gap-1.5"
       aria-label="Draft actions"
       data-testid="split-run-draft-action-group"
     >
-      {archive ? (
-        <NoteAction
-          action={archive}
-          actionBusy={actionBusy}
-          startBusy={startBusy}
-          startDisabled={startDisabled}
-          grouped
-          capsule
-          onClick={() => onAction?.(archive)}
-        />
-      ) : null}
-      {select ? (
-        <>
-          <ButtonGroupSeparator />
-          {select}
-        </>
-      ) : null}
       {rest.map((action) => (
         <NoteAction
           key={action.id}
@@ -368,8 +410,7 @@ function DraftActionCapsule({
           actionBusy={actionBusy}
           startBusy={startBusy}
           startDisabled={startDisabled}
-          grouped
-          capsule
+          variant="ghost"
           onClick={() => onAction?.(action)}
         />
       ))}
@@ -379,12 +420,12 @@ function DraftActionCapsule({
           actionBusy={actionBusy}
           startBusy={startBusy}
           startDisabled={startDisabled}
-          grouped
-          capsule
+          variant={startEmphasis === "filled" ? "default" : "outline"}
+          strip
           onClick={() => onAction?.(start)}
         />
       ) : null}
-    </ButtonGroup>
+    </div>
   );
 }
 
@@ -409,25 +450,8 @@ function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "b
   );
 }
 
-function ActionIcon({
-  icon,
-  kind,
-  capsule,
-}: {
-  icon?: SplitRunFooterAction["icon"];
-  kind?: SplitRunFooterAction["kind"];
-  capsule?: boolean;
-}) {
-  if (icon === "undo-2") {
-    return <Undo2 className="size-3.5" aria-hidden />;
-  }
-  if (icon === "sparkles") {
-    return <Sparkles className="size-3.5" aria-hidden />;
-  }
-  if (capsule && kind === "archive") {
-    return <Archive className="size-3.5 opacity-60" aria-hidden />;
-  }
-  if (capsule && kind === "start") {
+function ActionIcon({ kind, strip }: { kind?: SplitRunFooterAction["kind"]; strip?: boolean }) {
+  if (strip && kind === "start") {
     return <Play className="size-3.5" aria-hidden />;
   }
   return null;
@@ -439,7 +463,8 @@ function NoteAction({
   startBusy,
   startDisabled,
   grouped = false,
-  capsule = false,
+  strip = false,
+  variant,
   onClick,
 }: {
   action: SplitRunFooterAction;
@@ -447,7 +472,10 @@ function NoteAction({
   startBusy: boolean;
   startDisabled: boolean;
   grouped?: boolean;
-  capsule?: boolean;
+  /** On the refine strip Start carries a play icon. */
+  strip?: boolean;
+  /** Overrides the emphasis from the footer action. */
+  variant?: "default" | "outline" | "ghost";
   onClick: () => void;
 }) {
   const primary = action.emphasis === "primary";
@@ -463,16 +491,16 @@ function NoteAction({
     <Button
       type="button"
       size="sm"
-      variant={primary ? "default" : "outline"}
+      variant={variant ?? (primary ? "default" : "outline")}
       disabled={disabled}
       onClick={onClick}
-      className={noteActionClassName({ capsule, grouped, primary })}
+      className={noteActionClassName({ grouped })}
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
       {busy ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
       ) : (
-        <ActionIcon icon={action.icon} kind={action.kind} capsule={capsule} />
+        <ActionIcon kind={action.kind} strip={strip} />
       )}
       {action.label}
     </Button>

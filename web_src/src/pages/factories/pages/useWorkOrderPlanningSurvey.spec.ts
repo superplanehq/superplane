@@ -83,6 +83,17 @@ describe("useWorkOrderPlanningActivity", () => {
     await waitFor(() => expect(result.current.isWorking).toBe(true));
     expect(result.current.isWaiting).toBe(false);
     expect(result.current.hasAgentQuestion).toBe(false);
+    expect(result.current.session).toEqual({ executionId: "exec-1" });
+  });
+
+  it("returns no session when disabled", () => {
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useWorkOrderPlanningActivity("org-1", "factory-1", "wo-1", false, true), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.session).toBeNull();
+    expect(findPlanningSessionByWorkOrder).not.toHaveBeenCalled();
   });
 
   it("marks a pending wait as waiting, not working", async () => {

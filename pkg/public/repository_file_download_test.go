@@ -30,7 +30,7 @@ func downloadFile(
 ) *httptest.ResponseRecorder {
 	t.Helper()
 
-	url := fmt.Sprintf("/api/v1/canvases/%s/repository/file", canvasID)
+	url := fmt.Sprintf("/api/v1/canvases/%s/file", canvasID)
 	if path != "" {
 		url += "?path=" + path
 	}
@@ -117,6 +117,14 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "README.md")
 		assert.Equal(t, http.StatusNotFound, response.Code)
 		assert.Contains(t, response.Body.String(), "File not found")
+	})
+
+	t.Run("canvas.yaml without repository -> generated spec", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "canvas.yaml")
+		assert.Equal(t, http.StatusOK, response.Code)
+		assert.Contains(t, response.Body.String(), "kind: Canvas")
 	})
 
 	t.Run("git provider error -> internal server error", func(t *testing.T) {

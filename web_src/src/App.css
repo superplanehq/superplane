@@ -1141,42 +1141,21 @@
   animation: workspace-next-steps-banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Same violet / amber pair as the first-run sphere. */
-.sp-survey-accent,
-.sp-user-note-label {
-  color: #4c2a94;
+/*
+ * Outgoing chat turn. Remap the text tokens inside the primary bubble so the
+ * markdown, source chip, and Show more button invert with it.
+ */
+.sp-chat-outgoing {
+  --foreground: var(--primary-foreground);
+  --muted-foreground: color-mix(in oklab, var(--primary-foreground) 72%, transparent);
+  --border: color-mix(in oklab, var(--primary-foreground) 28%, transparent);
+  --accent: color-mix(in oklab, var(--primary-foreground) 14%, transparent);
+  --background: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
-.dark .sp-survey-accent,
-.dark .sp-user-note-label {
-  color: #f6a821;
-}
-
-.sp-survey-card,
-.sp-user-note {
-  border-color: rgb(91 51 173 / 28%);
-  background: color-mix(in oklab, #f3ecff 82%, transparent);
-}
-
-.dark .sp-survey-card,
-.dark .sp-user-note {
-  border-color: rgb(246 168 33 / 34%);
-  background: color-mix(in oklab, #f6a821 10%, transparent);
-}
-
-.sp-user-note textarea {
-  background-color: transparent !important;
-}
-
-.sp-user-note-fade {
-  background-image: linear-gradient(to top, color-mix(in oklab, #f3ecff 82%, white), transparent);
-}
-
-.dark .sp-user-note-fade {
-  background-image: linear-gradient(to top, color-mix(in oklab, #f6a821 10%, var(--background)), transparent);
-}
-
-/* Selected Task / Automations pill. Same violet / amber pair as user notes. */
+/* Selected Task / Automations pill. Same violet / amber pair as the first-run sphere. */
 [data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
   border-color: rgb(91 51 173 / 28%);
   background: color-mix(in oklab, #f3ecff 82%, transparent);
@@ -1188,26 +1167,6 @@
   border-color: rgb(246 168 33 / 34%);
   background: color-mix(in oklab, #f6a821 10%, transparent);
   color: #f6a821;
-}
-
-.sp-survey-option-selected {
-  background: rgb(91 51 173 / 10%);
-}
-
-.dark .sp-survey-option-selected {
-  background: rgb(246 168 33 / 14%);
-}
-
-.sp-survey-pick {
-  border-color: #5b33ad;
-  background: #5b33ad;
-  color: #fff;
-}
-
-.dark .sp-survey-pick {
-  border-color: #f6a821;
-  background: #f6a821;
-  color: #14100a;
 }
 
 .sp-survey-page {

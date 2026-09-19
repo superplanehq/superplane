@@ -129,6 +129,47 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Nil(t, config["mcp"])
 }
 
+func TestBuildOpenCodeConfigMergesWorkspaceMCP(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","headers":{"Authorization":"Bearer tok"}}]}`), 0o644))
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	docs, ok := mcp["docs"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", docs["type"])
+	assert.Equal(t, "https://mcp.example.com/mcp", docs["url"])
+}
+
+func TestBuildOpenCodeConfigReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	config := jsBuildConfig(t, taskDir, map[string]string{
+		"SUPERPLANE_TASK_DIR":             taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": "/task/workspace_mcp.json",
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	deepwiki, ok := mcp["deepwiki"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", deepwiki["type"])
+	assert.Equal(t, "https://mcp.deepwiki.com/mcp", deepwiki["url"])
+}
+
+func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	command, _ := superplane["command"].([]any)
+
+	assert.Equal(t, []any{"node", "/task/task_artifact_mcp.js"}, command)
+	assert.Equal(t, true, superplane["enabled"])
+}
+
 func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
@@ -181,6 +222,44 @@ func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "tool_end", end["type"])
 	assert.Equal(t, "passed", end["status"])
 	assert.Contains(t, output, `"type":"turn"`)
+}
+
+func TestFormatOpenCodeJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-openrouter-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("c", 2048)
+	imageResult := fmt.Sprintf(`{"content":[{"type":"image","data":%q,"mimeType":"image/png"}]}`, image)
+	output := runOpenCodeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"completed","input":{"command":%q},"output":%q}}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git", imageResult),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "image content omitted from logs")
+}
+
+func TestRunPromptRedactsSecretsFromStderrAndResult(t *testing.T) {
+	token := "github-token-from-openrouter-process"
+	result := runOpenRouterPrompt(t, promptHarness{
+		env: map[string]string{"GITHUB_TOKEN": token},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stderr:   "Bearer " + token,
+			Stdout: []string{
+				fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
+				`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+
+	assert.NotContains(t, result.output, token)
+	assert.NotContains(t, result.stderr, token)
+	assert.Contains(t, result.stderr, "Bearer [REDACTED]")
+	assert.NotContains(t, fmt.Sprint(resultPayload(t, result.resultFile)), token)
 }
 
 func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
@@ -997,6 +1076,7 @@ type promptHarness struct {
 type openRouterPromptResult struct {
 	exitCode      int
 	output        string
+	stderr        string
 	resultFile    string
 	taskDir       string
 	spawns        [][]string
@@ -1168,6 +1248,7 @@ runPrompt(%q, %q, helpers)
 	return openRouterPromptResult{
 		exitCode:      exitCode,
 		output:        stdout.String(),
+		stderr:        stderr.String(),
 		resultFile:    resultFile,
 		taskDir:       dir,
 		spawns:        recorded.Calls,

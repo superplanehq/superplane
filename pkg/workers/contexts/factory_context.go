@@ -376,14 +376,6 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderCommentAdded,
-		ActorName:      c.automationName(),
-		CommentBody:    body,
-	})
 	return nil
 }
 
@@ -393,7 +385,7 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
 		Key:        params.Key,
@@ -404,15 +396,11 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderArtifactAdded,
-		ActorName:      c.automationName(),
-		ArtifactType:   artifact.Type,
-	})
+	if created {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+	} else {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
+	}
 	return artifactToCore(artifact)
 }
 
@@ -861,6 +849,7 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 
 	created, err := pullRequest.CreateActivity(c.tx, models.FactoryPullRequestActivityParams{
 		RunID:             c.execution.RunID,
+		Title:             params.Title,
 		Description:       params.Description,
 		RevisionSHA:       params.Revision,
 		Access:            access,
@@ -892,8 +881,8 @@ func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequest
 		return nil, err
 	}
 
-	if params.Description != nil {
-		if err := activity.UpdateDescription(c.tx, *params.Description); err != nil {
+	if params.Title != nil || params.Description != nil {
+		if err := activity.UpdateContent(c.tx, params.Title, params.Description); err != nil {
 			return nil, err
 		}
 	}
@@ -959,6 +948,7 @@ func (c *FactoryContext) activityResult(
 
 func pullRequestActivityToCore(activity *models.FactoryPullRequestRun, revision *models.FactoryPullRequestRevision) *core.PullRequestActivity {
 	item := &core.PullRequestActivity{
+		Title:        activity.Title,
 		Description:  activity.Description,
 		Access:       activity.Access,
 		State:        activity.State,

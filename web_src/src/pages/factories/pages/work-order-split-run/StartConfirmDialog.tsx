@@ -13,23 +13,23 @@ import {
   AlertDialogTitle,
 } from "@/ui/alertDialog";
 
-import { START_CONFIRM_COPY, startConfirmBody } from "./startConfirm";
+import { START_CONFIRM_COPY, startConfirmBody, type StartConfirmScores } from "./startConfirm";
 
 const ACTION_CLASS = "rounded-md";
 
 export function StartConfirmDialog({
   open,
-  score,
+  scores,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean;
-  score?: number;
+  scores: StartConfirmScores;
   onOpenChange: (open: boolean) => void;
   onConfirm: (skipNext: boolean) => void;
 }) {
   const [skipNext, setSkipNext] = useState(false);
-  const body = startConfirmBody(score) ?? START_CONFIRM_COPY.missing;
+  const body = startConfirmBody(scores) ?? START_CONFIRM_COPY.missing;
 
   useEffect(() => {
     if (open) {
@@ -39,8 +39,8 @@ export function StartConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="overflow-hidden border-0 bg-transparent p-0 shadow-none ring-0">
-        <Frame data-testid="split-run-start-confirm">
+      <AlertDialogContent className="overflow-hidden p-0 ring-0">
+        <Frame variant="inverse" dense className="border-0 bg-popover" data-testid="split-run-start-confirm">
           <FrameHeader>
             <div className="flex items-start gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-amber-100 bg-amber-50 text-amber-500 dark:bg-amber-950 dark:text-amber-300">

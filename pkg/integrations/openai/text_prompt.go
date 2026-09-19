@@ -1,7 +1,6 @@
 package openai
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,10 +10,8 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/configuration/attachments"
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 const ResponsePayloadType = "openai.response"
@@ -22,11 +19,10 @@ const ResponsePayloadType = "openai.response"
 type CreateResponse struct{}
 
 type CreateResponseSpec struct {
-	Model           string   `json:"model"`
-	Input           string   `json:"input"`
-	Files           []string `json:"files"`
-	CodeInterpreter bool     `json:"codeInterpreter"`
-	OutputSchema    string   `json:"outputSchema"`
+	Model           string `json:"model"`
+	Input           string `json:"input"`
+	CodeInterpreter bool   `json:"codeInterpreter"`
+	OutputSchema    string `json:"outputSchema"`
 }
 
 type ResponsePayload struct {
@@ -93,7 +89,6 @@ func (c *CreateResponse) Documentation() string {
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
-- **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the OpenAI Files API and sent alongside the prompt.
 - **Code Interpreter**: (Optional) Let the model write and run Python in a sandboxed container. Files it creates are emitted as artifacts.
 - **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
@@ -150,21 +145,6 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Placeholder: "Enter the prompt text",
 		},
 		{
-			Name:        "files",
-			Label:       "Files",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "Files from the Files tab to attach to the prompt (images, PDFs, or text)",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "File path",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeRepositoryFile,
-					},
-				},
-			},
-		},
-		{
 			Name:        "codeInterpreter",
 			Label:       "Code Interpreter",
 			Type:        configuration.FieldTypeBool,
@@ -192,37 +172,6 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 
 	if spec.Input == "" {
 		return fmt.Errorf("input is required")
-	}
-
-	if len(spec.Files) > 0 {
-		if ctx.Files == nil {
-			return fmt.Errorf("files configured but file access is not available")
-		}
-		available, err := ctx.Files.List()
-		if err != nil {
-			return fmt.Errorf("failed to list repository files: %v", err)
-		}
-		fileSet := make(map[string]bool, len(available))
-		for _, f := range available {
-			if norm, err := gitprovider.NormalizePath(f); err == nil {
-				fileSet[norm] = true
-			}
-		}
-		for _, f := range spec.Files {
-			norm, err := gitprovider.ValidateUserPath(f)
-			if err != nil {
-				return fmt.Errorf("invalid file path %q: %v", f, err)
-			}
-			if !fileSet[norm] {
-				return fmt.Errorf("file %q not found in app repository", f)
-			}
-		}
-
-		// Read the files now so unsupported types, empty files, and size limits
-		// are caught at config time rather than on every execution.
-		if _, err := attachments.Read(ctx.Files, spec.Files); err != nil {
-			return err
-		}
 	}
 
 	// The schema field supports expressions (like the prompt), which are only
@@ -270,19 +219,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Read attached repository files and build the Responses API input: files are
-	// uploaded to the Files API and referenced by file_id alongside the prompt.
-	atts, err := attachments.Read(ctx.Files, spec.Files)
-	if err != nil {
-		return fmt.Errorf("failed to read attachments: %v", err)
-	}
-	input, fileIDs, err := buildInput(client, atts, spec.Input)
-	if err != nil {
-		return err
-	}
-	defer cleanupFiles(client, fileIDs)
-
-	req := CreateResponseRequest{Model: spec.Model, Input: input}
+	req := CreateResponseRequest{Model: spec.Model, Input: spec.Input}
 	if spec.CodeInterpreter {
 		req.Tools = []any{map[string]any{"type": "code_interpreter", "container": map[string]any{"type": "auto"}}}
 	}
@@ -335,47 +272,6 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		ResponsePayloadType,
 		[]any{payload},
 	)
-}
-
-// buildInput uploads each attachment to the OpenAI Files API and builds the
-// Responses API input: a plain string when there are no attachments, otherwise
-// a user message carrying input_text + input_image/input_file parts referenced
-// by file_id. The returned file IDs should be cleaned up after the request.
-func buildInput(client *Client, atts []attachments.Attachment, prompt string) (any, []string, error) {
-	if len(atts) == 0 {
-		return prompt, nil, nil
-	}
-
-	parts := make([]InputPart, 0, len(atts)+1)
-	parts = append(parts, InputPart{Type: "input_text", Text: prompt})
-	fileIDs := make([]string, 0, len(atts))
-	for _, att := range atts {
-		purpose := "user_data"
-		if att.IsImage() {
-			purpose = "vision"
-		}
-		fileID, err := client.UploadFile(bytes.NewReader(att.Data), att.Name, purpose, att.UploadMIME())
-		if err != nil {
-			cleanupFiles(client, fileIDs)
-			return nil, nil, fmt.Errorf("upload file %q: %w", att.Name, err)
-		}
-		fileIDs = append(fileIDs, fileID)
-
-		if att.IsImage() {
-			parts = append(parts, InputPart{Type: "input_image", FileID: fileID})
-		} else {
-			parts = append(parts, InputPart{Type: "input_file", FileID: fileID})
-		}
-	}
-
-	return []InputMessage{{Role: "user", Content: parts}}, fileIDs, nil
-}
-
-// cleanupFiles best-effort deletes uploaded files after the request completes.
-func cleanupFiles(client *Client, fileIDs []string) {
-	for _, id := range fileIDs {
-		_ = client.DeleteFile(id)
-	}
 }
 
 func (c *CreateResponse) Cancel(ctx core.ExecutionContext) error {

@@ -4,6 +4,8 @@ const (
 	VideoMaxDurationSeconds     = 900
 	VideoMaxFrames              = 24
 	VideoMaxFrameWidth          = 1280
+	VideoMaxFrameHeight         = 1280
+	VideoMaxSourcePixels        = 16_777_216
 	VideoProcessTimeoutSeconds  = 120
 	VideoDiskBudgetBytes        = 2 << 30
 	AttachmentManifestVersion   = 1
@@ -21,6 +23,8 @@ type AttachmentPolicy struct {
 	MaxDurationSeconds    int   `json:"max_duration_seconds"`
 	MaxFrames             int   `json:"max_frames"`
 	MaxFrameWidth         int   `json:"max_frame_width"`
+	MaxFrameHeight        int   `json:"max_frame_height"`
+	MaxSourcePixels       int   `json:"max_source_pixels"`
 	ProcessTimeoutSeconds int   `json:"process_timeout_seconds"`
 	DiskBudgetBytes       int64 `json:"disk_budget_bytes"`
 }
@@ -30,6 +34,8 @@ func DefaultAttachmentPolicy() AttachmentPolicy {
 		MaxDurationSeconds:    VideoMaxDurationSeconds,
 		MaxFrames:             VideoMaxFrames,
 		MaxFrameWidth:         VideoMaxFrameWidth,
+		MaxFrameHeight:        VideoMaxFrameHeight,
+		MaxSourcePixels:       VideoMaxSourcePixels,
 		ProcessTimeoutSeconds: VideoProcessTimeoutSeconds,
 		DiskBudgetBytes:       VideoDiskBudgetBytes,
 	}

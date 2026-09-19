@@ -179,6 +179,13 @@ describe("ColumnAutomationViewPopup", () => {
     expect(screen.getByTestId("column-automation-view-canvas")).toHaveTextContent("The automation is loading.");
   });
 
+  it("shows empty copy when the automation has no steps", () => {
+    renderPopup({ graph: { nodes: [], edges: [] }, editHref: undefined });
+
+    expect(screen.getByTestId("column-automation-view-canvas")).toHaveTextContent("This automation has no steps yet.");
+    expect(screen.getByTestId("column-automation-view-canvas")).not.toHaveTextContent("canvas");
+  });
+
   it("hides tabs when the automation has no form and no agent", () => {
     renderPopup();
 
@@ -210,6 +217,22 @@ describe("ColumnAutomationViewPopup", () => {
     expect(
       within(screen.getByTestId("column-automation-view-canvas")).getByRole("link", { name: "Edit automation" }),
     ).toHaveAttribute("href", EDIT_HREF);
+  });
+
+  it("shows visual evidence only when the agent slot enables it", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      agent: {
+        draft: PLANNING_REVIEW_DRAFT,
+        organizationId: "org-1",
+        onSave: vi.fn(),
+        showVisualEvidenceSetting: true,
+      },
+    });
+
+    expect(screen.getByRole("switch", { name: "Include visual evidence" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
   });
 
   it("puts General first when a form and an agent exist", () => {

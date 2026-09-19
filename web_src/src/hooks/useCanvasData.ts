@@ -30,8 +30,6 @@ import {
   canvasesListEventExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
-  canvasesGetCanvasRepository,
-  canvasesListCanvasRepositoryFiles,
   canvasesPutCanvasStaging,
   canvasesCommitCanvasStaging,
   canvasesDeleteCanvasStaging,
@@ -1714,15 +1712,6 @@ export const useUpdateCanvasConsole = (
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
 export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
 
-async function fetchRepositoryFileContent(
-  canvasId: string,
-  path: string,
-  versionId?: string,
-  stage = false,
-): Promise<string> {
-  return fetchRepositorySpecFileContent(canvasId, path, versionId, stage);
-}
-
 // fetchRepositoryFileContentCached reads raw repository-file content through the
 // React Query cache so callers (the Files diff, committed baselines, selection)
 // reuse and dedupe identical reads. Committed (stage=false) content only changes
@@ -1741,64 +1730,6 @@ export function fetchRepositoryFileContentCached(
     staleTime: stage ? 0 : Number.POSITIVE_INFINITY,
   });
 }
-
-export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: canvasKeys.repository(canvasId),
-    queryFn: async () => {
-      const response = await canvasesGetCanvasRepository(
-        withOrganizationHeader({
-          path: { canvasId },
-        }),
-      );
-      return response.data?.repository;
-    },
-    enabled: enabled && !!canvasId,
-    staleTime: 30_000,
-    refetchInterval: (query) => {
-      const state = query.state.data?.status?.state;
-      return state === "STATE_PENDING" ? 3000 : false;
-    },
-  });
-};
-
-export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: canvasKeys.repositoryFiles(canvasId),
-    queryFn: async () => {
-      const response = await canvasesListCanvasRepositoryFiles(
-        withOrganizationHeader({
-          path: { canvasId },
-        }),
-      );
-      return response.data;
-    },
-    enabled: enabled && !!canvasId,
-    staleTime: 15_000,
-  });
-};
-
-export const useCanvasRepositoryFile = (
-  canvasId: string,
-  path: string | null,
-  enabled: boolean = true,
-  versionId?: string,
-  stage = false,
-) => {
-  const normalizedPath = path ?? "";
-  return useQuery({
-    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId, stage),
-    queryFn: async () => {
-      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId, stage);
-      return {
-        path: normalizedPath,
-        content,
-      };
-    },
-    enabled: enabled && !!canvasId && !!normalizedPath,
-    staleTime: 15_000,
-  });
-};
 
 // useStageCanvasSpecFiles writes canvas.yaml/console.yaml edits to staging (no commit).
 export const useStageCanvasSpecFiles = (canvasId: string) => {
@@ -1866,54 +1797,3 @@ export const useDiscardCanvasStaging = (canvasId: string) => {
     },
   });
 };
-
-// useStageRepositoryFiles stages arbitrary repository file edits into staging.
-export const useStageRepositoryFiles = (canvasId: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (operations: CanvasesCanvasRepositoryFileOperation[]) => {
-      registerLocalStagingWrite(canvasId);
-      const response = await canvasesPutCanvasStaging(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: { operations },
-        }),
-      );
-      return response.data?.stagingSummary;
-    },
-    onSuccess: (stagingSummary) => {
-      queryClient.setQueryData(
-        canvasKeys.canvasStaging(canvasId),
-        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
-      );
-      invalidateStagedCanvasCaches(queryClient, canvasId);
-    },
-  });
-};
-
-// useDiscardRepositoryFilePaths reverts specific staged paths, refreshing StagingSummary.
-export const useDiscardRepositoryFilePaths = (canvasId: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (paths: string[]) => {
-      registerLocalStagingWrite(canvasId);
-      const response = await canvasesDeleteCanvasStaging(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: paths.length > 0 ? { paths } : undefined,
-        }),
-      );
-      return response.data?.stagingSummary;
-    },
-    onSuccess: (stagingSummary) => {
-      queryClient.setQueryData(
-        canvasKeys.canvasStaging(canvasId),
-        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
-      );
-      invalidateStagedCanvasCaches(queryClient, canvasId);
-    },
-  });
-};
-
-export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
-export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;

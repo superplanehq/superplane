@@ -48,10 +48,19 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
+	assert.Equal(t, false, agent.Configuration["includeVisualEvidence"])
 	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
 	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
 	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
 	assert.NotContains(t, result.canvasYAML, "Implementation plan:")
+	assert.NotContains(t, result.canvasYAML, "task().visual_evidence_enabled")
+	assert.NotContains(t, result.canvasYAML, "For a visual-only change")
+	assert.NotContains(t, result.canvasYAML, "report_visual_evidence_unavailable")
+	assert.NotContains(t, result.canvasYAML, "Visual evidence is unavailable:")
+	assert.NotContains(t, result.canvasYAML, "x-access-token")
+	assert.NotContains(t, result.canvasYAML, `git rev-parse '@{upstream}'`)
+	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")
+	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
@@ -65,6 +74,27 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
 	assert.NotContains(t, body, "[Task](")
 
+	commentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence")
+	assert.Equal(t, "github.createIssueComment", commentEvidence.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, commentEvidence.Integration)
+	assert.Contains(t, commentEvidence.Configuration["body"], `substring($["Create Pull Request"].data.head.sha, 0, 7)`)
+	assert.Contains(t, commentEvidence.Configuration["body"], "## Visual evidence")
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "attach-pr-artifact", TargetID: "has-visual-evidence", Channel: "default"})
+	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
+	assert.Equal(
+		t,
+		`($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		hasEvidence.Configuration["expression"],
+	)
+	hasUpdatedEvidence := findYAMLNode(t, canvas, "has-visual-evidence-updated")
+	assert.Equal(
+		t,
+		`($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
+		hasUpdatedEvidence.Configuration["expression"],
+	)
+	updatedCommentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence-updated")
+	assert.Contains(t, updatedCommentEvidence.Configuration["body"], `substring($["Update Pull Request"].data.head.sha, 0, 7)`)
+
 	updatePR := findYAMLNode(t, canvas, "update-pr")
 	updateBody, ok := updatePR.Configuration["body"].(string)
 	require.True(t, ok, "expected update-pr body to be a string")
@@ -74,6 +104,43 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "app-1", console.Metadata.CanvasID)
 	assert.Equal(t, "Implement refunds", console.Metadata.Name)
+}
+
+func TestMaterializePRFeedbackDefaultsPreservesVisualEvidence(t *testing.T) {
+	canvasID := uuid.New()
+	current := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository: "acme/app",
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+	for _, nodeID := range []string{
+		prFeedbackRunnerNodeID,
+		prFeedbackReviewRunnerNodeID,
+		prFeedbackReplyRunnerNodeID,
+	} {
+		findYAMLNode(t, current, nodeID).Configuration["includeVisualEvidence"] = true
+	}
+
+	result, err := materializePRFeedbackDefaults(
+		nil,
+		&models.Factory{},
+		&models.Canvas{ID: canvasID, Name: "Address PR feedback"},
+		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
+		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion},
+	)
+	require.NoError(t, err)
+
+	defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	for _, nodeID := range []string{
+		prFeedbackRunnerNodeID,
+		prFeedbackReviewRunnerNodeID,
+		prFeedbackReplyRunnerNodeID,
+	} {
+		assert.Equal(t, true, findYAMLNode(t, defaults, nodeID).Configuration["includeVisualEvidence"])
+	}
 }
 
 func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {

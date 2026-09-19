@@ -69,6 +69,14 @@ export const Loading: Story = {
   },
 };
 
+export const Empty: Story = {
+  name: "Empty",
+  args: {
+    graph: { nodes: [], edges: [] },
+    editHref: undefined,
+  },
+};
+
 export const WithAgent: Story = {
   name: "Agent and Automation",
   args: {

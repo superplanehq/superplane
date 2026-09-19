@@ -27,9 +27,11 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryHomePath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
+  firstFactoryLineId,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -43,12 +45,16 @@ import {
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import {
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
+} from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
-import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
+import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
@@ -245,17 +251,11 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
 
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
-  useWorkOrderPlanningActivity: (
-    _organizationId: string,
-    _factoryId: string,
-    _workOrderId: string,
-    enabled: boolean,
-    backlogAnalyzing = false,
-  ) => ({
+  useWorkOrderPlanningActivity: () => ({
     hasAgentQuestion: false,
     isWaiting: false,
     isWorking: false,
-    isAgentWorking: Boolean(enabled && backlogAnalyzing),
+    session: null,
   }),
   workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
     "planning-session-by-work-order",
@@ -355,19 +355,21 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
   });
 
-  it("shows a score on a review-candidate backlog card and opens the split run", async () => {
+  it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const user = userEvent.setup();
     renderLinesBoard();
 
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
-    expect(cardScore).toHaveAttribute("role", "meter");
-    expect(cardScore).toHaveAttribute("aria-valuenow", "5");
-    expect(cardScore).toHaveAttribute("aria-valuemax", "5");
-    expect(cardScore.querySelectorAll("[data-filled='true']")).toHaveLength(5);
-    const start = within(card).getByRole("button", { name: "Start" });
-    expect(cardScore.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cardScore).toHaveAttribute("data-tone", "ready");
+    expect(cardScore).toHaveTextContent("Clarity5Confidence5");
+    expect(cardScore).toHaveAttribute(
+      "aria-label",
+      "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
+    );
+    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(card).queryByTestId("work-order-card-start-wo-review-pay-842")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
@@ -380,7 +382,8 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Automations" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Clarity");
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "This task is ready to start" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
@@ -422,7 +425,7 @@ describe("LinesPage board", () => {
       const dialog = screen.getByTestId("work-order-split-run");
       expect(within(dialog).queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
       expect(within(dialog).getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-      expect(within(dialog).getByTestId("split-run-intent-plan-analyzing")).toBeInTheDocument();
+      expect(within(dialog).getByTestId("split-run-intent-verdict-analyzing")).toBeInTheDocument();
       expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
@@ -493,6 +496,27 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+  });
+
+  it("redirects to the first board when a missing line id is opened", async () => {
+    const user = userEvent.setup();
+    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/line-missing`;
+    render(
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        factory={REFUND_FACTORY}
+        navigateTo={missingLinePath}
+      />,
+    );
+
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-test-navigate"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryHomePath("org-1", PRIMARY_FACTORY_KEY, firstFactoryLineId(REFUND_FACTORY)),
+    );
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
   });
 
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {
@@ -1114,6 +1138,21 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1`,
+    );
+  });
+
+  it("reopens Jira intake setup when the OAuth return query is present", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    renderLinesBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
+      vi.fn(),
+      REFUND_FACTORY,
+      LANE_BANNERS,
+    );
+
+    expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
   });
 
   it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {
@@ -1387,7 +1426,7 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     const backlogLane = screen.getByTestId("lines-backlog-column");
-    for (const className of lineBoardColumnLaneClassName("lime")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("lime").surfaceClassName!.split(" ")) {
       expect(backlogLane).toHaveClass(className);
     }
   });
@@ -1411,7 +1450,7 @@ describe("LinesPage board editing", () => {
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
-    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("sky").surfaceClassName!.split(" ")) {
       expect(phaseLane).toHaveClass(className);
     }
   });
@@ -1449,7 +1488,7 @@ describe("LinesPage board editing", () => {
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
-    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("sky").surfaceClassName!.split(" ")) {
       expect(phaseLane).toHaveClass(className);
     }
   });
@@ -1468,7 +1507,7 @@ describe("LinesPage board editing", () => {
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
-    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+    for (const className of lineBoardColumnLaneProps("sky").surfaceClassName!.split(" ")) {
       expect(phaseLane).not.toHaveClass(className);
     }
   });
@@ -1512,7 +1551,39 @@ describe("LinesPage board editing", () => {
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
     expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("lists Source in the filter menu from configured intakes", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toHaveTextContent("Source");
+    expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+  });
+
+  it("narrows the board when a Source filter is selected", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryWorkOrders.mockReturnValue({
+      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+    });
+    renderLinesBoard();
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-sourceIds"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-sourceIds-github-issues"));
+
+    const board = screen.getByTestId("lines-detail-page");
+    expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
+    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {
@@ -1548,6 +1619,56 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
   });
 
+  it("lets the header view menu hide column colors and persist the choice", async () => {
+    const user = userEvent.setup();
+    const first = renderLinesBoard();
+
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.hover(screen.getByTestId("lines-board-view-column-color"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-no-column-colors"));
+
+    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+
+    first.unmount();
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+  });
+
+  it("lets the header view menu show column colors as borders", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.hover(screen.getByTestId("lines-board-view-column-color"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-colored-borders"));
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(backlog.className).not.toContain("bg-lime-300");
+    expect(backlog.className).toContain("border-lime-400");
+  });
+
+  it("lets the header view menu show soft column colors", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(backlog.className).toContain("bg-lime-300");
+    expect(backlog.className).toContain("dark:bg-lime-800");
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.hover(screen.getByTestId("lines-board-view-column-color"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-dim-column-colors"));
+
+    const softBacklog = screen.getByTestId("lines-backlog-column");
+    expect(softBacklog.className).toContain("bg-lime-100");
+    expect(softBacklog.className).toContain("dark:bg-lime-950/40");
+    expect(softBacklog.className).not.toContain("bg-lime-300");
+    expect(softBacklog.className).not.toContain("dark:bg-lime-800");
+  });
+
   it("lets the header view menu switch automation names to icons and persist the choice", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
@@ -1557,7 +1678,8 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByTestId("lines-backlog-automations")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByTestId("lines-board-view-icons"));
+    await user.hover(screen.getByTestId("lines-board-view-automations"));
+    fireEvent.click(await screen.findByTestId("lines-board-view-icons"));
 
     expect(screen.queryByTestId("lines-backlog-automation-rows")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-automations")).toBeInTheDocument();

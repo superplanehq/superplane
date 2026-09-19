@@ -81,6 +81,17 @@ describe("MarkdownContent", () => {
     expect(screen.getByRole("link", { name: "docs" })).not.toHaveAttribute("target");
   });
 
+  it("can style links and open them in a new tab", () => {
+    render(
+      <MarkdownContent content="Open [docs](https://example.com)." openLinksInNewTab linkClassName="visible-link" />,
+    );
+
+    const link = screen.getByRole("link", { name: "docs" });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveClass("visible-link");
+  });
+
   it("applies shared console link and inline-code styles", () => {
     const { container } = render(<MarkdownContent content={"See [docs](https://example.com) and `sha`."} />);
 

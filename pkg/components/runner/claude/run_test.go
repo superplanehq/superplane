@@ -26,6 +26,7 @@ func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	assert.NotContains(t, tools, "mcp__superplane")
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 	assert.Contains(t, tools, "Edit")
 	assert.Contains(t, tools, "Write")
@@ -46,12 +47,39 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "Bash")
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_spec")
+	assert.Contains(t, tools, "mcp__superplane__propose_clarity")
 	assert.Contains(t, tools, "mcp__superplane__propose_confidence")
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.Contains(t, tools, "mcp__superplane__create_task")
 	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
 	assert.NotContains(t, tools, "Edit")
 	assert.NotContains(t, tools, "Write")
+}
+
+func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
+	})
+	assert.Contains(t, tools, "mcp__docs")
+	assert.Contains(t, tools, "mcp__superplane")
+}
+
+func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_TASK_DIR":              taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  "/task/workspace_mcp.json",
+	})
+	assert.Contains(t, tools, "mcp__deepwiki")
+	assert.Contains(t, tools, "mcp__superplane")
 }
 
 func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
@@ -60,31 +88,28 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	assert.Contains(t, analysis, "propose_spec")
+	assert.Contains(t, analysis, "propose_clarity")
 	assert.Contains(t, analysis, "propose_confidence")
 	assert.NotContains(t, analysis, "propose_plan")
-	assert.Contains(t, analysis, "how well you understand the task")
-	assert.Contains(t, analysis, "why Clarity is not 5")
-	assert.Contains(t, analysis, "Do not name files")
-	assert.Contains(t, analysis, "Talk like a colleague")
-	assert.Contains(t, analysis, "2 to 4 short sentences")
-	assert.Contains(t, analysis, "Keep each option under 12 words")
-	assert.Contains(t, analysis, "Do not describe agent fit")
-	assert.NotContains(t, analysis, "how suitable the work is for an agent")
-	assert.NotContains(t, analysis, "check copy")
+	assert.Contains(t, analysis, "Follow the task prompt")
 	assert.Contains(t, analysis, "Use only the analysis tools")
 	assert.Contains(t, analysis, "call survey with 2 to 4 options")
-	assert.Contains(t, analysis, "do not have enough Clarity to write a plan")
-	assert.Contains(t, analysis, "If the score is 1 or 2")
-	assert.Contains(t, analysis, "Keep asking until Clarity is 5")
-	assert.Contains(t, analysis, "Scores 3 and 4")
-	assert.Contains(t, analysis, "Review it and start if you are happy")
-	assert.Contains(t, analysis, "If the score is below 5, you must ask")
-	assert.NotContains(t, analysis, "Why not start")
+	assert.Contains(t, analysis, "Do not paste the specification")
 	assert.Contains(t, analysis, "does not publish the specification or the score")
-	assert.Contains(t, analysis, "## Proposed outcome")
-	assert.Contains(t, analysis, "## Constraints")
+	assert.Contains(t, analysis, "Do not leave a written plan unpublished")
+	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
+	assert.Contains(t, analysis, "Do not name files")
 	assert.Contains(t, analysis, "Do not add an Open questions section")
+	assert.NotContains(t, analysis, "Talk like a colleague")
+	assert.NotContains(t, analysis, "## 1. Research")
+	assert.NotContains(t, analysis, "how suitable the work is for an agent")
+	assert.NotContains(t, analysis, "check copy")
+	assert.NotContains(t, analysis, "## Proposed outcome")
+	assert.NotContains(t, analysis, "## Workflow")
+	assert.NotContains(t, analysis, "Why not start")
+	assert.NotContains(t, analysis, "you must ask")
 	assert.NotContains(t, analysis, "## Executive summary")
+	assert.NotContains(t, analysis, "## Files and seams")
 	assert.NotContains(t, analysis, "Key architecture decisions")
 
 	unknown := planningSystemPromptFromScript(t, map[string]string{
@@ -106,6 +131,34 @@ func TestPlanningSystemPromptKeepsProtocolAtSystemPriority(t *testing.T) {
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{})
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
+}
+
+func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+
+	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__inspect_screenshot")
+	assert.Contains(t, tools, "mcp__superplane__upload_artifact")
+	assert.Contains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+}
+
+func TestFormatStreamJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-claude-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("a", 2048)
+	output := runClaudeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"text","text":%q},{"type":"thinking","thinking":%q},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":%q}}]}}`, token, token, "git remote set-url origin https://x-access-token:"+token+"@github.com/acme/app.git"),
+		fmt.Sprintf(`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"image","data":%q,"mimeType":"image/png"},{"type":"text","text":%q}]}]}}`, image, token),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "[image: image/png; content omitted from logs]")
 }
 
 func TestClaudePermissionModeUsesDefaultModeForAnalysisSession(t *testing.T) {
@@ -130,6 +183,38 @@ func TestClaudeContinuationUsesExactSession(t *testing.T) {
 	assert.Empty(t, claudeContinuationArgsFromScript(t, 0, ""))
 	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 1, "session-123"))
 	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 4, "session-123"))
+}
+
+func TestClaudePlanningFollowUpDoesNotResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(4, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis",SUPERPLANE_ANALYSIS_REWIND:"yes"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Empty(t, args)
+}
+
+func TestClaudePlanningPromptStepsStillResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(2, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Equal(t, []string{"--resume", "session-123"}, args)
 }
 
 func TestClaudeContinuationRejectsMissingSession(t *testing.T) {

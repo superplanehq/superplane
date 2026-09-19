@@ -114,6 +114,23 @@ async function waitOnce() {
   return requestJSON("GET", `/api/v1/runner/planning-sessions/wait?hold_seconds=${HOLD_SECONDS}`);
 }
 
+function persistAnalysisContinuation(taskDir, result) {
+  if (!taskDir) {
+    return;
+  }
+  const file = path.join(taskDir, "analysis_continuation.md");
+  const text = String((result && result.continuation) || "").trim();
+  if (!text) {
+    try {
+      fs.unlinkSync(file);
+    } catch (_err) {
+      // No previous rewind file.
+    }
+    return;
+  }
+  fs.writeFileSync(file, `${text}\n`);
+}
+
 function writePrompt(taskDir, text) {
   const dir = path.join(taskDir, "prompts");
   fs.mkdirSync(dir, { recursive: true });
@@ -127,7 +144,10 @@ function runPromptFile(taskDir, promptFile, model, extraArgs = []) {
     const child = spawn(
       process.execPath,
       [path.join(taskDir, "run.js"), promptFile, model || "", ...extraArgs],
-      { stdio: "inherit" },
+      {
+        stdio: "inherit",
+        env: { ...process.env, SUPERPLANE_ANALYSIS_REWIND: "yes" },
+      },
     );
     child.on("error", reject);
     child.on("close", (code) => resolve(code == null ? 1 : code));
@@ -170,11 +190,26 @@ async function runFollowUpPrompt(action, helpers, followUpIndex) {
   const now = helpers.now || Date.now;
   const index = FOLLOW_UP_CMD_INDEX_BASE + followUpIndex;
   const startedAt = now();
-  await maybePrepareAttachments(action.files || [], helpers);
+  await prepareAttachmentsWithRetry(action.files || [], helpers);
   emitFollowUpCommandStart(text, index, startedAt, writeRecord);
   const code = await helpers.runPrompt(text);
   emitFollowUpCommandEnd(index, code, startedAt, now(), writeRecord);
   return code;
+}
+
+async function prepareAttachmentsWithRetry(files, helpers) {
+  const sleep = helpers.sleep || defaultSleep;
+  const log = helpers.log || ((msg) => process.stderr.write(msg));
+  while (true) {
+    try {
+      await maybePrepareAttachments(files, helpers);
+      return;
+    } catch (err) {
+      const message = err && err.message ? err.message : String(err);
+      log(`Attachment preparation failed; retrying: ${message}\n`);
+      await sleep(WAIT_RETRY_SECONDS * 1000);
+    }
+  }
 }
 
 function maybePrepareAttachments(files, helpers) {
@@ -250,7 +285,9 @@ function mergeManifestFiles(taskDir, incoming) {
   }
   manifest.files = files;
   saveManifest(taskDir, manifest);
-  return { manifest, added };
+  const needsPreparation =
+    added || files.some((file) => file.status === "pending" || (file.kind === "video" && file.status === "downloaded"));
+  return { manifest, needsPreparation };
 }
 
 function runTaskScript(taskDir, name) {
@@ -270,8 +307,8 @@ function prepareIncomingAttachments(taskDir, incoming) {
   if (!incoming || incoming.length === 0) {
     return;
   }
-  const { manifest, added } = mergeManifestFiles(taskDir, incoming);
-  if (!added) {
+  const { manifest, needsPreparation } = mergeManifestFiles(taskDir, incoming);
+  if (!needsPreparation) {
     return;
   }
   runTaskScript(taskDir, "fetch_task_attachments.sh");
@@ -310,6 +347,7 @@ async function runLoop(helpers) {
       await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
+    persistAnalysisContinuation(helpers.taskDir, result);
     const code = await runFollowUpPrompt(action, helpers, followUpIndex);
     followUpIndex += 1;
     if (code !== 0) {
@@ -325,6 +363,7 @@ async function main() {
   const extraArgs = process.argv.slice(3);
   const code = await runLoop({
     waitOnce,
+    taskDir,
     runPrompt: (text) => runPromptFile(taskDir, writePrompt(taskDir, text), model, extraArgs),
   });
   process.exit(code);
@@ -336,6 +375,7 @@ module.exports = {
   interpretWaitResponse,
   nextAction,
   prepareIncomingAttachments,
+  persistAnalysisContinuation,
   runLoop,
   safeWaitRequest,
   writeLiveLogRecord,

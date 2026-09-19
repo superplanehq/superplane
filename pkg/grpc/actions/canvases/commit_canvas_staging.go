@@ -1,10 +1,8 @@
 package canvases
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
 	"time"
@@ -64,30 +62,9 @@ func CommitCanvasStaging(
 		return nil, err
 	}
 
-	//
-	// Commit to git first.
-	// If something goes wrong, we will revert the git commit.
-	//
-	specOps, gitOps := stagedCommitOperations(stagedFiles)
-	var gitRevertOps []gitprovider.FileOperation
-	if len(gitOps) > 0 {
-		var snapshotErr error
-		gitRevertOps, snapshotErr = snapshotGitFilesBeforeCommit(ctx, gitProvider, canvas, gitOps)
-		if snapshotErr != nil {
-			return nil, snapshotErr
-		}
-
-		if err := commitStagedGitFiles(
-			ctx,
-			gitProvider,
-			canvas,
-			canvas.OrganizationID.String(),
-			userID.String(),
-			resolvedStagingCommitMessage(commitMessage),
-			gitOps,
-		); err != nil {
-			return nil, err
-		}
+	specOps := stagedSpecOperations(stagedFiles)
+	if len(specOps) == 0 {
+		return nil, grpcerrors.FailedPrecondition(nil, "no staged changes to commit")
 	}
 
 	var newLiveVersion *models.CanvasVersion
@@ -159,16 +136,7 @@ func CommitCanvasStaging(
 		return nil
 	})
 
-	//
-	// If anything goes wrong here, we might need to revert the git commit.
-	//
 	if err != nil {
-		if len(gitRevertOps) > 0 {
-			if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, canvas.OrganizationID.String(), userID.String(), gitRevertOps); revertErr != nil {
-				log.Errorf("failed to revert git commit after spec apply failure for canvas %s: %v", canvas.ID.String(), revertErr)
-			}
-		}
-
 		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
@@ -213,24 +181,16 @@ func publishDeletedNodeCleanupMessages(canvasID uuid.UUID, result changesets.Can
 	}
 }
 
-func stagedCommitOperations(rows []models.WorkflowStagedFile) (specOps, gitOps []*pb.CanvasRepositoryFileOperation) {
+func stagedSpecOperations(rows []models.WorkflowStagedFile) []*pb.CanvasRepositoryFileOperation {
 	specContentByPath := map[string]string{}
 	for _, row := range rows {
-		if IsRepositorySpecFilePath(row.Path) {
-			if row.Deleted {
-				continue
-			}
-			specContentByPath[row.Path] = row.Content
+		if !IsRepositorySpecFilePath(row.Path) || row.Deleted {
 			continue
 		}
-
-		gitOps = append(gitOps, &pb.CanvasRepositoryFileOperation{
-			Path:    row.Path,
-			Content: []byte(row.Content),
-			Delete:  row.Deleted,
-		})
+		specContentByPath[row.Path] = row.Content
 	}
 
+	var specOps []*pb.CanvasRepositoryFileOperation
 	for _, path := range []string{CanvasYAMLRepositoryPath, ConsoleYAMLRepositoryPath} {
 		content, ok := specContentByPath[path]
 		if !ok {
@@ -242,172 +202,7 @@ func stagedCommitOperations(rows []models.WorkflowStagedFile) (specOps, gitOps [
 		})
 	}
 
-	return specOps, gitOps
-}
-
-func commitStagedGitFiles(
-	ctx context.Context,
-	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
-	organizationID string,
-	userID string,
-	message string,
-	gitOps []*pb.CanvasRepositoryFileOperation,
-) error {
-	if gitProvider == nil {
-		return grpcerrors.FailedPrecondition(nil, "git provider is not configured")
-	}
-
-	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return grpcerrors.NotFound(err, "repository not found")
-	}
-
-	user, err := models.FindActiveUserByID(organizationID, userID)
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to find user")
-	}
-
-	headSHA, err := gitProvider.Head(ctx, repository.RepoID, "")
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to resolve repository head")
-	}
-
-	operations := make([]gitprovider.FileOperation, 0, len(gitOps))
-	for _, operation := range gitOps {
-		content := operation.GetContent()
-		var reader io.Reader
-		if !operation.GetDelete() {
-			reader = bytes.NewReader(content)
-		}
-
-		operations = append(operations, gitprovider.FileOperation{
-			Path:      operation.GetPath(),
-			Content:   reader,
-			SizeBytes: int64(len(content)),
-			Delete:    operation.GetDelete(),
-		})
-	}
-
-	_, err = gitProvider.Commit(ctx, repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: headSHA,
-		Message:         message,
-		Operations:      operations,
-		Author: gitprovider.CommitAuthor{
-			Name:  user.Name,
-			Email: user.GetEmail(),
-		},
-	})
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to commit repository files")
-	}
-
-	return nil
-}
-
-func snapshotGitFilesBeforeCommit(
-	ctx context.Context,
-	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
-	gitOps []*pb.CanvasRepositoryFileOperation,
-) ([]gitprovider.FileOperation, error) {
-	if gitProvider == nil {
-		return nil, grpcerrors.FailedPrecondition(nil, "git provider is not configured")
-	}
-
-	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "repository not found")
-	}
-
-	revertOps := make([]gitprovider.FileOperation, 0, len(gitOps))
-	for _, operation := range gitOps {
-		path := operation.GetPath()
-		if operation.GetDelete() {
-			reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
-			if readErr != nil {
-				return nil, grpcerrors.FailedPrecondition(nil, fmt.Sprintf("cannot snapshot %q before staged delete: %v", path, readErr))
-			}
-
-			content, readErr := io.ReadAll(reader)
-			_ = reader.Close()
-			if readErr != nil {
-				return nil, grpcerrors.Internal(readErr, "failed to read before commit")
-			}
-
-			revertOps = append(revertOps, gitprovider.FileOperation{
-				Path:      path,
-				Content:   bytes.NewReader(content),
-				SizeBytes: int64(len(content)),
-			})
-			continue
-		}
-
-		reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
-		if readErr != nil {
-			revertOps = append(revertOps, gitprovider.FileOperation{
-				Path:   path,
-				Delete: true,
-			})
-			continue
-		}
-
-		content, readErr := io.ReadAll(reader)
-		_ = reader.Close()
-		if readErr != nil {
-			return nil, grpcerrors.Internal(readErr, "failed to read before commit")
-		}
-
-		revertOps = append(revertOps, gitprovider.FileOperation{
-			Path:      path,
-			Content:   bytes.NewReader(content),
-			SizeBytes: int64(len(content)),
-		})
-	}
-
-	return revertOps, nil
-}
-
-func revertGitFileCommit(
-	ctx context.Context,
-	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
-	organizationID string,
-	userID string,
-	revertOps []gitprovider.FileOperation,
-) error {
-	if len(revertOps) == 0 {
-		return nil
-	}
-
-	pbOps := make([]*pb.CanvasRepositoryFileOperation, 0, len(revertOps))
-	for _, operation := range revertOps {
-		pbOp := &pb.CanvasRepositoryFileOperation{
-			Path:   operation.Path,
-			Delete: operation.Delete,
-		}
-		if operation.Content != nil && !operation.Delete {
-			content, err := io.ReadAll(operation.Content)
-			if err != nil {
-				return grpcerrors.Internal(err, "failed to read revert content")
-			}
-			pbOp.Content = content
-		}
-		pbOps = append(pbOps, pbOp)
-	}
-
-	return commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userID, "Revert staged file commit", pbOps)
-}
-
-func resolvedStagingCommitMessage(messages ...string) string {
-	for _, message := range messages {
-		if trimmed := strings.TrimSpace(message); trimmed != "" {
-			return trimmed
-		}
-	}
-	return "Update files"
+	return specOps
 }
 
 func createNewCanvasVersionFromLive(

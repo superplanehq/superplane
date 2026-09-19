@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { commandDisplayText, isCommandTool, toolInputPreview, toolLineLabel } from "@/lib/agentToolLabels";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
@@ -8,11 +9,8 @@ import type { AgentActivity, AgentActivityItem, AgentContentItem, AgentToolItem 
 import { AnimatedThinkingState } from "./AnimatedThinkingState";
 import {
   activitySummaryLabel,
-  commandDisplayText,
   completedActivitySummaryLabel,
   groupToolRuns,
-  isCommandTool,
-  toolFilePaths,
   type ToolActivityGroup,
 } from "./agentActivitySummary";
 
@@ -281,53 +279,6 @@ function AssistantContent({ item }: { item: AgentContentItem }) {
       <MarkdownContent content={item.text} variant="workspace" className="max-w-none font-sans" />
     </div>
   );
-}
-
-function toolLineLabel(tool: AgentToolItem): string {
-  const fileLabel = fileToolLabel(tool);
-  if (fileLabel) return fileLabel;
-
-  const kind = tool.kind.toLowerCase();
-  const running = tool.status === "running";
-  const input = toolInputPreview(tool);
-  if (["search", "grep", "glob"].includes(kind)) {
-    return input ? `${running ? "Searching" : "Searched"} ${input}` : running ? "Searching" : "Searched";
-  }
-  if (kind === "web_search") return running ? "Searching the web" : "Searched the web";
-  if (kind === "web_fetch") return running ? "Fetching page" : "Fetched page";
-  return tool.name || tool.kind || "Tool";
-}
-
-function fileToolLabel(tool: AgentToolItem): string | undefined {
-  const kind = tool.kind.toLowerCase();
-  const verbs: Record<string, [running: string, completed: string]> = {
-    read: ["Exploring", "Explored"],
-    edit: ["Editing", "Edited"],
-    write: ["Creating", "Created"],
-  };
-  const action = verbs[kind];
-  if (!action) return undefined;
-
-  const files = toolFilePaths(tool.input);
-  const count = files.length;
-  const fileName = count === 1 ? displayFileName(files[0]) : undefined;
-  const verb = action[tool.status === "running" ? 0 : 1];
-
-  if (count > 1) return `${verb} ${count} files`;
-  return fileName ? `${verb} ${fileName}` : `${verb} file`;
-}
-
-function toolInputPreview(tool: AgentToolItem): string | undefined {
-  if (!tool.input || ["read", "edit", "write"].includes(tool.kind.toLowerCase())) return undefined;
-  return tool.input
-    .split(/\r?\n/)
-    .find((line) => line.trim())
-    ?.trim();
-}
-
-function displayFileName(path: string): string {
-  const normalized = path.replace(/\\/g, "/").replace(/\/$/, "");
-  return (normalized.split("/").at(-1) || normalized).replace(/\s+\(\d+ chars\)$/, "");
 }
 
 function failedTool(tool: AgentToolItem): boolean {

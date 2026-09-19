@@ -54,7 +54,7 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
 
-	response, err := canvases.CreateCanvasWithSeedFiles(
+	response, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
 		deps.Encryptor,
@@ -68,7 +68,6 @@ func CreateFactoryAutomation(
 		nil,
 		nil,
 		deps.UsageService,
-		nil,
 	)
 	if err != nil {
 		return nil, err

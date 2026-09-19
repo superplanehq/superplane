@@ -10,10 +10,11 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
+  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { ListLogEntriesResponse, LogEntry } from "./types";
+import type { ListLogEntriesConfiguration, ListLogEntriesResponse, LogEntry } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -93,22 +94,22 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
 function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   if (!node) return metadata;
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as unknown as ListLogEntriesConfiguration | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration.limit) {
+  if (configuration?.limit) {
     metadata.push({ icon: "hash", label: `Limit: ${configuration.limit}` });
   }
 
   return metadata;
 }
 
-function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer((rootTriggerNode as any)?.trigger?.name || "");
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const logEntries = getLogEntries(execution);

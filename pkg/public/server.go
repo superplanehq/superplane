@@ -392,10 +392,13 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/clarity", s.handleRunnerPlanningClarity).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/tasks", s.handleRunnerPlanningCreateTask).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
+	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -412,7 +415,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	// so we need to lift that endpoint here instead.
 	//
 	s.Router.Handle(
-		"/api/v1/canvases/{canvas_id}/repository/file",
+		"/api/v1/canvases/{canvas_id}/file",
 		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
 	).Methods(http.MethodGet)
 
@@ -560,7 +563,8 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-// RegisterWebSocketRoutes registers canvas, agent-session, and factory WebSocket endpoints.
+// RegisterWebSocketRoutes registers canvas, agent-session, factory, and
+// user-notification WebSocket endpoints.
 func (s *Server) RegisterWebSocketRoutes() {
 	log.Info("Registering websocket routes")
 
@@ -585,6 +589,13 @@ func (s *Server) RegisterWebSocketRoutes() {
 		"/ws/factories/{factoryId}",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
+	)
+
+	// User notifications WebSocket: live alerts for the authenticated user.
+	s.Router.Handle(
+		"/ws/users/notifications",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleUserNotificationsWebSocket)),
 	)
 }
 
@@ -668,17 +679,19 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	// Public routes (no authentication required)
 	//
-	publicRoute := r.Methods(http.MethodGet, http.MethodPost).Subrouter()
+	publicRoute := r.Methods(http.MethodGet, http.MethodPost, http.MethodHead).Subrouter()
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
+	publicRoute.HandleFunc("/api/v1/public/artifacts/{public_id}/{filename}", s.handlePublicArtifactDownload).Methods(http.MethodGet, http.MethodHead)
 
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
+	publicRoute.HandleFunc("/.well-known/oauth-client", s.HandleMCPOAuthClientMetadata).Methods("GET")
 
 	//
 	// Webhook endpoints for triggers
@@ -705,6 +718,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
@@ -720,8 +734,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
-	accountRoute.HandleFunc("/apps/install/preview", s.appInstallPreview).Methods("GET")
-	accountRoute.HandleFunc("/apps/install", s.installApp).Methods("POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()

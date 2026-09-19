@@ -10,6 +10,7 @@ const {
   interpretWaitResponse,
   nextAction,
   prepareIncomingAttachments,
+  persistAnalysisContinuation,
   runLoop,
   runPromptFile,
   safeWaitRequest,
@@ -92,8 +93,41 @@ test("prepareIncomingAttachments skips files already in the manifest", () => {
     },
   ];
   prepareIncomingAttachments(taskDir, incoming);
+  const manifestPath = path.join(taskDir, "attachments", "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.files[0].status = "ready";
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
   prepareIncomingAttachments(taskDir, incoming);
   assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments retries a pending download", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-retry-"));
+  const attempts = path.join(taskDir, "attempts.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash
+count=0
+[ ! -f ${JSON.stringify(attempts)} ] || count=$(cat ${JSON.stringify(attempts)})
+count=$((count + 1))
+printf '%s' "$count" > ${JSON.stringify(attempts)}
+[ "$count" -gt 1 ]
+`,
+  );
+  fs.writeFileSync(path.join(taskDir, "process_video_attachments.sh"), "#!/bin/bash\nexit 0\n");
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+
+  assert.throws(() => prepareIncomingAttachments(taskDir, incoming), /fetch_task_attachments\.sh failed/);
+  prepareIncomingAttachments(taskDir, incoming);
+
+  assert.equal(fs.readFileSync(attempts, "utf8"), "2");
 });
 
 test("prepareIncomingAttachments does not process image-only follow-ups", () => {
@@ -136,6 +170,72 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+test("runLoop retries attachment preparation before running the prompt", async () => {
+  const prompts = [];
+  const logs = [];
+  const sleeps = [];
+  const results = [{ status: "message", text: "See this clip", files: [{ id: "file-1" }] }, { status: "ended" }];
+  let attempts = 0;
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    prepareAttachments: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("temporary download failure");
+      }
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => sleeps.push(ms),
+    log: (message) => logs.push(message),
+    writeLiveLogRecord: () => {},
+  });
+
+  assert.equal(code, 0);
+  assert.equal(attempts, 2);
+  assert.deepEqual(prompts, ["See this clip"]);
+  assert.deepEqual(sleeps, [1000]);
+  assert.match(logs[0], /attachment preparation failed; retrying/i);
+});
+
+test("persistAnalysisContinuation writes a wait continuation for the next rewind", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-continuation-"));
+  persistAnalysisContinuation(dir, {
+    continuation: "Continue this SuperPlane analysis session.",
+  });
+  assert.equal(
+    fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
+    "Continue this SuperPlane analysis session.\n",
+  );
+  persistAnalysisContinuation(dir, { status: "message", text: "ok" });
+  assert.equal(fs.existsSync(path.join(dir, "analysis_continuation.md")), false);
+});
+
+test("runLoop writes wait continuation before the follow-up prompt", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-loop-continuation-"));
+  const results = [
+    {
+      status: "message",
+      text: "Narrow the spec",
+      continuation: "Continue this SuperPlane analysis session.",
+    },
+    { status: "ended" },
+  ];
+  await runLoop({
+    waitOnce: async () => results.shift(),
+    taskDir: dir,
+    runPrompt: async () => 0,
+    sleep: async () => {},
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(
+    fs.readFileSync(path.join(dir, "analysis_continuation.md"), "utf8"),
+    "Continue this SuperPlane analysis session.\n",
+  );
 });
 
 test("interpretWaitResponse treats a Cloudflare 502 as idle pending", () => {
@@ -458,13 +558,14 @@ test("runPromptFile forwards extra argv to run.js", async () => {
   const argvFile = path.join(taskDir, "argv.json");
   fs.writeFileSync(
     path.join(taskDir, "run.js"),
-    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n`,
+    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify({argv: process.argv.slice(2), rewind: process.env.SUPERPLANE_ANALYSIS_REWIND}));\n`,
   );
   const promptFile = path.join(taskDir, "prompt.txt");
   fs.writeFileSync(promptFile, "hello\n");
 
   const code = await runPromptFile(taskDir, promptFile, "openai/gpt-4.1", ["64"]);
   assert.equal(code, 0);
-  const argv = JSON.parse(fs.readFileSync(argvFile, "utf8"));
-  assert.deepEqual(argv, [promptFile, "openai/gpt-4.1", "64"]);
+  const recorded = JSON.parse(fs.readFileSync(argvFile, "utf8"));
+  assert.deepEqual(recorded.argv, [promptFile, "openai/gpt-4.1", "64"]);
+  assert.equal(recorded.rewind, "yes");
 });

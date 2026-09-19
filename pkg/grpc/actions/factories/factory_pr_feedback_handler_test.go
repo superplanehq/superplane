@@ -69,11 +69,33 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 6)
-		assert.Len(t, liveVersion.Edges, 5)
+		assert.Len(t, liveVersion.Nodes, 19)
+		assert.Len(t, liveVersion.Edges, 16)
+		var foundAcknowledge bool
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
+			if node.ID != prFeedbackAcknowledgeCommentNodeID {
+				continue
+			}
+			foundAcknowledge = true
+			assert.Equal(t, "github.addReaction", node.ComponentName())
+			assert.Equal(t, "{{ root().data.repository.full_name }}", node.Configuration["repository"])
+			assert.Equal(t, "{{ root().data.comment.id }}", node.Configuration["commentId"])
+			assert.Equal(t, "eyes", node.Configuration["content"])
+			assert.Equal(t, "issueComment", node.Configuration["target"])
 		}
+		assert.True(t, foundAcknowledge)
+		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
+		var foundAcknowledgeEdge bool
+		for _, edge := range liveVersion.Edges {
+			if edge.SourceID == prFeedbackCommentTriggerNodeID &&
+				edge.TargetID == prFeedbackAcknowledgeCommentNodeID &&
+				edge.Channel == "default" {
+				foundAcknowledgeEdge = true
+				break
+			}
+		}
+		assert.True(t, foundAcknowledgeEdge)
 	})
 
 	t.Run("creation fails when no repository is available", func(t *testing.T) {
@@ -153,8 +175,9 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		for _, node := range liveVersion.Nodes {
-			if node.ID == prFeedbackActivityNodeID {
-				assert.Equal(t, prFeedbackActivityDescriptionExpression(), node.Configuration["description"])
+			if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID); ok {
+				assert.Equal(t, title, node.Configuration["title"])
+				assert.Equal(t, description, node.Configuration["description"])
 			}
 			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
 				continue
@@ -235,6 +258,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		}
 		assert.True(t, foundWait)
 		assert.True(t, foundAnnounce)
+		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
 	})
 
 	t.Run("checks creation rejects an invalid attempt limit", func(t *testing.T) {
@@ -322,8 +346,19 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			if node.ID == prFeedbackWaitChecksNodeID {
 				assert.Equal(t, []any{"lint", "unit"}, node.Configuration["checkNames"])
 			}
+			if node.ID == prFeedbackActivityNodeID {
+				assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), node.Configuration["title"])
+			}
+			if node.ID == prFeedbackMarkPassedNodeID {
+				assert.Equal(t, prFeedbackChecksPassedTitleExpression(), node.Configuration["title"])
+				assert.Equal(t, prFeedbackChecksPassedDescriptionExpression(), node.Configuration["description"])
+			}
+			if node.ID == prFeedbackStartRepairNodeID {
+				assert.Equal(t, prFeedbackChecksRepairTitleExpression(), node.Configuration["title"])
+				assert.Equal(t, prFeedbackChecksRepairDescriptionExpression(), node.Configuration["description"])
+			}
 			if node.ID == prFeedbackPauseFixesNodeID {
-				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["description"])
+				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["title"])
 			}
 			if node.ID == prFeedbackAnnounceLimitNodeID {
 				assert.Equal(t, prFeedbackChecksLimitStatusNoteBody(5), node.Configuration["body"])
@@ -353,4 +388,24 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		assert.Error(t, err)
 	})
+}
+
+func assertLivePRFeedbackConcurrency(t *testing.T, canvasID uuid.UUID, nodes []models.Node) {
+	t.Helper()
+
+	for _, node := range nodes {
+		if node.Type == models.NodeTypeTrigger {
+			assert.Nilf(t, node.Concurrency, "trigger %s caps its concurrency", node.ID)
+			continue
+		}
+
+		require.NotNilf(t, node.Concurrency, "version node %s has no concurrency", node.ID)
+		assert.Equalf(t, prFeedbackConcurrencyKey, node.Concurrency.Key, "version node %s", node.ID)
+
+		stored, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, node.ID)
+		require.NoError(t, err)
+		spec := stored.ConcurrencySpec()
+		require.NotNilf(t, spec, "node record %s has no concurrency", node.ID)
+		assert.Equalf(t, prFeedbackConcurrencyKey, spec.Key, "node record %s", node.ID)
+	}
 }

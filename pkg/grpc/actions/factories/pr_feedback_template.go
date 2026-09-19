@@ -4,16 +4,30 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 const (
-	prFeedbackCommentTriggerNodeID = "on-pr-comment"
-	prFeedbackReviewTriggerNodeID  = "on-pr-review"
-	prFeedbackReplyTriggerNodeID   = "on-pr-review-reply"
-	prFeedbackFindNodeID           = "find-pull-request"
-	prFeedbackActivityNodeID       = "add-pr-activity"
-	prFeedbackRunnerNodeID         = "address-pr-feedback"
+	prFeedbackCommentTriggerNodeID        = "on-pr-comment"
+	prFeedbackAcknowledgeCommentNodeID    = "acknowledge-pr-comment"
+	prFeedbackReviewTriggerNodeID         = "on-pr-review"
+	prFeedbackReplyTriggerNodeID          = "on-pr-review-reply"
+	prFeedbackFindNodeID                  = "find-pull-request"
+	prFeedbackActivityNodeID              = "add-pr-activity"
+	prFeedbackRunnerNodeID                = "address-pr-feedback"
+	prFeedbackReviewFindNodeID            = "find-pull-request-for-review"
+	prFeedbackReviewActivityNodeID        = "add-pr-review-activity"
+	prFeedbackReviewRunnerNodeID          = "address-pr-review-feedback"
+	prFeedbackReplyFindNodeID             = "find-pull-request-for-review-reply"
+	prFeedbackReplyActivityNodeID         = "add-pr-review-reply-activity"
+	prFeedbackReplyRunnerNodeID           = "address-pr-review-reply-feedback"
+	prFeedbackEvidenceGateNodeID          = "has-pr-comment-visual-evidence"
+	prFeedbackEvidenceCommentNodeID       = "comment-pr-comment-visual-evidence"
+	prFeedbackReviewEvidenceGateNodeID    = "has-pr-review-visual-evidence"
+	prFeedbackReviewEvidenceCommentNodeID = "comment-pr-review-visual-evidence"
+	prFeedbackReplyEvidenceGateNodeID     = "has-pr-review-reply-visual-evidence"
+	prFeedbackReplyEvidenceCommentNodeID  = "comment-pr-review-reply-visual-evidence"
 
 	prFeedbackFindComponent     = "findPullRequest"
 	prFeedbackActivityComponent = "addPullRequestActivity"
@@ -33,6 +47,13 @@ const (
 
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
 	prFeedbackChecksTemplateID     = "pr-feedback:checks"
+
+	// A node with no concurrency spec runs one execution at a time across
+	// every pull request. Waiting for checks or addressing comments on one
+	// PR would then block the others. The key partitions the queue by PR
+	// number; max stays at the default of 1 so one PR still serializes.
+	prFeedbackPRNumberSource = `root().data.pull_request?.number ?? root().data.issue?.number`
+	prFeedbackConcurrencyKey = "pr-{{ " + prFeedbackPRNumberSource + " }}"
 )
 
 var prFeedbackTriggerNodeIDs = []string{
@@ -46,6 +67,7 @@ type prFeedbackBuildRequest struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	IncludeVisualEvidence  bool
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
@@ -71,7 +93,93 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 	mention := strings.TrimSpace(request.Mention)
 
 	includeReviewSubmissions := false
-	return &yaml.Canvas{
+	commentFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:            prFeedbackCommentTriggerNodeID,
+			Name:          "On PR Comment",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     "github.onPRComment",
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Integration:   request.Binding.integrationRef(),
+		},
+		FindID:            prFeedbackFindNodeID,
+		FindName:          "Find Pull Request",
+		ActivityID:        prFeedbackActivityNodeID,
+		ActivityName:      "Add Comment Activity",
+		RunnerID:          prFeedbackRunnerNodeID,
+		Title:             prFeedbackCommentActivityTitleExpression(),
+		Description:       prFeedbackCommentActivityDescriptionExpression(),
+		EvidenceGateID:    prFeedbackEvidenceGateNodeID,
+		EvidenceCommentID: prFeedbackEvidenceCommentNodeID,
+		Y:                 80,
+	}, request)
+	commentFlow.nodes = append(commentFlow.nodes, yaml.Node{
+		ID:        prFeedbackAcknowledgeCommentNodeID,
+		Name:      "Acknowledge PR Comment",
+		Type:      yaml.NodeTypeAction,
+		Component: "github.addReaction",
+		Configuration: map[string]any{
+			"repository": "{{ root().data.repository.full_name }}",
+			"commentId":  "{{ root().data.comment.id }}",
+			"content":    "eyes",
+			"target":     "issueComment",
+		},
+		Integration: request.Binding.integrationRef(),
+		Position:    yaml.Position{X: 360, Y: -40},
+	})
+	commentFlow.edges = append(commentFlow.edges, yaml.Edge{
+		Channel:  "default",
+		SourceID: prFeedbackCommentTriggerNodeID,
+		TargetID: prFeedbackAcknowledgeCommentNodeID,
+	})
+	reviewFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:            prFeedbackReviewTriggerNodeID,
+			Name:          "On PR Review",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     "github.onPRReview",
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Integration:   request.Binding.integrationRef(),
+		},
+		FindID:            prFeedbackReviewFindNodeID,
+		FindName:          "Find Pull Request For Review",
+		ActivityID:        prFeedbackReviewActivityNodeID,
+		ActivityName:      "Add Review Activity",
+		RunnerID:          prFeedbackReviewRunnerNodeID,
+		Title:             prFeedbackReviewActivityTitleExpression(),
+		Description:       prFeedbackReviewActivityDescriptionExpression(),
+		EvidenceGateID:    prFeedbackReviewEvidenceGateNodeID,
+		EvidenceCommentID: prFeedbackReviewEvidenceCommentNodeID,
+		Y:                 260,
+	}, request)
+	replyFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:        prFeedbackReplyTriggerNodeID,
+			Name:      "On PR Review Reply",
+			Type:      yaml.NodeTypeTrigger,
+			Component: "github.onPRReviewComment",
+			Configuration: prFeedbackReplyTriggerConfiguration(
+				request.Repository,
+				mention,
+				request.IgnoreBots,
+				request.AllowedBots,
+				includeReviewSubmissions,
+			),
+			Integration: request.Binding.integrationRef(),
+		},
+		FindID:            prFeedbackReplyFindNodeID,
+		FindName:          "Find Pull Request For Review Reply",
+		ActivityID:        prFeedbackReplyActivityNodeID,
+		ActivityName:      "Add Review Reply Activity",
+		RunnerID:          prFeedbackReplyRunnerNodeID,
+		Title:             prFeedbackReplyActivityTitleExpression(),
+		Description:       prFeedbackCommentActivityDescriptionExpression(),
+		EvidenceGateID:    prFeedbackReplyEvidenceGateNodeID,
+		EvidenceCommentID: prFeedbackReplyEvidenceCommentNodeID,
+		Y:                 440,
+	}, request)
+
+	return withPRFeedbackConcurrency(&yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
@@ -79,76 +187,159 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Description: prFeedbackDefaultDescription,
 		},
 		Spec: &yaml.CanvasSpec{
-			Edges: []yaml.Edge{
-				{Channel: "default", SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "default", SourceID: prFeedbackReviewTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "default", SourceID: prFeedbackReplyTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "found", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID},
-				{Channel: "default", SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackRunnerNodeID},
+			Edges: append(append(commentFlow.edges, reviewFlow.edges...), replyFlow.edges...),
+			Nodes: append(append(commentFlow.nodes, reviewFlow.nodes...), replyFlow.nodes...),
+		},
+	})
+}
+
+// withPRFeedbackConcurrency lets each pull request run at the same time.
+// Triggers have no queue, so they keep the default.
+func withPRFeedbackConcurrency(canvas *yaml.Canvas) *yaml.Canvas {
+	if canvas == nil || canvas.Spec == nil {
+		return canvas
+	}
+	for i := range canvas.Spec.Nodes {
+		if canvas.Spec.Nodes[i].Type != yaml.NodeTypeAction {
+			continue
+		}
+		canvas.Spec.Nodes[i].Concurrency = prFeedbackConcurrency()
+	}
+	return canvas
+}
+
+func prFeedbackConcurrency() *yaml.ConcurrencySpec {
+	return &yaml.ConcurrencySpec{Key: prFeedbackConcurrencyKey}
+}
+
+func prFeedbackModelConcurrency() *models.ConcurrencySpec {
+	return &models.ConcurrencySpec{Key: prFeedbackConcurrencyKey}
+}
+
+// ensurePRFeedbackConcurrency stamps the per-PR key on action nodes that
+// still use the global default of one execution at a time. A node that
+// already has a spec keeps it, so a custom limit is not overwritten.
+func ensurePRFeedbackConcurrency(nodes []models.Node) []models.Node {
+	for i := range nodes {
+		if nodes[i].Type == models.NodeTypeTrigger {
+			continue
+		}
+		if nodes[i].Concurrency != nil {
+			continue
+		}
+		nodes[i].Concurrency = prFeedbackModelConcurrency()
+	}
+	return nodes
+}
+
+type prFeedbackDiscussionFlowRequest struct {
+	Trigger           yaml.Node
+	FindID            string
+	FindName          string
+	ActivityID        string
+	ActivityName      string
+	RunnerID          string
+	Title             string
+	Description       string
+	EvidenceGateID    string
+	EvidenceCommentID string
+	Y                 int
+}
+
+type prFeedbackDiscussionFlowSpec struct {
+	nodes []yaml.Node
+	edges []yaml.Edge
+}
+
+func prFeedbackDiscussionFlowNodes(
+	flow prFeedbackDiscussionFlowRequest,
+	request prFeedbackBuildRequest,
+) prFeedbackDiscussionFlowSpec {
+	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
+	return prFeedbackDiscussionFlowSpec{
+		nodes: []yaml.Node{
+			flow.Trigger,
+			{
+				ID:        flow.FindID,
+				Name:      flow.FindName,
+				Type:      yaml.NodeTypeAction,
+				Component: prFeedbackFindComponent,
+				Configuration: map[string]any{
+					"provider":   "github",
+					"repository": "{{ root().data.repository.full_name }}",
+					"number":     prFeedbackPRNumberExpression(),
+					"url":        prFeedbackPRURLExpression(),
+				},
+				Position: yaml.Position{X: 360, Y: flow.Y},
 			},
-			Nodes: []yaml.Node{
-				{
-					ID:            prFeedbackCommentTriggerNodeID,
-					Name:          "On PR Comment",
-					Type:          yaml.NodeTypeTrigger,
-					Component:     "github.onPRComment",
-					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 80, Y: 80},
+			{
+				ID:        flow.ActivityID,
+				Name:      flow.ActivityName,
+				Type:      yaml.NodeTypeAction,
+				Component: prFeedbackActivityComponent,
+				Configuration: map[string]any{
+					"pullRequestId": `{{ $["` + flow.FindName + `"].data.pullRequest.id }}`,
+					"title":         flow.Title,
+					"description":   flow.Description,
+					"access":        "exclusive",
 				},
-				{
-					ID:            prFeedbackReviewTriggerNodeID,
-					Name:          "On PR Review",
-					Type:          yaml.NodeTypeTrigger,
-					Component:     "github.onPRReview",
-					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 80, Y: 260},
+				Position: yaml.Position{X: 640, Y: flow.Y},
+			},
+			{
+				ID:            flow.RunnerID,
+				Name:          prFeedbackRunnerNodeName,
+				Type:          yaml.NodeTypeAction,
+				Component:     request.Agent.component(),
+				Configuration: prFeedbackRunnerConfiguration(request),
+				Position:      yaml.Position{X: 920, Y: flow.Y},
+			},
+			{
+				ID:        flow.EvidenceGateID,
+				Name:      "Has Visual Evidence?",
+				Type:      yaml.NodeTypeAction,
+				Component: "if",
+				Configuration: map[string]any{
+					"expression": prFeedbackVisualEvidenceExpression(),
 				},
-				{
-					ID:            prFeedbackReplyTriggerNodeID,
-					Name:          "On PR Review Reply",
-					Type:          yaml.NodeTypeTrigger,
-					Component:     "github.onPRReviewComment",
-					Configuration: prFeedbackReplyTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, includeReviewSubmissions),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 80, Y: 440},
-				},
-				{
-					ID:        prFeedbackFindNodeID,
-					Name:      "Find Pull Request",
-					Type:      yaml.NodeTypeAction,
-					Component: prFeedbackFindComponent,
-					Configuration: map[string]any{
-						"provider":   "github",
-						"repository": "{{ root().data.repository.full_name }}",
-						"number":     prFeedbackPRNumberExpression(),
-						"url":        prFeedbackPRURLExpression(),
-					},
-					Position: yaml.Position{X: 360, Y: 260},
-				},
-				{
-					ID:        prFeedbackActivityNodeID,
-					Name:      "Add Pull Request Activity",
-					Type:      yaml.NodeTypeAction,
-					Component: prFeedbackActivityComponent,
-					Configuration: map[string]any{
-						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
-						"description":   prFeedbackActivityDescriptionExpression(),
-						"access":        "exclusive",
-					},
-					Position: yaml.Position{X: 500, Y: 260},
-				},
-				{
-					ID:            prFeedbackRunnerNodeID,
-					Name:          prFeedbackRunnerNodeName,
-					Type:          yaml.NodeTypeAction,
-					Component:     request.Agent.component(),
-					Configuration: prFeedbackRunnerConfiguration(request),
-					Position:      yaml.Position{X: 640, Y: 260},
-				},
+				Position: yaml.Position{X: 1200, Y: flow.Y},
+			},
+			{
+				ID:            flow.EvidenceCommentID,
+				Name:          "Comment Visual Evidence",
+				Type:          yaml.NodeTypeAction,
+				Component:     "github.createIssueComment",
+				Configuration: prFeedbackVisualEvidenceCommentConfiguration(),
+				Integration:   request.Binding.integrationRef(),
+				Position:      yaml.Position{X: 1480, Y: flow.Y},
 			},
 		},
+		edges: []yaml.Edge{
+			{Channel: "default", SourceID: flow.Trigger.ID, TargetID: flow.FindID},
+			{Channel: "found", SourceID: flow.FindID, TargetID: flow.ActivityID},
+			{Channel: "default", SourceID: flow.ActivityID, TargetID: flow.RunnerID},
+			{Channel: "passed", SourceID: flow.RunnerID, TargetID: flow.EvidenceGateID},
+			{Channel: "true", SourceID: flow.EvidenceGateID, TargetID: flow.EvidenceCommentID},
+		},
+	}
+}
+
+func prFeedbackVisualEvidenceExpression() string {
+	return `(previous().data.result.visualEvidence.status == "captured" || ` +
+		`previous().data.result.visualEvidence.status == "partial") && ` +
+		`len(previous().data.result.visualEvidence.artifacts) > 0`
+}
+
+func prFeedbackVisualEvidenceCommentConfiguration() map[string]any {
+	return map[string]any{
+		"repository":  "{{ root().data.repository.full_name }}",
+		"issueNumber": prFeedbackPRNumberExpression(),
+		"body": strings.Join([]string{
+			"## Visual evidence",
+			"",
+			"Captured for commit `{{ previous(2).data.result.headSha[:7] }}`.",
+			"",
+			"{{ fromBase64(previous(2).data.result.visualEvidence.markdown) }}",
+		}, "\n"),
 	}
 }
 
@@ -173,8 +364,46 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 	return configuration
 }
 
-func prFeedbackActivityDescriptionExpression() string {
-	return "{{ root().data.comment?.body ?? root().data.review?.body ?? join(map(root().data.review_comments ?? [], .body), \"\\n\\n\") ?? \"\" }}"
+func prFeedbackCommentActivityDescriptionExpression() string {
+	return `{{ root().data.comment.body }}`
+}
+
+func prFeedbackReviewActivityDescriptionExpression() string {
+	reviewBody := `(root().data.review?.body ?? "")`
+	reviewComments := `root().data.review_comments ?? []`
+	reviewCommentSections := `join(map(` + reviewComments + `, "· [" + .path + "](" + .html_url + ")\n" + .body), "\n\n")`
+	return `{{ ` + reviewBody +
+		` + (` + reviewBody + ` != "" && len(` + reviewComments + `) > 0 ? "\n\n" : "")` +
+		` + ` + reviewCommentSections + ` }}`
+}
+
+func prFeedbackCommentActivityTitleExpression() string {
+	return `{{ "[@" + root().data.comment.user.login + "](" + root().data.comment.user.html_url` +
+		` + ") left a [comment](" + root().data.comment.html_url + ")" }}`
+}
+
+func prFeedbackReplyActivityTitleExpression() string {
+	return `{{ "[@" + root().data.comment.user.login + "](" + root().data.comment.user.html_url` +
+		` + ") left a [comment](" + root().data.comment.html_url + ")"` +
+		" + \" in `\" + root().data.comment.path + \"`\" }}"
+}
+
+func prFeedbackReviewActivityTitleExpression() string {
+	return `{{ "[@" + root().data.review.user.login + "](" + root().data.review.user.html_url` +
+		` + ") left a [review](" + root().data.review.html_url + ")" }}`
+}
+
+func prFeedbackDiscussionActivityExpressions(nodeID string) (string, string, bool) {
+	switch nodeID {
+	case prFeedbackActivityNodeID:
+		return prFeedbackCommentActivityTitleExpression(), prFeedbackCommentActivityDescriptionExpression(), true
+	case prFeedbackReviewActivityNodeID:
+		return prFeedbackReviewActivityTitleExpression(), prFeedbackReviewActivityDescriptionExpression(), true
+	case prFeedbackReplyActivityNodeID:
+		return prFeedbackReplyActivityTitleExpression(), prFeedbackCommentActivityDescriptionExpression(), true
+	default:
+		return "", "", false
+	}
 }
 
 func prFeedbackPRURLExpression() string {
@@ -182,7 +411,7 @@ func prFeedbackPRURLExpression() string {
 }
 
 func prFeedbackPRNumberExpression() string {
-	return "{{ root().data.pull_request?.number ?? root().data.issue?.number }}"
+	return "{{ " + prFeedbackPRNumberSource + " }}"
 }
 
 func prFeedbackPRHeadExpression() string {
@@ -197,6 +426,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 	configuration := map[string]any{
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
+		"includeVisualEvidence":   request.IncludeVisualEvidence,
 		"steps":                   prFeedbackRunnerSteps(),
 		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
@@ -283,7 +513,8 @@ func prFeedbackRunnerSteps() []any {
 			"type": "bash",
 			"command": strings.Join([]string{
 				"set -euo pipefail",
-				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
+				"gh auth setup-git --hostname github.com --force",
+				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
 				"cd repo",
 				`if [ -z "${PR_HEAD:-}" ]; then`,
 				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
@@ -336,7 +567,49 @@ func prFeedbackRunnerSteps() []any {
 				"fi",
 			}, "\n"),
 		},
+		map[string]any{
+			"name":             "Publish Visual Evidence",
+			"type":             "bash",
+			"workingDirectory": "repo",
+			"command":          prFeedbackVisualEvidenceOutputCommand(),
+		},
 	}
+}
+
+func prFeedbackVisualEvidenceOutputCommand() string {
+	return strings.Join([]string{
+		"set -euo pipefail",
+		`EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"`,
+		`if [ ! -s "$EVIDENCE_FILE" ]; then`,
+		`  EVIDENCE_TMP="${EVIDENCE_FILE}.$$"`,
+		`  printf '%s\n' '{"status":"not_applicable","reason":"","artifacts":[]}' > "$EVIDENCE_TMP"`,
+		`  mv "$EVIDENCE_TMP" "$EVIDENCE_FILE"`,
+		"fi",
+		`EVIDENCE_MARKDOWN="$(jq -r '`,
+		`  if (.status == "captured" or .status == "partial") and (.artifacts | length) > 0 then`,
+		`    ([.artifacts[].markdown] +`,
+		`      (if (.reason // "") != "" then ["**Evidence note:** " + .reason] else [] end)) |`,
+		`    join("\n\n")`,
+		`  else`,
+		`    ""`,
+		`  end`,
+		`' "$EVIDENCE_FILE")"`,
+		`HEAD_SHA="$(git rev-parse HEAD)"`,
+		`jq -n \`,
+		`  --arg headSha "$HEAD_SHA" \`,
+		`  --slurpfile evidence "$EVIDENCE_FILE" \`,
+		`  --arg evidenceMarkdown "$EVIDENCE_MARKDOWN" \`,
+		`  '{`,
+		`    headSha: $headSha,`,
+		`    visualEvidence: {`,
+		`      status: $evidence[0].status,`,
+		`      reason: ($evidence[0].reason // ""),`,
+		`      attempts: ($evidence[0].attempts // []),`,
+		`      artifacts: $evidence[0].artifacts,`,
+		`      markdown: ($evidenceMarkdown | @base64)`,
+		`    }`,
+		`  }' > "$SUPERPLANE_RESULT_FILE"`,
+	}, "\n")
 }
 
 func prFeedbackPrompt() string {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,6 +86,35 @@ func TestProcessVideoAttachmentsScriptRejectsOverDuration(t *testing.T) {
 	item := manifestFile(t, attachments, "01-clip.mp4")
 	assert.Equal(t, "failed", item["status"])
 	assert.Equal(t, "duration_exceeds_limit", item["reason"])
+}
+
+func TestProcessVideoAttachmentsScriptRejectsExcessiveSourcePixels(t *testing.T) {
+	env := processVideoTestEnv(t)
+	dir, attachments := newAttachmentDir(t)
+	copyMediaFixture(t, attachments, "tiny.mp4", "01-clip.mp4")
+	writeVideoManifest(t, attachments, "01-clip.mp4")
+	env = append(env, "VIDEO_MAX_SOURCE_PIXELS=100")
+
+	_ = runProcessVideo(t, dir, env)
+	item := manifestFile(t, attachments, "01-clip.mp4")
+	assert.Equal(t, "failed", item["status"])
+	assert.Equal(t, "dimensions_exceed_limit", item["reason"])
+}
+
+func TestProcessVideoAttachmentsScriptEnforcesBudgetDuringFrameExtraction(t *testing.T) {
+	env := processVideoTestEnv(t)
+	dir, attachments := newAttachmentDir(t)
+	copyMediaFixture(t, attachments, "tiny.mp4", "01-clip.mp4")
+	writeVideoManifest(t, attachments, "01-clip.mp4")
+	initialSize := directorySize(t, attachments)
+	env = append(env, "VIDEO_DISK_BUDGET_BYTES="+strconv.FormatInt(initialSize+100, 10))
+
+	_ = runProcessVideo(t, dir, env)
+	item := manifestFile(t, attachments, "01-clip.mp4")
+	assert.Equal(t, "failed", item["status"])
+	assert.Equal(t, "disk_budget_exceeded", item["reason"])
+	_, err := os.Stat(filepath.Join(attachments, "01-clip.mp4.frames"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestProcessVideoAttachmentsScriptMarksWhisperFailurePartial(t *testing.T) {
@@ -193,4 +223,19 @@ func manifestFile(t *testing.T, attachments, dest string) map[string]any {
 	}
 	t.Fatalf("missing dest %s", dest)
 	return nil
+}
+
+func directorySize(t *testing.T, root string) int64 {
+	t.Helper()
+	var total int64
+	require.NoError(t, filepath.Walk(root, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			total += info.Size()
+		}
+		return nil
+	}))
+	return total
 }

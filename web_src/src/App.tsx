@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -70,7 +71,6 @@ import { factorySettingsSectionRoutes } from "./pages/factories/pages/settings/f
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
-import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
@@ -243,7 +243,6 @@ function AppRouter() {
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
-              <Route path="install" element={withAuthOnly(InstallPage)} />
               {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
               <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
@@ -324,6 +323,7 @@ export function OrganizationScope() {
 
   return (
     <PermissionsProvider>
+      <UserNotificationsListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>
   );

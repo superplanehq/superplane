@@ -124,7 +124,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
 		analysisSubject:      "Sentry exception",
 		createTitle:          "{{ root().data.data.issue.title }}",
-		createDescription:    "{{ root().data.data.issue.permalink }}",
+		createDescription:    "{{ root().data.description }}",
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",
@@ -481,7 +481,7 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 }
 
 func intakeRefinementPrompt() string {
-	return runner.PlanningSessionProtocolMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
+	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
 func intakeAnalysisCloneCommand() string {
