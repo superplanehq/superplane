@@ -4,7 +4,7 @@ import { agentRunnerStepTitles, AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunn
 import { FACTORY_NODE_VERTICAL_GAP, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
-import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
+import { resolveElkOutputChannels, resolveForwardLayoutEdges } from "./layoutGraph";
 import {
   applyLayoutedPositions,
   packComponentPositions,
@@ -369,10 +369,11 @@ export class ElkLayoutEngine implements LayoutEngine {
           .map((channel) => this.normalizeChannel(channel))
           .filter((channel, index, channels) => channels.indexOf(channel) === index);
         const edgeOutputChannels = Array.from(edgeChannelsBySourceNodeID.get(nodeId) || []);
-        const outputChannels = appendUniqueChannels(metadataOutputChannels, edgeOutputChannels);
-        if (outputChannels.length === 0) {
-          outputChannels.push("default");
-        }
+        const outputChannels = resolveElkOutputChannels({
+          metadataChannels: metadataOutputChannels,
+          connectedChannels: edgeOutputChannels,
+          isVertical,
+        });
 
         // ELK port indexes run clockwise from the top-left. On SOUTH that means
         // right-to-left, while multi-bottom handles render left-to-right. Reverse
