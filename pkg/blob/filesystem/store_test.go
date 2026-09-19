@@ -41,6 +41,13 @@ func TestStorePutGetHeadDelete(t *testing.T) {
 	require.NoError(t, reader.Close())
 	assert.Equal(t, payload, got)
 
+	ranged, err := store.GetRange(ctx, key, 4, 5)
+	require.NoError(t, err)
+	part, err := io.ReadAll(ranged)
+	require.NoError(t, err)
+	require.NoError(t, ranged.Close())
+	assert.Equal(t, []byte("bytes"), part)
+
 	_, err = store.SignedGetURL(ctx, key, 0)
 	assert.ErrorIs(t, err, blob.ErrSignedURLUnsupported)
 

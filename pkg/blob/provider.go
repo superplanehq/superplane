@@ -32,6 +32,7 @@ type Provider interface {
 	Name() string
 	Put(ctx context.Context, key string, r io.Reader, opts PutOptions) error
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
+	GetRange(ctx context.Context, key string, offset, length int64) (io.ReadCloser, error)
 	Head(ctx context.Context, key string) (*ObjectInfo, error)
 	Delete(ctx context.Context, key string) error
 	// SignedGetURL returns a time-limited HTTPS GET for the object.

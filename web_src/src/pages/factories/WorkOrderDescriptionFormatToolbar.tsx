@@ -21,6 +21,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { hrefFromInput } from "./lib/workOrderDescriptionHref";
 import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
 
@@ -254,7 +255,7 @@ function AttachFileButton({
         type="file"
         hidden
         multiple
-        accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/markdown,.png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.md"
+        accept={WORK_ORDER_FILE_ACCEPT}
         data-testid="work-order-description-file-input"
         onChange={(event) => {
           const files = event.target.files;
