@@ -12,6 +12,8 @@ Use only the analysis tools in this protocol. Explore the repository only. Do no
 
 ## Tools
 
+Read `$SUPERPLANE_TASK_DIR/attachments/INDEX.md` before you score Clarity. For a video, read the extracted frames and the transcript. The original file stays there as well. Do not mention those paths in chat.
+
 Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.
 
 If you write or update a specification this turn, call propose_spec with the full markdown before you stop. Do not leave a written plan unpublished. Do not add an Open questions section. Unclear points stay in chat and survey.

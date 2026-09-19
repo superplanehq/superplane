@@ -14,8 +14,10 @@ import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import {
   isReachableWorkOrderFileUrl,
+  isWorkOrderVideoSource,
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
+  workOrderFileContentTypeForSrc,
   workOrderFileDownloadMap,
   type WorkOrderFileRef,
 } from "@/lib/workOrderFiles";
@@ -35,6 +37,7 @@ import { MarkdownSection } from "./markdownSection";
 import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import { highlightMentionChildren } from "./markdownMentionHighlight";
+import { WorkOrderVideo } from "./WorkOrderVideo";
 import {
   MARKDOWN_TABLE_CLASSES,
   MARKDOWN_TABLE_DATA_CLASSES,
@@ -214,7 +217,7 @@ export function MarkdownContent({
             </MarkdownLink>
           ),
           img: ({ node: _node, ...props }) => (
-            <MarkdownImage fileUrls={fileUrls} hideUntilLoaded={variant === "workspace"} {...props} />
+            <MarkdownImage files={files} fileUrls={fileUrls} hideUntilLoaded={variant === "workspace"} {...props} />
           ),
           blockquote: MarkdownBlockquote,
           code: MarkdownCodeWithDiagrams,
@@ -355,14 +358,24 @@ function MarkdownImage({
   src,
   alt,
   className,
+  files,
   fileUrls,
   hideUntilLoaded,
   node: _node,
   ...props
-}: ComponentProps<"img"> & ExtraProps & { fileUrls?: Record<string, string>; hideUntilLoaded?: boolean }) {
+}: ComponentProps<"img"> &
+  ExtraProps & {
+    files?: WorkOrderFileRef[];
+    fileUrls?: Record<string, string>;
+    hideUntilLoaded?: boolean;
+  }) {
   const resolved = resolveWorkOrderFileSrc(src, fileUrls);
   if (!isReachableWorkOrderFileUrl(resolved)) {
     return <span>{alt?.trim() || "image"}</span>;
+  }
+  const contentType = workOrderFileContentTypeForSrc(src, files) ?? workOrderFileContentTypeForSrc(resolved, files);
+  if (isWorkOrderVideoSource({ contentType, src: resolved, alt })) {
+    return <WorkOrderVideo src={resolved} alt={alt} className={className} contentType={contentType} />;
   }
   if (hideUntilLoaded) {
     return <WorkspaceMarkdownImage src={resolved} alt={alt} className={className} {...props} />;

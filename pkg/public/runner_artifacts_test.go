@@ -349,6 +349,9 @@ func (p *artifactProvider) Put(context.Context, string, io.Reader, blob.PutOptio
 func (p *artifactProvider) Get(context.Context, string) (io.ReadCloser, error) {
 	return artifactReadSeekCloser{Reader: bytes.NewReader(p.content)}, nil
 }
+func (p *artifactProvider) GetRange(_ context.Context, _ string, offset, length int64) (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader(p.content[offset : offset+length])), nil
+}
 func (p *artifactProvider) Head(context.Context, string) (*blob.ObjectInfo, error) {
 	return &blob.ObjectInfo{Size: int64(len(p.content))}, nil
 }

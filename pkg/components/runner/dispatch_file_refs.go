@@ -28,6 +28,8 @@ type dispatchFileRewriter struct {
 	factoryID      uuid.UUID
 	workOrderID    uuid.UUID
 	resolveErr     error
+	mu             sync.Mutex
+	files          []storedfiles.DispatchFile
 }
 
 func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
@@ -39,7 +41,7 @@ func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
 		return "", r.resolveErr
 	}
 	ctx := context.Background()
-	rewritten, _, err := storedfiles.DescriptionForDispatch(
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
 		ctx,
 		database.DB(ctx),
 		blob.Current(),
@@ -52,7 +54,38 @@ func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("mint file URLs for the runner prompt: %w", err)
 	}
+	r.mu.Lock()
+	r.files = mergeDispatchFiles(r.files, files)
+	r.mu.Unlock()
 	return rewritten, nil
+}
+
+func (r *dispatchFileRewriter) Attachments() []TaskAttachment {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return TaskAttachmentsFromDispatch(r.files)
+}
+
+func mergeDispatchFiles(existing, incoming []storedfiles.DispatchFile) []storedfiles.DispatchFile {
+	seen := map[string]struct{}{}
+	out := make([]storedfiles.DispatchFile, 0, len(existing)+len(incoming))
+	for _, file := range existing {
+		id := file.ID.String()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, file)
+	}
+	for _, file := range incoming {
+		id := file.ID.String()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, file)
+	}
+	return out
 }
 
 func (r *dispatchFileRewriter) resolve() {
@@ -86,6 +119,11 @@ func (r *dispatchFileRewriter) resolve() {
 
 // MintAgentStepFileRefs copies steps and rewrites prompt/command text with
 // rewrite. Preview callers keep the original steps.
+type MintedAgentDispatch struct {
+	Steps       []AgentStep
+	Attachments []TaskAttachment
+}
+
 func MintAgentStepFileRefs(steps []AgentStep, rewrite func(string) (string, error)) ([]AgentStep, error) {
 	if rewrite == nil {
 		return steps, nil
@@ -114,5 +152,21 @@ func MintAgentStepFileRefs(steps []AgentStep, rewrite func(string) (string, erro
 }
 
 func MintStepsForRun(exec core.ExecutionContext, timeoutSeconds int, steps []AgentStep) ([]AgentStep, error) {
-	return MintAgentStepFileRefs(steps, DispatchFileRewriter(exec, timeoutSeconds))
+	minted, err := MintDispatchForRun(exec, timeoutSeconds, steps)
+	if err != nil {
+		return nil, err
+	}
+	return minted.Steps, nil
+}
+
+func MintDispatchForRun(exec core.ExecutionContext, timeoutSeconds int, steps []AgentStep) (MintedAgentDispatch, error) {
+	rewriter := &dispatchFileRewriter{exec: exec, timeoutSeconds: timeoutSeconds}
+	minted, err := MintAgentStepFileRefs(steps, rewriter.Rewrite)
+	if err != nil {
+		return MintedAgentDispatch{}, err
+	}
+	return MintedAgentDispatch{
+		Steps:       minted,
+		Attachments: rewriter.Attachments(),
+	}, nil
 }

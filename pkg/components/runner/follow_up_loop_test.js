@@ -9,6 +9,7 @@ const {
   FOLLOW_UP_CMD_INDEX_BASE,
   interpretWaitResponse,
   nextAction,
+  prepareIncomingAttachments,
   persistAnalysisContinuation,
   runLoop,
   runPromptFile,
@@ -30,11 +31,125 @@ test("exits when the session ends", () => {
   assert.deepEqual(nextAction({ status: "ended" }), { type: "exit", code: 0 });
 });
 
-test("turns a user message into the next prompt", () => {
-  assert.deepEqual(nextAction({ status: "message", text: " Add a Size field " }), {
-    type: "prompt",
-    text: "Add a Size field",
-  });
+test("turns a user message with files into the next prompt", () => {
+  assert.deepEqual(
+    nextAction({
+      status: "message",
+      text: "See this clip",
+      files: [{ id: "file-1", filename: "clip.mp4", content_type: "video/mp4", url: "https://files.example/clip.mp4" }],
+    }),
+    {
+      type: "prompt",
+      text: "See this clip",
+      files: [{ id: "file-1", filename: "clip.mp4", content_type: "video/mp4", url: "https://files.example/clip.mp4" }],
+    },
+  );
+});
+
+test("prepareIncomingAttachments downloads unseen files and processes videos", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-files-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      size_bytes: 12,
+      checksum: "abc",
+      url: "https://files.example/clip.mp4",
+    },
+  ]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].dest, "01-clip.mp4");
+  assert.equal(manifest.files[0].kind, "video");
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments skips files already in the manifest", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-skip-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+  prepareIncomingAttachments(taskDir, incoming);
+  const manifestPath = path.join(taskDir, "attachments", "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.files[0].status = "ready";
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+  prepareIncomingAttachments(taskDir, incoming);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments retries a pending download", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-retry-"));
+  const attempts = path.join(taskDir, "attempts.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash
+count=0
+[ ! -f ${JSON.stringify(attempts)} ] || count=$(cat ${JSON.stringify(attempts)})
+count=$((count + 1))
+printf '%s' "$count" > ${JSON.stringify(attempts)}
+[ "$count" -gt 1 ]
+`,
+  );
+  fs.writeFileSync(path.join(taskDir, "process_video_attachments.sh"), "#!/bin/bash\nexit 0\n");
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+
+  assert.throws(() => prepareIncomingAttachments(taskDir, incoming), /fetch_task_attachments\.sh failed/);
+  prepareIncomingAttachments(taskDir, incoming);
+
+  assert.equal(fs.readFileSync(attempts, "utf8"), "2");
+});
+
+test("prepareIncomingAttachments does not process image-only follow-ups", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-image-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-2",
+      filename: "shot.png",
+      content_type: "image/png",
+      url: "https://files.example/shot.png",
+    },
+  ]);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\n");
 });
 
 test("ignores an empty user message", () => {
@@ -55,6 +170,63 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+test("runLoop retries attachment preparation before running the prompt", async () => {
+  const prompts = [];
+  const logs = [];
+  const sleeps = [];
+  const results = [{ status: "message", text: "See this clip", files: [{ id: "file-1" }] }, { status: "ended" }];
+  let attempts = 0;
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    prepareAttachments: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("temporary download failure");
+      }
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => sleeps.push(ms),
+    log: (message) => logs.push(message),
+    writeLiveLogRecord: () => {},
+  });
+
+  assert.equal(code, 0);
+  assert.equal(attempts, 2);
+  assert.deepEqual(prompts, ["See this clip"]);
+  assert.deepEqual(sleeps, [1000]);
+  assert.match(logs[0], /attachment preparation failed; retrying/i);
+});
+
+test("runLoop continues after permanent attachment preparation failure", async () => {
+  const prompts = [];
+  const sleeps = [];
+  const results = [{ status: "message", text: "See this clip", files: [{ id: "file-1" }] }, { status: "ended" }];
+  let attempts = 0;
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    prepareAttachments: async () => {
+      attempts += 1;
+      throw new Error("download denied");
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => sleeps.push(ms),
+    log: () => {},
+    writeLiveLogRecord: () => {},
+  });
+
+  assert.equal(code, 0);
+  assert.equal(attempts, 3);
+  assert.deepEqual(sleeps, [1000, 1000]);
+  assert.match(prompts[0], /could not prepare the attached files/i);
+  assert.match(prompts[0], /See this clip/);
 });
 
 test("persistAnalysisContinuation writes a wait continuation for the next rewind", () => {

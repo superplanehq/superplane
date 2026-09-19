@@ -11,6 +11,12 @@ metadata:
   annotations:
     {{- if eq $className "traefik" }}
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/request-body-size: "64MB"
+    {{- end }}
+    {{- if eq $className "nginx" }}
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
     {{- end }}
     {{- if eq $className "gce" }}
     kubernetes.io/ingress.class: gce

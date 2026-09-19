@@ -9,12 +9,13 @@
 
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const HOLD_SECONDS = 45;
 const WAIT_RETRY_SECONDS = 1;
 const FOLLOW_UP_CMD_INDEX_BASE = 1000;
 const MAX_UNREACHABLE_WAITS = 8;
+const MAX_ATTACHMENT_PREPARE_ATTEMPTS = 3;
 const WAIT_FETCH_TIMEOUT_MS = (HOLD_SECONDS + 15) * 1000;
 
 function nextAction(result) {
@@ -25,7 +26,7 @@ function nextAction(result) {
   if (status === "message") {
     const text = String((result && result.text) || "").trim();
     if (text) {
-      return { type: "prompt", text };
+      return { type: "prompt", text, files: Array.isArray(result.files) ? result.files : [] };
     }
     return { type: "wait" };
   }
@@ -184,15 +185,145 @@ function emitFollowUpCommandEnd(index, code, startedAt, now, writeRecord) {
   });
 }
 
-async function runFollowUpPrompt(text, helpers, followUpIndex) {
+async function runFollowUpPrompt(action, helpers, followUpIndex) {
+  const text = action.text;
   const writeRecord = helpers.writeLiveLogRecord || writeLiveLogRecord;
   const now = helpers.now || Date.now;
   const index = FOLLOW_UP_CMD_INDEX_BASE + followUpIndex;
   const startedAt = now();
-  emitFollowUpCommandStart(text, index, startedAt, writeRecord);
-  const code = await helpers.runPrompt(text);
+  const attachmentError = await prepareAttachmentsWithRetry(action.files || [], helpers);
+  const prompt = attachmentError
+    ? `SuperPlane could not prepare the attached files after ${MAX_ATTACHMENT_PREPARE_ATTEMPTS} attempts. Tell the user to upload them again.\n\n${text}`
+    : text;
+  emitFollowUpCommandStart(prompt, index, startedAt, writeRecord);
+  const code = await helpers.runPrompt(prompt);
   emitFollowUpCommandEnd(index, code, startedAt, now(), writeRecord);
   return code;
+}
+
+async function prepareAttachmentsWithRetry(files, helpers) {
+  const sleep = helpers.sleep || defaultSleep;
+  const log = helpers.log || ((msg) => process.stderr.write(msg));
+  for (let attempt = 1; attempt <= MAX_ATTACHMENT_PREPARE_ATTEMPTS; attempt += 1) {
+    try {
+      await maybePrepareAttachments(files, helpers);
+      return "";
+    } catch (err) {
+      const message = err && err.message ? err.message : String(err);
+      if (attempt === MAX_ATTACHMENT_PREPARE_ATTEMPTS) {
+        log(`Attachment preparation failed after ${attempt} attempts: ${message}\n`);
+        return message;
+      }
+      log(`Attachment preparation failed; retrying: ${message}\n`);
+      await sleep(WAIT_RETRY_SECONDS * 1000);
+    }
+  }
+  return "";
+}
+
+function maybePrepareAttachments(files, helpers) {
+  if (typeof helpers.prepareAttachments === "function") {
+    return helpers.prepareAttachments(files);
+  }
+  if (!files || files.length === 0) {
+    return undefined;
+  }
+  prepareIncomingAttachments(readEnv("SUPERPLANE_TASK_DIR"), files);
+  return undefined;
+}
+
+function attachmentKind(file) {
+  const type = String((file && file.content_type) || "").split(";")[0].trim().toLowerCase();
+  if (type.startsWith("video/")) {
+    return "video";
+  }
+  const name = String((file && (file.filename || file.dest)) || "").toLowerCase();
+  return /\.(mp4|webm|mov|ogv|ogg|m4v|mkv)$/.test(name) ? "video" : "file";
+}
+
+function sanitizeDestName(name, index) {
+  const cleaned = String(name || "file")
+    .split(/[/\\]/)
+    .pop()
+    .replace(/[^a-zA-Z0-9._-]/g, "");
+  const base = cleaned && cleaned !== "." ? cleaned : "file";
+  return `${String(index).padStart(2, "0")}-${base}`;
+}
+
+function loadManifest(taskDir) {
+  const manifestPath = path.join(taskDir, "attachments", "manifest.json");
+  if (!fs.existsSync(manifestPath)) {
+    return {
+      version: 1,
+      policy: {},
+      files: [],
+    };
+  }
+  return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+}
+
+function saveManifest(taskDir, manifest) {
+  const dir = path.join(taskDir, "attachments");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+function mergeManifestFiles(taskDir, incoming) {
+  const manifest = loadManifest(taskDir);
+  const files = Array.isArray(manifest.files) ? manifest.files : [];
+  const seen = new Set(files.map((file) => file.id || file.url).filter(Boolean));
+  let added = false;
+  for (const file of incoming) {
+    const key = file.id || file.url;
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    files.push({
+      id: file.id || "",
+      filename: file.filename || "file",
+      content_type: file.content_type || "",
+      size_bytes: file.size_bytes || 0,
+      checksum: file.checksum || "",
+      url: file.url || "",
+      dest: sanitizeDestName(file.filename || file.url, files.length + 1),
+      kind: attachmentKind(file),
+      status: "pending",
+    });
+    added = true;
+  }
+  manifest.files = files;
+  saveManifest(taskDir, manifest);
+  const needsPreparation =
+    added || files.some((file) => file.status === "pending" || (file.kind === "video" && file.status === "downloaded"));
+  return { manifest, needsPreparation };
+}
+
+function runTaskScript(taskDir, name) {
+  const script = path.join(taskDir, name);
+  if (!fs.existsSync(script)) {
+    throw new Error(
+      `${name} is missing. Rebuild the runner image with ffmpeg, ffprobe, whisper-cli, and the Whisper model.`,
+    );
+  }
+  const result = spawnSync("bash", [script], { stdio: "inherit", env: process.env });
+  if (result.status !== 0) {
+    throw new Error(`${name} failed with exit ${result.status == null ? 1 : result.status}`);
+  }
+}
+
+function prepareIncomingAttachments(taskDir, incoming) {
+  if (!incoming || incoming.length === 0) {
+    return;
+  }
+  const { manifest, needsPreparation } = mergeManifestFiles(taskDir, incoming);
+  if (!needsPreparation) {
+    return;
+  }
+  runTaskScript(taskDir, "fetch_task_attachments.sh");
+  if ((manifest.files || []).some((file) => file.kind === "video")) {
+    runTaskScript(taskDir, "process_video_attachments.sh");
+  }
 }
 
 function isUnreachableWait(result) {
@@ -226,7 +357,7 @@ async function runLoop(helpers) {
       continue;
     }
     persistAnalysisContinuation(helpers.taskDir, result);
-    const code = await runFollowUpPrompt(action.text, helpers, followUpIndex);
+    const code = await runFollowUpPrompt(action, helpers, followUpIndex);
     followUpIndex += 1;
     if (code !== 0) {
       log(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
@@ -252,6 +383,7 @@ module.exports = {
   MAX_UNREACHABLE_WAITS,
   interpretWaitResponse,
   nextAction,
+  prepareIncomingAttachments,
   persistAnalysisContinuation,
   runLoop,
   safeWaitRequest,
