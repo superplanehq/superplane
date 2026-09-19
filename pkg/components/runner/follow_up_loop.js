@@ -15,6 +15,7 @@ const HOLD_SECONDS = 45;
 const WAIT_RETRY_SECONDS = 1;
 const FOLLOW_UP_CMD_INDEX_BASE = 1000;
 const MAX_UNREACHABLE_WAITS = 8;
+const MAX_ATTACHMENT_PREPARE_ATTEMPTS = 3;
 const WAIT_FETCH_TIMEOUT_MS = (HOLD_SECONDS + 15) * 1000;
 
 function nextAction(result) {
@@ -190,9 +191,12 @@ async function runFollowUpPrompt(action, helpers, followUpIndex) {
   const now = helpers.now || Date.now;
   const index = FOLLOW_UP_CMD_INDEX_BASE + followUpIndex;
   const startedAt = now();
-  await prepareAttachmentsWithRetry(action.files || [], helpers);
-  emitFollowUpCommandStart(text, index, startedAt, writeRecord);
-  const code = await helpers.runPrompt(text);
+  const attachmentError = await prepareAttachmentsWithRetry(action.files || [], helpers);
+  const prompt = attachmentError
+    ? `SuperPlane could not prepare the attached files after ${MAX_ATTACHMENT_PREPARE_ATTEMPTS} attempts. Tell the user to upload them again.\n\n${text}`
+    : text;
+  emitFollowUpCommandStart(prompt, index, startedAt, writeRecord);
+  const code = await helpers.runPrompt(prompt);
   emitFollowUpCommandEnd(index, code, startedAt, now(), writeRecord);
   return code;
 }
@@ -200,16 +204,21 @@ async function runFollowUpPrompt(action, helpers, followUpIndex) {
 async function prepareAttachmentsWithRetry(files, helpers) {
   const sleep = helpers.sleep || defaultSleep;
   const log = helpers.log || ((msg) => process.stderr.write(msg));
-  while (true) {
+  for (let attempt = 1; attempt <= MAX_ATTACHMENT_PREPARE_ATTEMPTS; attempt += 1) {
     try {
       await maybePrepareAttachments(files, helpers);
-      return;
+      return "";
     } catch (err) {
       const message = err && err.message ? err.message : String(err);
+      if (attempt === MAX_ATTACHMENT_PREPARE_ATTEMPTS) {
+        log(`Attachment preparation failed after ${attempt} attempts: ${message}\n`);
+        return message;
+      }
       log(`Attachment preparation failed; retrying: ${message}\n`);
       await sleep(WAIT_RETRY_SECONDS * 1000);
     }
   }
+  return "";
 }
 
 function maybePrepareAttachments(files, helpers) {

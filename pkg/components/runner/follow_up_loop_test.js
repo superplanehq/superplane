@@ -202,6 +202,33 @@ test("runLoop retries attachment preparation before running the prompt", async (
   assert.match(logs[0], /attachment preparation failed; retrying/i);
 });
 
+test("runLoop continues after permanent attachment preparation failure", async () => {
+  const prompts = [];
+  const sleeps = [];
+  const results = [{ status: "message", text: "See this clip", files: [{ id: "file-1" }] }, { status: "ended" }];
+  let attempts = 0;
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    prepareAttachments: async () => {
+      attempts += 1;
+      throw new Error("download denied");
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => sleeps.push(ms),
+    log: () => {},
+    writeLiveLogRecord: () => {},
+  });
+
+  assert.equal(code, 0);
+  assert.equal(attempts, 3);
+  assert.deepEqual(sleeps, [1000, 1000]);
+  assert.match(prompts[0], /could not prepare the attached files/i);
+  assert.match(prompts[0], /See this clip/);
+});
+
 test("persistAnalysisContinuation writes a wait continuation for the next rewind", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-continuation-"));
   persistAnalysisContinuation(dir, {
