@@ -50,6 +50,80 @@ func TestOriginFromIntakeRootEvent_PeelsEnvelopeThenReadsURL(t *testing.T) {
 	}, OriginFromIntakeRootEvent(event))
 }
 
+func TestOriginFromIntakePayload_UsesSentryIssueTitleAsLabel(t *testing.T) {
+	origin := OriginFromIntakePayload(map[string]any{
+		"resource": "issue",
+		"action":   "created",
+		"data": map[string]any{
+			"issue": map[string]any{
+				"id":        "123",
+				"title":     "  Error #1:\nThis is a test error!  ",
+				"permalink": "https://acme.sentry.io/issues/123/",
+				"web_url":   "https://acme.sentry.io/issues/123/",
+			},
+		},
+	})
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://acme.sentry.io/issues/123/",
+		Label: "Error #1: This is a test error!",
+	}, origin)
+}
+
+func TestOriginFromIntakeRootEvent_UsesSentryIssueTitleAsLabel(t *testing.T) {
+	event := &CanvasEvent{Data: NewJSONValue(map[string]any{
+		"type": "sentry.issue",
+		"data": map[string]any{
+			"resource": "issue",
+			"action":   "created",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"id":        "123",
+					"title":     "Error #1: This is a test error!",
+					"permalink": "https://acme.sentry.io/issues/123/",
+				},
+			},
+		},
+	})}
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://acme.sentry.io/issues/123/",
+		Label: "Error #1: This is a test error!",
+	}, OriginFromIntakeRootEvent(event))
+}
+
+func TestOriginFromIntakePayload_FallsBackWhenSentryTitleIsMissing(t *testing.T) {
+	t.Run("missing title", func(t *testing.T) {
+		origin := OriginFromIntakePayload(map[string]any{
+			"data": map[string]any{
+				"issue": map[string]any{
+					"id":        "123",
+					"permalink": "https://acme.sentry.io/issues/123/",
+				},
+			},
+		})
+
+		assert.Equal(t, &WorkOrderOrigin{
+			URL:   "https://acme.sentry.io/issues/123/",
+			Label: "123",
+		}, origin)
+	})
+
+	t.Run("empty title", func(t *testing.T) {
+		origin := OriginFromIntakePayload(map[string]any{
+			"issue": map[string]any{
+				"title":     "  \n  ",
+				"permalink": "https://acme.sentry.io/issues/7670162495/",
+			},
+		})
+
+		assert.Equal(t, &WorkOrderOrigin{
+			URL:   "https://acme.sentry.io/issues/7670162495/",
+			Label: "7670162495",
+		}, origin)
+	})
+}
+
 func TestOriginFromIntakePayload_PrefersJiraBrowseURLOverProxySelf(t *testing.T) {
 	origin := OriginFromIntakePayload(map[string]any{
 		"action": "created",
