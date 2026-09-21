@@ -331,6 +331,39 @@ func FindPlanningSession(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (
 	return &session, nil
 }
 
+// FindPlanningSessionWaitView loads wait-loop fields without hydrating messages.
+// The long-poll handler uses this on every tick so idle waiters do not reload
+// the full transcript once per second.
+func FindPlanningSessionWaitView(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*FactoryPlanningSession, error) {
+	var session FactoryPlanningSession
+	err := tx.
+		Select(
+			"id",
+			"organization_id",
+			"factory_id",
+			"kind",
+			"state",
+			"canvas_run_id",
+			"wait_state",
+			"wait_kind",
+			"wait_text",
+			"wait_work_order_id",
+			"wait_work_order_key",
+			"survey_id",
+			"survey",
+			"draft_work_order_id",
+		).
+		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, id).
+		First(&session).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryPlanningSessionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
 func FindPlanningSessionByRun(tx *gorm.DB, canvasRunID uuid.UUID) (*FactoryPlanningSession, error) {
 	var session FactoryPlanningSession
 	err := tx.Where("canvas_run_id = ?", canvasRunID).First(&session).Error

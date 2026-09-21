@@ -77,3 +77,11 @@ This opens a browser with flame graphs, call graphs, and source views.
 | `/debug/pprof/mutex` | Lock contention. |
 
 Browse `http://localhost:6060/debug/pprof/` for the full index.
+
+## Service-level KPIs
+
+HTTP latency and error KPIs are defined in
+[docs/operations/performance-kpis.md](../operations/performance-kpis.md).
+Frontend measurement steps are in
+[docs/operations/frontend-performance.md](../operations/frontend-performance.md).
+

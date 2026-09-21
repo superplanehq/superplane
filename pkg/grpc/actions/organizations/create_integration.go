@@ -242,6 +242,14 @@ func syncIntegration(
 }
 
 func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference) (*pb.Integration, error) {
+	secrets, err := models.ListIntegrationSecrets(instance.ID)
+	if err != nil {
+		return nil, err
+	}
+	return serializeIntegrationWithSecrets(registry, instance, nodeRefs, secrets)
+}
+
+func serializeIntegrationWithSecrets(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference, secrets []models.IntegrationSecret) (*pb.Integration, error) {
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, err
@@ -330,10 +338,6 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		})
 	}
 
-	secrets, err := models.ListIntegrationSecrets(instance.ID)
-	if err != nil {
-		return nil, err
-	}
 	for _, secret := range secrets {
 		proto.Status.Secrets = append(proto.Status.Secrets, &pb.Integration_Secret{
 			Name:        secret.Name,

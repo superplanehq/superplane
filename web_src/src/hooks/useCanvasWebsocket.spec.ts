@@ -8,7 +8,7 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import type { InfiniteRunsPage } from "@/hooks/canvasInfiniteCache";
 
 const { useWebSocketMock, nodeExecutionStoreMock } = vi.hoisted(() => ({
-  useWebSocketMock: vi.fn(),
+  useWebSocketMock: vi.fn(() => ({ readyState: 1 })),
   nodeExecutionStoreMock: {
     updateNodeEvent: vi.fn(),
     updateNodeExecution: vi.fn(),
@@ -33,7 +33,7 @@ const testOrganizationId = "org-1";
 const testNodeId = "node-1";
 
 function getWebsocketHandler<T extends (...args: never[]) => unknown>(handlerName: "onMessage" | "onOpen"): T {
-  const call = useWebSocketMock.mock.calls.at(-1);
+  const call = useWebSocketMock.mock.calls.at(-1) as [unknown, { onMessage?: T; onOpen?: T } | undefined] | undefined;
   if (!call || !call[1]?.[handlerName]) {
     throw new Error(`Websocket ${handlerName} handler was not registered`);
   }
@@ -508,5 +508,15 @@ describe("useCanvasWebsocket", () => {
 
     expect(onCanvasStagingEvent).toHaveBeenCalledOnce();
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(0);
+  });
+
+  it("reports connection state from the websocket readyState", () => {
+    const queryClient = new QueryClient();
+    const { result, rerender } = renderCanvasWebsocketHook(queryClient);
+    expect(result.current.isConnected).toBe(true);
+
+    useWebSocketMock.mockReturnValue({ readyState: 0 });
+    rerender();
+    expect(result.current.isConnected).toBe(false);
   });
 });

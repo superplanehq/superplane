@@ -1064,7 +1064,16 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
   });
 };
 
-export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
+export type InfiniteCanvasRunsOptions = {
+  refetchInterval?: number | false | (() => number | false);
+};
+
+export const useInfiniteCanvasRuns = (
+  canvasId: string,
+  filters: CanvasRunsFilters = {},
+  enabled = true,
+  options?: InfiniteCanvasRunsOptions,
+) => {
   const limit = 25;
   const queryClient = useQueryClient();
   const queryKey = canvasKeys.infiniteRuns(canvasId, filters);
@@ -1122,7 +1131,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
-    refetchInterval: 60_000,
+    refetchInterval: options?.refetchInterval ?? 60_000,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });

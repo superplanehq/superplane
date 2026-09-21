@@ -9,9 +9,7 @@ import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type {
   CanvasesCanvas,
-  CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
   ActionsAction,
@@ -46,6 +44,8 @@ import {
   useWidgets,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
+import { useNodeRuntimeMaps } from "@/hooks/useNodeRuntimeMaps";
+import { canvasRunsPollInterval } from "@/lib/canvasRunsPoll";
 import { useCanvasStagingResync } from "@/hooks/useCanvasStagingResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
@@ -144,7 +144,7 @@ import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePreparedCanvasData } from "./usePreparedCanvasData";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
-import { useVisibleNodeRuntimeMaps } from "./useVisibleNodeRuntimeMaps";
+import { resolveShowNodeRuntimeActivity } from "./resolveShowNodeRuntimeActivity";
 import { useGetSidebarData } from "./useGetSidebarData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
 import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
@@ -548,9 +548,17 @@ export function AppPage({
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
     [isRunInspectionMode, selectedRunId, runStatusFilters],
   );
-  const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
-  const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
-  const infiniteRunningRunsQuery = useInfiniteCanvasRuns(canvasId!, RUNNING_RUNS_FILTERS, isViewingLiveVersion);
+  const canvasWebsocketConnectedRef = useRef(false);
+  const liveRunsPollInterval = useCallback(() => canvasRunsPollInterval(canvasWebsocketConnectedRef.current), []);
+  const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity, {
+    refetchInterval: liveRunsPollInterval,
+  });
+  const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion, {
+    refetchInterval: liveRunsPollInterval,
+  });
+  const infiniteRunningRunsQuery = useInfiniteCanvasRuns(canvasId!, RUNNING_RUNS_FILTERS, isViewingLiveVersion, {
+    refetchInterval: liveRunsPollInterval,
+  });
   const selectedRunIdIsValid = selectedRunId ? isValidRunId(selectedRunId) : false;
   const describedRunQuery = useDescribeRun(
     canvasId!,
@@ -794,8 +802,6 @@ export function AppPage({
   }, [organizationId, canvasId, queryClient, isEditing]);
 
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
-  // Subscribe to version to ensure React detects all updates
-  const storeVersion = useNodeExecutionStore((state) => state.version);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
   const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
@@ -975,48 +981,13 @@ export function AppPage({
     activeCanvasVersionId,
   ]);
 
-  // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
-  // Rebuild whenever store version changes (indicates data was updated)
-  const { nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap } = useMemo<{
-    nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
-    nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
-    nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
-  }>(() => {
-    void storeVersion;
-    const executionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
-    const queueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
-    const eventsMap: Record<string, CanvasesCanvasEvent[]> = {};
-
-    // Get current store data
-    const storeData = useNodeExecutionStore.getState().data;
-
-    storeData.forEach((data, nodeId) => {
-      if (data.executions.length > 0) {
-        executionsMap[nodeId] = data.executions;
-      }
-      if (data.queueItems.length > 0) {
-        queueItemsMap[nodeId] = data.queueItems;
-      }
-      if (data.events.length > 0) {
-        eventsMap[nodeId] = data.events;
-      }
-    });
-
-    return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
-  }, [storeVersion]);
-  const { showNodeRuntimeActivity, visibleNodeExecutionsMap, visibleNodeQueueItemsMap, visibleNodeEventsMap } =
-    useVisibleNodeRuntimeMaps({
-      showLiveActivity,
-      factoryEmbed,
-      isRunInspectionMode,
-      nodeExecutionsMap,
-      nodeQueueItemsMap,
-      nodeEventsMap,
-    });
-  const consoleNodeStatuses = useMemo(
-    () => deriveConsoleNodeStatuses(visibleNodeExecutionsMap),
-    [visibleNodeExecutionsMap],
-  );
+  const showNodeRuntimeActivity = resolveShowNodeRuntimeActivity({
+    showLiveActivity,
+    factoryEmbed,
+    isRunInspectionMode,
+  });
+  const { nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap } = useNodeRuntimeMaps(showNodeRuntimeActivity);
+  const consoleNodeStatuses = useMemo(() => deriveConsoleNodeStatuses(nodeExecutionsMap), [nodeExecutionsMap]);
   const handleConsoleTriggerNode = useConsoleTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
 
   const {
@@ -1467,9 +1438,9 @@ export function AppPage({
     canvas: canvasForPrep,
     triggers: allTriggers,
     components: allComponents,
-    nodeEventsMap: visibleNodeEventsMap,
-    nodeExecutionsMap: visibleNodeExecutionsMap,
-    nodeQueueItemsMap: visibleNodeQueueItemsMap,
+    nodeEventsMap: nodeEventsMap,
+    nodeExecutionsMap: nodeExecutionsMap,
+    nodeQueueItemsMap: nodeQueueItemsMap,
     canvasId,
     queryClient,
     user: me,
@@ -1512,7 +1483,7 @@ export function AppPage({
     canvasId,
     queryClient,
     me,
-    visibleNodeExecutionsMap,
+    visibleNodeExecutionsMap: nodeExecutionsMap,
     selectedRunFullExecutions,
   });
 
@@ -1578,7 +1549,7 @@ export function AppPage({
     canvasNodesById,
     allComponents,
     allTriggers,
-    visibleNodeEventsMap,
+    visibleNodeEventsMap: nodeEventsMap,
     showNodeRuntimeActivity,
     getNodeData,
   });
@@ -1702,7 +1673,7 @@ export function AppPage({
       setRemoteCanvasUpdatePending,
     });
 
-  useCanvasWebsocket(
+  const { isConnected: canvasWebsocketConnected } = useCanvasWebsocket(
     canvasId!,
     organizationId!,
     handleNodeWebsocketEvent,
@@ -1714,6 +1685,7 @@ export function AppPage({
     true,
     handleCanvasStagingEvent,
   );
+  canvasWebsocketConnectedRef.current = canvasWebsocketConnected;
   const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents, !dataLoading);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
   const logNodesRef = useRef<{ signature: string; nodes: ComponentsNode[] }>({ signature: "", nodes: [] });
@@ -1837,12 +1809,12 @@ export function AppPage({
     (nodeId: string, event: SidebarEvent): TabData | undefined => {
       return buildTabData(nodeId, event, {
         workflowNodes: canvasNodes,
-        nodeEventsMap: visibleNodeEventsMap,
-        nodeExecutionsMap: visibleNodeExecutionsMap,
-        nodeQueueItemsMap: visibleNodeQueueItemsMap,
+        nodeEventsMap: nodeEventsMap,
+        nodeExecutionsMap: nodeExecutionsMap,
+        nodeQueueItemsMap: nodeQueueItemsMap,
       });
     },
-    [canvasNodes, visibleNodeExecutionsMap, visibleNodeEventsMap, visibleNodeQueueItemsMap],
+    [canvasNodes, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
   const autocompleteExampleContext = useAutocompleteExampleContext({
@@ -1850,8 +1822,8 @@ export function AppPage({
     canvasNodes,
     canvasNodesById,
     incomingNodeIdsByTargetId,
-    visibleNodeExecutionsMap,
-    visibleNodeEventsMap,
+    visibleNodeExecutionsMap: nodeExecutionsMap,
+    visibleNodeEventsMap: nodeEventsMap,
     allComponentsByName,
     allTriggersByName,
   });

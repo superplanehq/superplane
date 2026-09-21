@@ -290,6 +290,24 @@ func FindCanvasWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas,
 	return &canvas, nil
 }
 
+func FindCanvasesByIDs(tx *gorm.DB, ids []uuid.UUID) (map[uuid.UUID]Canvas, error) {
+	canvasesByID := make(map[uuid.UUID]Canvas, len(ids))
+	if len(ids) == 0 {
+		return canvasesByID, nil
+	}
+
+	var canvases []Canvas
+	err := tx.Where("id IN ?", ids).Find(&canvases).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, canvas := range canvases {
+		canvasesByID[canvas.ID] = canvas
+	}
+	return canvasesByID, nil
+}
+
 func FindUnscopedCanvas(id uuid.UUID) (*Canvas, error) {
 	return FindUnscopedCanvasInTransaction(database.Conn(), id)
 }

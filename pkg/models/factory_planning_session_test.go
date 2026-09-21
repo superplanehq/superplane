@@ -216,6 +216,25 @@ func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
 	assert.Equal(t, "Add refund retries", session.Wait().Text)
 }
 
+func TestFindPlanningSessionWaitViewDoesNotHydrateMessages(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-wait-view")
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "Keep waiting light", uuid.Nil))
+
+	full, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, full.Messages)
+
+	view, err := FindPlanningSessionWaitView(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, session.ID, view.ID)
+	assert.Equal(t, PlanningWaitResolved, view.WaitState)
+	assert.Empty(t, view.Messages)
+	assert.True(t, view.IsAnalysisSession() || view.Kind != "")
+}
+
 func TestFactoryPlanningSession_SendUserMessageStoresUserID(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-sender")

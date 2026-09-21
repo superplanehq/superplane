@@ -164,6 +164,28 @@ describe("useInfiniteCanvasRuns", () => {
       );
     });
   });
+
+  it("disables polling when refetchInterval is false", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns.mockResolvedValueOnce({
+      data: {
+        runs: [],
+        totalCount: 0,
+        hasNextPage: false,
+      },
+    });
+
+    renderHook(() => useInfiniteCanvasRuns("canvas-1", {}, true, { refetchInterval: false }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(canvasesListRuns).toHaveBeenCalled();
+    });
+
+    const query = queryClient.getQueryCache().find({ queryKey: canvasKeys.infiniteRuns("canvas-1") });
+    expect((query?.options as { refetchInterval?: number | false }).refetchInterval).toBe(false);
+  });
 });
 
 describe("useDescribeRun", () => {
