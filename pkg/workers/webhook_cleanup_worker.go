@@ -141,9 +141,12 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 	}
 
 	// Cleanup clears the mirrored registration id, so a refresh hook still in
-	// flight stops retrying against a webhook that no longer exists.
+	// flight stops retrying against a webhook that no longer exists. Return a
+	// persist error so this transaction rolls back and retries instead of
+	// deleting the webhook while the mirrored id still points at it.
 	if persistErr := integrationContext.PersistMetadata(); persistErr != nil {
 		logger.Errorf("Error persisting integration metadata after webhook cleanup: %v", persistErr)
+		return persistErr
 	}
 
 	return tx.Unscoped().Delete(webhook).Error

@@ -278,9 +278,14 @@ func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *mod
 
 	// Persist on failure too: Setup can change remote state and mirror it onto
 	// the integration before it fails, so dropping those writes leaves the
-	// integration pointing at a registration that no longer exists.
+	// integration pointing at a registration that no longer exists. A persist
+	// error after a successful Setup must fail this attempt so the webhook is
+	// not marked ready without a stored registration id.
 	if persistErr := integrationContext.PersistMetadata(); persistErr != nil {
 		logger.Errorf("Error persisting integration metadata after webhook setup: %v", persistErr)
+		if err == nil {
+			err = persistErr
+		}
 	}
 
 	return metadata, instance.AppName, err

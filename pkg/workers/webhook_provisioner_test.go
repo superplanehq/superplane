@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"gorm.io/gorm"
 )
 
 type BadEncryptor struct{}
@@ -162,6 +163,49 @@ func Test__WebhookProvisioner_PersistsIntegrationMetadataWrittenBySetup(t *testi
 	assertIntegrationMetadata(t, integration.ID, float64(34))
 }
 
+func Test__WebhookProvisioner_RetriesWhenPersistingSetupMetadataFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
+			ctx.Integration.SetMetadata(map[string]any{"webhookId": 34})
+			return map[string]any{}, nil
+		},
+	})
+
+	integration := createDummyIntegration(t, r)
+	webhook := createPendingWebhook(t, integration.ID)
+
+	db := database.Conn()
+	callbackName := "test:fail-app-installation-metadata"
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+		table := tx.Statement.Table
+		if table == "" && tx.Statement.Schema != nil {
+			table = tx.Statement.Schema.Table
+		}
+		if table != "app_installations" {
+			return
+		}
+		_ = tx.AddError(errors.New("forced metadata write failure"))
+	}))
+	t.Cleanup(func() {
+		db.Callback().Update().Remove(callbackName)
+	})
+
+	require.NoError(t, provisioner.LockAndProcessWebhook(logger, webhook))
+
+	updatedWebhook, err := models.FindWebhook(webhook.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStatePending, updatedWebhook.State)
+	assert.Equal(t, 1, updatedWebhook.RetryCount)
+	assertIntegrationMetadata(t, integration.ID, nil)
+}
+
 func Test__WebhookProvisioner_PersistsIntegrationMetadataWhenSetupFails(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -219,7 +263,16 @@ func assertIntegrationMetadata(t *testing.T, integrationID uuid.UUID, webhookID 
 
 	var stored models.Integration
 	require.NoError(t, database.Conn().Where("id = ?", integrationID).First(&stored).Error)
-	assert.Equal(t, webhookID, stored.Metadata.Data()["webhookId"])
+	data := stored.Metadata.Data()
+	if webhookID == nil {
+		if data == nil {
+			return
+		}
+		assert.Nil(t, data["webhookId"])
+		return
+	}
+	require.NotNil(t, data)
+	assert.Equal(t, webhookID, data["webhookId"])
 }
 
 func Test__WebhookProvisioner_ConcurrentProcessing(t *testing.T) {
