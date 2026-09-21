@@ -8,6 +8,7 @@ import type {
   CanvasesCanvasRun,
 } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { getWebsocketReconnectDelay } from "@/lib/websocketReconnect";
 import {
   parseRunsFiltersFromQueryKey,
   upsertExecutionIntoDescribeRunData,
@@ -456,7 +457,7 @@ export function useCanvasWebsocket({
       shouldReconnect: () => true,
       reconnectAttempts: Number.POSITIVE_INFINITY,
       heartbeat: false,
-      reconnectInterval: 3000,
+      reconnectInterval: getWebsocketReconnectDelay,
       onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
