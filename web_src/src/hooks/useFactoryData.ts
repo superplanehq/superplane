@@ -28,6 +28,7 @@ import type {
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderSummary,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryAutomation,
@@ -164,7 +165,7 @@ export function useFactory(organizationId: string, factoryId: string) {
 export function useFactoryWorkOrders(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: workOrdersKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoriesWorkOrder[]> => {
+    queryFn: async (): Promise<FactoriesWorkOrderSummary[]> => {
       const response = await factoriesListWorkOrders(
         withOrganizationHeader({
           organizationId,

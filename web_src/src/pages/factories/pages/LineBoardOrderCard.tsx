@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import type { FactoriesWorkOrderCheckScore, FactoriesWorkOrderSummary } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { useMemo, type ComponentProps } from "react";
@@ -20,9 +20,9 @@ export function LineBoardOrderCard({
   onOpenWorkOrder,
   isAnalyzing = false,
 }: {
-  order: FactoriesWorkOrder;
+  order: FactoriesWorkOrderSummary;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrderSummary) => void;
   isAnalyzing?: boolean;
 }) {
   return (
@@ -45,7 +45,7 @@ export function LineBoardWorkOrderCard({
   onOpen,
   isAnalyzing = false,
 }: {
-  order: FactoriesWorkOrder;
+  order: FactoriesWorkOrderSummary;
   workOrderCardContext: WorkOrderCardContext;
   onOpen: () => void;
   isAnalyzing?: boolean;
@@ -65,7 +65,7 @@ export function LineBoardWorkOrderCard({
     watchSession,
     isAnalyzing,
   );
-  const scores = cardScores(showConfidence, order.checks, session.session, isAnalyzing);
+  const scores = cardScores(showConfidence, order.checkScores, session.session, isAnalyzing);
 
   return (
     <WorkOrderCard
@@ -81,7 +81,7 @@ export function LineBoardWorkOrderCard({
 /** Scores from checks, and the strip rule for the thinking state. Nothing when the column hides scores. */
 function cardScores(
   showConfidence: boolean,
-  checks: FactoriesWorkOrderCheck[] | undefined,
+  checks: FactoriesWorkOrderCheckScore[] | undefined,
   session: PlanningSessionMachineInput | null,
   backlogAnalyzing: boolean,
 ): Pick<ComponentProps<typeof WorkOrderCard>, "clarityScore" | "confidenceScore" | "isAnalyzing"> {

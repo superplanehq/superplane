@@ -1,3 +1,4 @@
+import type { FactoriesWorkOrderCheck } from "@/api-client";
 import {
   useFactoryPullRequests,
   useFactoryWorkOrders,
@@ -51,9 +52,10 @@ function useSplitRunWorkOrderExtras(
   organizationId: string,
   factoryId: string,
   order: ReturnType<typeof useSplitRunPageSelection>["order"],
+  describedChecks: FactoriesWorkOrderCheck[] | undefined,
 ) {
   const orderId = order?.id ?? "";
-  const orderChecks = order?.checks ?? [];
+  const orderChecks = describedChecks ?? order?.checks ?? [];
   const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
   const { data: pullRequests = [] } = useFactoryPullRequests(
     organizationId,
@@ -83,6 +85,7 @@ export function useFactoryAppSplitRunPage() {
     organizationId,
     factoryId,
     order,
+    liveWorkOrder.data?.checks,
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(

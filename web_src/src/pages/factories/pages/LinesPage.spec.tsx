@@ -7,6 +7,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
+  FactoriesWorkOrderSummary,
   FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
@@ -64,11 +65,19 @@ import { ADD_INTAKE_COPY } from "./lineIntakeModel";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
-function withBoardChecks(orders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return orders.map((order) => ({
-    ...order,
-    checks: DEFAULT_CHECKS_BY_ORDER_ID[order.id ?? ""] ?? order.checks,
-  }));
+function withBoardChecks(orders: FactoriesWorkOrder[]): FactoriesWorkOrderSummary[] {
+  return orders.map((order) => {
+    const checks = DEFAULT_CHECKS_BY_ORDER_ID[order.id ?? ""] ?? order.checks;
+    return {
+      ...order,
+      checkScores: checks?.map((check) => ({
+        key: check.key,
+        name: check.name,
+        score: check.score,
+        maxScore: check.maxScore,
+      })),
+    };
+  });
 }
 
 const LANE_BANNERS: FactoryPreviewFlags = { addIntakeControl: false, columnAutomations: false };
@@ -97,7 +106,8 @@ function renderLinesBoard(
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
-const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
+const useWorkOrder = vi.fn(() => ({ data: undefined as FactoriesWorkOrder | undefined }));
 const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
@@ -155,7 +165,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
       return updateLineIsPending.value;
     },
   }),
-  useWorkOrder: () => ({ data: undefined }),
+  useWorkOrder: () => useWorkOrder(),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => useFactoryPullRequests(),
@@ -263,6 +273,7 @@ async function resetLinesBoardMocks() {
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useWorkOrder.mockReturnValue({ data: undefined });
   useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryAutomations.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
@@ -314,7 +325,7 @@ describe("LinesPage board", () => {
   it("shows a score on a draft card and hides it on other columns", () => {
     const draft = withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS)[0];
     useFactoryWorkOrders.mockReturnValue({
-      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checks: draft.checks }],
+      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checkScores: draft.checkScores }],
     });
     renderLinesBoard();
 
@@ -323,7 +334,11 @@ describe("LinesPage board", () => {
   });
 
   it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
+    const [candidate] = REVIEW_CANDIDATE_WORK_ORDERS;
     useFactoryWorkOrders.mockReturnValue({ data: withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS) });
+    useWorkOrder.mockReturnValue({
+      data: { ...candidate, checks: DEFAULT_CHECKS_BY_ORDER_ID[candidate.id ?? ""] },
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 

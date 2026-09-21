@@ -18,6 +18,20 @@ func serializeChecks(checks []models.FactoryWorkOrderCheck) ([]*pb.WorkOrderChec
 	return result, nil
 }
 
+func serializeCheckScores(checks []models.FactoryWorkOrderCheck) []*pb.WorkOrderCheckScore {
+	result := make([]*pb.WorkOrderCheckScore, 0, len(checks))
+	for i := range checks {
+		check := &checks[i]
+		result = append(result, &pb.WorkOrderCheckScore{
+			Key:      check.Key,
+			Name:     check.Name,
+			Score:    check.Score,
+			MaxScore: check.MaxScore,
+		})
+	}
+	return result
+}
+
 func serializeCheck(check *models.FactoryWorkOrderCheck) (*pb.WorkOrderCheck, error) {
 	automation, err := check.AutomationRef()
 	if err != nil {
