@@ -117,6 +117,22 @@ describe("WorkOrderDescription", () => {
     expect(content).toHaveStyle({ maxHeight: "220px" });
   });
 
+  it("uses the outgoing fade class on a collapsed preview", () => {
+    render(
+      <WorkOrderDescription
+        description="# Test description"
+        previewHeight={220}
+        fadeClassName="sp-chat-outgoing-fade"
+      />,
+    );
+
+    const content = screen.getByTestId("work-order-description-markdown").parentElement;
+    Object.defineProperty(content!, "scrollHeight", { configurable: true, get: () => 640 });
+
+    act(() => notifyResize());
+    expect(screen.getByTestId("work-order-description").querySelector(".sp-chat-outgoing-fade")).not.toBeNull();
+  });
+
   it("does not collapse a preview when the body fits", () => {
     render(<WorkOrderDescription description="# Test description" previewHeight={220} />);
 

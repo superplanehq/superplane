@@ -1143,10 +1143,21 @@
 /*
  * Outgoing chat turn. Quiet surface from the current theme so the bubble sits
  * close to the thread. Markdown, chips, and links keep the normal text tokens.
+ * --sp-chat-outgoing-surface is the same mix over the thread, for fade stops.
  */
 .sp-chat-outgoing {
+  --sp-chat-outgoing-surface: color-mix(in oklab, var(--foreground) 8%, var(--background));
   background: color-mix(in oklab, var(--foreground) 8%, transparent);
   color: var(--foreground);
+}
+
+.sp-chat-outgoing .sp-chat-outgoing-fade {
+  background-image: linear-gradient(
+    to top,
+    var(--sp-chat-outgoing-surface),
+    color-mix(in oklab, var(--sp-chat-outgoing-surface) 90%, transparent),
+    transparent
+  );
 }
 
 /* Selected Task / Automations pill. Same violet / amber pair as the first-run sphere. */

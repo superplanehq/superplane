@@ -8,8 +8,8 @@
 /** Outgoing turn: quiet fill, no frame, tighter bottom-right corner. */
 export const USER_BUBBLE_CLASSNAME = "sp-chat-outgoing rounded-2xl rounded-br-md px-3.5 py-2.5 text-[14px] leading-5";
 
-/** Collapsed-description fade. The bubble is translucent, so fade from the thread. */
-export const USER_BUBBLE_FADE_CLASSNAME = "from-background via-background/90";
+/** Collapsed-description fade that matches the composited outgoing surface. */
+export const USER_BUBBLE_FADE_CLASSNAME = "sp-chat-outgoing-fade";
 
 /** The opening request uses the same bubble; it is the first outgoing turn. */
 export const REQUEST_CARD_CLASSNAME = USER_BUBBLE_CLASSNAME;
