@@ -196,7 +196,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return nil
 	}
 
-	if !slices.Contains(config.Actions, message.Action) {
+	if !issueActionAllowed(config.Actions, message.Action) {
 		return nil
 	}
 
@@ -237,6 +237,14 @@ func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	// Integration subscriptions are tied to the node lifecycle and are cleaned up by the platform.
 	return nil
+}
+
+func issueActionAllowed(configured []string, action string) bool {
+	if configured == nil {
+		return true
+	}
+
+	return slices.Contains(configured, action)
 }
 
 func setOnIssueMetadata(writer core.MetadataWriter, metadata OnIssueMetadata) error {
