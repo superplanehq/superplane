@@ -131,4 +131,55 @@ describe("github wait_for_pull_request_checks mapper", () => {
       "Failed checks": "build",
     });
   });
+
+  it("returns the node title when execution metadata is missing", () => {
+    const props = waitForPullRequestChecksMapper.props(
+      makeContext({ ref: REVISION, checkNames: ["DCO"] }, makeExecution({ metadata: undefined })),
+    );
+
+    expect(props.title).toBe("Wait For Pull Request Checks");
+  });
+
+  it("builds an event section when execution metadata is missing", () => {
+    const props = waitForPullRequestChecksMapper.props(
+      makeContext(
+        { ref: REVISION },
+        makeExecution({
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          metadata: undefined,
+          rootEvent: {
+            id: "event-1",
+            createdAt: new Date().toISOString(),
+            data: {},
+            nodeId: "trigger-1",
+            type: "github.pull_request",
+          },
+        }),
+      ),
+    );
+
+    expect(props.eventSections).toHaveLength(1);
+    expect(props.eventSections?.[0]?.eventId).toBe("event-1");
+    expect(props.eventSections?.[0]?.eventState).toBe("passed");
+  });
+
+  it("summarizes empty checks when execution metadata is missing", () => {
+    const node = makeNode({ ref: REVISION });
+    const context: ExecutionDetailsContext = {
+      nodes: [node],
+      node,
+      execution: makeExecution({
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        metadata: undefined,
+      }),
+    };
+
+    expect(waitForPullRequestChecksMapper.getExecutionDetails(context)).toEqual({
+      "Selected checks": "0",
+      "Pending checks": "None",
+      "Failed checks": "None",
+    });
+  });
 });
