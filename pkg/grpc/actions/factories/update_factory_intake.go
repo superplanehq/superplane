@@ -184,7 +184,7 @@ func applyIntakeUpdate(
 			}
 		}
 		if name != nil {
-			if _, err := canvases.UpdateCanvas(ctx, tx, canvas, name, nil, nil); err != nil {
+			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil, nil); err != nil {
 				return err
 			}
 		}
@@ -200,6 +200,10 @@ func applyIntakeUpdate(
 			return err
 		}
 		return factoryErrorToStatus(err, "failed to update factory intake")
+	}
+
+	if name != nil {
+		canvases.PublishCanvasUpdated(canvas)
 	}
 
 	return nil

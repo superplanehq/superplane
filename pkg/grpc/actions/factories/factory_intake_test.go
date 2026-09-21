@@ -547,6 +547,24 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.True(t, response.GetIntake().GetHealthy())
 	})
 
+	t.Run("update applies a new name and settings together", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		name := "Bug intake"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Name:      &name,
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"bug"},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Bug intake", response.GetIntake().GetName())
+		assert.Equal(t, []string{"bug"}, response.GetIntake().GetSettings().GetLabels())
+	})
+
 	t.Run("label and assignment filters reach the filter expression", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
