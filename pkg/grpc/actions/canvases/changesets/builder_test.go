@@ -248,6 +248,35 @@ func Test__ChangesetBuilder(t *testing.T) {
 		require.NotNil(t, op)
 		require.Equal(t, integrationID, op.Node.IntegrationID)
 	})
+
+	t.Run("add node keeps metadata", func(t *testing.T) {
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
+			nil,
+			nil,
+			[]models.Node{
+				{
+					ID:   "node-a",
+					Name: "Node A",
+					Type: models.NodeTypeTrigger,
+					Ref: models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "jira.onIssue"},
+					},
+					Metadata: map[string]any{
+						"jiraMoveOnComplete":   true,
+						"jiraCompletionColumn": "QA",
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.assertNoError()
+		op := steps.findNodeOperation(ChangeTypeAddNode, "node-a")
+		require.NotNil(t, op)
+		require.Equal(t, true, op.Node.Metadata["jiraMoveOnComplete"])
+		require.Equal(t, "QA", op.Node.Metadata["jiraCompletionColumn"])
+	})
 }
 
 type ChangesetBuilderSteps struct {

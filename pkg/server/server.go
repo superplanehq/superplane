@@ -134,6 +134,7 @@ func startWorkers(
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
 		startFactorySentryResolveConsumer(rabbitMQURL, encryptor, registry)
+		startFactoryJiraCloseConsumer(rabbitMQURL, encryptor, registry, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -373,6 +374,17 @@ func startFactorySentryResolveConsumer(
 ) {
 	log.Println("Starting Factory Sentry Resolve Consumer")
 	consumer := workers.NewFactorySentryResolveConsumer(rabbitMQURL, encryptor, componentRegistry)
+	go consumer.Start()
+}
+
+func startFactoryJiraCloseConsumer(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	componentRegistry *registry.Registry,
+	baseURL string,
+) {
+	log.Println("Starting Factory Jira Close Consumer")
+	consumer := workers.NewFactoryJiraCloseConsumer(rabbitMQURL, encryptor, componentRegistry, baseURL)
 	go consumer.Start()
 }
 
