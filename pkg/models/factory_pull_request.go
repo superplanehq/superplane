@@ -93,6 +93,10 @@ type FactoryPullRequest struct {
 	ClosedAt            *time.Time
 	CurrentRevisionID   *uuid.UUID
 	ActiveMutationRunID *uuid.UUID
+	Mergeable           bool
+	MergeBlockedReason  string
+	MergeBlockedMessage string
+	MergeableHeadSHA    string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -320,6 +324,72 @@ func (p *FactoryPullRequest) Update(tx *gorm.DB, patch FactoryPullRequestPatch) 
 		}
 		return order.RecordPullRequestUpdated(inner, p.Ref(), patch.Automation, patch.Run)
 	})
+}
+
+type FactoryPullRequestMergeabilitySnapshot struct {
+	Mergeable      bool
+	BlockedReason  string
+	BlockedMessage string
+	HeadSHA        string
+}
+
+func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {
+	now := time.Now()
+	p.Mergeable = snapshot.Mergeable
+	p.MergeBlockedReason = snapshot.BlockedReason
+	p.MergeBlockedMessage = snapshot.BlockedMessage
+	p.MergeableHeadSHA = strings.TrimSpace(snapshot.HeadSHA)
+	p.UpdatedAt = now
+	return tx.Model(p).Updates(map[string]any{
+		"mergeable":             p.Mergeable,
+		"merge_blocked_reason":  p.MergeBlockedReason,
+		"merge_blocked_message": p.MergeBlockedMessage,
+		"mergeable_head_sha":    p.MergeableHeadSHA,
+		"updated_at":            p.UpdatedAt,
+	}).Error
+}
+
+func (p *FactoryPullRequest) HasCachedMergeability() bool {
+	return p.Mergeable || strings.TrimSpace(p.MergeBlockedReason) != "" || strings.TrimSpace(p.MergeableHeadSHA) != ""
+}
+
+func ListOpenGitHubFactoryPullRequestsForWebhook(
+	tx *gorm.DB,
+	repository string,
+	numbers []int64,
+	sha string,
+) ([]FactoryPullRequest, error) {
+	repository = strings.TrimSpace(repository)
+	sha = strings.TrimSpace(sha)
+	if repository == "" {
+		return nil, nil
+	}
+
+	if len(numbers) == 0 && sha == "" {
+		return nil, nil
+	}
+
+	query := tx.Model(&FactoryPullRequest{}).
+		Where("provider = ?", FactoryPullRequestProviderGitHub).
+		Where("state IN ?", []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
+		Where("repository = ?", repository)
+
+	revisionIDs := tx.Model(&FactoryPullRequestRevision{}).Select("id").Where("sha = ?", sha)
+	switch {
+	case len(numbers) > 0 && sha != "":
+		query = query.Where("number IN ? OR current_revision_id IN (?)", numbers, revisionIDs)
+	case len(numbers) > 0:
+		query = query.Where("number IN ?", numbers)
+	default:
+		query = query.Where("current_revision_id IN (?)", revisionIDs)
+	}
+
+	var pullRequests []FactoryPullRequest
+	err := query.Find(&pullRequests).Error
+	if err != nil {
+		return nil, err
+	}
+	return pullRequests, nil
 }
 
 func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) (*FactoryPullRequest, error) {

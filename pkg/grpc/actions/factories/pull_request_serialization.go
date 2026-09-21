@@ -101,6 +101,7 @@ func serializeFactoryPullRequest(
 		Runs:            serializePullRequestRuns(runs, usageByRun),
 		Activities:      serializePullRequestActivities(runs, usageByRun),
 		CurrentRevision: serializePullRequestRevision(currentRevision),
+		Mergeable:       pullRequest.Mergeable && pullRequest.State == models.FactoryPullRequestStateOpen,
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID

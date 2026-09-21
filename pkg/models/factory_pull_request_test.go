@@ -213,6 +213,34 @@ func Test__FactoryPullRequest(t *testing.T) {
 		assert.ErrorIs(t, err, models.ErrFactoryPullRequestNotFound)
 		assert.NotErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
+
+	t.Run("stores mergeability without a timeline event", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		order := createOrder(t, factoryModel)
+		pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/app/pull/88",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      true,
+			BlockedReason:  "",
+			BlockedMessage: "",
+			HeadSHA:        "abc123",
+		}))
+
+		found, err := factoryModel.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		require.NoError(t, err)
+		assert.True(t, found.Mergeable)
+		assert.Equal(t, "abc123", found.MergeableHeadSHA)
+		assert.True(t, found.HasCachedMergeability())
+
+		matched, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(db, "acme/app", []int64{88}, "")
+		require.NoError(t, err)
+		require.Len(t, matched, 1)
+		assert.Equal(t, pullRequest.ID, matched[0].ID)
+	})
 }
 
 func findWorkOrderEventType(t *testing.T, events []models.FactoryWorkOrderEvent, eventType string) models.FactoryWorkOrderEvent {

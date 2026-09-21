@@ -282,6 +282,62 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 	assert.Zero(t, eventCount)
 }
 
+func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+
+	accepted := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"repository":{"full_name":"acme/app"},"check_run":{"head_sha":"abc","pull_requests":[{"number":1}]}}`),
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
+	})
+	require.Equal(t, http.StatusOK, accepted.Code)
+
+	ping := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"zen":"Keep it logically awesome."}`),
+		headers: map[string]string{
+			"X-GitHub-Event": "ping",
+		},
+	})
+	require.Equal(t, http.StatusOK, ping.Code)
+
+	rejected := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"ok":true}`),
+	})
+	require.Equal(t, http.StatusNotFound, rejected.Code)
+}
+
 type canvasesGatewayStubServer struct {
 	pbCanvases.UnimplementedCanvasesServer
 	createCanvasCalled bool
@@ -372,6 +428,7 @@ type requestParams struct {
 	authCookie   string
 	contentType  string
 	customSource bool
+	headers      map[string]string
 }
 
 func execRequest(server *Server, params requestParams) *httptest.ResponseRecorder {
@@ -396,6 +453,10 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 
 	if params.authCookie != "" {
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: params.authCookie})
+	}
+
+	for key, value := range params.headers {
+		req.Header.Set(key, value)
 	}
 
 	res := httptest.NewRecorder()

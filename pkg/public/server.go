@@ -30,6 +30,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -1739,7 +1740,13 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
-	if err != nil || len(nodes) == 0 {
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	eventType := r.Header.Get("X-GitHub-Event")
+	if len(nodes) == 0 && !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
@@ -1776,6 +1783,16 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
 			log.Errorf("error publishing execution state for %s: %v", executionID, err)
 		}
+	}
+
+	if eventType != "" {
+		payload := append([]byte(nil), body...)
+		go factoryactions.RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+			context.WithoutCancel(r.Context()),
+			factoryactions.IntakeDependencies{Registry: s.registry, Encryptor: s.encryptor},
+			eventType,
+			payload,
+		)
 	}
 
 	if firstResponse != nil {

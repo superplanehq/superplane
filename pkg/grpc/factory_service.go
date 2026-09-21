@@ -54,7 +54,7 @@ func (s *FactoryService) CreateFactory(ctx context.Context, req *pb.CreateFactor
 
 func (s *FactoryService) DescribeFactory(ctx context.Context, req *pb.DescribeFactoryRequest) (*pb.DescribeFactoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DescribeFactory(ctx, organizationID, req.GetId())
+	return actions.DescribeFactory(ctx, s.intakeDeps, organizationID, req.GetId())
 }
 
 func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactoryRequest) (*pb.UpdateFactoryResponse, error) {
@@ -64,7 +64,7 @@ func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactor
 
 func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.UpdateFactoryOnboardingRequest) (*pb.UpdateFactoryOnboardingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateFactoryOnboarding(ctx, organizationID, req)
+	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
