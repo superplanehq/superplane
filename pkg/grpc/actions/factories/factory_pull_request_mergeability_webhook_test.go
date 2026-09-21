@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func TestGitHubMergeabilityWebhookRef(t *testing.T) {
@@ -144,4 +147,245 @@ func TestVerifyGitHubFactoryMergeabilitySignature(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, code)
 	})
+}
+
+func TestRefreshFactoryPullRequestMergeabilityAtRecordTime(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/other", 91)
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	vcsID := integration.ID.String()
+	appRepo := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &vcsID,
+		AppRepository:    &appRepo,
+	}))
+
+	const headSHA = "abc123def456"
+	stubFactoryGitHub(t, mergeableFactoryGitHub(headSHA))
+
+	refreshFactoryPullRequestMergeabilityByID(
+		t.Context(),
+		IntakeDependencies{Encryptor: r.Encryptor},
+		factory.OrganizationID,
+		factory.ID,
+		pullRequest.ID,
+	)
+
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.True(t, stored.Mergeable)
+	assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+	assert.Empty(t, stored.MergeBlockedReason)
+
+	webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	repositories := map[string]struct{}{}
+	for _, hook := range webhooks {
+		repositories[factoryMergeabilityWebhookRepository(hook.Configuration.Data())] = struct{}{}
+	}
+	assert.Contains(t, repositories, "acme/other")
+}
+
+func TestRefreshFactoryPullRequestMergeabilityAfterRunFinishes(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 92)
+	const headSHA = "abc123def456"
+	stubFactoryGitHub(t, mergeableFactoryGitHub(headSHA))
+
+	grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pullRequest.ID.String()})
+	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	require.NotNil(t, pullRequest.ActiveMutationRunID)
+
+	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	blocked, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.False(t, blocked.Mergeable)
+	assert.Empty(t, blocked.MergeableHeadSHA)
+
+	require.NoError(t, db.Model(pullRequest).Update("active_mutation_run_id", nil).Error)
+	pullRequest.ActiveMutationRunID = nil
+
+	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.True(t, stored.Mergeable)
+	assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+}
+
+func TestListOpenGitHubFactoryPullRequestsForWebhookMatching(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 93)
+	const headSHA = "headcommitsha"
+	require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable: true,
+		HeadSHA:   headSHA,
+	}))
+
+	closedOrder, err := factory.CreateWorkOrder(db, "Closed", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	closed, err := closedOrder.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:   "https://github.com/acme/app/pull/94",
+		State: models.FactoryPullRequestStateClosed,
+	})
+	require.NoError(t, err)
+	require.NoError(t, closed.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		HeadSHA: headSHA,
+	}))
+
+	otherRepoOrder, err := factory.CreateWorkOrder(db, "Other repo", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	otherRepo, err := otherRepoOrder.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: "https://github.com/acme/other/pull/93",
+	})
+	require.NoError(t, err)
+	require.NoError(t, otherRepo.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		HeadSHA: headSHA,
+	}))
+
+	otherOrg, err := models.CreateOrganization(support.RandomName("org"), "")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		organizationID uuid.UUID
+		repository     string
+		numbers        []int64
+		sha            string
+		wantIDs        []uuid.UUID
+	}{
+		{
+			name:           "matches a head commit with no revision row",
+			organizationID: r.Organization.ID,
+			repository:     "acme/app",
+			sha:            headSHA,
+			wantIDs:        []uuid.UUID{pullRequest.ID},
+		},
+		{
+			name:           "matches by number or head sha",
+			organizationID: r.Organization.ID,
+			repository:     "acme/app",
+			numbers:        []int64{93},
+			sha:            "missingsha",
+			wantIDs:        []uuid.UUID{pullRequest.ID},
+		},
+		{
+			name:           "ignores a closed pull request with the same head sha",
+			organizationID: r.Organization.ID,
+			repository:     "acme/app",
+			sha:            headSHA,
+			wantIDs:        []uuid.UUID{pullRequest.ID},
+		},
+		{
+			name:           "ignores another repository",
+			organizationID: r.Organization.ID,
+			repository:     "acme/other",
+			sha:            headSHA,
+			wantIDs:        []uuid.UUID{otherRepo.ID},
+		},
+		{
+			name:           "ignores another organization",
+			organizationID: otherOrg.ID,
+			repository:     "acme/app",
+			numbers:        []int64{93},
+			sha:            headSHA,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			matched, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(
+				db,
+				tc.organizationID,
+				tc.repository,
+				tc.numbers,
+				tc.sha,
+			)
+			require.NoError(t, err)
+			gotIDs := make([]uuid.UUID, 0, len(matched))
+			for _, item := range matched {
+				gotIDs = append(gotIDs, item.ID)
+			}
+			assert.ElementsMatch(t, tc.wantIDs, gotIDs)
+		})
+	}
+}
+
+func TestRefreshFactoryPullRequestMergeabilityPublishesOnlyOnStoredChange(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 95)
+	const headSHA = "abc123def456"
+	stubFactoryGitHub(t, mergeableFactoryGitHub(headSHA))
+
+	published := 0
+	original := publishFactoryWorkOrderUpdated
+	publishFactoryWorkOrderUpdated = func(string, string, string) error {
+		published++
+		return nil
+	}
+	t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+
+	grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pullRequest.ID.String()})
+	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	assert.Equal(t, 0, published)
+
+	require.NoError(t, db.Model(pullRequest).Update("active_mutation_run_id", nil).Error)
+	pullRequest.ActiveMutationRunID = nil
+	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	assert.Equal(t, 1, published)
+
+	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	assert.Equal(t, 1, published)
+}
+
+func createOpenGitHubFactoryPullRequest(
+	t *testing.T,
+	db *gorm.DB,
+	r *support.ResourceRegistry,
+	repository string,
+	number int64,
+) (*models.Factory, *models.FactoryPullRequest) {
+	t.Helper()
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: fmt.Sprintf("https://github.com/%s/pull/%d", repository, number),
+	})
+	require.NoError(t, err)
+	return factory, pullRequest
+}
+
+func stubFactoryGitHub(t *testing.T, api factoryGitHubAPI) {
+	t.Helper()
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return api, nil
+	}
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+}
+
+func mergeableFactoryGitHub(headSHA string) *fakeFactoryGitHub {
+	combined, checks := successChecks()
+	return &fakeFactoryGitHub{
+		pullRequest: mergeableGitHubPullRequest(headSHA),
+		combined:    combined,
+		checkRuns:   checks,
+		repository:  allMethodsRepository(),
+	}
 }
