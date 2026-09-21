@@ -8,10 +8,17 @@ import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
+  createIntegration: vi.fn(),
+  followBrowserAction: vi.fn(() => true),
   connected: [] as Array<{
     metadata: { id: string; name: string; integrationName: string };
     status: { state: string };
   }>,
+  jiraDefinition: { name: "jira", label: "Jira", hostedAppInstall: false } as {
+    name: string;
+    label: string;
+    hostedAppInstall: boolean;
+  },
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -24,8 +31,8 @@ vi.mock("@/hooks/useIntegrations", () => ({
     isLoading: false,
     refetch: vi.fn(),
   }),
-  useAvailableIntegrations: () => ({ data: [{ name: "jira", label: "Jira" }] }),
-  useCreateIntegration: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
+  useAvailableIntegrations: () => ({ data: [mocks.jiraDefinition], isLoading: false }),
+  useCreateIntegration: () => ({ mutateAsync: mocks.createIntegration, reset: vi.fn() }),
   useIntegrationResources: () => ({
     data: [
       { id: "ENG", name: "Engineering (ENG)" },
@@ -35,6 +42,10 @@ vi.mock("@/hooks/useIntegrations", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+}));
+
+vi.mock("@/lib/browserAction", () => ({
+  followBrowserAction: mocks.followBrowserAction,
 }));
 
 vi.mock("@/ui/IntegrationCreateDialog", () => ({
@@ -75,6 +86,17 @@ describe("JiraIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1" });
+    mocks.createIntegration.mockReset();
+    mocks.createIntegration.mockResolvedValue({
+      data: {
+        integration: {
+          metadata: { id: "integration-pending" },
+          status: { browserAction: { url: "https://auth.atlassian.com/authorize" } },
+        },
+      },
+    });
+    mocks.followBrowserAction.mockClear();
+    mocks.jiraDefinition.hostedAppInstall = false;
     mocks.connected.splice(0, mocks.connected.length, {
       metadata: { id: "integration-1", name: "Acme Jira", integrationName: "jira" },
       status: { state: "ready" },
@@ -161,6 +183,14 @@ describe("JiraIntakeSetupDialog", () => {
     });
   });
 
+  it("places Connect Jira on the right of the connection step", async () => {
+    mocks.connected.splice(0, mocks.connected.length);
+    renderDialog();
+
+    const button = await screen.findByTestId("jira-setup-connect");
+    expect(button.parentElement).toHaveClass("ml-auto");
+  });
+
   it("opens project selection as soon as a new site is connected", async () => {
     mocks.connected.splice(0, mocks.connected.length);
     const user = userEvent.setup();
@@ -172,6 +202,26 @@ describe("JiraIntakeSetupDialog", () => {
 
     expect(screen.getByRole("heading", { name: JIRA_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
     expect(screen.getByTestId("jira-project-ENG")).toBeInTheDocument();
+  });
+
+  it("opens Atlassian authorization without a second dialog when Jira OAuth is hosted", async () => {
+    mocks.jiraDefinition.hostedAppInstall = true;
+    mocks.connected.splice(0, mocks.connected.length);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("jira-setup-connect"));
+
+    await waitFor(() => {
+      expect(mocks.createIntegration).toHaveBeenCalledWith({
+        integrationName: "jira",
+        name: "jira",
+        configuration: { setupReturnPath: "/org-1/workspaces/sp/lines/line-plan/setup/jira" },
+      });
+    });
+    expect(mocks.followBrowserAction).toHaveBeenCalledWith({ url: "https://auth.atlassian.com/authorize" });
+    expect(screen.queryByTestId("finish-connect")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("setup-return-to")).not.toBeInTheDocument();
   });
 
   it("selects the returned connection after OAuth and opens the project step", async () => {

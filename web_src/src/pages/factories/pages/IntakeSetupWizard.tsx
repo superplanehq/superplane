@@ -16,6 +16,7 @@ export function IntakeSetupWizard({
   onBack,
   children,
   footer,
+  stepAction,
 }: {
   testId: string;
   integrationName: string;
@@ -25,6 +26,8 @@ export function IntakeSetupWizard({
   onBack: () => void;
   children: ReactNode;
   footer: ReactNode;
+  /** Rendered on the right of the current step label, e.g. Connect. */
+  stepAction?: ReactNode;
 }) {
   return (
     <FirstRunShell
@@ -40,7 +43,12 @@ export function IntakeSetupWizard({
         <p className="text-[15px] leading-6 text-muted-foreground">{helper}</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
-        <IntakeSetupStepper testId={`${testId}-stepper`} integrationName={integrationName} current={step}>
+        <IntakeSetupStepper
+          testId={`${testId}-stepper`}
+          integrationName={integrationName}
+          current={step}
+          stepAction={stepAction}
+        >
           {children}
         </IntakeSetupStepper>
         {footer}
@@ -54,11 +62,13 @@ function IntakeSetupStepper({
   integrationName,
   current,
   children,
+  stepAction,
 }: {
   testId: string;
   integrationName: string;
   current: IntakeSetupStep;
   children: ReactNode;
+  stepAction?: ReactNode;
 }) {
   const steps: Array<{ id: IntakeSetupStep; label: string }> = [
     { id: "connection", label: `Connect ${integrationName}` },
@@ -80,9 +90,10 @@ function IntakeSetupStepper({
               )}
             >
               <StepBadge number={index + 1} done={done} />
-              {step.label}
+              <span className="min-w-0 flex-1">{step.label}</span>
+              {active && stepAction ? <div className="ml-auto shrink-0">{stepAction}</div> : null}
             </div>
-            {active ? <div className="mt-3 space-y-3">{children}</div> : null}
+            {active && children ? <div className="mt-3 space-y-3">{children}</div> : null}
           </div>
         );
       })}

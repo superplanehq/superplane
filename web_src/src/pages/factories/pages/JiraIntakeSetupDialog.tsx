@@ -28,6 +28,8 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
     setup.step === "connection"
       ? JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper
       : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+  const showConnectAction =
+    setup.step === "connection" && !setup.connectedQuery.isLoading && setup.jiraIntegrations.length === 0;
 
   return (
     <>
@@ -37,6 +39,18 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
         step={setup.step}
         title={title}
         helper={helper}
+        stepAction={
+          showConnectAction ? (
+            <Button
+              type="button"
+              disabled={setup.connecting}
+              onClick={() => void setup.connectJira()}
+              data-testid="jira-setup-connect"
+            >
+              {setup.connecting ? JIRA_INTAKE_SETUP_COPY.wizardConnecting : JIRA_INTAKE_SETUP_COPY.wizardConnect}
+            </Button>
+          ) : undefined
+        }
         footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
         onBack={() => {
           if (setup.step === "project") {
@@ -46,14 +60,16 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
           props.onClose();
         }}
       >
-        <div>
-          <SetupStepBody setup={setup} />
-          {setup.error ? (
-            <p className="workspace-body-text mt-4 text-destructive" role="alert">
-              {setup.error}
-            </p>
-          ) : null}
-        </div>
+        {showConnectAction && !setup.error ? null : (
+          <div>
+            <SetupStepBody setup={setup} />
+            {setup.error ? (
+              <p className="workspace-body-text mt-4 text-destructive" role="alert">
+                {setup.error}
+              </p>
+            ) : null}
+          </div>
+        )}
       </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}
@@ -82,7 +98,6 @@ function SetupStepBody({ setup }: { setup: JiraIntakeSetupModel }) {
         selectedId={setup.integrationId}
         loading={setup.connectedQuery.isLoading}
         onSelect={setup.setIntegrationId}
-        onConnect={() => setup.setConnectOpen(true)}
       />
     );
   }
@@ -104,13 +119,11 @@ function ConnectionStep({
   selectedId,
   loading,
   onSelect,
-  onConnect,
 }: {
   integrations: OrganizationsIntegration[];
   selectedId: string;
   loading: boolean;
   onSelect: (id: string) => void;
-  onConnect: () => void;
 }) {
   if (loading) {
     return (
@@ -120,38 +133,33 @@ function ConnectionStep({
       </p>
     );
   }
+  if (integrations.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="space-y-4">
-      {integrations.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-[13px] font-medium">{JIRA_INTAKE_SETUP_COPY.wizardStepConnectExisting}</p>
-          {integrations.map((integration) => {
-            const id = integration.metadata?.id ?? "";
-            const selected = id === selectedId;
-            return (
-              <Button
-                key={id}
-                type="button"
-                variant="ghost"
-                onClick={() => onSelect(id)}
-                data-testid={`jira-connection-${id}`}
-                className={cn(
-                  "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
-                  selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Jira"}</span>
-                {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
-              </Button>
-            );
-          })}
-        </div>
-      ) : (
-        <Button type="button" onClick={onConnect} data-testid="jira-setup-connect">
-          {JIRA_INTAKE_SETUP_COPY.wizardConnect}
-        </Button>
-      )}
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium">{JIRA_INTAKE_SETUP_COPY.wizardStepConnectExisting}</p>
+      {integrations.map((integration) => {
+        const id = integration.metadata?.id ?? "";
+        const selected = id === selectedId;
+        return (
+          <Button
+            key={id}
+            type="button"
+            variant="ghost"
+            onClick={() => onSelect(id)}
+            data-testid={`jira-connection-${id}`}
+            className={cn(
+              "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
+              selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
+            )}
+          >
+            <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Jira"}</span>
+            {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+          </Button>
+        );
+      })}
     </div>
   );
 }
