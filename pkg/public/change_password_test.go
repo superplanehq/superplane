@@ -144,7 +144,7 @@ func TestChangePassword_AccountWithoutPasswordAuth(t *testing.T) {
 func TestChangePassword_RejectsImpersonation(t *testing.T) {
 	server, r, token := setupChangePasswordTestServer(t)
 
-	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+	require.NoError(t, models.PromoteToInstallationAdmin(database.Conn(), r.Account.ID.String()))
 
 	target, err := models.CreateAccount("Target User", "target-impersonate@example.com")
 	require.NoError(t, err)

@@ -49,7 +49,7 @@ func TestRequireInstallationAdmin(t *testing.T) {
 
 	t.Run("admin account reaches the handler", func(t *testing.T) {
 		// Promote to admin
-		require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+		require.NoError(t, models.PromoteToInstallationAdmin(database.Conn(), r.Account.ID.String()))
 
 		req := httptest.NewRequest(http.MethodGet, "/admin/api/organizations", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
