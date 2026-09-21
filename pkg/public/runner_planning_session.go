@@ -550,8 +550,10 @@ func captureRunnerPlanningErrorToSentry(r *http.Request, session *models.Factory
 }
 
 func applyRunnerPlanningErrorTags(scope *sentry.Scope, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	if r != nil && r.URL != nil && r.URL.Path != "" {
-		scope.SetTag("route", r.URL.Path)
+	if r != nil {
+		if route := resolveCriticalHTTPRoute(r); route != "" {
+			scope.SetTag("route", route)
+		}
 	}
 	if session != nil {
 		if session.ID != uuid.Nil {

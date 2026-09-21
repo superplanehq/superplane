@@ -15,6 +15,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -230,6 +231,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := bindTestSentryHub(t)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", nil)
+			req.Pattern = "/api/v1/runner/planning-sessions/clarity"
 			rec := httptest.NewRecorder()
 			writeRunnerPlanningError(rec, req, tt.session, tt.err)
 			require.Equal(t, tt.status, rec.Code)
@@ -252,6 +254,36 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			assert.Contains(t, capturedExceptionText(event), tt.wantMessage)
 		})
 	}
+}
+
+func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
+	transport := bindTestSentryHub(t)
+	activityID := uuid.New()
+	path := "/api/v1/runner/planning-sessions/activities/" + activityID.String()
+	router := mux.NewRouter()
+	router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", func(w http.ResponseWriter, r *http.Request) {
+		writeRunnerPlanningError(w, r, nil, errors.New("lookup timeout"))
+	}).Methods(http.MethodPut)
+
+	req := httptest.NewRequest(http.MethodPut, path, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	event := requireCapturedException(t, transport.Events())
+	assert.Equal(t, "/api/v1/runner/planning-sessions/activities/{activity_id}", event.Tags["route"])
+}
+
+func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
+	transport := bindTestSentryHub(t)
+	activityID := uuid.New()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), nil)
+	rec := httptest.NewRecorder()
+	writeRunnerPlanningError(rec, req, nil, errors.New("lookup timeout"))
+
+	event := requireCapturedException(t, transport.Events())
+	_, present := event.Tags["route"]
+	assert.False(t, present)
 }
 
 func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
