@@ -2,6 +2,7 @@ package sentry
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,7 +100,8 @@ func Test__IssueDescription(t *testing.T) {
 
 	t.Run("full issue and event follow sentry sections", func(t *testing.T) {
 		body := IssueDescription(fullIssue, event)
-		assert.Contains(t, body, "[View in Sentry](https://your-org.sentry.io/issues/123/events/evt-1/)")
+		assert.NotContains(t, body, "View in Sentry")
+		assert.True(t, strings.HasPrefix(body, "## Highlights"))
 		assert.Contains(t, body, "## Highlights")
 		assert.Contains(t, body, "**Title:** Error #1: This is a test error!")
 		assert.Contains(t, body, "**Short ID:** IPE-1")
@@ -130,11 +132,8 @@ func Test__IssueDescription(t *testing.T) {
 			"title":     "Broken deploy",
 			"permalink": "https://your-org.sentry.io/issues/9/",
 		}, nil)
-		assert.Equal(
-			t,
-			"[View in Sentry](https://your-org.sentry.io/issues/9/)\n\n## Highlights\n\n- **Title:** Broken deploy",
-			body,
-		)
+		assert.Equal(t, "## Highlights\n\n- **Title:** Broken deploy", body)
+		assert.NotContains(t, body, "View in Sentry")
 		assert.NotContains(t, body, "## Stack Trace")
 		assert.NotContains(t, body, "```json")
 	})
@@ -157,14 +156,6 @@ func Test__IssueDescription(t *testing.T) {
 		assert.Contains(t, body, "**Event type:** default")
 		assert.Contains(t, body, "## Message")
 		assert.Contains(t, body, "json body")
-	})
-
-	t.Run("prefers the event web URL", func(t *testing.T) {
-		body := IssueDescription(fullIssue, &IssueEventDetail{
-			WebURL: "https://your-org.sentry.io/issues/123/events/abc/",
-		})
-		assert.Contains(t, body, "[View in Sentry](https://your-org.sentry.io/issues/123/events/abc/)")
-		assert.NotContains(t, body, "events/evt-1")
 	})
 
 	t.Run("adds extra highlights and a message-only body", func(t *testing.T) {
@@ -259,7 +250,8 @@ func Test__FetchedIssueDescription(t *testing.T) {
 	body := FetchedIssueDescription(testIssueClient(httpCtx), map[string]any{"id": "123", "title": "TypeError: boom"}, nil)
 	assert.Contains(t, body, "**Count:** 3")
 	assert.Contains(t, body, "**Release:** 1.4.2")
-	assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/events/evt-latest/)")
+	assert.NotContains(t, body, "View in Sentry")
+	assert.True(t, strings.HasPrefix(body, "## Highlights"))
 	assert.Contains(t, body, "Run (main.go:10) [in app]")
 	assert.NotContains(t, body, "```json")
 }

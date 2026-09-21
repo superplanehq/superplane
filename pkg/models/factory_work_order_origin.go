@@ -22,7 +22,7 @@ func OriginFromIntakePayload(payload map[string]any) *WorkOrderOrigin {
 
 	return &WorkOrderOrigin{
 		URL:   originURL,
-		Label: OriginLabelFromURL(originURL),
+		Label: OriginLabelFromIntake(originURL, sentryIssueTitle(payload)),
 	}
 }
 
@@ -37,6 +37,16 @@ func OriginFromIntakeRootEvent(event *CanvasEvent) *WorkOrderOrigin {
 	}
 
 	return OriginFromIntakePayload(payload)
+}
+
+func OriginLabelFromIntake(rawURL, title string) string {
+	if isSentryOriginURL(rawURL) {
+		if trimmed := strings.TrimSpace(title); trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return OriginLabelFromURL(rawURL)
 }
 
 func OriginLabelFromURL(rawURL string) string {
@@ -149,4 +159,39 @@ func lastPathSegment(parsed *url.URL) string {
 		return strings.TrimSpace(parsed.String())
 	}
 	return parts[len(parts)-1]
+}
+
+func sentryIssueTitle(payload map[string]any) string {
+	if title := mapPathString(payload, "data", "issue", "title"); title != "" {
+		return title
+	}
+
+	return mapPathString(payload, "issue", "title")
+}
+
+func mapPathString(payload map[string]any, keys ...string) string {
+	current := any(payload)
+	for _, key := range keys {
+		next, ok := current.(map[string]any)
+		if !ok || next == nil {
+			return ""
+		}
+		current = next[key]
+	}
+
+	value, ok := current.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+func isSentryOriginURL(rawURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	return host == "sentry.io" || strings.HasSuffix(host, ".sentry.io")
 }

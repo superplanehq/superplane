@@ -182,6 +182,7 @@ func Test__OnIssue__OnIntegrationMessage__EnrichesDescriptionFromAPI(t *testing.
 	assert.Contains(t, description, "## Stack Trace")
 	assert.Contains(t, description, "Handle (app.go:22) [in app]")
 	assert.Contains(t, description, "**Count:** 8")
+	assert.NotContains(t, description, "View in Sentry")
 	assert.NotContains(t, description, "```json")
 	require.Len(t, httpCtx.Requests, 2)
 }

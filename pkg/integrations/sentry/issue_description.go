@@ -21,7 +21,6 @@ func IssueDescription(issue any, event *IssueEventDetail) string {
 	}
 
 	var b strings.Builder
-	writeIssueLink(&b, issueMap, event)
 	writeHighlights(&b, issueMap, event)
 	writeMessage(&b, event)
 	writeStackTrace(&b, event)
@@ -35,32 +34,6 @@ func IssueDescription(issue any, event *IssueEventDetail) string {
 	writeReplayAndTrace(&b, event, issueMap)
 
 	return strings.TrimSpace(b.String())
-}
-
-func writeIssueLink(b *strings.Builder, issue map[string]any, event *IssueEventDetail) {
-	link := sentryIssueLink(issue, event)
-	if link == "" {
-		return
-	}
-	fmt.Fprintf(b, "[View in Sentry](%s)\n\n", link)
-}
-
-func sentryIssueLink(issue map[string]any, event *IssueEventDetail) string {
-	if eventURL := eventString(event, func(e *IssueEventDetail) string { return e.WebURL }); eventURL != "" {
-		return eventURL
-	}
-
-	issueLink := firstNonEmpty(mapString(issue, "permalink"), mapString(issue, "web_url"))
-	eventID := eventString(event, func(e *IssueEventDetail) string {
-		return firstNonEmpty(e.EventID, e.ID)
-	})
-	if issueLink == "" {
-		return ""
-	}
-	if eventID == "" {
-		return issueLink
-	}
-	return strings.TrimRight(issueLink, "/") + "/events/" + eventID + "/"
 }
 
 func writeHighlights(b *strings.Builder, issue map[string]any, event *IssueEventDetail) {

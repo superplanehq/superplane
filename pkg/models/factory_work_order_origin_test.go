@@ -75,6 +75,59 @@ func TestOriginFromIntakePayload_MissingURLReturnsNil(t *testing.T) {
 	}))
 }
 
+func TestOriginFromIntakePayload_UsesSentryIssueTitle(t *testing.T) {
+	origin := OriginFromIntakePayload(map[string]any{
+		"data": map[string]any{
+			"issue": map[string]any{
+				"permalink": "https://acme.sentry.io/issues/7670162495/",
+				"title":     "  TypeError: boom  ",
+			},
+		},
+	})
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://acme.sentry.io/issues/7670162495/",
+		Label: "TypeError: boom",
+	}, origin)
+}
+
+func TestOriginFromIntakePayload_UsesTopLevelSentryIssueTitle(t *testing.T) {
+	origin := OriginFromIntakePayload(map[string]any{
+		"issue": map[string]any{
+			"permalink": "https://sentry.io/issues/123/",
+			"title":     "Broken deploy",
+		},
+	})
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://sentry.io/issues/123/",
+		Label: "Broken deploy",
+	}, origin)
+}
+
+func TestOriginFromIntakePayload_FallsBackWhenSentryTitleMissing(t *testing.T) {
+	origin := OriginFromIntakePayload(map[string]any{
+		"data": map[string]any{
+			"issue": map[string]any{
+				"permalink": "https://acme.sentry.io/issues/7670162495/",
+			},
+		},
+	})
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://acme.sentry.io/issues/7670162495/",
+		Label: "7670162495",
+	}, origin)
+}
+
+func TestFactoryWorkOrderOrigin_KeepsStoredLabel(t *testing.T) {
+	originURL := "https://acme.sentry.io/issues/123/"
+	label := "123"
+	order := &FactoryWorkOrder{OriginURL: &originURL, OriginLabel: &label}
+
+	assert.Equal(t, &WorkOrderOrigin{URL: originURL, Label: label}, order.Origin())
+}
+
 func TestOriginLabelFromURL(t *testing.T) {
 	assert.Equal(t, "acme/payments#12", OriginLabelFromURL("https://github.com/acme/payments/issues/12"))
 	assert.Equal(t, "acme/payments#8", OriginLabelFromURL("https://github.com/acme/payments/pull/8"))
@@ -82,4 +135,18 @@ func TestOriginLabelFromURL(t *testing.T) {
 	assert.Equal(t, "P123ABC", OriginLabelFromURL("https://acme.example.com/incidents/P123ABC"))
 	assert.Equal(t, "1", OriginLabelFromURL("https://example.com/item/1"))
 	assert.Equal(t, "ENG-42", OriginLabelFromURL("https://acme.atlassian.net/browse/ENG-42"))
+}
+
+func TestOriginLabelFromIntake(t *testing.T) {
+	assert.Equal(
+		t,
+		"TypeError: boom",
+		OriginLabelFromIntake("https://acme.sentry.io/issues/123/", "  TypeError: boom  "),
+	)
+	assert.Equal(t, "123", OriginLabelFromIntake("https://acme.sentry.io/issues/123/", "  "))
+	assert.Equal(
+		t,
+		"acme/payments#12",
+		OriginLabelFromIntake("https://github.com/acme/payments/issues/12", "Handle duplicate refunds"),
+	)
 }
