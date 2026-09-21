@@ -5,7 +5,6 @@ import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, ty
 
 import {
   workOrderCardPullRequestAriaLabel,
-  workOrderCardPullRequestIsMergeable,
   workOrderCardPullRequestVisibleLabel,
 } from "../lib/workOrderCardPullRequest";
 import { pullRequestState, type FactoryPullRequestState } from "../lib/workOrderPullRequest";
