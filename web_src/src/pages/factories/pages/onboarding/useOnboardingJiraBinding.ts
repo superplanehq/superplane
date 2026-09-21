@@ -1,7 +1,7 @@
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCallback, useEffect, useState } from "react";
 
-import type { JiraCompletionColumnValue } from "../JiraCompletionColumnFields";
+import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
 import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../intakeSourceSettingsModel";
 import { readOnboardingJiraProject, writeOnboardingJiraProject } from "./onboardingJiraProject";
 

@@ -12,7 +12,7 @@ import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
 import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
 import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
-import type { JiraCompletionColumnValue } from "../../JiraCompletionColumnFields";
+import type { JiraCompletionColumnValue } from "../../jiraCompletionColumn";
 
 const STORY_JIRA_PROJECTS = [
   { id: "PAY", name: "Payments" },

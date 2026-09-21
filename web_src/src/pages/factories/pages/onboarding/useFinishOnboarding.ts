@@ -16,7 +16,7 @@ import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganiza
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
-import type { JiraCompletionColumnValue } from "../JiraCompletionColumnFields";
+import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
