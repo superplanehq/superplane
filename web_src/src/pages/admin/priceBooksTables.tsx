@@ -20,7 +20,7 @@ const bodyCellClass = "px-4 py-2.5 text-gray-700 dark:text-gray-300";
 const numericCellClass = `${bodyCellClass} text-right tabular-nums`;
 const rowClass = "border-b border-slate-50 last:border-0 dark:border-gray-800/70";
 
-function EmptyRatesMessage({ message }: { message: string }) {
+export function EmptyRatesMessage({ message }: { message: string }) {
   return (
     <div className={`${tableWrapClass} p-8 text-center`}>
       <BookOpen size={24} className="mx-auto text-gray-400 dark:text-gray-500" />
@@ -60,17 +60,19 @@ function UsdRateInput({
   );
 }
 
+type IndexedModelRate = { rate: PriceBookModelRate; index: number };
+
 export function ModelsTable({
-  rates,
+  rows,
   editable,
   onChange,
 }: {
-  rates: PriceBookModelRate[];
+  rows: IndexedModelRate[];
   editable: boolean;
   onChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
 }) {
-  if (rates.length === 0) {
-    return <EmptyRatesMessage message="This version has no model rates." />;
+  if (rows.length === 0) {
+    return null;
   }
 
   return (
@@ -88,7 +90,7 @@ export function ModelsTable({
           </tr>
         </thead>
         <tbody>
-          {rates.map((rate, index) => (
+          {rows.map(({ rate, index }) => (
             <tr key={`${rate.match_key}:${rate.match_mode}`} className={rowClass}>
               <td className={`${bodyCellClass} font-mono text-xs`}>{rate.match_key}</td>
               <td className={bodyCellClass}>{formatMatchMode(rate.match_mode)}</td>

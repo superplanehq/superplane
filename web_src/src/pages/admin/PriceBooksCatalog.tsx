@@ -7,7 +7,7 @@ import { BookOpen } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatDate } from "./formatDate";
 import { AddModelRateForm, AddVMRateForm } from "./priceBooksForms";
-import { ModelsTable, tableWrapClass, VMsTable } from "./priceBooksTables";
+import { EmptyRatesMessage, ModelsTable, tableWrapClass, VMsTable } from "./priceBooksTables";
 import type { PriceBookModelRate, PriceBooksResponse, PriceBookVMRate } from "./priceBooksApi";
 
 type PriceBooksTab = "models" | "vms";
@@ -202,6 +202,11 @@ function ModelsPanel({
   onSave: () => void;
   onSync: () => void;
 }) {
+  const hasNoRates = models.length === 0;
+
+  const selectedRows = models.map((rate, index) => ({ rate, index })).filter(({ rate }) => rate.selected);
+  const otherRows = models.map((rate, index) => ({ rate, index })).filter(({ rate }) => !rate.selected);
+
   return (
     <>
       {isCurrent && (
@@ -232,7 +237,24 @@ function ModelsPanel({
           </Button>
         </div>
       )}
-      <ModelsTable rates={models} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+      {hasNoRates ? (
+        <EmptyRatesMessage message="This version has no model rates." />
+      ) : (
+        <>
+          <div>
+            <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Selected models</Text>
+            {selectedRows.length > 0 ? (
+              <ModelsTable rows={selectedRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+            ) : (
+              <EmptyRatesMessage message="No models are selected in hosted LLM settings." />
+            )}
+          </div>
+          <div>
+            <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Other models</Text>
+            <ModelsTable rows={otherRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+          </div>
+        </>
+      )}
       {isCurrent && <AddModelRateForm disabled={actionsDisabled} onAdd={onAddModel} />}
     </>
   );
