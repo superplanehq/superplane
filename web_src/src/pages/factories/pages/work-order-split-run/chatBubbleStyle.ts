@@ -1,15 +1,15 @@
 /**
  * Refine chat bubble styles. Every outgoing turn (the opening request, typed
- * notes, and survey picks) shares one primary bubble so the thread reads as
- * one person talking. `sp-chat-outgoing` (App.css) remaps the text tokens
- * inside the bubble so markdown and chips invert with it.
+ * notes, and survey picks) shares one quiet bubble so the thread reads as one
+ * person talking. `sp-chat-outgoing` (App.css) uses a translucent mix of the
+ * theme foreground so markdown and chips keep the normal text tokens.
  */
 
-/** Outgoing turn: primary fill, no frame, tighter bottom-right corner. */
+/** Outgoing turn: quiet fill, no frame, tighter bottom-right corner. */
 export const USER_BUBBLE_CLASSNAME = "sp-chat-outgoing rounded-2xl rounded-br-md px-3.5 py-2.5 text-[14px] leading-5";
 
-/** Collapsed-description fade that matches the primary bubble background. */
-export const USER_BUBBLE_FADE_CLASSNAME = "from-primary via-primary/90";
+/** Collapsed-description fade. The bubble is translucent, so fade from the thread. */
+export const USER_BUBBLE_FADE_CLASSNAME = "from-background via-background/90";
 
 /** The opening request uses the same bubble; it is the first outgoing turn. */
 export const REQUEST_CARD_CLASSNAME = USER_BUBBLE_CLASSNAME;
