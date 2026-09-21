@@ -74,6 +74,7 @@ export const PULL_REQUEST_REVIEW_COPY = {
   closing: "This task closes when the pull request is merged or closed.",
   moreActions: "More actions",
   merge: "Merge",
+  merging: "Merging",
   mergeMethod: "Merge method",
   merged: "The pull request is merged.",
   permission: "You do not have permission to manage this task.",

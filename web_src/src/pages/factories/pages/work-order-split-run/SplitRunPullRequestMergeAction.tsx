@@ -89,7 +89,8 @@ function ConnectedPullRequestMergeAction({
   return (
     <SplitRunPullRequestMergeControls
       mergeability={mergeabilityQuery.data}
-      merging={mergeMutation.isPending}
+      mergeabilityFailed={mergeabilityQuery.isError}
+      merging={mergeMutation.isPending || mergeMutation.isSuccess}
       canAct={canAct}
       compact={compact}
       onMerge={(mergeMethod, expectedHeadSha) => {
@@ -124,14 +125,55 @@ function selectedMergeMethod(
   return defaultMergeMethod(allowedMethods);
 }
 
+function mergeabilityIsKnown(
+  mergeability: FactoriesFactoryPullRequestMergeability | undefined,
+  mergeabilityFailed: boolean,
+) {
+  return mergeability != null && !mergeabilityFailed;
+}
+
+function pullRequestCanMerge(
+  canAct: boolean,
+  mergeability: FactoriesFactoryPullRequestMergeability | undefined,
+  mergeabilityFailed: boolean,
+  method: FactoryPullRequestMergeMethodChoice | undefined,
+) {
+  return Boolean(
+    canAct &&
+      mergeabilityIsKnown(mergeability, mergeabilityFailed) &&
+      mergeability?.canMerge &&
+      method &&
+      mergeability.headSha,
+  );
+}
+
+function mergeBlockedMessage(
+  mergeability: FactoriesFactoryPullRequestMergeability | undefined,
+  mergeabilityFailed: boolean,
+) {
+  if (mergeabilityIsKnown(mergeability, mergeabilityFailed) && mergeability?.canMerge) {
+    return undefined;
+  }
+  return mergeability?.message;
+}
+
+function mergeControlLabel(merging: boolean) {
+  if (merging) {
+    return PULL_REQUEST_REVIEW_COPY.merging;
+  }
+  return PULL_REQUEST_REVIEW_COPY.merge;
+}
+
 export function SplitRunPullRequestMergeControls({
   mergeability,
+  mergeabilityFailed = false,
   merging,
   canAct,
   compact,
   onMerge,
 }: {
   mergeability?: FactoriesFactoryPullRequestMergeability;
+  mergeabilityFailed?: boolean;
   merging: boolean;
   canAct: boolean;
   compact: boolean;
@@ -140,8 +182,8 @@ export function SplitRunPullRequestMergeControls({
   const allowedMethods = allowedMergeMethods(mergeability?.allowedMethods);
   const [selectedMethod, setSelectedMethod] = useState<FactoryPullRequestMergeMethodChoice | undefined>();
   const method = selectedMergeMethod(allowedMethods, selectedMethod);
-  const canMerge = Boolean(canAct && mergeability?.canMerge && method && mergeability.headSha);
-  const reason = mergeability?.canMerge ? undefined : mergeability?.message;
+  const canMerge = pullRequestCanMerge(canAct, mergeability, mergeabilityFailed, method);
+  const reason = mergeBlockedMessage(mergeability, mergeabilityFailed);
 
   useEffect(() => {
     if (method && method !== selectedMethod) {
@@ -167,7 +209,7 @@ export function SplitRunPullRequestMergeControls({
         onClick={() => mergeWith(method)}
         data-testid="split-run-merge-button"
       >
-        {PULL_REQUEST_REVIEW_COPY.merge}
+        {mergeControlLabel(merging)}
       </Button>
       <ButtonGroupSeparator />
       <MergeMethodMenu

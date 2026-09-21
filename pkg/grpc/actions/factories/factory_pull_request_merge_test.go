@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
@@ -408,6 +409,25 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		require.NotNil(t, stored.MergedAt)
 	})
 
+	t.Run("refuses when the pull request is not open", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		state := models.FactoryPullRequestStateMerged
+		mergedAt := time.Now()
+		require.NoError(t, stored.Update(db, models.FactoryPullRequestPatch{State: &state, MergedAt: &mergedAt}))
+		api := readyAPI()
+		useGitHub(t, api)
+
+		_, err = merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, 0, api.mergeCalls)
+	})
+
 	t.Run("refuses when GitHub reports the head moved", func(t *testing.T) {
 		factory := newFactory(t)
 		pr := createGitHubPR(t, factory, createOrder(t, factory))
@@ -803,6 +823,59 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		assert.False(t, got.GetCanMerge())
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION, got.GetBlockedReason())
 		assert.Equal(t, mergeBlockedMissingIntegration, got.GetMessage())
+	})
+
+	t.Run("reports a stored merged pull request as not open", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		state := models.FactoryPullRequestStateMerged
+		mergedAt := time.Now()
+		require.NoError(t, stored.Update(db, models.FactoryPullRequestPatch{State: &state, MergedAt: &mergedAt}))
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_NOT_OPEN, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedNotOpen, got.GetMessage())
+	})
+
+	t.Run("corrects an open record when GitHub reports merged", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		combined, checks := successChecks()
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: &github.PullRequest{
+				Merged:         github.Ptr(true),
+				State:          github.Ptr("closed"),
+				Mergeable:      github.Ptr(true),
+				MergeableState: github.Ptr("clean"),
+				Draft:          github.Ptr(false),
+				Head:           &github.PullRequestBranch{SHA: github.Ptr(headSHA)},
+			},
+			combined:   combined,
+			checkRuns:  checks,
+			repository: allMethodsRepository(),
+		})
+
+		got := describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_NOT_OPEN, got.GetBlockedReason())
+		assert.Equal(t, mergeBlockedNotOpen, got.GetMessage())
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateMerged, stored.State)
+		require.NotNil(t, stored.MergedAt)
+		updatedAt := stored.UpdatedAt
+
+		got = describe(t, factory, pr)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_NOT_OPEN, got.GetBlockedReason())
+
+		stored, err = factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		assert.Equal(t, updatedAt, stored.UpdatedAt)
 	})
 
 	t.Run("lists allowed methods from repository flags", func(t *testing.T) {

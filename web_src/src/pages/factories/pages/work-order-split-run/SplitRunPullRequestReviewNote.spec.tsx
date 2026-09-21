@@ -7,11 +7,17 @@ import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeabili
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
+const mergeabilityQuery = { isError: false };
+const mergeMutation = { isPending: false, isSuccess: false };
 const mergeMutate = vi.fn();
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
-  useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
-  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+  useFactoryPullRequestMergeability: () => ({ data: mergeability.current, isError: mergeabilityQuery.isError }),
+  useMergeFactoryPullRequest: () => ({
+    mutate: mergeMutate,
+    isPending: mergeMutation.isPending,
+    isSuccess: mergeMutation.isSuccess,
+  }),
 }));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
@@ -45,6 +51,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   mergeMutate.mockReset();
+  mergeabilityQuery.isError = false;
+  mergeMutation.isPending = false;
+  mergeMutation.isSuccess = false;
   mergeability.current = {
     canMerge: true,
     allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_MERGE"],
@@ -244,5 +253,31 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+  });
+
+  it("shows Merging and disables the merge controls while a merge is pending", () => {
+    mergeMutation.isPending = true;
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toHaveTextContent("Merging");
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+  });
+
+  it("keeps Merging after a successful merge until the pull request is merged", () => {
+    mergeMutation.isSuccess = true;
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toHaveTextContent("Merging");
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+  });
+
+  it("does not re-enable merge after a failed mergeability refetch", () => {
+    mergeabilityQuery.isError = true;
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
   });
 });

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -28,6 +29,7 @@ const (
 	mergeBlockedDraft              = "The pull request is a draft."
 	mergeBlockedConflicting        = "The pull request has conflicts."
 	mergeBlockedMissingIntegration = "GitHub is not connected."
+	mergeBlockedNotOpen            = "The pull request is not open."
 )
 
 type factoryPullRequestMergeability struct {
@@ -38,9 +40,35 @@ type factoryPullRequestMergeability struct {
 	HeadSHA        string
 	PullRequest    *models.FactoryPullRequest
 	Client         factoryGitHubAPI
+	StateCorrected bool
 }
 
 func loadFactoryPullRequestForMerge(
+	db *gorm.DB,
+	orgID uuid.UUID,
+	factoryID string,
+	prID string,
+) (*models.Factory, *models.FactoryPullRequest, error) {
+	factory, pullRequest, err := loadFactoryPullRequest(db, orgID, factoryID, prID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if pullRequest.State != models.FactoryPullRequestStateOpen {
+		return nil, nil, errFactoryPullRequestNotOpen
+	}
+	return factory, pullRequest, nil
+}
+
+func loadFactoryPullRequestForDescribe(
+	db *gorm.DB,
+	orgID uuid.UUID,
+	factoryID string,
+	prID string,
+) (*models.Factory, *models.FactoryPullRequest, error) {
+	return loadFactoryPullRequest(db, orgID, factoryID, prID)
+}
+
+func loadFactoryPullRequest(
 	db *gorm.DB,
 	orgID uuid.UUID,
 	factoryID string,
@@ -63,9 +91,6 @@ func loadFactoryPullRequestForMerge(
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
 		return nil, nil, errFactoryPullRequestNotGitHub
 	}
-	if pullRequest.State != models.FactoryPullRequestStateOpen {
-		return nil, nil, errFactoryPullRequestNotOpen
-	}
 	return factory, pullRequest, nil
 }
 
@@ -77,6 +102,9 @@ func evaluateFactoryPullRequestMergeability(
 	pullRequest *models.FactoryPullRequest,
 ) (*factoryPullRequestMergeability, error) {
 	result := &factoryPullRequestMergeability{PullRequest: pullRequest}
+	if pullRequest.State != models.FactoryPullRequestStateOpen {
+		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_NOT_OPEN, mergeBlockedNotOpen), nil
+	}
 
 	client, err := newFactoryGitHubAPI(db, deps, factory)
 	if err != nil {
@@ -100,6 +128,15 @@ func evaluateFactoryPullRequestMergeability(
 		return nil, err
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
+
+	if githubPullRequestIsClosed(githubPR) {
+		corrected, err := syncFactoryPullRequestIfClosedOnGitHub(db, pullRequest, githubPR)
+		if err != nil {
+			return nil, err
+		}
+		result.StateCorrected = corrected
+		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_NOT_OPEN, mergeBlockedNotOpen), nil
+	}
 
 	if githubPR.GetDraft() || strings.EqualFold(githubPR.GetMergeableState(), "draft") {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT, mergeBlockedDraft), nil
@@ -133,6 +170,45 @@ func evaluateFactoryPullRequestMergeability(
 
 	result.CanMerge = true
 	return result, nil
+}
+
+func githubPullRequestIsClosed(githubPR *github.PullRequest) bool {
+	_, ok := factoryPullRequestStateFromGitHub(githubPR)
+	return ok
+}
+
+func factoryPullRequestStateFromGitHub(githubPR *github.PullRequest) (string, bool) {
+	if githubPR.GetMerged() {
+		return models.FactoryPullRequestStateMerged, true
+	}
+	if strings.EqualFold(githubPR.GetState(), "closed") {
+		return models.FactoryPullRequestStateClosed, true
+	}
+	return "", false
+}
+
+func syncFactoryPullRequestIfClosedOnGitHub(
+	db *gorm.DB,
+	pullRequest *models.FactoryPullRequest,
+	githubPR *github.PullRequest,
+) (bool, error) {
+	nextState, ok := factoryPullRequestStateFromGitHub(githubPR)
+	if !ok || pullRequest.State == nextState {
+		return false, nil
+	}
+
+	now := time.Now()
+	patch := models.FactoryPullRequestPatch{State: &nextState}
+	if nextState == models.FactoryPullRequestStateMerged {
+		patch.MergedAt = &now
+	}
+	if nextState == models.FactoryPullRequestStateClosed {
+		patch.ClosedAt = &now
+	}
+	if err := pullRequest.Update(db, patch); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func blockedMergeability(
