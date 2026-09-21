@@ -419,35 +419,38 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
   });
 
-  it("pauses, resumes, and deletes a Sentry intake after confirmation", async () => {
-    const onPause = vi.fn();
+  it.each(["sentry-exceptions", "jira-issues"] as const)(
+    "pauses, resumes, and deletes a %s intake after confirmation",
+    async (sourceId) => {
+      const onPause = vi.fn();
+      const onResume = vi.fn();
+      const onDelete = vi.fn();
+      const user = userEvent.setup();
+      renderPopup({ sourceId, onPause, onResume, onDelete });
+
+      expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
+      expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+
+      await user.click(screen.getByTestId("intake-source-settings-pause"));
+      expect(onPause).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByTestId("intake-source-settings-delete"));
+      expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+      expect(onDelete).not.toHaveBeenCalled();
+      await user.click(screen.getByTestId("intake-delete-cancel"));
+      expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
+      expect(onDelete).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("intake-source-settings-delete"));
+      await user.click(screen.getByTestId("intake-delete-confirm"));
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["sentry-exceptions", "jira-issues"] as const)("offers resume for a paused %s intake", async (sourceId) => {
     const onResume = vi.fn();
-    const onDelete = vi.fn();
     const user = userEvent.setup();
-    renderPopup({ sourceId: "sentry-exceptions", onPause, onResume, onDelete });
-
-    expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
-    expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-    expect(onPause).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    expect(onDelete).not.toHaveBeenCalled();
-    await user.click(screen.getByTestId("intake-delete-cancel"));
-    expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
-    expect(onDelete).not.toHaveBeenCalled();
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    await user.click(screen.getByTestId("intake-delete-confirm"));
-    expect(onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it("offers resume for a paused Sentry intake", async () => {
-    const onResume = vi.fn();
-    const user = userEvent.setup();
-    renderPopup({ sourceId: "sentry-exceptions", paused: true, onResume });
+    renderPopup({ sourceId, paused: true, onResume });
 
     expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("intake-source-settings-resume"));

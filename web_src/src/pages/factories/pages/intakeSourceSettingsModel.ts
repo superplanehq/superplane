@@ -1,5 +1,7 @@
 import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
+import type { LineIntakeSourceId } from "./lineIntakeModel";
+
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
 export type IntakeSettingsTab = "general" | "agent" | "automation";
@@ -74,16 +76,20 @@ export const INTAKE_SETTINGS_COPY = {
   resume: "Resume intake",
   pausing: "Pausing",
   resuming: "Resuming",
-  pauseHelper: "SuperPlane stops new Sentry items. Tasks in Backlog stay.",
+  pauseHelper: "SuperPlane stops new items. Tasks in Backlog stay.",
   delete: "Delete intake",
   deleteTitle: "Delete this intake?",
   deleteDescription:
-    "SuperPlane stops new Sentry items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
+    "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
   deleteCancel: "Keep intake",
   deleteConfirm: "Delete intake",
   pauseError: "SuperPlane could not change the intake. Try again.",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
+
+export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
+  return sourceId === "sentry-exceptions" || sourceId === "jira-issues";
+}
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];

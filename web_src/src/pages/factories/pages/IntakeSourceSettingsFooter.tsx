@@ -13,6 +13,7 @@ import { useState } from "react";
 
 import {
   INTAKE_SETTINGS_COPY,
+  intakeSupportsPause,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -51,7 +52,7 @@ export function IntakeSourceSettingsFooter({
   onClose: () => void;
   saveDisabled?: boolean;
 }) {
-  const sentryControls = sourceId === "sentry-exceptions";
+  const pauseControls = intakeSupportsPause(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const footerError = saveError ?? pauseError ?? (deleteOpen ? undefined : deleteError);
   const busy = pausePending || deletePending;
@@ -60,7 +61,7 @@ export function IntakeSourceSettingsFooter({
     <>
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {sentryControls ? (
+          {pauseControls ? (
             <>
               {paused ? (
                 <Button
@@ -121,7 +122,7 @@ export function IntakeSourceSettingsFooter({
           {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
         </Button>
       </footer>
-      {sentryControls ? (
+      {pauseControls ? (
         <IntakeDeleteConfirmDialog
           open={deleteOpen}
           pending={deletePending}
