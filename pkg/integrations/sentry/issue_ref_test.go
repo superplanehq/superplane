@@ -62,6 +62,58 @@ func Test__IssueIDFromEventData(t *testing.T) {
 	})
 }
 
+func Test__IssueIDFromURL(t *testing.T) {
+	t.Run("reads an org-host issue URL", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://acme.sentry.io/issues/12/")
+		require.True(t, ok)
+		assert.Equal(t, "12", issueID)
+	})
+
+	t.Run("accepts a missing trailing slash", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://acme.sentry.io/issues/12")
+		require.True(t, ok)
+		assert.Equal(t, "12", issueID)
+	})
+
+	t.Run("ignores a query string", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://acme.sentry.io/issues/12/?project=1&query=is%3Aunresolved")
+		require.True(t, ok)
+		assert.Equal(t, "12", issueID)
+	})
+
+	t.Run("reads an organizations issue URL", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://sentry.io/organizations/acme/issues/12/")
+		require.True(t, ok)
+		assert.Equal(t, "12", issueID)
+	})
+
+	t.Run("ignores a non-issue URL", func(t *testing.T) {
+		_, ok := IssueIDFromURL("https://acme.sentry.io/projects/frontend/")
+		assert.False(t, ok)
+	})
+
+	t.Run("ignores a GitHub issue URL", func(t *testing.T) {
+		_, ok := IssueIDFromURL("https://github.com/acme/payments/issues/12")
+		assert.False(t, ok)
+	})
+
+	t.Run("does not treat 12 as 123", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://acme.sentry.io/issues/123/")
+		require.True(t, ok)
+		assert.Equal(t, "123", issueID)
+		assert.NotEqual(t, "12", issueID)
+
+		twelve, ok := IssueIDFromURL("https://acme.sentry.io/issues/12/")
+		require.True(t, ok)
+		assert.Equal(t, "12", twelve)
+	})
+}
+
+func Test__IssueURLFragment(t *testing.T) {
+	assert.Equal(t, "/issues/12", IssueURLFragment("12"))
+	assert.Equal(t, "", IssueURLFragment("  "))
+}
+
 func Test__IssueStatusIsSettled(t *testing.T) {
 	assert.True(t, IssueStatusIsSettled(IssueStatusResolved))
 	assert.True(t, IssueStatusIsSettled(IssueStatusResolvedInNextRelease))

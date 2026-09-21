@@ -30,6 +30,10 @@ const (
 	// imports. The wizard tells the user this number.
 	intakeSentrySeedSize = 10
 
+	// intakeSentrySeedEventWindow is how many recent trigger events a reseed
+	// reads so it can drop issues that already sit on the intake.
+	intakeSentrySeedEventWindow = 200
+
 	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
 	// imports. The wizard tells the user this number.
 	intakeJiraSeedSize = 10
@@ -275,10 +279,85 @@ func seedSentryIssues(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
 	}
 
+	return seedKnownSentryIssues(tx, canvasID, client, issues)
+}
+
+func seedKnownSentryIssues(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	client *sentry.Client,
+	issues []sentry.Issue,
+) (intakeSeedResult, error) {
+	issues, err := filterSentryIssuesForSeed(tx, canvasID, issues)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
 	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(client, issues)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(issues)}, nil
+}
+
+func filterSentryIssuesForSeed(tx *gorm.DB, canvasID uuid.UUID, issues []sentry.Issue) ([]sentry.Issue, error) {
+	if len(issues) == 0 {
+		return issues, nil
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("load intake canvas: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("intake canvas is not owned by a factory")
+	}
+
+	factory, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	seen, err := sentryIssueIDsOnTrigger(tx, canvasID)
+	if err != nil {
+		return nil, err
+	}
+
+	kept := make([]sentry.Issue, 0, len(issues))
+	for _, issue := range issues {
+		if seen[issue.ID] {
+			log.Infof("skipping Sentry issue %s: already on intake", issue.ID)
+			continue
+		}
+
+		hasOrder, err := sentry.IssueHasWorkOrder(tx, factory, issue.ID)
+		if err != nil {
+			return nil, err
+		}
+		if hasOrder {
+			log.Infof("skipping Sentry issue %s: work order already exists", issue.ID)
+			continue
+		}
+
+		kept = append(kept, issue)
+	}
+
+	return kept, nil
+}
+
+func sentryIssueIDsOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, error) {
+	events, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, intakeSentrySeedEventWindow, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	for i := range events {
+		issueID, ok := sentry.IssueIDFromEventData(events[i].Data.Data())
+		if ok {
+			seen[issueID] = true
+		}
+	}
+	return seen, nil
 }
 
 // sentryIssueEvents shapes each issue of a newest-first page like the webhook

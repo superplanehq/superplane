@@ -20,7 +20,11 @@ var ErrPullRequestNotFound = errors.New("pull request not found")
 var ErrPullRequestActivityAlreadyActive = errors.New("pull request activity already active for this handler and revision")
 
 type FactoryContext interface {
-	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
+	// CreateWorkOrder reports whether a row was inserted via the second
+	// return value; callers must skip downstream emits when `created` is
+	// false so a duplicate Sentry intake item does not leak into the
+	// timeline.
+	CreateWorkOrder(params WorkOrderParams) (order *WorkOrder, created bool, err error)
 	// FindWorkOrder resolves a work order by id or by one of its
 	// artifacts' keys, without requiring the current run to be attached
 	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
