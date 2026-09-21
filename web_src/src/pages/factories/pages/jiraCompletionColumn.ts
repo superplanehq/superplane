@@ -8,6 +8,5 @@ export function preferredJiraCompletionColumn(names: string[], current: string):
   if (trimmed && names.some((name) => name === trimmed)) {
     return trimmed;
   }
-  const done = names.find((name) => name.toLowerCase() === "done");
-  return done ?? names[0] ?? "";
+  return names.find((name) => name.toLowerCase() === "done") ?? "";
 }
