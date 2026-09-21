@@ -10,8 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
@@ -85,7 +87,7 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 	}
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	startedAt := time.UnixMilli(snapshot.StartedAt)
@@ -113,7 +115,7 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := session.UpsertActivity(database.DB(r.Context()), activity); err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
@@ -184,7 +186,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		}
 		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 		if err != nil {
-			writeRunnerPlanningError(w, err)
+			writeRunnerPlanningError(w, r, session, err)
 			return
 		}
 		if session.State == models.PlanningSessionStateEnded {
@@ -194,7 +196,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		if session.WaitState == models.PlanningWaitResolved {
 			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
 			if err != nil {
-				writeRunnerPlanningError(w, err)
+				writeRunnerPlanningError(w, r, session, err)
 				return
 			}
 			if consumed {
@@ -206,13 +208,13 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 				text, err := mintPlanningWaitText(r.Context(), session, result)
 				if err != nil {
 					restorePlanningWait(session, result)
-					writeRunnerPlanningError(w, err)
+					writeRunnerPlanningError(w, r, session, err)
 					return
 				}
 				body, bodyErr := planningWaitMessageBody(r.Context(), session, result, text)
 				if bodyErr != nil {
 					restorePlanningWait(session, result)
-					writeRunnerPlanningError(w, bodyErr)
+					writeRunnerPlanningError(w, r, session, bodyErr)
 					return
 				}
 				if err := writeJSON(w, http.StatusOK, body); err != nil {
@@ -222,7 +224,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			}
 		}
 		if err := beginPlanningWaitAndNotify(database.DB(r.Context()), session); err != nil {
-			writeRunnerPlanningError(w, err)
+			writeRunnerPlanningError(w, r, session, err)
 			return
 		}
 		if !time.Now().Before(deadline) {
@@ -250,11 +252,11 @@ func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request
 	}
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	if err := proposePlanningSpecAndNotify(database.DB(r.Context()), session, req.Body); err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
@@ -284,11 +286,11 @@ func (s *Server) handleRunnerPlanningScore(
 	}
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	if err := propose(session, database.DB(r.Context()), req.Score, req.Summary); err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
@@ -306,13 +308,13 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 	}
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	if err := session.ProposeSurvey(database.DB(r.Context()), models.PlanningSessionSurvey{
 		Questions: req.Questions,
 	}); err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
@@ -330,7 +332,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 	}
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	activityID, ok := parseOptionalActivityID(w, req.ActivityID)
@@ -338,7 +340,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		return
 	}
 	if err := session.RecordAgentMessageForActivity(database.DB(r.Context()), req.Text, activityID); err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
@@ -363,13 +365,13 @@ func (s *Server) handleRunnerPlanningCreateTask(w http.ResponseWriter, r *http.R
 	}
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	db := database.DB(r.Context())
 	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	order, err := session.CreateSplitTask(db, factoryModel, models.PlanningSplitTask{
@@ -377,7 +379,7 @@ func (s *Server) handleRunnerPlanningCreateTask(w http.ResponseWriter, r *http.R
 		Description: req.Description,
 	}, activityID)
 	if err != nil {
-		writeRunnerPlanningError(w, err)
+		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	workersctx.EmitWorkOrderCreated(db, factoryModel, order)
@@ -520,7 +522,7 @@ func writeJSON(w http.ResponseWriter, status int, body any) error {
 	return nil
 }
 
-func writeRunnerPlanningError(w http.ResponseWriter, err error) {
+func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
 	switch {
 	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -531,7 +533,37 @@ func writeRunnerPlanningError(w http.ResponseWriter, err error) {
 		http.Error(w, "planning session has ended", http.StatusConflict)
 	default:
 		log.WithError(err).Error("runner planning session failed")
+		captureRunnerPlanningErrorToSentry(r, session, err)
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)
+	}
+}
+
+func captureRunnerPlanningErrorToSentry(r *http.Request, session *models.FactoryPlanningSession, err error) {
+	hub := sentry.CurrentHub()
+	if hub == nil || hub.Client() == nil {
+		return
+	}
+	hub.WithScope(func(scope *sentry.Scope) {
+		applyRunnerPlanningErrorTags(scope, r, session, err)
+		hub.CaptureException(err)
+	})
+}
+
+func applyRunnerPlanningErrorTags(scope *sentry.Scope, r *http.Request, session *models.FactoryPlanningSession, err error) {
+	if r != nil && r.URL != nil && r.URL.Path != "" {
+		scope.SetTag("route", r.URL.Path)
+	}
+	if session != nil {
+		if session.ID != uuid.Nil {
+			scope.SetTag("planning_session_id", session.ID.String())
+		}
+		if session.DraftWorkOrderID != nil && *session.DraftWorkOrderID != uuid.Nil {
+			scope.SetTag("draft_work_order_id", session.DraftWorkOrderID.String())
+		}
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code != "" {
+		scope.SetTag("postgres_error_code", pgErr.Code)
 	}
 }
 
