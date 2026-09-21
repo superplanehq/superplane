@@ -14,20 +14,28 @@ const getOrganizationIdFromUrl = (): string | null => {
   return null;
 };
 
-export function withOrganizationHeader(options: any = {}): any {
+type OrganizationHeaderInput = {
+  organizationId?: string | null;
+  headers?: HeadersInit;
+};
+
+export function withOrganizationHeader<TIn, TOut = TIn & { headers: Record<string, string> }>(
+  options?: TIn & { organizationId?: string | null },
+): TOut {
+  const resolved = (options ?? {}) as TIn & OrganizationHeaderInput;
   // Prefer an explicit organizationId (e.g. from route params) over window.location
   // because window.location can be stale during router transitions.
-  const organizationId = options?.organizationId ?? getOrganizationIdFromUrl();
+  const organizationId = resolved.organizationId ?? getOrganizationIdFromUrl();
 
   const headers: Record<string, string> = {};
 
-  if (options.headers) {
-    if (options.headers instanceof Headers) {
-      options.headers.forEach((value: string, key: string) => {
+  if (resolved.headers) {
+    if (resolved.headers instanceof Headers) {
+      resolved.headers.forEach((value: string, key: string) => {
         headers[key] = value;
       });
-    } else if (typeof options.headers === "object" && !Array.isArray(options.headers)) {
-      Object.assign(headers, options.headers);
+    } else if (typeof resolved.headers === "object" && !Array.isArray(resolved.headers)) {
+      Object.assign(headers, resolved.headers);
     }
   }
 
@@ -37,10 +45,10 @@ export function withOrganizationHeader(options: any = {}): any {
 
   // Avoid leaking our internal option into fetch/init objects.
   // Codegen clients ignore unknown top-level fields, but callers may also pass this to native fetch.
-  const { organizationId: _ignored, ...rest } = options ?? {};
+  const { organizationId: _ignored, headers: _ignoredHeaders, ...rest } = resolved;
 
   return {
     ...rest,
     headers,
-  };
+  } as TOut;
 }

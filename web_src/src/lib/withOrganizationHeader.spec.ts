@@ -41,7 +41,17 @@ describe("withOrganizationHeader", () => {
     setPathname("/old-org-id");
 
     const options = withOrganizationHeader({ organizationId: "new-org-id" });
-    expect(options.organizationId).toBeUndefined();
+    expect("organizationId" in options).toBe(false);
+  });
+
+  it("preserves extra request options for OpenAPI clients", () => {
+    const options = withOrganizationHeader({
+      organizationId: "org-1",
+      path: { id: "factory-1" },
+    });
+
+    expect(options.path).toEqual({ id: "factory-1" });
+    expect("organizationId" in options).toBe(false);
   });
 
   it("merges provided headers and preserves them", () => {
