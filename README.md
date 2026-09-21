@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="./docs/images/green-parrot.png" alt="Green parrot facing left" width="100%">
+  <img src="./docs/images/green-parrot.png" alt="Green parrot facing left" width="360">
 </p>
 
 <p align="center">
