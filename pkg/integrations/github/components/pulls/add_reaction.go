@@ -178,6 +178,14 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid target: %s", config.Target)
 	}
 
+	if strings.TrimSpace(config.CommentID) == "" {
+		return ctx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			"github.reaction",
+			[]any{},
+		)
+	}
+
 	commentID, err := parseCommentID(config.CommentID)
 	if err != nil {
 		return fmt.Errorf("comment ID is not a number: %v", err)
