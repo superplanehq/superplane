@@ -283,18 +283,46 @@ function appendLineToSection(section: CommandSection, text: string): CommandSect
   };
 }
 
+type MarkdownFence = {
+  marker: "`" | "~";
+  length: number;
+  info: string;
+};
+
 function noteHasUnclosedFence(text: string): boolean {
-  let fenceCount = 0;
+  let open: MarkdownFence | undefined;
   for (const line of text.split("\n")) {
-    if (isMarkdownFenceLine(line)) {
-      fenceCount += 1;
+    const fence = parseMarkdownFenceLine(line);
+    if (!fence) {
+      continue;
+    }
+    if (!open) {
+      open = fence;
+      continue;
+    }
+    if (isClosingMarkdownFence(open, fence)) {
+      open = undefined;
     }
   }
-  return fenceCount % 2 === 1;
+  return open !== undefined;
 }
 
-function isMarkdownFenceLine(line: string): boolean {
-  return /^\s*```/.test(line);
+function parseMarkdownFenceLine(line: string): MarkdownFence | undefined {
+  const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!match) {
+    return undefined;
+  }
+  const run = match[2];
+  const marker = run[0] === "~" ? "~" : "`";
+  const rest = match[3];
+  if (marker === "`" && rest.includes("`")) {
+    return undefined;
+  }
+  return { marker, length: run.length, info: rest.trim() };
+}
+
+function isClosingMarkdownFence(open: MarkdownFence, fence: MarkdownFence): boolean {
+  return fence.marker === open.marker && fence.length >= open.length && fence.info === "";
 }
 
 function startToolOnSection(section: CommandSection, kind: string, text: string, sourceId?: string): CommandSection {

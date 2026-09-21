@@ -280,7 +280,7 @@ function MarkdownCodeWithDiagrams({
   ...props
 }: ComponentProps<"code"> & { children?: ReactNode }) {
   const language = /language-(\w+)/.exec(className || "")?.[1];
-  const code = String(children).replace(/\n$/, "");
+  const code = (children == null ? "" : String(children)).replace(/\n$/, "");
 
   if (language === "mermaid") {
     return <MermaidWidget content={code} />;
