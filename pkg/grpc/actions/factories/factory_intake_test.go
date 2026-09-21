@@ -1105,6 +1105,16 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 
 func Test__SerializeFactoryIntakeJiraWebhookHealth(t *testing.T) {
 	spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceJiraIssues)
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceJiraIssues, spec)
+	require.NotEmpty(t, graph.TriggerNodeID)
+
+	integrationID := uuid.NewString()
+	for i := range spec.Nodes {
+		if spec.Nodes[i].ID != graph.TriggerNodeID {
+			continue
+		}
+		spec.Nodes[i].IntegrationID = &integrationID
+	}
 	intake := &models.FactoryIntake{
 		ID:        uuid.New(),
 		FactoryID: uuid.New(),
@@ -1112,7 +1122,9 @@ func Test__SerializeFactoryIntakeJiraWebhookHealth(t *testing.T) {
 		Source:    models.FactoryIntakeSourceJiraIssues,
 	}
 
-	serialized := serializeFactoryIntake(nil, intake, spec, nil)
+	serialized := serializeFactoryIntake(nil, intake, spec, map[string]string{
+		integrationID: models.IntegrationStateReady,
+	})
 
 	assert.False(t, serialized.GetHealthy(), "a Jira intake without a ready webhook must not be healthy")
 	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, serialized.GetHealth())
