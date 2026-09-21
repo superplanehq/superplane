@@ -59,7 +59,9 @@ func (c *AddReaction) Documentation() string {
 
 ## Output
 
-Returns the created GitHub reaction object, including id, content, user, and timestamp.`
+If the component creates a reaction, it returns the GitHub reaction object, including id, content, user, and timestamp.
+
+If the resolved comment ID is blank, the component finishes with success and emits no reaction object. Downstream nodes that wait for that output do not run.`
 }
 
 func (c *AddReaction) Icon() string {
@@ -108,7 +110,7 @@ func (c *AddReaction) Configuration() []configuration.Field {
 			Label:       "Comment ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "ID of the comment to react to",
+			Description: "ID of the comment to react to. If the resolved value is blank, the component does not add a reaction.",
 		},
 		{
 			Name:     "content",
