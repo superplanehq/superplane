@@ -366,8 +366,8 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       pattern: re("/api/v1/factories/([^/]+)/velocity"),
       resolve: (match, _method, _body, url) => {
         const byPeriod = fixture.velocityByFactoryId?.[match[1]];
-        const periodDays = Number(url.searchParams.get("periodDays") ?? 14);
-        const report = byPeriod?.[periodDays] ?? byPeriod?.[14] ?? EMPTY_FACTORY_VELOCITY[14];
+        const periodDays = Number(url.searchParams.get("periodDays") ?? 30);
+        const report = byPeriod?.[periodDays] ?? byPeriod?.[30] ?? EMPTY_FACTORY_VELOCITY[30];
         const paged = paginateVelocityPeople(report, url);
 
         // The page follows peopleSyncedAt to know a sync finished, so a report
