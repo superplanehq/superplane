@@ -458,12 +458,18 @@ function modelCatalogIncludes(catalogPath, model) {
   }
 }
 
+function modelListIncludes(stdout, model) {
+  const expected = openRouterModelId(model);
+  return String(stdout || "")
+    .split(/\r?\n/)
+    .some((line) => line.trim() === expected);
+}
+
 function ensureOpenCodeModelCatalog(
   taskDir,
   model,
   childEnv,
-  cwd,
-  refresh = spawnSync,
+  run = spawnSync,
 ) {
   if (!model) {
     return "skipped";
@@ -475,25 +481,40 @@ function ensureOpenCodeModelCatalog(
 
   const refreshEnv = { ...childEnv };
   delete refreshEnv.OPENCODE_DISABLE_MODELS_FETCH;
-  const result = refresh(
+  delete refreshEnv.OPENCODE_CONFIG;
+  // Keep the generated task config from making a custom model look bundled.
+  const commandOptions = {
+    cwd: path.parse(path.resolve(taskDir)).root,
+    encoding: "utf8",
+    timeout: MODEL_CATALOG_REFRESH_TIMEOUT_MS,
+    maxBuffer: MODEL_CATALOG_REFRESH_MAX_BUFFER,
+  };
+  const refreshResult = run(
     "opencode",
     ["models", "openrouter", "--refresh", "--pure"],
     {
-      cwd,
+      ...commandOptions,
       env: refreshEnv,
-      encoding: "utf8",
-      timeout: MODEL_CATALOG_REFRESH_TIMEOUT_MS,
-      maxBuffer: MODEL_CATALOG_REFRESH_MAX_BUFFER,
     },
   );
   if (modelCatalogIncludes(catalogPath, model)) {
     return "refreshed";
   }
 
-  const reason = result.error
-    ? `: ${result.error.message}`
-    : result.status !== 0
-      ? `: refresh exited with status ${result.status}`
+  const bundledEnv = { ...childEnv };
+  delete bundledEnv.OPENCODE_CONFIG;
+  const bundledResult = run("opencode", ["models", "openrouter", "--pure"], {
+    ...commandOptions,
+    env: bundledEnv,
+  });
+  if (modelListIncludes(bundledResult.stdout, model)) {
+    return "bundled";
+  }
+
+  const reason = refreshResult.error
+    ? `: ${refreshResult.error.message}`
+    : refreshResult.status !== 0
+      ? `: refresh exited with status ${refreshResult.status}`
       : ": the refreshed catalog does not list the model";
   throw new Error(
     `OpenCode could not refresh metadata for ${catalogModelId(model)}${reason}`,
@@ -575,11 +596,16 @@ async function runPrompt(promptFile, model, helpers = {}) {
   ensureXdgDirs(sp);
 
   const currentModel = catalogModelId(model);
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
   const childEnv = openCodeProcessEnv(sp, env);
   const ensureModelCatalog =
     helpers.ensureOpenCodeModelCatalog || ensureOpenCodeModelCatalog;
-  ensureModelCatalog(sp, currentModel, childEnv, cwd);
+  const catalogSource = ensureModelCatalog(sp, currentModel, childEnv);
+  if (catalogSource === "bundled") {
+    printLiveLogLine(
+      `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
+    );
+  }
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
