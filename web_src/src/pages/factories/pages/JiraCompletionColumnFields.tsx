@@ -77,53 +77,12 @@ export function JiraCompletionColumnFields({
         {value.jiraMoveOnComplete ? (
           <div className="flex flex-col gap-1.5 pl-1">
             <Label htmlFor="jira-completion-column-select">{JIRA_COMPLETION_COLUMN_COPY.column}</Label>
-            {selectedColumn ? (
-              <Select
-                value={selectedColumn}
-                onValueChange={(column) => onChange({ ...value, jiraCompletionColumn: column })}
-              >
-                <SelectTrigger
-                  id="jira-completion-column-select"
-                  className="w-full"
-                  data-testid="jira-completion-column-select"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {columns.map((column) => (
-                    <SelectItem key={column} value={column}>
-                      {column}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Select
-                disabled={columns.length === 0}
-                onValueChange={(column) => onChange({ ...value, jiraCompletionColumn: column })}
-              >
-                <SelectTrigger
-                  id="jira-completion-column-select"
-                  className="w-full"
-                  data-testid="jira-completion-column-select"
-                >
-                  <SelectValue
-                    placeholder={
-                      statusesQuery.isLoading ? JIRA_COMPLETION_COLUMN_COPY.loading : JIRA_COMPLETION_COLUMN_COPY.column
-                    }
-                  />
-                </SelectTrigger>
-                {columns.length > 0 ? (
-                  <SelectContent>
-                    {columns.map((column) => (
-                      <SelectItem key={column} value={column}>
-                        {column}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                ) : null}
-              </Select>
-            )}
+            <JiraCompletionColumnSelect
+              columns={columns}
+              selectedColumn={selectedColumn}
+              loading={statusesQuery.isLoading}
+              onChange={(column) => onChange({ ...value, jiraCompletionColumn: column })}
+            />
             <p className="text-[12px] text-muted-foreground">{JIRA_COMPLETION_COLUMN_COPY.helper}</p>
             {statusesQuery.isError ? (
               <p className="text-[12px] text-destructive">{JIRA_COMPLETION_COLUMN_COPY.empty}</p>
@@ -132,5 +91,47 @@ export function JiraCompletionColumnFields({
         ) : null}
       </div>
     </fieldset>
+  );
+}
+
+function JiraCompletionColumnSelect({
+  columns,
+  selectedColumn,
+  loading,
+  onChange,
+}: {
+  columns: string[];
+  selectedColumn: string;
+  loading: boolean;
+  onChange: (column: string) => void;
+}) {
+  const options = columns.map((column) => (
+    <SelectItem key={column} value={column}>
+      {column}
+    </SelectItem>
+  ));
+
+  if (selectedColumn) {
+    return (
+      <Select value={selectedColumn} onValueChange={onChange}>
+        <SelectTrigger
+          id="jira-completion-column-select"
+          className="w-full"
+          data-testid="jira-completion-column-select"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>{options}</SelectContent>
+      </Select>
+    );
+  }
+
+  return (
+    <Select disabled={columns.length === 0} onValueChange={onChange}>
+      <SelectTrigger id="jira-completion-column-select" className="w-full" data-testid="jira-completion-column-select">
+        <SelectValue placeholder={loading ? JIRA_COMPLETION_COLUMN_COPY.loading : JIRA_COMPLETION_COLUMN_COPY.column} />
+      </SelectTrigger>
+      {columns.length > 0 ? <SelectContent>{options}</SelectContent> : null}
+    </Select>
   );
 }
