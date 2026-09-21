@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import type {
@@ -9,7 +9,6 @@ import type {
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFactoryPullRequestMergeability, useMergeFactoryPullRequest } from "@/hooks/useFactoryPullRequestMerge";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -142,6 +141,8 @@ export function SplitRunPullRequestMergeControls({
   const method = selectedMergeMethod(allowedMethods, selectedMethod);
   const canMerge = Boolean(canAct && mergeability?.canMerge && method && mergeability.headSha);
   const reason = mergeability?.canMerge ? undefined : mergeability?.message;
+  const reasonId = useId();
+  const showReason = Boolean(canAct && reason);
 
   useEffect(() => {
     if (method && method !== selectedMethod) {
@@ -164,6 +165,7 @@ export function SplitRunPullRequestMergeControls({
         size={compact ? "sm" : "lg"}
         className={compact ? undefined : "h-11 px-5 text-[15px] font-semibold"}
         disabled={!canMerge || merging}
+        aria-describedby={showReason ? reasonId : undefined}
         onClick={() => mergeWith(method)}
         data-testid="split-run-merge-button"
       >
@@ -186,19 +188,13 @@ export function SplitRunPullRequestMergeControls({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <PermissionTooltip allowed={canAct} message={PULL_REQUEST_REVIEW_COPY.permission}>
-        {canAct && reason ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="inline-flex" data-testid="split-run-merge-reason">
-                {mergeControls}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top">{reason}</TooltipContent>
-          </Tooltip>
-        ) : (
-          mergeControls
-        )}
+        {mergeControls}
       </PermissionTooltip>
+      {showReason ? (
+        <p id={reasonId} className={mergedClassName(compact)} data-testid="split-run-merge-reason">
+          {reason}
+        </p>
+      ) : null}
     </div>
   );
 }
