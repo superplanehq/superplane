@@ -132,6 +132,29 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 	assert.Equal(t, issue, payload["data"].(map[string]any)["issue"])
 }
 
+func Test__OnIssue__OnIntegrationMessage__EmptyActionsEmitNothing(t *testing.T) {
+	trigger := &OnIssue{}
+	eventCtx := &contexts.EventContext{}
+
+	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		Message: WebhookMessage{
+			Resource: "issue",
+			Action:   "created",
+			Data: map[string]any{
+				"issue": map[string]any{"id": "123"},
+			},
+		},
+		Configuration: map[string]any{
+			"actions": []string{},
+		},
+		Events: eventCtx,
+		Logger: logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, eventCtx.Payloads)
+}
+
 func Test__OnIssue__OnIntegrationMessage__EnrichesDescriptionFromAPI(t *testing.T) {
 	trigger := &OnIssue{}
 	eventCtx := &contexts.EventContext{}
