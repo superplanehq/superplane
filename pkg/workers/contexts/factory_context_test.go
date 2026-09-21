@@ -377,6 +377,256 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 	})
 }
 
+func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	jiraPayloadOnSite := func(action, siteURL, issueKey string) map[string]any {
+		return map[string]any{
+			"type": "jira.issue",
+			"data": map[string]any{
+				"action": action,
+				"url":    siteURL + "/browse/" + issueKey,
+				"issue":  map[string]any{"key": issueKey},
+			},
+		}
+	}
+	jiraPayload := func(action, issueKey string) map[string]any {
+		return jiraPayloadOnSite(action, "https://acme.atlassian.net", issueKey)
+	}
+
+	countOrders := func(factoryModel *models.Factory) int {
+		t.Helper()
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{})
+		require.NoError(t, err)
+		return len(orders)
+	}
+
+	t.Run("skips a Jira issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		existing, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing jira task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-5", Label: "ENG-5"},
+		)
+		require.NoError(t, err)
+		beforeEvents, err := existing.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-5"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Existing jira task"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		afterEvents, err := existing.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		assert.Len(t, afterEvents, len(beforeEvents))
+	})
+
+	t.Run("create then update for the same issue inserts one work order", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		createdCanvas, createdExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-9"))
+		_, err = factoryModel.CreateIntake(database.Conn(), createdCanvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		createdCtx := NewFactoryContext(database.Conn(), createdCanvas, createdExecution)
+
+		first, created, err := createdCtx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, first)
+		require.NotNil(t, first.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-9", first.Origin.URL)
+		assert.Equal(t, "ENG-9", first.Origin.Label)
+
+		persisted, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(first.ID))
+		require.NoError(t, err)
+		beforeEvents, err := persisted.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, beforeEvents)
+
+		updatedCanvas, updatedExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-9"))
+		updatedCtx := NewFactoryContext(database.Conn(), updatedCanvas, updatedExecution)
+
+		second, created, err := updatedCtx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, second)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		afterEvents, err := persisted.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		assert.Len(t, afterEvents, len(beforeEvents))
+	})
+
+	t.Run("creates a task when the same key exists on another Jira site", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Other site issue",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://other.atlassian.net/browse/ENG-5", Label: "ENG-5"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayloadOnSite("created", "https://acme.atlassian.net", "ENG-5"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Acme ENG-5"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		require.NotNil(t, order.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-5", order.Origin.URL)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("does not skip ENG-5 when ENG-50 already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Issue ENG-50",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-50", Label: "ENG-50"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-5"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Issue ENG-5"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("creates a task when the Jira issue has none", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-7"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		require.NotNil(t, order.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-7", order.Origin.URL)
+		assert.Equal(t, "ENG-7", order.Origin.Label)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		origin := models.WorkOrderOrigin{
+			URL:   "https://github.com/acme/payments/issues/12",
+			Label: "acme/payments#12",
+		}
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"First github task",
+			"",
+			nil,
+			nil,
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": origin.URL,
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("serializes concurrent creates for the same Jira issue", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		canvasOne, executionOne, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-8"))
+		canvasTwo, executionTwo, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-8"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasOne.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasTwo.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		created := make([]bool, 2)
+		errs := make([]error, 2)
+		canvases := []*models.Canvas{canvasOne, canvasTwo}
+		executions := []*models.CanvasNodeExecution{executionOne, executionTwo}
+
+		for i := 0; i < 2; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					ctx := NewFactoryContext(tx, canvases[idx], executions[idx])
+					_, didCreate, createErr := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+					created[idx] = didCreate
+					return createErr
+				})
+			}(i)
+		}
+
+		close(start)
+		wg.Wait()
+
+		for _, createErr := range errs {
+			require.NoError(t, createErr)
+		}
+
+		createdCount := 0
+		for _, didCreate := range created {
+			if didCreate {
+				createdCount++
+			}
+		}
+		assert.Equal(t, 1, createdCount)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
