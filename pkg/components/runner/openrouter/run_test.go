@@ -196,6 +196,26 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	assert.Equal(t, "throughput", routing["sort"])
 }
 
+func TestEnsureOpenCodeModelCatalogRefreshesOnce(t *testing.T) {
+	taskDir := t.TempDir()
+	result := jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", true)
+
+	assert.Equal(t, "refreshed", result.Source)
+	assert.Equal(t, 1, result.Calls)
+	assert.Equal(t, []string{"models", "openrouter", "--refresh", "--pure"}, result.Args)
+	assert.False(t, result.FetchDisabled)
+
+	result = jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", true)
+	assert.Equal(t, "cache", result.Source)
+	assert.Equal(t, 0, result.Calls)
+}
+
+func TestEnsureOpenCodeModelCatalogRejectsUnknownModelWithoutFreshCatalog(t *testing.T) {
+	result := jsEnsureOpenCodeModelCatalog(t, t.TempDir(), "x-ai/grok-4.6", false)
+
+	assert.Contains(t, result.Error, "could not refresh metadata for x-ai/grok-4.6")
+}
+
 func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
 	output := runOpenCodeFormatter(t, []string{
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
@@ -1167,6 +1187,9 @@ function mockChild(spec) {
   return child;
 }
 const helpers = {
+  ensureOpenCodeModelCatalog() {
+    return "cache";
+  },
   spawnOpenCode(args) {
     const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
     index += 1;
@@ -1354,6 +1377,61 @@ func jsBuildConfigWithPrompt(t *testing.T, taskDir string, env map[string]string
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(out, &config))
 	return config
+}
+
+type modelCatalogResult struct {
+	Source        string   `json:"source"`
+	Calls         int      `json:"calls"`
+	Args          []string `json:"args"`
+	FetchDisabled bool     `json:"fetchDisabled"`
+	Error         string   `json:"error"`
+}
+
+func jsEnsureOpenCodeModelCatalog(t *testing.T, taskDir, model string, createCatalog bool) modelCatalogResult {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `
+const fs = require("fs");
+const path = require("path");
+const { ensureOpenCodeModelCatalog, openCodeModelCatalogPath } = require(process.argv[1]);
+const taskDir = process.argv[2];
+const model = process.argv[3];
+const createCatalog = process.argv[4] === "true";
+const calls = [];
+let args = [];
+let fetchDisabled = true;
+function refresh(command, refreshArgs, options) {
+  calls.push(command);
+  args = refreshArgs;
+  fetchDisabled = Object.prototype.hasOwnProperty.call(options.env, "OPENCODE_DISABLE_MODELS_FETCH");
+  if (createCatalog) {
+    const catalog = openCodeModelCatalogPath(taskDir);
+    fs.mkdirSync(path.dirname(catalog), { recursive: true });
+    fs.writeFileSync(catalog, JSON.stringify({
+      openrouter: { models: { [model]: { attachment: true } } },
+    }) + "\n");
+  }
+  return { status: 0, stdout: "", stderr: "" };
+}
+try {
+  const source = ensureOpenCodeModelCatalog(
+    taskDir,
+    model,
+    { OPENCODE_DISABLE_MODELS_FETCH: "1" },
+    "/repo",
+    refresh,
+  );
+  process.stdout.write(JSON.stringify({ source, calls: calls.length, args, fetchDisabled }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({ error: error.message, calls: calls.length, args, fetchDisabled }));
+}
+`, script, taskDir, model, fmt.Sprint(createCatalog))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var result modelCatalogResult
+	require.NoError(t, json.Unmarshal(out, &result))
+	return result
 }
 
 func runOpenCodeFormatter(t *testing.T, lines []string) string {

@@ -15,6 +15,8 @@ const { spawn, spawnSync } = require("child_process");
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
+const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 30_000;
+const MODEL_CATALOG_REFRESH_MAX_BUFFER = 32 * 1024 * 1024;
 const SESSION_FILE = "opencode_session";
 
 function loadActivityStreamModule() {
@@ -443,6 +445,61 @@ function openCodeProcessEnv(taskDir, baseEnv = process.env) {
   };
 }
 
+function openCodeModelCatalogPath(taskDir) {
+  return path.join(taskDir, "xdg", "cache", "opencode", "models.json");
+}
+
+function modelCatalogIncludes(catalogPath, model) {
+  try {
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+    return Boolean(catalog?.openrouter?.models?.[catalogModelId(model)]);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function ensureOpenCodeModelCatalog(
+  taskDir,
+  model,
+  childEnv,
+  cwd,
+  refresh = spawnSync,
+) {
+  if (!model) {
+    return "skipped";
+  }
+  const catalogPath = openCodeModelCatalogPath(taskDir);
+  if (modelCatalogIncludes(catalogPath, model)) {
+    return "cache";
+  }
+
+  const refreshEnv = { ...childEnv };
+  delete refreshEnv.OPENCODE_DISABLE_MODELS_FETCH;
+  const result = refresh(
+    "opencode",
+    ["models", "openrouter", "--refresh", "--pure"],
+    {
+      cwd,
+      env: refreshEnv,
+      encoding: "utf8",
+      timeout: MODEL_CATALOG_REFRESH_TIMEOUT_MS,
+      maxBuffer: MODEL_CATALOG_REFRESH_MAX_BUFFER,
+    },
+  );
+  if (modelCatalogIncludes(catalogPath, model)) {
+    return "refreshed";
+  }
+
+  const reason = result.error
+    ? `: ${result.error.message}`
+    : result.status !== 0
+      ? `: refresh exited with status ${result.status}`
+      : ": the refreshed catalog does not list the model";
+  throw new Error(
+    `OpenCode could not refresh metadata for ${catalogModelId(model)}${reason}`,
+  );
+}
+
 function ensureXdgDirs(taskDir) {
   for (const name of ["data", "config", "cache"]) {
     fs.mkdirSync(path.join(taskDir, "xdg", name), { recursive: true });
@@ -520,6 +577,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const currentModel = catalogModelId(model);
   writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
   const childEnv = openCodeProcessEnv(sp, env);
+  const ensureModelCatalog =
+    helpers.ensureOpenCodeModelCatalog || ensureOpenCodeModelCatalog;
+  ensureModelCatalog(sp, currentModel, childEnv, cwd);
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
@@ -1937,6 +1997,8 @@ module.exports = {
   retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,
+  openCodeModelCatalogPath,
+  ensureOpenCodeModelCatalog,
   readSessionUsage,
   workspaceMCPServers,
 };
