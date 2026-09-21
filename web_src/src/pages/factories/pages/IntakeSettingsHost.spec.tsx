@@ -13,7 +13,11 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  INTAKE_SETTINGS_COPY,
+  type IntakeSettingsTab,
+} from "./intakeSourceSettingsModel";
 import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 
 const {
@@ -294,6 +298,8 @@ describe("IntakeSettingsHost", () => {
         .map((tab) => tab.textContent),
     ).toEqual(["General", "Automation"]);
     expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -426,6 +432,45 @@ describe("IntakeSettingsHost", () => {
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-sentry");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("pauses, resumes, and deletes a Jira intake from settings", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        ...JIRA_INTAKE,
+        healthy: true,
+        health: undefined,
+      },
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-jira", paused: true });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(deleteIntake).toHaveBeenCalledWith("intake-jira");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes a paused Jira intake from settings", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        ...JIRA_INTAKE,
+        healthy: true,
+        health: undefined,
+        paused: true,
+      },
+    });
+
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-resume"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-jira", paused: false });
   });
 
   it("shows a pause error in settings when pause fails", async () => {
