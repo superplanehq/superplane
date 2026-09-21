@@ -74,3 +74,23 @@ func TestNodeConfigurationBuilder_ResolveExpression_UsesConfiguredExpressionVari
 	require.NoError(t, err)
 	require.Equal(t, "hello", out)
 }
+
+func TestNodeConfigurationBuilder_ResolveTemplateExpressions_EncodesContainersAsJSON(t *testing.T) {
+	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
+
+	for _, test := range []struct {
+		expression string
+		expected   string
+	}{
+		{`{{ [1, 2, 3] }}`, `[1,2,3]`},
+		{`{{ {"service": "Claude Sonnet", "cost_usd": 415.4159} }}`, `{"cost_usd":415.4159,"service":"Claude Sonnet"}`},
+		{`{{ [{"service": "Claude Sonnet"}] }}`, `[{"service":"Claude Sonnet"}]`},
+		{`{{ "hello" }}`, `hello`},
+		{`{{ 42 }}`, `42`},
+		{`{{ true }}`, `true`},
+	} {
+		out, err := b.ResolveTemplateExpressions(test.expression)
+		require.NoError(t, err)
+		require.Equal(t, test.expected, out, test.expression)
+	}
+}
