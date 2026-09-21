@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -29,6 +30,10 @@ type IntegrationContext struct {
 	registry    *registry.Registry
 	onNewEvents func([]models.CanvasEvent)
 
+	// loadedMetadata is the metadata snapshot from when this context was
+	// created. PersistMetadata uses it to write only keys the handler changed.
+	loadedMetadata map[string]any
+
 	//
 	// Lazily create a secret storage, when Secrets() used.
 	//
@@ -43,7 +48,7 @@ func NewIntegrationContext(
 	registry *registry.Registry,
 	onNewEvents func([]models.CanvasEvent),
 ) *IntegrationContext {
-	return &IntegrationContext{
+	ctx := &IntegrationContext{
 		tx:          tx,
 		node:        node,
 		integration: integration,
@@ -51,6 +56,10 @@ func NewIntegrationContext(
 		registry:    registry,
 		onNewEvents: onNewEvents,
 	}
+	if integration != nil {
+		ctx.loadedMetadata = cloneMetadataMap(integration.Metadata.Data())
+	}
+	return ctx
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
@@ -346,26 +355,46 @@ func (c *IntegrationContext) Persist() error {
 	})
 }
 
-// PersistMetadata writes only the metadata column. Webhook Setup and Cleanup
-// mirror provider state onto the integration (Jira keeps the registration id
-// its refresh hook must extend), and those handlers run outside any code path
-// that saves the integration afterwards. Only metadata is written so a sync
-// running at the same time does not lose its own state or secret updates.
+// PersistMetadata writes only the metadata keys this context changed. Webhook
+// Setup and Cleanup mirror provider state onto the integration (Jira keeps the
+// registration id its refresh hook must extend), and those handlers run outside
+// any code path that saves the integration afterwards. The row is locked and
+// each changed key is applied only when the stored value still matches the
+// snapshot from load, so a sync running at the same time does not lose OAuth
+// expiration, user, or project data.
 func (c *IntegrationContext) PersistMetadata() error {
 	if c.tx == nil || c.integration == nil {
 		return nil
 	}
 
-	// The column is NOT NULL, and a handler that clears every key leaves a nil
-	// map behind. Writing NULL would fail the caller's transaction.
-	metadata := c.integration.Metadata.Data()
-	if metadata == nil {
-		metadata = map[string]any{}
+	current := cloneMetadataMap(c.integration.Metadata.Data())
+	if !metadataHasDelta(c.loadedMetadata, current) {
+		return nil
 	}
 
-	return c.tx.Model(c.integration).
-		Update("metadata", metadata).
-		Error
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := c.integration.LockInTransaction(tx); err != nil {
+			return err
+		}
+
+		var latest models.Integration
+		if err := tx.Unscoped().Where("id = ?", c.integration.ID).First(&latest).Error; err != nil {
+			return err
+		}
+
+		merged := cloneMetadataMap(latest.Metadata.Data())
+		applyMetadataDelta(merged, c.loadedMetadata, current)
+
+		// The column is NOT NULL, and a handler that clears every key leaves a
+		// nil map behind. Writing NULL would fail the caller's transaction.
+		if err := tx.Model(&latest).Update("metadata", merged).Error; err != nil {
+			return err
+		}
+
+		c.integration.Metadata = datatypes.NewJSONType(merged)
+		c.loadedMetadata = cloneMetadataMap(merged)
+		return nil
+	})
 }
 
 func (c *IntegrationContext) GetState() string {
@@ -568,4 +597,91 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 
 	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
 	return c.secretStorage
+}
+
+func cloneMetadataMap(metadata map[string]any) map[string]any {
+	cloned := map[string]any{}
+	if len(metadata) == 0 {
+		return cloned
+	}
+
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return cloned
+	}
+	if err := json.Unmarshal(encoded, &cloned); err != nil || cloned == nil {
+		return map[string]any{}
+	}
+	return cloned
+}
+
+func metadataHasDelta(original, current map[string]any) bool {
+	keys := metadataKeyUnion(original, current)
+	for key := range keys {
+		originalValue, originalExists := original[key]
+		currentValue, currentExists := current[key]
+		if originalExists != currentExists || !metadataValuesEqual(originalValue, currentValue) {
+			return true
+		}
+	}
+	return false
+}
+
+func applyMetadataDelta(latest, original, current map[string]any) {
+	keys := metadataKeyUnion(original, current)
+	for key := range keys {
+		originalValue, originalExists := original[key]
+		currentValue, currentExists := current[key]
+		if originalExists == currentExists && metadataValuesEqual(originalValue, currentValue) {
+			continue
+		}
+
+		latestValue, latestExists := latest[key]
+		if latestExists != originalExists || !metadataValuesEqual(latestValue, originalValue) {
+			continue
+		}
+
+		if currentExists {
+			latest[key] = cloneMetadataValue(currentValue)
+			continue
+		}
+		delete(latest, key)
+	}
+}
+
+func metadataKeyUnion(left, right map[string]any) map[string]struct{} {
+	keys := make(map[string]struct{}, len(left)+len(right))
+	for key := range left {
+		keys[key] = struct{}{}
+	}
+	for key := range right {
+		keys[key] = struct{}{}
+	}
+	return keys
+}
+
+func metadataValuesEqual(left, right any) bool {
+	if left == nil && right == nil {
+		return true
+	}
+
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	return bytes.Equal(leftJSON, rightJSON)
+}
+
+func cloneMetadataValue(value any) any {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return value
+	}
+
+	var cloned any
+	if err := json.Unmarshal(encoded, &cloned); err != nil {
+		return value
+	}
+	return cloned
 }
