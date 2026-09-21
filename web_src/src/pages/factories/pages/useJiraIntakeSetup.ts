@@ -77,9 +77,10 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     void connectedQuery.refetch();
   }, [stayOnConnection, step, selectIntegrationId, jiraIntegrations, integrationId, connectedQuery]);
 
-  useEffect(() => {
+  const selectProject = (id: string) => {
+    setProjectId(id);
     setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
-  }, [projectId]);
+  };
 
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
@@ -130,7 +131,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     integrationId,
     setIntegrationId,
     projectId,
-    setProjectId,
+    setProjectId: selectProject,
     skipInitialImport,
     setSkipInitialImport,
     jiraCompletion,

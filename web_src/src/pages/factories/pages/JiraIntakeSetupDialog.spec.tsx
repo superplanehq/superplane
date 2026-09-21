@@ -98,6 +98,14 @@ function renderDialog(onCreated = vi.fn(), selectIntegrationId = "") {
   );
 }
 
+async function chooseProjectAndWaitForDone(user: ReturnType<typeof userEvent.setup>, projectId = "ENG") {
+  await user.click(await screen.findByTestId(`jira-project-${projectId}`));
+  expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByTestId("jira-completion-column-select")).toHaveTextContent("Done");
+  });
+}
+
 describe("JiraIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.createIntake.mockReset();
@@ -138,9 +146,7 @@ describe("JiraIntakeSetupDialog", () => {
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    await screen.findByTestId("jira-project-ENG");
-    await user.click(screen.getByTestId("jira-project-ENG"));
-    expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -167,8 +173,7 @@ describe("JiraIntakeSetupDialog", () => {
     expect(screen.getByTestId("jira-skip-initial-import")).not.toBeChecked();
     await user.click(screen.getByTestId("jira-skip-initial-import"));
     expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
-    await user.click(screen.getByTestId("jira-project-ENG"));
-    expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -223,8 +228,7 @@ describe("JiraIntakeSetupDialog", () => {
     await user.click(await screen.findByTestId("jira-connection-integration-2"));
     await user.click(screen.getByTestId("jira-setup-continue"));
 
-    await user.click(await screen.findByTestId("jira-project-ENG"));
-    expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -292,9 +296,7 @@ describe("JiraIntakeSetupDialog", () => {
     const onCreated = vi.fn();
     renderDialog(onCreated, "integration-new");
 
-    expect(await screen.findByTestId("jira-project-ENG")).toBeInTheDocument();
-    await user.click(screen.getByTestId("jira-project-ENG"));
-    expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -328,7 +330,7 @@ describe("JiraIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(await screen.findByTestId("jira-project-ENG"));
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(JIRA_INTAKE_SETUP_COPY.wizardCreateError);
@@ -339,8 +341,8 @@ describe("JiraIntakeSetupDialog", () => {
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    await user.click(await screen.findByTestId("jira-project-ENG"));
-    const select = await screen.findByTestId("jira-completion-column-select");
+    await chooseProjectAndWaitForDone(user);
+    const select = screen.getByTestId("jira-completion-column-select");
     await user.click(select);
     await user.click(screen.getByRole("option", { name: "QA" }));
     await user.click(screen.getByTestId("jira-setup-finish"));
@@ -363,8 +365,7 @@ describe("JiraIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(await screen.findByTestId("jira-project-ENG"));
-    expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-move-on-complete"));
     expect(screen.queryByTestId("jira-completion-column-select")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("jira-setup-finish"));
