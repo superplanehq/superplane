@@ -5,35 +5,25 @@ import { cn } from "@/lib/utils";
 import { Check, Loader2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
+
 export function ProductiveConnectionStep({
   integrations,
   selectedId,
   loading,
   onSelect,
-  onConnect,
 }: {
   integrations: OrganizationsIntegration[];
   selectedId: string;
   loading: boolean;
   onSelect: (id: string) => void;
-  onConnect: () => void;
 }) {
-  if (loading) return <LoadingMessage message="Loading Productive.io connections…" />;
-  return (
-    <div className="space-y-4">
-      <p className="workspace-body-text text-muted-foreground">
-        SuperPlane uses a personal API token to read the tasks of your projects.
-      </p>
-      {integrations.length > 0 ? (
-        <ConnectionOptions integrations={integrations} selectedId={selectedId} onSelect={onSelect} />
-      ) : (
-        <ProductiveConnectionInstructions />
-      )}
-      <Button type="button" variant={integrations.length > 0 ? "outline" : "default"} onClick={onConnect}>
-        {integrations.length > 0 ? "Connect another account" : "Connect Productive.io"}
-      </Button>
-    </div>
-  );
+  if (loading) return <LoadingMessage message={PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnectionsLoading} />;
+  if (integrations.length === 0) {
+    return null;
+  }
+
+  return <ConnectionOptions integrations={integrations} selectedId={selectedId} onSelect={onSelect} />;
 }
 
 function ConnectionOptions({
@@ -47,37 +37,27 @@ function ConnectionOptions({
 }) {
   return (
     <div className="space-y-2">
-      <p className="text-[13px] font-medium">Choose a connection</p>
+      <p className="text-[13px] font-medium">{PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnectExisting}</p>
       {integrations.map((integration) => {
         const id = integration.metadata?.id ?? "";
         const selected = id === selectedId;
         return (
-          <button
+          <Button
             key={id}
             type="button"
+            variant="ghost"
             onClick={() => onSelect(id)}
-            className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left ${
-              selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30"
-            }`}
+            data-testid={`productive-connection-${id}`}
+            className={cn(
+              "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
+              selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
+            )}
           >
-            <span className="text-[13px] font-medium">{integration.metadata?.name || "Productive.io"}</span>
-            {selected ? <Check className="size-4" aria-hidden /> : null}
-          </button>
+            <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Productive.io"}</span>
+            {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+          </Button>
         );
       })}
-    </div>
-  );
-}
-
-function ProductiveConnectionInstructions() {
-  return (
-    <div className="rounded-lg border border-border bg-muted/30 p-4">
-      <p className="text-[13px] font-medium">Connect your Productive.io account</p>
-      <ol className="workspace-body-text mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
-        <li>Create a personal access token in Productive.io API integrations.</li>
-        <li>Copy the organization ID from your Productive.io URL.</li>
-        <li>Enter both values in the next form.</li>
-      </ol>
     </div>
   );
 }
@@ -97,10 +77,12 @@ export function ProductiveProjectStep({
   onSelect: (id: string) => void;
   onRetry: () => void;
 }) {
-  if (loading) return <LoadingMessage message="Loading Productive.io projects…" />;
-  if (error) return <RetryMessage message="SuperPlane could not load Productive.io projects." onRetry={onRetry} />;
+  if (loading) return <LoadingMessage message={PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsLoading} />;
+  if (error) return <RetryMessage message={PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsError} onRetry={onRetry} />;
   if (projects.length === 0) {
-    return <p className="workspace-body-text text-muted-foreground">This connection has no available projects.</p>;
+    return (
+      <p className="workspace-body-text text-muted-foreground">{PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>
+    );
   }
   return <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />;
 }
@@ -165,36 +147,22 @@ function ProjectOption({
   const id = project.id ?? "";
   return (
     <li>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         role="option"
         aria-selected={selected}
         onClick={() => onSelect(id)}
         data-testid={`productive-project-${id}`}
         className={cn(
-          "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+          "h-auto w-full justify-start gap-3 rounded-none px-3 py-2.5 text-left text-[13px] font-medium",
           selected ? "bg-accent/50" : "hover:bg-accent/30",
         )}
       >
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{project.name || "Untitled project"}</span>
+        <span className="min-w-0 flex-1 truncate">{project.name || "Untitled project"}</span>
         {selected ? <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden /> : null}
-      </button>
+      </Button>
     </li>
-  );
-}
-
-export function ProductiveCompleteStep() {
-  return (
-    <div className="flex flex-col items-center py-6 text-center">
-      <span className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-        <Check className="size-5" aria-hidden />
-      </span>
-      <p className="mt-3 text-[15px] font-semibold">Productive.io intake is ready</p>
-      <p className="workspace-body-text mt-1 text-muted-foreground">
-        SuperPlane is adding the newest open tasks to the Backlog. SuperPlane checks the project every minute, so later
-        tasks arrive shortly after your team creates them.
-      </p>
-    </div>
   );
 }
 
@@ -212,7 +180,7 @@ function RetryMessage({ message, onRetry }: { message: string; onRetry: () => vo
     <div className="space-y-3">
       <p className="workspace-body-text text-destructive">{message}</p>
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-        Try again
+        {PRODUCTIVE_INTAKE_SETUP_COPY.wizardRetry}
       </Button>
     </div>
   );

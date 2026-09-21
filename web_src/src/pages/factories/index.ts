@@ -44,5 +44,6 @@ export {
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
   JiraIntakeSetupPage,
+  ProductiveIntakeSetupPage,
   SentryIntakeSetupPage,
 } from "./pages";
