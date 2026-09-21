@@ -7,6 +7,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test__IssueRefFromEventData(t *testing.T) {
+	t.Run("reads key and host from a webhook envelope", func(t *testing.T) {
+		ref, ok := IssueRefFromEventData(map[string]any{
+			"type": IssueEventPayloadType,
+			"data": map[string]any{
+				"action": "created",
+				"url":    "https://acme.atlassian.net/browse/ENG-5",
+				"issue":  map[string]any{"key": "ENG-5"},
+			},
+		})
+
+		require.True(t, ok)
+		assert.Equal(t, IssueRef{Key: "ENG-5", Host: "acme.atlassian.net"}, ref)
+	})
+
+	t.Run("ignores a jira event without a site URL", func(t *testing.T) {
+		_, ok := IssueRefFromEventData(map[string]any{
+			"type": IssueEventPayloadType,
+			"data": map[string]any{
+				"action": "created",
+				"issue":  map[string]any{"key": "ENG-5"},
+			},
+		})
+		assert.False(t, ok)
+	})
+}
+
 func Test__IssueKeyFromEventData(t *testing.T) {
 	t.Run("reads an issue key from a webhook envelope", func(t *testing.T) {
 		issueKey, ok := IssueKeyFromEventData(map[string]any{
@@ -39,6 +66,28 @@ func Test__IssueKeyFromEventData(t *testing.T) {
 		})
 		assert.False(t, ok)
 	})
+}
+
+func Test__IssueRefFromURL(t *testing.T) {
+	t.Run("reads key and host from a browse URL", func(t *testing.T) {
+		ref, ok := IssueRefFromURL("https://Acme.Atlassian.Net/browse/ENG-5")
+		require.True(t, ok)
+		assert.Equal(t, IssueRef{Key: "ENG-5", Host: "acme.atlassian.net"}, ref)
+	})
+
+	t.Run("ignores a URL without a host", func(t *testing.T) {
+		_, ok := IssueRefFromURL("/browse/ENG-5")
+		assert.False(t, ok)
+	})
+}
+
+func Test__IssueRefFromSite(t *testing.T) {
+	ref, ok := IssueRefFromSite("https://acme.atlassian.net/", "ENG-5")
+	require.True(t, ok)
+	assert.Equal(t, IssueRef{Key: "ENG-5", Host: "acme.atlassian.net"}, ref)
+
+	_, ok = IssueRefFromSite("  ", "ENG-5")
+	assert.False(t, ok)
 }
 
 func Test__IssueKeyFromURL(t *testing.T) {
@@ -78,6 +127,10 @@ func Test__IssueKeyFromURL(t *testing.T) {
 }
 
 func Test__IssueURLFragment(t *testing.T) {
-	assert.Equal(t, "/browse/ENG-5", IssueURLFragment("ENG-5"))
-	assert.Equal(t, "", IssueURLFragment("  "))
+	assert.Equal(t, "acme.atlassian.net/browse/ENG-5", IssueURLFragment(IssueRef{
+		Host: "acme.atlassian.net",
+		Key:  "ENG-5",
+	}))
+	assert.Equal(t, "", IssueURLFragment(IssueRef{Key: "ENG-5"}))
+	assert.Equal(t, "", IssueURLFragment(IssueRef{}))
 }

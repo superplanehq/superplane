@@ -213,21 +213,21 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 		return false, nil
 	}
 
-	issueKey, ok := jira.IssueKeyFromEventData(event.Data.Data())
+	ref, ok := jira.IssueRefFromEventData(event.Data.Data())
 	if !ok {
 		return false, nil
 	}
 
-	if err := jira.LockIssueWorkOrder(c.tx, factoryModel, issueKey); err != nil {
+	if err := jira.LockIssueWorkOrder(c.tx, factoryModel, ref); err != nil {
 		return false, err
 	}
 
-	hasOrder, err := jira.IssueHasWorkOrder(c.tx, factoryModel, issueKey)
+	hasOrder, err := jira.IssueHasWorkOrder(c.tx, factoryModel, ref)
 	if err != nil {
 		return false, err
 	}
 	if hasOrder {
-		log.Infof("skipping Jira issue %s: work order already exists", issueKey)
+		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
 	}
 	return hasOrder, nil
 }

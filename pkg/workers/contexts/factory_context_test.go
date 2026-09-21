@@ -381,15 +381,18 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	jiraPayload := func(action, issueKey string) map[string]any {
+	jiraPayloadOnSite := func(action, siteURL, issueKey string) map[string]any {
 		return map[string]any{
 			"type": "jira.issue",
 			"data": map[string]any{
 				"action": action,
-				"url":    "https://acme.atlassian.net/browse/" + issueKey,
+				"url":    siteURL + "/browse/" + issueKey,
 				"issue":  map[string]any{"key": issueKey},
 			},
 		}
+	}
+	jiraPayload := func(action, issueKey string) map[string]any {
+		return jiraPayloadOnSite(action, "https://acme.atlassian.net", issueKey)
 	}
 
 	countOrders := func(factoryModel *models.Factory) int {
@@ -464,6 +467,34 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		afterEvents, err := persisted.ListEvents(database.Conn(), 0, nil)
 		require.NoError(t, err)
 		assert.Len(t, afterEvents, len(beforeEvents))
+	})
+
+	t.Run("creates a task when the same key exists on another Jira site", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Other site issue",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://other.atlassian.net/browse/ENG-5", Label: "ENG-5"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayloadOnSite("created", "https://acme.atlassian.net", "ENG-5"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Acme ENG-5"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		require.NotNil(t, order.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-5", order.Origin.URL)
+		assert.Equal(t, 2, countOrders(factoryModel))
 	})
 
 	t.Run("does not skip ENG-5 when ENG-50 already has a task", func(t *testing.T) {

@@ -229,7 +229,7 @@ func seedKnownJiraIssues(
 	hits []jira.IssueSearchHit,
 	siteURL string,
 ) (intakeSeedResult, error) {
-	hits, err := filterJiraIssuesForSeed(tx, canvasID, hits)
+	hits, err := filterJiraIssuesForSeed(tx, canvasID, hits, siteURL)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
@@ -245,7 +245,7 @@ func seedKnownJiraIssues(
 	return intakeSeedResult{itemCount: len(payloads)}, nil
 }
 
-func filterJiraIssuesForSeed(tx *gorm.DB, canvasID uuid.UUID, hits []jira.IssueSearchHit) ([]jira.IssueSearchHit, error) {
+func filterJiraIssuesForSeed(tx *gorm.DB, canvasID uuid.UUID, hits []jira.IssueSearchHit, siteURL string) ([]jira.IssueSearchHit, error) {
 	if len(hits) == 0 {
 		return hits, nil
 	}
@@ -279,12 +279,18 @@ func filterJiraIssuesForSeed(tx *gorm.DB, canvasID uuid.UUID, hits []jira.IssueS
 			continue
 		}
 
-		hasOrder, err := jira.IssueHasWorkOrder(tx, factory, issueKey)
+		ref, ok := jira.IssueRefFromSite(siteURL, issueKey)
+		if !ok {
+			kept = append(kept, hit)
+			continue
+		}
+
+		hasOrder, err := jira.IssueHasWorkOrder(tx, factory, ref)
 		if err != nil {
 			return nil, err
 		}
 		if hasOrder {
-			log.Infof("skipping Jira issue %s: work order already exists", issueKey)
+			log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
 			continue
 		}
 

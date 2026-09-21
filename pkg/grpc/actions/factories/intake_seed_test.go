@@ -609,7 +609,13 @@ func Test__JiraSeedSkipsKnownIssues(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, repeat.itemCount)
 
+	otherSite, err := seedKnownJiraIssues(tx, canvasID, load, []jira.IssueSearchHit{
+		{Key: "ENG-11"},
+	}, "https://other.atlassian.net")
+	require.NoError(t, err)
+	assert.Equal(t, 1, otherSite.itemCount)
+
 	finalEvents, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
 	require.NoError(t, err)
-	assert.Len(t, finalEvents, 2)
+	assert.Len(t, finalEvents, 3)
 }
