@@ -828,6 +828,104 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		}, got.GetAllowedMethods())
 		assert.Equal(t, headSHA, got.GetHeadSha())
 	})
+
+	t.Run("reuses a stored mergeable snapshot", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		combined, checks := successChecks()
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    combined,
+			checkRuns:   checks,
+			repository:  allMethodsRepository(),
+		})
+		first := describe(t, factory, pr)
+		assert.True(t, first.GetCanMerge())
+		assert.Equal(t, []pb.FactoryPullRequestMergeability_MergeMethod{
+			pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
+			pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE,
+			pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE,
+		}, first.GetAllowedMethods())
+
+		useGitHub(t, &fakeFactoryGitHub{})
+		second := describe(t, factory, pr)
+		assert.True(t, second.GetCanMerge())
+		assert.Equal(t, headSHA, second.GetHeadSha())
+		assert.Equal(t, first.GetAllowedMethods(), second.GetAllowedMethods())
+	})
+
+	t.Run("reuses stored allowed merge methods", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		combined, checks := successChecks()
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    combined,
+			checkRuns:   checks,
+			repository: &github.Repository{
+				AllowSquashMerge: github.Ptr(true),
+				AllowMergeCommit: github.Ptr(false),
+				AllowRebaseMerge: github.Ptr(false),
+			},
+		})
+		first := describe(t, factory, pr)
+		assert.True(t, first.GetCanMerge())
+		assert.Equal(t, []pb.FactoryPullRequestMergeability_MergeMethod{
+			pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
+		}, first.GetAllowedMethods())
+
+		useGitHub(t, &fakeFactoryGitHub{})
+		second := describe(t, factory, pr)
+		assert.Equal(t, first.GetAllowedMethods(), second.GetAllowedMethods())
+
+		_, err := MergeFactoryPullRequest(ctx, deps, orgID, &pb.MergeFactoryPullRequestRequest{
+			FactoryId:       factory.ID.String(),
+			PrId:            pr.GetId(),
+			MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE,
+			ExpectedHeadSha: headSHA,
+		})
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+	})
+
+	t.Run("ignores a snapshot after the head revision moves", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		combined, checks := successChecks()
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    combined,
+			checkRuns:   checks,
+			repository:  allMethodsRepository(),
+		})
+		first := describe(t, factory, pr)
+		assert.True(t, first.GetCanMerge())
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		_, err = stored.ObserveRevision(db, "newheadsha")
+		require.NoError(t, err)
+
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest("newheadsha"),
+			combined: &github.CombinedStatus{
+				State:      github.Ptr("pending"),
+				TotalCount: github.Ptr(1),
+				Statuses: []*github.RepoStatus{{
+					Context: github.Ptr("ci"),
+					State:   github.Ptr("pending"),
+				}},
+			},
+			checkRuns:  &github.ListCheckRunsResults{},
+			repository: allMethodsRepository(),
+		})
+		second := describe(t, factory, pr)
+		assert.False(t, second.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, second.GetBlockedReason())
+		assert.Equal(t, "newheadsha", second.GetHeadSha())
+	})
 }
 
 func grantExclusivePullRequestAccess(

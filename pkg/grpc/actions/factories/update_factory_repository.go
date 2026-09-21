@@ -255,7 +255,7 @@ func reconcileFactoryRepository(
 		}
 	}
 
-	return nil
+	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
 }
 
 func replaceTriggerRepository(nodes []models.Node, component, previousRepository, repository string) bool {

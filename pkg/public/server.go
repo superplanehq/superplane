@@ -29,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -1710,7 +1711,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.FindWebhook(webhookID)
+	webhook, err := models.FindWebhook(webhookID)
 	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
@@ -1736,9 +1737,28 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
-	if err != nil || len(nodes) == 0 {
+	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
+	}
+
+	eventType := r.Header.Get("X-GitHub-Event")
+	mergeabilityWebhook := factoryactions.IsFactoryMergeabilityWebhook(webhook)
+	if len(nodes) == 0 {
+		if !mergeabilityWebhook || !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+			http.Error(w, "webhook not found", http.StatusNotFound)
+			return
+		}
+		if code, err := factoryactions.VerifyGitHubFactoryMergeabilitySignature(
+			r.Context(),
+			s.encryptor,
+			webhook,
+			r.Header,
+			body,
+		); err != nil {
+			http.Error(w, "invalid signature", code)
+			return
+		}
 	}
 
 	newEvents := []models.CanvasEvent{}
@@ -1773,6 +1793,17 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
 			log.Errorf("error publishing execution state for %s: %v", executionID, err)
 		}
+	}
+
+	if mergeabilityWebhook && factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+		payload := append([]byte(nil), body...)
+		go factoryactions.RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+			context.WithoutCancel(r.Context()),
+			factoryactions.IntakeDependencies{Registry: s.registry, Encryptor: s.encryptor},
+			webhook,
+			eventType,
+			payload,
+		)
 	}
 
 	if firstResponse != nil {
