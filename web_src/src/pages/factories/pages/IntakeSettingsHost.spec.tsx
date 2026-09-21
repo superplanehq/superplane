@@ -15,7 +15,11 @@ import {
   renderHost,
   SENTRY_INTAKE,
 } from "./IntakeSettingsHost.spec.fixtures";
-import { INTAKE_SETTINGS_COPY } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  INTAKE_SETTINGS_COPY,
+  intakeSettingsToApi,
+} from "./intakeSourceSettingsModel";
 
 const {
   useCanvas,
@@ -292,18 +296,7 @@ describe("IntakeSettingsHost", () => {
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-github",
-      settings: {
-        confidencePct: 65,
-        labels: [],
-        labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
-        assignment: "ASSIGNMENT_ANY",
-        authorsWithAccess: false,
-        newIssues: true,
-        reopenedIssues: true,
-        superplaneLabelAdded: true,
-        jiraMoveOnComplete: true,
-        jiraCompletionColumn: "",
-      },
+      settings: intakeSettingsToApi(DEFAULT_GITHUB_INTAKE_SETTINGS),
     });
   });
 
@@ -422,18 +415,11 @@ describe("IntakeSettingsHost", () => {
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-jira",
-      settings: {
-        confidencePct: 65,
-        labels: [],
-        labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
-        assignment: "ASSIGNMENT_ANY",
-        authorsWithAccess: false,
-        newIssues: true,
-        reopenedIssues: true,
-        superplaneLabelAdded: true,
-        jiraMoveOnComplete: true,
+      settings: intakeSettingsToApi({
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        name: "Jira issues",
         jiraCompletionColumn: "Done",
-      },
+      }),
       integrationId: "jira-2",
       resourceId: "OPS",
     });

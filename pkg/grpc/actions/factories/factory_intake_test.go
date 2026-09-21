@@ -831,7 +831,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 	t.Run("a source without a filter ignores label settings", func(t *testing.T) {
 		factory := newFactory(t)
-		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
 
 		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),

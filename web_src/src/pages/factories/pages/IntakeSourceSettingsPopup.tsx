@@ -14,6 +14,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
+import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import {
   SettingsAutomationCanvasEdit,
@@ -369,6 +370,7 @@ function IntakeGeneralTab({
             integrationId={integrationId}
             projectId={resourceId}
           />
+          <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
         </div>
       </div>
       <IntakeSourceSettingsFooter

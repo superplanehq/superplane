@@ -274,9 +274,13 @@ func applyIntakeSettingsToGraph(
 		graph.TriggerNodeID == "" {
 		return nil, nil, invalidArgument("intake automation has no trigger to update")
 	}
-	if graph.FilterNodeID == "" {
-		if intakeSourceHasFilterNode(source) && intakeSettingsChangeFilters(current, updated) {
-			return nil, nil, invalidArgument("intake automation has no filter to update")
+	if graph.FilterNodeID == "" &&
+		intakeSourceHasFilterNode(source) &&
+		intakeSettingsChangeFilters(current, updated) {
+		var err error
+		nodes, edges, graph, err = ensureIntakeFilterNode(nodes, edges, graph)
+		if err != nil {
+			return nil, nil, invalidArgument(err.Error())
 		}
 	}
 
@@ -291,6 +295,9 @@ func applyIntakeSettingsToGraph(
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
 				configuration["actions"] = intakeTriggerActionsFor(updated)
+				nodes[i].Configuration = configuration
+			case models.FactoryIntakeSourceSentryExceptions:
+				configuration["actions"] = intakeSentryActionsFor(updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)
