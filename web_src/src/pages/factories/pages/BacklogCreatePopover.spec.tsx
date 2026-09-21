@@ -56,8 +56,11 @@ describe("BacklogCreatePopover", () => {
     expect(screen.getByTestId("lines-backlog-create-menu").getAttribute("data-side")).toBe("right");
     expect(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually })).toBeInTheDocument();
     expect(screen.getByText(BACKLOG_CREATE_COPY.createManuallyHint)).toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-tabs")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-tab-intake-github")).toHaveTextContent("GitHub");
+    expect(screen.getByTestId("lines-backlog-create-tab-intake-sentry")).toHaveTextContent("Sentry");
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(searchPlaceholderForIntake("Sentry exceptions"))).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(searchPlaceholderForIntake("Sentry exceptions"))).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-create-icon-intake-github")).toHaveAttribute("src", "/github.svg");
     expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-github");
     expect(screen.queryByTestId("lines-backlog-create-item-gh-1")).not.toBeInTheDocument();
@@ -183,6 +186,148 @@ describe("BacklogCreatePopover", () => {
 
     await user.click(screen.getByTestId("lines-backlog-create-item-gh-1"));
     expect(onImportItem).toHaveBeenCalledWith(githubItems[0]);
+  });
+
+  it("switches search and results to the selected intake tab", async () => {
+    const onFocusedIntakeChange = vi.fn();
+    const onImportItem = vi.fn();
+    const sentryItems: BacklogIntakeItem[] = [
+      {
+        id: "se-1",
+        intakeId: "intake-sentry",
+        key: "PROJ-1",
+        title: "Null pointer in checkout",
+        body: "Checkout throws when the cart is empty.",
+      },
+    ];
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={githubItems}
+        query=""
+        focusedIntakeId="intake-github"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={onFocusedIntakeChange}
+        onCreateManually={vi.fn()}
+        onImportItem={onImportItem}
+      />,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    await user.click(screen.getByTestId("lines-backlog-create-tab-intake-sentry"));
+    expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-sentry");
+
+    rerender(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={sentryItems}
+        query=""
+        focusedIntakeId="intake-sentry"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={onFocusedIntakeChange}
+        onCreateManually={vi.fn()}
+        onImportItem={onImportItem}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText(searchPlaceholderForIntake("Sentry exceptions"))).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-item-se-1")).toHaveTextContent("Null pointer in checkout");
+    expect(screen.queryByTestId("lines-backlog-create-items-intake-github")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-backlog-create-item-se-1"));
+    expect(onImportItem).toHaveBeenCalledWith(sentryItems[0]);
+  });
+
+  it("resets results scroll when the intake tab changes", async () => {
+    const onFocusedIntakeChange = vi.fn();
+    const user = userEvent.setup();
+    const manyGithubItems = Array.from({ length: 8 }, (_, index) => ({
+      id: `gh-${index}`,
+      intakeId: "intake-github",
+      key: `#${index}`,
+      title: `Issue ${index}`,
+      body: "",
+    }));
+    const sentryItems: BacklogIntakeItem[] = [
+      {
+        id: "se-1",
+        intakeId: "intake-sentry",
+        key: "PROJ-1",
+        title: "Null pointer in checkout",
+        body: "",
+      },
+    ];
+
+    const { rerender } = render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={manyGithubItems}
+        query=""
+        focusedIntakeId="intake-github"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={onFocusedIntakeChange}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    const githubList = screen.getByTestId("lines-backlog-create-items-intake-github");
+    Object.defineProperty(githubList, "scrollHeight", { configurable: true, value: 400 });
+    Object.defineProperty(githubList, "clientHeight", { configurable: true, value: 140 });
+    githubList.scrollTop = 280;
+    fireEvent.scroll(githubList);
+    expect(githubList.scrollTop).toBe(280);
+
+    await user.click(screen.getByTestId("lines-backlog-create-tab-intake-sentry"));
+    expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-sentry");
+
+    rerender(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={sentryItems}
+        query=""
+        focusedIntakeId="intake-sentry"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={onFocusedIntakeChange}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    const sentryList = screen.getByTestId("lines-backlog-create-items-intake-sentry");
+    expect(sentryList.scrollTop).toBe(0);
+  });
+
+  it("keeps a single intake as a search row without tabs", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <BacklogCreatePopover
+        canAdd
+        sources={[sources[0]]}
+        items={[]}
+        query=""
+        focusedIntakeId="intake-github"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={vi.fn()}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    expect(screen.queryByTestId("lines-backlog-create-tabs")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-create-tab-intake-github")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-icon-intake-github")).toBeInTheDocument();
   });
 
   it("loads the next search page when the results list is scrolled to the end", async () => {
