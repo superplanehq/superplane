@@ -610,6 +610,7 @@ function createFormatter(promptFile, onSession, activityOverride) {
       const ended = endTextStream(inText, textBuf);
       inText = ended.inText;
       textBuf = ended.textBuf;
+      flushClaudeActivityToolInputs(activity, activityBlocks);
       tools.flush(Boolean(failed));
     },
     resultJSON() {
@@ -944,6 +945,27 @@ function handleClaudeActivityEvent(payload, activity, blocks, messageId) {
     );
   } else {
     activity.endContent(tracked.id);
+  }
+  blocks.delete(index);
+}
+
+function flushClaudeActivityToolInputs(activity, blocks) {
+  if (!activity.enabled) {
+    return;
+  }
+  for (const tracked of blocks.values()) {
+    if (
+      tracked.kind !== "tool" ||
+      !tracked.partialInput ||
+      !validJSONObject(tracked.partialInput)
+    ) {
+      continue;
+    }
+    activity.updateToolInput(
+      tracked.id,
+      normalizedToolInput(tracked.partialInput, tracked.name),
+      true,
+    );
   }
 }
 
