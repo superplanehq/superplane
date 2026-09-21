@@ -5,7 +5,7 @@ import type { HomePageFixture } from "./handlers";
 interface HomePageHarnessProps {
   /**
    * Fixture to serve for this story. Defaults to the populated current-homepage
-   * seed (apps + folders).
+   * seed.
    */
   fixture?: HomePageFixture;
   /**

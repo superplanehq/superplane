@@ -14,11 +14,8 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
 import {
   buildFactoryRunParameters,
   factoryAppTemplateAgentFromRewrite,
@@ -28,7 +25,6 @@ import {
   type FactoryDefinition,
 } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
-import type { CanvasFolderData } from "./types";
 import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "./uniqueCanvasName";
 
 const MAX_NAME_RETRY_ATTEMPTS = 20;
@@ -46,10 +42,6 @@ export type CreateFactoryCanvasFn = (input: {
 }) => Promise<{
   data?: { canvas?: { metadata?: { id?: string; name?: string } } };
 }>;
-
-export type UpdateCanvasFolderMembershipFn = (
-  membership: ReturnType<typeof appendCanvasToFolderMembership>,
-) => Promise<unknown>;
 
 export async function stageAndCommitFactorySpecs(
   organizationId: string,
@@ -241,11 +233,9 @@ export async function ensureFactoryCanvas(args: {
   organizationId: string;
   queryClient: QueryClient;
   definition: FactoryDefinition;
-  folder?: CanvasFolderData;
   workspaceFactoryId?: string;
   existingCanvasId?: string;
   createCanvas: CreateFactoryCanvasFn;
-  updateCanvasFolderMembership: UpdateCanvasFolderMembershipFn;
 }): Promise<FactoryCanvasHandle> {
   if (args.existingCanvasId) {
     if (args.pending?.canvasId === args.existingCanvasId) {
@@ -266,14 +256,6 @@ export async function ensureFactoryCanvas(args: {
     existingNames,
     createCanvas: args.createCanvas,
   });
-
-  if (args.folder) {
-    try {
-      await args.updateCanvasFolderMembership(appendCanvasToFolderMembership(args.folder, created.canvasId));
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-    }
-  }
 
   return created;
 }
