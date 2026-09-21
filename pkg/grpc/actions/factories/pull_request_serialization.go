@@ -12,6 +12,13 @@ import (
 	"gorm.io/gorm"
 )
 
+func factoryPullRequestMergeableOnBoard(pullRequest *models.FactoryPullRequest) bool {
+	if pullRequest == nil || pullRequest.ActiveMutationRunID != nil {
+		return false
+	}
+	return pullRequest.Mergeable && pullRequest.State == models.FactoryPullRequestStateOpen
+}
+
 func serializeFactoryPullRequests(
 	tx *gorm.DB,
 	pullRequests []models.FactoryPullRequest,
@@ -101,7 +108,7 @@ func serializeFactoryPullRequest(
 		Runs:            serializePullRequestRuns(runs, usageByRun),
 		Activities:      serializePullRequestActivities(runs, usageByRun),
 		CurrentRevision: serializePullRequestRevision(currentRevision),
-		Mergeable:       pullRequest.Mergeable && pullRequest.State == models.FactoryPullRequestStateOpen,
+		Mergeable:       factoryPullRequestMergeableOnBoard(pullRequest),
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID

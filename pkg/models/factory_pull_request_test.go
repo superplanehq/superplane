@@ -259,6 +259,41 @@ func Test__FactoryPullRequest(t *testing.T) {
 		assert.False(t, moved.HasCachedMergeability())
 	})
 
+	t.Run("does not overwrite mergeability for a different head sha", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		order := createOrder(t, factoryModel)
+		pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/app/pull/89",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable: true,
+			HeadSHA:   "sha-old",
+		}))
+		stale := *pullRequest
+		require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      false,
+			BlockedReason:  "CHECKS_UNFINISHED",
+			BlockedMessage: "Checks are still running.",
+			HeadSHA:        "sha-new",
+		}))
+
+		require.NoError(t, stale.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable: true,
+			HeadSHA:   "sha-old",
+		}))
+
+		found, err := factoryModel.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		require.NoError(t, err)
+		assert.False(t, found.Mergeable)
+		assert.Equal(t, "sha-new", found.MergeableHeadSHA)
+		assert.Equal(t, "CHECKS_UNFINISHED", found.MergeBlockedReason)
+		assert.Equal(t, "sha-old", stale.MergeableHeadSHA)
+		assert.True(t, stale.Mergeable)
+	})
+
 	t.Run("lists GitHub pull requests for a closed webhook without a state filter", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
