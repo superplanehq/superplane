@@ -16,7 +16,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { Tag } from "./types";
-import { formatBytes, stringOrDash } from "../utils";
+import { formatBytes, stringOrDash } from "../eventDisplay";
 
 interface GetImageTagConfiguration {
   repository?: string;

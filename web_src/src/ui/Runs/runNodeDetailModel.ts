@@ -9,7 +9,7 @@ import type {
 } from "@/api-client";
 import { getState, getStateMap } from "@/pages/app/mappers";
 import { buildExecutionInfo } from "@/pages/app/utils";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import {
   buildComponentDefinitionsByName,
   buildTriggerDefinitionsByName,

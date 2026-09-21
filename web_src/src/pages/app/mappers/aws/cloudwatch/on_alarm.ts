@@ -5,8 +5,8 @@ import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { Predicate } from "../../utils";
-import { formatPredicate, stringOrDash } from "../../utils";
+import type { Predicate } from "../../eventDisplay";
+import { formatPredicate, stringOrDash } from "../../eventDisplay";
 import type { CloudWatchAlarmEvent } from "./types";
 
 interface Configuration {

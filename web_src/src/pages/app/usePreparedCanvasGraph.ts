@@ -54,20 +54,19 @@ export function usePreparedCanvasGraph(
       return { nodes: [], edges: [], isLoading };
     }
 
-    const { nodes, edges } = prepareData(
-      canvas,
-      catalog.triggers,
-      catalog.components,
-      EMPTY_NODE_MAP,
-      EMPTY_NODE_MAP,
-      EMPTY_NODE_MAP,
-      canvas.metadata?.id ?? "",
+    const { nodes, edges } = prepareData({
+      workflow: canvas,
+      triggers: catalog.triggers,
+      components: catalog.components,
+      nodeEventsMap: EMPTY_NODE_MAP,
+      nodeExecutionsMap: EMPTY_NODE_MAP,
+      nodeQueueItemsMap: EMPTY_NODE_MAP,
+      workflowId: canvas.metadata?.id ?? "",
       queryClient,
-      me,
-      "live",
-      undefined,
+      user: me,
+      canvasMode: "live",
       organizationId,
-    );
+    });
 
     return { nodes, edges, isLoading: false };
   }, [canvas, catalog, isLoading, me, organizationId, queryClient]);

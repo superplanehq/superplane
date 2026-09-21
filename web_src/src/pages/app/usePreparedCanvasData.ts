@@ -49,20 +49,20 @@ export function usePreparedCanvasData({
       return { nodes: [], edges: [] };
     }
 
-    return prepareData(
-      canvas,
+    return prepareData({
+      workflow: canvas,
       triggers,
       components,
       nodeEventsMap,
       nodeExecutionsMap,
       nodeQueueItemsMap,
-      canvasId,
+      workflowId: canvasId,
       queryClient,
       user,
       canvasMode,
       openModal,
       organizationId,
-    );
+    });
   }, [
     canvas,
     triggers,

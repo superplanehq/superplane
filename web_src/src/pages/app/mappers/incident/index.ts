@@ -2,7 +2,7 @@ import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, Trig
 import { onIncidentTriggerRenderer } from "./on_incident";
 import { onIncidentCustomFieldRenderer } from "./on_incident_webhook";
 import { createIncidentMapper } from "./create_incident";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIncident: createIncidentMapper,

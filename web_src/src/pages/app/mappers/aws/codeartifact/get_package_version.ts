@@ -17,7 +17,7 @@ import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { PackageVersionDescription, PackageLicense, PackageVersionPayload } from "./types";
 import { formatPackageName } from "./utils";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 
 export interface GetPackageVersionConfiguration {
   region?: string;

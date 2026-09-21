@@ -74,18 +74,31 @@ interface QueuedMessage {
   timestamp: number;
 }
 
-export function useCanvasWebsocket(
-  canvasId: string,
-  organizationId: string,
-  onNodeEvent?: (nodeId: string, event: string) => void,
-  onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void,
-  onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
-  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void,
-  shouldApplyCanvasUpdate?: () => boolean,
+type UseCanvasWebsocketOptions = {
+  canvasId: string;
+  organizationId: string;
+  onNodeEvent?: (nodeId: string, event: string) => void;
+  onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void;
+  onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void;
+  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void;
+  shouldApplyCanvasUpdate?: () => boolean;
+  processRuntimeEvents?: boolean;
+  enabled?: boolean;
+  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void;
+};
+
+export function useCanvasWebsocket({
+  canvasId,
+  organizationId,
+  onNodeEvent,
+  onWorkflowEvent,
+  onExecutionEvent,
+  onCanvasLifecycleEvent,
+  shouldApplyCanvasUpdate,
   processRuntimeEvents = true,
   enabled = true,
-  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
-): void {
+  onCanvasStagingEvent,
+}: UseCanvasWebsocketOptions): void {
   const updateNodeEvent = useNodeExecutionStore((state) => state.updateNodeEvent);
   const updateNodeExecution = useNodeExecutionStore((state) => state.updateNodeExecution);
   const addNodeQueueItem = useNodeExecutionStore((state) => state.addNodeQueueItem);
@@ -455,5 +468,5 @@ export function useCanvasWebsocket(
 }
 
 export function useCanvasRuntimeWebsocket(canvasId: string, organizationId: string, enabled = true): void {
-  useCanvasWebsocket(canvasId, organizationId, undefined, undefined, undefined, undefined, undefined, true, enabled);
+  useCanvasWebsocket({ canvasId, organizationId, processRuntimeEvents: true, enabled });
 }

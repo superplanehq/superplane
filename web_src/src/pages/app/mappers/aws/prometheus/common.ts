@@ -12,7 +12,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import prometheusIcon from "@/assets/icons/integrations/aws.prometheus.svg";
 
 export const MAX_METADATA_ITEMS = 3;

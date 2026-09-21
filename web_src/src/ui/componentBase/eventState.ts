@@ -1,5 +1,7 @@
 import type React from "react";
 
+export { DEFAULT_EVENT_STATE_MAP } from "./defaultEventStateMap";
+
 export type EventState = "success" | "failed" | "neutral" | "queued" | "running" | string;
 
 export interface EventStateStyle {

@@ -12,7 +12,7 @@ import { getCheckRuleMapper } from "./get_check_rule";
 import { updateCheckRuleMapper } from "./update_check_rule";
 import { deleteCheckRuleMapper } from "./delete_check_rule";
 import { sendLogEventMapper } from "./send_log_event";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { onAlertNotificationTriggerRenderer } from "./on_alert_notification";
 import { onSyntheticCheckNotificationTriggerRenderer } from "./on_synthetic_check_notification";
 
