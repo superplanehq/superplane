@@ -125,7 +125,13 @@ func CreateFactoryIntake(
 	// An intake works without a first batch, so a source that cannot be read
 	// now costs the head start and nothing more. Persist the result so clients
 	// can distinguish an empty source from an import that did not run.
-	seedResult, seedErr := seedIntake(ctx, deps, db, canvasID, source, binding)
+	var seedResult intakeSeedResult
+	var seedErr error
+	if req.GetSkipInitialImport() {
+		seedResult = intakeSeedResult{skipped: true}
+	} else {
+		seedResult, seedErr = seedIntake(ctx, deps, db, canvasID, source, binding)
+	}
 	if err := recordInitialImport(db, intake, seedResult, seedErr); err != nil {
 		// The intake, canvas, and seed events already exist. Returning an error
 		// would invite a retry that creates a duplicate intake and emits the

@@ -20,6 +20,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
   const [step, setStep] = useState<JiraSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
@@ -104,6 +105,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
         source: "SOURCE_JIRA_ISSUES",
         integrationId,
         resourceId: projectId,
+        ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
     } catch (cause) {
@@ -119,6 +121,8 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     setIntegrationId,
     projectId,
     setProjectId,
+    skipInitialImport,
+    setSkipInitialImport,
     connectOpen,
     setConnectOpen,
     connecting,

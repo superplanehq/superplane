@@ -6,6 +6,7 @@ export const SENTRY_INTAKE_SETUP_COPY = {
   wizardStepProject: "Which Sentry project should create tasks?",
   wizardStepProjectHelper:
     "SuperPlane adds the 10 newest unresolved issues of this project. SuperPlane also listens for new issues.",
+  wizardStepProjectHelperSkip: "SuperPlane listens for new issues. SuperPlane does not import existing issues.",
   wizardConnect: "Connect Sentry",
   wizardContinue: "Continue",
   wizardFinish: "Finish",

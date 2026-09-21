@@ -7,6 +7,7 @@ import { Check, Loader2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
+import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { useSentryIntakeSetup, type SentryIntakeSetupModel } from "./useSentryIntakeSetup";
 
@@ -26,7 +27,9 @@ export function SentryIntakeSetupDialog(props: SentryIntakeSetupDialogProps) {
   const helper =
     setup.step === "connection"
       ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : setup.skipInitialImport
+        ? SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
+        : SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const showConnectAction =
     setup.step === "connection" && !setup.connectedQuery.isLoading && setup.sentryIntegrations.length === 0;
 
@@ -284,7 +287,12 @@ function SetupFooter({ setup, onCreated }: { setup: SentryIntakeSetupModel; onCr
   }
 
   return (
-    <div>
+    <div className="space-y-3">
+      <IntakeSkipInitialImportField
+        checked={setup.skipInitialImport}
+        onCheckedChange={setup.setSkipInitialImport}
+        testId="sentry-skip-initial-import"
+      />
       <Button
         type="button"
         className="w-full"
