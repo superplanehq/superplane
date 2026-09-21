@@ -14,35 +14,18 @@ export const PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS = [
   "address-pr-review-reply-feedback",
 ] as const;
 
-const PR_FEEDBACK_VISUAL_EVIDENCE_NODE_IDS = [
-  "has-pr-comment-visual-evidence",
-  "comment-pr-comment-visual-evidence",
-  "has-pr-review-visual-evidence",
-  "comment-pr-review-visual-evidence",
-  "has-pr-review-reply-visual-evidence",
-  "comment-pr-review-reply-visual-evidence",
-] as const;
-
-function hasVisualEvidenceOutputStep(node: CanvasSpecNode): boolean {
-  const steps = node.configuration?.steps;
-  return (
-    Array.isArray(steps) &&
-    steps.some(
-      (step) => typeof step === "object" && step !== null && "name" in step && step.name === "Publish Visual Evidence",
-    )
-  );
+function exposesVisualEvidenceSetting(node: CanvasSpecNode): boolean {
+  return node.configuration !== undefined && "includeVisualEvidence" in node.configuration;
 }
 
-/** Whether a PR discussion canvas can publish agent evidence safely. */
+/** Whether every PR discussion agent supports visual evidence. */
 export function supportsPRFeedbackVisualEvidence(spec: CanvasesCanvas["spec"] | null | undefined): boolean {
   const nodes = spec?.nodes ?? [];
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const hasEvidenceGraph = PR_FEEDBACK_VISUAL_EVIDENCE_NODE_IDS.every((nodeId) => nodesById.has(nodeId));
-  const feedbackAgentsCanPublish = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.every((nodeId) => {
+  return PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.every((nodeId) => {
     const node = nodesById.get(nodeId);
-    return Boolean(node && isAgentHarnessComponent(node.component) && hasVisualEvidenceOutputStep(node));
+    return Boolean(node && isAgentHarnessComponent(node.component) && exposesVisualEvidenceSetting(node));
   });
-  return hasEvidenceGraph && feedbackAgentsCanPublish;
 }
 
 /** Agent harness nodes on a column automation canvas. */

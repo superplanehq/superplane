@@ -236,7 +236,6 @@ flowchart LR
 
 ## Do not confuse with
 
-- Git canvas files (`pkg/git`, Files tab, `canvas.yaml`)
 - `workflow_staged_files` (unpublished canvas text in Postgres)
 - Work-order artifacts (JSONB, 64 KB cap)
 - Agent chat images (base64 in Postgres, session cookie)

@@ -135,19 +135,13 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
 			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
-			"passed:" + prFeedbackRunnerNodeID + "->" + prFeedbackEvidenceGateNodeID,
-			"true:" + prFeedbackEvidenceGateNodeID + "->" + prFeedbackEvidenceCommentNodeID,
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackAcknowledgeCommentNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
 			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
 			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
-			"passed:" + prFeedbackReviewRunnerNodeID + "->" + prFeedbackReviewEvidenceGateNodeID,
-			"true:" + prFeedbackReviewEvidenceGateNodeID + "->" + prFeedbackReviewEvidenceCommentNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
 			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
 			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
-			"passed:" + prFeedbackReplyRunnerNodeID + "->" + prFeedbackReplyEvidenceGateNodeID,
-			"true:" + prFeedbackReplyEvidenceGateNodeID + "->" + prFeedbackReplyEvidenceCommentNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
@@ -192,7 +186,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Equal(t, prFeedbackCommentActivityDescriptionExpression(), replyActivity.Configuration["description"])
 	})
 
-	t.Run("discussion runners default visual evidence off and publish captured evidence", func(t *testing.T) {
+	t.Run("discussion runners support visual evidence without a second comment", func(t *testing.T) {
 		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
 			Repository: "acme/app",
 			Mention:    prFeedbackDefaultMention,
@@ -202,28 +196,20 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		for _, nodeID := range []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID} {
 			runner := findSpecNode(t, canvas, nodeID)
 			assert.Equal(t, false, runner.Configuration["includeVisualEvidence"])
-			output := runnerStepCommand(t, runner, "Publish Visual Evidence")
-			assert.Contains(t, output, "git rev-parse HEAD")
-			assert.Contains(t, output, "visual-evidence.json")
+			assert.False(t, runnerHasStep(t, runner, "Publish Visual Evidence"))
 		}
 
-		for _, gateID := range []string{prFeedbackEvidenceGateNodeID, prFeedbackReviewEvidenceGateNodeID, prFeedbackReplyEvidenceGateNodeID} {
-			gate := findSpecNode(t, canvas, gateID)
-			expression, ok := gate.Configuration["expression"].(string)
-			require.True(t, ok)
-			assert.Contains(t, expression, "previous().data.result.visualEvidence.status")
-			require.NoError(t, expressionvalidation.ValidateExpression(expression, nil))
+		for _, node := range canvas.Spec.Nodes {
+			assert.NotEqual(t, "github.createIssueComment", node.Component)
+			assert.NotContains(t, node.ID, "visual-evidence")
 		}
 
-		for _, commentID := range []string{prFeedbackEvidenceCommentNodeID, prFeedbackReviewEvidenceCommentNodeID, prFeedbackReplyEvidenceCommentNodeID} {
-			comment := findSpecNode(t, canvas, commentID)
-			assert.Equal(t, "github.createIssueComment", comment.Component)
-			body, ok := comment.Configuration["body"].(string)
-			require.True(t, ok)
-			assert.Contains(t, body, "previous(2).data.result.headSha[:7]")
-			assert.Contains(t, body, "fromBase64(previous(2).data.result.visualEvidence.markdown)")
-			requireValidTemplateExpressions(t, body)
-		}
+		prompt := prFeedbackPrompt()
+		assert.Contains(t, prompt, "Explain disagreements in the completion comment.")
+		assert.Contains(t, prompt, "Post one pull request comment after you address all feedback.")
+		assert.Contains(t, prompt, "Summarize the changes in this comment.")
+		assert.Contains(t, prompt, "If you upload visual evidence, include it in the same comment.")
+		assert.Contains(t, prompt, "Do not post a separate visual evidence comment.")
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
@@ -537,6 +523,21 @@ func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
 	}
 	require.Failf(t, "step not found", "runner has no step %q", name)
 	return ""
+}
+
+func runnerHasStep(t *testing.T, node yaml.Node, name string) bool {
+	t.Helper()
+
+	steps, ok := node.Configuration["steps"].([]any)
+	require.True(t, ok, "runner has no steps")
+	for _, step := range steps {
+		item, ok := step.(map[string]any)
+		require.True(t, ok)
+		if item["name"] == name {
+			return true
+		}
+	}
+	return false
 }
 
 func withoutPRFeedbackAcknowledgeComment(spec models.LiveCanvasSpec) models.LiveCanvasSpec {

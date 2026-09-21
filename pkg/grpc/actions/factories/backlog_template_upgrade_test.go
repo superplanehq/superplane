@@ -188,7 +188,6 @@ func createCurrentBacklogForUpgrade(
 		r.Registry,
 		r.Encryptor,
 		r.AuthService,
-		r.GitProvider,
 		"http://localhost:8000",
 		r.Organization.ID,
 		document.Metadata.Name,
@@ -226,7 +225,6 @@ func createLegacyBacklogForUpgrade(
 		r.Registry,
 		r.Encryptor,
 		r.AuthService,
-		r.GitProvider,
 		"http://localhost:8000",
 		r.Organization.ID,
 		legacyDocument.Metadata.Name,
@@ -248,7 +246,6 @@ func backlogUpgradeDependencies(r *support.ResourceRegistry) IntakeDependencies 
 		Registry:       r.Registry,
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
-		GitProvider:    r.GitProvider,
 		WebhookBaseURL: "http://localhost:8000",
 	}
 }

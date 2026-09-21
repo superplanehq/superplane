@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
@@ -22,7 +21,6 @@ import (
 type Dependencies struct {
 	Encryptor         crypto.Encryptor
 	ComponentRegistry *componentregistry.Registry
-	GitProvider       gitprovider.Provider
 	WebhookBaseURL    string
 	AuthService       authorization.Authorization
 	UsageService      usage.Service

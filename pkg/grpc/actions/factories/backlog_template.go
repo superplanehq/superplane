@@ -116,7 +116,6 @@ func createBacklogCanvas(
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
-		deps.GitProvider,
 		deps.WebhookBaseURL,
 		factoryModel.OrganizationID,
 		canvasDoc.Metadata.Name,

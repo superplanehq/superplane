@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
@@ -17,7 +16,6 @@ import (
 type Dependencies struct {
 	Encryptor      crypto.Encryptor
 	Registry       *componentregistry.Registry
-	GitProvider    gitprovider.Provider
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
 	UsageService   usage.Service
@@ -42,7 +40,7 @@ func NewDefaultRegistry(deps Dependencies) *Registry {
 		newReadAction(deps),
 		newReadRuntimeAction(deps),
 		newListFilesAction(),
-		newReadFileAction(deps),
+		newReadFileAction(),
 		newPatchStagingAction(deps),
 		listIntegrationsAction{},
 		newListResourcesAction(deps),

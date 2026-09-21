@@ -108,25 +108,22 @@ describe("supportsPRFeedbackVisualEvidence", () => {
   const feedbackAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) =>
     agentNode({
       id,
-      configuration: { ...implementerConfiguration, steps: [{ name: "Publish Visual Evidence", type: "bash" }] },
+      configuration: { ...implementerConfiguration, includeVisualEvidence: false },
     }),
   );
-  const evidenceNodes = [
-    "has-pr-comment-visual-evidence",
-    "comment-pr-comment-visual-evidence",
-    "has-pr-review-visual-evidence",
-    "comment-pr-review-visual-evidence",
-    "has-pr-review-reply-visual-evidence",
-    "comment-pr-review-reply-visual-evidence",
-  ].map((id) => ({ id, type: "TYPE_ACTION" as const, component: "if" }));
 
-  it("accepts the generated discussion graph", () => {
-    expect(supportsPRFeedbackVisualEvidence({ nodes: [...feedbackAgents, ...evidenceNodes] })).toBe(true);
+  it("accepts discussion agents that expose the visual evidence setting", () => {
+    expect(supportsPRFeedbackVisualEvidence({ nodes: feedbackAgents })).toBe(true);
   });
 
-  it("rejects a legacy discussion graph without publish support", () => {
+  it("rejects legacy discussion agents without the visual evidence setting", () => {
     const legacyAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) => agentNode({ id }));
     expect(supportsPRFeedbackVisualEvidence({ nodes: legacyAgents })).toBe(false);
+  });
+
+  it("requires every discussion agent to expose the visual evidence setting", () => {
+    const incompleteAgents = feedbackAgents.map((node, index) => (index === 2 ? agentNode({ id: node.id }) : node));
+    expect(supportsPRFeedbackVisualEvidence({ nodes: incompleteAgents })).toBe(false);
   });
 });
 

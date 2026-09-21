@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -27,17 +26,16 @@ import (
 )
 
 type NodeQueueWorker struct {
-	registry    *registry.Registry
-	gitProvider gitprovider.Provider
-	semaphore   *semaphore.Weighted
-	logger      *log.Entry
+	registry  *registry.Registry
+	semaphore *semaphore.Weighted
+	logger    *log.Entry
 
 	rabbitMQURL               string
 	queueItemConsumer         *tackle.Consumer
 	executionFinishedConsumer *tackle.Consumer
 }
 
-func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
+func NewNodeQueueWorker(registry *registry.Registry, rabbitMQURL string) *NodeQueueWorker {
 	logger := log.WithFields(log.Fields{"worker": "NodeQueueWorker"})
 
 	queueItemConsumer := tackle.NewConsumer()
@@ -48,7 +46,6 @@ func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Pro
 
 	return &NodeQueueWorker{
 		registry:                  registry,
-		gitProvider:               gitProvider,
 		rabbitMQURL:               rabbitMQURL,
 		semaphore:                 semaphore.NewWeighted(25),
 		logger:                    logger,
@@ -433,7 +430,6 @@ func (w *NodeQueueWorker) dispatchQueueItem(
 		item,
 		configFields,
 		collector.OnNewEvents,
-		contexts.NewRepositoryFilesContext(w.gitProvider, item.WorkflowID),
 	)
 
 	if err != nil {

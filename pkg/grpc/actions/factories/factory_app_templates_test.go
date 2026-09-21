@@ -62,6 +62,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "x-access-token")
 	assert.NotContains(t, result.canvasYAML, `git rev-parse '@{upstream}'`)
 	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")
+	assert.Contains(t, result.canvasYAML, "implement and wire the change into the production page or component")
+	assert.Contains(t, result.canvasYAML, "does not replace the product implementation unless the task explicitly requests")
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -110,7 +112,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	requireValidCanvasExpressions(t, canvas)
 }
 
-func TestMaterializePRFeedbackDefaultsPreservesVisualEvidence(t *testing.T) {
+func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.T) {
 	canvasID := uuid.New()
 	current := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
 		Repository: "acme/app",
@@ -125,6 +127,27 @@ func TestMaterializePRFeedbackDefaultsPreservesVisualEvidence(t *testing.T) {
 		prFeedbackReplyRunnerNodeID,
 	} {
 		findYAMLNode(t, current, nodeID).Configuration["includeVisualEvidence"] = true
+	}
+	legacyEvidenceFlows := []struct {
+		runnerID  string
+		gateID    string
+		commentID string
+	}{
+		{prFeedbackRunnerNodeID, "has-pr-comment-visual-evidence", "comment-pr-comment-visual-evidence"},
+		{prFeedbackReviewRunnerNodeID, "has-pr-review-visual-evidence", "comment-pr-review-visual-evidence"},
+		{prFeedbackReplyRunnerNodeID, "has-pr-review-reply-visual-evidence", "comment-pr-review-reply-visual-evidence"},
+	}
+	legacyEvidenceNodeIDs := make([]string, 0, 2*len(legacyEvidenceFlows))
+	for _, flow := range legacyEvidenceFlows {
+		legacyEvidenceNodeIDs = append(legacyEvidenceNodeIDs, flow.gateID, flow.commentID)
+		current.Spec.Nodes = append(current.Spec.Nodes,
+			yaml.Node{ID: flow.gateID, Type: yaml.NodeTypeAction, Component: "if"},
+			yaml.Node{ID: flow.commentID, Type: yaml.NodeTypeAction, Component: "github.createIssueComment"},
+		)
+		current.Spec.Edges = append(current.Spec.Edges,
+			yaml.Edge{SourceID: flow.runnerID, TargetID: flow.gateID, Channel: "passed"},
+			yaml.Edge{SourceID: flow.gateID, TargetID: flow.commentID, Channel: "true"},
+		)
 	}
 
 	result, err := materializePRFeedbackDefaults(
@@ -144,6 +167,9 @@ func TestMaterializePRFeedbackDefaultsPreservesVisualEvidence(t *testing.T) {
 		prFeedbackReplyRunnerNodeID,
 	} {
 		assert.Equal(t, true, findYAMLNode(t, defaults, nodeID).Configuration["includeVisualEvidence"])
+	}
+	for _, node := range defaults.Spec.Nodes {
+		assert.NotContains(t, legacyEvidenceNodeIDs, node.ID)
 	}
 }
 

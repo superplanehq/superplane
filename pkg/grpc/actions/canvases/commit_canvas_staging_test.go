@@ -28,7 +28,7 @@ func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 	require.NotNil(t, resp.GetVersion().GetMetadata())
@@ -64,7 +64,7 @@ func Test__CommitCanvasStaging__IgnoresRenamedCanvasInYAML(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Rename attempt", "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Rename attempt", "", r.AuthService)
 	require.NoError(t, err)
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvas.ID)
@@ -80,7 +80,7 @@ func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Bad console", "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Bad console", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
@@ -90,7 +90,7 @@ func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
 func Test__CommitCanvasStaging__RequiresStagedChanges(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
 
-	_, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Nothing to commit", "", r.AuthService)
+	_, err := CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Nothing to commit", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
@@ -120,7 +120,7 @@ func Test__CommitCanvasStaging__IgnoresLeftoverNonSpecFiles(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
@@ -147,7 +147,7 @@ func Test__CommitCanvasStaging__RejectsNonSpecOnlyStaging(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Add readme", "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Add readme", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
@@ -178,10 +178,10 @@ func Test__CommitCanvasStaging__RejectsStaleStaging(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(otherCtx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Promote live", "", r.AuthService)
+	_, err = CommitCanvasStaging(otherCtx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Promote live", "", r.AuthService)
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ownerCtx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Stale commit", "", r.AuthService)
+	_, err = CommitCanvasStaging(ownerCtx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Stale commit", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)

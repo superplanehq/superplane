@@ -142,7 +142,6 @@ func createPRFeedbackCanvas(
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
-		deps.GitProvider,
 		deps.WebhookBaseURL,
 		factory.OrganizationID,
 		canvasDoc.Metadata.Name,

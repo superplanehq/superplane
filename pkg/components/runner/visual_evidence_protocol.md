@@ -11,7 +11,8 @@
 - Poll the preview URL with a bounded timeout before you start Playwright.
 - Run the installed `playwright cli` on the runner host, not in the repository container.
 - A signed-in application is not required when an isolated preview can show the change.
-- Use an existing Storybook story or component preview first. If it does not show the changed state, create a focused temporary story or fixture.
+- Visual evidence must not replace the requested product implementation. Implement and wire the UI change before you capture evidence.
+- Use an existing Storybook story or component preview first. If necessary, create a focused temporary story or fixture only for evidence.
 - Open the direct Storybook iframe or the focused preview route. Render the actual component instead of recreating it as static HTML.
 - Use `snapshot` or `find`. Then use the returned element references instead of guessed selectors.
 - Use `eval` to verify computed styles or state when the change has a testable visual property.
@@ -23,7 +24,8 @@
 - Upload the smallest useful set. Usually, use one focused image for each affected theme or state.
 - Capture evidence after the requested UI changes and verification are complete. If later edits change the shown UI, recapture and upload the evidence.
 - If the repository has no component preview, start the application with local or mock data. Create a temporary preview route or harness when needed.
-- Remove temporary preview files before you commit unless they are useful regression coverage.
+- Remove every story, preview route, harness, or fixture created only for evidence before you commit.
+- Keep these files only when the task explicitly requests prototype work or repository instructions require durable Storybook coverage.
 - Close the Playwright session and stop temporary preview processes after capture.
 - Do not report evidence as unavailable only because the main application requires authentication or production data.
 - Before you report evidence as unavailable, attempt at least one isolated preview and one Playwright capture. Include each command and concrete outcome in the `report_visual_evidence_unavailable` attempts field. Set each attempt type to `preview`, `playwright`, or `upload`.
