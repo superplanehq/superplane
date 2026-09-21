@@ -364,6 +364,33 @@ service Factories {
     };
   }
 
+  rpc DescribeFactoryPullRequestMergeability(
+    DescribeFactoryPullRequestMergeabilityRequest
+  ) returns (DescribeFactoryPullRequestMergeabilityResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/prs/{pr_id}/mergeability"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory pull request mergeability";
+      description: "Returns whether a tracked factory pull request can merge from SuperPlane";
+      tags: "Factory";
+    };
+  }
+
+  rpc MergeFactoryPullRequest(
+    MergeFactoryPullRequestRequest
+  ) returns (MergeFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Merge factory pull request";
+      description: "Merges a tracked GitHub pull request with a method the repository allows";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -638,6 +665,76 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update factory LLM models";
       description: "Sets the workspace subset of parent models. An empty list inherits the parent list.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryAgentResources(ListFactoryAgentResourcesRequest) returns (ListFactoryAgentResourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/agent-resources"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workspace agent resources";
+      description: "Returns MCP connections for a workspace. Skills are reserved for a later release.";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryAgentResource(CreateFactoryAgentResourceRequest) returns (CreateFactoryAgentResourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a workspace agent resource";
+      description: "Adds an MCP connection to the workspace catalog.";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryAgentResource(UpdateFactoryAgentResourceRequest) returns (UpdateFactoryAgentResourceResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a workspace agent resource";
+      description: "Updates name, enabled state, or MCP configuration.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryAgentResource(DeleteFactoryAgentResourceRequest) returns (DeleteFactoryAgentResourceResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a workspace agent resource";
+      description: "Removes an MCP connection and its OAuth tokens.";
+      tags: "Factory";
+    };
+  }
+
+  rpc StartFactoryAgentResourceOAuth(StartFactoryAgentResourceOAuthRequest) returns (StartFactoryAgentResourceOAuthResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:start"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start MCP OAuth";
+      description: "Discovers the MCP authorization server and returns the browser URL.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DisconnectFactoryAgentResourceOAuth(DisconnectFactoryAgentResourceOAuthRequest) returns (DisconnectFactoryAgentResourceOAuthResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:disconnect"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Disconnect MCP OAuth";
+      description: "Revokes stored tokens when the vendor advertises a revoke endpoint.";
       tags: "Factory";
     };
   }
@@ -1333,6 +1430,51 @@ message UpdateFactoryPullRequestRequest {
 }
 
 message UpdateFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message FactoryPullRequestMergeability {
+  enum BlockedReason {
+    BLOCKED_REASON_UNSPECIFIED = 0;
+    BLOCKED_REASON_ACTIVE_RUN = 1;
+    BLOCKED_REASON_CHECKS_UNFINISHED = 2;
+    BLOCKED_REASON_CHECK_FAILED = 3;
+    BLOCKED_REASON_DRAFT = 4;
+    BLOCKED_REASON_CONFLICTING = 5;
+    BLOCKED_REASON_MISSING_INTEGRATION = 6;
+  }
+
+  enum MergeMethod {
+    MERGE_METHOD_UNSPECIFIED = 0;
+    MERGE_METHOD_SQUASH = 1;
+    MERGE_METHOD_MERGE = 2;
+    MERGE_METHOD_REBASE = 3;
+  }
+
+  bool can_merge = 1;
+  BlockedReason blocked_reason = 2;
+  string message = 3;
+  repeated MergeMethod allowed_methods = 4;
+  string head_sha = 5;
+}
+
+message DescribeFactoryPullRequestMergeabilityRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message DescribeFactoryPullRequestMergeabilityResponse {
+  FactoryPullRequestMergeability mergeability = 1;
+}
+
+message MergeFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  FactoryPullRequestMergeability.MergeMethod merge_method = 3;
+  string expected_head_sha = 4;
+}
+
+message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
 
@@ -2196,6 +2338,118 @@ message UpdateFactoryLLMModelsRequest {
 message UpdateFactoryLLMModelsResponse {
   repeated FactoryLLMModel selected = 1;
   bool inherit_parent = 2;
+}
+
+message FactoryAgentResource {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_MCP_SERVER = 1;
+    KIND_SKILL = 2;
+  }
+
+  enum Auth {
+    AUTH_UNSPECIFIED = 0;
+    AUTH_HEADERS = 1;
+    AUTH_OAUTH = 2;
+  }
+
+  enum OAuthStatus {
+    OAUTH_STATUS_UNSPECIFIED = 0;
+    OAUTH_STATUS_NOT_CONNECTED = 1;
+    OAUTH_STATUS_CONNECTED = 2;
+    OAUTH_STATUS_NEEDS_RECONNECT = 3;
+    OAUTH_STATUS_VENDOR_REJECTED = 4;
+  }
+
+  message Header {
+    string name = 1;
+    string secret_name = 2;
+    string secret_key = 3;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  Kind kind = 3;
+  string name = 4;
+  bool enabled = 5;
+  string url = 6;
+  Auth auth = 7;
+  repeated Header headers = 8;
+  OAuthStatus oauth_status = 9;
+  string oauth_error = 10;
+  string oauth_connected_by_user_id = 11;
+  google.protobuf.Timestamp oauth_connected_at = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  string repository = 15;
+  string ref = 16;
+  string path = 17;
+  string markdown = 18;
+}
+
+message ListFactoryAgentResourcesRequest {
+  string factory_id = 1;
+  FactoryAgentResource.Kind kind = 2;
+}
+
+message ListFactoryAgentResourcesResponse {
+  repeated FactoryAgentResource resources = 1;
+}
+
+message CreateFactoryAgentResourceRequest {
+  string factory_id = 1;
+  FactoryAgentResource.Kind kind = 2;
+  string name = 3;
+  bool enabled = 4;
+  string url = 5;
+  FactoryAgentResource.Auth auth = 6;
+  repeated FactoryAgentResource.Header headers = 7;
+  string markdown = 8;
+}
+
+message CreateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message UpdateFactoryAgentResourceRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+  optional string name = 3;
+  optional bool enabled = 4;
+  optional string url = 5;
+  optional FactoryAgentResource.Auth auth = 6;
+  repeated FactoryAgentResource.Header headers = 7;
+  optional string markdown = 8;
+}
+
+message UpdateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message DeleteFactoryAgentResourceRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message DeleteFactoryAgentResourceResponse {}
+
+message StartFactoryAgentResourceOAuthRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message StartFactoryAgentResourceOAuthResponse {
+  string authorization_url = 1;
+  FactoryAgentResource resource = 2;
+}
+
+message DisconnectFactoryAgentResourceOAuthRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message DisconnectFactoryAgentResourceOAuthResponse {
+  FactoryAgentResource resource = 1;
 }
 
 message UsageByModel {

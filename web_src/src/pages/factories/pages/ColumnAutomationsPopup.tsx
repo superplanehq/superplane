@@ -1,3 +1,4 @@
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Bot, LoaderCircle, Sparkles, Workflow } from "lucide-react";
@@ -103,6 +104,7 @@ export function ColumnAutomationGlyph({
           "shrink-0 object-contain",
           className,
           automation.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+          logoDarkInvertClass(automation.iconSrc),
         )}
       />
     );

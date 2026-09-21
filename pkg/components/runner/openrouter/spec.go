@@ -139,7 +139,7 @@ func planningFollowUpCommand(spec RunOpenRouterSpec) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
-			runner.WrapCommandInWorkingDirectory(
+			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
 				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
 			),

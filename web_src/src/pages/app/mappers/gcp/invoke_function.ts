@@ -11,6 +11,17 @@ import type {
 import { baseMapper } from "./base";
 import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
 
+type InvokeFunctionData = {
+  functionName?: string;
+  executionId?: string;
+  resultRaw?: unknown;
+  result?: unknown;
+};
+
+type InvokeFunctionOutputPayload = OutputPayload & {
+  data?: InvokeFunctionData;
+};
+
 export const invokeFunctionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
@@ -20,9 +31,9 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const outputs = context.execution.outputs as { default?: InvokeFunctionOutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
-    const data = payload?.data as Record<string, any> | undefined;
+    const data = payload?.data;
 
     const details: Record<string, string> = {};
 
@@ -31,12 +42,12 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
     }
 
     if (data?.functionName) {
-      const parts = String(data.functionName).split("/");
+      const parts = data.functionName.split("/");
       details["Function"] = parts[parts.length - 1] ?? data.functionName;
     }
 
     if (data?.executionId) {
-      details["Execution ID"] = String(data.executionId);
+      details["Execution ID"] = data.executionId;
     }
 
     if (data?.resultRaw !== undefined) {

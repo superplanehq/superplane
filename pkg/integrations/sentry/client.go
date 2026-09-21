@@ -763,14 +763,27 @@ func (c *Client) ListIssues() ([]Issue, error) {
 }
 
 func (c *Client) ListNewestUnresolvedIssues(project string, limit int) ([]Issue, error) {
+	return c.SearchUnresolvedIssues(project, "", limit)
+}
+
+// SearchUnresolvedIssues lists unresolved issues newest first. A non-empty
+// query is appended to the Sentry search, which matches the issue title,
+// message, and culprit.
+func (c *Client) SearchUnresolvedIssues(project, query string, limit int) ([]Issue, error) {
 	if limit <= 0 {
 		limit = newestUnresolvedIssueLimit
 	}
 
+	search := "is:unresolved"
+	if query = strings.TrimSpace(query); query != "" {
+		search += " " + query
+	}
+	encodedQuery := url.QueryEscape(search)
+
 	path := fmt.Sprintf(
 		"/api/0/organizations/%s/issues/?query=%s&limit=%d",
 		url.PathEscape(c.orgSlug),
-		url.QueryEscape("is:unresolved"),
+		encodedQuery,
 		limit,
 	)
 	if project = strings.TrimSpace(project); project != "" {
@@ -778,7 +791,7 @@ func (c *Client) ListNewestUnresolvedIssues(project string, limit int) ([]Issue,
 			"/api/0/projects/%s/%s/issues/?query=%s&limit=%d",
 			url.PathEscape(c.orgSlug),
 			url.PathEscape(project),
-			url.QueryEscape("is:unresolved"),
+			encodedQuery,
 			limit,
 		)
 	}

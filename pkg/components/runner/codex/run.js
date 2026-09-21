@@ -131,14 +131,18 @@ function codexExecArgs(
       "-c",
       'approval_policy="never"',
     );
-    args.push(...mcpConfigOverrides(mcpScriptPath));
+    args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol())}`,
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (artifactEnabled(env)) args.push(...mcpConfigOverrides(mcpScriptPath));
+    if (artifactEnabled(env)) {
+      args.push(...mcpConfigOverrides(mcpScriptPath, env));
+    } else {
+      args.push(...workspaceMCPConfigOverrides(env));
+    }
   }
   if (model) {
     args.push("-m", model);
@@ -161,7 +165,10 @@ function writeSessionID(taskDir, sessionID) {
   }
 }
 
-function codexSessionForPrompt(promptCount, sessionID) {
+function codexSessionForPrompt(promptCount, sessionID, env = process.env) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
+    return "";
+  }
   if (Number(promptCount) < 1) {
     return "";
   }
@@ -178,13 +185,76 @@ function codexSessionIDFromEvent(event) {
   ).trim();
 }
 
-function mcpConfigOverrides(mcpScriptPath) {
+function mcpConfigOverrides(mcpScriptPath, env = process.env) {
   return [
     "-c",
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    ...workspaceMCPConfigOverrides(env),
   ];
+}
+
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    return Array.isArray(parsed.servers) ? parsed.servers : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function workspaceMCPConfigOverrides(env = process.env) {
+  const args = [];
+  for (const server of workspaceMCPServers(env)) {
+    const name = String((server && server.name) || "").trim();
+    const url = String((server && server.url) || "").trim();
+    if (!name || name === "superplane" || !url) {
+      continue;
+    }
+    const serverKey = tomlKey(name);
+    args.push("-c", `mcp_servers.${serverKey}.url=${tomlString(url)}`);
+    const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+    for (const [headerName, headerValue] of Object.entries(headers)) {
+      if (!headerName) {
+        continue;
+      }
+      args.push("-c", `mcp_servers.${serverKey}.http_headers.${tomlKey(headerName)}=${tomlString(String(headerValue))}`);
+    }
+  }
+  return args;
+}
+
+function tomlKey(value) {
+  const key = String(value);
+  if (/^[A-Za-z0-9_]+$/.test(key)) {
+    return key;
+  }
+  return tomlString(key);
 }
 
 function tomlString(value) {
@@ -226,15 +296,15 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
     Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
   let prompt = applyAnalysisContinuation(
     sp,
-    promptCount,
+    sessionID ? promptCount : 0,
     fs.readFileSync(promptFile, "utf8"),
   );
   if (planningAnalysisEnabled()) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
-  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
 
   const startedAt = Date.now();
   if (artifactEnabled()) {
@@ -259,7 +329,7 @@ async function runPrompt(promptFile, model) {
     writeStdout("Planning session tools enabled\n");
     writeStdout("sandbox: read-only\n");
   }
-  if (promptCount > 0) {
+  if (sessionID) {
     writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);
@@ -816,4 +886,5 @@ module.exports = {
   planningEnabled,
   planningSystemPrompt,
   planningAnalysisEnabled,
+  workspaceMCPConfigOverrides,
 };

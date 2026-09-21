@@ -27,9 +27,11 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryHomePath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
+  firstFactoryLineId,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -43,7 +45,11 @@ import {
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import {
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
+} from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
@@ -490,6 +496,27 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+  });
+
+  it("redirects to the first board when a missing line id is opened", async () => {
+    const user = userEvent.setup();
+    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/line-missing`;
+    render(
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        factory={REFUND_FACTORY}
+        navigateTo={missingLinePath}
+      />,
+    );
+
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-test-navigate"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryHomePath("org-1", PRIMARY_FACTORY_KEY, firstFactoryLineId(REFUND_FACTORY)),
+    );
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
   });
 
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {
@@ -1524,7 +1551,39 @@ describe("LinesPage board editing", () => {
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
     expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("lists Source in the filter menu from configured intakes", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toHaveTextContent("Source");
+    expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+  });
+
+  it("narrows the board when a Source filter is selected", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryWorkOrders.mockReturnValue({
+      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+    });
+    renderLinesBoard();
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-sourceIds"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-sourceIds-github-issues"));
+
+    const board = screen.getByTestId("lines-detail-page");
+    expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
+    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {

@@ -142,9 +142,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 import { HomePage } from "./index";
-import { InstallProgressPanel } from "./InstallProgressPanel";
 import { NewAppPage } from "./NewAppPage";
-import type { AppEntry } from "./AppDetailModal";
 
 function makeCanvas(
   id: string,
@@ -195,30 +193,6 @@ function renderHome(initialEntries = ["/org-123"]) {
             <Route path="workspaces" element={<div data-testid="workspaces-index">Workspaces</div>} />
           </Route>
         </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
-function renderInstallProgressPanel(app: AppEntry) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/org-123/apps/new"]}>
-        <InstallProgressPanel
-          app={app}
-          organizationId="org-123"
-          skipPreviewFetch
-          preloadedIntegrations={[]}
-          preloadedParams={[]}
-          onClose={vi.fn()}
-        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -308,29 +282,6 @@ describe("HomePage canvas folders", () => {
     expect(screen.getByTestId("permission-denied-page")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
-  });
-
-  it("does not install an app without create permission if the install action is invoked", async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    permissionMocks.canAct.mockImplementation((_resource: string, action: string) => action !== "create");
-
-    renderInstallProgressPanel({
-      repo: "github.com/superplanehq/example-app",
-      icon: "",
-      title: "Example App",
-      description: "",
-      integrations: [],
-      tags: [],
-      requirements: [],
-      agentInstructions: "",
-    });
-
-    await user.click(screen.getByRole("button", { name: "Take me to the app without connecting" }));
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to create canvases.");
   });
 
   it("renders folders before free canvases using the manual folder order", () => {
@@ -541,38 +492,6 @@ describe("HomePage canvas folders", () => {
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App created, but failed to add it to folder");
-  });
-
-  it("opens a folder-scoped installed app when folder membership update fails", async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      if (url.includes("/apps/install/preview")) {
-        return new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 });
-      }
-      if (url.includes("/apps/install")) {
-        return new Response(JSON.stringify({ canvasId: "canvas-installed", organizationId: "org-123" }), {
-          status: 200,
-        });
-      }
-      return new Response(JSON.stringify({}), { status: 200 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    mutationMocks.updateCanvasFolderMembership.mockRejectedValue(new Error("Failed to fetch"));
-    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
-    useCanvasFolders.mockReturnValue({
-      data: [makeFolder("folder-1", "Deployments", "green")],
-      isLoading: false,
-      error: null,
-    });
-
-    renderHome(["/org-123/apps/new?folderId=folder-1"]);
-    await user.click(await screen.findByRole("button", { name: /browse starter apps/i }));
-    await user.click((await screen.findAllByRole("button", { name: "Setup" }))[0]);
-    await user.click(await screen.findByRole("button", { name: "Take me to the app without connecting" }));
-
-    expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
-    expect(showErrorToast).toHaveBeenCalledWith("App installed, but failed to add it to folder");
   });
 
   it("disables folder header creation without update permission", async () => {

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 
-import type { CanvasSpecNode } from "../lib/columnCanvasAgent";
+import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS, type CanvasSpecNode } from "../lib/columnCanvasAgent";
 import { persistColumnAgent, useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
@@ -63,6 +63,19 @@ const backlogCanvas: CanvasesCanvas = {
     nodes: [
       { ...implementerNode, id: "analyze", name: "Analyze intake" },
       { ...implementerNode, id: "refine-task", name: "Refine Task" },
+    ],
+    edges: [],
+  },
+};
+
+const prFeedbackCanvas: CanvasesCanvas = {
+  metadata: { id: "pr-feedback", liveVersionId: "version-live" },
+  spec: {
+    nodes: [
+      { ...implementerNode, id: "address-pr-feedback", name: "Address PR feedback" },
+      { ...implementerNode, id: "address-pr-review-feedback", name: "Address PR feedback" },
+      { ...implementerNode, id: "address-pr-review-reply-feedback", name: "Address PR feedback" },
+      { ...implementerNode, id: "custom-runner", name: "Custom agent" },
     ],
     edges: [],
   },
@@ -145,6 +158,26 @@ describe("useColumnCanvasAgentEditor", () => {
     rerender({ appId: "backlog" });
     expect(result.current.showVisualEvidenceSetting).toBe(false);
   });
+
+  it("shows visual evidence for discussion feedback when requested", () => {
+    hookState.canvas.current = prFeedbackCanvas;
+
+    const { result } = renderHook(
+      () =>
+        useColumnCanvasAgentEditor("organization-1", "pr-feedback", {
+          showVisualEvidenceSetting: true,
+          synchronizedAgentNodeIds: PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    expect(result.current.showVisualEvidenceSetting).toBe(true);
+    expect(result.current.agentNodeIds).toEqual([
+      "address-pr-feedback",
+      "address-pr-review-feedback",
+      "address-pr-review-reply-feedback",
+    ]);
+  });
 });
 
 describe("persistColumnAgent", () => {
@@ -192,5 +225,33 @@ describe("persistColumnAgent", () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalled();
+  });
+
+  it("updates every synchronized discussion runner", async () => {
+    const stageYaml = vi.fn().mockResolvedValue({});
+    const commit = vi.fn().mockResolvedValue({});
+    const invalidate = vi.fn().mockResolvedValue({});
+
+    await persistColumnAgent({
+      appId: "pr-feedback",
+      canvas: prFeedbackCanvas,
+      agentNodeIds: ["address-pr-feedback", "address-pr-review-feedback", "address-pr-review-reply-feedback"],
+      draft,
+      stageYaml,
+      commit,
+      invalidate,
+    });
+
+    const serialized = JSON.parse(stageYaml.mock.calls[0][0].canvasYaml) as NonNullable<CanvasesCanvas["spec"]>;
+    const synchronizedIds = new Set<string>(PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS);
+    const runners = serialized.nodes?.filter((node) => node.id && synchronizedIds.has(node.id)) ?? [];
+    expect(runners).toHaveLength(3);
+    for (const runner of runners) {
+      expect(runner.configuration?.includeVisualEvidence).toBe(true);
+      expect(runner.configuration?.model).toBe("opus");
+    }
+    const customRunner = serialized.nodes?.find((node) => node.id === "custom-runner");
+    expect(customRunner?.configuration?.includeVisualEvidence).toBeUndefined();
+    expect(customRunner?.configuration?.model).toBe("sonnet");
   });
 });

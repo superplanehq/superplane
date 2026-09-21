@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +91,11 @@ function IntakeSourceLogo({
     <img
       src={source.iconSrc}
       alt={source.iconAlt}
-      className={cn("size-4 shrink-0", isMonochromeSourceLogo(source.iconAlt) && className)}
+      className={cn(
+        "size-4 shrink-0",
+        isMonochromeSourceLogo(source.iconAlt) && className,
+        logoDarkInvertClass(source.iconSrc),
+      )}
     />
   );
 }

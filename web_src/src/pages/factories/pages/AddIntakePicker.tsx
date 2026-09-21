@@ -1,5 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
+import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -112,7 +114,9 @@ export function AddIntakePicker({
 
 function TemplateGlyph({ template }: { template: AddIntakeTemplate }) {
   if (template.iconSrc) {
-    return <img src={template.iconSrc} alt="" className="size-5 shrink-0" />;
+    return (
+      <img src={template.iconSrc} alt="" className={cn("size-5 shrink-0", logoDarkInvertClass(template.iconSrc))} />
+    );
   }
   return (
     <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-muted-foreground">

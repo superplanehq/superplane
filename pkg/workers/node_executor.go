@@ -441,6 +441,7 @@ func (w *NodeExecutor) executeActionNode(
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
+		Logger:    logger,
 	}
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)

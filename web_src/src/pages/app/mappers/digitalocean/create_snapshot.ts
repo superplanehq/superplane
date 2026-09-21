@@ -15,6 +15,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { DropletNodeMetadata } from "./types";
+import type { SnapshotPayload } from "./droplet_payloads";
 
 export const createSnapshotMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -33,7 +34,7 @@ export const createSnapshotMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -41,7 +42,7 @@ export const createSnapshotMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const snapshot = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const snapshot = outputs?.default?.[0]?.data as SnapshotPayload | undefined;
     if (!snapshot) return details;
 
     details["Snapshot ID"] = snapshot.id?.toString() || "-";
@@ -49,7 +50,7 @@ export const createSnapshotMapper: ComponentBaseMapper = {
 
     details["Resource ID"] = snapshot.resource_id?.toString() || "-";
 
-    if (snapshot.regions?.length > 0) {
+    if (snapshot.regions && snapshot.regions.length > 0) {
       details["Regions"] = snapshot.regions.join(", ");
     }
 

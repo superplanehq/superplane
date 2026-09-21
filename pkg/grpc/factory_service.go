@@ -177,6 +177,16 @@ func (s *FactoryService) UpdateFactoryPullRequest(ctx context.Context, req *pb.U
 	return actions.UpdateFactoryPullRequest(ctx, organizationID, req)
 }
 
+func (s *FactoryService) DescribeFactoryPullRequestMergeability(ctx context.Context, req *pb.DescribeFactoryPullRequestMergeabilityRequest) (*pb.DescribeFactoryPullRequestMergeabilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribeFactoryPullRequestMergeability(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) MergeFactoryPullRequest(ctx context.Context, req *pb.MergeFactoryPullRequestRequest) (*pb.MergeFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.MergeFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
@@ -326,4 +336,34 @@ func (s *FactoryService) SendPlanningSessionMessage(ctx context.Context, req *pb
 func (s *FactoryService) AnswerPlanningSessionSurvey(ctx context.Context, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.AnswerPlanningSessionSurvey(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryAgentResources(ctx context.Context, req *pb.ListFactoryAgentResourcesRequest) (*pb.ListFactoryAgentResourcesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryAgentResources(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryAgentResource(ctx context.Context, req *pb.CreateFactoryAgentResourceRequest) (*pb.CreateFactoryAgentResourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryAgentResource(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb.UpdateFactoryAgentResourceRequest) (*pb.UpdateFactoryAgentResourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryAgentResource(ctx context.Context, req *pb.DeleteFactoryAgentResourceRequest) (*pb.DeleteFactoryAgentResourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) StartFactoryAgentResourceOAuth(ctx context.Context, req *pb.StartFactoryAgentResourceOAuthRequest) (*pb.StartFactoryAgentResourceOAuthResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.StartFactoryAgentResourceOAuth(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DisconnectFactoryAgentResourceOAuth(ctx context.Context, req *pb.DisconnectFactoryAgentResourceOAuthRequest) (*pb.DisconnectFactoryAgentResourceOAuthResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DisconnectFactoryAgentResourceOAuth(ctx, s.intakeDeps, organizationID, req)
 }

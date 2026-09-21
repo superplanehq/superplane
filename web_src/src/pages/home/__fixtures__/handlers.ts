@@ -196,6 +196,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Task Refinement",
               description: "Refine draft work orders with an agent",
             },
+            {
+              id: "workspace_agent_resources",
+              label: "Agent Resources",
+              description: "Add MCP servers for workspace agents",
+            },
           ],
         },
       }),
@@ -221,13 +226,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           has_password: true,
           providers: storybookAccountProviders(meUser.email),
         },
-      }),
-    },
-    // Catalog install from FreshOrgLanding starter setup
-    {
-      pattern: re("/apps/install"),
-      resolve: () => ({
-        json: { canvasId: "storybook-installed-canvas", organizationId: orgId },
       }),
     },
   ];

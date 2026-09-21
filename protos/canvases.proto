@@ -85,36 +85,14 @@ service Canvases {
     };
   }
 
-  rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/repository"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get canvas repository";
-      description: "Returns information about the canvas git repository";
-      tags: "CanvasRepository";
-    };
-  }
-
-  rpc ListCanvasRepositoryFiles(ListCanvasRepositoryFilesRequest) returns (ListCanvasRepositoryFilesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/repository/files"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List canvas repository files";
-      description: "Lists files in the git repository attached to a canvas";
-      tags: "CanvasRepository";
-    };
-  }
-
   rpc PutCanvasStaging(PutCanvasStagingRequest) returns (PutCanvasStagingResponse) {
     option (google.api.http) = {
       put: "/api/v1/canvases/{canvas_id}/staging"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Stage canvas repository files";
-      description: "Writes staged edits for the current user without creating a new version";
+      summary: "Stage canvas spec files";
+      description: "Writes staged canvas.yaml and console.yaml edits for the current user without creating a new version";
       tags: "CanvasStaging";
     };
   }
@@ -148,7 +126,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Commit canvas staging";
-      description: "Commits the current user's staged edits to the main branch";
+      description: "Commits the current user's staged canvas.yaml and console.yaml edits as a new canvas version";
       tags: "CanvasStaging";
     };
   }
@@ -426,49 +404,6 @@ message CreateCanvasRequest {
 
 message CreateCanvasResponse {
   Canvas canvas = 1;
-}
-
-message CanvasRepository {
-  message Metadata {
-    string canvas_id = 1;
-    google.protobuf.Timestamp updated_at = 2;
-  }
-
-  enum State {
-    STATE_UNSPECIFIED = 0;
-    STATE_PENDING = 1;
-    STATE_READY = 2;
-    STATE_ERROR = 3;
-  }
-
-  message Status {
-    State state = 1;
-    string head_sha = 2;
-    optional string error = 3;
-  }
-
-  Metadata metadata = 1;
-  Status status = 2;
-}
-
-message GetCanvasRepositoryRequest {
-  string canvas_id = 1;
-}
-
-message GetCanvasRepositoryResponse {
-  CanvasRepository repository = 1;
-}
-
-message ListCanvasRepositoryFilesRequest {
-  string canvas_id = 1;
-}
-
-message CanvasRepositoryFile {
-  string path = 1;
-}
-
-message ListCanvasRepositoryFilesResponse {
-  repeated CanvasRepositoryFile files = 1;
 }
 
 message CanvasRepositoryFileOperation {

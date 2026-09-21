@@ -162,6 +162,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
+	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

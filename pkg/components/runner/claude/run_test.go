@@ -57,6 +57,31 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "Write")
 }
 
+func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
+	})
+	assert.Contains(t, tools, "mcp__docs")
+	assert.Contains(t, tools, "mcp__superplane")
+}
+
+func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_TASK_DIR":              taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  "/task/workspace_mcp.json",
+	})
+	assert.Contains(t, tools, "mcp__deepwiki")
+	assert.Contains(t, tools, "mcp__superplane")
+}
+
 func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	analysis := planningSystemPromptFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
@@ -158,6 +183,38 @@ func TestClaudeContinuationUsesExactSession(t *testing.T) {
 	assert.Empty(t, claudeContinuationArgsFromScript(t, 0, ""))
 	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 1, "session-123"))
 	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 4, "session-123"))
+}
+
+func TestClaudePlanningFollowUpDoesNotResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(4, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis",SUPERPLANE_ANALYSIS_REWIND:"yes"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Empty(t, args)
+}
+
+func TestClaudePlanningPromptStepsStillResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(2, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Equal(t, []string{"--resume", "session-123"}, args)
 }
 
 func TestClaudeContinuationRejectsMissingSession(t *testing.T) {

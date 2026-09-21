@@ -229,7 +229,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     //
     // If the execution is not finished, we just show
     // the information from the metadata.

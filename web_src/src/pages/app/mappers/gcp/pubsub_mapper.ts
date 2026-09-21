@@ -156,7 +156,7 @@ function formatSubscriptionType(value: string): string {
 }
 
 function pubsubMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const config = (node.configuration as Record<string, unknown> | undefined) ?? {};
   const metadata: MetadataItem[] = [];
 
   const topic = config.topic || config.topicId;

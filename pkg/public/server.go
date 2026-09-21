@@ -415,7 +415,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	// so we need to lift that endpoint here instead.
 	//
 	s.Router.Handle(
-		"/api/v1/canvases/{canvas_id}/repository/file",
+		"/api/v1/canvases/{canvas_id}/file",
 		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
 	).Methods(http.MethodGet)
 
@@ -691,6 +691,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
+	publicRoute.HandleFunc("/.well-known/oauth-client", s.HandleMCPOAuthClientMetadata).Methods("GET")
 
 	//
 	// Webhook endpoints for triggers
@@ -717,6 +718,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
@@ -732,8 +734,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
-	accountRoute.HandleFunc("/apps/install/preview", s.appInstallPreview).Methods("GET")
-	accountRoute.HandleFunc("/apps/install", s.installApp).Methods("POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()

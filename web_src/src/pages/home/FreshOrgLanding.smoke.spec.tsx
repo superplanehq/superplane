@@ -25,19 +25,15 @@ describe("FreshOrgLanding", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders factory-first landing with blank and browse escape hatches", async () => {
-    const user = userEvent.setup();
+  it("renders factory-first landing with a blank app escape hatch", async () => {
     render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" />);
 
     expect(await screen.findByRole("heading", { name: "Create a new app" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/set up a software factory to automate coding work/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /setup factory/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create a blank app/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /browse starter apps/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /browse starter apps/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/automation starters/i)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /browse starter apps/i }));
-    expect(screen.getByText(/automation starters/i)).toBeInTheDocument();
   });
 
   it("opens factory setup with GitHub, Claude, and starting tasks", async () => {
