@@ -15,6 +15,9 @@ const { spawn, spawnSync } = require("child_process");
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
+const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
+const OPENROUTER_METADATA_TIMEOUT_SECONDS = 10;
+const OPENROUTER_METADATA_MAX_BUFFER = 1024 * 1024;
 const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 30_000;
 const MODEL_CATALOG_REFRESH_MAX_BUFFER = 32 * 1024 * 1024;
 const SESSION_FILE = "opencode_session";
@@ -188,6 +191,73 @@ function openRouterModelId(model) {
   return `openrouter/${trimmed}`;
 }
 
+function openRouterMetadataURL(model, env = process.env) {
+  const configuredBaseURL = String(
+    (env && env.OPENROUTER_BASE_URL) || "",
+  ).trim();
+  const baseURL = (configuredBaseURL || OPENROUTER_API_BASE_URL).replace(
+    /\/+$/,
+    "",
+  );
+  const modelPath = catalogModelId(model)
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `${baseURL}/models/${modelPath}/endpoints`;
+}
+
+function openCodeModalities(values) {
+  const supported = new Set(["text", "audio", "image", "video", "pdf"]);
+  const modalities = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const modality = value === "file" ? "pdf" : value;
+    if (supported.has(modality) && !modalities.includes(modality)) {
+      modalities.push(modality);
+    }
+  }
+  return modalities;
+}
+
+function loadOpenRouterModelMetadata(model, env = process.env, run = spawnSync) {
+  if (!model) {
+    return null;
+  }
+  const result = run(
+    "curl",
+    [
+      "--fail",
+      "--silent",
+      "--show-error",
+      "--max-time",
+      String(OPENROUTER_METADATA_TIMEOUT_SECONDS),
+      openRouterMetadataURL(model, env),
+    ],
+    {
+      encoding: "utf8",
+      timeout: (OPENROUTER_METADATA_TIMEOUT_SECONDS + 1) * 1000,
+      maxBuffer: OPENROUTER_METADATA_MAX_BUFFER,
+    },
+  );
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+  try {
+    const response = JSON.parse(result.stdout);
+    const architecture = response?.data?.architecture;
+    const input = openCodeModalities(architecture?.input_modalities);
+    const output = openCodeModalities(architecture?.output_modalities);
+    if (input.length === 0 || output.length === 0) {
+      return null;
+    }
+    return {
+      attachment: input.some((modality) => modality !== "text"),
+      modalities: { input, output },
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
 function classifyOpenRouterError(text) {
   const raw = String(text || "");
   const lower = raw.toLowerCase();
@@ -347,6 +417,7 @@ function buildOpenCodeConfig({
   env = process.env,
   planning = false,
   models = [],
+  modelMetadata = {},
 } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
@@ -367,6 +438,7 @@ function buildOpenCodeConfig({
   const modelEntries = {};
   for (const id of modelIds) {
     modelEntries[id] = {
+      ...(modelMetadata[id] || {}),
       options: {
         provider: {
           allow_fallbacks: false,
@@ -416,12 +488,13 @@ function buildOpenCodeConfig({
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models) {
+function writeOpenCodeConfig(taskDir, env, models, modelMetadata = {}) {
   const config = buildOpenCodeConfig({
     taskDir,
     env,
     planning: planningEnabled(env),
     models,
+    modelMetadata,
   });
   fs.writeFileSync(
     path.join(taskDir, "opencode.json"),
@@ -505,7 +578,7 @@ function ensureOpenCodeModelCatalog(
     timeout: MODEL_CATALOG_REFRESH_TIMEOUT_MS,
     maxBuffer: MODEL_CATALOG_REFRESH_MAX_BUFFER,
   };
-  const refreshResult = run(
+  run(
     "opencode",
     ["models", "openrouter", "--refresh", "--pure"],
     {
@@ -534,14 +607,7 @@ function ensureOpenCodeModelCatalog(
     return "bundled";
   }
 
-  const reason = refreshResult.error
-    ? `: ${refreshResult.error.message}`
-    : refreshResult.status !== 0
-      ? `: refresh exited with status ${refreshResult.status}`
-      : ": the refreshed catalog does not list the model";
-  throw new Error(
-    `OpenCode could not refresh metadata for ${catalogModelId(model)}${reason}`,
-  );
+  return "unavailable";
 }
 
 function ensureXdgDirs(taskDir) {
@@ -620,15 +686,30 @@ async function runPrompt(promptFile, model, helpers = {}) {
 
   const currentModel = catalogModelId(model);
   const childEnv = openCodeProcessEnv(sp, env);
+  const loadModelMetadata =
+    helpers.loadOpenRouterModelMetadata || loadOpenRouterModelMetadata;
+  const modelMetadata = loadModelMetadata(currentModel, env);
   const ensureModelCatalog =
     helpers.ensureOpenCodeModelCatalog || ensureOpenCodeModelCatalog;
-  const catalogSource = ensureModelCatalog(sp, currentModel, childEnv);
+  const catalogSource = modelMetadata
+    ? "openrouter"
+    : ensureModelCatalog(sp, currentModel, childEnv);
   if (catalogSource === "bundled") {
     printLiveLogLine(
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
     );
   }
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
+  if (catalogSource === "unavailable") {
+    printLiveLogLine(
+      `Model metadata unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
+    );
+  }
+  writeOpenCodeConfig(
+    sp,
+    env,
+    currentModel ? [currentModel] : [],
+    modelMetadata && currentModel ? { [currentModel]: modelMetadata } : {},
+  );
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
@@ -2048,6 +2129,7 @@ module.exports = {
   openCodeProcessEnv,
   openCodeModelCatalogPath,
   ensureOpenCodeModelCatalog,
+  loadOpenRouterModelMetadata,
   readSessionUsage,
   workspaceMCPServers,
 };

@@ -177,6 +177,15 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 		"taskDir": "/task",
 		"env":     map[string]string{"OPENROUTER_API_KEY": "sk-or"},
 		"models":  []string{"x-ai/grok-4.6"},
+		"modelMetadata": map[string]any{
+			"x-ai/grok-4.6": map[string]any{
+				"attachment": true,
+				"modalities": map[string]any{
+					"input":  []string{"text", "image", "pdf"},
+					"output": []string{"text"},
+				},
+			},
+		},
 	})
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
@@ -190,6 +199,11 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	require.Contains(t, models, "x-ai/grok-4.6")
 	assert.Len(t, models, 1)
 	grok, _ := models["x-ai/grok-4.6"].(map[string]any)
+	assert.Equal(t, true, grok["attachment"])
+	assert.Equal(t, map[string]any{
+		"input":  []any{"text", "image", "pdf"},
+		"output": []any{"text"},
+	}, grok["modalities"])
 	options, _ := grok["options"].(map[string]any)
 	routing, _ := options["provider"].(map[string]any)
 	assert.Equal(t, false, routing["allow_fallbacks"])
@@ -210,10 +224,56 @@ func TestEnsureOpenCodeModelCatalogRefreshesOnce(t *testing.T) {
 	assert.Equal(t, 0, result.Calls)
 }
 
-func TestEnsureOpenCodeModelCatalogRejectsUnknownModelWithoutFreshCatalog(t *testing.T) {
+func TestEnsureOpenCodeModelCatalogDoesNotStopPromptWithoutMetadata(t *testing.T) {
 	result := jsEnsureOpenCodeModelCatalog(t, t.TempDir(), "x-ai/grok-4.6", false, false)
 
-	assert.Contains(t, result.Error, "could not refresh metadata for x-ai/grok-4.6")
+	assert.Equal(t, "unavailable", result.Source)
+	assert.Empty(t, result.Error)
+}
+
+func TestLoadOpenRouterModelMetadataMapsFileInputToPDF(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `
+const { loadOpenRouterModelMetadata } = require(process.argv[1]);
+let request;
+const metadata = loadOpenRouterModelMetadata(
+  "x-ai/grok-4.6",
+  {},
+  (command, args) => {
+    request = { command, args };
+    return {
+      status: 0,
+      stdout: JSON.stringify({
+        data: {
+          architecture: {
+            input_modalities: ["text", "image", "file"],
+            output_modalities: ["text"],
+          },
+        },
+      }),
+    };
+  },
+);
+process.stdout.write(JSON.stringify({ metadata, request }));
+`, script)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var result struct {
+		Metadata map[string]any `json:"metadata"`
+		Request  struct {
+			Command string   `json:"command"`
+			Args    []string `json:"args"`
+		} `json:"request"`
+	}
+	require.NoError(t, json.Unmarshal(out, &result))
+	assert.Equal(t, true, result.Metadata["attachment"])
+	assert.Equal(t, map[string]any{
+		"input":  []any{"text", "image", "pdf"},
+		"output": []any{"text"},
+	}, result.Metadata["modalities"])
+	assert.Equal(t, "curl", result.Request.Command)
+	assert.Contains(t, result.Request.Args, "https://openrouter.ai/api/v1/models/x-ai/grok-4.6/endpoints")
 }
 
 func TestEnsureOpenCodeModelCatalogUsesBundledMetadataWhenRefreshFails(t *testing.T) {
@@ -994,6 +1054,20 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	requireNoTypedLiveLogLine(t, result.output, "Starting OpenCode")
 }
 
+func TestRunPromptContinuesWhenModelMetadataIsUnavailable(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		env: map[string]string{
+			"TEST_MODEL_CATALOG_SOURCE": "unavailable",
+		},
+		spawns: []spawnScript{successSpawn("The prompt still ran.")},
+	})
+
+	assert.Equal(t, 0, result.exitCode)
+	assert.Contains(t, result.output, "Model metadata unavailable. Continuing with OpenCode configuration for x-ai/grok-4.6.")
+	assert.Equal(t, "The prompt still ran.", resultPayload(t, result.resultFile)["result"])
+}
+
 func TestRunPromptDoesNotRetryWhenSuccessfulSpawnLogs429(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "x-ai/grok-4.6",
@@ -1198,8 +1272,11 @@ function mockChild(spec) {
   return child;
 }
 const helpers = {
+  loadOpenRouterModelMetadata() {
+    return null;
+  },
   ensureOpenCodeModelCatalog() {
-    return "cache";
+    return process.env.TEST_MODEL_CATALOG_SOURCE || "cache";
   },
   spawnOpenCode(args) {
     const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
