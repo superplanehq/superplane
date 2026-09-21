@@ -24,6 +24,19 @@ import HarnessIcon from "@/assets/icons/integrations/harness.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "../mapperLookup";
 
+type RunPipelineSource = {
+  executionId?: string;
+  pipelineIdentifier?: string;
+  status?: string;
+  planExecutionUrl?: string;
+  startedAt?: string;
+  endedAt?: string;
+};
+
+type RunPipelinePayload = RunPipelineSource & {
+  data?: RunPipelineSource;
+};
+
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   running: {
@@ -107,16 +120,16 @@ export const runPipelineMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, unknown> = {};
     const outputs = context.execution.outputs as
       | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
       | undefined;
 
     const payload =
-      (outputs?.success?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.failed?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.default?.[0]?.data as Record<string, any> | undefined);
+      (outputs?.success?.[0]?.data as RunPipelinePayload | undefined) ||
+      (outputs?.failed?.[0]?.data as RunPipelinePayload | undefined) ||
+      (outputs?.default?.[0]?.data as RunPipelinePayload | undefined);
 
     const payloadData =
       payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
@@ -125,7 +138,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
 
     const metadataFallback =
       (!payloadData || typeof payloadData !== "object") && context.execution.metadata
-        ? (context.execution.metadata as Record<string, any>)
+        ? (context.execution.metadata as RunPipelineSource)
         : undefined;
 
     const sourceData =
@@ -143,12 +156,12 @@ export const runPipelineMapper: ComponentBaseMapper = {
       if (value) details[key] = value;
     };
 
-    addDetail("Execution ID", sourceData.executionId as string | undefined);
-    addDetail("Pipeline", sourceData.pipelineIdentifier as string | undefined);
-    addDetail("Status", sourceData.status as string | undefined);
-    addDetail("Plan URL", sourceData.planExecutionUrl as string | undefined);
-    addDetail("Started At", sourceData.startedAt as string | undefined);
-    addDetail("Ended At", sourceData.endedAt as string | undefined);
+    addDetail("Execution ID", sourceData.executionId);
+    addDetail("Pipeline", sourceData.pipelineIdentifier);
+    addDetail("Status", sourceData.status);
+    addDetail("Plan URL", sourceData.planExecutionUrl);
+    addDetail("Started At", sourceData.startedAt);
+    addDetail("Ended At", sourceData.endedAt);
 
     return details;
   },
