@@ -40,7 +40,7 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 		return nil, grpcerrors.InvalidArgument(nil, "cannot update provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, spec)
+	data, err := prepareSecretData(ctx, encryptor, secret.ID, spec)
 	if err != nil {
 		return nil, err
 	}
