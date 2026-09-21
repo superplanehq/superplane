@@ -306,4 +306,48 @@ describe("IntakeSettingsHost", () => {
     expect(deleteIntake).toHaveBeenCalledWith("intake-sentry");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("shows a pause error in settings when pause fails", async () => {
+    updateIntake.mockRejectedValue(new Error("pause failed"));
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        intakeId: "intake-sentry",
+        appId: "app-sentry-intake",
+        healthy: true,
+        paused: false,
+        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
+        source: lineIntakeSourceById("sentry-exceptions")!,
+      },
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-sentry", paused: true });
+    expect(screen.getByRole("alert")).toHaveTextContent("pause failed");
+  });
+
+  it("shows a delete error in the confirmation dialog when delete fails", async () => {
+    deleteIntake.mockRejectedValue(new Error("delete failed"));
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        intakeId: "intake-sentry",
+        appId: "app-sentry-intake",
+        healthy: true,
+        paused: false,
+        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
+        source: lineIntakeSourceById("sentry-exceptions")!,
+      },
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+
+    const dialog = screen.getByTestId("intake-delete-dialog");
+    expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent("delete failed");
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

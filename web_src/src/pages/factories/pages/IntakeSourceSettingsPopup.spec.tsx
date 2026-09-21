@@ -124,9 +124,11 @@ function renderPopup(
     labelOptionsLoading?: boolean;
     sourceId?: LineIntakeSourceId;
     paused?: boolean;
-    onPause?: () => void;
-    onResume?: () => void;
-    onDelete?: () => void;
+    pauseError?: string;
+    deleteError?: string;
+    onPause?: () => void | Promise<void>;
+    onResume?: () => void | Promise<void>;
+    onDelete?: () => void | Promise<void>;
   } = {},
 ) {
   return render(
@@ -146,6 +148,8 @@ function renderPopup(
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
               paused={props.paused}
+              pauseError={props.pauseError}
+              deleteError={props.deleteError}
               onPause={props.onPause}
               onResume={props.onResume}
               onDelete={props.onDelete}
@@ -390,5 +394,35 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("intake-source-settings-resume"));
     expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a failed pause from rejecting and shows the error", async () => {
+    const onPause = vi.fn().mockRejectedValue(new Error("pause failed"));
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      onPause,
+      pauseError: INTAKE_SETTINGS_COPY.pauseError,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+
+    expect(onPause).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent(INTAKE_SETTINGS_COPY.pauseError);
+  });
+
+  it("shows a delete error in the confirmation dialog", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      onDelete: vi.fn().mockRejectedValue(new Error("delete failed")),
+      deleteError: INTAKE_SETTINGS_COPY.deleteError,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+
+    const dialog = screen.getByTestId("intake-delete-dialog");
+    expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteError);
+    expect(within(screen.getByTestId("intake-source-settings")).queryByRole("alert")).not.toBeInTheDocument();
   });
 });

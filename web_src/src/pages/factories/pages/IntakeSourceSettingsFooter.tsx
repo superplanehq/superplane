@@ -51,7 +51,7 @@ export function IntakeSourceSettingsFooter({
 }) {
   const sentryControls = sourceId === "sentry-exceptions";
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const footerError = saveError ?? pauseError ?? deleteError;
+  const footerError = saveError ?? pauseError ?? (deleteOpen ? undefined : deleteError);
   const busy = pausePending || deletePending;
 
   return (
@@ -67,7 +67,7 @@ export function IntakeSourceSettingsFooter({
                   size="sm"
                   disabled={busy}
                   title={INTAKE_SETTINGS_COPY.pauseHelper}
-                  onClick={() => void onResume?.()}
+                  onClick={() => void ignoreFailedIntakeAction(onResume)}
                   data-testid="intake-source-settings-resume"
                 >
                   {pausePending ? INTAKE_SETTINGS_COPY.resuming : INTAKE_SETTINGS_COPY.resume}
@@ -79,7 +79,7 @@ export function IntakeSourceSettingsFooter({
                   size="sm"
                   disabled={busy}
                   title={INTAKE_SETTINGS_COPY.pauseHelper}
-                  onClick={() => void onPause?.()}
+                  onClick={() => void ignoreFailedIntakeAction(onPause)}
                   data-testid="intake-source-settings-pause"
                 >
                   {pausePending ? INTAKE_SETTINGS_COPY.pausing : INTAKE_SETTINGS_COPY.pause}
@@ -123,6 +123,7 @@ export function IntakeSourceSettingsFooter({
         <IntakeDeleteConfirmDialog
           open={deleteOpen}
           pending={deletePending}
+          error={deleteError}
           onOpenChange={setDeleteOpen}
           onConfirm={onDelete}
         />
@@ -131,14 +132,24 @@ export function IntakeSourceSettingsFooter({
   );
 }
 
+async function ignoreFailedIntakeAction(action?: () => Promise<void> | void) {
+  try {
+    await action?.();
+  } catch {
+    // The parent supplies the actionable error message.
+  }
+}
+
 function IntakeDeleteConfirmDialog({
   open,
   pending,
+  error,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean;
   pending: boolean;
+  error?: string;
   onOpenChange: (open: boolean) => void;
   onConfirm?: () => Promise<void> | void;
 }) {
@@ -149,6 +160,11 @@ function IntakeDeleteConfirmDialog({
           <AlertDialogTitle>{INTAKE_SETTINGS_COPY.deleteTitle}</AlertDialogTitle>
           <AlertDialogDescription>{INTAKE_SETTINGS_COPY.deleteDescription}</AlertDialogDescription>
         </AlertDialogHeader>
+        {error ? (
+          <p className="workspace-body-text text-destructive" role="alert" data-testid="intake-delete-error">
+            {error}
+          </p>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel data-testid="intake-delete-cancel">{INTAKE_SETTINGS_COPY.deleteCancel}</AlertDialogCancel>
           <AlertDialogAction

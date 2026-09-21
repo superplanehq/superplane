@@ -66,6 +66,12 @@ func UpdateFactoryIntake(
 	}
 
 	if req.Paused != nil {
+		if intake.Source != models.FactoryIntakeSourceSentryExceptions {
+			return nil, factoryErrorToStatus(
+				invalidArgument("pause is only supported for Sentry intakes"),
+				"failed to update factory intake",
+			)
+		}
 		if err := intake.SetPaused(db, req.GetPaused()); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory intake")
 		}
