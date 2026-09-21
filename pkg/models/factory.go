@@ -44,9 +44,24 @@ type Factory struct {
 	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
 	OnboardingCompletedAt  *time.Time
 	HostedSpendBudgetCents *int64
+	PlanningEnabled        bool
+	PlanningClarity        bool
+	PlanningConfidence     bool
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
+}
+
+// FactoryPlanning is the workspace toggle for draft chat plus the two
+// optional scores. Defaults are all on.
+type FactoryPlanning struct {
+	Enabled    bool
+	Clarity    bool
+	Confidence bool
+}
+
+func DefaultFactoryPlanning() FactoryPlanning {
+	return FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -132,6 +147,7 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		return nil, err
 	}
 
+	planning := DefaultFactoryPlanning()
 	now := time.Now()
 	factory := &Factory{
 		ID:                    uuid.New(),
@@ -142,6 +158,9 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		NextWorkOrderNumber:   1,
 		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
 		OnboardingCompletedAt: nil,
+		PlanningEnabled:       planning.Enabled,
+		PlanningClarity:       planning.Clarity,
+		PlanningConfidence:    planning.Confidence,
 		CreatedAt:             now,
 		UpdatedAt:             now,
 	}
@@ -372,6 +391,35 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 		return err
 	}
 	f.HostedSpendBudgetCents = budgetCents
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) Planning() FactoryPlanning {
+	return FactoryPlanning{
+		Enabled:    f.PlanningEnabled,
+		Clarity:    f.PlanningClarity,
+		Confidence: f.PlanningConfidence,
+	}
+}
+
+func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("planning_enabled", "planning_clarity", "planning_confidence", "updated_at").
+		Updates(map[string]any{
+			"planning_enabled":    planning.Enabled,
+			"planning_clarity":    planning.Clarity,
+			"planning_confidence": planning.Confidence,
+			"updated_at":          now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PlanningEnabled = planning.Enabled
+	f.PlanningClarity = planning.Clarity
+	f.PlanningConfidence = planning.Confidence
 	f.UpdatedAt = now
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -34,14 +33,6 @@ func UpgradeDefaultBacklogTemplates(
 	organizationID uuid.UUID,
 ) (BacklogTemplateUpgradeResult, error) {
 	db := database.DB(ctx)
-	organization, err := models.FindOrganizationByIDInTransaction(db, organizationID.String())
-	if err != nil {
-		return BacklogTemplateUpgradeResult{}, err
-	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCreateWithAgent) {
-		return BacklogTemplateUpgradeResult{}, nil
-	}
-
 	factoryModels, err := models.ListFactories(db, organizationID)
 	if err != nil {
 		return BacklogTemplateUpgradeResult{}, err
@@ -193,12 +184,19 @@ func isDefaultLegacyBacklog(nodes []models.Node, edges []models.Edge) bool {
 	if !models.IsBacklogFactoryApp(nodes, edges) || backlogTemplateVersionFrom(nodes) >= backlogTemplateVersion {
 		return false
 	}
-	expected := buildLegacyBacklogCanvas(backlogCanvasRequest{
+	request := backlogCanvasRequest{
 		Agent:      intakeAgentFromCanvasNodes(nodes),
 		GitHubName: backlogGitHubIntegrationName(nodes),
-	})
-	return reflect.DeepEqual(backlogBehaviorNodes(nodes), backlogBehaviorNodes(expected.Nodes())) &&
-		reflect.DeepEqual(sortedBacklogEdges(edges), sortedBacklogEdges(expected.Edges()))
+	}
+	legacy := buildLegacyBacklogCanvas(request)
+	v2 := buildV2BacklogCanvas(request)
+	return matchesBacklogSnapshot(nodes, edges, legacy.Nodes(), legacy.Edges()) ||
+		matchesBacklogSnapshot(nodes, edges, v2.Nodes(), v2.Edges())
+}
+
+func matchesBacklogSnapshot(nodes []models.Node, edges []models.Edge, expectedNodes []models.Node, expectedEdges []models.Edge) bool {
+	return reflect.DeepEqual(backlogBehaviorNodes(nodes), backlogBehaviorNodes(expectedNodes)) &&
+		reflect.DeepEqual(sortedBacklogEdges(edges), sortedBacklogEdges(expectedEdges))
 }
 
 func backlogTemplateVersionFrom(nodes []models.Node) int {
@@ -249,7 +247,7 @@ func sortedBacklogEdges(edges []models.Edge) []models.Edge {
 
 func backlogGitHubIntegrationName(nodes []models.Node) string {
 	for _, node := range nodes {
-		if node.ID != intakeAnalysisNodeID {
+		if node.ID != intakeAnalysisNodeID && node.ID != backlogRefinementNodeID {
 			continue
 		}
 		environment, _ := node.Configuration["environmentFrom"].([]any)

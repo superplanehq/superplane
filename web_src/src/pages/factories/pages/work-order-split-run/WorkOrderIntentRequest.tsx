@@ -48,6 +48,8 @@ export type IntentAnalysisChat = {
   canTogglePlan?: boolean;
   clarity?: ComposerScore;
   confidence?: ComposerScore;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   planStatus?: PlanChipStatus;
   isAnalyzing?: boolean;
   closedDecision?: ReactNode;
@@ -223,6 +225,8 @@ function AnalysisComposer({
             open={Boolean(analysis.planPaneOpen)}
             clarity={analysis.clarity}
             confidence={analysis.confidence}
+            showClarity={analysis.showClarity !== false}
+            showConfidence={analysis.showConfidence !== false}
             isAnalyzing={chipsWorking}
             canTogglePlan={Boolean(analysis.canTogglePlan)}
             planStatus={analysis.planStatus}

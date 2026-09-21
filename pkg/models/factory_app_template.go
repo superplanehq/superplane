@@ -63,7 +63,17 @@ func IsBacklogFactoryApp(nodes []Node, _ []Edge) bool {
 		"attach-intent":            true,
 		"add-run-error":            true,
 	}
-	return matchesBacklogIdentity(nodes, versionTwoNodeIDs)
+	if matchesBacklogIdentity(nodes, versionTwoNodeIDs) {
+		return true
+	}
+
+	versionThreeNodeIDs := map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"task-refinement-enabled":  true,
+		"refine-task":              true,
+		"add-run-error":            true,
+	}
+	return matchesBacklogIdentity(nodes, versionThreeNodeIDs)
 }
 
 // StampFactoryAppTemplate records template identity in the live version and

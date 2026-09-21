@@ -70,6 +70,21 @@ func TestIsBacklogFactoryApp(t *testing.T) {
 		assert.True(t, IsBacklogFactoryApp(nodes, edges))
 	})
 
+	t.Run("accepts the exact version 3 graph", func(t *testing.T) {
+		nodes := []Node{
+			triggerNode("trigger", "onWorkOrder"),
+			componentNode("task-refinement-enabled", "if"),
+			componentNode("refine-task", "runnerClaudeCode"),
+			componentNode("add-run-error", "addRunError"),
+		}
+		edges := []Edge{
+			{SourceID: "trigger", TargetID: "task-refinement-enabled", Channel: "default"},
+			{SourceID: "task-refinement-enabled", TargetID: "refine-task", Channel: "true"},
+			{SourceID: "refine-task", TargetID: "add-run-error", Channel: "failed"},
+		}
+		assert.True(t, IsBacklogFactoryApp(nodes, edges))
+	})
+
 	t.Run("rejects a custom on-work-order canvas", func(t *testing.T) {
 		assert.False(t, IsBacklogFactoryApp([]Node{triggerNode("trigger", "onWorkOrder")}, nil))
 	})

@@ -343,17 +343,13 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, canvasID.String(), defaults.Metadata.ID)
 	assert.Equal(t, "Backlog scoring", defaults.Metadata.Name)
-	analysis := findYAMLNode(t, defaults, intakeAnalysisNodeID)
 	refinement := findYAMLNode(t, defaults, backlogRefinementNodeID)
-	assert.Equal(t, "runnerOpenRouter", analysis.Component)
-	assert.Equal(t, analysis.Component, refinement.Component)
-	assert.Equal(t, "anthropic/claude-opus-4-6", analysis.Configuration["model"])
+	assert.Equal(t, "runnerOpenRouter", refinement.Component)
+	assert.Equal(t, "anthropic/claude-opus-4-6", refinement.Configuration["model"])
 	assert.Equal(t, map[string]any{
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
-	}, analysis.Configuration["credentials"])
-	assert.Equal(t, analysis.Configuration["credentials"], refinement.Configuration["credentials"])
-	assert.Equal(t, analysis.Configuration["model"], refinement.Configuration["model"])
+	}, refinement.Configuration["credentials"])
 }
 
 func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {

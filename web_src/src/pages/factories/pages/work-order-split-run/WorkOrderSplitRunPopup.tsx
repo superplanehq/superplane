@@ -2,9 +2,8 @@ import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 import type { FactoriesFactoryPullRequest } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
@@ -27,6 +26,7 @@ import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
+import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -36,8 +36,9 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  */
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const { organizationId, factoryId, orderId, fixture, fixed = false, onClose, canUpdate = true } = props;
-  const refinementFeature = useExperimentalFeature(organizationId);
-  const refinementEnabled = refinementFeature.has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const factoryQuery = useFactory(organizationId ?? "", factoryId ?? "");
+  const refinementEnabled = factoryPlanningEnabled(factoryQuery.data);
+  const refinementFeature = { isLoading: factoryQuery.isPending };
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
@@ -119,8 +120,7 @@ function AnalysisWorkOrderPopup({
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
-  const initialTab = defaultSplitRunPopupTab(fixture);
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
@@ -154,7 +154,11 @@ function AnalysisWorkOrderPopup({
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
   const taskHref = createdTaskHref(organizationId, factoryKey, lineId);
-  const stripAnalysis = draftStripAnalysis(fixture.footer.kind, analysis, modelSelects.strip, taskHref);
+  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const stripAnalysis = draftStripAnalysis(fixture.footer.kind, analysis, modelSelects.strip, taskHref, {
+    showClarity: factoryShowsClarity(factory),
+    showConfidence: factoryShowsConfidence(factory),
+  });
 
   return (
     <PopupShell
@@ -286,11 +290,12 @@ function draftStripAnalysis(
   analysis: ReturnType<typeof useAnalysisPlanningSession>,
   modelSelect: ReactNode | undefined,
   taskHref: CreatedTaskHref,
+  scores: { showClarity: boolean; showConfidence: boolean },
 ) {
   if (footerKind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref };
+  return { ...analysis, modelSelect, taskHref, ...scores };
 }
 
 /**

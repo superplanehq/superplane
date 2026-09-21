@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 
 describe("workOrderPopupMode", () => {
-  it("waits for Task Refinement access before choosing a popup", () => {
+  it("waits for Planning settings before choosing a popup", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
@@ -51,7 +51,7 @@ describe("workOrderPopupMode", () => {
     ).toBe("classic");
   });
 
-  it("uses the analysis popup for a pinned session after the flag is disabled", () => {
+  it("uses the analysis popup for a pinned session after Planning is off", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: true,

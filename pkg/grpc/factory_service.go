@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -54,6 +55,9 @@ func (s *FactoryService) CreateFactory(ctx context.Context, req *pb.CreateFactor
 
 func (s *FactoryService) DescribeFactory(ctx context.Context, req *pb.DescribeFactoryRequest) (*pb.DescribeFactoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	if orgUUID, err := uuid.Parse(organizationID); err == nil {
+		_, _ = actions.UpgradeDefaultBacklogTemplates(ctx, s.intakeDeps, orgUUID)
+	}
 	return actions.DescribeFactory(ctx, organizationID, req.GetId())
 }
 
