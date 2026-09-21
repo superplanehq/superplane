@@ -216,6 +216,15 @@ function newAgentActivity(id: string, provider?: string, turn?: number, startedA
   };
 }
 
+const activityRecordTypeAliases: Readonly<Record<string, string>> = {
+  activity_tool_start: "tool_start",
+  activity_tool_end: "tool_end",
+};
+
+function normalizedActivityRecordType(type?: string): string | undefined {
+  return type ? (activityRecordTypeAliases[type] ?? type) : type;
+}
+
 function applyActivityRecord(activity: AgentActivity, record: AgentActivityRecord): AgentActivity {
   const withSequence = {
     ...activity,
@@ -223,7 +232,7 @@ function applyActivityRecord(activity: AgentActivity, record: AgentActivityRecor
     turn: record.turn ?? activity.turn,
     sequence: Math.max(activity.sequence, record.sequence ?? 0),
   };
-  switch (record.type) {
+  switch (normalizedActivityRecordType(record.type)) {
     case "activity_start":
       return { ...withSequence, status: "running", startedAtMs: record.started_at ?? activity.startedAtMs };
     case "activity_end":
