@@ -187,10 +187,6 @@ func applyPRFeedbackSettings(
 				nodes[i].Configuration = configuration
 				continue
 			}
-			if nodes[i].ID == graph.AnnounceLimitNodeID {
-				nodes[i].Configuration = prFeedbackChecksLimitStatusNoteConfiguration(updated.MaximumAttempts)
-				continue
-			}
 			if graph.isChecks() {
 				if title, description, ok := prFeedbackChecksActivityExpressions(nodes[i].ID); ok {
 					configuration := maps.Clone(nodes[i].Configuration)
@@ -232,7 +228,6 @@ func applyPRFeedbackSettings(
 			}
 		}
 
-		nodes, edges := ensureChecksAnnounceLimitNode(nodes, slices.Clone(liveVersion.Edges), graph, updated.MaximumAttempts)
 		nodes = ensurePRFeedbackConcurrency(nodes)
 
 		if err := canvases.PublishGeneratedCanvasNodes(
@@ -242,7 +237,7 @@ func applyPRFeedbackSettings(
 			uuid.MustParse(userID),
 			"Update PR feedback settings",
 			nodes,
-			edges,
+			slices.Clone(liveVersion.Edges),
 			changesets.CanvasPublisherOptions{
 				Registry:       deps.Registry,
 				OrgID:          canvas.OrganizationID,
@@ -264,33 +259,4 @@ func applyPRFeedbackSettings(
 	}
 
 	return nil
-}
-
-func ensureChecksAnnounceLimitNode(
-	nodes []models.Node,
-	edges []models.Edge,
-	graph prFeedbackGraph,
-	maximumAttempts int,
-) ([]models.Node, []models.Edge) {
-	if !graph.isChecks() || graph.PauseFixesNodeID == "" {
-		return nodes, edges
-	}
-	if findIntakeNode(nodes, prFeedbackAnnounceLimitNodeID) != nil {
-		return nodes, edges
-	}
-
-	nodes = append(nodes, models.Node{
-		ID:            prFeedbackAnnounceLimitNodeID,
-		Name:          "Set Fixes Paused Note",
-		Type:          "TYPE_ACTION",
-		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: prFeedbackSetStatusNoteComponent}},
-		Configuration: prFeedbackChecksLimitStatusNoteConfiguration(maximumAttempts),
-		Position:      models.Position{X: 1180, Y: 400},
-	})
-	edges = append(edges, models.Edge{
-		Channel:  "default",
-		SourceID: graph.PauseFixesNodeID,
-		TargetID: prFeedbackAnnounceLimitNodeID,
-	})
-	return nodes, edges
 }
