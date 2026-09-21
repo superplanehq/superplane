@@ -41,7 +41,7 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 	createPR := func(t *testing.T, factory *models.Factory, req *pb.CreateFactoryPullRequestRequest) *pb.FactoryPullRequest {
 		t.Helper()
 		req.FactoryId = factory.ID.String()
-		resp, err := CreateFactoryPullRequest(ctx, orgID, req)
+		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, req)
 		require.NoError(t, err)
 		require.NotNil(t, resp.GetPullRequest())
 		return resp.GetPullRequest()

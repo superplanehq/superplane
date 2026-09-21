@@ -337,20 +337,32 @@ type FactoryPullRequestMergeabilitySnapshot struct {
 
 func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {
 	now := time.Now()
+	headSHA := strings.TrimSpace(snapshot.HeadSHA)
+	allowedMethods := strings.TrimSpace(snapshot.AllowedMethods)
+	knownHead := strings.TrimSpace(p.MergeableHeadSHA)
+	result := tx.Model(p).
+		Where("mergeable_head_sha IN ?", []string{"", knownHead, headSHA}).
+		Updates(map[string]any{
+			"mergeable":                 snapshot.Mergeable,
+			"merge_blocked_reason":      snapshot.BlockedReason,
+			"merge_blocked_message":     snapshot.BlockedMessage,
+			"mergeable_head_sha":        headSHA,
+			"mergeable_allowed_methods": allowedMethods,
+			"updated_at":                now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil
+	}
 	p.Mergeable = snapshot.Mergeable
 	p.MergeBlockedReason = snapshot.BlockedReason
 	p.MergeBlockedMessage = snapshot.BlockedMessage
-	p.MergeableHeadSHA = strings.TrimSpace(snapshot.HeadSHA)
-	p.MergeableAllowedMethods = strings.TrimSpace(snapshot.AllowedMethods)
+	p.MergeableHeadSHA = headSHA
+	p.MergeableAllowedMethods = allowedMethods
 	p.UpdatedAt = now
-	return tx.Model(p).Updates(map[string]any{
-		"mergeable":                 p.Mergeable,
-		"merge_blocked_reason":      p.MergeBlockedReason,
-		"merge_blocked_message":     p.MergeBlockedMessage,
-		"mergeable_head_sha":        p.MergeableHeadSHA,
-		"mergeable_allowed_methods": p.MergeableAllowedMethods,
-		"updated_at":                p.UpdatedAt,
-	}).Error
+	return nil
 }
 
 func (p *FactoryPullRequest) HasCachedMergeability() bool {
@@ -404,11 +416,16 @@ func ListOpenGitHubFactoryPullRequestsForWebhook(
 	revisionIDs := tx.Model(&FactoryPullRequestRevision{}).Select("id").Where("sha = ?", sha)
 	switch {
 	case len(numbers) > 0 && sha != "":
-		query = query.Where("number IN ? OR current_revision_id IN (?)", numbers, revisionIDs)
+		query = query.Where(
+			"(number IN ? OR current_revision_id IN (?) OR mergeable_head_sha = ?)",
+			numbers,
+			revisionIDs,
+			sha,
+		)
 	case len(numbers) > 0:
 		query = query.Where("number IN ?", numbers)
 	default:
-		query = query.Where("current_revision_id IN (?)", revisionIDs)
+		query = query.Where("(current_revision_id IN (?) OR mergeable_head_sha = ?)", revisionIDs, sha)
 	}
 
 	var pullRequests []FactoryPullRequest
