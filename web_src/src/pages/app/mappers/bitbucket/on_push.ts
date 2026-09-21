@@ -80,6 +80,10 @@ export interface BitbucketCommit {
   };
 }
 
+function commitMessageFromChange(change?: BitbucketChange): string {
+  return change?.new?.target?.message?.trim() || "";
+}
+
 function buildBitbucketSubtitle(shortSha: string, createdAt?: string): string | React.ReactNode {
   const trimmedSha = shortSha.trim();
   if (trimmedSha && createdAt) {
@@ -95,7 +99,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as BitbucketPush;
     const firstChange = eventData?.push?.changes?.[0];
-    const commitMessage = firstChange?.new?.target?.message?.trim() || "";
+    const commitMessage = commitMessageFromChange(firstChange);
     const shortSha = firstChange?.new?.target?.hash?.slice(0, 7) || "";
 
     return {

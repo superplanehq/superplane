@@ -337,24 +337,7 @@ function getWaitEventSubtitle(
         expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
       }
     } else if (configuration?.mode === "countdown") {
-      const waitUntil = configuration.waitUntil as string;
-
-      // Try to parse countdown target date
-      if (waitUntil && execution.createdAt) {
-        try {
-          // For simple string dates, extract the date without evaluating expressions
-          const dateMatch = waitUntil.match(/["']([^"']+)["']/);
-          if (dateMatch) {
-            const targetDate = new Date(dateMatch[1]);
-            const createdDate = new Date(execution.createdAt);
-            if (!isNaN(targetDate.getTime()) && !isNaN(createdDate.getTime())) {
-              expectedDuration = targetDate.getTime() - createdDate.getTime();
-            }
-          }
-        } catch {
-          // If parsing fails, expectedDuration remains undefined
-        }
-      }
+      expectedDuration = countdownDurationFromConfig(configuration.waitUntil, execution.createdAt);
     } else if (configuration?.duration) {
       // Legacy duration format
       const duration = configuration.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
@@ -389,6 +372,29 @@ function getWaitEventSubtitle(
   }
 
   return timeAgoDate ? renderTimeAgo(timeAgoDate) : undefined;
+}
+
+function countdownDurationFromConfig(waitUntil?: string, createdAt?: string): number | undefined {
+  if (!waitUntil || !createdAt) {
+    return undefined;
+  }
+
+  try {
+    const dateMatch = waitUntil.match(/["']([^"']+)["']/);
+    if (!dateMatch) {
+      return undefined;
+    }
+
+    const targetDate = new Date(dateMatch[1]);
+    const createdDate = new Date(createdAt);
+    if (Number.isNaN(targetDate.getTime()) || Number.isNaN(createdDate.getTime())) {
+      return undefined;
+    }
+
+    return targetDate.getTime() - createdDate.getTime();
+  } catch {
+    return undefined;
+  }
 }
 
 function formatDateValue(value?: string): string | undefined {
