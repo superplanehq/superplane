@@ -181,7 +181,7 @@ func Test__IntegrationRequestWorker_LeasesBeforeProcessing(t *testing.T) {
 			stateDuringSync = request.State
 			runAtDuringSync = request.RunAt
 
-			listed, err := models.ListIntegrationRequests()
+			listed, err := models.ListIntegrationRequests(workerPollBatchSize)
 			require.NoError(t, err)
 			for _, listedRequest := range listed {
 				if listedRequest.AppInstallationID == installationID {
