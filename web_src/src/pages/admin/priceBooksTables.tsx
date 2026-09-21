@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BookOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   centsToUsdInput,
   formatMatchMode,
@@ -20,11 +20,12 @@ const bodyCellClass = "px-4 py-2.5 text-gray-700 dark:text-gray-300";
 const numericCellClass = `${bodyCellClass} text-right tabular-nums`;
 const rowClass = "border-b border-slate-50 last:border-0 dark:border-gray-800/70";
 
-export function EmptyRatesMessage({ message }: { message: string }) {
+export function EmptyRatesMessage({ message, action }: { message: string; action?: ReactNode }) {
   return (
     <div className={`${tableWrapClass} p-8 text-center`}>
       <BookOpen size={24} className="mx-auto text-gray-400 dark:text-gray-500" />
       <Text className="mt-3 text-sm text-gray-600 dark:text-gray-400">{message}</Text>
+      {action}
     </div>
   );
 }

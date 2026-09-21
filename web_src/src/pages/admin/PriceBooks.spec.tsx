@@ -490,7 +490,30 @@ describe("PriceBooks", () => {
     renderPage();
 
     expect(await screen.findByText("Selected models")).toBeInTheDocument();
-    expect(screen.getByText("No models are selected in hosted LLM settings.")).toBeInTheDocument();
+    expect(screen.getByText("No models are selected in Hosted LLM settings.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Hosted LLM settings" })).toHaveAttribute("href", "/admin/settings");
+  });
+
+  it("shows empty state when every model rate is selected", async () => {
+    const catalog = {
+      ...currentCatalog,
+      models: [
+        {
+          ...currentCatalog.models[0],
+          selected: true,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(catalog)),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Other models")).toBeInTheDocument();
+    expect(screen.getByText("No other model rates in this version.")).toBeInTheDocument();
+    expect(screen.getByText("claude-sonnet")).toBeInTheDocument();
   });
 
   it("edits a rate in the other models group", async () => {

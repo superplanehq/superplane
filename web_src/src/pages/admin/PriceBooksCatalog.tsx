@@ -1,3 +1,4 @@
+import { Link } from "@/components/Link/link";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -246,12 +247,26 @@ function ModelsPanel({
             {selectedRows.length > 0 ? (
               <ModelsTable rows={selectedRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
             ) : (
-              <EmptyRatesMessage message="No models are selected in hosted LLM settings." />
+              <EmptyRatesMessage
+                message="No models are selected in Hosted LLM settings."
+                action={
+                  <Link
+                    href="/admin/settings"
+                    className="mt-3 inline-block text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Open Hosted LLM settings
+                  </Link>
+                }
+              />
             )}
           </div>
           <div>
             <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Other models</Text>
-            <ModelsTable rows={otherRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+            {otherRows.length > 0 ? (
+              <ModelsTable rows={otherRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+            ) : (
+              <EmptyRatesMessage message="No other model rates in this version." />
+            )}
           </div>
         </>
       )}

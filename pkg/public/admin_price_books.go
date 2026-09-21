@@ -406,14 +406,7 @@ func buildAdminPriceBooksResponse(
 		})
 	}
 
-	allowlist := make([]string, 0)
-	for _, p := range providers {
-		for _, m := range p.AllowedModels {
-			if strings.TrimSpace(m) != "" {
-				allowlist = append(allowlist, m)
-			}
-		}
-	}
+	allowlist := hostedModelAllowlist(providers)
 
 	prefixes := make([]pricebook.PrefixRate, 0)
 	families := make([]pricebook.FamilyRate, 0)
@@ -477,4 +470,19 @@ func buildAdminPriceBooksResponse(
 		Models:         modelRates,
 		VMs:            vmRates,
 	}
+}
+
+func hostedModelAllowlist(providers []models.HostedLLMProvider) []string {
+	allowlist := make([]string, 0)
+	for _, provider := range providers {
+		if !provider.OffersHostedModels() {
+			continue
+		}
+		for _, model := range provider.AllowedModels {
+			if strings.TrimSpace(model) != "" {
+				allowlist = append(allowlist, model)
+			}
+		}
+	}
+	return allowlist
 }

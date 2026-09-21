@@ -245,6 +245,7 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 	t.Run("prefix allowlist selects matching prefix rate", func(t *testing.T) {
 		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
 			Provider:      "openai",
+			APIKey:        []byte("encrypted"),
 			AllowedModels: datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}),
 		})
 		require.NoError(t, err)
@@ -273,6 +274,7 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 	t.Run("family allowlist selects matching family rate", func(t *testing.T) {
 		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
 			Provider:      "openai",
+			APIKey:        []byte("encrypted"),
 			AllowedModels: datatypes.NewJSONSlice([]string{"some-vendor/sonnet-v3"}),
 		})
 		require.NoError(t, err)
@@ -292,6 +294,30 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 		sonnet := findModelRate(body.Models, "sonnet")
 		require.NotNil(t, sonnet, "sonnet family rate should exist in 2026-08-31.1")
 		assert.True(t, sonnet.Selected, "sonnet family rate should be selected when an allowlist entry matches the family token")
+	})
+
+	t.Run("keyless provider allowlist does not select rates", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      "openai",
+			AllowedModels: datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}),
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		sonnet := findModelRate(body.Models, "claude-sonnet")
+		require.NotNil(t, sonnet, "claude-sonnet should exist in rates")
+		assert.False(t, sonnet.Selected, "claude-sonnet should not be selected without a hosted API key")
 	})
 }
 
