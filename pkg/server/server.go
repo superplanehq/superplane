@@ -242,12 +242,6 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
-		log.Println("Starting Repository Provisioner")
-		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
-		go w.Start(context.Background())
-	}
-
 	var workerUsageService usage.Service
 	initWorkerUsageService := func() (usage.Service, error) {
 		if workerUsageService != nil {
