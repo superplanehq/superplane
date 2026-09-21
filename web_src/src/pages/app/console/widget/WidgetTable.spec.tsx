@@ -339,6 +339,171 @@ describe("WidgetTable row actions — permission gating", () => {
     renderTable({ canRunNodes: true });
     expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(1);
   });
+
+  it("passes the selected row payload when clicking second row", async () => {
+    const onTrigger = vi.fn().mockResolvedValue(undefined);
+    const THREE_ROWS = [
+      { id: "mem-1", service: "api", pr_number: "101" },
+      { id: "mem-2", service: "web", pr_number: "102" },
+      { id: "mem-3", service: "worker", pr_number: "103" },
+    ];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider
+            canvasId="canvas-1"
+            organizationId="org-1"
+            nodes={[START_NODE]}
+            canRunNodes
+            onTriggerNode={onTrigger}
+          >
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [{ field: "service" }],
+                rowActions: [
+                  {
+                    kind: "trigger",
+                    label: "Redeploy",
+                    node: "start",
+                    payload: { "issue.number": "{{ pr_number }}" },
+                  },
+                ],
+              }}
+              rows={THREE_ROWS}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const triggers = screen.getAllByTestId("widget-row-action-start");
+    expect(triggers).toHaveLength(3);
+    await act(async () => {
+      fireEvent.click(triggers[1]);
+    });
+
+    expect(onTrigger).toHaveBeenCalledWith(
+      "start-id",
+      expect.objectContaining({
+        parameters: expect.objectContaining({
+          issue: { number: "102" },
+        }),
+      }),
+    );
+  });
+
+  it("passes the selected row payload when clicking second row without explicit action.payload", async () => {
+    const onTrigger = vi.fn().mockResolvedValue(undefined);
+    const THREE_ROWS = [
+      { id: "run-1", payload: { pr_number: 101, repo: "superplane" } },
+      { id: "run-2", payload: { pr_number: 102, repo: "superplane" } },
+      { id: "run-3", payload: { pr_number: 103, repo: "superplane" } },
+    ];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider
+            canvasId="canvas-1"
+            organizationId="org-1"
+            nodes={[START_NODE]}
+            canRunNodes
+            onTriggerNode={onTrigger}
+          >
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [{ field: "payload.pr_number" }],
+                rowActions: [
+                  {
+                    kind: "trigger",
+                    label: "Redeploy",
+                    node: "start",
+                  },
+                ],
+              }}
+              rows={THREE_ROWS}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const triggers = screen.getAllByTestId("widget-row-action-start");
+    expect(triggers).toHaveLength(3);
+    await act(async () => {
+      fireEvent.click(triggers[1]);
+    });
+
+    expect(onTrigger).toHaveBeenCalledWith(
+      "start-id",
+      expect.objectContaining({
+        parameters: expect.objectContaining({
+          pr_number: 102,
+          repo: "superplane",
+        }),
+      }),
+    );
+  });
+
+  it("handles flattened memory rows with distinct keys and triggers the clicked row", async () => {
+    const onTrigger = vi.fn().mockResolvedValue(undefined);
+    const ROWS_FROM_MEMORY = [
+      { id: "mem-1:0", title: "First task", priority: "low" },
+      { id: "mem-1:1", title: "Second task", priority: "high" },
+      { id: "mem-1:2", title: "Third task", priority: "critical" },
+    ];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider
+            canvasId="canvas-1"
+            organizationId="org-1"
+            nodes={[START_NODE]}
+            canRunNodes
+            onTriggerNode={onTrigger}
+          >
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [{ field: "title" }],
+                rowActions: [
+                  {
+                    kind: "trigger",
+                    label: "Run task",
+                    node: "start",
+                  },
+                ],
+              }}
+              rows={ROWS_FROM_MEMORY}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const triggers = screen.getAllByTestId("widget-row-action-start");
+    expect(triggers).toHaveLength(3);
+    await act(async () => {
+      fireEvent.click(triggers[2]);
+    });
+
+    expect(onTrigger).toHaveBeenCalledWith(
+      "start-id",
+      expect.objectContaining({
+        parameters: expect.objectContaining({
+          title: "Third task",
+          priority: "critical",
+        }),
+      }),
+    );
+  });
 });
 
 describe("WidgetTable row actions — manual-run gating", () => {
