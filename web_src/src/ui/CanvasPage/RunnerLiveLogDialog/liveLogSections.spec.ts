@@ -201,6 +201,57 @@ describe("liveLogSections", () => {
     expect(tools.tools[1].lines).toEqual([]);
   });
 
+  it("keeps a streamed fenced code block in one note", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = appendLineToLatestSection(state, "```go");
+    state = appendLineToLatestSection(state, "// comment");
+    state = appendLineToLatestSection(state, '\tfmt.Println("hi")');
+    state = appendLineToLatestSection(state, "");
+    state = appendLineToLatestSection(state, "```");
+
+    expect(state.sections[0].lines).toEqual(["```go", "// comment", '\tfmt.Println("hi")', "", "```"]);
+    expect(state.sections[0].events).toEqual([{ kind: "note", text: '```go\n// comment\n\tfmt.Println("hi")\n\n```' }]);
+  });
+
+  it("keeps collecting lines while a fence is open", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = appendLineToLatestSection(state, "```go");
+    state = appendLineToLatestSection(state, "package main");
+
+    expect(state.sections[0].events).toEqual([{ kind: "note", text: "```go\npackage main" }]);
+  });
+
+  it("starts a new note after the closing fence", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = appendLineToLatestSection(state, "```go");
+    state = appendLineToLatestSection(state, "package main");
+    state = appendLineToLatestSection(state, "```");
+    state = appendLineToLatestSection(state, "Done.");
+
+    expect(state.sections[0].events).toEqual([
+      { kind: "note", text: "```go\npackage main\n```" },
+      { kind: "note", text: "Done." },
+    ]);
+  });
+
   it("does not turn blank stdout into prompt notes between tools", () => {
     let state = startCommandSection(emptyState(), {
       index: 5,
