@@ -419,6 +419,30 @@ func ListOpenGitHubFactoryPullRequestsForWebhook(
 	return pullRequests, nil
 }
 
+func ListGitHubFactoryPullRequestsForWebhook(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	repository string,
+	numbers []int64,
+) ([]FactoryPullRequest, error) {
+	repository = strings.TrimSpace(repository)
+	if organizationID == uuid.Nil || repository == "" || len(numbers) == 0 {
+		return nil, nil
+	}
+
+	var pullRequests []FactoryPullRequest
+	err := tx.Model(&FactoryPullRequest{}).
+		Where("organization_id = ?", organizationID).
+		Where("provider = ?", FactoryPullRequestProviderGitHub).
+		Where("repository = ?", repository).
+		Where("number IN ?", numbers).
+		Find(&pullRequests).Error
+	if err != nil {
+		return nil, err
+	}
+	return pullRequests, nil
+}
+
 func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) (*FactoryPullRequest, error) {
 	query := tx.Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID)
 
