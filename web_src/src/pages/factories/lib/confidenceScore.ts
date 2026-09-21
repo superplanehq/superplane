@@ -16,7 +16,7 @@ export function isScoreCheckName(name: string | undefined): boolean {
   return name != null && SCORE_CHECK_NAMES.includes(name);
 }
 
-/** Board cards show the meter next to Start. Only drafts need the request. */
+/** Board cards show the meter next to Start. Only drafts show a score. */
 export function boardCardLoadsConfidenceChecks(displayStatus: WorkOrderDisplayStatus): boolean {
   return displayStatus === "draft";
 }

@@ -8,7 +8,6 @@ import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -54,7 +53,7 @@ function useSplitRunWorkOrderExtras(
   order: ReturnType<typeof useSplitRunPageSelection>["order"],
 ) {
   const orderId = order?.id ?? "";
-  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const orderChecks = order?.checks ?? [];
   const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
   const { data: pullRequests = [] } = useFactoryPullRequests(
     organizationId,

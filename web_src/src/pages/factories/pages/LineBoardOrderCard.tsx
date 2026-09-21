@@ -1,8 +1,7 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
-import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS, useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
-import { useEffect, useMemo, useRef, type ComponentProps } from "react";
+import { useMemo, type ComponentProps } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
@@ -66,26 +65,7 @@ export function LineBoardWorkOrderCard({
     watchSession,
     isAnalyzing,
   );
-  // Poll checks while anything may still write a score. The visible state
-  // below is stricter and matches the refine strip.
-  const showAnalysisActivity = watchSession && (session.isWorking || isAnalyzing);
-  const { data: checks = [], refetch } = useWorkOrderChecks(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryId ?? "",
-    order.id ?? "",
-    {
-      enabled: showConfidence,
-      refetchInterval: showAnalysisActivity ? ANALYZING_WORK_ORDER_CHECKS_POLL_MS : false,
-    },
-  );
-  const wasAnalyzing = useRef(showAnalysisActivity);
-  useEffect(() => {
-    if (wasAnalyzing.current && !showAnalysisActivity && showConfidence) {
-      void refetch?.();
-    }
-    wasAnalyzing.current = showAnalysisActivity;
-  }, [refetch, showAnalysisActivity, showConfidence]);
-  const scores = cardScores(showConfidence, checks, session.session, isAnalyzing);
+  const scores = cardScores(showConfidence, order.checks, session.session, isAnalyzing);
 
   return (
     <WorkOrderCard
@@ -101,7 +81,7 @@ export function LineBoardWorkOrderCard({
 /** Scores from checks, and the strip rule for the thinking state. Nothing when the column hides scores. */
 function cardScores(
   showConfidence: boolean,
-  checks: FactoriesWorkOrderCheck[],
+  checks: FactoriesWorkOrderCheck[] | undefined,
   session: PlanningSessionMachineInput | null,
   backlogAnalyzing: boolean,
 ): Pick<ComponentProps<typeof WorkOrderCard>, "clarityScore" | "confidenceScore" | "isAnalyzing"> {

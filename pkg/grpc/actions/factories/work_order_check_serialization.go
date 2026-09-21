@@ -1,47 +1,10 @@
 package factories
 
 import (
-	"context"
-
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-func ListWorkOrderChecks(
-	ctx context.Context,
-	organizationID string,
-	req *pb.ListWorkOrderChecksRequest,
-) (*pb.ListWorkOrderChecksResponse, error) {
-	orgID, err := parseOrganizationID(organizationID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
-	db := database.DB(ctx)
-	factoryModel, err := findFactory(db, orgID, req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
-	order, err := findWorkOrder(db, factoryModel, req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
-	checks, err := order.ListChecks(db)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
-	serialized, err := serializeChecks(checks)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order checks")
-	}
-
-	return &pb.ListWorkOrderChecksResponse{Checks: serialized}, nil
-}
 
 func serializeChecks(checks []models.FactoryWorkOrderCheck) ([]*pb.WorkOrderCheck, error) {
 	result := make([]*pb.WorkOrderCheck, 0, len(checks))

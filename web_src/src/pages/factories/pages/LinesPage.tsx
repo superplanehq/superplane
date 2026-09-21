@@ -21,7 +21,6 @@ import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryInt
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -994,7 +993,6 @@ function LineBoardSplitRunPopup({
   isAnalyzing: boolean;
   onClose: () => void;
 }) {
-  const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
     workOrderIds: [peekOrderId],
@@ -1014,7 +1012,7 @@ function LineBoardSplitRunPopup({
       orderNumber={peekOrder.number}
       lineId={lineId}
       fixture={splitRunFixtureForWorkOrder(peekOrder, {
-        checks: peekChecks,
+        checks: peekOrder.checks,
         artifacts: peekArtifacts,
         lineId,
         lineName: resolvedLineName,

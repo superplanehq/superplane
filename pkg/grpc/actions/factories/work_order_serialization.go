@@ -55,6 +55,9 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	if err := attachWorkOrderFiles(ctx, db, serialized, order.ID); err != nil {
 		return nil, err
 	}
+	if err := attachWorkOrderChecks(db, []*pb.WorkOrder{serialized}); err != nil {
+		return nil, err
+	}
 	return serialized, nil
 }
 
@@ -112,7 +115,46 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		result[i] = serialized
 	}
 
+	if err := attachWorkOrderChecks(db, result); err != nil {
+		return nil, err
+	}
+
 	return result, nil
+}
+
+func attachWorkOrderChecks(db *gorm.DB, orders []*pb.WorkOrder) error {
+	ids := make([]uuid.UUID, 0, len(orders))
+	for _, order := range orders {
+		if order == nil || order.GetId() == "" {
+			continue
+		}
+		id, err := uuid.Parse(order.GetId())
+		if err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+
+	grouped, err := models.ListChecksForWorkOrders(db, ids)
+	if err != nil {
+		return err
+	}
+
+	for _, order := range orders {
+		if order == nil || order.GetId() == "" {
+			continue
+		}
+		id, err := uuid.Parse(order.GetId())
+		if err != nil {
+			return err
+		}
+		serialized, err := serializeChecks(grouped[id])
+		if err != nil {
+			return err
+		}
+		order.Checks = serialized
+	}
+	return nil
 }
 
 // loadWorkOrderAssigneeUsers reloads assignees with User so the API can
