@@ -61,7 +61,7 @@ export const getDropletMapper: ComponentBaseMapper = {
       details["IP Address"] = ip;
     }
 
-    if (droplet.tags && droplet.tags.length > 0) {
+    if (Array.isArray(droplet.tags) && droplet.tags.length > 0) {
       details["Tags"] = droplet.tags.join(", ");
     }
 
