@@ -29,9 +29,9 @@ func (m *mockClient) ProjectID() string {
 
 // withFactory installs a factory that returns the given mock client.
 func withFactory(mc *mockClient) {
-	SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
+	newClient = func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
 		return mc, nil
-	})
+	}
 }
 
 // firstPayload returns the single emitted payload's data map.

@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type GetBucket struct{}
@@ -109,7 +110,7 @@ func (g *GetBucket) Execute(ctx core.ExecutionContext) error {
 
 	b, err := getBucket(context.Background(), client, bucket)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to get bucket", err, roleHintViewer))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to get bucket", roleHintViewer))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, bucketPayloadType, []any{bucketPayload(b)})

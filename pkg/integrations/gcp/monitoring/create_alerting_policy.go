@@ -11,6 +11,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 const maxPolicyConditions = 6
@@ -320,7 +321,7 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 	endpoint := fmt.Sprintf("%s/projects/%s/alertPolicies", monitoringBaseURL, client.ProjectID())
 	body, err := client.PostURL(context.Background(), endpoint, policy)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create alerting policy", roleHintWrite, err))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to create alerting policy", roleHintWrite))
 	}
 
 	var created alertPolicy

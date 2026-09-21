@@ -118,7 +118,7 @@ func (d *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 				map[string]any{"name": instance, "deleted": true},
 			})
 		}
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete instance", err, roleHintAdmin))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to delete instance", roleHintAdmin))
 	}
 
 	// Instance deletion takes minutes, so poll until the instance is gone instead

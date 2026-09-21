@@ -70,7 +70,7 @@ func Test__CreateStaticIP__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -109,7 +109,7 @@ func Test__CreateStaticIP__Execute(t *testing.T) {
 				return addressJSON("web-ip", "34.1.2.3", "us-central1", "RESERVED", "EXTERNAL", "PREMIUM"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -130,7 +130,7 @@ func Test__CreateStaticIP__Execute(t *testing.T) {
 				return nil, &gcpcommon.GCPAPIError{StatusCode: http.StatusConflict, Message: "already exists"}
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{

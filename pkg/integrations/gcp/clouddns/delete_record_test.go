@@ -93,7 +93,7 @@ func TestDeleteRecord_Execute(t *testing.T) {
 	}
 
 	t.Run("looks up existing record and emits output when done", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -107,7 +107,7 @@ func TestDeleteRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&DeleteRecord{}).Execute(core.ExecutionContext{
@@ -126,14 +126,14 @@ func TestDeleteRecord_Execute(t *testing.T) {
 	})
 
 	t.Run("fails when record does not exist", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
 					return json.Marshal(map[string]any{"rrsets": []any{}})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&DeleteRecord{}).Execute(core.ExecutionContext{
@@ -154,7 +154,7 @@ func TestDeleteRecord_Execute(t *testing.T) {
 
 	t.Run("deletes all record types when type is omitted", func(t *testing.T) {
 		var capturedBody any
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -169,7 +169,7 @@ func TestDeleteRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&DeleteRecord{}).Execute(core.ExecutionContext{
@@ -199,7 +199,7 @@ func TestDeleteRecord_Execute(t *testing.T) {
 	})
 
 	t.Run("fails when change status is unexpected", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -213,7 +213,7 @@ func TestDeleteRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -84,42 +83,8 @@ func GetAddress(ctx context.Context, client Client, project, region, name string
 // WaitForRegionOperation polls a regional operation until it reaches DONE,
 // mirroring WaitForZoneOperation for regional resources such as addresses.
 func WaitForRegionOperation(ctx context.Context, client Client, project, region, operationName string) error {
-	path := fmt.Sprintf("projects/%s/regions/%s/operations/%s", project, region, operationName)
-	deadline := time.Now().Add(defaultOperationWaitTimeout)
-	ticker := time.NewTicker(operationPollInterval)
-	defer ticker.Stop()
-	for {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for operation %s", operationName)
-		}
-		body, err := client.Get(ctx, path)
-		if err != nil {
-			return err
-		}
-		var op zoneOperationResp
-		if err := json.Unmarshal(body, &op); err != nil {
-			return fmt.Errorf("parse operation response: %w", err)
-		}
-		switch op.Status {
-		case opStatusDone:
-			if op.Error != nil && len(op.Error.Errors) > 0 {
-				msg := op.Error.Errors[0].Message
-				if msg == "" {
-					msg = op.Error.Errors[0].Code
-				}
-				return fmt.Errorf("operation failed: %s", msg)
-			}
-			return nil
-		case opStatusPending, opStatusRunning:
-		default:
-			return fmt.Errorf("unexpected operation status: %s", op.Status)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
-	}
+	return waitForComputeOperation(ctx, client,
+		fmt.Sprintf("projects/%s/regions/%s/operations/%s", project, region, operationName), operationName)
 }
 
 type addressesScopedList struct {

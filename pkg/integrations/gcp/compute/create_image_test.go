@@ -100,7 +100,7 @@ func Test__CreateImage__Execute(t *testing.T) {
 				return imageGetJSON("img", "READY", "my-app", map[string]string{"env": "prod"}, "fp", ""), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -144,7 +144,7 @@ func Test__CreateImage__Execute(t *testing.T) {
 				return imageGetJSON("img", "READY", "", nil, "fp", ""), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -170,7 +170,7 @@ func Test__CreateImage__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -198,7 +198,7 @@ func Test__CreateImage__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -218,7 +218,7 @@ func Test__CreateImage__Execute(t *testing.T) {
 				return []byte("not-json"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{

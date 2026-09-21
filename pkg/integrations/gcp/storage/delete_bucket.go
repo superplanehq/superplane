@@ -119,7 +119,7 @@ func (d *DeleteBucket) Execute(ctx core.ExecutionContext) error {
 				map[string]any{"name": bucket, "deleted": true},
 			})
 		}
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete bucket", err, roleHintAdmin))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to delete bucket", roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, bucketPayloadType, []any{

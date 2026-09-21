@@ -184,7 +184,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-http", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -231,7 +231,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op", firewallGetJSON("deny-ssh", "INGRESS", "deny")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -260,7 +260,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op", firewallGetJSON("egress-rule", "EGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -289,7 +289,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op", firewallGetJSON("top-prio", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -316,7 +316,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -343,7 +343,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -367,7 +367,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return []byte("not-json"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -394,7 +394,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-sa", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -431,7 +431,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -464,7 +464,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-sa", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -499,7 +499,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -529,7 +529,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-tagged", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -562,7 +562,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-all", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -595,7 +595,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 			},
 			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-all-proto", "INGRESS", "allow")),
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -628,7 +628,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -658,7 +658,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
