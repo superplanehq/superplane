@@ -121,7 +121,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a Sentry exception is reported.",
 		triggerComponent:     "sentry.onIssue",
 		triggerName:          "On Issue Event",
-		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
+		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		analysisSubject:      "Sentry exception",
 		createTitle:          "{{ root().data.data.issue.title }}",
 		createDescription:    "{{ root().data.description }}",
@@ -408,6 +408,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return defaultJiraIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		return defaultSentryIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

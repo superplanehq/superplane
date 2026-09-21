@@ -95,9 +95,25 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.NotContains(t, create.Configuration["description"], "permalink")
 	})
 
-	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {
+	t.Run("a Sentry issue flows from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+		require.NoError(t, err)
+
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, intakeSentryActionsFor(defaultSentryIntakeSettings()), trigger.Configuration["actions"])
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.Component)
+		assert.Equal(t, "true", filter.Configuration["expression"])
+	})
+
+	t.Run("PagerDuty and Productive.io create a work order without a filter", func(t *testing.T) {
 		for _, source := range []string{
-			models.FactoryIntakeSourceSentryExceptions,
 			models.FactoryIntakeSourcePagerDutyIncidents,
 			models.FactoryIntakeSourceProductiveTasks,
 		} {
