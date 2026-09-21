@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
-	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
@@ -808,54 +807,14 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 		return
 	}
 
-	organization, err := models.FindOrganizationByID(orgID)
-	if err != nil {
+	if _, err := models.FindOrganizationByID(orgID); err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
 		return
 	}
-	featureWasEnabled := organization.HasExperimentalFeature(featureID)
-
 	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
 		log.Errorf("admin: failed to enable feature %s for org %s: %v", featureID, orgID, err)
 		http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
 		return
-	}
-
-	if featureID == features.FeatureFactoryCreateWithAgent {
-		result, upgradeErr := factoryactions.UpgradeDefaultBacklogTemplates(
-			r.Context(),
-			factoryactions.IntakeDependencies{
-				Registry:       s.registry,
-				Encryptor:      s.encryptor,
-				AuthService:    s.authService,
-				GitProvider:    s.gitProvider,
-				WebhookBaseURL: s.WebhooksBaseURL,
-				UsageService:   s.usageService,
-			},
-			parsedOrgID,
-		)
-		if upgradeErr != nil {
-			log.Errorf(
-				"admin: failed to upgrade Backlog templates for org %s: upgraded=%d skipped=%d: %v",
-				orgID,
-				result.Upgraded,
-				result.Skipped,
-				upgradeErr,
-			)
-			if !featureWasEnabled {
-				if rollbackErr := models.DisableExperimentalFeature(parsedOrgID, featureID); rollbackErr != nil {
-					log.Errorf("admin: failed to roll back feature %s for org %s: %v", featureID, orgID, rollbackErr)
-				}
-			}
-			http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
-			return
-		}
-		log.Infof(
-			"admin: upgraded Backlog templates for org %s: upgraded=%d skipped=%d",
-			orgID,
-			result.Upgraded,
-			result.Skipped,
-		)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

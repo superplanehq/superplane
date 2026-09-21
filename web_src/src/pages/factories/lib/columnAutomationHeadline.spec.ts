@@ -30,8 +30,14 @@ describe("columnAutomationHeadline", () => {
     expect(columnAutomationHeadline(intake)).toBe("Listens to Jira tickets");
   });
 
-  it("describes task analysis", () => {
-    expect(columnAutomationHeadline(automation({ kind: "analysis", catalogId: "analysis" }))).toBe("Scores new tasks");
+  it("describes Planning when the analysis automation is on", () => {
+    expect(columnAutomationHeadline(automation({ kind: "analysis", catalogId: "analysis" }))).toBe("Plans new tasks");
+  });
+
+  it("describes Planning as off when the analysis automation is disabled", () => {
+    expect(columnAutomationHeadline(automation({ kind: "analysis", catalogId: "analysis", health: "disabled" }))).toBe(
+      "Planning is off",
+    );
   });
 
   it("names the agent after the column step", () => {

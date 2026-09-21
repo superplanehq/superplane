@@ -1,8 +1,6 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { canvasKeys, useCanvas, useCommitCanvasStaging, useUpdateCanvasVersion } from "@/hooks/useCanvasData";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -22,6 +20,7 @@ const REFINEMENT_AGENT_NODE_ID = "refine-task";
 interface ColumnCanvasAgentEditorOptions {
   showVisualEvidenceSetting?: boolean;
   synchronizedAgentNodeIds?: readonly string[];
+  preferredAgentNodeId?: string;
 }
 
 function editableAgentNodeIds(
@@ -50,10 +49,9 @@ export function useColumnCanvasAgentEditor(
   const commitStaging = useCommitCanvasStaging(canvasId);
   const queryClient = useQueryClient();
   const [editorOpen, setEditorOpen] = useState(false);
-  const features = useExperimentalFeature(organizationId);
 
   const canvas = canvasQuery.data;
-  const preferredAgentNodeId = features.has(FEATURE_FACTORY_CREATE_WITH_AGENT) ? REFINEMENT_AGENT_NODE_ID : undefined;
+  const preferredAgentNodeId = options.preferredAgentNodeId ?? REFINEMENT_AGENT_NODE_ID;
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
   const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizedAgentNodeIds);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
@@ -75,7 +73,7 @@ export function useColumnCanvasAgentEditor(
   return {
     agentNode,
     agentNodeIds,
-    isLoading: enabled && (canvasQuery.isPending || features.isLoading),
+    isLoading: enabled && canvasQuery.isPending,
     draft,
     showVisualEvidenceSetting,
     editorOpen,
