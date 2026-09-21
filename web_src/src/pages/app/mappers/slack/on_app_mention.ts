@@ -4,6 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerProps } from "@/ui/trigger";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import { stringOrDash } from "../utils";
 
 interface OnAppMentionConfiguration {
   channel?: string;
@@ -31,24 +32,18 @@ interface AppMentionEventData {
 export const onAppMentionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as AppMentionEventData | undefined;
-    const title = eventData?.text?.trim() ? eventData.text : "App mention";
-    const subtitle = buildSubtitle(
-      eventData?.user ? `Mention by ${eventData.user}` : "Mention",
-      context.event?.createdAt,
-    );
 
     return {
-      title,
-      subtitle,
+      title: mentionTitle(eventData),
+      subtitle: buildSubtitle(mentionByline(eventData), context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as AppMentionEventData | undefined;
-    const mentionedAt = formatSlackTimestamp(eventData?.ts || eventData?.event_ts);
 
     return {
-      "Mentioned At": mentionedAt || "",
+      "Mentioned At": formatSlackTimestamp(eventData?.ts || eventData?.event_ts) || "",
       Channel: stringOrDash(eventData?.channel),
       User: stringOrDash(eventData?.user),
       Text: stringOrDash(eventData?.text),
@@ -60,15 +55,6 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as OnAppMentionMetadata | undefined;
     const configuration = node.configuration as OnAppMentionConfiguration | undefined;
-    const metadataItems = [];
-
-    const channelLabel = metadata?.channel?.name || configuration?.channel;
-    if (channelLabel) {
-      metadataItems.push({
-        icon: "hash",
-        label: channelLabel,
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -76,14 +62,11 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
       iconSlug: "slack",
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: mentionMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as AppMentionEventData | undefined;
-      const title = eventData?.text?.trim() ? eventData.text : "App mention";
-      const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", lastEvent.createdAt);
-
+      const { title, subtitle } = onAppMentionTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
@@ -97,12 +80,26 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
   },
 };
 
-function stringOrDash(value?: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
+function mentionTitle(eventData?: AppMentionEventData): string {
+  return eventData?.text?.trim() ? eventData.text : "App mention";
+}
+
+function mentionByline(eventData?: AppMentionEventData): string {
+  return eventData?.user ? `Mention by ${eventData.user}` : "Mention";
+}
+
+function mentionMetadataItems(metadata?: OnAppMentionMetadata, configuration?: OnAppMentionConfiguration) {
+  const channelLabel = metadata?.channel?.name || configuration?.channel;
+  if (!channelLabel) {
+    return [];
   }
 
-  return String(value);
+  return [
+    {
+      icon: "hash",
+      label: channelLabel,
+    },
+  ];
 }
 
 function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
