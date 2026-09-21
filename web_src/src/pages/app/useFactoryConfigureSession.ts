@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import type { ActionsAction, CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
 import type { ResyncStagedOptions } from "@/hooks/useCanvasStagingResync";
@@ -9,6 +9,7 @@ import {
   type FactoryConfigureSaveOptions,
 } from "./factoryConfigureActions";
 import { useFactoryConfigureEnter } from "./useFactoryConfigureEnter";
+import { applyFactoryCanvasLayout } from "./useTopologyMutationCommit";
 
 export type FactoryConfigureActions = {
   save: (options?: FactoryConfigureSaveOptions) => Promise<void>;
@@ -65,7 +66,8 @@ type UseFactoryConfigureSessionOptions = {
   hasStagingChanges: boolean;
   hasUncommittedCanvasDraftChanges: boolean;
   applyLocalWorkflowUpdate: (updatedWorkflow: CanvasesCanvas) => void;
-  layoutDraftWorkflow?: (workflow: CanvasesCanvas) => Promise<CanvasesCanvas>;
+  factoryAutoLayout?: boolean;
+  components?: ActionsAction[];
 };
 
 /**
@@ -98,7 +100,8 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
     applyLocalWorkflowUpdate,
-    layoutDraftWorkflow,
+    factoryAutoLayout,
+    components,
   } = options;
 
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
@@ -107,8 +110,10 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
   onFactoryConfigureSavedRef.current = onFactoryConfigureSaved;
   const editSessionActiveRef = useRef(editSessionActive);
   editSessionActiveRef.current = editSessionActive;
-  const layoutDraftWorkflowRef = useRef(layoutDraftWorkflow);
-  layoutDraftWorkflowRef.current = layoutDraftWorkflow;
+  const factoryAutoLayoutRef = useRef(factoryAutoLayout);
+  factoryAutoLayoutRef.current = factoryAutoLayout;
+  const componentsRef = useRef(components);
+  componentsRef.current = components;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
   const { allowNextConfigureEnter, configureVisitIdRef } = useFactoryConfigureEnter(options);
@@ -173,8 +178,9 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
             const requestedVersionId = activeCanvasVersionIdRef.current;
             const requestedEditSessionActive = editSessionActiveRef.current;
             const merged = { ...current, spec };
-            const layout = layoutDraftWorkflowRef.current;
-            const nextWorkflow = layout ? await layout(merged) : merged;
+            const nextWorkflow = factoryAutoLayoutRef.current
+              ? await applyFactoryCanvasLayout(merged, componentsRef.current || [])
+              : merged;
             if (
               configureVisitIdRef.current !== requestedVisitId ||
               activeCanvasVersionIdRef.current !== requestedVersionId ||
