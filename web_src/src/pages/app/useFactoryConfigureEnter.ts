@@ -142,5 +142,5 @@ export function useFactoryConfigureEnter({
     configureEnterNonce,
   ]);
 
-  return { allowNextConfigureEnter };
+  return { allowNextConfigureEnter, configureVisitIdRef };
 }
