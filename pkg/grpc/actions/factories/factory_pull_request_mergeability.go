@@ -135,6 +135,165 @@ func evaluateFactoryPullRequestMergeability(
 	return result, nil
 }
 
+func persistFactoryPullRequestMergeability(
+	db *gorm.DB,
+	pullRequest *models.FactoryPullRequest,
+	result *factoryPullRequestMergeability,
+) error {
+	if pullRequest == nil || result == nil {
+		return nil
+	}
+	if result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
+		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
+		return nil
+	}
+	return pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      result.CanMerge,
+		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
+		BlockedMessage: result.Message,
+		HeadSHA:        result.HeadSHA,
+		AllowedMethods: mergeMethodNames(result.AllowedMethods),
+	})
+}
+
+func syncFactoryPullRequestMergeability(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*factoryPullRequestMergeability, error) {
+	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	if err != nil {
+		return nil, err
+	}
+	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func mergeabilityFromCache(
+	db *gorm.DB,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*factoryPullRequestMergeability, bool, error) {
+	result := &factoryPullRequestMergeability{
+		PullRequest:    pullRequest,
+		HeadSHA:        pullRequest.MergeableHeadSHA,
+		AllowedMethods: mergeMethodsFromNames(pullRequest.CachedAllowedMethods()),
+	}
+	active, err := factoryPullRequestHasActiveAutomation(db, factory, pullRequest)
+	if err != nil {
+		return nil, false, err
+	}
+	if active {
+		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, mergeBlockedActiveRun), true, nil
+	}
+	if !pullRequest.HasCachedMergeability() {
+		return result, false, nil
+	}
+	matchesHead, err := cachedMergeabilityMatchesHead(db, pullRequest)
+	if err != nil {
+		return nil, false, err
+	}
+	if !matchesHead {
+		return result, false, nil
+	}
+	reason := mergeabilityBlockedReasonFromName(pullRequest.MergeBlockedReason)
+	if reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
+		reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
+		return result, false, nil
+	}
+	if pullRequest.Mergeable {
+		if len(result.AllowedMethods) == 0 {
+			return result, false, nil
+		}
+		result.CanMerge = true
+		return result, true, nil
+	}
+	return blockedMergeability(result, reason, pullRequest.MergeBlockedMessage), true, nil
+}
+
+func cachedMergeabilityMatchesHead(db *gorm.DB, pullRequest *models.FactoryPullRequest) (bool, error) {
+	if pullRequest.CurrentRevisionID == nil {
+		return true, nil
+	}
+	revision, err := models.FindPullRequestRevision(db, *pullRequest.CurrentRevisionID)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(revision.SHA), strings.TrimSpace(pullRequest.MergeableHeadSHA)), nil
+}
+
+func mergeMethodNames(methods []pb.FactoryPullRequestMergeability_MergeMethod) string {
+	names := make([]string, 0, len(methods))
+	for _, method := range methods {
+		switch method {
+		case pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH:
+			names = append(names, "SQUASH")
+		case pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE:
+			names = append(names, "MERGE")
+		case pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE:
+			names = append(names, "REBASE")
+		}
+	}
+	return strings.Join(names, ",")
+}
+
+func mergeMethodsFromNames(names []string) []pb.FactoryPullRequestMergeability_MergeMethod {
+	methods := make([]pb.FactoryPullRequestMergeability_MergeMethod, 0, len(names))
+	for _, name := range names {
+		switch strings.ToUpper(strings.TrimSpace(name)) {
+		case "SQUASH":
+			methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH)
+		case "MERGE":
+			methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE)
+		case "REBASE":
+			methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE)
+		}
+	}
+	return methods
+}
+
+func mergeabilityBlockedReasonName(reason pb.FactoryPullRequestMergeability_BlockedReason) string {
+	switch reason {
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN:
+		return "ACTIVE_RUN"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED:
+		return "CHECKS_UNFINISHED"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED:
+		return "CHECK_FAILED"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT:
+		return "DRAFT"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING:
+		return "CONFLICTING"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION:
+		return "MISSING_INTEGRATION"
+	default:
+		return ""
+	}
+}
+
+func mergeabilityBlockedReasonFromName(name string) pb.FactoryPullRequestMergeability_BlockedReason {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "ACTIVE_RUN":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN
+	case "CHECKS_UNFINISHED":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED
+	case "CHECK_FAILED":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED
+	case "DRAFT":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT
+	case "CONFLICTING":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING
+	case "MISSING_INTEGRATION":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION
+	default:
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED
+	}
+}
+
 func blockedMergeability(
 	result *factoryPullRequestMergeability,
 	reason pb.FactoryPullRequestMergeability_BlockedReason,

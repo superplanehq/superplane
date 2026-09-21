@@ -70,6 +70,13 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 
+  it("shows a Mergeable pill next to an open Review pill", () => {
+    renderCard({ pullRequests: [{ ...openPullRequest, mergeable: true }] });
+
+    expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
+  });
+
   it("keeps Waiting for user review when the pull request is closed", () => {
     renderCard({
       pullRequests: [{ ...openPullRequest, id: "pr-closed", state: "STATE_CLOSED" }],
