@@ -241,31 +241,60 @@ function applyBufferedRecord(state: LogState, record: PendingLiveLogRecord, comm
 
 function appendLineToSection(section: CommandSection, text: string): CommandSection {
   const withLine = { ...section, lines: [...section.lines, text] };
-  if (!isPromptSection(section) || !text.trim()) {
+  if (!isPromptSection(section)) {
     return withLine;
   }
 
   const running = runningToolsInSection(section);
-  if (running.length !== 1) {
+  if (running.length === 1) {
+    if (!text.trim()) {
+      return withLine;
+    }
+    const open = running[0];
     return {
       ...withLine,
-      events: [...section.events, { kind: "note", text }],
+      events: section.events.map((event) => {
+        if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
+          return event;
+        }
+        return {
+          ...event,
+          tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
+        };
+      }),
     };
   }
 
-  const open = running[0];
+  const last = section.events.at(-1);
+  if (last?.kind === "note" && noteHasUnclosedFence(last.text)) {
+    return {
+      ...withLine,
+      events: [...section.events.slice(0, -1), { kind: "note", text: `${last.text}\n${text}` }],
+    };
+  }
+
+  if (!text.trim()) {
+    return withLine;
+  }
+
   return {
     ...withLine,
-    events: section.events.map((event) => {
-      if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
-        return event;
-      }
-      return {
-        ...event,
-        tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
-      };
-    }),
+    events: [...section.events, { kind: "note", text }],
   };
+}
+
+function noteHasUnclosedFence(text: string): boolean {
+  let fenceCount = 0;
+  for (const line of text.split("\n")) {
+    if (isMarkdownFenceLine(line)) {
+      fenceCount += 1;
+    }
+  }
+  return fenceCount % 2 === 1;
+}
+
+function isMarkdownFenceLine(line: string): boolean {
+  return /^\s*```/.test(line);
 }
 
 function startToolOnSection(section: CommandSection, kind: string, text: string, sourceId?: string): CommandSection {
