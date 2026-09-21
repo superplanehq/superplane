@@ -15,6 +15,11 @@ interface OnIncidentMetadata {
   };
 }
 
+interface OnIncidentConfiguration {
+  events?: string[];
+  urgencies?: string[];
+}
+
 interface OnIncidentEventData {
   agent?: Agent;
   incident?: Incident;
@@ -27,12 +32,10 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = (context.event?.data as { data?: OnIncidentEventData } | undefined)?.data;
     const incident = eventData?.incident;
-    const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
-    const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
     return {
-      title: `${incident?.id || ""} - ${incident?.title || ""}`,
-      subtitle,
+      title: incidentTitle(incident),
+      subtitle: buildSubtitle(incidentContent(incident), context.event?.createdAt),
     };
   },
 
@@ -44,55 +47,72 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnIncidentMetadata;
-    const configuration = node.configuration as { events?: string[]; urgencies?: string[] } | undefined;
-    const metadataItems = [];
-
-    if (metadata?.service?.name) {
-      metadataItems.push({
-        icon: "bell",
-        label: metadata.service.name,
-      });
-    }
-
-    if (configuration?.events) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Events: ${configuration.events.join(", ")}`,
-      });
-    }
-
-    if (configuration?.urgencies) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Urgencies: ${configuration.urgencies.join(", ")}`,
-      });
-    }
+    const configuration = node.configuration as OnIncidentConfiguration | undefined;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: incidentMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnIncidentEventData;
-      const incident = eventData?.incident;
-      const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
-      const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
-
-      props.lastEventData = {
-        title: `${incident?.id || ""} - ${incident?.title || ""}`,
-        subtitle,
-        receivedAt: new Date(lastEvent.createdAt),
-        state: "triggered",
-        eventId: lastEvent.id,
-      };
+      props.lastEventData = lastIncidentEventData(lastEvent.data as OnIncidentEventData, lastEvent);
     }
 
     return props;
   },
 };
+
+function incidentTitle(incident?: Incident): string {
+  return `${incident?.id || ""} - ${incident?.title || ""}`;
+}
+
+function incidentContent(incident?: Incident): string {
+  return [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
+}
+
+function incidentMetadataItems(metadata?: OnIncidentMetadata, configuration?: OnIncidentConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.service?.name) {
+    metadataItems.push({
+      icon: "bell",
+      label: metadata.service.name,
+    });
+  }
+
+  if (configuration?.events) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Events: ${configuration.events.join(", ")}`,
+    });
+  }
+
+  if (configuration?.urgencies) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Urgencies: ${configuration.urgencies.join(", ")}`,
+    });
+  }
+
+  return metadataItems;
+}
+
+function lastIncidentEventData(
+  eventData: OnIncidentEventData | undefined,
+  lastEvent: { createdAt: string; id: string },
+) {
+  const incident = eventData?.incident;
+
+  return {
+    title: incidentTitle(incident),
+    subtitle: buildSubtitle(incidentContent(incident), lastEvent.createdAt),
+    receivedAt: new Date(lastEvent.createdAt),
+    state: "triggered",
+    eventId: lastEvent.id,
+  };
+}
 
 function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
   if (content && createdAt) {
