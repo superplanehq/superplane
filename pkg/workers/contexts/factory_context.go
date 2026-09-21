@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -123,37 +124,74 @@ func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *Fact
 	return c
 }
 
-func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
+func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
-		return nil, errors.New("cannot create work order while executing another work order")
+		return nil, false, errors.New("cannot create work order while executing another work order")
 	}
 	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	if c.canvas.FactoryID == nil {
-		return nil, errors.New("app is not owned by a factory")
+		return nil, false, errors.New("app is not owned by a factory")
 	}
 
 	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+
+	skip, err := c.skipDuplicateSentryWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
 	}
 
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if err := c.prepareWorkOrderFiles(order); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
-	return workOrderToCore(order), nil
+	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) skipDuplicateSentryWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	issueID, ok := sentry.IssueIDFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := sentry.LockIssueWorkOrder(c.tx, factoryModel, issueID); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := sentry.IssueHasWorkOrder(c.tx, factoryModel, issueID)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Sentry issue %s: work order already exists", issueID)
+	}
+	return hasOrder, nil
 }
 
 func (c *FactoryContext) createFactoryWorkOrder(

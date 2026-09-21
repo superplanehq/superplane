@@ -52,10 +52,22 @@ type fakeFactoryContext struct {
 	lastUpdateParams core.UpdatePullRequestActivityParams
 	updateResult     *core.PullRequestActivityResult
 	updateErr        error
+
+	createCalls   int
+	createCreated bool
+	createOrder   *core.WorkOrder
+	createErr     error
 }
 
-func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
-	return nil, nil
+func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	f.createCalls++
+	if f.createErr != nil {
+		return nil, false, f.createErr
+	}
+	if f.createOrder != nil {
+		return f.createOrder, f.createCreated, nil
+	}
+	return nil, f.createCreated, nil
 }
 
 func (f *fakeFactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
@@ -148,6 +160,45 @@ func (f *fakeFactoryContext) UpdatePullRequestActivity(params core.UpdatePullReq
 		Activity:    &core.PullRequestActivity{Title: title, Description: description, Access: params.Access, State: "active"},
 		Outcome:     core.PullRequestActivityOutcomeReady,
 	}, nil
+}
+
+func TestCreateWorkOrder_Execute(t *testing.T) {
+	component := &CreateWorkOrder{}
+	workOrder := &core.WorkOrder{ID: "wo-1", Title: "t", State: "draft"}
+
+	t.Run("emits workOrder.created when a task is inserted", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{createCreated: true, createOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"title": "t"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.createCalls)
+		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+		assert.Equal(t, "workOrder.created", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+	})
+
+	t.Run("passes silently when the issue already has a task", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{createCreated: false}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"title": "t"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.createCalls)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Empty(t, stateCtx.Channel, "skip must not emit on any channel")
+		assert.Empty(t, stateCtx.Type)
+		assert.Nil(t, stateCtx.Payloads)
+	})
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {

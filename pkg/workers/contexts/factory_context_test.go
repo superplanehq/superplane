@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestFactoryContext_CreateWorkOrder(t *testing.T) {
@@ -38,10 +40,11 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	t.Run("creates work order on factory-owned app", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		workOrder, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		workOrder, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
 			Title:       "From GitHub issue",
 			Description: "Automated intake",
 		})
+		require.True(t, created)
 		require.NoError(t, err)
 		assert.Equal(t, "From GitHub issue", workOrder.Title)
 		assert.Equal(t, "Automated intake", workOrder.Description)
@@ -110,8 +113,9 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-		created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
 		require.NoError(t, err)
+		require.True(t, inserted)
 
 		persisted, err := factory.FindWorkOrder(database.Conn(), uuid.MustParse(created.ID))
 		require.NoError(t, err)
@@ -123,7 +127,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	t.Run("rejects blank title", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, models.ErrFactoryWorkOrderTitleRequired)
 	})
@@ -132,7 +136,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		regularCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		ctx := NewFactoryContext(database.Conn(), regularCanvas, nodeExecution)
 
-		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
 		require.Error(t, err)
 		assert.EqualError(t, err, "app is not owned by a factory")
 	})
@@ -164,9 +168,212 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&workOrderExecution).Error)
 
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-		_, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
+		_, _, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
 		require.Error(t, err)
 		assert.EqualError(t, err, "cannot create work order while executing another work order")
+	})
+}
+
+func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	sentryPayload := func(issueID string) map[string]any {
+		return map[string]any{
+			"type": "sentry.issue",
+			"data": map[string]any{
+				"resource": "issue",
+				"action":   "created",
+				"data": map[string]any{
+					"issue": map[string]any{
+						"id":        issueID,
+						"title":     "boom",
+						"permalink": "https://acme.sentry.io/issues/" + issueID + "/",
+					},
+				},
+			},
+		}
+	}
+
+	countOrders := func(factoryModel *models.Factory) int {
+		t.Helper()
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{})
+		require.NoError(t, err)
+		return len(orders)
+	}
+
+	t.Run("skips a Sentry issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing sentry task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.sentry.io/issues/123/", Label: "boom"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("123"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("does not skip issue 12 when issue 123 already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Issue 123",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.sentry.io/issues/123/", Label: "123"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("12"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("skips a self-hosted Sentry issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing sentry task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://sentry.internal.example/issues/123/", Label: "boom"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("123"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("creates a task when the Sentry issue has none", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("456"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		origin := models.WorkOrderOrigin{
+			URL:   "https://github.com/acme/payments/issues/12",
+			Label: "acme/payments#12",
+		}
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"First github task",
+			"",
+			nil,
+			nil,
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": origin.URL,
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("serializes concurrent creates for the same Sentry issue", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		canvasOne, executionOne, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("789"))
+		canvasTwo, executionTwo, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("789"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasOne.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasTwo.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		created := make([]bool, 2)
+		errs := make([]error, 2)
+		canvases := []*models.Canvas{canvasOne, canvasTwo}
+		executions := []*models.CanvasNodeExecution{executionOne, executionTwo}
+
+		for i := 0; i < 2; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					ctx := NewFactoryContext(tx, canvases[idx], executions[idx])
+					_, didCreate, createErr := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+					created[idx] = didCreate
+					return createErr
+				})
+			}(i)
+		}
+
+		close(start)
+		wg.Wait()
+
+		for _, createErr := range errs {
+			require.NoError(t, createErr)
+		}
+
+		createdCount := 0
+		for _, didCreate := range created {
+			if didCreate {
+				createdCount++
+			}
+		}
+		assert.Equal(t, 1, createdCount)
+		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 }
 
@@ -999,10 +1206,11 @@ func TestFactoryContext_CreateWorkOrderIngestsGitHubImagesBeforeEmit(t *testing.
 			}, nil
 		},
 	)
-	created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
 		Title:       "From GitHub issue",
 		Description: description,
 	})
+	require.True(t, inserted)
 	require.NoError(t, err)
 
 	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
@@ -1071,7 +1279,7 @@ func TestFactoryContext_CreateWorkOrderDefersFileCleanupUntilCallerApplies(t *te
 	ctx := NewFactoryContext(db, canvas, nodeExecution).WithFileBindCleanup(func(job FileBindCleanup) {
 		jobs = append(jobs, job)
 	})
-	_, err = ctx.CreateWorkOrder(core.WorkOrderParams{
+	_, _, err = ctx.CreateWorkOrder(core.WorkOrderParams{
 		Title:       "From workspace file",
 		Description: "See ![bug](" + blob.FileRef(file.ID) + ")",
 	})
