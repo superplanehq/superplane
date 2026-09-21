@@ -1442,6 +1442,7 @@ message FactoryPullRequestMergeability {
     BLOCKED_REASON_DRAFT = 4;
     BLOCKED_REASON_CONFLICTING = 5;
     BLOCKED_REASON_MISSING_INTEGRATION = 6;
+    BLOCKED_REASON_NOT_OPEN = 7;
   }
 
   enum MergeMethod {
