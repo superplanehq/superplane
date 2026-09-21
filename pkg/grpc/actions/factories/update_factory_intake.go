@@ -102,10 +102,15 @@ func validateIntakePause(source string, paused *bool) error {
 	if paused == nil {
 		return nil
 	}
-	if source != models.FactoryIntakeSourceSentryExceptions {
-		return invalidArgument("pause is only supported for Sentry intakes")
+	if !intakeSourceSupportsPause(source) {
+		return invalidArgument("pause is not supported for this intake")
 	}
 	return nil
+}
+
+func intakeSourceSupportsPause(source string) bool {
+	return source == models.FactoryIntakeSourceSentryExceptions ||
+		source == models.FactoryIntakeSourceJiraIssues
 }
 
 func resolveUpdatedIntakeBinding(

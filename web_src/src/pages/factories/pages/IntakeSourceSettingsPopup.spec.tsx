@@ -195,6 +195,22 @@ function renderPopup(
   );
 }
 
+function intakeConnection(overrides: Partial<IntakeSettingsConnection> = {}): IntakeSettingsConnection {
+  return {
+    binding: { integrationId: "", resourceId: "" },
+    integrations: [
+      {
+        metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+        status: { state: "ready" },
+      },
+    ],
+    projects: [],
+    onBindingChange: vi.fn(),
+    onConnect: vi.fn(),
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   localStorage.clear();
 });
@@ -384,19 +400,7 @@ describe("IntakeSourceSettingsPopup", () => {
   it("shows Connection fields for a Jira intake that needs a live connection", () => {
     renderPopup({
       sourceId: "jira-issues",
-      connection: {
-        health: "HEALTH_MISSING_INTEGRATION",
-        binding: { integrationId: "", resourceId: "" },
-        integrations: [
-          {
-            metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
-            status: { state: "ready" },
-          },
-        ],
-        projects: [],
-        onBindingChange: vi.fn(),
-        onConnect: vi.fn(),
-      },
+      connection: intakeConnection({ health: "HEALTH_MISSING_INTEGRATION" }),
     });
 
     expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
@@ -406,23 +410,56 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByTestId("intake-connection-jira-1")).toHaveTextContent("Atlassian");
   });
 
-  it("keeps Save disabled until the Jira project is chosen", () => {
+  it("hides Connect when a Jira intake already has an account", () => {
     renderPopup({
       sourceId: "jira-issues",
-      connection: {
-        health: "HEALTH_MISSING_INTEGRATION",
-        binding: { integrationId: "jira-1", resourceId: "" },
+      connection: intakeConnection({
+        binding: { integrationId: "jira-1", resourceId: "ENG" },
+        projects: [{ id: "ENG", name: "Engineering" }],
+      }),
+    });
+
+    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-jira-1")).toBeInTheDocument();
+  });
+
+  it("shows Connect Jira when the intake has no account", () => {
+    renderPopup({
+      sourceId: "jira-issues",
+      connection: intakeConnection({ integrations: [] }),
+    });
+
+    expect(screen.getByTestId("intake-connection-connect")).toHaveTextContent("Connect Jira");
+  });
+
+  it("hides Connect when a Sentry intake already has an account", () => {
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      connection: intakeConnection({
+        binding: { integrationId: "sentry-1", resourceId: "proj-1" },
         integrations: [
           {
-            metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+            metadata: { id: "sentry-1", name: "Sentry org", integrationName: "sentry" },
             status: { state: "ready" },
           },
         ],
+        projects: [{ id: "proj-1", name: "Frontend" }],
+      }),
+    });
+
+    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-sentry-1")).toBeInTheDocument();
+  });
+
+  it("keeps Save disabled until the Jira project is chosen", () => {
+    renderPopup({
+      sourceId: "jira-issues",
+      connection: intakeConnection({
+        health: "HEALTH_MISSING_INTEGRATION",
+        binding: { integrationId: "jira-1", resourceId: "" },
         projects: [{ id: "ENG", name: "Engineering" }],
         saveDisabled: true,
-        onBindingChange: vi.fn(),
-        onConnect: vi.fn(),
-      },
+      }),
     });
 
     expect(screen.getByTestId("intake-source-settings-save")).toBeDisabled();
@@ -436,35 +473,38 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
   });
 
-  it("pauses, resumes, and deletes a Sentry intake after confirmation", async () => {
-    const onPause = vi.fn();
+  it.each(["sentry-exceptions", "jira-issues"] as const)(
+    "pauses, resumes, and deletes a %s intake after confirmation",
+    async (sourceId) => {
+      const onPause = vi.fn();
+      const onResume = vi.fn();
+      const onDelete = vi.fn();
+      const user = userEvent.setup();
+      renderPopup({ sourceId, onPause, onResume, onDelete });
+
+      expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
+      expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+
+      await user.click(screen.getByTestId("intake-source-settings-pause"));
+      expect(onPause).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByTestId("intake-source-settings-delete"));
+      expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+      expect(onDelete).not.toHaveBeenCalled();
+      await user.click(screen.getByTestId("intake-delete-cancel"));
+      expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
+      expect(onDelete).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("intake-source-settings-delete"));
+      await user.click(screen.getByTestId("intake-delete-confirm"));
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["sentry-exceptions", "jira-issues"] as const)("offers resume for a paused %s intake", async (sourceId) => {
     const onResume = vi.fn();
-    const onDelete = vi.fn();
     const user = userEvent.setup();
-    renderPopup({ sourceId: "sentry-exceptions", onPause, onResume, onDelete });
-
-    expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
-    expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-    expect(onPause).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    expect(onDelete).not.toHaveBeenCalled();
-    await user.click(screen.getByTestId("intake-delete-cancel"));
-    expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
-    expect(onDelete).not.toHaveBeenCalled();
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    await user.click(screen.getByTestId("intake-delete-confirm"));
-    expect(onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it("offers resume for a paused Sentry intake", async () => {
-    const onResume = vi.fn();
-    const user = userEvent.setup();
-    renderPopup({ sourceId: "sentry-exceptions", paused: true, onResume });
+    renderPopup({ sourceId, paused: true, onResume });
 
     expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("intake-source-settings-resume"));
