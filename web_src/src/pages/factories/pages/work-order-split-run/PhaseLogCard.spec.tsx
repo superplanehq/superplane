@@ -9,6 +9,14 @@ import type { SplitRunStreamLine } from "./splitRunMocks";
 
 const useLiveLogStreamMock = vi.fn();
 
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
+
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
@@ -501,5 +509,35 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByText("size").tagName).toBe("STRONG");
     expect(screen.getByText("medium").tagName).toBe("CODE");
     expect(screen.queryByText("**size**")).not.toBeInTheDocument();
+  });
+
+  it("renders a fenced Go note as one code block", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "```go\npackage main\n\nfunc main() {}\n```",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByTestId("code-block-editor")).toHaveLength(1);
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent("package main");
   });
 });

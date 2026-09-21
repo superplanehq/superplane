@@ -54,6 +54,13 @@ describe("MarkdownContent", () => {
     expect(screen.queryByTestId("markdown-code")).not.toBeInTheDocument();
   });
 
+  it("does not render undefined for an empty mermaid fence", () => {
+    render(<MarkdownContent content={"```mermaid\n```"} />);
+
+    expect(screen.getByTestId("mermaid-diagram")).toHaveTextContent("");
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+  });
+
   it("renders node links as chips when canvas context is available", () => {
     render(
       <MarkdownContent
