@@ -105,7 +105,7 @@ function notesFromSectionEvents(
         noteParentId: stepId,
         noteDepth: 1,
         componentType: tool.kind,
-        componentName: tool.text,
+        componentName: agentToolDisplayText({ kind: tool.kind, name: tool.kind, input: tool.text }),
         status: streamStatus(tool.status),
         detail: tool.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n") || undefined,
         ...orderKeyProps(orderKey),

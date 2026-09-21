@@ -13,8 +13,14 @@ export type AgentToolOutputPreview = {
   hasMore: boolean;
 };
 
+type AgentToolDisplayInput = Pick<AgentToolItem, "input" | "kind" | "name">;
+
+export function isCommandKind(kind: string): boolean {
+  return COMMAND_KINDS.has(kind.toLowerCase());
+}
+
 export function isCommandTool(item: AgentActivityItem): boolean {
-  return item.type === "tool" && COMMAND_KINDS.has(normalizedKind(item));
+  return item.type === "tool" && isCommandKind(item.kind);
 }
 
 export function commandText(input: string): string {
@@ -42,7 +48,7 @@ export function toolFilePaths(input: string): string[] {
   );
 }
 
-export function agentToolDisplayText(tool: AgentToolItem): string {
+export function agentToolDisplayText(tool: AgentToolDisplayInput): string {
   return toolInputDisplayText(tool) ?? toolDisplayName(tool);
 }
 
@@ -64,7 +70,7 @@ export function agentToolOutputPreview(tool: AgentToolItem): AgentToolOutputPrev
   return { lines, hasMore: extraVisible || tool.truncated };
 }
 
-function toolInputDisplayText(tool: AgentToolItem): string | undefined {
+function toolInputDisplayText(tool: AgentToolDisplayInput): string | undefined {
   const input = tool.input.trim();
   if (!input) return undefined;
 
@@ -95,7 +101,7 @@ function normalizedKind(tool: Pick<AgentToolItem, "kind">): string {
   return tool.kind.toLowerCase();
 }
 
-function toolDisplayName(tool: AgentToolItem): string {
+function toolDisplayName(tool: AgentToolDisplayInput): string {
   return tool.name || tool.kind || "Tool";
 }
 
