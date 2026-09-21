@@ -1085,6 +1085,16 @@ message FactoryIntake {
     INITIAL_IMPORT_STATUS_SKIPPED = 4;
   }
 
+  // Why healthy is false. HEALTH_OK when the intake can receive items.
+  enum Health {
+    HEALTH_UNSPECIFIED = 0;
+    HEALTH_OK = 1;
+    HEALTH_MISSING_INTEGRATION = 2;
+    HEALTH_INTEGRATION_NOT_READY = 3;
+    HEALTH_WEBHOOK_NOT_READY = 4;
+    HEALTH_GRAPH_BROKEN = 5;
+  }
+
   // Settings that change what the intake does. They are stored in the canvas
   // graph, because the canvas is what the workers run. This block is a
   // read/write facade over that graph.
@@ -1142,6 +1152,11 @@ message FactoryIntake {
   optional int32 initial_import_item_count = 12;
   // True when live items are ignored. Hand-picked import still works.
   bool paused = 13;
+  // Live trigger connection. Empty when the intake is unbound.
+  string integration_id = 14;
+  // Live trigger resource, such as a Jira project key.
+  string resource_id = 15;
+  Health health = 16;
 }
 
 message FactoryIntakeRun {
@@ -1202,6 +1217,9 @@ message UpdateFactoryIntakeRequest {
   optional string name = 3;
   optional FactoryIntake.Settings settings = 4;
   optional bool paused = 5;
+  // Rebind the live trigger. Set both fields together.
+  optional string integration_id = 6;
+  optional string resource_id = 7;
 }
 
 message UpdateFactoryIntakeResponse {
