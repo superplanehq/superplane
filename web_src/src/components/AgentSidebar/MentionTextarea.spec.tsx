@@ -40,6 +40,12 @@ describe("MentionTextarea", () => {
     expect(textarea.style.overflowY).toBe("hidden");
   });
 
+  it("keeps selected glyphs transparent so the backdrop stays the visible text (issue #6372)", () => {
+    const { textarea } = renderTextarea("hello");
+
+    expect(textarea.className).toContain("selection:text-transparent");
+  });
+
   it("caps height and syncs internal scroll with the backdrop", () => {
     const mention: InsertedMention = {
       id: "node-1",
