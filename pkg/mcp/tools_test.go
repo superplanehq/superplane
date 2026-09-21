@@ -109,6 +109,108 @@ func TestListToolsRejectsNonJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "the MCP server did not return JSON")
 }
 
+func TestListToolsReadsMultilineSSEPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		var payload rpcRequest
+		require.NoError(t, json.Unmarshal(body, &payload))
+		w.Header().Set("Content-Type", "text/event-stream")
+		switch payload.Method {
+		case "initialize":
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n\n")
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":2,\ndata: \"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"Ping the server.\"}]}}\n\n")
+		default:
+			t.Fatalf("unexpected method %s", payload.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	tools, err := ListTools(context.Background(), server.Client(), server.URL, nil)
+	require.NoError(t, err)
+	require.Equal(t, []Tool{{Name: "ping", Description: "Ping the server."}}, tools)
+}
+
+func TestListToolsReturnsBeforeSSEStreamEnds(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		var payload rpcRequest
+		require.NoError(t, json.Unmarshal(body, &payload))
+		switch payload.Method {
+		case "initialize":
+			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": 1, "result": map[string]any{}})
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			flusher, ok := w.(http.Flusher)
+			require.True(t, ok)
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"Ping the server.\"}]}}\n\n")
+			flusher.Flush()
+			<-r.Context().Done()
+		default:
+			t.Fatalf("unexpected method %s", payload.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	tools, err := ListTools(context.Background(), server.Client(), server.URL, nil)
+	require.NoError(t, err)
+	require.Equal(t, []Tool{{Name: "ping", Description: "Ping the server."}}, tools)
+}
+
+func TestListToolsFollowsNextCursor(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Method string `json:"method"`
+			Params struct {
+				Cursor string `json:"cursor"`
+			} `json:"params"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		switch payload.Method {
+		case "initialize":
+			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": 1, "result": map[string]any{}})
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			if payload.Params.Cursor == "" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"jsonrpc": "2.0",
+					"id":      2,
+					"result": map[string]any{
+						"tools":      []map[string]any{{"name": "search", "description": "Search the catalog."}},
+						"nextCursor": "page-2",
+					},
+				})
+				return
+			}
+			assert.Equal(t, "page-2", payload.Params.Cursor)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      3,
+				"result": map[string]any{
+					"tools": []map[string]any{{"name": "create_issue", "description": "Create an issue."}},
+				},
+			})
+		default:
+			t.Fatalf("unexpected method %s", payload.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	tools, err := ListTools(context.Background(), server.Client(), server.URL, nil)
+	require.NoError(t, err)
+	require.Equal(t, []Tool{
+		{Name: "search", Description: "Search the catalog."},
+		{Name: "create_issue", Description: "Create an issue."},
+	}, tools)
+}
+
 func jsonRPCToolsHandler(t *testing.T, tools []map[string]any) http.Handler {
 	t.Helper()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

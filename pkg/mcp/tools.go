@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 const (
 	mcpProtocolVersion = "2025-03-26"
 	mcpSessionHeader   = "Mcp-Session-Id"
+	maxToolsListPages  = 50
 )
 
 // Tool is one MCP tools/list entry. Schema is omitted on purpose.
@@ -50,7 +52,8 @@ type clientInfo struct {
 }
 
 type toolsListResult struct {
-	Tools []toolPayload `json:"tools"`
+	Tools      []toolPayload `json:"tools"`
+	NextCursor string        `json:"nextCursor"`
 }
 
 type toolPayload struct {
@@ -76,23 +79,37 @@ func ListTools(ctx context.Context, httpClient HTTPDoer, mcpURL string, headers 
 	}
 	_ = postMCPNotification(rpcCtx, httpClient, mcpURL, headers, sessionID, "notifications/initialized")
 
-	var result toolsListResult
-	if _, err := postMCP(rpcCtx, httpClient, mcpURL, headers, sessionID, rpcRequest{
-		JSONRPC: "2.0",
-		ID:      2,
-		Method:  "tools/list",
-		Params:  map[string]any{},
-	}, &result); err != nil {
-		return nil, err
-	}
-
-	tools := make([]Tool, 0, len(result.Tools))
-	for _, tool := range result.Tools {
-		name := strings.TrimSpace(tool.Name)
-		if name == "" {
-			continue
+	var tools []Tool
+	cursor := ""
+	for page := 0; page < maxToolsListPages; page++ {
+		params := map[string]any{}
+		if cursor != "" {
+			params["cursor"] = cursor
 		}
-		tools = append(tools, Tool{Name: name, Description: strings.TrimSpace(tool.Description)})
+		var result toolsListResult
+		nextSession, err := postMCP(rpcCtx, httpClient, mcpURL, headers, sessionID, rpcRequest{
+			JSONRPC: "2.0",
+			ID:      page + 2,
+			Method:  "tools/list",
+			Params:  params,
+		}, &result)
+		if err != nil {
+			return nil, err
+		}
+		if nextSession != "" {
+			sessionID = nextSession
+		}
+		for _, tool := range result.Tools {
+			name := strings.TrimSpace(tool.Name)
+			if name == "" {
+				continue
+			}
+			tools = append(tools, Tool{Name: name, Description: strings.TrimSpace(tool.Description)})
+		}
+		cursor = strings.TrimSpace(result.NextCursor)
+		if cursor == "" {
+			return tools, nil
+		}
 	}
 	return tools, nil
 }
@@ -152,11 +169,6 @@ func postMCP(
 	}
 	defer resp.Body.Close()
 
-	limited := io.LimitReader(resp.Body, MaxMetadataBytes)
-	raw, err := io.ReadAll(limited)
-	if err != nil {
-		return "", err
-	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("the MCP server returned HTTP %d", resp.StatusCode)
 	}
@@ -169,7 +181,7 @@ func postMCP(
 		return nextSession, nil
 	}
 
-	decoded, err := decodeMCPBody(resp.Header.Get("Content-Type"), raw)
+	decoded, err := readMCPJSON(resp)
 	if err != nil {
 		return "", err
 	}
@@ -196,31 +208,62 @@ func postMCP(
 	return nextSession, nil
 }
 
-func decodeMCPBody(contentType string, body []byte) ([]byte, error) {
-	if len(bytes.TrimSpace(body)) == 0 {
-		return nil, fmt.Errorf("the MCP server did not return JSON")
+func readMCPJSON(resp *http.Response) ([]byte, error) {
+	limited := io.LimitReader(resp.Body, MaxMetadataBytes)
+	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+		return sseJSONPayload(limited)
 	}
-	if strings.Contains(strings.ToLower(contentType), "text/event-stream") {
-		return sseJSONPayload(body)
+	raw, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
 	}
+	return decodeJSONBody(raw)
+}
+
+func decodeJSONBody(body []byte) ([]byte, error) {
 	trimmed := bytes.TrimSpace(body)
-	if !json.Valid(trimmed) {
+	if len(trimmed) == 0 || !json.Valid(trimmed) {
 		return nil, fmt.Errorf("the MCP server did not return JSON")
 	}
 	return trimmed, nil
 }
 
-func sseJSONPayload(body []byte) ([]byte, error) {
-	var payload []byte
-	for _, line := range strings.Split(string(body), "\n") {
-		line = strings.TrimRight(line, "\r")
-		if !strings.HasPrefix(line, "data:") {
-			continue
+func sseJSONPayload(body io.Reader) ([]byte, error) {
+	reader := bufio.NewReader(body)
+	var dataLines []string
+	for {
+		line, err := reader.ReadString('\n')
+		hasLine := len(line) > 0
+		if hasLine {
+			line = strings.TrimRight(line, "\r\n")
+			if line == "" {
+				if payload := sseDataPayload(dataLines); len(payload) > 0 {
+					return payload, nil
+				}
+				dataLines = nil
+			} else if strings.HasPrefix(line, "data:") {
+				dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+			}
 		}
-		payload = []byte(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		if err == io.EOF {
+			if payload := sseDataPayload(dataLines); len(payload) > 0 {
+				return payload, nil
+			}
+			return nil, fmt.Errorf("the MCP server did not return JSON")
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
-	if len(payload) == 0 || !json.Valid(payload) {
-		return nil, fmt.Errorf("the MCP server did not return JSON")
+}
+
+func sseDataPayload(lines []string) []byte {
+	if len(lines) == 0 {
+		return nil
 	}
-	return payload, nil
+	payload := []byte(strings.Join(lines, "\n"))
+	if !json.Valid(payload) {
+		return nil
+	}
+	return payload
 }
