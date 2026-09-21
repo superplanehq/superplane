@@ -21,7 +21,7 @@ export interface NewRelicMetricPayload {
 
 export interface NewRelicNRQLResultPayload {
   query?: string;
-  results?: any[];
+  results?: unknown[];
 }
 
 export interface OnIssueConfiguration {

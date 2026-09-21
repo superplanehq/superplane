@@ -1,5 +1,9 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
+import { Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ADD_INTAKE_COPY, ADD_INTAKE_TEMPLATES, type AddIntakeTemplate } from "./lineIntakeModel";
 
@@ -13,13 +17,33 @@ interface AddIntakePickerProps {
   takenSourceIds?: readonly string[];
 }
 
+function filterTemplates(templates: AddIntakeTemplate[], query: string): AddIntakeTemplate[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return templates;
+  }
+  return templates.filter((template) => {
+    const haystack = `${template.name} ${template.description}`.toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+
 export function AddIntakePicker({
   open,
   onClose,
   onSelect,
-  templates = ADD_INTAKE_TEMPLATES,
+  templates: availableTemplates = ADD_INTAKE_TEMPLATES,
   takenSourceIds = [],
 }: AddIntakePickerProps) {
+  const [query, setQuery] = useState("");
+  const templates = useMemo(() => filterTemplates(availableTemplates, query), [availableTemplates, query]);
+
+  useEffect(() => {
+    if (open) {
+      setQuery("");
+    }
+  }, [open]);
+
   return (
     <Dialog
       open={open}
@@ -39,38 +63,66 @@ export function AddIntakePicker({
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="grid grid-cols-2 gap-2 p-3" data-testid="add-intake-templates">
-          {templates.map((template) => {
-            const taken = takenSourceIds.includes(template.id);
-            const unavailable = Boolean(template.soon) || taken;
-            return (
-              <li key={template.id}>
-                <button
-                  type="button"
-                  disabled={unavailable}
-                  onClick={() => {
-                    if (unavailable) {
-                      return;
-                    }
-                    onSelect(template);
-                  }}
-                  data-testid={`add-intake-template-${template.id}`}
-                  className={cn(
-                    "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
-                    unavailable ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
-                  )}
-                >
-                  <TemplateGlyph template={template} />
-                  <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
-                    {template.name}
-                  </span>
-                  <span className="workspace-body-text text-muted-foreground">
-                    {intakeTemplateStatus(template, taken)}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+        <div className="border-b border-border px-4 py-3">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              id="add-intake-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search intakes"
+              aria-label="Search intakes"
+              className="h-9 pl-8 text-[13px] shadow-none"
+              data-testid="add-intake-search"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <ul
+          className="grid max-h-[min(24rem,50vh)] grid-cols-2 gap-2 overflow-y-auto p-3 [scrollbar-width:thin]"
+          data-testid="add-intake-templates"
+        >
+          {templates.length === 0 ? (
+            <li className="col-span-2 px-2 py-8 text-center">
+              <p className="workspace-body-text text-muted-foreground">No intakes match this search.</p>
+            </li>
+          ) : (
+            templates.map((template) => {
+              const taken = takenSourceIds.includes(template.id);
+              const unavailable = Boolean(template.soon) || taken;
+              return (
+                <li key={template.id}>
+                  <button
+                    type="button"
+                    disabled={unavailable}
+                    onClick={() => {
+                      if (unavailable) {
+                        return;
+                      }
+                      onSelect(template);
+                    }}
+                    data-testid={`add-intake-template-${template.id}`}
+                    className={cn(
+                      "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
+                      unavailable ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
+                    )}
+                  >
+                    <TemplateGlyph template={template} />
+                    <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
+                      {template.name}
+                    </span>
+                    <span className="workspace-body-text text-muted-foreground">
+                      {intakeTemplateStatus(template, taken)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })
+          )}
         </ul>
       </DialogContent>
     </Dialog>
@@ -89,7 +141,9 @@ function intakeTemplateStatus(template: AddIntakeTemplate, taken: boolean): stri
 
 function TemplateGlyph({ template }: { template: AddIntakeTemplate }) {
   if (template.iconSrc) {
-    return <img src={template.iconSrc} alt="" className="size-5 shrink-0" />;
+    return (
+      <img src={template.iconSrc} alt="" className={cn("size-5 shrink-0", logoDarkInvertClass(template.iconSrc))} />
+    );
   }
   return (
     <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-muted-foreground">

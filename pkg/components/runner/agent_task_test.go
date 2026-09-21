@@ -40,6 +40,53 @@ func TestWrapCommandInWorkingDirectoryAllowsAbsolutePath(t *testing.T) {
 	assert.Equal(t, `cd '/tmp/workspace' && node run.js`, got)
 }
 
+func TestWrapPromptCommandInWorkingDirectoryCopiesSkills(t *testing.T) {
+	t.Parallel()
+
+	got := WrapPromptCommandInWorkingDirectory("repo", `node run.js`)
+	assert.Contains(t, got, `cd "$_sp_root"/'repo'`)
+	assert.Contains(t, got, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
+	assert.Contains(t, got, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.agents/skills" .agents/skills`)
+	assert.Contains(t, got, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
+	assert.NotContains(t, got, `cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/`)
+	assert.Contains(t, got, "node run.js")
+	assert.True(t, strings.Index(got, "cp -a") < strings.Index(got, "node run.js"))
+}
+
+func TestAppendVisualEvidenceProtocolAddsProtocolToFirstPromptOnly(t *testing.T) {
+	t.Parallel()
+
+	firstPrompt := "implement the change"
+	secondPrompt := "review the change"
+	command := "git status"
+	steps := []AgentStep{
+		{Name: "Prepare", Type: AgentStepBash, Command: &command},
+		{Name: "Implement", Type: AgentStepPrompt, Prompt: &firstPrompt},
+		{Name: "Review", Type: AgentStepPrompt, Prompt: &secondPrompt},
+	}
+
+	got := AppendVisualEvidenceProtocol(steps, true)
+
+	require.Len(t, got, len(steps))
+	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
+	assert.Contains(t, *got[1].Prompt, firstPrompt)
+	assert.Contains(t, *got[1].Prompt, "Visual evidence protocol")
+	assert.Contains(t, *got[1].Prompt, "posterPath")
+	assert.Equal(t, secondPrompt, *got[2].Prompt)
+	assert.Equal(t, command, *got[0].Command)
+	twice := AppendVisualEvidenceProtocol(got, true)
+	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Visual evidence protocol"))
+}
+
+func TestAppendVisualEvidenceProtocolDoesNothingWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	prompt := "implement the change"
+	steps := []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt}}
+
+	assert.Equal(t, steps, AppendVisualEvidenceProtocol(steps, false))
+}
+
 func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	t.Parallel()
 
@@ -73,6 +120,9 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Contains(t, commands[2].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[2].Command, `cd "$_sp_root"/'repo'`)
 	assert.Contains(t, commands[2].Command, "node run.js 02-implement.txt")
+	assert.Contains(t, commands[2].Command, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
+	assert.Contains(t, commands[2].Command, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
+	assert.NotContains(t, commands[1].Command, `_sp_install_workspace_skills`)
 	assertAgentStepMergesUsage(t, commands[2].Command, "node run.js 02-implement.txt")
 	assert.Contains(t, commands[3].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[3].Command, `cd "$_sp_root"/'repo'`)

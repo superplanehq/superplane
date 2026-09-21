@@ -5,6 +5,7 @@ const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
 import { durationLabelMs, formatGoDuration, formatGoDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -924,20 +925,27 @@ function PhaseStopButton({ phaseId, busy, onStop }: { phaseId: string; busy: boo
 
 function StreamDuration({ line }: { line: SplitRunStreamLine }) {
   return (
-    <LogStatusTime status={line.status} duration={line.duration} testId={`split-run-stream-duration-${line.id}`} />
+    <LogStatusTime
+      status={line.status}
+      duration={line.duration}
+      durationRunning={line.durationRunning}
+      testId={`split-run-stream-duration-${line.id}`}
+    />
   );
 }
 
 function LogStatusTime({
   status,
   duration,
+  durationRunning,
   testId,
 }: {
   status: SplitRunPhaseStatus;
   duration?: string;
+  durationRunning?: boolean;
   testId: string;
 }) {
-  const running = status === "running";
+  const running = durationRunning ?? status === "running";
   const { now, sampledAt } = useRunningLogClock(running, duration);
   const clock = running ? tickingRunningClock(duration, sampledAt, now) : logStatusTimeLabel(duration);
   const mark = statusTimeMark(status);
@@ -1009,7 +1017,7 @@ function PhaseMetrics({
   phase: SplitRunPhase;
   onUsageOpenChange?: (open: boolean) => void;
 }) {
-  const running = phase.status === "running";
+  const running = phase.durationRunning ?? phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
     ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
@@ -1455,7 +1463,11 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
   const Icon = resolveIcon(iconSlug ?? "box");
   return (
     <span className="inline-flex size-3 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
-      {iconSrc ? <img src={iconSrc} alt="" className="size-3 object-contain" /> : <Icon className="size-3" />}
+      {iconSrc ? (
+        <img src={iconSrc} alt="" className={cn("size-3 object-contain", logoDarkInvertClass(iconSrc))} />
+      ) : (
+        <Icon className="size-3" />
+      )}
     </span>
   );
 }

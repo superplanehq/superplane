@@ -363,4 +363,16 @@ describe("PhaseLogCard usage", () => {
     await user.click(screen.getByRole("button", { name: "Show usage" }));
     expect(onUsageOpenChange).toHaveBeenCalledWith(true);
   });
+
+  it("shows the reported runner model next to spend", () => {
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210", model: "openai/gpt-4.1" }}
+        expanded={false}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("gpt-4.1");
+    expect(screen.getByTestId("split-run-phase-duration-plan")).not.toHaveTextContent("claude-sonnet-4-6");
+  });
 });

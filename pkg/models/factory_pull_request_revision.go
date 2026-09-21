@@ -28,6 +28,10 @@ func (FactoryPullRequestRevision) TableName() string {
 	return "factory_pull_request_revisions"
 }
 
+func (p *FactoryPullRequest) LockForUpdate(tx *gorm.DB) error {
+	return p.lock(tx)
+}
+
 func (p *FactoryPullRequest) lock(tx *gorm.DB) error {
 	var locked FactoryPullRequest
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).

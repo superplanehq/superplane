@@ -20,11 +20,12 @@ interface FilterMenuProps {
   state: WorkOrderListState;
   /** Omit on a line board: the page is already scoped to one line. */
   lineOptions?: WorkOrderFilterOption[];
+  sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
-export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuProps) {
+export function FilterMenu({ state, lineOptions, sourceOptions, assigneeOptions }: FilterMenuProps) {
   const filterCount = lineOptions ? state.filterCount : state.filterCount - state.filters.lineIds.length;
   return (
     <DropdownMenu open={state.filterMenuOpen} onOpenChange={state.setFilterMenuOpen}>
@@ -66,6 +67,14 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
             emptyLabel="No lines yet"
           />
         ) : null}
+
+        <FilterSubMenu
+          label="Source"
+          resetLabel="Any source"
+          dimension="sourceIds"
+          state={state}
+          options={sourceOptions}
+        />
 
         <FilterSubMenu
           label="Owner"
@@ -116,6 +125,7 @@ function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabe
             <DropdownMenuItem
               key={option.value}
               className={MENU_ITEM_CLASSNAME}
+              data-testid={`work-orders-filter-${dimension}-${option.value}`}
               onSelect={(event) => {
                 event.preventDefault();
                 state.toggleFilter(dimension, option.value);

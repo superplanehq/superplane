@@ -16,6 +16,7 @@ type RunCodexSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 }
 
 func decodeRunCodexSpec(raw any) (RunCodexSpec, error) {
@@ -122,7 +123,7 @@ func planningFollowUpCommand(spec RunCodexSpec) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
-			runner.WrapCommandInWorkingDirectory(
+			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
 				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
 			),

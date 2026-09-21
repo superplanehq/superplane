@@ -137,6 +137,29 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(outputNames(implement)).toEqual(["feature/rf-103", "#503"]);
   });
 
+  it("prefers reported step models over the Start override", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        lineDispatches: [
+          {
+            ...dispatch("STATE_FINISHED", [
+              {
+                id: "exec-1",
+                step: "implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                models: ["openai/gpt-4.1"],
+              },
+            ]),
+            model: "anthropic/claude-sonnet-4-6",
+          },
+        ],
+      }),
+    );
+    expect(fixture.phases.find((phase) => phase.name === "Implement")?.model).toBe("openai/gpt-4.1");
+  });
+
   it("keeps a single Backlog ingest row on an ingest draft", () => {
     const fixture = splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog"]);
@@ -1019,16 +1042,126 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    const analysis = fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis");
+    const analysis = fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds");
 
     expect(analysis?.name).toBe("Analysis");
     expect(analysis?.status).toBe("running");
     expect(analysis?.componentName).toBe("Confidence score");
     expect(analysis?.appId).toBe("canvas-backlog");
     expect(analysis?.runId).toBe("run-analysis");
-    expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
+    expect(analysis?.durationRunning).toBe(true);
+    expect(fixture.openPhaseId).toBe("backlog-analysis-wo-draft-refunds");
     expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
+  });
+
+  it("does not count pending analysis queue time as execution time", () => {
+    const queuedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_PENDING",
+            createdAt: queuedAt,
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      status: "pending",
+      duration: "<1s",
+      durationRunning: false,
+    });
+  });
+
+  it("shows spend, tokens, and model on the Analysis step when the run has usage", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            updatedAt: "2026-08-28T12:00:08Z",
+            finishedAt: "2026-08-28T12:00:08Z",
+            totalTokens: "1200",
+            costCents: "18",
+            models: ["anthropic/claude-sonnet-4-6"],
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      costCents: "18",
+      totalTokens: "1200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("aggregates analysis usage across attempts without counting idle time", () => {
+    const firstStartedAt = Date.now() - 3 * 60 * 60 * 1000;
+    const firstFinishedAt = firstStartedAt + 10 * 60 * 1000 + 19 * 1000;
+    const retryStartedAt = firstFinishedAt + 2 * 60 * 60 * 1000;
+    const retryFinishedAt = retryStartedAt + 47 * 1000;
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog-first",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-failed",
+            canvasId: "canvas-backlog-first",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            createdAt: new Date(firstStartedAt).toISOString(),
+            finishedAt: new Date(firstFinishedAt).toISOString(),
+            totalTokens: "329500",
+            costCents: "71",
+            models: ["anthropic/claude-opus-5"],
+          },
+        },
+        {
+          canvasId: "canvas-backlog-retry",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-passed",
+            canvasId: "canvas-backlog-retry",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: new Date(retryStartedAt).toISOString(),
+            finishedAt: new Date(retryFinishedAt).toISOString(),
+            totalTokens: "34000",
+            costCents: "19",
+            models: ["anthropic/claude-opus-5", "openai/gpt-5"],
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.filter((phase) => phase.name === "Analysis")).toHaveLength(1);
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      appId: "canvas-backlog-retry",
+      runId: "run-passed",
+      status: "passed",
+      startedAt: new Date(firstStartedAt).toISOString(),
+      duration: "11m 6s",
+      totalTokens: "363500",
+      costCents: "90",
+      model: "anthropic/claude-opus-5 · openai/gpt-5",
+    });
   });
 
   it("shows a requested analysis completion as passed while the run stops", () => {
@@ -1050,7 +1183,7 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("passed");
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-1")?.status).toBe("passed");
   });
 
   // A freshly created draft is known to be analyzing before its run appears in
@@ -1100,7 +1233,7 @@ describe("line board work-order examples", () => {
       },
     );
 
-    expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog", "backlog-analysis-run-analysis", "plan-0"]);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog", "backlog-analysis-wo-1", "plan-0"]);
   });
 
   it("marks a cancelled analysis passed when a score and plan already exist", () => {
@@ -1140,7 +1273,7 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("passed");
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.status).toBe("passed");
   });
 
   it("keeps a cancelled analysis running when no score or plan exists", () => {
@@ -1162,7 +1295,11 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("running");
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      status: "running",
+      duration: "2m",
+      durationRunning: false,
+    });
   });
 
   it("keeps a failed analysis failed when no score or plan exists", () => {
@@ -1184,7 +1321,7 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis")?.status).toBe("failed");
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.status).toBe("failed");
   });
 
   it("omits an older cancelled analysis when a newer analysis run exists", () => {
@@ -1217,12 +1354,17 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.filter((phase) => phase.name === "Analysis").map((phase) => phase.runId)).toEqual([
-      "run-new",
-    ]);
+    const analyses = fixture.phases.filter((phase) => phase.name === "Analysis");
+    expect(analyses).toHaveLength(1);
+    expect(analyses[0]).toMatchObject({
+      id: "backlog-analysis-wo-draft-refunds",
+      runId: "run-new",
+      status: "running",
+      startedAt: "2026-08-28T12:00:00Z",
+    });
   });
 
-  it("keeps a cancelled analysis with a score and plan beside a newer analysis run", () => {
+  it("shows a completed analysis and its running continuation as one running phase", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       checks: [
@@ -1271,12 +1413,11 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(
-      fixture.phases.filter((phase) => phase.name === "Analysis").map((phase) => [phase.runId, phase.status]),
-    ).toEqual([
-      ["run-complete", "passed"],
-      ["run-new", "running"],
-    ]);
+    expect(fixture.phases.filter((phase) => phase.name === "Analysis")).toHaveLength(1);
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      runId: "run-new",
+      status: "running",
+    });
   });
 
   it("omits a timed-out analysis after a later run delivers a score and plan", () => {
@@ -1334,7 +1475,7 @@ describe("line board work-order examples", () => {
     ).toEqual([["run-retry", "passed"]]);
   });
 
-  it("keeps an explicitly stopped analysis failed after a later run delivers", () => {
+  it("shows an explicitly stopped analysis and its successful retry as one passed phase", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       checks: [
@@ -1385,12 +1526,11 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(
-      fixture.phases.filter((phase) => phase.name === "Analysis").map((phase) => [phase.runId, phase.status]),
-    ).toEqual([
-      ["run-stopped", "failed"],
-      ["run-retry", "passed"],
-    ]);
+    expect(fixture.phases.filter((phase) => phase.name === "Analysis")).toHaveLength(1);
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      runId: "run-retry",
+      status: "passed",
+    });
   });
 
   it("keeps an explicitly stopped analysis failed when no score or plan exists", () => {
@@ -1413,10 +1553,10 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-run-stopped")?.status).toBe("failed");
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.status).toBe("failed");
   });
 
-  it("keeps a failed analysis beside a newer analysis run", () => {
+  it("shows a failed analysis and its retry as one running phase", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       analysisRuns: [
@@ -1446,12 +1586,11 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(
-      fixture.phases.filter((phase) => phase.name === "Analysis").map((phase) => [phase.runId, phase.status]),
-    ).toEqual([
-      ["run-crash", "failed"],
-      ["run-new", "running"],
-    ]);
+    expect(fixture.phases.filter((phase) => phase.name === "Analysis")).toHaveLength(1);
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")).toMatchObject({
+      runId: "run-new",
+      status: "running",
+    });
   });
 
   it("puts the reported score on the newest analysis phase", () => {
@@ -1498,9 +1637,8 @@ describe("line board work-order examples", () => {
 
     const analysis = fixture.phases.filter((phase) => phase.id.startsWith("backlog-analysis-"));
 
-    expect(analysis.map((phase) => phase.runId)).toEqual(["run-old", "run-new"]);
-    expect(analysis[0].checks).toBeUndefined();
-    expect(analysis[1].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
+    expect(analysis.map((phase) => phase.runId)).toEqual(["run-new"]);
+    expect(analysis[0].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
     expect(fixture.openPhaseId).toBeUndefined();
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);

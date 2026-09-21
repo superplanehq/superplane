@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"sort"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -332,14 +334,21 @@ func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID
 	return result
 }
 
+type workOrderUsageView struct {
+	Totals            models.UsageTotals
+	ByModel           []models.UsageByModel
+	ByMachineType     []models.UsageByMachineType
+	ModelsByExecution map[uuid.UUID][]string
+}
+
 func serializeWorkOrder(
 	f *models.Factory,
 	order *models.FactoryWorkOrder,
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
-	usage models.UsageTotals,
+	usage workOrderUsageView,
 ) (*pb.WorkOrder, error) {
-	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
+	serializedDispatches := serializeWorkOrderLineDispatches(dispatches, usage.ModelsByExecution)
 
 	displayKey := ""
 	if f != nil {
@@ -350,6 +359,9 @@ func serializeWorkOrder(
 	if err != nil {
 		return nil, err
 	}
+
+	totalCostCents := usage.Totals.CostCents()
+	byModel, byMachineType := serializeWorkOrderUsageBreakdown(usage.ByModel, usage.ByMachineType, totalCostCents)
 
 	return &pb.WorkOrder{
 		Id:                   order.ID.String(),
@@ -364,13 +376,85 @@ func serializeWorkOrder(
 		Assignees:            serializeWorkOrderAssignees(order.Assignees),
 		LineDispatches:       serializedDispatches,
 		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
-		TotalTokens:          usage.TotalTokens,
-		TotalCostCents:       usage.CostCents(),
-		TotalDurationSeconds: usage.DurationSeconds,
+		TotalTokens:          usage.Totals.TotalTokens,
+		TotalCostCents:       totalCostCents,
+		TotalDurationSeconds: usage.Totals.DurationSeconds,
+		UsageByModel:         byModel,
+		UsageByMachineType:   byMachineType,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
+}
+
+const microsPerCent = 10_000
+
+func serializeWorkOrderUsageBreakdown(
+	byModel []models.UsageByModel,
+	byMachine []models.UsageByMachineType,
+	totalCents int64,
+) ([]*pb.UsageByModel, []*pb.UsageByMachineType) {
+	micros := make([]int64, 0, len(byModel)+len(byMachine))
+	for _, row := range byModel {
+		micros = append(micros, row.CostMicros)
+	}
+	for _, row := range byMachine {
+		micros = append(micros, row.CostMicros)
+	}
+	cents := allocateCostCents(micros, totalCents)
+
+	modelsOut := make([]*pb.UsageByModel, 0, len(byModel))
+	for i, row := range byModel {
+		modelsOut = append(modelsOut, &pb.UsageByModel{
+			Provider:    row.Provider,
+			Model:       row.Model,
+			TotalTokens: row.TotalTokens,
+			CostCents:   cents[i],
+		})
+	}
+	machinesOut := make([]*pb.UsageByMachineType, 0, len(byMachine))
+	offset := len(byModel)
+	for i, row := range byMachine {
+		machinesOut = append(machinesOut, &pb.UsageByMachineType{
+			MachineType:     row.MachineType,
+			DurationSeconds: row.DurationSeconds,
+			CostCents:       cents[offset+i],
+		})
+	}
+	return modelsOut, machinesOut
+}
+
+type costRemainder struct {
+	index     int
+	remainder int64
+}
+
+func allocateCostCents(micros []int64, totalCents int64) []int64 {
+	cents := make([]int64, len(micros))
+	remainders := make([]costRemainder, 0, len(micros))
+	var sum int64
+	for i, value := range micros {
+		if value < 0 {
+			value = 0
+		}
+		cents[i] = value / microsPerCent
+		sum += cents[i]
+		remainders = append(remainders, costRemainder{index: i, remainder: value % microsPerCent})
+	}
+	gap := totalCents - sum
+	if gap <= 0 {
+		return cents
+	}
+	sort.SliceStable(remainders, func(i, j int) bool {
+		return remainders[i].remainder > remainders[j].remainder
+	})
+	for i := 0; i < int(gap) && i < len(remainders); i++ {
+		if remainders[i].remainder == 0 {
+			break
+		}
+		cents[remainders[i].index]++
+	}
+	return cents
 }
 
 func serializeWorkOrderSourceRunID(order *models.FactoryWorkOrder) string {
@@ -471,15 +555,21 @@ func serializeWorkOrderCreator(
 	}
 }
 
-func serializeWorkOrderLineDispatches(dispatches []models.FactoryWorkOrderLineDispatchRecord) []*pb.WorkOrderLineDispatch {
+func serializeWorkOrderLineDispatches(
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	modelsByExecution map[uuid.UUID][]string,
+) []*pb.WorkOrderLineDispatch {
 	result := make([]*pb.WorkOrderLineDispatch, 0, len(dispatches))
 	for _, dispatch := range dispatches {
-		result = append(result, serializeWorkOrderLineDispatch(dispatch))
+		result = append(result, serializeWorkOrderLineDispatch(dispatch, modelsByExecution))
 	}
 	return result
 }
 
-func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatchRecord) *pb.WorkOrderLineDispatch {
+func serializeWorkOrderLineDispatch(
+	dispatch models.FactoryWorkOrderLineDispatchRecord,
+	modelsByExecution map[uuid.UUID][]string,
+) *pb.WorkOrderLineDispatch {
 	item := &pb.WorkOrderLineDispatch{
 		Id: dispatch.ID.String(),
 		Line: &pb.LineRef{
@@ -490,7 +580,7 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 		State:          serializeLineDispatchState(dispatch.State),
 		Result:         serializeLineDispatchResult(dispatch.Result),
 		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
-		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions),
+		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, modelsByExecution),
 		Model:          dispatch.Model,
 	}
 	if dispatch.FinishedAt != nil {
@@ -543,15 +633,18 @@ func serializeLineDispatchResult(result string) pb.WorkOrderLineDispatch_Result 
 	}
 }
 
-func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionRecord) []*pb.WorkOrderExecution {
+func serializeWorkOrderExecutions(
+	executions []models.FactoryWorkOrderExecutionRecord,
+	modelsByExecution map[uuid.UUID][]string,
+) []*pb.WorkOrderExecution {
 	result := make([]*pb.WorkOrderExecution, 0, len(executions))
 	for _, execution := range executions {
-		result = append(result, serializeWorkOrderExecution(execution))
+		result = append(result, serializeWorkOrderExecution(execution, modelsByExecution[execution.ID]))
 	}
 	return result
 }
 
-func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
+func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord, models []string) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
 		Id:              execution.ID.String(),
 		Step:            execution.StepName,
@@ -563,6 +656,7 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 		TotalTokens:     execution.TotalTokens,
 		CostCents:       execution.CostCents,
 		DurationSeconds: execution.DurationSeconds,
+		Models:          models,
 	}
 	if execution.RunID != nil {
 		runRef := &pb.WorkOrderExecution_RunRef{

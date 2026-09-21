@@ -9,19 +9,25 @@ import (
 )
 
 const (
-	prFeedbackCommentTriggerNodeID     = "on-pr-comment"
-	prFeedbackAcknowledgeCommentNodeID = "acknowledge-pr-comment"
-	prFeedbackReviewTriggerNodeID      = "on-pr-review"
-	prFeedbackReplyTriggerNodeID       = "on-pr-review-reply"
-	prFeedbackFindNodeID               = "find-pull-request"
-	prFeedbackActivityNodeID           = "add-pr-activity"
-	prFeedbackRunnerNodeID             = "address-pr-feedback"
-	prFeedbackReviewFindNodeID         = "find-pull-request-for-review"
-	prFeedbackReviewActivityNodeID     = "add-pr-review-activity"
-	prFeedbackReviewRunnerNodeID       = "address-pr-review-feedback"
-	prFeedbackReplyFindNodeID          = "find-pull-request-for-review-reply"
-	prFeedbackReplyActivityNodeID      = "add-pr-review-reply-activity"
-	prFeedbackReplyRunnerNodeID        = "address-pr-review-reply-feedback"
+	prFeedbackCommentTriggerNodeID        = "on-pr-comment"
+	prFeedbackAcknowledgeCommentNodeID    = "acknowledge-pr-comment"
+	prFeedbackReviewTriggerNodeID         = "on-pr-review"
+	prFeedbackReplyTriggerNodeID          = "on-pr-review-reply"
+	prFeedbackFindNodeID                  = "find-pull-request"
+	prFeedbackActivityNodeID              = "add-pr-activity"
+	prFeedbackRunnerNodeID                = "address-pr-feedback"
+	prFeedbackReviewFindNodeID            = "find-pull-request-for-review"
+	prFeedbackReviewActivityNodeID        = "add-pr-review-activity"
+	prFeedbackReviewRunnerNodeID          = "address-pr-review-feedback"
+	prFeedbackReplyFindNodeID             = "find-pull-request-for-review-reply"
+	prFeedbackReplyActivityNodeID         = "add-pr-review-reply-activity"
+	prFeedbackReplyRunnerNodeID           = "address-pr-review-reply-feedback"
+	prFeedbackEvidenceGateNodeID          = "has-pr-comment-visual-evidence"
+	prFeedbackEvidenceCommentNodeID       = "comment-pr-comment-visual-evidence"
+	prFeedbackReviewEvidenceGateNodeID    = "has-pr-review-visual-evidence"
+	prFeedbackReviewEvidenceCommentNodeID = "comment-pr-review-visual-evidence"
+	prFeedbackReplyEvidenceGateNodeID     = "has-pr-review-reply-visual-evidence"
+	prFeedbackReplyEvidenceCommentNodeID  = "comment-pr-review-reply-visual-evidence"
 
 	prFeedbackFindComponent     = "findPullRequest"
 	prFeedbackActivityComponent = "addPullRequestActivity"
@@ -61,6 +67,7 @@ type prFeedbackBuildRequest struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	IncludeVisualEvidence  bool
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
@@ -95,14 +102,16 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
 			Integration:   request.Binding.integrationRef(),
 		},
-		FindID:       prFeedbackFindNodeID,
-		FindName:     "Find Pull Request",
-		ActivityID:   prFeedbackActivityNodeID,
-		ActivityName: "Add Comment Activity",
-		RunnerID:     prFeedbackRunnerNodeID,
-		Title:        prFeedbackCommentActivityTitleExpression(),
-		Description:  prFeedbackCommentActivityDescriptionExpression(),
-		Y:            80,
+		FindID:            prFeedbackFindNodeID,
+		FindName:          "Find Pull Request",
+		ActivityID:        prFeedbackActivityNodeID,
+		ActivityName:      "Add Comment Activity",
+		RunnerID:          prFeedbackRunnerNodeID,
+		Title:             prFeedbackCommentActivityTitleExpression(),
+		Description:       prFeedbackCommentActivityDescriptionExpression(),
+		EvidenceGateID:    prFeedbackEvidenceGateNodeID,
+		EvidenceCommentID: prFeedbackEvidenceCommentNodeID,
+		Y:                 80,
 	}, request)
 	commentFlow.nodes = append(commentFlow.nodes, yaml.Node{
 		ID:        prFeedbackAcknowledgeCommentNodeID,
@@ -132,14 +141,16 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
 			Integration:   request.Binding.integrationRef(),
 		},
-		FindID:       prFeedbackReviewFindNodeID,
-		FindName:     "Find Pull Request For Review",
-		ActivityID:   prFeedbackReviewActivityNodeID,
-		ActivityName: "Add Review Activity",
-		RunnerID:     prFeedbackReviewRunnerNodeID,
-		Title:        prFeedbackReviewActivityTitleExpression(),
-		Description:  prFeedbackReviewActivityDescriptionExpression(),
-		Y:            260,
+		FindID:            prFeedbackReviewFindNodeID,
+		FindName:          "Find Pull Request For Review",
+		ActivityID:        prFeedbackReviewActivityNodeID,
+		ActivityName:      "Add Review Activity",
+		RunnerID:          prFeedbackReviewRunnerNodeID,
+		Title:             prFeedbackReviewActivityTitleExpression(),
+		Description:       prFeedbackReviewActivityDescriptionExpression(),
+		EvidenceGateID:    prFeedbackReviewEvidenceGateNodeID,
+		EvidenceCommentID: prFeedbackReviewEvidenceCommentNodeID,
+		Y:                 260,
 	}, request)
 	replyFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
 		Trigger: yaml.Node{
@@ -156,14 +167,16 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			),
 			Integration: request.Binding.integrationRef(),
 		},
-		FindID:       prFeedbackReplyFindNodeID,
-		FindName:     "Find Pull Request For Review Reply",
-		ActivityID:   prFeedbackReplyActivityNodeID,
-		ActivityName: "Add Review Reply Activity",
-		RunnerID:     prFeedbackReplyRunnerNodeID,
-		Title:        prFeedbackReplyActivityTitleExpression(),
-		Description:  prFeedbackCommentActivityDescriptionExpression(),
-		Y:            440,
+		FindID:            prFeedbackReplyFindNodeID,
+		FindName:          "Find Pull Request For Review Reply",
+		ActivityID:        prFeedbackReplyActivityNodeID,
+		ActivityName:      "Add Review Reply Activity",
+		RunnerID:          prFeedbackReplyRunnerNodeID,
+		Title:             prFeedbackReplyActivityTitleExpression(),
+		Description:       prFeedbackCommentActivityDescriptionExpression(),
+		EvidenceGateID:    prFeedbackReplyEvidenceGateNodeID,
+		EvidenceCommentID: prFeedbackReplyEvidenceCommentNodeID,
+		Y:                 440,
 	}, request)
 
 	return withPRFeedbackConcurrency(&yaml.Canvas{
@@ -220,15 +233,17 @@ func ensurePRFeedbackConcurrency(nodes []models.Node) []models.Node {
 }
 
 type prFeedbackDiscussionFlowRequest struct {
-	Trigger      yaml.Node
-	FindID       string
-	FindName     string
-	ActivityID   string
-	ActivityName string
-	RunnerID     string
-	Title        string
-	Description  string
-	Y            int
+	Trigger           yaml.Node
+	FindID            string
+	FindName          string
+	ActivityID        string
+	ActivityName      string
+	RunnerID          string
+	Title             string
+	Description       string
+	EvidenceGateID    string
+	EvidenceCommentID string
+	Y                 int
 }
 
 type prFeedbackDiscussionFlowSpec struct {
@@ -278,12 +293,53 @@ func prFeedbackDiscussionFlowNodes(
 				Configuration: prFeedbackRunnerConfiguration(request),
 				Position:      yaml.Position{X: 920, Y: flow.Y},
 			},
+			{
+				ID:        flow.EvidenceGateID,
+				Name:      "Has Visual Evidence?",
+				Type:      yaml.NodeTypeAction,
+				Component: "if",
+				Configuration: map[string]any{
+					"expression": prFeedbackVisualEvidenceExpression(),
+				},
+				Position: yaml.Position{X: 1200, Y: flow.Y},
+			},
+			{
+				ID:            flow.EvidenceCommentID,
+				Name:          "Comment Visual Evidence",
+				Type:          yaml.NodeTypeAction,
+				Component:     "github.createIssueComment",
+				Configuration: prFeedbackVisualEvidenceCommentConfiguration(),
+				Integration:   request.Binding.integrationRef(),
+				Position:      yaml.Position{X: 1480, Y: flow.Y},
+			},
 		},
 		edges: []yaml.Edge{
 			{Channel: "default", SourceID: flow.Trigger.ID, TargetID: flow.FindID},
 			{Channel: "found", SourceID: flow.FindID, TargetID: flow.ActivityID},
 			{Channel: "default", SourceID: flow.ActivityID, TargetID: flow.RunnerID},
+			{Channel: "passed", SourceID: flow.RunnerID, TargetID: flow.EvidenceGateID},
+			{Channel: "true", SourceID: flow.EvidenceGateID, TargetID: flow.EvidenceCommentID},
 		},
+	}
+}
+
+func prFeedbackVisualEvidenceExpression() string {
+	return `(previous().data.result.visualEvidence.status == "captured" || ` +
+		`previous().data.result.visualEvidence.status == "partial") && ` +
+		`len(previous().data.result.visualEvidence.artifacts) > 0`
+}
+
+func prFeedbackVisualEvidenceCommentConfiguration() map[string]any {
+	return map[string]any{
+		"repository":  "{{ root().data.repository.full_name }}",
+		"issueNumber": prFeedbackPRNumberExpression(),
+		"body": strings.Join([]string{
+			"## Visual evidence",
+			"",
+			"Captured for commit `{{ previous(2).data.result.headSha[:7] }}`.",
+			"",
+			"{{ fromBase64(previous(2).data.result.visualEvidence.markdown) }}",
+		}, "\n"),
 	}
 }
 
@@ -370,6 +426,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 	configuration := map[string]any{
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
+		"includeVisualEvidence":   request.IncludeVisualEvidence,
 		"steps":                   prFeedbackRunnerSteps(),
 		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
@@ -456,7 +513,8 @@ func prFeedbackRunnerSteps() []any {
 			"type": "bash",
 			"command": strings.Join([]string{
 				"set -euo pipefail",
-				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
+				"gh auth setup-git --hostname github.com --force",
+				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
 				"cd repo",
 				`if [ -z "${PR_HEAD:-}" ]; then`,
 				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
@@ -509,7 +567,49 @@ func prFeedbackRunnerSteps() []any {
 				"fi",
 			}, "\n"),
 		},
+		map[string]any{
+			"name":             "Publish Visual Evidence",
+			"type":             "bash",
+			"workingDirectory": "repo",
+			"command":          prFeedbackVisualEvidenceOutputCommand(),
+		},
 	}
+}
+
+func prFeedbackVisualEvidenceOutputCommand() string {
+	return strings.Join([]string{
+		"set -euo pipefail",
+		`EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"`,
+		`if [ ! -s "$EVIDENCE_FILE" ]; then`,
+		`  EVIDENCE_TMP="${EVIDENCE_FILE}.$$"`,
+		`  printf '%s\n' '{"status":"not_applicable","reason":"","artifacts":[]}' > "$EVIDENCE_TMP"`,
+		`  mv "$EVIDENCE_TMP" "$EVIDENCE_FILE"`,
+		"fi",
+		`EVIDENCE_MARKDOWN="$(jq -r '`,
+		`  if (.status == "captured" or .status == "partial") and (.artifacts | length) > 0 then`,
+		`    ([.artifacts[].markdown] +`,
+		`      (if (.reason // "") != "" then ["**Evidence note:** " + .reason] else [] end)) |`,
+		`    join("\n\n")`,
+		`  else`,
+		`    ""`,
+		`  end`,
+		`' "$EVIDENCE_FILE")"`,
+		`HEAD_SHA="$(git rev-parse HEAD)"`,
+		`jq -n \`,
+		`  --arg headSha "$HEAD_SHA" \`,
+		`  --slurpfile evidence "$EVIDENCE_FILE" \`,
+		`  --arg evidenceMarkdown "$EVIDENCE_MARKDOWN" \`,
+		`  '{`,
+		`    headSha: $headSha,`,
+		`    visualEvidence: {`,
+		`      status: $evidence[0].status,`,
+		`      reason: ($evidence[0].reason // ""),`,
+		`      attempts: ($evidence[0].attempts // []),`,
+		`      artifacts: $evidence[0].artifacts,`,
+		`      markdown: ($evidenceMarkdown | @base64)`,
+		`    }`,
+		`  }' > "$SUPERPLANE_RESULT_FILE"`,
+	}, "\n")
 }
 
 func prFeedbackPrompt() string {

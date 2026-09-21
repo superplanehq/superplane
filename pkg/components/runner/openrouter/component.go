@@ -149,18 +149,20 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
-	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
 	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
+	dispatched = runner.AppendVisualEvidenceProtocol(dispatched, runner.HasArtifactUploadToken(environment))
 	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
+	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

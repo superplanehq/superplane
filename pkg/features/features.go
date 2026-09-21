@@ -53,9 +53,9 @@ const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
-// FeatureFactoryVisualEvidence asks implementation agents to capture and
-// publish screenshots or videos for UI changes.
-const FeatureFactoryVisualEvidence = "factory_visual_evidence"
+// FeatureWorkspaceAgentResources gates the workspace Agent resources settings
+// page until MCP servers are ready for general use.
+const FeatureWorkspaceAgentResources = "workspace_agent_resources"
 
 func released() *bool {
 	v := true
@@ -73,7 +73,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCreateWithAgent, Label: "Task Refinement", Description: "Refine draft work orders with an agent"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
-	{ID: FeatureFactoryVisualEvidence, Label: "Factory Visual Evidence", Description: "Ask implementation agents to capture and publish visual evidence"},
+	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP servers for workspace agents"},
 }
 
 func All() []Feature {

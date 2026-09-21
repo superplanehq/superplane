@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { workOrderListSource } from "./workOrderCardSource";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatDurationSeconds, formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
 import {
@@ -53,6 +54,8 @@ export interface WorkOrderListEntry {
   assigneeIds: string[];
   assigneeNames: string[];
   isUnassigned: boolean;
+  sourceId: string;
+  sourceLabel: string;
   searchHaystack: string;
   isDispatchable: boolean;
 }
@@ -70,6 +73,7 @@ export function buildWorkOrderListEntry(
     pairs.map((pair) => pair.execution),
   );
   const { assigneeIds, assigneeNames } = collectAssignees(order);
+  const source = workOrderListSource(order);
 
   const createdAtMs = parseTimestamp(order.createdAt);
   const displayKey = getWorkOrderDisplayKey(order, factory?.key ?? null);
@@ -101,6 +105,8 @@ export function buildWorkOrderListEntry(
     assigneeIds,
     assigneeNames,
     isUnassigned: isUnassignedWorkOrder(order),
+    sourceId: source.id,
+    sourceLabel: source.label,
     searchHaystack: buildSearchHaystack([
       displayKey,
       title,
@@ -108,6 +114,7 @@ export function buildWorkOrderListEntry(
       lines.names.join(" "),
       latestStepName,
       assigneeNames.join(" "),
+      source.label,
     ]),
     isDispatchable: isDispatchableState(order.state),
   };
@@ -304,6 +311,8 @@ export const WORK_ORDER_LAYOUTS: Array<{ id: WorkOrderLayoutId; label: string }>
 /** Sentinel assignee filter value that matches tasks with no assignee. */
 export const UNASSIGNED_FILTER_VALUE = "unassigned";
 
+export { MANUAL_FILTER_VALUE } from "./workOrderCardSource";
+
 /**
  * Filters chosen in the Filter menu. Each dimension narrows independently
  * (AND across dimensions, OR within one), and an empty array means the
@@ -312,13 +321,19 @@ export const UNASSIGNED_FILTER_VALUE = "unassigned";
 export interface WorkOrderFilters {
   statuses: WorkOrderDisplayStatus[];
   lineIds: string[];
+  sourceIds: string[];
   assigneeIds: string[];
 }
 
-export const EMPTY_WORK_ORDER_FILTERS: WorkOrderFilters = { statuses: [], lineIds: [], assigneeIds: [] };
+export const EMPTY_WORK_ORDER_FILTERS: WorkOrderFilters = {
+  statuses: [],
+  lineIds: [],
+  sourceIds: [],
+  assigneeIds: [],
+};
 
 export function countWorkOrderFilters(filters: WorkOrderFilters): number {
-  return filters.statuses.length + filters.lineIds.length + filters.assigneeIds.length;
+  return filters.statuses.length + filters.lineIds.length + filters.sourceIds.length + filters.assigneeIds.length;
 }
 
 export function applyWorkOrderScope(
@@ -345,6 +360,9 @@ export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: Wo
   }
   if (filters.lineIds.length > 0) {
     result = result.filter((entry) => entry.lineIds.some((lineId) => filters.lineIds.includes(lineId)));
+  }
+  if (filters.sourceIds.length > 0) {
+    result = result.filter((entry) => filters.sourceIds.includes(entry.sourceId));
   }
   if (filters.assigneeIds.length > 0) {
     result = result.filter((entry) => {

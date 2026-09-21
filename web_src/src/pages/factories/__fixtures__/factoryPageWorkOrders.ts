@@ -203,6 +203,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
           updatedAt: HOUR_AGO,
           totalTokens: "900",
           costCents: "28",
+          models: ["anthropic/claude-sonnet-4-6"],
         }),
       ],
       { model: "anthropic/claude-sonnet-4-6" },
@@ -210,6 +211,8 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   ],
   totalTokens: "2700",
   totalCostCents: "73",
+  usageByModel: [{ provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" }],
+  usageByMachineType: [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
 };
 
 // Storybook user is co-assigned so "mine + failed" surfaces this order.

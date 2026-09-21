@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import type { UpdateHttpSyntheticCheckConfiguration } from "./types";
+import type { HttpSyntheticCheckPayload, UpdateHttpSyntheticCheckConfiguration } from "./types";
 import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -50,7 +50,7 @@ export const updateHttpSyntheticCheckMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as HttpSyntheticCheckPayload | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };

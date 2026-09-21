@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import type { CheckRuleNodeMetadata, GetCheckRuleConfiguration } from "./types";
+import type { CheckRuleNodeMetadata, CheckRulePayload, GetCheckRuleConfiguration } from "./types";
 import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -41,7 +41,7 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as CheckRulePayload | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };

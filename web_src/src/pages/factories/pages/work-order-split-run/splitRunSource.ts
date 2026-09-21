@@ -51,7 +51,7 @@ const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   avatarUrl: STORYBOOK_ME_USER_AVATAR_URL,
 };
 
-const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
+export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
   "github-issues": { name: "GitHub issues", iconSrc: githubIcon, iconAlt: "GitHub" },
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },

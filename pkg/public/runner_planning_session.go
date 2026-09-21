@@ -209,12 +209,13 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 					writeRunnerPlanningError(w, err)
 					return
 				}
-				if err := writeJSON(w, http.StatusOK, map[string]any{
-					"status":         result.Kind,
-					"text":           text,
-					"work_order_id":  result.WorkOrderID,
-					"work_order_key": result.WorkOrderKey,
-				}); err != nil {
+				body, bodyErr := planningWaitMessageBody(r.Context(), session, result, text)
+				if bodyErr != nil {
+					restorePlanningWait(session, result)
+					writeRunnerPlanningError(w, bodyErr)
+					return
+				}
+				if err := writeJSON(w, http.StatusOK, body); err != nil {
 					restorePlanningWait(session, result)
 				}
 				return
@@ -438,6 +439,31 @@ func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSe
 
 func hasOutstandingPlanningQuestion(session *models.FactoryPlanningSession) bool {
 	return len(session.CurrentSurvey().Questions) > 0
+}
+
+func planningWaitMessageBody(
+	ctx context.Context,
+	session *models.FactoryPlanningSession,
+	result models.PlanningWaitResult,
+	text string,
+) (map[string]any, error) {
+	body := map[string]any{
+		"status":         result.Kind,
+		"text":           text,
+		"work_order_id":  result.WorkOrderID,
+		"work_order_key": result.WorkOrderKey,
+	}
+	if session == nil || !session.IsAnalysisSession() {
+		return body, nil
+	}
+	continuation, err := models.AnalysisContinuationText(database.DB(ctx), session)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(continuation) != "" {
+		body["continuation"] = continuation
+	}
+	return body, nil
 }
 
 func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {

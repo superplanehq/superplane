@@ -89,6 +89,7 @@ spec:
             value: '{{ join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
             valueSource: literal
         executionTimeoutSeconds: 3600
+        includeVisualEvidence: false
         machineType: e1-large-amd64
         model: sonnet
         steps:
@@ -141,7 +142,6 @@ spec:
               2/ Make long term fixes, not fast patches.
               3/ Add tests where it makes sense.
 
-              {{ task().visual_evidence_enabled ? "Visual evidence:\n\n- Changes that are not related to the UI do not require visual evidence.\n- Rendered markup, styles, layout, and interaction behavior are UI changes. Unit tests do not replace visual evidence.\n- For a visual-only change, capture and upload at least one screenshot.\n- If an interaction was added or changed, record and upload a short WebM video that shows the interaction works. A screenshot is optional.\n- Save screenshots and videos in $SUPERPLANE_TASK_DIR/evidence. Do not add them to the repository.\n- For a named Playwright output, use an absolute path under $SUPERPLANE_TASK_DIR/evidence. Automatic Playwright outputs already use this directory.\n- Read repository setup instructions and package scripts before starting a preview.\n- Start Storybook or the project preview according to the repository instructions. Run it in the repository container when required. Retain its server log.\n- Poll the preview URL with a bounded timeout before starting Playwright.\n- Run the installed `playwright cli` on the runner host, not in the repository container.\n- A signed-in application is not required when an isolated preview can show the change.\n- Use an existing Storybook story or component preview first. If it does not show the changed state, create a focused temporary story or fixture.\n- Open the direct Storybook iframe or the focused preview route. Render the actual component instead of recreating it as static HTML.\n- Use `snapshot` or `find`, then use the returned element references instead of guessed selectors.\n- Use `eval` to verify computed styles or state when the change has a testable visual property.\n- Check the browser console for errors before capture.\n- Capture the changed element or a focused viewport. Do not capture a mostly empty full page.\n- Call `inspect_screenshot` for every screenshot. Review the returned image and verify that the intended state is visible.\n- Upload the unchanged inspected file with `upload_artifact`. Video uploads do not require image inspection.\n- Do not use file size, custom PNG decoding, or pixel-color counting as a substitute for visual inspection.\n- Upload the smallest useful set. Usually, use one focused image for each affected theme or state.\n- If the repository has no component preview, start the application with local or mock data. Create a temporary preview route or harness when needed.\n- Remove temporary preview files before committing unless they are useful regression coverage.\n- Close the Playwright session and stop temporary preview processes after capture.\n- Do not report evidence as unavailable only because the main application requires authentication or production data.\n- Before reporting evidence as unavailable, attempt at least one isolated preview and one Playwright capture. Include each command and concrete outcome in the report_visual_evidence_unavailable attempts field. Set each attempt type to preview, playwright, or upload.\n- Keep the evidence focused. Do not capture secrets or unrelated user data.\n- If preview, capture, inspection, or upload still fails after these attempts, call report_visual_evidence_unavailable with the reason and attempts. Continue the task." : "" }}
           - name: Commit and Push
             type: bash
             workingDirectory: repo
@@ -193,7 +193,6 @@ spec:
 
               echo "Title and description found. Using as output"
               BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-              COMMIT_SHA="$(git rev-parse '@{upstream}')"
 
               EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"
               if [ ! -s "$EVIDENCE_FILE" ]; then
@@ -202,9 +201,11 @@ spec:
                 mv "$EVIDENCE_TMP" "$EVIDENCE_FILE"
               fi
 
-              EVIDENCE_COMMENT="$(jq -r --arg commit "$COMMIT_SHA" '
-                if .status == "captured" and (.artifacts | length) > 0 then
-                  "## Visual evidence\n\nCaptured for commit `" + $commit + "`.\n\n" + ([.artifacts[].markdown] | join("\n\n"))
+              EVIDENCE_MARKDOWN="$(jq -r '
+                if (.status == "captured" or .status == "partial") and (.artifacts | length) > 0 then
+                  ([.artifacts[].markdown] +
+                    (if (.reason // "") != "" then ["**Evidence note:** " + .reason] else [] end)) |
+                  join("\n\n")
                 else
                   ""
                 end
@@ -214,7 +215,7 @@ spec:
                 --rawfile title /tmp/TITLE \
                 --rawfile description /tmp/DESCRIPTION.md \
                 --slurpfile evidence "$EVIDENCE_FILE" \
-                --arg evidenceComment "$EVIDENCE_COMMENT" \
+                --arg evidenceMarkdown "$EVIDENCE_MARKDOWN" \
                 '{
                   branch: $branch,
                   title: ($title | gsub("[\\r\\n]"; "") | @base64),
@@ -224,7 +225,7 @@ spec:
                     reason: ($evidence[0].reason // ""),
                     attempts: ($evidence[0].attempts // []),
                     artifacts: $evidence[0].artifacts,
-                    comment: ($evidenceComment | @base64)
+                    markdown: ($evidenceMarkdown | @base64)
                   }
                 }' \
                 > "$SUPERPLANE_RESULT_FILE"
@@ -352,7 +353,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+        expression: ($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
       position:
         x: 1160
         "y": 1320
@@ -366,7 +367,12 @@ spec:
       configuration:
         repository: "{{ task().repository }}"
         issueNumber: '{{ $["Create Pull Request"].data.number }}'
-        body: '{{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.comment) }}'
+        body: |-
+          ## Visual evidence
+
+          Captured for commit `{{ substring($["Create Pull Request"].data.head.sha, 0, 7) }}`.
+
+          {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
       position:
         x: 1000
         "y": 1488
@@ -411,7 +417,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Implement From Task Description"].data.result.visualEvidence.status == "captured" && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+        expression: ($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
       position:
         x: 1724
         "y": 1320
@@ -425,7 +431,12 @@ spec:
       configuration:
         repository: "{{ task().repository }}"
         issueNumber: '{{ $["Update Pull Request"].data.number }}'
-        body: '{{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.comment) }}'
+        body: |-
+          ## Visual evidence
+
+          Captured for commit `{{ substring($["Update Pull Request"].data.head.sha, 0, 7) }}`.
+
+          {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
       position:
         x: 1884
         "y": 1488

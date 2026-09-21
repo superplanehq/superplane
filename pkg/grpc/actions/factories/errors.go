@@ -108,6 +108,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "run is already linked to a different pull request")
 	case errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete):
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
+	case errors.Is(err, errFactoryGitHubNotConnected):
+		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errFactoryPullRequestNotGitHub):
+		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
+	case errors.Is(err, errFactoryPullRequestNotOpen):
+		return grpcerrors.FailedPrecondition(err, "The pull request is not open.")
+	case errors.Is(err, errFactoryPullRequestNotMergeable):
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "The pull request cannot merge."))
+	case errors.Is(err, errFactoryPullRequestMergeMethodNotAllowed):
+		return grpcerrors.FailedPrecondition(err, "The repository does not allow this merge method.")
+	case errors.Is(err, errFactoryPullRequestHeadMoved):
+		return grpcerrors.FailedPrecondition(err, "The pull request head changed. Review the pull request and try again.")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound):
 		return grpcerrors.NotFound(err, "planning session not found")
 	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
@@ -116,6 +128,30 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has ended")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
+	case errors.Is(err, models.ErrFactoryAgentResourceNotFound):
+		return grpcerrors.NotFound(err, "agent resource not found")
+	case errors.Is(err, models.ErrFactoryAgentResourceKindInvalid):
+		return grpcerrors.InvalidArgument(err, "agent resource kind is not valid")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameInvalid):
+		return grpcerrors.InvalidArgument(err, "name must be lowercase letters, digits, and dashes")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameReserved):
+		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
+		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
+	case errors.Is(err, models.ErrFactoryAgentResourceAuthInvalid):
+		return grpcerrors.InvalidArgument(err, "auth must be headers or oauth")
+	case errors.Is(err, models.ErrFactoryAgentResourceURLRequired):
+		return grpcerrors.InvalidArgument(err, "MCP URL is required")
+	case errors.Is(err, models.ErrFactoryAgentResourceHeaderInvalid):
+		return grpcerrors.InvalidArgument(err, "each header needs a name, secret, and key")
+	case errors.Is(err, models.ErrFactoryAgentResourceKindNotSupported):
+		return grpcerrors.FailedPrecondition(err, "GitHub skill packages are not available yet")
+	case errors.Is(err, models.ErrFactoryAgentResourceMarkdownRequired):
+		return grpcerrors.InvalidArgument(err, "SKILL.md content is required")
+	case errors.Is(err, models.ErrFactoryAgentResourceMarkdownTooLarge):
+		return grpcerrors.InvalidArgument(err, "SKILL.md must be 64 KiB or smaller")
+	case errors.Is(err, models.ErrFactoryAgentResourceMCPCapReached):
+		return grpcerrors.FailedPrecondition(err, "this workspace already has 20 enabled MCP connections")
 	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
@@ -153,4 +189,20 @@ var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))
+}
+
+func joinedErrorMessage(err error, fallback string) string {
+	joined, ok := err.(interface{ Unwrap() []error })
+	if !ok {
+		return fallback
+	}
+	inner := joined.Unwrap()
+	if len(inner) == 0 {
+		return fallback
+	}
+	message := inner[len(inner)-1].Error()
+	if message == "" {
+		return fallback
+	}
+	return message
 }

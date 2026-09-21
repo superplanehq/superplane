@@ -111,7 +111,7 @@ func createBacklogCanvas(
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build Backlog automation")
 	}
 
-	response, err := canvases.CreateCanvasWithSeedFiles(
+	response, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
 		deps.Encryptor,
@@ -125,7 +125,6 @@ func createBacklogCanvas(
 		nodes,
 		edges,
 		deps.UsageService,
-		nil,
 	)
 	if err != nil {
 		return uuid.Nil, err

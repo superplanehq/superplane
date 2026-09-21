@@ -7,6 +7,7 @@ import type {
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
 } from "@/api-client";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import {
   UNKNOWN_ORG_USER_NAME,
   getUserInitials,
@@ -41,12 +42,14 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
-import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import {
-  analysisResultDeliveredForRun,
-  isUnfinishedCancelledAnalysis,
-  statusForAnalysisRun,
-} from "../../lib/analysisOutcome";
+  parseWorkOrderMetric,
+  type WorkOrderUsageByMachineType,
+  type WorkOrderUsageByModel,
+} from "../../lib/workOrderUsage";
+import { joinRunnerModels } from "./draftStartModel";
+import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import { analysisResultDeliveredForRun, statusForAnalysisRun } from "../../lib/analysisOutcome";
 import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
@@ -87,6 +90,8 @@ export interface SplitRunStreamLine {
   componentName: string;
   status: SplitRunPhaseStatus;
   duration?: string;
+  /** Whether the displayed duration should keep ticking. Defaults to a running status. */
+  durationRunning?: boolean;
   detail?: string;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
@@ -123,6 +128,8 @@ export interface SplitRunPhase {
   description?: string;
   status: SplitRunPhaseStatus;
   duration: string;
+  /** Whether the displayed duration should keep ticking. Defaults to a running status. */
+  durationRunning?: boolean;
   /** When this automation started. */
   startedAt?: string;
   /** Component that ran or is running in this phase. */
@@ -173,6 +180,8 @@ export interface SplitRunFixture {
   startedLabel: string;
   costUsd: string;
   tokensLabel: string;
+  usageByModel?: WorkOrderUsageByModel[];
+  usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
   currentStepIndex: number;
   lineStatus: SplitRunPhaseStatus;
@@ -387,6 +396,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
+    usageByModel: order.usageByModel,
+    usageByMachineType: order.usageByMachineType,
     lineName:
       options?.lineName?.trim() ||
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
@@ -646,87 +657,101 @@ function phasesForOrder(
 
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
 
-/**
- * Backlog analysis runs of this task, oldest first. Each phase keeps
- * its run, so the log panel streams the analysis while the automation
- * still works. The newest phase carries the reported score.
- */
+/** One task analysis can span multiple canvas runs. Present those attempts as one phase. */
 function phasesForAnalysisRuns(
   runs: BacklogAnalysisRun[],
   apiChecks?: FactoriesWorkOrderCheck[],
   artifacts?: FactoriesWorkOrderArtifact[],
 ): SplitRunPhase[] {
   const ordered = [...runs]
-    .filter((entry) => Boolean(entry.canvasId && entry.run.id))
+    .filter((entry) => Boolean(entry.canvasId && entry.workOrderId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
-  const result = { checks: apiChecks, artifacts };
-  const visible = visibleAnalysisRuns(ordered, result);
-
-  return visible.map((entry, index) => {
-    const isLast = index === visible.length - 1;
-    return analysisRunToPhase(
-      entry,
-      isLast ? confidenceChecks(apiChecks) : undefined,
-      analysisResultDeliveredForRun(entry.run, { ...result, isLast }),
-    );
-  });
-}
-
-function visibleAnalysisRuns(
-  ordered: BacklogAnalysisRun[],
-  result: { checks?: FactoriesWorkOrderCheck[]; artifacts?: FactoriesWorkOrderArtifact[] },
-): BacklogAnalysisRun[] {
-  if (ordered.length <= 1) {
-    return ordered;
+  const latest = ordered.at(-1);
+  if (!latest) {
+    return [];
   }
-  return ordered.filter((entry, index) => {
-    if (index === ordered.length - 1) {
-      return true;
-    }
-    const delivered = analysisResultDeliveredForRun(entry.run, { ...result, isLast: false });
-    return !isUnfinishedCancelledAnalysis(entry.run, delivered);
-  });
+
+  const result = { checks: apiChecks, artifacts };
+  return [
+    analysisAttemptsToPhase(
+      ordered,
+      confidenceChecks(apiChecks),
+      analysisResultDeliveredForRun(latest.run, { ...result, isLast: true }),
+    ),
+  ];
 }
 
-function analysisRunToPhase(
-  entry: BacklogAnalysisRun,
+function analysisAttemptsToPhase(
+  attempts: BacklogAnalysisRun[],
   checks?: WorkOrderCheckPresentation[],
   delivered = false,
 ): SplitRunPhase {
-  const status = statusForAnalysisRun(entry.run, statusForCanvasRun(entry.run), delivered);
+  const first = attempts[0];
+  const latest = attempts.at(-1);
+  if (!first || !latest) {
+    throw new Error("analysis phase requires at least one attempt");
+  }
+
+  const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
+  const durationRunning = latest.run.state === "STATE_STARTED";
   const componentName = CONFIDENCE_CHECK_NAME;
-  const duration = durationForExecution(
-    {
-      createdAt: entry.run.createdAt,
-      updatedAt: entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt,
-    },
-    status,
-  );
+  const latestDuration = analysisAttemptsDuration([latest], durationRunning);
   const line: SplitRunStreamLine = {
-    id: entry.run.id ?? componentName,
-    at: clockLabel(entry.run.createdAt),
+    id: latest.run.id ?? componentName,
+    at: clockLabel(latest.run.createdAt),
     componentName,
     status,
-    duration,
+    duration: latestDuration,
+    durationRunning,
     kind: "action",
     componentType: componentName,
     action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
     iconSlug: "box",
   };
   return {
-    id: `${ANALYSIS_PHASE_ID_PREFIX}${entry.run.id}`,
+    id: `${ANALYSIS_PHASE_ID_PREFIX}${latest.workOrderId}`,
     name: "Analysis",
     status,
-    duration,
-    startedAt: entry.run.createdAt,
+    duration: analysisAttemptsDuration(attempts, durationRunning),
+    durationRunning,
+    startedAt: first.run.createdAt,
     componentName,
     artifacts: [],
     checks,
     stream: [line],
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
-    appId: entry.canvasId,
-    runId: entry.run.id,
+    appId: latest.canvasId,
+    runId: latest.run.id,
+    costCents: sumAnalysisMetric(attempts, (attempt) => attempt.run.costCents),
+    totalTokens: sumAnalysisMetric(attempts, (attempt) => attempt.run.totalTokens),
+    model: joinRunnerModels(attempts.flatMap((attempt) => attempt.run.models ?? [])),
   };
+}
+
+function analysisAttemptsDuration(attempts: BacklogAnalysisRun[], durationRunning: boolean, now = Date.now()): string {
+  const lastIndex = attempts.length - 1;
+  const durationMs = attempts.reduce((total, attempt, index) => {
+    const startedAt = Date.parse(attempt.run.createdAt ?? "");
+    if (!Number.isFinite(startedAt)) {
+      return total;
+    }
+    const recordedEnd = Date.parse(attempt.run.finishedAt ?? attempt.run.updatedAt ?? "");
+    const isLatestRunningAttempt = index === lastIndex && durationRunning;
+    const endedAt = isLatestRunningAttempt ? now : Number.isFinite(recordedEnd) ? recordedEnd : startedAt;
+    return total + Math.max(0, endedAt - startedAt);
+  }, 0);
+  return formatMinutesSecondsDuration(durationMs) || "<1s";
+}
+
+function sumAnalysisMetric(
+  attempts: BacklogAnalysisRun[],
+  select: (attempt: BacklogAnalysisRun) => string | undefined,
+): string | undefined {
+  const values = attempts.map(select).filter((value): value is string => value != null && value !== "");
+  if (values.length === 0) {
+    return undefined;
+  }
+  return String(values.reduce((total, value) => total + parseWorkOrderMetric(value), 0));
 }
 
 function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] | undefined {
@@ -1127,7 +1152,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
-    model: dispatchModelForExecution(order, execution),
+    model: modelsForExecution(order, execution),
   };
 }
 
@@ -1248,6 +1273,14 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function modelsForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): string | undefined {
+  const reported = joinRunnerModels(execution.models ?? []);
+  if (reported) {
+    return reported;
+  }
+  return dispatchModelForExecution(order, execution);
 }
 
 function dispatchModelForExecution(
