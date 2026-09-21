@@ -138,16 +138,20 @@ func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	return automation
 }
 
-func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+func serializeFactoryIntakes(tx *gorm.DB, intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
 	result := make([]*pb.FactoryIntake, len(intakes))
 	for i := range intakes {
-		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+		result[i] = serializeFactoryIntake(tx, &intakes[i], specs[intakes[i].CanvasID])
 	}
 	return result
 }
 
-func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
+	healthy := graph.Healthy(spec.Edges)
+	if healthy && intake.Source == models.FactoryIntakeSourceJiraIssues {
+		healthy = jiraIntakeWebhookReady(tx, intake.CanvasID, graph.TriggerNodeID)
+	}
 
 	serialized := &pb.FactoryIntake{
 		Id:                  intake.ID.String(),
@@ -156,7 +160,7 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
 		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
-		Healthy:             graph.Healthy(spec.Edges),
+		Healthy:             healthy,
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
