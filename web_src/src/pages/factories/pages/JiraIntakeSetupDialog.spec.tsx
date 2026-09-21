@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
@@ -131,6 +132,30 @@ describe("JiraIntakeSetupDialog", () => {
         source: "SOURCE_JIRA_ISSUES",
         integrationId: "integration-1",
         resourceId: "ENG",
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("creates a bound intake without importing existing issues", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await screen.findByTestId("jira-project-ENG");
+    expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
+    expect(screen.getByTestId("jira-skip-initial-import")).not.toBeChecked();
+    await user.click(screen.getByTestId("jira-skip-initial-import"));
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
+    await user.click(screen.getByTestId("jira-project-ENG"));
+    await user.click(screen.getByTestId("jira-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_JIRA_ISSUES",
+        integrationId: "integration-1",
+        resourceId: "ENG",
+        skipInitialImport: true,
       });
     });
     expect(onCreated).toHaveBeenCalled();

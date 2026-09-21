@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { SentryIntakeSetupDialog } from "./SentryIntakeSetupDialog";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 
@@ -104,6 +105,30 @@ describe("SentryIntakeSetupDialog", () => {
         source: "SOURCE_SENTRY_EXCEPTIONS",
         integrationId: "integration-1",
         resourceId: "payments",
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("creates a bound intake without importing existing issues", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await screen.findByTestId("sentry-project-payments");
+    expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
+    expect(screen.getByTestId("sentry-skip-initial-import")).not.toBeChecked();
+    await user.click(screen.getByTestId("sentry-skip-initial-import"));
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
+    await user.click(screen.getByTestId("sentry-project-payments"));
+    await user.click(screen.getByTestId("sentry-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        integrationId: "integration-1",
+        resourceId: "payments",
+        skipInitialImport: true,
       });
     });
     expect(onCreated).toHaveBeenCalled();

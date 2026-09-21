@@ -147,6 +147,60 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "production", trigger.Configuration["project"])
 	})
 
+	t.Run("skipping the initial import starts a bound Sentry intake empty", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId:     integrationID,
+			ResourceId:        "payments",
+			SkipInitialImport: true,
+		})
+
+		assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+		assert.Nil(t, intake.InitialImportItemCount)
+
+		runs, err := ListFactoryIntakeRuns(ctx, orgID, &pb.ListFactoryIntakeRunsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs.GetRuns())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+	})
+
+	t.Run("skipping the initial import starts a bound Jira intake empty", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId:     integrationID,
+			ResourceId:        "ENG",
+			SkipInitialImport: true,
+		})
+
+		assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+		assert.Nil(t, intake.InitialImportItemCount)
+
+		runs, err := ListFactoryIntakeRuns(ctx, orgID, &pb.ListFactoryIntakeRunsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs.GetRuns())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+	})
+
 	t.Run("a Jira intake listens to the selected project and stays unhealthy until the webhook is ready", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
