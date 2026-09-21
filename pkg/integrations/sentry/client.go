@@ -221,6 +221,7 @@ type Issue struct {
 	Title         string         `json:"title" mapstructure:"title"`
 	Count         string         `json:"count" mapstructure:"count"`
 	Status        string         `json:"status" mapstructure:"status"`
+	Substatus     string         `json:"substatus" mapstructure:"substatus"`
 	Priority      string         `json:"priority" mapstructure:"priority"`
 	HasSeen       bool           `json:"hasSeen" mapstructure:"hasSeen"`
 	IsPublic      bool           `json:"isPublic" mapstructure:"isPublic"`
@@ -278,7 +279,7 @@ type IssueEventDetail struct {
 	Culprit     string            `json:"culprit" mapstructure:"culprit"`
 	Type        string            `json:"type" mapstructure:"type"`
 	WebURL      string            `json:"web_url" mapstructure:"web_url"`
-	Release     string            `json:"release" mapstructure:"release"`
+	Release     IssueEventRelease `json:"release" mapstructure:"release"`
 	Tags        []IssueTag        `json:"tags" mapstructure:"tags"`
 	User        map[string]any    `json:"user" mapstructure:"user"`
 	Contexts    map[string]any    `json:"contexts" mapstructure:"contexts"`
@@ -291,6 +292,50 @@ type IssueEventDetail struct {
 type IssueEventEntry struct {
 	Type string         `json:"type" mapstructure:"type"`
 	Data map[string]any `json:"data" mapstructure:"data"`
+}
+
+// IssueEventRelease is a Sentry event release. GET .../events/{id}/ returns
+// either a version string or a release object. A type mismatch must not fail
+// the whole event decode.
+type IssueEventRelease struct {
+	Version string
+}
+
+func (r IssueEventRelease) String() string {
+	return r.Version
+}
+
+func (r *IssueEventRelease) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
+		r.Version = ""
+		return nil
+	}
+
+	if data[0] == '"' {
+		var version string
+		if err := json.Unmarshal(data, &version); err != nil {
+			return err
+		}
+		r.Version = version
+		return nil
+	}
+
+	if data[0] != '{' {
+		r.Version = ""
+		return nil
+	}
+
+	var obj struct {
+		Version      string `json:"version"`
+		ShortVersion string `json:"shortVersion"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+
+	r.Version = firstNonEmpty(obj.ShortVersion, obj.Version)
+	return nil
 }
 
 func (e *IssueEventDetail) HasStack() bool {

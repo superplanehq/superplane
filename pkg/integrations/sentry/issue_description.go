@@ -3,6 +3,7 @@ package sentry
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"sort"
 	"strings"
 )
@@ -69,7 +70,7 @@ func writeHighlights(b *strings.Builder, issue map[string]any, event *IssueEvent
 		if value == "" {
 			return
 		}
-		lines = append(lines, fmt.Sprintf("- **%s:** %s", label, value))
+		lines = append(lines, fmt.Sprintf("- **%s:** %s", label, markdownInline(value)))
 	}
 
 	title := firstNonEmpty(mapString(issue, "title"), eventString(event, func(e *IssueEventDetail) string { return e.Title }))
@@ -123,7 +124,7 @@ func writeMessage(b *strings.Builder, event *IssueEventDetail) {
 	}
 
 	b.WriteString("## Message\n\n")
-	fmt.Fprintf(b, "%s\n\n", message)
+	fmt.Fprintf(b, "%s\n\n", markdownInline(message))
 }
 
 func writeStackTrace(b *strings.Builder, event *IssueEventDetail) {
@@ -138,7 +139,7 @@ func writeStackTrace(b *strings.Builder, event *IssueEventDetail) {
 			b.WriteString("\n")
 		}
 		if block.heading != "" {
-			fmt.Fprintf(b, "%s\n\n", block.heading)
+			fmt.Fprintf(b, "%s\n\n", markdownInline(block.heading))
 		}
 		b.WriteString("```\n")
 		b.WriteString(strings.Join(block.frames, "\n"))
@@ -198,7 +199,7 @@ func writeUser(b *strings.Builder, event *IssueEventDetail) {
 	lines := make([]string, 0, 3)
 	for _, key := range []string{"username", "email", "id"} {
 		if value := mapString(event.User, key); value != "" {
-			lines = append(lines, fmt.Sprintf("- **%s:** %s", key, value))
+			lines = append(lines, fmt.Sprintf("- **%s:** %s", key, markdownInline(value)))
 		}
 	}
 	if len(lines) == 0 {
@@ -215,18 +216,21 @@ func writeTags(b *strings.Builder, issue map[string]any, event *IssueEventDetail
 	if event != nil {
 		tags = mergeTags(tags, event.Tags)
 	}
-	if len(tags) == 0 {
-		return
-	}
 
-	b.WriteString("## Tags\n\n")
+	var lines []string
 	for _, tag := range tags {
 		if tag.Key == "" || tag.Value == "" {
 			continue
 		}
-		fmt.Fprintf(b, "- **%s:** %s\n", tag.Key, tag.Value)
+		lines = append(lines, fmt.Sprintf("- **%s:** %s", markdownInline(tag.Key), markdownInline(tag.Value)))
 	}
-	b.WriteString("\n")
+	if len(lines) == 0 {
+		return
+	}
+
+	b.WriteString("## Tags\n\n")
+	b.WriteString(strings.Join(lines, "\n"))
+	b.WriteString("\n\n")
 }
 
 func writeContexts(b *strings.Builder, event *IssueEventDetail) {
@@ -252,7 +256,7 @@ func writeContexts(b *strings.Builder, event *IssueEventDetail) {
 		if formatted == "" {
 			continue
 		}
-		fmt.Fprintf(b, "- **%s:** %s\n", key, formatted)
+		fmt.Fprintf(b, "- **%s:** %s\n", markdownInline(key), markdownInline(formatted))
 	}
 	b.WriteString("\n")
 }
@@ -292,7 +296,7 @@ func writeBreadcrumbs(b *strings.Builder, event *IssueEventDetail) {
 		if line == "" {
 			continue
 		}
-		fmt.Fprintf(b, "- %s\n", line)
+		fmt.Fprintf(b, "- %s\n", markdownInline(line))
 	}
 	b.WriteString("\n")
 }
@@ -331,7 +335,7 @@ func writeSDK(b *strings.Builder, event *IssueEventDetail) {
 	}
 
 	b.WriteString("## SDK\n\n")
-	fmt.Fprintf(b, "%s\n\n", label)
+	fmt.Fprintf(b, "%s\n\n", markdownInline(label))
 }
 
 func writeReplayAndTrace(b *strings.Builder, event *IssueEventDetail, issue map[string]any) {
@@ -346,10 +350,10 @@ func writeReplayAndTrace(b *strings.Builder, event *IssueEventDetail, issue map[
 	}
 
 	if replayID != "" {
-		fmt.Fprintf(b, "**Replay ID:** %s\n", replayID)
+		fmt.Fprintf(b, "**Replay ID:** %s\n", markdownInline(replayID))
 	}
 	if traceID != "" {
-		fmt.Fprintf(b, "**Trace ID:** %s\n", traceID)
+		fmt.Fprintf(b, "**Trace ID:** %s\n", markdownInline(traceID))
 	}
 	b.WriteString("\n")
 }
@@ -498,9 +502,13 @@ func eventMessage(event *IssueEventDetail) string {
 
 func releaseLabel(issue map[string]any, event *IssueEventDetail) string {
 	return firstNonEmpty(
-		eventString(event, func(e *IssueEventDetail) string { return e.Release }),
+		eventString(event, func(e *IssueEventDetail) string { return e.Release.String() }),
 		tagValue(issue, event, "release"),
 	)
+}
+
+func markdownInline(value string) string {
+	return html.EscapeString(value)
 }
 
 func nonzeroScalar(value any) string {
