@@ -1,6 +1,7 @@
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -131,6 +132,25 @@ function IntakeSourceIcon({ source }: { source: BacklogIntakeSource }) {
   );
 }
 
+type CreateMenuSourcesProps = {
+  sources: BacklogIntakeSource[];
+  query: string;
+  focusedIntakeId: string | null;
+  items: BacklogIntakeItem[];
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  errorMessage?: string;
+  resultsRef: RefObject<HTMLDivElement | null>;
+  onQueryChange: (query: string) => void;
+  onFocusedIntakeChange: (intakeId: string | null) => void;
+  onImportItem: (item: BacklogIntakeItem) => void;
+  onScroll: (target: HTMLDivElement) => void;
+};
+
+function activeIntakeSource(sources: BacklogIntakeSource[], focusedIntakeId: string | null) {
+  return sources.find((source) => source.intakeId === focusedIntakeId) ?? sources[0];
+}
+
 function CreateMenuSources({
   sources,
   query,
@@ -144,10 +164,87 @@ function CreateMenuSources({
   onFocusedIntakeChange,
   onImportItem,
   onScroll,
+}: CreateMenuSourcesProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const activeSource = activeIntakeSource(sources, focusedIntakeId);
+  const showTabs = sources.length > 1;
+
+  useEffect(() => {
+    if (!showTabs) {
+      return;
+    }
+    searchInputRef.current?.focus();
+  }, [focusedIntakeId, showTabs]);
+
+  if (!activeSource) {
+    return null;
+  }
+
+  const searchPanel = (
+    <IntakeSearchPanel
+      source={activeSource}
+      query={query}
+      showIcon={!showTabs}
+      indentResults={!showTabs}
+      inputRef={searchInputRef}
+      items={items}
+      isLoading={isLoading}
+      isLoadingMore={isLoadingMore}
+      errorMessage={errorMessage}
+      resultsRef={resultsRef}
+      onQueryChange={onQueryChange}
+      onFocusedIntakeChange={onFocusedIntakeChange}
+      onImportItem={onImportItem}
+      onScroll={onScroll}
+    />
+  );
+
+  if (!showTabs) {
+    return searchPanel;
+  }
+
+  return (
+    <div>
+      <Tabs value={activeSource.intakeId} onValueChange={onFocusedIntakeChange} className="gap-0 px-2.5 pt-1.5">
+        <TabsList data-testid="lines-backlog-create-tabs">
+          {sources.map((source) => (
+            <TabsTrigger
+              key={source.intakeId}
+              value={source.intakeId}
+              data-testid={`lines-backlog-create-tab-${source.intakeId}`}
+            >
+              <IntakeSourceIcon source={source} />
+              {source.iconAlt}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {searchPanel}
+    </div>
+  );
+}
+
+function IntakeSearchPanel({
+  source,
+  query,
+  showIcon,
+  indentResults,
+  inputRef,
+  items,
+  isLoading,
+  isLoadingMore,
+  errorMessage,
+  resultsRef,
+  onQueryChange,
+  onFocusedIntakeChange,
+  onImportItem,
+  onScroll,
 }: {
-  sources: BacklogIntakeSource[];
+  source: BacklogIntakeSource;
   query: string;
-  focusedIntakeId: string | null;
+  showIcon: boolean;
+  indentResults: boolean;
+  inputRef: RefObject<HTMLInputElement | null>;
   items: BacklogIntakeItem[];
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -158,38 +255,35 @@ function CreateMenuSources({
   onImportItem: (item: BacklogIntakeItem) => void;
   onScroll: (target: HTMLDivElement) => void;
 }) {
-  return sources.map((source) => {
-    const focused = focusedIntakeId === source.intakeId;
-    const searchId = `lines-backlog-create-search-${source.intakeId}`;
-    return (
-      <div key={source.intakeId} data-testid={`lines-backlog-create-source-${source.intakeId}`}>
-        <label htmlFor={searchId} className="mt-1 flex items-center gap-2.5 px-2.5 py-1.5">
-          <IntakeSourceIcon source={source} />
-          <Input
-            id={searchId}
-            value={focused ? query : ""}
-            onChange={(event) => onQueryChange(event.target.value)}
-            onFocus={() => onFocusedIntakeChange(source.intakeId)}
-            placeholder={searchPlaceholderForIntake(source.name)}
-            data-testid={searchId}
-            className="h-8 px-2.5 text-sm"
-          />
-        </label>
-        {focused ? (
-          <IntakeSearchResults
-            intakeId={source.intakeId}
-            items={items}
-            isLoading={isLoading}
-            isLoadingMore={isLoadingMore}
-            errorMessage={errorMessage}
-            resultsRef={resultsRef}
-            onScroll={onScroll}
-            onImportItem={onImportItem}
-          />
-        ) : null}
-      </div>
-    );
-  });
+  const searchId = `lines-backlog-create-search-${source.intakeId}`;
+  return (
+    <div data-testid={`lines-backlog-create-source-${source.intakeId}`}>
+      <label htmlFor={searchId} className="mt-1 flex items-center gap-2.5 px-2.5 py-1.5">
+        {showIcon ? <IntakeSourceIcon source={source} /> : null}
+        <Input
+          ref={inputRef}
+          id={searchId}
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          onFocus={() => onFocusedIntakeChange(source.intakeId)}
+          placeholder={searchPlaceholderForIntake(source.name)}
+          data-testid={searchId}
+          className="h-8 px-2.5 text-sm"
+        />
+      </label>
+      <IntakeSearchResults
+        intakeId={source.intakeId}
+        items={items}
+        isLoading={isLoading}
+        isLoadingMore={isLoadingMore}
+        errorMessage={errorMessage}
+        resultsRef={resultsRef}
+        indent={indentResults}
+        onScroll={onScroll}
+        onImportItem={onImportItem}
+      />
+    </div>
+  );
 }
 
 function IntakeSearchResults({
@@ -199,6 +293,7 @@ function IntakeSearchResults({
   isLoadingMore,
   errorMessage,
   resultsRef,
+  indent = true,
   onScroll,
   onImportItem,
 }: {
@@ -208,6 +303,7 @@ function IntakeSearchResults({
   isLoadingMore: boolean;
   errorMessage?: string;
   resultsRef: RefObject<HTMLDivElement | null>;
+  indent?: boolean;
   onScroll: (target: HTMLDivElement) => void;
   onImportItem: (item: BacklogIntakeItem) => void;
 }) {
@@ -243,7 +339,7 @@ function IntakeSearchResults({
   return (
     <div
       ref={resultsRef}
-      className="mt-0.5 mb-1 ml-8 flex max-h-44 flex-col overflow-y-auto"
+      className={cn("mt-0.5 mb-1 flex max-h-44 flex-col overflow-y-auto", indent && "ml-8")}
       data-testid={`lines-backlog-create-items-${intakeId}`}
       onScroll={(event) => onScroll(event.currentTarget)}
     >
