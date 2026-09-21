@@ -7,13 +7,16 @@ export const PRODUCTIVE_INTAKE_SETUP_COPY = {
   wizardStepProjectHelper:
     "SuperPlane adds the 30 newest open tasks from this project. SuperPlane also listens for new tasks.",
   wizardConnect: "Connect Productive.io",
+  wizardConnectAnother: "Connect another account",
   wizardContinue: "Continue",
   wizardFinish: "Finish",
   wizardFinishing: "Finishing...",
   wizardConnectionsLoading: "Loading Productive.io connections...",
   wizardProjectsLoading: "Loading Productive.io projects...",
   wizardProjectsError: "SuperPlane could not load Productive.io projects.",
+  wizardProjectsErrorHint: "If this continues, make sure that the connection is still valid.",
   wizardProjectsEmpty: "This connection has no available projects.",
   wizardRetry: "Try again",
+  wizardCheckConnection: "Check connection",
   wizardCreateError: "SuperPlane could not create the Productive.io intake.",
 } as const;

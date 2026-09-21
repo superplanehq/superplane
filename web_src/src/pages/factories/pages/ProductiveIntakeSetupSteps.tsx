@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Check, Loader2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 
 import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
 
@@ -67,6 +68,7 @@ export function ProductiveProjectStep({
   selectedId,
   loading,
   error,
+  repairHref,
   onSelect,
   onRetry,
 }: {
@@ -74,11 +76,13 @@ export function ProductiveProjectStep({
   selectedId: string;
   loading: boolean;
   error: boolean;
+  /** Connection detail page, where a broken credential is repaired. */
+  repairHref?: string;
   onSelect: (id: string) => void;
   onRetry: () => void;
 }) {
   if (loading) return <LoadingMessage message={PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsLoading} />;
-  if (error) return <RetryMessage message={PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsError} onRetry={onRetry} />;
+  if (error) return <ProjectsErrorMessage repairHref={repairHref} onRetry={onRetry} />;
   if (projects.length === 0) {
     return (
       <p className="workspace-body-text text-muted-foreground">{PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>
@@ -175,13 +179,29 @@ function LoadingMessage({ message }: { message: string }) {
   );
 }
 
-function RetryMessage({ message, onRetry }: { message: string; onRetry: () => void }) {
+/**
+ * A failed project load is often a broken credential, which a retry can never
+ * fix, so the connection detail page is offered next to the retry.
+ */
+function ProjectsErrorMessage({ repairHref, onRetry }: { repairHref?: string; onRetry: () => void }) {
   return (
     <div className="space-y-3">
-      <p className="workspace-body-text text-destructive">{message}</p>
-      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-        {PRODUCTIVE_INTAKE_SETUP_COPY.wizardRetry}
-      </Button>
+      <div className="space-y-1">
+        <p className="workspace-body-text text-destructive">{PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsError}</p>
+        <p className="workspace-body-text text-muted-foreground">
+          {PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsErrorHint}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          {PRODUCTIVE_INTAKE_SETUP_COPY.wizardRetry}
+        </Button>
+        {repairHref ? (
+          <Button asChild variant="ghost" size="sm" data-testid="productive-setup-check-connection">
+            <Link to={repairHref}>{PRODUCTIVE_INTAKE_SETUP_COPY.wizardCheckConnection}</Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

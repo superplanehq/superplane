@@ -3,7 +3,12 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import {
+  factoryHomePath,
+  factoryLineDetailPath,
+  factorySettingsSectionPath,
+  firstFactoryLineId,
+} from "../lib/factoryPagePaths";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
 
@@ -25,6 +30,7 @@ export function ProductiveIntakeSetupPage() {
       <ProductiveIntakeSetupDialog
         organizationId={model.dialog.organizationId}
         factoryId={model.dialog.factoryId}
+        integrationsBasePath={model.dialog.integrationsBasePath}
         onClose={() => navigate(model.returnHref)}
         onCreated={() => navigate(model.returnHref)}
       />
@@ -40,7 +46,7 @@ function resolveProductiveIntakeSetupModel(
   titleParts: string[];
   redirectTo: string;
   returnHref: string;
-  dialog?: { organizationId: string; factoryId: string };
+  dialog?: { organizationId: string; factoryId: string; integrationsBasePath: string };
 } {
   const { organizationId, factoryId, factoryKey, factory } = layout;
   const workspaceName = factory?.name ?? "Workspace";
@@ -58,6 +64,10 @@ function resolveProductiveIntakeSetupModel(
     titleParts,
     redirectTo: "",
     returnHref,
-    dialog: { organizationId, factoryId },
+    dialog: {
+      organizationId,
+      factoryId,
+      integrationsBasePath: factorySettingsSectionPath(organizationId, factoryKey, "organization", "integrations"),
+    },
   };
 }

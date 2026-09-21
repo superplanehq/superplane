@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     metadata: { id: string; name: string; integrationName: string };
     status: { state: string };
   }>,
+  projectsError: false,
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -27,12 +28,14 @@ vi.mock("@/hooks/useIntegrations", () => ({
   useAvailableIntegrations: () => ({ data: [{ name: "productive", label: "Productive" }] }),
   useCreateIntegration: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useIntegrationResources: () => ({
-    data: [
-      { id: "project-1", name: "Payments" },
-      { id: "project-2", name: "Growth" },
-    ],
+    data: mocks.projectsError
+      ? []
+      : [
+          { id: "project-1", name: "Payments" },
+          { id: "project-2", name: "Growth" },
+        ],
     isLoading: false,
-    isError: false,
+    isError: mocks.projectsError,
     refetch: vi.fn(),
   }),
 }));
@@ -52,6 +55,7 @@ function renderDialog(onCreated = vi.fn()) {
       <ProductiveIntakeSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
+        integrationsBasePath="/org-1/workspaces/sp/settings/organization/integrations"
         onClose={vi.fn()}
         onCreated={onCreated}
       />
@@ -63,6 +67,7 @@ describe("ProductiveIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1" });
+    mocks.projectsError = false;
     mocks.connected.splice(0, mocks.connected.length, {
       metadata: { id: "integration-1", name: "Productive", integrationName: "productive" },
       status: { state: "ready" },
@@ -149,6 +154,30 @@ describe("ProductiveIntakeSetupDialog", () => {
         resourceId: "project-1",
       });
     });
+  });
+
+  it("links to the connection when the project list cannot load", async () => {
+    mocks.projectsError = true;
+    renderDialog();
+
+    expect(await screen.findByText(PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsError)).toBeInTheDocument();
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.wizardProjectsErrorHint)).toBeInTheDocument();
+    expect(screen.getByTestId("productive-setup-check-connection")).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/sp/settings/organization/integrations/integration-1",
+    );
+  });
+
+  it("offers another account when a broken connection already exists", async () => {
+    mocks.projectsError = true;
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("first-run-back"));
+
+    const connect = screen.getByTestId("productive-setup-connect");
+    expect(connect).toHaveTextContent(PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnectAnother);
+    expect(screen.getByTestId("productive-connection-integration-1")).toBeInTheDocument();
   });
 
   it("shows the create fallback when SuperPlane returns an internal error", async () => {

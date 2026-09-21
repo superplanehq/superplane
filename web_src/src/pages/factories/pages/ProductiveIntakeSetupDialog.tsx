@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { integrationDetailPath } from "@/lib/integrationSettingsPaths";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
@@ -9,6 +10,8 @@ import { type ProductiveIntakeSetupModel, useProductiveIntakeSetup } from "./use
 interface ProductiveIntakeSetupDialogProps {
   organizationId: string;
   factoryId: string;
+  /** Base path of the organization integrations settings pages. */
+  integrationsBasePath: string;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -23,8 +26,12 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
     setup.step === "connection"
       ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnectHelper
       : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
-  const showConnectAction =
-    setup.step === "connection" && !setup.connectedQuery.isLoading && setup.productiveIntegrations.length === 0;
+  const onConnectionStep = setup.step === "connection" && !setup.connectedQuery.isLoading;
+  const hasConnections = setup.productiveIntegrations.length > 0;
+  // A broken account is only replaceable while Connect stays reachable, so the
+  // action also shows next to an existing connection, not only on an empty list.
+  const showConnectAction = onConnectionStep;
+  const hideEmptyConnectionBody = onConnectionStep && !hasConnections;
 
   return (
     <>
@@ -36,8 +43,16 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
         helper={helper}
         stepAction={
           showConnectAction ? (
-            <Button type="button" onClick={() => setup.setConnectOpen(true)} data-testid="productive-setup-connect">
-              {PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnect}
+            <Button
+              type="button"
+              variant={hasConnections ? "outline" : "default"}
+              size={hasConnections ? "sm" : "default"}
+              onClick={() => setup.setConnectOpen(true)}
+              data-testid="productive-setup-connect"
+            >
+              {hasConnections
+                ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnectAnother
+                : PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnect}
             </Button>
           ) : undefined
         }
@@ -50,9 +65,9 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
           props.onClose();
         }}
       >
-        {showConnectAction && !setup.error ? null : (
+        {hideEmptyConnectionBody && !setup.error ? null : (
           <div>
-            <SetupStepBody setup={setup} />
+            <SetupStepBody setup={setup} integrationsBasePath={props.integrationsBasePath} />
             {setup.error ? (
               <p className="workspace-body-text mt-4 text-destructive" role="alert">
                 {setup.error}
@@ -80,7 +95,13 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
   );
 }
 
-function SetupStepBody({ setup }: { setup: ProductiveIntakeSetupModel }) {
+function SetupStepBody({
+  setup,
+  integrationsBasePath,
+}: {
+  setup: ProductiveIntakeSetupModel;
+  integrationsBasePath: string;
+}) {
   if (setup.step === "connection") {
     return (
       <ProductiveConnectionStep
@@ -98,6 +119,7 @@ function SetupStepBody({ setup }: { setup: ProductiveIntakeSetupModel }) {
       selectedId={setup.projectId}
       loading={setup.projectsQuery.isLoading}
       error={setup.projectsQuery.isError}
+      repairHref={setup.integrationId ? integrationDetailPath(integrationsBasePath, setup.integrationId) : undefined}
       onSelect={setup.setProjectId}
       onRetry={() => void setup.projectsQuery.refetch()}
     />
