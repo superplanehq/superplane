@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 152,
-  "maxAllowedDatabaseConnCalls": 164,
+  "maxAllowedInTransactionDefinitions": 144,
+  "maxAllowedDatabaseConnCalls": 156,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
