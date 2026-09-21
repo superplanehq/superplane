@@ -318,7 +318,7 @@ func TestFormatCodexJsonLinesEmitsReasoningAndOrderedActivity(t *testing.T) {
 	assert.Equal(t, "reasoning", records[1]["channel"])
 	starts := []string{}
 	for _, record := range records {
-		if record["type"] == "tool_start" {
+		if record["type"] == "activity_tool_start" {
 			starts = append(starts, record["id"].(string))
 		}
 	}
