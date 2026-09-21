@@ -19,9 +19,14 @@ type OrganizationHeaderInput = {
   headers?: HeadersInit;
 };
 
-export function withOrganizationHeader<TIn, TOut = TIn & { headers: Record<string, string> }>(
-  options?: TIn & { organizationId?: string | null },
-): TOut {
+type OrganizationHeaderResult<TIn> = Omit<TIn, keyof OrganizationHeaderInput> & {
+  headers: Record<string, string>;
+};
+
+export function withOrganizationHeader<
+  TIn extends object = object,
+  TOut = OrganizationHeaderResult<TIn>,
+>(options?: TIn & OrganizationHeaderInput): TOut {
   const resolved = (options ?? {}) as TIn & OrganizationHeaderInput;
   // Prefer an explicit organizationId (e.g. from route params) over window.location
   // because window.location can be stale during router transitions.

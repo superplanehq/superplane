@@ -42,6 +42,8 @@ describe("withOrganizationHeader", () => {
 
     const options = withOrganizationHeader({ organizationId: "new-org-id" });
     expect("organizationId" in options).toBe(false);
+    // @ts-expect-error organizationId is stripped from the return type
+    void options.organizationId;
   });
 
   it("preserves extra request options for OpenAPI clients", () => {
