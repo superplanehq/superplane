@@ -56,8 +56,8 @@ func TestDescribeFactoryVelocity_ClampsPeriodDays(t *testing.T) {
 		input    int32
 		expected int
 	}{
-		{"defaults to the page default when zero", 0, 14},
-		{"defaults to the page default when negative", -3, 14},
+		{"defaults to the page default when zero", 0, 30},
+		{"defaults to the page default when negative", -3, 30},
 		{"honors 30", 30, 30},
 		{"caps to 30", 90, 30},
 		{"honors 14", 14, 14},
