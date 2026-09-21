@@ -22,7 +22,7 @@ function renderPicker(
 }
 
 describe("AddIntakePicker", () => {
-  it("offers GitHub, Jira, Sentry, and coming-soon DataDog and Notion sources", () => {
+  it("offers GitHub, Jira, Sentry, Productive.io, and coming-soon DataDog and Notion sources", () => {
     renderPicker();
 
     const picker = screen.getByTestId("add-intake-picker");
@@ -33,6 +33,7 @@ describe("AddIntakePicker", () => {
     expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(within(picker).getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(within(picker).getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(within(picker).queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
