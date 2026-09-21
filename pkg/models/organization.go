@@ -58,7 +58,8 @@ type OrganizationWithCounts struct {
 }
 
 func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	query := database.Conn().
+	tx := database.Conn()
+	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
 
@@ -71,26 +72,7 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 		return nil, 0, err
 	}
 
-	canvasCountsQuery := database.Conn().
-		Table("workflows").
-		Select("organization_id, COUNT(*) AS count").
-		Where("deleted_at IS NULL").
-		Group("organization_id")
-
-	memberCountsQuery := database.Conn().
-		Table("users").
-		Select("organization_id, COUNT(*) AS count").
-		Where("deleted_at IS NULL").
-		Group("organization_id")
-
-	query = query.
-		Select(`
-			organizations.*,
-			COALESCE(canvas_counts.count, 0) AS canvas_count,
-			COALESCE(member_counts.count, 0) AS member_count
-		`).
-		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
-		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
+	query = withOrganizationCounts(tx, query)
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -108,6 +90,44 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 	}
 
 	return organizations, total, nil
+}
+
+func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
+	query := withOrganizationCounts(
+		tx,
+		tx.Model(&Organization{}).Where("organizations.deleted_at IS NULL"),
+	)
+
+	var organization OrganizationWithCounts
+	err := query.Where("organizations.id = ?", id).First(&organization).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
+func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
+	canvasCountsQuery := tx.
+		Table("workflows").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	memberCountsQuery := tx.
+		Table("users").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	return query.
+		Select(`
+			organizations.*,
+			COALESCE(canvas_counts.count, 0) AS canvas_count,
+			COALESCE(member_counts.count, 0) AS member_count
+		`).
+		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
+		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
 }
 
 func resolveOrganizationOrderClause(sortBy, sortDirection string) string {

@@ -6,17 +6,20 @@ import { Link, useParams } from "react-router";
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
+import { OrgOverviewPanel } from "./OrgOverviewPanel";
 import { OrgUsersTable } from "./OrgUsersTable";
 
-type OrganizationTab = "users" | "automations" | "features" | "credits";
+const ORGANIZATION_TABS = ["overview", "users", "automations", "features", "credits"] as const;
+
+type OrganizationTab = (typeof ORGANIZATION_TABS)[number];
 
 function isOrganizationTab(value: string): value is OrganizationTab {
-  return value === "users" || value === "automations" || value === "features" || value === "credits";
+  return ORGANIZATION_TABS.some((tab) => tab === value);
 }
 
 const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
-  const [tab, setTab] = useState<OrganizationTab>("users");
+  const [tab, setTab] = useState<OrganizationTab>("overview");
   const [creditsVisited, setCreditsVisited] = useState(false);
 
   useReportPageReady(true);
@@ -43,11 +46,15 @@ const OrganizationDetail: React.FC = () => {
         }}
       >
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="automations">Automations</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
+        <TabsContent value="overview" className="mt-3">
+          <OrgOverviewPanel orgId={orgId!} />
+        </TabsContent>
         <TabsContent value="users" className="mt-3">
           <OrgUsersTable orgId={orgId!} />
         </TabsContent>
