@@ -31,6 +31,7 @@ import {
   factoryColumnAutomationViewPath,
   factoryHomePath,
   factoryJiraIntakeSetupPath,
+  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -166,6 +167,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useDeleteFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
   useRefreshBacklog: () => ({ mutateAsync: refreshBacklogMutateAsync, isPending: false }),
@@ -266,11 +268,6 @@ vi.mock("./useWorkOrderPlanningSurvey", () => ({
     factoryId,
     workOrderId,
   ],
-}));
-
-vi.mock("./ProductiveIntakeSetupDialog", () => ({
-  ProductiveIntakeSetupDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="productive-intake-setup" /> : null,
 }));
 
 async function resetLinesBoardMocks() {
@@ -1163,7 +1160,9 @@ describe("LinesPage board extras", () => {
 
     await user.click(productive);
 
-    expect(screen.getByTestId("productive-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 

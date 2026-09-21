@@ -65,6 +65,18 @@ func UpdateFactoryIntake(
 		}
 	}
 
+	if req.Paused != nil {
+		if intake.Source != models.FactoryIntakeSourceSentryExceptions {
+			return nil, factoryErrorToStatus(
+				invalidArgument("pause is only supported for Sentry intakes"),
+				"failed to update factory intake",
+			)
+		}
+		if err := intake.SetPaused(db, req.GetPaused()); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory intake")
+		}
+	}
+
 	intake, err = factory.FindIntake(db, intakeID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
@@ -76,7 +88,7 @@ func UpdateFactoryIntake(
 	}
 
 	return &pb.UpdateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(intake, specs[intake.CanvasID]),
+		Intake: serializeFactoryIntake(db, intake, specs[intake.CanvasID]),
 	}, nil
 }
 

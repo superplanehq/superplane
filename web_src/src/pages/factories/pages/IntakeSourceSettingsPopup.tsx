@@ -4,10 +4,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
+import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
 import {
   INTAKE_SETTINGS_COPY,
   intakeSettingsTabs,
-  normalizeIntakeSourceSettings,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -35,6 +35,14 @@ interface IntakeSourceSettingsPopupProps {
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   savePending?: boolean;
   saveError?: string;
+  paused?: boolean;
+  pausePending?: boolean;
+  deletePending?: boolean;
+  pauseError?: string;
+  deleteError?: string;
+  onPause?: () => Promise<void> | void;
+  onResume?: () => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
   editAutomationHref?: string;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
@@ -56,6 +64,14 @@ export function IntakeSourceSettingsPopup({
   onSave,
   savePending = false,
   saveError,
+  paused = false,
+  pausePending = false,
+  deletePending = false,
+  pauseError,
+  deleteError,
+  onPause,
+  onResume,
+  onDelete,
   editAutomationHref,
   canvasId,
   runHrefFor,
@@ -122,6 +138,14 @@ export function IntakeSourceSettingsPopup({
         editAutomationHref={editAutomationHref}
         savePending={savePending}
         saveError={saveError}
+        paused={paused}
+        pausePending={pausePending}
+        deletePending={deletePending}
+        pauseError={pauseError}
+        deleteError={deleteError}
+        onPause={onPause}
+        onResume={onResume}
+        onDelete={onDelete}
         onDraftChange={setDraft}
         onSave={onSave}
         onClose={onClose}
@@ -146,6 +170,14 @@ function IntakeSettingsTabPanel({
   editAutomationHref,
   savePending,
   saveError,
+  paused,
+  pausePending,
+  deletePending,
+  pauseError,
+  deleteError,
+  onPause,
+  onResume,
+  onDelete,
   onDraftChange,
   onSave,
   onClose,
@@ -165,6 +197,14 @@ function IntakeSettingsTabPanel({
   editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
+  paused: boolean;
+  pausePending: boolean;
+  deletePending: boolean;
+  pauseError?: string;
+  deleteError?: string;
+  onPause?: () => Promise<void> | void;
+  onResume?: () => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
@@ -203,6 +243,14 @@ function IntakeSettingsTabPanel({
       draft={draft}
       savePending={savePending}
       saveError={saveError}
+      paused={paused}
+      pausePending={pausePending}
+      deletePending={deletePending}
+      pauseError={pauseError}
+      deleteError={deleteError}
+      onPause={onPause}
+      onResume={onResume}
+      onDelete={onDelete}
       onDraftChange={onDraftChange}
       onSave={onSave}
       onClose={onClose}
@@ -217,6 +265,14 @@ function IntakeGeneralTab({
   draft,
   savePending,
   saveError,
+  paused,
+  pausePending,
+  deletePending,
+  pauseError,
+  deleteError,
+  onPause,
+  onResume,
+  onDelete,
   onDraftChange,
   onSave,
   onClose,
@@ -227,6 +283,14 @@ function IntakeGeneralTab({
   draft: IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
+  paused: boolean;
+  pausePending: boolean;
+  deletePending: boolean;
+  pauseError?: string;
+  deleteError?: string;
+  onPause?: () => Promise<void> | void;
+  onResume?: () => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
@@ -245,30 +309,22 @@ function IntakeGeneralTab({
           <JiraIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
         </div>
       </div>
-      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-        {saveError ? (
-          <p className="workspace-body-text text-destructive" role="alert">
-            {saveError}
-          </p>
-        ) : (
-          <span />
-        )}
-        <Button
-          type="button"
-          disabled={savePending}
-          onClick={async () => {
-            try {
-              await onSave(normalizeIntakeSourceSettings(draft));
-              onClose();
-            } catch {
-              // The parent supplies the actionable error message.
-            }
-          }}
-          data-testid="intake-source-settings-save"
-        >
-          {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
-        </Button>
-      </footer>
+      <IntakeSourceSettingsFooter
+        sourceId={sourceId}
+        draft={draft}
+        savePending={savePending}
+        saveError={saveError}
+        paused={paused}
+        pausePending={pausePending}
+        deletePending={deletePending}
+        pauseError={pauseError}
+        deleteError={deleteError}
+        onPause={onPause}
+        onResume={onResume}
+        onDelete={onDelete}
+        onSave={onSave}
+        onClose={onClose}
+      />
     </>
   );
 }

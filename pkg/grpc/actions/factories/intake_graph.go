@@ -3,7 +3,9 @@ package factories
 import (
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 // intakeGraph locates the nodes of an intake inside its canvas. Node
@@ -29,6 +31,40 @@ func (g intakeGraph) Healthy(edges []models.Edge) bool {
 	}
 
 	return hasCanvasPath(edges, g.TriggerNodeID, g.CreateNodeID)
+}
+
+// jiraIntakeWebhookReady reports whether the intake trigger can receive Jira
+// issue events. A pending, failed, or unregistered webhook looks like a live
+// intake in the canvas, but Atlassian never POSTs until the shared webhook is
+// ready and has a remote id.
+func jiraIntakeWebhookReady(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) bool {
+	if tx == nil || triggerNodeID == "" {
+		return false
+	}
+
+	node, err := models.FindCanvasNode(tx, canvasID, triggerNodeID)
+	if err != nil || node.WebhookID == nil {
+		return false
+	}
+
+	webhook, err := models.FindWebhookInTransaction(tx, *node.WebhookID)
+	if err != nil {
+		return false
+	}
+	if webhook.State != models.WebhookStateReady {
+		return false
+	}
+
+	return jiraWebhookHasRemoteID(webhook.Metadata.Data())
+}
+
+func jiraWebhookHasRemoteID(metadata any) bool {
+	asMap, ok := metadata.(map[string]any)
+	if !ok || asMap == nil {
+		return false
+	}
+	id, present := asMap["webhookId"]
+	return present && id != nil
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls

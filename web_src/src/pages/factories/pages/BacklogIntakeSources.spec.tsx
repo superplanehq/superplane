@@ -11,6 +11,7 @@ function configuredIntake(overrides: Partial<ConfiguredLineIntakeSource> = {}): 
     intakeId: "intake-github",
     appId: "app-github-issues-intake",
     healthy: true,
+    paused: false,
     settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS },
     source: lineIntakeSourceById("github-issues")!,
     ...overrides,
@@ -78,6 +79,44 @@ describe("BacklogIntakeSources", () => {
     expect(within(intake).getByTestId("line-intake-source-intake-github-needs-repair")).toHaveTextContent(
       "Needs repair",
     );
+  });
+
+  it("says listening is paused and keeps the needs-repair state separate", () => {
+    renderSources({
+      intakes: [
+        configuredIntake({
+          intakeId: "intake-sentry",
+          paused: true,
+          source: lineIntakeSourceById("sentry-exceptions")!,
+        }),
+      ],
+    });
+
+    const intake = screen.getByTestId("line-intake-source-intake-sentry");
+    expect(intake).toHaveTextContent("Listening to Sentry exceptions is paused");
+    expect(within(intake).getByTestId("line-intake-source-intake-sentry-paused")).toHaveTextContent("Paused");
+    expect(within(intake).queryByTestId("line-intake-source-intake-sentry-needs-repair")).not.toBeInTheDocument();
+    expect(intake.querySelector("[data-paused='true']")).not.toBeNull();
+  });
+
+  it("keeps needs repair when a paused intake is also broken", () => {
+    renderSources({
+      intakes: [
+        configuredIntake({
+          intakeId: "intake-sentry",
+          healthy: false,
+          paused: true,
+          source: lineIntakeSourceById("sentry-exceptions")!,
+        }),
+      ],
+    });
+
+    const intake = screen.getByTestId("line-intake-source-intake-sentry");
+    expect(intake).toHaveTextContent("Listening to Sentry exceptions is paused");
+    expect(within(intake).getByTestId("line-intake-source-intake-sentry-needs-repair")).toHaveTextContent(
+      "Needs repair",
+    );
+    expect(within(intake).queryByTestId("line-intake-source-intake-sentry-paused")).not.toBeInTheDocument();
   });
 
   it("opens the settings of the intake the user clicked", async () => {

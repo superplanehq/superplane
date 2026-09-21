@@ -256,6 +256,23 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, itemWithComments.URL, response.GetOrder().GetOrigin().GetUrl())
 	})
 
+	t.Run("importing a chosen item still works while the intake is paused", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		require.NoError(t, intake.SetPaused(database.DB(t.Context()), true))
+
+		response, err := ImportFactoryIntakeItem(ctx, deps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    item.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder())
+		assert.Equal(t, item.Title, response.GetOrder().GetTitle())
+		require.NotNil(t, response.GetOrder().GetOrigin())
+		assert.Equal(t, item.URL, response.GetOrder().GetOrigin().GetUrl())
+	})
+
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := createIntake(t, factory)
