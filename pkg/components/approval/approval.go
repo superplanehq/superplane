@@ -37,6 +37,11 @@ func init() {
  */
 type Config struct {
 	Items []Item `json:"items" mapstructure:"items"`
+
+	// AutoApprove is optional. When set, the gate classifies the incoming
+	// change and may clear inert, low-risk changes without a human. See
+	// autoapprove.go. A nil policy keeps the gate fully manual.
+	AutoApprove *AutoApprovePolicy `json:"autoApprove,omitempty" mapstructure:"autoApprove"`
 }
 
 type Item struct {
@@ -370,7 +375,7 @@ func (a *Approval) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (a *Approval) Configuration() []configuration.Field {
-	return []configuration.Field{
+	return append([]configuration.Field{
 		{
 			Name:        "items",
 			Label:       "Approvers",
@@ -439,7 +444,7 @@ func (a *Approval) Configuration() []configuration.Field {
 				},
 			},
 		},
-	}
+	}, autoApproveField())
 }
 
 func (a *Approval) Setup(ctx core.SetupContext) error {
@@ -462,6 +467,14 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return err
+	}
+
+	handled, autoErr := a.tryAutoApprove(ctx, &config)
+	if autoErr != nil {
+		return autoErr
+	}
+	if handled {
+		return nil
 	}
 
 	nodeMetadata := NodeMetadata{}
