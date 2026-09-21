@@ -1,14 +1,65 @@
 package apikeys
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
+
+func TestAPIKeyErrorToStatus(t *testing.T) {
+	t.Run("maps api key name unique violation to already exists", func(t *testing.T) {
+		err := apiKeyErrorToStatus(&pgconn.PgError{
+			Code:           "23505",
+			ConstraintName: "unique_api_key_in_organization",
+		}, "failed to create API key")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		require.Equal(t, codes.AlreadyExists, code)
+		require.Equal(t, apiKeyNameAlreadyExistsMessage, message)
+	})
+
+	t.Run("maps model duplicate name error to already exists", func(t *testing.T) {
+		err := apiKeyErrorToStatus(models.ErrAPIKeyNameAlreadyExists, "failed to create API key")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		require.Equal(t, codes.AlreadyExists, code)
+		require.Equal(t, apiKeyNameAlreadyExistsMessage, message)
+	})
+
+	t.Run("maps unique violations on other constraints to internal", func(t *testing.T) {
+		err := apiKeyErrorToStatus(&pgconn.PgError{
+			Code:           "23505",
+			ConstraintName: "unique_human_user_in_organization",
+		}, "failed to create API key")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		require.Equal(t, codes.Internal, code)
+		require.Equal(t, "failed to create API key", message)
+	})
+
+	t.Run("preserves unrelated errors as internal", func(t *testing.T) {
+		original := errors.New("other error")
+
+		err := apiKeyErrorToStatus(original, "failed to update API key")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		require.Equal(t, codes.Internal, code)
+		require.Equal(t, "failed to update API key", message)
+		require.ErrorIs(t, err, original)
+	})
+}
 
 func TestSerializeAPIKey_WithCreator(t *testing.T) {
 	orgID := uuid.New()
