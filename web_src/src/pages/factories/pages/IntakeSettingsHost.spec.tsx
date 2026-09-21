@@ -369,6 +369,10 @@ describe("IntakeSettingsHost", () => {
         superplaneLabelAdded: true,
         jiraMoveOnComplete: true,
         jiraCompletionColumn: "",
+        sentryNewIssues: true,
+        sentryRegressedIssues: true,
+        sentryAssignedIssues: false,
+        sentryLevels: [],
       },
     });
   });
@@ -495,6 +499,10 @@ describe("IntakeSettingsHost", () => {
         superplaneLabelAdded: true,
         jiraMoveOnComplete: true,
         jiraCompletionColumn: "Done",
+        sentryNewIssues: true,
+        sentryRegressedIssues: true,
+        sentryAssignedIssues: false,
+        sentryLevels: [],
       },
       integrationId: "jira-2",
       resourceId: "OPS",

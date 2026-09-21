@@ -14,6 +14,7 @@ import { INTAKE_CONNECTION_COPY } from "./intakeConnectionModel";
 import { IntakeSourceSettingsPopup, type IntakeSettingsConnection } from "./IntakeSourceSettingsPopup";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
   INTAKE_SETTINGS_COPY,
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
@@ -159,7 +160,7 @@ function renderPopup(
               settings={
                 props.settings ??
                 (props.sourceId === "sentry-exceptions"
-                  ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" }
+                  ? DEFAULT_SENTRY_INTAKE_SETTINGS
                   : props.sourceId === "jira-issues"
                     ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
                     : DEFAULT_GITHUB_INTAKE_SETTINGS)
@@ -392,6 +393,10 @@ describe("IntakeSourceSettingsPopup", () => {
         authorsWithAccess: true,
         jiraMoveOnComplete: true,
         jiraCompletionColumn: "",
+        sentryNewIssues: true,
+        sentryRegressedIssues: true,
+        sentryAssignedIssues: false,
+        sentryLevels: [],
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);

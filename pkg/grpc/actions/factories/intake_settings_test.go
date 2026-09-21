@@ -372,3 +372,146 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 		}
 	})
 }
+
+func Test__intakeSentryActionsFor(t *testing.T) {
+	t.Run("listens for created and unresolved issues by default", func(t *testing.T) {
+		assert.Equal(t, []any{"created", "unresolved"}, intakeSentryActionsFor(defaultSentryIntakeSettings()))
+	})
+
+	t.Run("maps each event checkbox to its webhook action", func(t *testing.T) {
+		settings := defaultSentryIntakeSettings()
+		settings.SentryNewIssues = false
+		settings.SentryRegressedIssues = false
+		settings.SentryAssignedIssues = true
+
+		assert.Equal(t, []any{"assigned"}, intakeSentryActionsFor(settings))
+	})
+}
+
+func Test__intakeFilterExpressionFor_SentryLevels(t *testing.T) {
+	t.Run("accepts every level when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, defaultSentryIntakeSettings())
+		assert.Equal(t, "true", expression)
+	})
+
+	t.Run("builds a level membership check in a stable order", func(t *testing.T) {
+		settings := defaultSentryIntakeSettings()
+		settings.SentryLevels = []string{"error", "fatal", "unknown"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, settings)
+
+		assert.Equal(t, `(root().data.data.issue?.level ?? "") in ["fatal","error"]`, expression)
+	})
+}
+
+func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
+	newSpec := func(actions []any, expression string) models.LiveCanvasSpec {
+		return models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				{
+					ID:            intakeTriggerNodeID,
+					Configuration: map[string]any{"actions": actions},
+				},
+				{
+					ID:            intakeFilterNodeID,
+					Configuration: map[string]any{"expression": expression},
+				},
+			},
+		}
+	}
+	graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID}
+
+	t.Run("reads the trigger actions and level list", func(t *testing.T) {
+		settings := defaultSentryIntakeSettings()
+		settings.SentryAssignedIssues = true
+		settings.SentryLevels = []string{"warning", "error"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, settings)
+
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			graph,
+			newSpec(intakeSentryActionsFor(settings), expression),
+		)
+
+		assert.True(t, parsed.SentryNewIssues)
+		assert.True(t, parsed.SentryRegressedIssues)
+		assert.True(t, parsed.SentryAssignedIssues)
+		assert.Equal(t, []string{"error", "warning"}, parsed.SentryLevels)
+	})
+
+	t.Run("a hand-edited expression falls back to the defaults", func(t *testing.T) {
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			graph,
+			newSpec([]any{"created", "unresolved"}, `root().data.data.issue.level == "error"`),
+		)
+
+		assert.True(t, parsed.SentryNewIssues)
+		assert.True(t, parsed.SentryRegressedIssues)
+		assert.False(t, parsed.SentryAssignedIssues)
+		assert.Empty(t, parsed.SentryLevels)
+	})
+
+	t.Run("an intake without a filter reports the default settings", func(t *testing.T) {
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{
+				Nodes: []models.Node{
+					{
+						ID:            intakeTriggerNodeID,
+						Configuration: map[string]any{"actions": []any{"created", "unresolved"}},
+					},
+				},
+			},
+		)
+
+		assert.Equal(t, defaultSentryIntakeSettings().SentryNewIssues, parsed.SentryNewIssues)
+		assert.Equal(t, defaultSentryIntakeSettings().SentryRegressedIssues, parsed.SentryRegressedIssues)
+		assert.False(t, parsed.SentryAssignedIssues)
+		assert.Empty(t, parsed.SentryLevels)
+	})
+}
+
+func Test__intakeFilterExpressionFor_EvaluatesAgainstSentryPayloads(t *testing.T) {
+	errorIssue := map[string]any{
+		"data": map[string]any{
+			"issue": map[string]any{
+				"title": "Error #1: This is a test error!",
+				"level": "error",
+			},
+		},
+	}
+	warningIssue := map[string]any{
+		"data": map[string]any{
+			"issue": map[string]any{
+				"title": "Slow query",
+				"level": "warning",
+			},
+		},
+	}
+	issueWithoutLevel := map[string]any{
+		"data": map[string]any{
+			"issue": map[string]any{
+				"title": "Error #1: This is a test error!",
+			},
+		},
+	}
+
+	t.Run("accepts every level when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, defaultSentryIntakeSettings())
+
+		assert.Equal(t, true, evalRootDataExpression(t, expression, errorIssue))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, warningIssue))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, issueWithoutLevel))
+	})
+
+	t.Run("keeps only the selected levels and treats a missing level as no match", func(t *testing.T) {
+		settings := defaultSentryIntakeSettings()
+		settings.SentryLevels = []string{"fatal", "error"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, settings)
+
+		assert.Equal(t, true, evalRootDataExpression(t, expression, errorIssue))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, warningIssue))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, issueWithoutLevel))
+	})
+}

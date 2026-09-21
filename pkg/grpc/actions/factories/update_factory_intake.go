@@ -287,6 +287,9 @@ func applyIntakeSettingsToGraph(
 			case models.FactoryIntakeSourceGitHubIssues:
 				configuration["actions"] = intakeTriggerActionsFor(updated)
 				nodes[i].Configuration = configuration
+			case models.FactoryIntakeSourceSentryExceptions:
+				configuration["actions"] = intakeSentryActionsFor(updated)
+				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)
 				nodes[i].Configuration = configuration
