@@ -28,8 +28,8 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
   ];
 }
 
-export function buildIncidentExecutionDetails(execution: ExecutionInfo, instanceUrl?: string): Record<string, any> {
-  const details: Record<string, any> = {};
+export function buildIncidentExecutionDetails(execution: ExecutionInfo, instanceUrl?: string): Record<string, string> {
+  const details: Record<string, string> = {};
   if (execution.createdAt) {
     details["Executed at"] = new Date(execution.createdAt).toLocaleString();
   }

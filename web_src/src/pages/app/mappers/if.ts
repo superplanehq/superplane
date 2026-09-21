@@ -116,9 +116,9 @@ export const ifMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const configuration = context.execution.configuration as IfConfiguration;
-    const details: Record<string, any> = {
+    const details: Record<string, string> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       Expression: configuration.expression,
     };
