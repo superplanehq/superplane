@@ -76,6 +76,7 @@ import { useAppPageAgentSuggestions } from "./useAppPageAgentSuggestions";
 import { useAutoLayoutOnUpdatePreference } from "./useAutoLayoutOnUpdatePreference";
 import {
   appendWorkflowFragment,
+  applyFactoryCanvasLayout,
   removeWorkflowEdges,
   removeWorkflowNodes,
   useTopologyMutationCommit,
@@ -1948,6 +1949,15 @@ export function AppPage({
     () => commitTopologyMutation((workflow) => workflow),
     [commitTopologyMutation],
   );
+  const layoutDraftWorkflow = useCallback(
+    async (workflow: CanvasesCanvas) => {
+      if (!factoryAutoLayout) {
+        return workflow;
+      }
+      return applyFactoryCanvasLayout(workflow, components);
+    },
+    [components, factoryAutoLayout],
+  );
   const { ready: factoryConfigureLayoutReady, holdCanvas } = useFactoryConfigureInitialLayout({
     factoryAutoLayout,
     isEditing,
@@ -3452,6 +3462,7 @@ export function AppPage({
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
     applyLocalWorkflowUpdate,
+    layoutDraftWorkflow,
   });
 
   const buildYamlExportPayload = useCallback(

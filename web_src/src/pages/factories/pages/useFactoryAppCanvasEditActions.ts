@@ -202,7 +202,7 @@ function useFactoryAppResetActions({
         showErrorToast(parsed.error);
         return;
       }
-      configureActionsRef.current?.applyDraftSpec(parsed.spec);
+      await configureActionsRef.current?.applyDraftSpec(parsed.spec);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to reset app"));
     }
