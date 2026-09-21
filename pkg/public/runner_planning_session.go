@@ -186,7 +186,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		}
 		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 		if err != nil {
-			writeRunnerPlanningError(w, r, session, err)
+			writePlanningWaitError(w, r, session, err)
 			return
 		}
 		if session.State == models.PlanningSessionStateEnded {
@@ -196,7 +196,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		if session.WaitState == models.PlanningWaitResolved {
 			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
 			if err != nil {
-				writeRunnerPlanningError(w, r, session, err)
+				writePlanningWaitError(w, r, session, err)
 				return
 			}
 			if consumed {
@@ -208,13 +208,13 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 				text, err := mintPlanningWaitText(r.Context(), session, result)
 				if err != nil {
 					restorePlanningWait(session, result)
-					writeRunnerPlanningError(w, r, session, err)
+					writePlanningWaitError(w, r, session, err)
 					return
 				}
 				body, bodyErr := planningWaitMessageBody(r.Context(), session, result, text)
 				if bodyErr != nil {
 					restorePlanningWait(session, result)
-					writeRunnerPlanningError(w, r, session, bodyErr)
+					writePlanningWaitError(w, r, session, bodyErr)
 					return
 				}
 				if err := writeJSON(w, http.StatusOK, body); err != nil {
@@ -224,7 +224,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			}
 		}
 		if err := beginPlanningWaitAndNotify(database.DB(r.Context()), session); err != nil {
-			writeRunnerPlanningError(w, r, session, err)
+			writePlanningWaitError(w, r, session, err)
 			return
 		}
 		if !time.Now().Before(deadline) {
@@ -522,6 +522,25 @@ func writeJSON(w http.ResponseWriter, status int, body any) error {
 	return nil
 }
 
+func requestCanceledByClient(r *http.Request, err error) bool {
+	if r == nil {
+		return false
+	}
+	ctxErr := r.Context().Err()
+	if ctxErr == nil {
+		return false
+	}
+	return errors.Is(ctxErr, context.Canceled) && errors.Is(err, context.Canceled)
+}
+
+func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
+	if requestCanceledByClient(r, err) {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+		return
+	}
+	writeRunnerPlanningError(w, r, session, err)
+}
+
 func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
 	switch {
 	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
@@ -531,6 +550,9 @@ func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *m
 		http.Error(w, "planning session not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
+	case requestCanceledByClient(r, err):
+		log.WithError(err).Debug("runner planning session client disconnected")
+		w.WriteHeader(499)
 	default:
 		log.WithError(err).Error("runner planning session failed")
 		captureRunnerPlanningErrorToSentry(r, session, err)
