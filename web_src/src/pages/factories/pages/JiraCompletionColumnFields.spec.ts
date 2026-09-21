@@ -11,7 +11,7 @@ describe("preferredJiraCompletionColumn", () => {
     expect(preferredJiraCompletionColumn(["To Do", "In Progress", "Done"], "")).toBe("Done");
   });
 
-  it("uses the first column when Done is missing", () => {
-    expect(preferredJiraCompletionColumn(["Ready", "Closed"], "")).toBe("Ready");
+  it("leaves the column empty when Done is missing", () => {
+    expect(preferredJiraCompletionColumn(["Ready", "Closed"], "")).toBe("");
   });
 });

@@ -98,7 +98,10 @@ export function JiraCompletionColumnFields({
                 </SelectContent>
               </Select>
             ) : (
-              <Select disabled>
+              <Select
+                disabled={columns.length === 0}
+                onValueChange={(column) => onChange({ ...value, jiraCompletionColumn: column })}
+              >
                 <SelectTrigger
                   id="jira-completion-column-select"
                   className="w-full"
@@ -110,6 +113,15 @@ export function JiraCompletionColumnFields({
                     }
                   />
                 </SelectTrigger>
+                {columns.length > 0 ? (
+                  <SelectContent>
+                    {columns.map((column) => (
+                      <SelectItem key={column} value={column}>
+                        {column}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                ) : null}
               </Select>
             )}
             <p className="text-[12px] text-muted-foreground">{JIRA_COMPLETION_COLUMN_COPY.helper}</p>
