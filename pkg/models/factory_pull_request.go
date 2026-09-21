@@ -78,27 +78,28 @@ var (
 )
 
 type FactoryPullRequest struct {
-	ID                  uuid.UUID
-	OrganizationID      uuid.UUID
-	FactoryID           uuid.UUID
-	WorkOrderID         uuid.UUID
-	Provider            string
-	ExternalID          *string
-	Repository          string
-	Number              int64
-	URL                 string
-	Title               string
-	State               string
-	MergedAt            *time.Time
-	ClosedAt            *time.Time
-	CurrentRevisionID   *uuid.UUID
-	ActiveMutationRunID *uuid.UUID
-	Mergeable           bool
-	MergeBlockedReason  string
-	MergeBlockedMessage string
-	MergeableHeadSHA    string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                      uuid.UUID
+	OrganizationID          uuid.UUID
+	FactoryID               uuid.UUID
+	WorkOrderID             uuid.UUID
+	Provider                string
+	ExternalID              *string
+	Repository              string
+	Number                  int64
+	URL                     string
+	Title                   string
+	State                   string
+	MergedAt                *time.Time
+	ClosedAt                *time.Time
+	CurrentRevisionID       *uuid.UUID
+	ActiveMutationRunID     *uuid.UUID
+	Mergeable               bool
+	MergeBlockedReason      string
+	MergeBlockedMessage     string
+	MergeableHeadSHA        string
+	MergeableAllowedMethods string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 type FactoryPullRequestRun struct {
@@ -331,6 +332,7 @@ type FactoryPullRequestMergeabilitySnapshot struct {
 	BlockedReason  string
 	BlockedMessage string
 	HeadSHA        string
+	AllowedMethods string
 }
 
 func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {
@@ -339,13 +341,15 @@ func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRe
 	p.MergeBlockedReason = snapshot.BlockedReason
 	p.MergeBlockedMessage = snapshot.BlockedMessage
 	p.MergeableHeadSHA = strings.TrimSpace(snapshot.HeadSHA)
+	p.MergeableAllowedMethods = strings.TrimSpace(snapshot.AllowedMethods)
 	p.UpdatedAt = now
 	return tx.Model(p).Updates(map[string]any{
-		"mergeable":             p.Mergeable,
-		"merge_blocked_reason":  p.MergeBlockedReason,
-		"merge_blocked_message": p.MergeBlockedMessage,
-		"mergeable_head_sha":    p.MergeableHeadSHA,
-		"updated_at":            p.UpdatedAt,
+		"mergeable":                 p.Mergeable,
+		"merge_blocked_reason":      p.MergeBlockedReason,
+		"merge_blocked_message":     p.MergeBlockedMessage,
+		"mergeable_head_sha":        p.MergeableHeadSHA,
+		"mergeable_allowed_methods": p.MergeableAllowedMethods,
+		"updated_at":                p.UpdatedAt,
 	}).Error
 }
 
@@ -353,15 +357,37 @@ func (p *FactoryPullRequest) HasCachedMergeability() bool {
 	return p.Mergeable || strings.TrimSpace(p.MergeBlockedReason) != "" || strings.TrimSpace(p.MergeableHeadSHA) != ""
 }
 
+func (p *FactoryPullRequest) CachedAllowedMethods() []string {
+	return splitFactoryMergeMethods(p.MergeableAllowedMethods)
+}
+
+func splitFactoryMergeMethods(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.ToUpper(strings.TrimSpace(part))
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
 func ListOpenGitHubFactoryPullRequestsForWebhook(
 	tx *gorm.DB,
+	organizationID uuid.UUID,
 	repository string,
 	numbers []int64,
 	sha string,
 ) ([]FactoryPullRequest, error) {
 	repository = strings.TrimSpace(repository)
 	sha = strings.TrimSpace(sha)
-	if repository == "" {
+	if organizationID == uuid.Nil || repository == "" {
 		return nil, nil
 	}
 
@@ -370,6 +396,7 @@ func ListOpenGitHubFactoryPullRequestsForWebhook(
 	}
 
 	query := tx.Model(&FactoryPullRequest{}).
+		Where("organization_id = ?", organizationID).
 		Where("provider = ?", FactoryPullRequestProviderGitHub).
 		Where("state IN ?", []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
 		Where("repository = ?", repository)

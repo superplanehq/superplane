@@ -117,6 +117,7 @@ func MergeFactoryPullRequest(
 				_ = pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
 					BlockedMessage: message,
 					HeadSHA:        pullRequest.MergeableHeadSHA,
+					AllowedMethods: pullRequest.MergeableAllowedMethods,
 				})
 			}
 		}

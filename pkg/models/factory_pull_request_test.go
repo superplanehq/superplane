@@ -228,18 +228,35 @@ func Test__FactoryPullRequest(t *testing.T) {
 			BlockedReason:  "",
 			BlockedMessage: "",
 			HeadSHA:        "abc123",
+			AllowedMethods: "SQUASH,MERGE",
 		}))
 
 		found, err := factoryModel.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 		require.NoError(t, err)
 		assert.True(t, found.Mergeable)
 		assert.Equal(t, "abc123", found.MergeableHeadSHA)
+		assert.Equal(t, []string{"SQUASH", "MERGE"}, found.CachedAllowedMethods())
 		assert.True(t, found.HasCachedMergeability())
 
-		matched, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(db, "acme/app", []int64{88}, "")
+		matched, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(db, r.Organization.ID, "acme/app", []int64{88}, "")
 		require.NoError(t, err)
 		require.Len(t, matched, 1)
 		assert.Equal(t, pullRequest.ID, matched[0].ID)
+
+		otherOrg, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		unmatched, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(db, otherOrg.ID, "acme/app", []int64{88}, "")
+		require.NoError(t, err)
+		assert.Empty(t, unmatched)
+
+		_, err = pullRequest.ObserveRevision(db, "def456")
+		require.NoError(t, err)
+		moved, err := factoryModel.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		require.NoError(t, err)
+		assert.False(t, moved.Mergeable)
+		assert.Empty(t, moved.MergeableHeadSHA)
+		assert.Empty(t, moved.MergeableAllowedMethods)
+		assert.False(t, moved.HasCachedMergeability())
 	})
 }
 

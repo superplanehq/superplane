@@ -1,11 +1,13 @@
 package factories
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -92,11 +94,54 @@ func TestEnsureGitHubFactoryMergeabilityWebhook(t *testing.T) {
 	assert.Equal(t, firstID, webhooks[0].ID)
 
 	require.NoError(t, db.Model(&webhooks[0]).Update("state", models.WebhookStateFailed).Error)
-	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/other"))
+	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
 	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
 	require.NoError(t, err)
 	require.Len(t, webhooks, 1)
 	assert.Equal(t, firstID, webhooks[0].ID)
 	assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
-	assert.Equal(t, "acme/other", factoryMergeabilityWebhookRepository(webhooks[0].Configuration.Data()))
+	assert.Equal(t, "acme/app", factoryMergeabilityWebhookRepository(webhooks[0].Configuration.Data()))
+
+	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/other"))
+	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, webhooks, 2)
+	repositories := map[string]struct{}{}
+	for _, hook := range webhooks {
+		assert.True(t, isFactoryMergeabilityWebhook(hook.Configuration.Data()))
+		repositories[factoryMergeabilityWebhookRepository(hook.Configuration.Data())] = struct{}{}
+	}
+	assert.Equal(t, map[string]struct{}{"acme/app": {}, "acme/other": {}}, repositories)
+}
+
+func TestVerifyGitHubFactoryMergeabilitySignature(t *testing.T) {
+	r := support.Setup(t)
+	webhookID := uuid.New()
+	secret := []byte("webhook-secret")
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), secret, []byte(webhookID.String()))
+	require.NoError(t, err)
+	webhook := &models.Webhook{ID: webhookID, Secret: encrypted}
+	body := []byte(`{"ok":true}`)
+
+	t.Run("accepts a matching GitHub signature", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+crypto.Sign(secret, body))
+		code, err := VerifyGitHubFactoryMergeabilitySignature(t.Context(), r.Encryptor, webhook, headers, body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+	})
+
+	t.Run("rejects a missing signature", func(t *testing.T) {
+		code, err := VerifyGitHubFactoryMergeabilitySignature(t.Context(), r.Encryptor, webhook, http.Header{}, body)
+		require.Error(t, err)
+		assert.Equal(t, http.StatusForbidden, code)
+	})
+
+	t.Run("rejects a mismatched signature", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256=deadbeef")
+		code, err := VerifyGitHubFactoryMergeabilitySignature(t.Context(), r.Encryptor, webhook, headers, body)
+		require.Error(t, err)
+		assert.Equal(t, http.StatusForbidden, code)
+	})
 }

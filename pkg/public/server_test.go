@@ -286,7 +286,6 @@ func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.
 		r.Registry,
 		jwt.NewSigner("test"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
@@ -298,37 +297,78 @@ func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.
 	)
 	require.NoError(t, err)
 
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
 	webhookID := uuid.New()
+	secret := []byte("webhook-secret")
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), secret, []byte(webhookID.String()))
+	require.NoError(t, err)
 	require.NoError(t, database.Conn().Create(&models.Webhook{
 		ID:     webhookID,
 		State:  models.WebhookStateReady,
-		Secret: []byte("secret"),
+		Secret: encrypted,
+		Configuration: datatypes.NewJSONType(any(map[string]any{
+			"eventTypes":          []string{"check_run"},
+			"repository":          "acme/app",
+			"factoryMergeability": true,
+		})),
+		AppInstallationID: &integration.ID,
 	}).Error)
 
+	body := []byte(`{"repository":{"full_name":"acme/app"},"check_run":{"head_sha":"abc","pull_requests":[{"number":1}]}}`)
 	accepted := execRequest(server, requestParams{
 		method: "POST",
 		path:   "/webhooks/" + webhookID.String(),
-		body:   []byte(`{"repository":{"full_name":"acme/app"},"check_run":{"head_sha":"abc","pull_requests":[{"number":1}]}}`),
+		body:   body,
 		headers: map[string]string{
-			"X-GitHub-Event": "check_run",
+			"X-GitHub-Event":      "check_run",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, body),
 		},
 	})
 	require.Equal(t, http.StatusOK, accepted.Code)
 
+	unsigned := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
+	})
+	require.Equal(t, http.StatusForbidden, unsigned.Code)
+
+	pingBody := []byte(`{"zen":"Keep it logically awesome."}`)
 	ping := execRequest(server, requestParams{
 		method: "POST",
 		path:   "/webhooks/" + webhookID.String(),
-		body:   []byte(`{"zen":"Keep it logically awesome."}`),
+		body:   pingBody,
 		headers: map[string]string{
-			"X-GitHub-Event": "ping",
+			"X-GitHub-Event":      "ping",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, pingBody),
 		},
 	})
 	require.Equal(t, http.StatusOK, ping.Code)
 
+	plainID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     plainID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
 	rejected := execRequest(server, requestParams{
 		method: "POST",
-		path:   "/webhooks/" + webhookID.String(),
+		path:   "/webhooks/" + plainID.String(),
 		body:   []byte(`{"ok":true}`),
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
 	})
 	require.Equal(t, http.StatusNotFound, rejected.Code)
 }

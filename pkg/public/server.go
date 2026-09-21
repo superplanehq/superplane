@@ -1711,7 +1711,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.FindWebhook(webhookID)
+	webhook, err := models.FindWebhook(webhookID)
 	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
@@ -1743,9 +1743,22 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	eventType := r.Header.Get("X-GitHub-Event")
-	if len(nodes) == 0 && !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
-		http.Error(w, "webhook not found", http.StatusNotFound)
-		return
+	mergeabilityWebhook := factoryactions.IsFactoryMergeabilityWebhook(webhook)
+	if len(nodes) == 0 {
+		if !mergeabilityWebhook || !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+			http.Error(w, "webhook not found", http.StatusNotFound)
+			return
+		}
+		if code, err := factoryactions.VerifyGitHubFactoryMergeabilitySignature(
+			r.Context(),
+			s.encryptor,
+			webhook,
+			r.Header,
+			body,
+		); err != nil {
+			http.Error(w, "invalid signature", code)
+			return
+		}
 	}
 
 	newEvents := []models.CanvasEvent{}
@@ -1782,11 +1795,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if eventType != "" {
+	if mergeabilityWebhook && factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
 		payload := append([]byte(nil), body...)
 		go factoryactions.RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			context.WithoutCancel(r.Context()),
 			factoryactions.IntakeDependencies{Registry: s.registry, Encryptor: s.encryptor},
+			webhook,
 			eventType,
 			payload,
 		)

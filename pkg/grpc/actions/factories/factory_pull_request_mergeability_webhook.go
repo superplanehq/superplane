@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -26,16 +27,37 @@ var factoryMergeabilityGitHubEvents = []string{"check_run", "check_suite", "stat
 func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	ctx context.Context,
 	deps IntakeDependencies,
+	webhook *models.Webhook,
 	eventType string,
 	body []byte,
 ) {
+	if webhook == nil || webhook.AppInstallationID == nil {
+		return
+	}
+
 	repository, numbers, sha := githubMergeabilityWebhookRef(eventType, body)
 	if repository == "" {
 		return
 	}
+	configured := factoryMergeabilityWebhookRepository(webhook.Configuration.Data())
+	if configured != "" && !strings.EqualFold(configured, repository) {
+		return
+	}
 
 	db := database.DB(ctx)
-	pullRequests, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(db, repository, numbers, sha)
+	integration, err := models.FindUnscopedIntegrationInTransaction(db, *webhook.AppInstallationID)
+	if err != nil {
+		log.WithError(err).Warn("factory mergeability: webhook integration not found")
+		return
+	}
+
+	pullRequests, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(
+		db,
+		integration.OrganizationID,
+		repository,
+		numbers,
+		sha,
+	)
 	if err != nil {
 		log.WithError(err).Warn("factory mergeability: failed to list pull requests for GitHub event")
 		return
@@ -73,6 +95,7 @@ func refreshFactoryPullRequestMergeability(
 		BlockedReason:  pullRequest.MergeBlockedReason,
 		BlockedMessage: pullRequest.MergeBlockedMessage,
 		HeadSHA:        pullRequest.MergeableHeadSHA,
+		AllowedMethods: pullRequest.MergeableAllowedMethods,
 	}
 	result, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 	if err != nil {
@@ -84,6 +107,7 @@ func refreshFactoryPullRequestMergeability(
 		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
 		BlockedMessage: result.Message,
 		HeadSHA:        result.HeadSHA,
+		AllowedMethods: mergeMethodNames(result.AllowedMethods),
 	}
 	if before == after {
 		return
@@ -190,7 +214,10 @@ func ensureGitHubFactoryMergeabilityWebhook(
 		if !isFactoryMergeabilityWebhook(hook.Configuration.Data()) {
 			continue
 		}
-		return updateFactoryMergeabilityWebhook(tx, hook, repository)
+		if factoryMergeabilityWebhookRepository(hook.Configuration.Data()) != repository {
+			continue
+		}
+		return updateFactoryMergeabilityWebhook(tx, hook)
 	}
 
 	return createFactoryMergeabilityWebhook(ctx, tx, encryptor, integration.ID, repository)
@@ -202,6 +229,13 @@ func factoryMergeabilityWebhookConfiguration(repository string) map[string]any {
 		"repository":                  repository,
 		factoryMergeabilityWebhookKey: true,
 	}
+}
+
+func IsFactoryMergeabilityWebhook(webhook *models.Webhook) bool {
+	if webhook == nil {
+		return false
+	}
+	return isFactoryMergeabilityWebhook(webhook.Configuration.Data())
 }
 
 func isFactoryMergeabilityWebhook(configuration any) bool {
@@ -222,23 +256,16 @@ func factoryMergeabilityWebhookRepository(configuration any) string {
 	return strings.TrimSpace(repository)
 }
 
-func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook, repository string) error {
-	sameRepository := factoryMergeabilityWebhookRepository(hook.Configuration.Data()) == repository
-	if sameRepository && hook.State != models.WebhookStateFailed {
+func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook) error {
+	if hook.State != models.WebhookStateFailed {
 		return nil
 	}
 
-	updates := map[string]any{
+	return tx.Model(hook).Updates(map[string]any{
 		"state":       models.WebhookStatePending,
 		"retry_count": 0,
 		"updated_at":  time.Now(),
-	}
-	if !sameRepository {
-		hook.Configuration = datatypes.NewJSONType(any(factoryMergeabilityWebhookConfiguration(repository)))
-		updates["configuration"] = hook.Configuration
-	}
-
-	return tx.Model(hook).Updates(updates).Error
+	}).Error
 }
 
 func createFactoryMergeabilityWebhook(
@@ -267,6 +294,32 @@ func createFactoryMergeabilityWebhook(
 		return fmt.Errorf("create factory mergeability webhook: %w", err)
 	}
 	return nil
+}
+
+func VerifyGitHubFactoryMergeabilitySignature(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	webhook *models.Webhook,
+	headers http.Header,
+	body []byte,
+) (int, error) {
+	if encryptor == nil || webhook == nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	signature := strings.TrimPrefix(headers.Get("X-Hub-Signature-256"), "sha256=")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	secret, err := encryptor.Decrypt(ctx, webhook.Secret, []byte(webhook.ID.String()))
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+	}
+	if err := crypto.VerifySignature(secret, body, signature); err != nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+	return http.StatusOK, nil
 }
 
 func githubMergeabilityWebhookRef(eventType string, body []byte) (repository string, numbers []int64, sha string) {

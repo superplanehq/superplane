@@ -636,6 +636,7 @@ CREATE TABLE public.factory_pull_requests (
     merge_blocked_reason text DEFAULT ''::text NOT NULL,
     merge_blocked_message text DEFAULT ''::text NOT NULL,
     mergeable_head_sha text DEFAULT ''::text NOT NULL,
+    mergeable_allowed_methods text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
 );
@@ -4565,7 +4566,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260921133102	f
+20260921141323	f
 \.
 
 

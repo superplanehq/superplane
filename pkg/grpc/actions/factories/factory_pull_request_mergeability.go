@@ -152,6 +152,7 @@ func persistFactoryPullRequestMergeability(
 		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
 		BlockedMessage: result.Message,
 		HeadSHA:        result.HeadSHA,
+		AllowedMethods: mergeMethodNames(result.AllowedMethods),
 	})
 }
 
@@ -180,7 +181,7 @@ func mergeabilityFromCache(
 	result := &factoryPullRequestMergeability{
 		PullRequest:    pullRequest,
 		HeadSHA:        pullRequest.MergeableHeadSHA,
-		AllowedMethods: cachedMergeMethods(),
+		AllowedMethods: mergeMethodsFromNames(pullRequest.CachedAllowedMethods()),
 	}
 	active, err := factoryPullRequestHasActiveAutomation(db, factory, pullRequest)
 	if err != nil {
@@ -192,24 +193,67 @@ func mergeabilityFromCache(
 	if !pullRequest.HasCachedMergeability() {
 		return result, false, nil
 	}
+	matchesHead, err := cachedMergeabilityMatchesHead(db, pullRequest)
+	if err != nil {
+		return nil, false, err
+	}
+	if !matchesHead {
+		return result, false, nil
+	}
 	reason := mergeabilityBlockedReasonFromName(pullRequest.MergeBlockedReason)
 	if reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
 		reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
 		return result, false, nil
 	}
 	if pullRequest.Mergeable {
+		if len(result.AllowedMethods) == 0 {
+			return result, false, nil
+		}
 		result.CanMerge = true
 		return result, true, nil
 	}
 	return blockedMergeability(result, reason, pullRequest.MergeBlockedMessage), true, nil
 }
 
-func cachedMergeMethods() []pb.FactoryPullRequestMergeability_MergeMethod {
-	return []pb.FactoryPullRequestMergeability_MergeMethod{
-		pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
-		pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE,
-		pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE,
+func cachedMergeabilityMatchesHead(db *gorm.DB, pullRequest *models.FactoryPullRequest) (bool, error) {
+	if pullRequest.CurrentRevisionID == nil {
+		return true, nil
 	}
+	revision, err := models.FindPullRequestRevision(db, *pullRequest.CurrentRevisionID)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(revision.SHA), strings.TrimSpace(pullRequest.MergeableHeadSHA)), nil
+}
+
+func mergeMethodNames(methods []pb.FactoryPullRequestMergeability_MergeMethod) string {
+	names := make([]string, 0, len(methods))
+	for _, method := range methods {
+		switch method {
+		case pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH:
+			names = append(names, "SQUASH")
+		case pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE:
+			names = append(names, "MERGE")
+		case pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE:
+			names = append(names, "REBASE")
+		}
+	}
+	return strings.Join(names, ",")
+}
+
+func mergeMethodsFromNames(names []string) []pb.FactoryPullRequestMergeability_MergeMethod {
+	methods := make([]pb.FactoryPullRequestMergeability_MergeMethod, 0, len(names))
+	for _, name := range names {
+		switch strings.ToUpper(strings.TrimSpace(name)) {
+		case "SQUASH":
+			methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH)
+		case "MERGE":
+			methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE)
+		case "REBASE":
+			methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE)
+		}
+	}
+	return methods
 }
 
 func mergeabilityBlockedReasonName(reason pb.FactoryPullRequestMergeability_BlockedReason) string {
