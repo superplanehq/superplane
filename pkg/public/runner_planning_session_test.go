@@ -14,7 +14,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5/pgconn"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/blob"
@@ -118,6 +123,310 @@ func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	assert.Equal(t, models.PlanningClarityCheckKey, checks[0].Key)
 	assert.Equal(t, 2.0, checks[0].Score)
 	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
+}
+
+func TestWriteRunnerPlanningError(t *testing.T) {
+	sessionID := uuid.New()
+	draftID := uuid.New()
+	session := &models.FactoryPlanningSession{
+		ID:               sessionID,
+		DraftWorkOrderID: &draftID,
+	}
+	deadlock := fmt.Errorf("save score: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"})
+
+	tests := []struct {
+		name          string
+		err           error
+		session       *models.FactoryPlanningSession
+		cancelRequest bool
+		status        int
+		body          string
+		wantCapture   bool
+		wantTags      map[string]string
+		omitTags      []string
+		wantMessage   string
+	}{
+		{
+			name:    "invalid session",
+			err:     models.ErrFactoryPlanningSessionInvalid,
+			session: session,
+			status:  http.StatusBadRequest,
+			body:    models.ErrFactoryPlanningSessionInvalid.Error() + "\n",
+		},
+		{
+			name:    "not found",
+			err:     models.ErrFactoryPlanningSessionNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    "planning session not found\n",
+		},
+		{
+			name:    "gorm not found",
+			err:     gorm.ErrRecordNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    "planning session not found\n",
+		},
+		{
+			name:    "ended",
+			err:     models.ErrFactoryPlanningSessionEnded,
+			session: session,
+			status:  http.StatusConflict,
+			body:    "planning session has ended\n",
+		},
+		{
+			name:        "no draft stays 500",
+			err:         models.ErrFactoryPlanningSessionNoDraft,
+			session:     session,
+			status:      http.StatusInternalServerError,
+			body:        "Lookup failed\n",
+			wantCapture: true,
+			wantTags: map[string]string{
+				"route":               "/api/v1/runner/planning-sessions/clarity",
+				"planning_session_id": sessionID.String(),
+				"draft_work_order_id": draftID.String(),
+			},
+			wantMessage: models.ErrFactoryPlanningSessionNoDraft.Error(),
+		},
+		{
+			name:        "rejected check stays 500",
+			err:         fmt.Errorf("%w: key is required", models.ErrFactoryWorkOrderCheckInvalid),
+			session:     session,
+			status:      http.StatusInternalServerError,
+			body:        "Lookup failed\n",
+			wantCapture: true,
+			wantTags: map[string]string{
+				"route":               "/api/v1/runner/planning-sessions/clarity",
+				"planning_session_id": sessionID.String(),
+				"draft_work_order_id": draftID.String(),
+			},
+			wantMessage: models.ErrFactoryWorkOrderCheckInvalid.Error(),
+		},
+		{
+			name:        "wrapped postgres error includes code",
+			err:         deadlock,
+			session:     session,
+			status:      http.StatusInternalServerError,
+			body:        "Lookup failed\n",
+			wantCapture: true,
+			wantTags: map[string]string{
+				"route":               "/api/v1/runner/planning-sessions/clarity",
+				"planning_session_id": sessionID.String(),
+				"draft_work_order_id": draftID.String(),
+				"postgres_error_code": "40P01",
+			},
+			wantMessage: "deadlock detected",
+		},
+		{
+			name:        "nil session omits session tags",
+			err:         errors.New("lookup timeout"),
+			status:      http.StatusInternalServerError,
+			body:        "Lookup failed\n",
+			wantCapture: true,
+			wantTags: map[string]string{
+				"route": "/api/v1/runner/planning-sessions/clarity",
+			},
+			omitTags:    []string{"planning_session_id", "draft_work_order_id", "postgres_error_code"},
+			wantMessage: "lookup timeout",
+		},
+		{
+			name:          "client disconnect is 499",
+			err:           fmt.Errorf("lookup: %w", context.Canceled),
+			session:       session,
+			cancelRequest: true,
+			status:        499,
+		},
+		{
+			name:        "canceled error with live request stays 500",
+			err:         fmt.Errorf("lookup: %w", context.Canceled),
+			session:     session,
+			status:      http.StatusInternalServerError,
+			body:        "Lookup failed\n",
+			wantCapture: true,
+			wantTags: map[string]string{
+				"route":               "/api/v1/runner/planning-sessions/clarity",
+				"planning_session_id": sessionID.String(),
+				"draft_work_order_id": draftID.String(),
+			},
+			wantMessage: context.Canceled.Error(),
+		},
+		{
+			name:        "deadline exceeded with live request stays 500",
+			err:         fmt.Errorf("lookup: %w", context.DeadlineExceeded),
+			session:     session,
+			status:      http.StatusInternalServerError,
+			body:        "Lookup failed\n",
+			wantCapture: true,
+			wantTags: map[string]string{
+				"route":               "/api/v1/runner/planning-sessions/clarity",
+				"planning_session_id": sessionID.String(),
+				"draft_work_order_id": draftID.String(),
+			},
+			wantMessage: context.DeadlineExceeded.Error(),
+		},
+		{
+			name:          "deadline exceeded after client disconnect stays 500",
+			err:           fmt.Errorf("lookup: %w", context.DeadlineExceeded),
+			session:       session,
+			cancelRequest: true,
+			status:        http.StatusInternalServerError,
+			body:          "Lookup failed\n",
+			wantCapture:   true,
+			wantTags: map[string]string{
+				"route":               "/api/v1/runner/planning-sessions/clarity",
+				"planning_session_id": sessionID.String(),
+				"draft_work_order_id": draftID.String(),
+			},
+			wantMessage: context.DeadlineExceeded.Error(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := logtest.NewGlobal()
+			t.Cleanup(func() { hook.Reset() })
+			transport := bindTestSentryHub(t)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", nil)
+			req.Pattern = "/api/v1/runner/planning-sessions/clarity"
+			if tt.cancelRequest {
+				ctx, cancel := context.WithCancel(req.Context())
+				cancel()
+				req = req.WithContext(ctx)
+			}
+			rec := httptest.NewRecorder()
+			writeRunnerPlanningError(rec, req, tt.session, tt.err)
+			require.Equal(t, tt.status, rec.Code)
+			assert.Equal(t, tt.body, rec.Body.String())
+
+			errorLogs := 0
+			for _, entry := range hook.AllEntries() {
+				if entry.Level == log.ErrorLevel {
+					errorLogs++
+				}
+			}
+			if tt.status >= http.StatusInternalServerError {
+				assert.NotZero(t, errorLogs)
+			} else {
+				assert.Zero(t, errorLogs)
+			}
+
+			events := transport.Events()
+			if !tt.wantCapture {
+				assert.Empty(t, events)
+				return
+			}
+
+			event := requireCapturedException(t, events)
+			for key, value := range tt.wantTags {
+				assert.Equal(t, value, event.Tags[key], "tag %s", key)
+			}
+			for _, key := range tt.omitTags {
+				_, present := event.Tags[key]
+				assert.False(t, present, "tag %s should be omitted", key)
+			}
+			assert.Contains(t, capturedExceptionText(event), tt.wantMessage)
+		})
+	}
+}
+
+func TestWritePlanningWaitError(t *testing.T) {
+	sessionID := uuid.New()
+	session := &models.FactoryPlanningSession{ID: sessionID}
+	lookupCanceled := fmt.Errorf("lookup: %w", context.Canceled)
+
+	t.Run("client disconnect returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		ctx, cancel := context.WithCancel(req.Context())
+		cancel()
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, lookupCanceled)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("canceled error with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, lookupCanceled)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+}
+
+func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
+	transport := bindTestSentryHub(t)
+	activityID := uuid.New()
+	path := "/api/v1/runner/planning-sessions/activities/" + activityID.String()
+	router := mux.NewRouter()
+	router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", func(w http.ResponseWriter, r *http.Request) {
+		writeRunnerPlanningError(w, r, nil, errors.New("lookup timeout"))
+	}).Methods(http.MethodPut)
+
+	req := httptest.NewRequest(http.MethodPut, path, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	event := requireCapturedException(t, transport.Events())
+	assert.Equal(t, "/api/v1/runner/planning-sessions/activities/{activity_id}", event.Tags["route"])
+}
+
+func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
+	transport := bindTestSentryHub(t)
+	activityID := uuid.New()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), nil)
+	rec := httptest.NewRecorder()
+	writeRunnerPlanningError(rec, req, nil, errors.New("lookup timeout"))
+
+	event := requireCapturedException(t, transport.Events())
+	_, present := event.Tags["route"]
+	assert.False(t, present)
+}
+
+func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
+	r := support.Setup(t)
+	transport := bindTestSentryHub(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	session.DraftWorkOrderID = nil
+	require.NoError(t, db.Model(session).Updates(map[string]any{
+		"draft_work_order_id": nil,
+		"wait_work_order_id":  nil,
+	}).Error)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
+		`{"score":5,"summary":"The plan is ready."}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	assert.Equal(t, "Lookup failed\n", rec.Body.String())
+
+	event := requireCapturedException(t, transport.Events())
+	assert.Equal(t, "/api/v1/runner/planning-sessions/clarity", event.Tags["route"])
+	assert.Equal(t, session.ID.String(), event.Tags["planning_session_id"])
+	_, hasDraft := event.Tags["draft_work_order_id"]
+	assert.False(t, hasDraft)
+	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
@@ -469,24 +778,6 @@ func TestRunnerPlanningWaitContextCancelReturnsPending(t *testing.T) {
 	assert.Equal(t, "pending", body["status"])
 }
 
-func TestWriteRunnerPlanningErrorCanceledReturnsPending(t *testing.T) {
-	rec := httptest.NewRecorder()
-	writeRunnerPlanningError(rec, context.Canceled)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	assert.Equal(t, "pending", body["status"])
-}
-
-func TestWriteRunnerPlanningErrorDeadlineExceededReturnsPending(t *testing.T) {
-	rec := httptest.NewRecorder()
-	writeRunnerPlanningError(rec, context.DeadlineExceeded)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	assert.Equal(t, "pending", body["status"])
-}
-
 func TestBeginPlanningWaitAndNotify_SkipsLockWhenAlreadyPending(t *testing.T) {
 	r := support.Setup(t)
 	_, session, _, _ := mustPlanningRunnerSession(t, r)
@@ -528,6 +819,42 @@ func TestRunnerPlanningWaitIdleTicksDoNotReloadMessages(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.Equal(t, "pending", body["status"])
 	assert.Equal(t, int64(0), messageQueries.Load(), "idle wait ticks must not reload session messages")
+}
+
+func TestRunnerPlanningWaitLoadCanceledReturnsPending(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "hello", uuid.Nil))
+	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req = req.WithContext(&errAfterFirstCheckContext{Context: ctx})
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "pending", body["status"])
+
+	held, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitResolved, held.WaitState)
+
+	live := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	live.Header.Set("Authorization", "Bearer "+token)
+	liveRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(liveRec, live)
+	require.Equal(t, http.StatusOK, liveRec.Code, liveRec.Body.String())
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(liveRec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "hello", delivered["text"])
 }
 
 func TestRunnerPlanningWaitCancelDoesNotConsumeUserMessage(t *testing.T) {
@@ -900,6 +1227,78 @@ func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.Facto
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "Add refund retries.", uuid.Nil))
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
+}
+
+func bindTestSentryHub(t *testing.T) *memorySentryTransport {
+	t.Helper()
+	transport := &memorySentryTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://public@localhost/1",
+		Transport: transport,
+	})
+	require.NoError(t, err)
+	hub := sentry.CurrentHub()
+	previous := hub.Client()
+	hub.BindClient(client)
+	t.Cleanup(func() {
+		hub.BindClient(previous)
+	})
+	return transport
+}
+
+func capturedExceptionText(event *sentry.Event) string {
+	var values []string
+	for _, exception := range event.Exception {
+		values = append(values, exception.Value)
+	}
+	return strings.Join(values, "\n")
+}
+
+func requireCapturedException(t *testing.T, events []*sentry.Event) *sentry.Event {
+	t.Helper()
+	for _, event := range events {
+		if event != nil && len(event.Exception) > 0 {
+			return event
+		}
+	}
+	require.Fail(t, "expected a captured exception", "events=%d", len(events))
+	return nil
+}
+
+type memorySentryTransport struct {
+	mu     sync.Mutex
+	events []*sentry.Event
+}
+
+func (t *memorySentryTransport) Configure(sentry.ClientOptions) {}
+
+func (t *memorySentryTransport) Flush(time.Duration) bool { return true }
+
+func (t *memorySentryTransport) SendEvent(event *sentry.Event) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	clone := *event
+	t.events = append(t.events, &clone)
+}
+
+func (t *memorySentryTransport) Events() []*sentry.Event {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]*sentry.Event, len(t.events))
+	copy(out, t.events)
+	return out
+}
+
+type errAfterFirstCheckContext struct {
+	context.Context
+	checks atomic.Int32
+}
+
+func (c *errAfterFirstCheckContext) Err() error {
+	if c.checks.Add(1) == 1 {
+		return nil
+	}
+	return c.Context.Err()
 }
 
 func requirePlanningWaitPending(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {

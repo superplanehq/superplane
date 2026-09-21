@@ -6,8 +6,8 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import type { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
 import { formatPackageLabel, formatPackageName } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { Predicate } from "../../utils";
-import { formatPredicate, numberOrZero, stringOrDash } from "../../utils";
+import type { Predicate } from "../../eventDisplay";
+import { formatPredicate, numberOrZero, stringOrDash } from "../../eventDisplay";
 import type { MetadataItem } from "@/ui/metadataList";
 
 export interface Configuration {

@@ -127,6 +127,68 @@ func TestAdminListOrganizations(t *testing.T) {
 	})
 }
 
+func TestAdminGetOrganization(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String()
+
+	t.Run("admin can load organization", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var org adminOrgItem
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &org))
+		assert.Equal(t, r.Organization.ID.String(), org.ID)
+		assert.Equal(t, r.Organization.Name, org.Name)
+		assert.Equal(t, r.Organization.Slug, org.Slug)
+		assert.Equal(t, r.Organization.Description, org.Description)
+		assert.GreaterOrEqual(t, org.MemberCount, int64(0))
+		assert.GreaterOrEqual(t, org.CanvasCount, int64(0))
+		require.NotNil(t, org.CreatedAt)
+		require.NotNil(t, org.UpdatedAt)
+	})
+
+	t.Run("returns 404 for unknown organization", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("returns 404 for deleted organization", func(t *testing.T) {
+		deleted, err := models.CreateOrganization("Deleted Admin Org", "gone")
+		require.NoError(t, err)
+		require.NoError(t, models.SoftDeleteOrganization(deleted.ID.String()))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + deleted.ID.String(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular User", "regular-org-get@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: regularToken,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
 func TestAdminInstallationNetworkSettings(t *testing.T) {
 	unsetEnvForAdminTest(t, "BLOCKED_HTTP_HOSTS")
 	unsetEnvForAdminTest(t, "BLOCKED_PRIVATE_IP_RANGES")

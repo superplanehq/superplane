@@ -30,6 +30,18 @@ const (
 	// imports. The wizard tells the user this number.
 	intakeSentrySeedSize = 10
 
+	// intakeSentrySeedEventWindow is how many recent trigger events a reseed
+	// reads so it can drop issues that already sit on the intake.
+	intakeSentrySeedEventWindow = 200
+
+	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
+	// imports. The wizard tells the user this number.
+	intakeJiraSeedSize = 10
+
+	// intakeJiraSeedEventWindow is how many recent trigger events a reseed
+	// reads so it can drop issues that already sit on the intake.
+	intakeJiraSeedEventWindow = 200
+
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
 	intakeGitHubIssuePayloadType = "github.issue"
@@ -202,7 +214,27 @@ func seedJiraIssues(
 
 	projectKey, _ := binding.Configuration["project"].(string)
 	siteURL := jira.SiteURLFromMetadata(installation.Metadata.Data())
-	payloads, err := newestJiraIssueEvents(client, projectKey, siteURL, intakeSeedSize)
+	hits, err := newestJiraIssueHits(client, projectKey, intakeJiraSeedSize)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	return seedKnownJiraIssues(tx, canvasID, client.GetIssue, hits, siteURL)
+}
+
+func seedKnownJiraIssues(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	load jiraIssueLoader,
+	hits []jira.IssueSearchHit,
+	siteURL string,
+) (intakeSeedResult, error) {
+	hits, err := filterJiraIssuesForSeed(tx, canvasID, hits, siteURL)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	payloads, err := jiraIssueEvents(load, hits, siteURL)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
@@ -211,6 +243,77 @@ func seedJiraIssues(
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(payloads)}, nil
+}
+
+func filterJiraIssuesForSeed(tx *gorm.DB, canvasID uuid.UUID, hits []jira.IssueSearchHit, siteURL string) ([]jira.IssueSearchHit, error) {
+	if len(hits) == 0 {
+		return hits, nil
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("load intake canvas: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("intake canvas is not owned by a factory")
+	}
+
+	factory, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	seen, err := jiraIssueKeysOnTrigger(tx, canvasID)
+	if err != nil {
+		return nil, err
+	}
+
+	kept := make([]jira.IssueSearchHit, 0, len(hits))
+	for _, hit := range hits {
+		issueKey := strings.TrimSpace(hit.Key)
+		if issueKey == "" {
+			continue
+		}
+		if seen[issueKey] {
+			log.Infof("skipping Jira issue %s: already on intake", issueKey)
+			continue
+		}
+
+		ref, ok := jira.IssueRefFromSite(siteURL, issueKey)
+		if !ok {
+			kept = append(kept, hit)
+			continue
+		}
+
+		hasOrder, err := jira.IssueHasWorkOrder(tx, factory, ref)
+		if err != nil {
+			return nil, err
+		}
+		if hasOrder {
+			log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
+			continue
+		}
+
+		kept = append(kept, hit)
+	}
+
+	return kept, nil
+}
+
+func jiraIssueKeysOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, error) {
+	events, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, intakeJiraSeedEventWindow, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	for i := range events {
+		issueKey, ok := jira.IssueKeyFromEventData(events[i].Data.Data())
+		if ok {
+			seen[issueKey] = true
+		}
+	}
+	return seen, nil
 }
 
 func seedProductiveTasks(
@@ -271,10 +374,85 @@ func seedSentryIssues(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
 	}
 
+	return seedKnownSentryIssues(tx, canvasID, client, issues)
+}
+
+func seedKnownSentryIssues(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	client *sentry.Client,
+	issues []sentry.Issue,
+) (intakeSeedResult, error) {
+	issues, err := filterSentryIssuesForSeed(tx, canvasID, issues)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
 	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(client, issues)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(issues)}, nil
+}
+
+func filterSentryIssuesForSeed(tx *gorm.DB, canvasID uuid.UUID, issues []sentry.Issue) ([]sentry.Issue, error) {
+	if len(issues) == 0 {
+		return issues, nil
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("load intake canvas: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("intake canvas is not owned by a factory")
+	}
+
+	factory, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	seen, err := sentryIssueIDsOnTrigger(tx, canvasID)
+	if err != nil {
+		return nil, err
+	}
+
+	kept := make([]sentry.Issue, 0, len(issues))
+	for _, issue := range issues {
+		if seen[issue.ID] {
+			log.Infof("skipping Sentry issue %s: already on intake", issue.ID)
+			continue
+		}
+
+		hasOrder, err := sentry.IssueHasWorkOrder(tx, factory, issue.ID)
+		if err != nil {
+			return nil, err
+		}
+		if hasOrder {
+			log.Infof("skipping Sentry issue %s: work order already exists", issue.ID)
+			continue
+		}
+
+		kept = append(kept, issue)
+	}
+
+	return kept, nil
+}
+
+func sentryIssueIDsOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, error) {
+	events, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, intakeSentrySeedEventWindow, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	for i := range events {
+		issueID, ok := sentry.IssueIDFromEventData(events[i].Data.Data())
+		if ok {
+			seen[issueID] = true
+		}
+	}
+	return seen, nil
 }
 
 // sentryIssueEvents shapes each issue of a newest-first page like the webhook
@@ -443,7 +621,7 @@ func gitHubIssueEvents(issues []*github.Issue, repository string) ([]map[string]
 // gitHubIssueEvent converts an issue from the API into the body of an "issues"
 // webhook. The generated graph reads titles, bodies, labels, and assignees out
 // of that shape.
-func newestJiraIssueEvents(client *jira.Client, projectKey, siteURL string, limit int) ([]map[string]any, error) {
+func newestJiraIssueHits(client *jira.Client, projectKey string, limit int) ([]jira.IssueSearchHit, error) {
 	projectKey = strings.TrimSpace(projectKey)
 	if projectKey == "" {
 		return nil, fmt.Errorf("project is required")
@@ -455,7 +633,7 @@ func newestJiraIssueEvents(client *jira.Client, projectKey, siteURL string, limi
 		return nil, fmt.Errorf("failed to list the issues of project %s: %w", projectKey, err)
 	}
 
-	return jiraIssueEvents(client.GetIssue, hits, siteURL)
+	return hits, nil
 }
 
 // jiraIssueLoader reads one issue by key. The seed takes the read as a

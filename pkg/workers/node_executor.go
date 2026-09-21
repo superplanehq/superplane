@@ -20,7 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -36,7 +36,6 @@ var ErrRecordLocked = errors.New("record locked")
 type NodeExecutor struct {
 	encryptor      crypto.Encryptor
 	registry       *registry.Registry
-	gitProvider    gitprovider.Provider
 	authService    authorization.Authorization
 	oidcProvider   oidc.Provider
 	baseURL        string
@@ -48,11 +47,10 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, oidcProvider oidc.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
-		gitProvider:    gitProvider,
 		oidcProvider:   oidcProvider,
 		baseURL:        baseURL,
 		webhookBaseURL: webhookBaseURL,
@@ -65,6 +63,15 @@ func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gi
 
 func (w *NodeExecutor) Name() string {
 	return "NodeExecutor"
+}
+
+func (w *NodeExecutor) factoryIntakeDeps() factoryactions.IntakeDependencies {
+	return factoryactions.IntakeDependencies{
+		Registry:       w.registry,
+		Encryptor:      w.encryptor,
+		AuthService:    w.authService,
+		WebhookBaseURL: w.webhookBaseURL,
+	}
 }
 
 func (w *NodeExecutor) Start(ctx context.Context) {
@@ -249,6 +256,20 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		})
 	}
 
+	type pendingGitHubPullRequest struct {
+		organizationID uuid.UUID
+		factoryID      uuid.UUID
+		pullRequestID  uuid.UUID
+	}
+	pendingGitHubPullRequests := []pendingGitHubPullRequest{}
+	onGitHubPullRequestRecorded := func(organizationID, factoryID, pullRequestID uuid.UUID) {
+		pendingGitHubPullRequests = append(pendingGitHubPullRequests, pendingGitHubPullRequest{
+			organizationID: organizationID,
+			factoryID:      factoryID,
+			pullRequestID:  pullRequestID,
+		})
+	}
+
 	// Notification payloads are collected during the transaction and
 	// published after commit, so no email is sent for rolled-back work.
 	pendingWorkOrderNotifications := []messages.FactoryWorkOrderNotificationMessage{}
@@ -299,7 +320,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onFileBindCleanup, runCancellations)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -343,6 +364,16 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 	}
 
+	for _, recorded := range pendingGitHubPullRequests {
+		factoryactions.ScheduleFactoryPullRequestMergeabilityRefresh(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
+	}
+
 	for _, notification := range pendingWorkOrderNotifications {
 		if err := notification.Publish(); err != nil {
 			w.logger.Errorf("failed to publish factory work order notification RabbitMQ message: %v", err)
@@ -363,6 +394,7 @@ func (w *NodeExecutor) executeActionNode(
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
 	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 	onFactoryWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage),
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
 	runCancellations *RunCancellationNotifier,
 ) error {
@@ -428,7 +460,6 @@ func (w *NodeExecutor) executeActionNode(
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
-		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
 		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
@@ -437,6 +468,7 @@ func (w *NodeExecutor) executeActionNode(
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
+			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),

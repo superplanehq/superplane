@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -24,16 +22,14 @@ type CanvasCleanupWorker struct {
 	maxRunsPerTick      int
 	maxResourcesPerTick int
 	sessionCleaner      agents.ProviderSessionCleaner
-	gitProvider         git.Provider
 }
 
-func NewCanvasCleanupWorker(gitProvider git.Provider, providers ...agents.Provider) *CanvasCleanupWorker {
+func NewCanvasCleanupWorker(providers ...agents.Provider) *CanvasCleanupWorker {
 	w := &CanvasCleanupWorker{
 		semaphore:           semaphore.NewWeighted(25),
 		logger:              log.WithFields(log.Fields{"worker": "CanvasCleanupWorker"}),
 		maxRunsPerTick:      50,
 		maxResourcesPerTick: 500,
-		gitProvider:         gitProvider,
 	}
 
 	if len(providers) > 0 {
@@ -123,7 +119,6 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 	}
 
 	var sessionsToClean []models.AgentSession
-	var repositoriesToClean []models.Repository
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
 		if err != nil {
@@ -140,22 +135,19 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 			return nil
 		}
 
-		sessions, repositories, err := w.finalizeCanvas(tx, *lockedCanvas)
+		sessions, err := w.finalizeCanvas(tx, *lockedCanvas)
 		if err != nil {
 			return err
 		}
 
 		sessionsToClean = sessions
-		repositoriesToClean = repositories
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
-	w.cleanupProviderSessions(ctx, sessionsToClean)
-	w.cleanupGitRepositories(ctx, repositoriesToClean)
+	w.cleanupProviderSessions(context.Background(), sessionsToClean)
 	return nil
 }
 
@@ -254,46 +246,36 @@ func (w *CanvasCleanupWorker) cleanRemainingResources(canvas models.Canvas) (boo
 	return complete, nil
 }
 
-func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, []models.Repository, error) {
+func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, error) {
 	if err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Delete(&models.CanvasNode{}).Error; err != nil {
-		return nil, nil, fmt.Errorf("failed to delete canvas nodes: %w", err)
+		return nil, fmt.Errorf("failed to delete canvas nodes: %w", err)
 	}
 
 	sessions, err := models.ListAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list canvas agent sessions: %w", err)
-	}
-
-	var repositories []models.Repository
-	repository, err := models.FindRepositoryInTransaction(tx, canvas.ID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil, fmt.Errorf("find canvas repository: %w", err)
-	}
-
-	if repository != nil {
-		repositories = append(repositories, *repository)
+		return nil, fmt.Errorf("list canvas agent sessions: %w", err)
 	}
 
 	if err := models.DeleteAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID); err != nil {
-		return nil, nil, fmt.Errorf("delete canvas agent sessions: %w", err)
+		return nil, fmt.Errorf("delete canvas agent sessions: %w", err)
 	}
 
 	// A factory intake holds a RESTRICT reference to its canvas, so the row has
 	// to go before the canvas does.
 	if err := models.DeleteFactoryIntakesByCanvas(tx, canvas.ID); err != nil {
-		return nil, nil, fmt.Errorf("delete factory intakes: %w", err)
+		return nil, fmt.Errorf("delete factory intakes: %w", err)
 	}
 
 	if err := models.DeleteFactoryPRFeedbackHandlersByCanvas(tx, canvas.ID); err != nil {
-		return nil, nil, fmt.Errorf("delete factory PR feedback handlers: %w", err)
+		return nil, fmt.Errorf("delete factory PR feedback handlers: %w", err)
 	}
 
 	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
-		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
+		return nil, fmt.Errorf("failed to delete canvas: %w", err)
 	}
 
 	logging.WithCanvas(w.logger, canvas).Info("Successfully cleaned up canvas")
-	return sessions, repositories, nil
+	return sessions, nil
 }
 
 func (w *CanvasCleanupWorker) cleanupProviderSessions(ctx context.Context, sessions []models.AgentSession) {
@@ -320,34 +302,6 @@ func (w *CanvasCleanupWorker) cleanupProviderSessions(ctx context.Context, sessi
 				"provider":            session.Provider,
 				"provider_session_id": session.ProviderSessionID,
 			}).WithError(err).Warn("Failed to cleanup provider agent session")
-		}
-	}
-}
-
-func (w *CanvasCleanupWorker) cleanupGitRepositories(ctx context.Context, repositories []models.Repository) {
-	if w.gitProvider == nil || len(repositories) == 0 {
-		return
-	}
-
-	for _, repository := range repositories {
-		if repository.Provider != w.gitProvider.Name() {
-			w.logger.WithFields(log.Fields{
-				"repository_id":       repository.ID,
-				"repository_provider": repository.Provider,
-				"git_provider":        w.gitProvider.Name(),
-			}).Warn("Skipping repository cleanup for repository with mismatched provider")
-			continue
-		}
-
-		cleanupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		err := w.gitProvider.DeleteRepository(cleanupCtx, repository.RepoID)
-		cancel()
-		if err != nil {
-			w.logger.WithFields(log.Fields{
-				"repository_id": repository.ID,
-				"provider":      repository.Provider,
-				"repo_id":       repository.RepoID,
-			}).WithError(err).Warn("Failed to cleanup git repository")
 		}
 	}
 }

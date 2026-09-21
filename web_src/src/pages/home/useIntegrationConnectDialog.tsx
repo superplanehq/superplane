@@ -12,6 +12,7 @@ import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integratio
 import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
+  usesHostedJiraOAuth,
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
@@ -20,6 +21,7 @@ import {
   persistGitHubSetupReturnPath,
   startDirectGitHubConnect,
 } from "@/lib/startDirectGitHubConnect";
+import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 
@@ -150,7 +152,7 @@ export function useIntegrationConnectDialog({
       setConfigureIntegrationId,
     });
 
-  const connectGitHubWithoutDialog = useHostedGitHubConnect({
+  const hostedConnect = useHostedProviderConnect({
     organizationId,
     returnTo,
     connected,
@@ -162,12 +164,15 @@ export function useIntegrationConnectDialog({
 
   const requestConnect = async (integrationName: string, preferredIntegrationId?: string): Promise<boolean> => {
     if (integrationName === "github" && githubConnect.hosted) {
-      return connectGitHubWithoutDialog(false, preferredIntegrationId);
+      return hostedConnect.github(false, preferredIntegrationId);
     }
     const existingSelection = selectReadyIntegrationInstance(connected, selections, integrationName);
     if (existingSelection) {
       onSelectionsChange(existingSelection);
       return true;
+    }
+    if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
+      return hostedConnect.jira();
     }
     openConnectDialog(integrationName);
     return false;
@@ -202,7 +207,11 @@ export function useIntegrationConnectDialog({
 
   const createNew = (integrationName: string) => {
     if (integrationName === "github" && githubConnect.hosted) {
-      void connectGitHubWithoutDialog(true);
+      void hostedConnect.github(true);
+      return;
+    }
+    if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
+      void hostedConnect.jira();
       return;
     }
     openCreateIntegrationModal(integrationName);
@@ -280,6 +289,10 @@ function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefini
     privateApp: offersPrivateGitHubAppSetup(githubDefinition),
     useWizard: usesPrivateGitHubAppWizard(githubDefinition),
   };
+}
+
+function isHostedJira(availableIntegrations: IntegrationsIntegrationDefinition[]) {
+  return usesHostedJiraOAuth(availableIntegrations.find((item) => item.name === "jira"));
 }
 
 type QueuedHostedGitHubConnect = {
@@ -387,4 +400,77 @@ export function useHostedGitHubConnect({
   }, [connectGitHubWithoutDialog, currentUserId, currentUserResolved]);
 
   return connectGitHubWithoutDialog;
+}
+
+function useHostedProviderConnect({
+  organizationId,
+  returnTo,
+  connected,
+  existingIntegrationNames,
+  currentUserId,
+  currentUserResolved,
+  createIntegration,
+}: {
+  organizationId: string;
+  returnTo?: string;
+  connected: OrganizationsIntegration[];
+  existingIntegrationNames: Set<string>;
+  currentUserId?: string;
+  currentUserResolved: boolean;
+  createIntegration: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+}) {
+  return {
+    github: useHostedGitHubConnect({
+      organizationId,
+      returnTo,
+      connected,
+      existingIntegrationNames,
+      currentUserId,
+      currentUserResolved,
+      createIntegration,
+    }),
+    jira: useHostedJiraConnect({
+      organizationId,
+      returnTo,
+      existingIntegrationNames,
+      createIntegration,
+    }),
+  };
+}
+
+function useHostedJiraConnect({
+  organizationId,
+  returnTo,
+  existingIntegrationNames,
+  createIntegration,
+}: {
+  organizationId: string;
+  returnTo?: string;
+  existingIntegrationNames: Set<string>;
+  createIntegration: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+}) {
+  return useCallback(async (): Promise<boolean> => {
+    try {
+      return await startDirectJiraConnect({
+        organizationId,
+        returnTo,
+        existingNames: existingIntegrationNames,
+        create: async (payload) => {
+          const response = await createIntegration(payload);
+          return response.data;
+        },
+      });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
+      return false;
+    }
+  }, [createIntegration, existingIntegrationNames, organizationId, returnTo]);
 }

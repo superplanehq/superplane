@@ -25,8 +25,9 @@ const (
 // newAuthorizedIntegration returns an IntegrationContext simulating a successfully-connected OAuth integration.
 func newAuthorizedIntegration() *contexts.IntegrationContext {
 	return newAuthorizedIntegrationWithMetadata(Metadata{
-		CloudID: testCloudID,
-		SiteURL: testSiteURL,
+		CloudID:                     testCloudID,
+		SiteURL:                     testSiteURL,
+		IssueWebhookScopesRequested: true,
 	})
 }
 
@@ -52,6 +53,11 @@ func newAuthorizedIntegrationWithMetadata(metadata Metadata) *contexts.Integrati
 // testProxyURL builds the expected OAuth API proxy URL for a REST path, mirroring Client.apiURL.
 func testProxyURL(path string) string {
 	return APIProxyHost + "/" + testCloudID + path
+}
+
+func Test__coreScopeList(t *testing.T) {
+	assert.Contains(t, coreScopeList, "read:issue-details:jira")
+	assert.Contains(t, coreScopeList, "manage:jira-webhook")
 }
 
 func Test__NewClient(t *testing.T) {

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 
 	// The intake graph uses built-in components and integration triggers, which
 	// only reach the registry through their init functions.
@@ -29,7 +31,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		Registry:       r.Registry,
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
-		GitProvider:    r.GitProvider,
 		WebhookBaseURL: "http://localhost:8000",
 	}
 
@@ -82,7 +83,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
 		assert.Equal(t, "Productive.io tasks", intake.GetName())
-		assert.True(t, intake.GetHealthy())
+		assert.False(t, intake.GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, intake.GetHealth())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		require.NoError(t, err)
@@ -127,6 +129,10 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "payments", trigger.Configuration["project"])
 		assert.Equal(t, []any{"created", "unresolved"}, trigger.Configuration["actions"])
+		assert.Equal(t, integrationID, intake.GetIntegrationId())
+		assert.Equal(t, "payments", intake.GetResourceId())
+		assert.True(t, intake.GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intake.GetHealth())
 	})
 
 	t.Run("a Sentry intake listens to the production project from setup", func(t *testing.T) {
@@ -143,6 +149,235 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "production", trigger.Configuration["project"])
+	})
+
+	t.Run("skipping the initial import starts a bound Sentry intake empty", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId:     integrationID,
+			ResourceId:        "payments",
+			SkipInitialImport: true,
+		})
+
+		assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+		assert.Nil(t, intake.InitialImportItemCount)
+
+		runs, err := ListFactoryIntakeRuns(ctx, orgID, &pb.ListFactoryIntakeRunsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs.GetRuns())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+	})
+
+	t.Run("skipping the initial import starts a bound Jira intake empty", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId:     integrationID,
+			ResourceId:        "ENG",
+			SkipInitialImport: true,
+		})
+
+		assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+		assert.Nil(t, intake.InitialImportItemCount)
+
+		runs, err := ListFactoryIntakeRuns(ctx, orgID, &pb.ListFactoryIntakeRunsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs.GetRuns())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+	})
+
+	t.Run("a Jira intake stores the completion column on the trigger", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		move := true
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId:     integrationID,
+			ResourceId:        "ENG",
+			SkipInitialImport: true,
+			Settings: &pb.FactoryIntake_Settings{
+				JiraMoveOnComplete:   &move,
+				JiraCompletionColumn: "In Review",
+			},
+		})
+
+		assert.Equal(t, integrationID, intake.GetIntegrationId())
+		assert.Equal(t, "ENG", intake.GetResourceId())
+		assert.True(t, intake.GetSettings().GetJiraMoveOnComplete())
+		assert.Equal(t, "In Review", intake.GetSettings().GetJiraCompletionColumn())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, true, trigger.Metadata[intakeMetadataJiraMoveOnComplete])
+		assert.Equal(t, "In Review", trigger.Metadata[intakeMetadataJiraCompletionColumn])
+	})
+
+	t.Run("updating Jira intake settings can disable the completion move", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId:     integrationID,
+			ResourceId:        "ENG",
+			SkipInitialImport: true,
+		})
+		assert.True(t, intake.GetSettings().GetJiraMoveOnComplete())
+		assert.Empty(t, intake.GetSettings().GetJiraCompletionColumn())
+
+		move := false
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues:            protoBool(true),
+				ReopenedIssues:       protoBool(true),
+				JiraMoveOnComplete:   &move,
+				JiraCompletionColumn: "Done",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetSettings().GetJiraMoveOnComplete())
+		assert.Equal(t, "Done", response.GetIntake().GetSettings().GetJiraCompletionColumn())
+	})
+
+	t.Run("a Jira intake listens to the selected project and stays unhealthy until the webhook is ready", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "ENG",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+		assert.Equal(t, pb.FactoryIntake_SOURCE_JIRA_ISSUES, intake.GetSource())
+		assert.False(t, intake.GetHealthy(), "a pending Jira webhook must not look like a live intake")
+		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, intake.GetHealth())
+
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		node, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, intakeTriggerNodeID)
+		require.NoError(t, err)
+		reason := ""
+		if node.StateReason != nil {
+			reason = *node.StateReason
+		}
+		require.Equal(t, models.CanvasNodeStateReady, node.State, reason)
+		require.NotNil(t, node.WebhookID)
+
+		webhook, err := models.FindWebhookInTransaction(database.DB(t.Context()), *node.WebhookID)
+		require.NoError(t, err)
+		assert.Equal(t, models.WebhookStatePending, webhook.State)
+		raw, err := json.Marshal(webhook.Configuration.Data())
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), `"ENG"`)
+
+		require.NoError(t, webhook.ReadyWithMetadata(database.DB(t.Context()), map[string]any{
+			"webhookId": int64(1000),
+		}))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, listed.GetIntakes()[0].GetHealth())
+
+		require.NoError(t, webhook.MarkFailed(database.DB(t.Context())))
+		listed, err = ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.False(t, listed.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, listed.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("a listed Sentry intake is unhealthy after its integration is deleted", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+
+		integration, err := models.FindIntegrationInTransaction(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			uuid.MustParse(integrationID),
+		)
+		require.NoError(t, err)
+		require.NoError(t, integration.SoftDeleteInTransaction(database.DB(t.Context())))
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, response.GetIntakes()[0].GetHealth())
+		assert.Equal(t, integrationID, response.GetIntakes()[0].GetIntegrationId())
+		assert.Equal(t, "payments", response.GetIntakes()[0].GetResourceId())
+	})
+
+	t.Run("a listed Sentry intake is unhealthy while its integration is not ready", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+
+		require.NoError(t, database.DB(t.Context()).Model(&models.Integration{}).
+			Where("id = ?", uuid.MustParse(integrationID)).
+			Update("state", models.IntegrationStateError).Error)
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_INTEGRATION_NOT_READY, response.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("an unbound GitHub intake stays healthy when listed", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.True(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, response.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("an unbound Sentry intake needs a connection when listed", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, response.GetIntakes()[0].GetHealth())
 	})
 
 	t.Run("creating a Sentry intake with an invalid user id does not panic", func(t *testing.T) {
@@ -366,6 +601,24 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.True(t, response.GetIntake().GetHealthy())
 	})
 
+	t.Run("update applies a new name and settings together", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		name := "Bug intake"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Name:      &name,
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"bug"},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Bug intake", response.GetIntake().GetName())
+		assert.Equal(t, []string{"bug"}, response.GetIntake().GetSettings().GetLabels())
+	})
+
 	t.Run("label and assignment filters reach the filter expression", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -578,7 +831,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 	t.Run("a source without a filter ignores label settings", func(t *testing.T) {
 		factory := newFactory(t)
-		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
 
 		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),
@@ -618,6 +871,248 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE, settings.GetLabelFilterMode())
 	})
 
+	t.Run("update sets and clears paused, and list returns it", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		assert.False(t, intake.GetPaused())
+
+		paused := true
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+
+		paused = false
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetPaused())
+	})
+
+	t.Run("update sets and clears paused for a Jira intake", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_JIRA_ISSUES})
+		assert.False(t, intake.GetPaused())
+
+		paused := true
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+
+		paused = false
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetPaused())
+	})
+
+	t.Run("update rejects pause for a GitHub intake", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		paused := true
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.False(t, intake.GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.False(t, listed.GetIntakes()[0].GetPaused())
+	})
+
+	t.Run("update rebinds a Sentry intake to a ready integration", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: oldID,
+			ResourceId:    "payments",
+		})
+
+		integration, err := models.FindIntegrationInTransaction(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			uuid.MustParse(oldID),
+		)
+		require.NoError(t, err)
+		require.NoError(t, integration.SoftDeleteInTransaction(database.DB(t.Context())))
+
+		newID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		resourceID := "checkout"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &newID,
+			ResourceId:    &resourceID,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, response.GetIntake().GetHealth())
+		assert.Equal(t, newID, response.GetIntake().GetIntegrationId())
+		assert.Equal(t, "checkout", response.GetIntake().GetResourceId())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, newID, *trigger.IntegrationID)
+		assert.Equal(t, "checkout", trigger.Configuration["project"])
+	})
+
+	t.Run("update rejects a binding with only an integration", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("update rejects a GitHub connection change", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		resourceID := "acme/backlog"
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+			ResourceId:    &resourceID,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("update applies settings and a new connection together", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: oldID,
+			ResourceId:    "ENG",
+		})
+
+		newID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "OPS")
+		resourceID := "OPS"
+		newIssues := false
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &newID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues: &newIssues,
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, newID, response.GetIntake().GetIntegrationId())
+		assert.Equal(t, "OPS", response.GetIntake().GetResourceId())
+		assert.False(t, response.GetIntake().GetSettings().GetNewIssues())
+		assert.True(t, response.GetIntake().GetSettings().GetReopenedIssues())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, newID, *trigger.IntegrationID)
+		assert.Equal(t, "OPS", trigger.Configuration["project"])
+		assert.Equal(t, []any{"updated"}, trigger.Configuration["events"])
+	})
+
+	t.Run("update rejects a bad connection without keeping settings", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: oldID,
+			ResourceId:    "ENG",
+		})
+		assert.True(t, intake.GetSettings().GetNewIssues())
+
+		missingID := uuid.NewString()
+		resourceID := "OPS"
+		newIssues := false
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &missingID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues: &newIssues,
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.Equal(t, oldID, listed.GetIntakes()[0].GetIntegrationId())
+		assert.Equal(t, "ENG", listed.GetIntakes()[0].GetResourceId())
+		assert.True(t, listed.GetIntakes()[0].GetSettings().GetNewIssues())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, listed.GetIntakes()[0])
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, oldID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
+	})
+
+	t.Run("update rejects a GitHub connection change without keeping settings", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		resourceID := "acme/backlog"
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"bug"},
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.Empty(t, listed.GetIntakes()[0].GetSettings().GetLabels())
+	})
+
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -634,6 +1129,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		assert.Error(t, err)
+	})
+
+	t.Run("deleting an intake leaves existing work orders", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		origin := models.WorkOrderOrigin{
+			URL:   "https://acme.sentry.io/issues/1",
+			Label: "ISSUE-1",
+		}
+		order, err := factory.CreateWorkOrderWithOrigin(
+			database.DB(t.Context()),
+			"Crash in checkout",
+			"The checkout page panics.",
+			nil,
+			[]uuid.UUID{},
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		_, err = DeleteFactoryIntake(ctx, orgID, &pb.DeleteFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+
+		found, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
+		require.NoError(t, err)
+		require.NotNil(t, found.Origin())
+		assert.Equal(t, origin.URL, found.Origin().URL)
+		assert.Equal(t, origin.Label, found.Origin().Label)
 	})
 
 	t.Run("a missing intake reports not found", func(t *testing.T) {
@@ -671,11 +1197,38 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 		InitialImportItemCount: &itemCount,
 	}
 
-	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+	serialized := serializeFactoryIntake(nil, intake, models.LiveCanvasSpec{}, nil)
 
 	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
 	require.NotNil(t, serialized.InitialImportItemCount)
 	assert.Zero(t, serialized.GetInitialImportItemCount())
+}
+
+func Test__SerializeFactoryIntakeJiraWebhookHealth(t *testing.T) {
+	spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceJiraIssues)
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceJiraIssues, spec)
+	require.NotEmpty(t, graph.TriggerNodeID)
+
+	integrationID := uuid.NewString()
+	for i := range spec.Nodes {
+		if spec.Nodes[i].ID != graph.TriggerNodeID {
+			continue
+		}
+		spec.Nodes[i].IntegrationID = &integrationID
+	}
+	intake := &models.FactoryIntake{
+		ID:        uuid.New(),
+		FactoryID: uuid.New(),
+		CanvasID:  uuid.New(),
+		Source:    models.FactoryIntakeSourceJiraIssues,
+	}
+
+	serialized := serializeFactoryIntake(nil, intake, spec, map[string]string{
+		integrationID: models.IntegrationStateReady,
+	})
+
+	assert.False(t, serialized.GetHealthy(), "a Jira intake without a ready webhook must not be healthy")
+	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, serialized.GetHealth())
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {
@@ -743,4 +1296,32 @@ func liveIntakeNodes(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryI
 	require.NoError(t, err)
 
 	return liveVersion.Nodes
+}
+
+func createReadyJiraIntakeIntegration(t *testing.T, organizationID uuid.UUID, projectKey string) string {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"jira",
+		support.RandomName("jira"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	integration.State = models.IntegrationStateReady
+	integration.Metadata = datatypes.NewJSONType(map[string]any{
+		"cloudId": "jira-cloud-1",
+		"siteUrl": "https://acme.atlassian.net",
+		"projects": []any{
+			map[string]any{"id": "10000", "key": projectKey, "name": projectKey},
+		},
+	})
+	require.NoError(t, database.DB(t.Context()).Save(integration).Error)
+	return integration.ID.String()
+}
+
+func protoBool(value bool) *bool {
+	return &value
 }

@@ -247,7 +247,6 @@ func newRunnerArtifactTestServer(
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
@@ -258,7 +257,7 @@ func newRunnerArtifactTestServer(
 		false,
 	)
 	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), nil)
 	return server
 }
 

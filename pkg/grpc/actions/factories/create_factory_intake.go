@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -25,7 +24,6 @@ type IntakeDependencies struct {
 	Registry       *registry.Registry
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
-	GitProvider    git.Provider
 	WebhookBaseURL string
 	UsageService   usage.Service
 	NewItemSource  IntakeItemSourceFactory
@@ -103,12 +101,23 @@ func CreateFactoryIntake(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
+
+	settings := defaultIntakeSettings()
+	if source == models.FactoryIntakeSourceJiraIssues {
+		settings = defaultJiraIntakeSettings()
+	}
+	settings = parseIntakeSettings(settings, req.GetSettings())
+	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
+		settings.ConfidencePct = DefaultIntakeConfidencePct
+	}
+
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
 		OrganizationID: orgID,
 		FactoryID:      factoryID,
 		Source:         source,
 		Name:           name,
 		Binding:        binding,
+		Settings:       settings,
 	})
 	if err != nil {
 		return nil, err
@@ -125,7 +134,13 @@ func CreateFactoryIntake(
 	// An intake works without a first batch, so a source that cannot be read
 	// now costs the head start and nothing more. Persist the result so clients
 	// can distinguish an empty source from an import that did not run.
-	seedResult, seedErr := seedIntake(ctx, deps, db, canvasID, source, binding)
+	var seedResult intakeSeedResult
+	var seedErr error
+	if req.GetSkipInitialImport() {
+		seedResult = intakeSeedResult{skipped: true}
+	} else {
+		seedResult, seedErr = seedIntake(ctx, deps, db, canvasID, source, binding)
+	}
 	if err := recordInitialImport(db, intake, seedResult, seedErr); err != nil {
 		// The intake, canvas, and seed events already exist. Returning an error
 		// would invite a retry that creates a duplicate intake and emits the
@@ -146,8 +161,13 @@ func CreateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
+	states, err := intakeIntegrationStates(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
 	return &pb.CreateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(intake, spec[canvasID]),
+		Intake: serializeFactoryIntake(db, intake, spec[canvasID], states),
 	}, nil
 }
 
@@ -173,6 +193,7 @@ type intakeCanvasRequest struct {
 	Source         string
 	Name           string
 	Binding        *intakeBinding
+	Settings       intakeSettings
 }
 
 // createIntakeCanvas builds the intake graph and commits it as the canvas's
@@ -199,7 +220,6 @@ func createIntakeCanvas(
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
-		deps.GitProvider,
 		deps.WebhookBaseURL,
 		orgID,
 		canvasDoc.Metadata.Name,

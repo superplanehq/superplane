@@ -30,7 +30,6 @@ func Test__IntakeSeed(t *testing.T) {
 		Registry:       r.Registry,
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
-		GitProvider:    r.GitProvider,
 		WebhookBaseURL: "http://localhost:8000",
 	}
 
@@ -401,4 +400,222 @@ func Test__SentryIssueEvents(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "Newest timeout", secondIssue["title"])
 	assert.Equal(t, sentry.IssueDescription(secondIssue, nil), events[1]["description"])
+}
+
+func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factoryModel.ID.String(),
+		Source:    pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+	})
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(response.GetIntake().GetCanvasId())
+	tx := database.DB(t.Context())
+
+	createOriginOrder := func(issueID, title, state, result string) {
+		t.Helper()
+		origin := models.WorkOrderOrigin{
+			URL:   "https://acme.sentry.io/issues/" + issueID + "/",
+			Label: title,
+		}
+		order, createErr := factoryModel.CreateWorkOrderWithOrigin(tx, title, "", nil, nil, nil, origin)
+		require.NoError(t, createErr)
+		switch {
+		case state == models.FactoryWorkOrderStateDraft:
+			return
+		case state == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected:
+			_, updateErr := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateClosed,
+				Result:  models.FactoryWorkOrderResultRejected,
+			})
+			require.NoError(t, updateErr)
+		case state == models.FactoryWorkOrderStateClosed:
+			_, updateErr := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateOpen,
+			})
+			require.NoError(t, updateErr)
+			_, closeErr := order.Close(tx, result, nil)
+			require.NoError(t, closeErr)
+		}
+	}
+
+	createOriginOrder("11", "Draft timeout", models.FactoryWorkOrderStateDraft, "")
+	createOriginOrder("22", "Closed timeout", models.FactoryWorkOrderStateClosed, models.FactoryWorkOrderResultCompleted)
+	createOriginOrder("33", "Archived timeout", models.FactoryWorkOrderStateClosed, models.FactoryWorkOrderResultRejected)
+
+	queued := []sentry.Issue{{
+		ID:        "44",
+		Title:     "Queued timeout",
+		Permalink: "https://acme.sentry.io/issues/44/",
+	}}
+	first, err := seedKnownSentryIssues(tx, canvasID, nil, queued)
+	require.NoError(t, err)
+	assert.Equal(t, 1, first.itemCount)
+
+	before, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, before, 1)
+
+	result, err := seedKnownSentryIssues(tx, canvasID, nil, []sentry.Issue{
+		{ID: "11", Title: "Draft timeout", Permalink: "https://acme.sentry.io/issues/11/"},
+		{ID: "22", Title: "Closed timeout", Permalink: "https://acme.sentry.io/issues/22/"},
+		{ID: "33", Title: "Archived timeout", Permalink: "https://acme.sentry.io/issues/33/"},
+		{ID: "44", Title: "Queued timeout", Permalink: "https://acme.sentry.io/issues/44/"},
+		{ID: "55", Title: "Fresh timeout", Permalink: "https://acme.sentry.io/issues/55/"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.itemCount)
+
+	after, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, after, 2)
+
+	freshIDs := map[string]bool{}
+	for i := range after {
+		issueID, ok := sentry.IssueIDFromEventData(after[i].Data.Data())
+		require.True(t, ok)
+		freshIDs[issueID] = true
+	}
+	assert.Equal(t, map[string]bool{"44": true, "55": true}, freshIDs)
+
+	repeat, err := seedKnownSentryIssues(tx, canvasID, nil, []sentry.Issue{
+		{ID: "11", Title: "Draft timeout"},
+		{ID: "22", Title: "Closed timeout"},
+		{ID: "33", Title: "Archived timeout"},
+		{ID: "44", Title: "Queued timeout"},
+		{ID: "55", Title: "Fresh timeout"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, repeat.itemCount)
+
+	finalEvents, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	assert.Len(t, finalEvents, 2)
+}
+
+func Test__JiraSeedSkipsKnownIssues(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factoryModel.ID.String(),
+		Source:    pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+	})
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(response.GetIntake().GetCanvasId())
+	tx := database.DB(t.Context())
+	siteURL := "https://acme.atlassian.net"
+
+	createOriginOrder := func(issueKey, title, state, result string) {
+		t.Helper()
+		origin := models.WorkOrderOrigin{
+			URL:   jira.IssueURL(siteURL, issueKey),
+			Label: issueKey,
+		}
+		order, createErr := factoryModel.CreateWorkOrderWithOrigin(tx, title, "", nil, nil, nil, origin)
+		require.NoError(t, createErr)
+		switch {
+		case state == models.FactoryWorkOrderStateDraft:
+			return
+		case state == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected:
+			_, updateErr := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateClosed,
+				Result:  models.FactoryWorkOrderResultRejected,
+			})
+			require.NoError(t, updateErr)
+		case state == models.FactoryWorkOrderStateClosed:
+			_, updateErr := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateOpen,
+			})
+			require.NoError(t, updateErr)
+			_, closeErr := order.Close(tx, result, nil)
+			require.NoError(t, closeErr)
+		}
+	}
+
+	load := func(issueKey string) (*jira.Issue, error) {
+		return &jira.Issue{
+			Key: issueKey,
+			Fields: map[string]any{
+				"summary": "Summary of " + issueKey,
+			},
+		}, nil
+	}
+
+	createOriginOrder("ENG-11", "Draft issue", models.FactoryWorkOrderStateDraft, "")
+	createOriginOrder("ENG-22", "Closed issue", models.FactoryWorkOrderStateClosed, models.FactoryWorkOrderResultCompleted)
+	createOriginOrder("ENG-33", "Archived issue", models.FactoryWorkOrderStateClosed, models.FactoryWorkOrderResultRejected)
+
+	queued := []jira.IssueSearchHit{{Key: "ENG-44"}}
+	first, err := seedKnownJiraIssues(tx, canvasID, load, queued, siteURL)
+	require.NoError(t, err)
+	assert.Equal(t, 1, first.itemCount)
+
+	before, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, before, 1)
+
+	result, err := seedKnownJiraIssues(tx, canvasID, load, []jira.IssueSearchHit{
+		{Key: "ENG-11"},
+		{Key: "ENG-22"},
+		{Key: "ENG-33"},
+		{Key: "ENG-44"},
+		{Key: "ENG-55"},
+	}, siteURL)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.itemCount)
+
+	after, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, after, 2)
+
+	freshKeys := map[string]bool{}
+	for i := range after {
+		issueKey, ok := jira.IssueKeyFromEventData(after[i].Data.Data())
+		require.True(t, ok)
+		freshKeys[issueKey] = true
+	}
+	assert.Equal(t, map[string]bool{"ENG-44": true, "ENG-55": true}, freshKeys)
+
+	repeat, err := seedKnownJiraIssues(tx, canvasID, load, []jira.IssueSearchHit{
+		{Key: "ENG-11"},
+		{Key: "ENG-22"},
+		{Key: "ENG-33"},
+		{Key: "ENG-44"},
+		{Key: "ENG-55"},
+	}, siteURL)
+	require.NoError(t, err)
+	assert.Equal(t, 0, repeat.itemCount)
+
+	otherSite, err := seedKnownJiraIssues(tx, canvasID, load, []jira.IssueSearchHit{
+		{Key: "ENG-11"},
+	}, "https://other.atlassian.net")
+	require.NoError(t, err)
+	assert.Equal(t, 1, otherSite.itemCount)
+
+	finalEvents, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	assert.Len(t, finalEvents, 3)
 }

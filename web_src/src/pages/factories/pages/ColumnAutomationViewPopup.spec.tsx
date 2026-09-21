@@ -59,8 +59,8 @@ useInfiniteCanvasRuns.mockReturnValue({
 const EDIT_HREF = "/org-1/workspaces/RF/apps/app-refund-implementer?configure=1&agent=1&from=lines&lineId=line-plan";
 
 function implementGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-refund-implementer", name: "Implement", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -70,16 +70,16 @@ function implementGraph(): IntakeAutomationGraph {
         edges: [{ channel: "default", sourceId: "on-run", targetId: "agent" }],
       },
     },
-    [{ name: "onRun", label: "On run" }],
-    [{ name: "runnerClaudeCode", label: "Claude Code" }],
-    {},
-    {},
-    {},
-    "app-refund-implementer",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    triggers: [{ name: "onRun", label: "On run" }],
+    components: [{ name: "runnerClaudeCode", label: "Claude Code" }],
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-refund-implementer",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
   return {
     nodes,
     edges,

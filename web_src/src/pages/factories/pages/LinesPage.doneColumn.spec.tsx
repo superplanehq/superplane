@@ -52,6 +52,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useDeleteFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => ({ data: [], isLoading: false, isError: false }),
   useImportFactoryIntakeItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRefreshBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -80,11 +81,6 @@ vi.mock("@/hooks/usePageTitle", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
-}));
-
-vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
-  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
 }));
 
 vi.mock("./useWorkOrderPlanningSurvey", () => ({

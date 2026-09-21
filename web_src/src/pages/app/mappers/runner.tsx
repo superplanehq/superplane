@@ -4,7 +4,7 @@ import { getColorClass } from "@/lib/colors";
 import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
 import { getTriggerRenderer } from "./mapperLookup";
@@ -20,7 +20,7 @@ import type {
   SubtitleContext,
 } from "./types";
 
-import { stringOrDash } from "./utils";
+import { stringOrDash } from "./eventDisplay";
 
 const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";

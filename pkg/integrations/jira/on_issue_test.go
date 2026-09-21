@@ -73,7 +73,8 @@ func Test__OnIssue__Setup(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		require.Len(t, integration.WebhookRequests, 1)
 		assert.Equal(t, WebhookConfiguration{
-			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+			Events:   []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+			Projects: []string{"ENG"},
 		}, integration.WebhookRequests[0])
 	})
 }
@@ -120,6 +121,41 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		require.NotNil(t, event.User)
 		assert.Equal(t, "Alice", event.User.DisplayName)
 		assert.Empty(t, event.URL)
+	})
+
+	t.Run("emits a created event for each object when the body is a JSON array", func(t *testing.T) {
+		arrayBody := []byte(`[
+			{
+				"webhookEvent": "jira:issue_created",
+				"issue": {
+					"id": "10001",
+					"key": "ENG-42",
+					"fields": {"project": {"key": "ENG"}}
+				}
+			},
+			{
+				"webhookEvent": "jira:issue_created",
+				"issue": {
+					"id": "10002",
+					"key": "ENG-43",
+					"fields": {"project": {"key": "ENG"}}
+				}
+			}
+		]`)
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          arrayBody,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 2, events.Count())
+		assert.Equal(t, "ENG-42", events.Payloads[0].Data.(IssueEvent).Issue.Key)
+		assert.Equal(t, "ENG-43", events.Payloads[1].Data.(IssueEvent).Issue.Key)
 	})
 
 	t.Run("emits the issue page address when the site is known", func(t *testing.T) {

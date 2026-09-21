@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { groupSplitRunStream } from "./PhaseLogCard";
+import { groupSplitRunStream } from "./phaseLogStream";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,

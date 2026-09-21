@@ -74,7 +74,7 @@ function ManualSource({ source }: { source: Extract<SplitRunSource, { kind: "man
 function CompactIntakeSource({ source }: { source: Extract<SplitRunSource, { kind: "intake" }> }) {
   return (
     <>
-      <IntakeSourceLogo source={source} className="brightness-0 invert dark:invert-0" />
+      <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
       {source.ticket ? <IntakeTicket ticket={source.ticket} /> : <span className="truncate">{source.name}</span>}
     </>
   );

@@ -196,17 +196,15 @@ describe("AgentActivityView", () => {
     expect(screen.queryByText("Running", { exact: true })).not.toBeInTheDocument();
   });
 
-  it.each([
-    [JSON.stringify({ command: "cd /repo && rg -n retry pkg", timeout: 30_000 }), "cd /repo && rg -n retry pkg"],
-    [String.raw`{"command":"cd /repo && grep -n \"retry`, 'cd /repo && grep -n "retry'],
-  ])("extracts a Bash command from provider input", async (input, command) => {
+  it("extracts a Bash command from provider input", async () => {
     const user = userEvent.setup();
+    const command = "cd /repo && rg -n retry pkg";
     render(
       <AgentActivityView
         live
         activity={activityWith({
           ...completedTool("command-1", "bash", "Bash"),
-          input,
+          input: JSON.stringify({ command, timeout: 30_000 }),
           status: "running",
         })}
       />,
@@ -448,7 +446,7 @@ describe("AgentActivityView", () => {
     const summary = screen.getByRole("button", { name: "Explored 1 file" });
     await user.click(summary);
 
-    expect(screen.getByText("Explored main.ts")).toBeInTheDocument();
+    expect(screen.getByText("/repo/src/main.ts")).toBeInTheDocument();
   });
 
   it("uses factual names for common shell activity", () => {

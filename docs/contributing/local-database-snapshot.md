@@ -36,8 +36,8 @@ Restore replaces `superplane_dev` only. It does not change `superplane_test`.
 
 ## Limits
 
-The dump stores Postgres rows. It does not restore SuperGit canvas git data
-or blob files. GitHub App credentials stay in `.env`.
+The dump stores Postgres rows. It does not restore blob files. GitHub App
+credentials stay in `.env`.
 
 ## Multiple local instances
 

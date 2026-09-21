@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -73,7 +73,6 @@ type CanvasPublishResult struct {
 
 type CanvasPublisherOptions struct {
 	Registry       *registry.Registry
-	GitProvider    gitprovider.Provider
 	OrgID          uuid.UUID
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
@@ -399,6 +398,9 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Type = updatedNode.Type
 	existingNode.Ref = datatypes.NewJSONType(updatedNode.Ref)
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
+	existingNode.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(
+		mergeNodeMetadata(existingNode.Metadata.Data(), updatedNode.Metadata),
+	))
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
 	existingNode.SetConcurrencySpec(updatedNode.Concurrency)
@@ -446,7 +448,9 @@ func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
 			draftNode.ErrorMessage = &errorMsg
 		}
 
-		draftNode.Metadata = node.Metadata.Data()
+		merged := mergeNodeMetadata(draftNode.Metadata, node.Metadata.Data())
+		draftNode.Metadata = merged
+		node.Metadata = datatypes.NewJSONType(merged)
 		p.finalNodes[pending.draftID] = draftNode
 		p.allNodes[node.NodeID] = node
 		if err := p.tx.Save(&node).Error; err != nil {
@@ -614,7 +618,6 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
-		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
@@ -668,6 +671,23 @@ func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {
 }
 
 const appSubscriptionIDKey = "appSubscriptionID"
+
+func mergeNodeMetadata(base map[string]any, overlay any) map[string]any {
+	merged := map[string]any{}
+	maps.Copy(merged, base)
+	overlayMap, ok := overlay.(map[string]any)
+	if !ok {
+		if len(merged) == 0 {
+			return base
+		}
+		return merged
+	}
+	maps.Copy(merged, overlayMap)
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
+}
 
 func withoutAppSubscriptionID(values map[string]any) map[string]any {
 	if values == nil {

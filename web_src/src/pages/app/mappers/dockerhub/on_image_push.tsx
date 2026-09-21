@@ -12,8 +12,8 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import type { Repository, RepositoryMetadata } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import type { Predicate } from "../utils";
-import { formatPredicate, stringOrDash } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate, stringOrDash } from "../eventDisplay";
 import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnImagePushMetadata {
@@ -38,39 +38,62 @@ interface ImagePushEvent {
   repository?: Repository;
 }
 
+function imagePushTitle(eventData?: ImagePushEvent): string {
+  const repository = eventData?.repository?.repo_name;
+  if (!repository) {
+    return "Image push";
+  }
+  const tag = eventData?.push_data?.tag;
+  return tag ? `${repository}:${tag}` : repository;
+}
+
+function createdAtSubtitle(createdAt?: string) {
+  return createdAt ? renderTimeAgo(new Date(createdAt)) : "";
+}
+
+function repositoryVisibility(isPrivate?: boolean): string {
+  if (isPrivate === undefined) {
+    return "-";
+  }
+  return isPrivate ? "Private" : "Public";
+}
+
+function pushedAtLabel(pushedAt?: number): string {
+  if (!pushedAt) {
+    return "-";
+  }
+  return formatTimestampInUserTimezone(new Date(pushedAt * 1000).toISOString());
+}
+
+function imagePushRootEventValues(eventData?: ImagePushEvent): Record<string, string> {
+  const repository = eventData?.repository;
+  const pushData = eventData?.push_data;
+  return {
+    Repository: stringOrDash(repository?.repo_name),
+    Tag: stringOrDash(pushData?.tag),
+    Pusher: stringOrDash(pushData?.pusher),
+    "Pushed At": pushedAtLabel(pushData?.pushed_at),
+    "Repository URL": stringOrDash(repository?.repo_url),
+    Visibility: repositoryVisibility(repository?.is_private),
+    Stars: stringOrDash(repository?.star_count),
+    Pulls: stringOrDash(repository?.pull_count),
+  };
+}
+
 /**
  * Renderer for the "dockerhub.onImagePush" trigger
  */
 export const onImagePushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as ImagePushEvent;
-    const repository = eventData?.repository?.repo_name;
-    const tag = eventData?.push_data?.tag;
-
-    const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "Image push";
-    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
-
-    return { title, subtitle };
+    return {
+      title: imagePushTitle(eventData),
+      subtitle: createdAtSubtitle(context.event?.createdAt),
+    };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as ImagePushEvent;
-    const repository = eventData?.repository;
-    const pushData = eventData?.push_data;
-    const pushedAt = pushData?.pushed_at ? new Date(pushData.pushed_at * 1000).toISOString() : undefined;
-
-    const visibility = repository?.is_private === undefined ? "-" : repository.is_private ? "Private" : "Public";
-
-    return {
-      Repository: stringOrDash(repository?.repo_name),
-      Tag: stringOrDash(pushData?.tag),
-      Pusher: stringOrDash(pushData?.pusher),
-      "Pushed At": pushedAt ? formatTimestampInUserTimezone(pushedAt) : "-",
-      "Repository URL": stringOrDash(repository?.repo_url),
-      Visibility: visibility,
-      Stars: stringOrDash(repository?.star_count),
-      Pulls: stringOrDash(repository?.pull_count),
-    };
+    return imagePushRootEventValues(context.event?.data as ImagePushEvent);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

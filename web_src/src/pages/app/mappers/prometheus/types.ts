@@ -97,5 +97,5 @@ export interface QueryRangeNodeMetadata {
 
 export interface PrometheusQueryPayload {
   resultType?: string;
-  result?: any[];
+  result?: unknown[];
 }

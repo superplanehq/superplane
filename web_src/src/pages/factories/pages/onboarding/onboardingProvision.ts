@@ -1,6 +1,7 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
+  FactoriesFactoryIntakeSettings,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
@@ -166,6 +167,7 @@ export type CreateFactoryIntake = (input: {
   source: FactoriesFactoryIntakeSource;
   integrationId?: string;
   resourceId?: string;
+  settings?: FactoriesFactoryIntakeSettings;
 }) => Promise<FactoriesFactoryIntake>;
 
 export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
@@ -211,6 +213,7 @@ export async function provisionJiraIntake(args: {
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
   resourceId: string;
+  settings?: FactoriesFactoryIntakeSettings;
 }): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
@@ -225,6 +228,7 @@ export async function provisionJiraIntake(args: {
     source: JIRA_INTAKE_SOURCE,
     integrationId: args.integrationId,
     resourceId: args.resourceId,
+    ...(args.settings ? { settings: args.settings } : {}),
   });
   rememberOnboardingIntakeBinding(created.id, {
     integrationId: args.integrationId,
@@ -240,7 +244,11 @@ export async function provisionOnboardingIntake(args: {
   createIntake: CreateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
   issuesChoice: IssuesChoiceId | null;
-  jira?: { integrationId: string; projectId: string };
+  jira?: {
+    integrationId: string;
+    projectId: string;
+    settings?: FactoriesFactoryIntakeSettings;
+  };
 }): Promise<FactoriesFactoryIntake | undefined> {
   const intakes = await args.listIntakes();
   const desiredSource = args.issuesChoice === "jira" ? JIRA_INTAKE_SOURCE : GITHUB_INTAKE_SOURCE;
@@ -264,6 +272,7 @@ export async function provisionOnboardingIntake(args: {
     deleteIntake: args.deleteIntake,
     integrationId: args.jira.integrationId,
     resourceId: args.jira.projectId,
+    settings: args.jira.settings,
   });
 }
 

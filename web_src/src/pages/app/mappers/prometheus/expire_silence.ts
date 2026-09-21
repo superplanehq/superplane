@@ -29,9 +29,9 @@ export const expireSilenceMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const details: Record<string, any> = {};
+    const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
       details["Expired At"] = new Date(context.execution.createdAt).toLocaleString();

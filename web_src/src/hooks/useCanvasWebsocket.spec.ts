@@ -61,7 +61,7 @@ function emitWebSocketOpen() {
 }
 
 function renderCanvasWebsocketHook(queryClient: QueryClient) {
-  return renderHook(() => useCanvasWebsocket(testCanvasId, testOrganizationId), {
+  return renderHook(() => useCanvasWebsocket({ canvasId: testCanvasId, organizationId: testOrganizationId }), {
     wrapper: ({ children }: { children: ReactNode }) =>
       createElement(QueryClientProvider, { client: queryClient }, children),
   });
@@ -374,15 +374,12 @@ describe("useCanvasWebsocket", () => {
 
     renderHook(
       () =>
-        useCanvasWebsocket(
-          testCanvasId,
-          testOrganizationId,
-          undefined,
-          undefined,
-          undefined,
+        useCanvasWebsocket({
+          canvasId: testCanvasId,
+          organizationId: testOrganizationId,
           onCanvasLifecycleEvent,
-          () => true,
-        ),
+          shouldApplyCanvasUpdate: () => true,
+        }),
       {
         wrapper: ({ children }: { children: ReactNode }) =>
           createElement(QueryClientProvider, { client: queryClient }, children),
@@ -407,7 +404,11 @@ describe("useCanvasWebsocket", () => {
 
     renderHook(
       () =>
-        useCanvasWebsocket(testCanvasId, testOrganizationId, undefined, undefined, undefined, onCanvasLifecycleEvent),
+        useCanvasWebsocket({
+          canvasId: testCanvasId,
+          organizationId: testOrganizationId,
+          onCanvasLifecycleEvent,
+        }),
       {
         wrapper: ({ children }: { children: ReactNode }) =>
           createElement(QueryClientProvider, { client: queryClient }, children),
@@ -429,18 +430,13 @@ describe("useCanvasWebsocket", () => {
 
     renderHook(
       () =>
-        useCanvasWebsocket(
-          testCanvasId,
-          testOrganizationId,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          false,
-          true,
+        useCanvasWebsocket({
+          canvasId: testCanvasId,
+          organizationId: testOrganizationId,
+          processRuntimeEvents: false,
+          enabled: true,
           onCanvasStagingEvent,
-        ),
+        }),
       {
         wrapper: ({ children }: { children: ReactNode }) =>
           createElement(QueryClientProvider, { client: queryClient }, children),
@@ -483,18 +479,13 @@ describe("useCanvasWebsocket", () => {
 
     renderHook(
       () =>
-        useCanvasWebsocket(
-          testCanvasId,
-          testOrganizationId,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          false,
-          true,
+        useCanvasWebsocket({
+          canvasId: testCanvasId,
+          organizationId: testOrganizationId,
+          processRuntimeEvents: false,
+          enabled: true,
           onCanvasStagingEvent,
-        ),
+        }),
       {
         wrapper: ({ children }: { children: ReactNode }) =>
           createElement(QueryClientProvider, { client: queryClient }, children),

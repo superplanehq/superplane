@@ -14,6 +14,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import type { DropletPayload } from "./droplet_payloads";
 
 export const createDropletMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -32,7 +33,7 @@ export const createDropletMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -40,12 +41,10 @@ export const createDropletMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const droplet = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const droplet = outputs?.default?.[0]?.data as DropletPayload | undefined;
     if (!droplet) return details;
 
-    const ip = droplet.networks?.v4?.find(
-      (n: { type?: string; ip_address?: string }) => n.type === "public",
-    )?.ip_address;
+    const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
 
     details["Droplet ID"] = droplet.id?.toString() || "-";
     details["Name"] = droplet.name || "-";

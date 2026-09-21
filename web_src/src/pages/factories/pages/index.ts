@@ -13,6 +13,8 @@ export { OnboardingPage } from "./onboarding/OnboardingPage";
 export { NewWorkspacePage } from "./onboarding/NewWorkspacePage";
 export { WorkspaceOverviewPage } from "./onboarding/WorkspaceOverviewPage";
 export { ChecksPRFeedbackSetupPage, DiscussionPRFeedbackSetupPage } from "./PRFeedbackSetupPage";
+export { JiraIntakeSetupPage } from "./JiraIntakeSetupPage";
+export { ProductiveIntakeSetupPage } from "./ProductiveIntakeSetupPage";
 export { SentryIntakeSetupPage } from "./SentryIntakeSetupPage";
 export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";

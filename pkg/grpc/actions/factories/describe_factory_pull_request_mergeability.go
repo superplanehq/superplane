@@ -24,9 +24,15 @@ func DescribeFactoryPullRequestMergeability(
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 	}
 
-	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
+	}
+	if !cached {
+		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
+		}
 	}
 
 	return &pb.DescribeFactoryPullRequestMergeabilityResponse{Mergeability: result.proto()}, nil

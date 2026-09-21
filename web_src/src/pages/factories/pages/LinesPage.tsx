@@ -4,6 +4,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesFactoryPrFeedbackHandler,
   FactoriesWorkOrder,
+  FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
@@ -13,6 +14,7 @@ import {
   useFactoryPullRequests,
   useFactoryWorkOrders,
   useUpdateFactoryLine,
+  useWorkOrder,
   useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
@@ -21,19 +23,13 @@ import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryInt
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import {
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -128,6 +124,7 @@ import {
   factoryHomePath,
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
+  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -141,7 +138,6 @@ import {
   isJiraIntakeSetupSearchOpen,
   isPRFeedbackSearchOpen,
   jiraIntakeIntegrationIdFromSearch,
-  withoutJiraIntakeSetupSearch,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
@@ -164,12 +160,11 @@ import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline"
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
-import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import {
-  ADD_INTAKE_TEMPLATES,
+  addIntakeTemplatesForOrg,
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
+  isAddIntakeSoon,
   isLineIntakeSourceId,
   type AddIntakeTemplate,
 } from "./lineIntakeModel";
@@ -240,7 +235,7 @@ export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
-  const { pathname, search, state: locationState } = useLocation();
+  const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -267,31 +262,13 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
-  const canAddJiraIntake = hasExperimentalFeature(FEATURE_FACTORY_JIRA_INTAKE);
-  const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
-  const hasSentryIntake = configuredIntakes.some((intake) => intake.source.id === "sentry-exceptions");
-  const hasJiraIntake = configuredIntakes.some((intake) => intake.source.id === "jira-issues");
   const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-  const addIntakeTemplates = useMemo(() => {
-    const allowedIds = new Set(["github-issues"]);
-    if (canAddJiraIntake) {
-      allowedIds.add("jira-issues");
-    }
-    if (canAddSentryIntake) {
-      allowedIds.add("sentry-exceptions");
-    }
-    if (canAddProductiveIntake) {
-      allowedIds.add("productive-tasks");
-    }
-    return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
-  }, [canAddJiraIntake, canAddSentryIntake, canAddProductiveIntake]);
-  // The menu entry only pays off once a source beyond the default GitHub issues is available.
-  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake || canAddJiraIntake;
+  const takenIntakeSourceIds = useMemo(
+    (): string[] => configuredIntakes.map((intake) => intake.source.id),
+    [configuredIntakes],
+  );
+  const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
-  const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
-  const jiraIntakeSetupOpen = isJiraIntakeSetupSearchOpen(search);
-  const returnedJiraIntegrationId = jiraIntakeIntegrationIdFromSearch(search);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -320,8 +297,6 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
-  const canSetupSentry = canUpdate && canAddSentryIntake && !hasSentryIntake;
-  const canSetupJira = canUpdate && canAddJiraIntake && !hasJiraIntake;
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -385,8 +360,18 @@ export function LinesPage() {
     return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
   }
 
+  if (isJiraIntakeSetupSearchOpen(search) && selectedLine.id) {
+    return (
+      <Navigate
+        to={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id, {
+          integrationId: jiraIntakeIntegrationIdFromSearch(search) || undefined,
+        })}
+        replace
+      />
+    );
+  }
+
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
-  const sentrySetupLineId = selectedLine.id;
 
   const intakePanel: BacklogIntakePanel | undefined = showColumnAutomations
     ? undefined
@@ -432,6 +417,9 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
+    if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
+      return;
+    }
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
         navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
@@ -439,11 +427,15 @@ export function LinesPage() {
       return;
     }
     if (template.id === "productive-tasks") {
-      setProductiveIntakeSetupOpen(true);
+      if (selectedLine.id) {
+        navigate(factoryProductiveIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
       return;
     }
     if (template.id === "jira-issues") {
-      navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      if (selectedLine.id) {
+        navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
       return;
     }
     if (!isLineIntakeSourceId(template.id)) {
@@ -524,20 +516,7 @@ export function LinesPage() {
         onClose={() => setAddIntakeOpen(false)}
         onSelect={createIntakeFromTemplate}
         templates={addIntakeTemplates}
-      />
-      <ProductiveIntakeSetupDialog
-        open={productiveIntakeSetupOpen}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        onClose={() => setProductiveIntakeSetupOpen(false)}
-      />
-      <JiraIntakeSetupDialog
-        open={jiraIntakeSetupOpen}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        setupReturnTo={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id)}
-        selectIntegrationId={returnedJiraIntegrationId}
-        onClose={() => navigate(withoutJiraIntakeSetupSearch(pathname, search), { replace: true })}
+        takenSourceIds={takenIntakeSourceIds}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
@@ -630,19 +609,7 @@ export function LinesPage() {
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
-            onAddIntake={
-              showColumnAutomations ? undefined : canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined
-            }
-            onSetupSentry={
-              canSetupSentry && sentrySetupLineId
-                ? () => navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, sentrySetupLineId))
-                : undefined
-            }
-            onSetupJira={
-              canSetupJira
-                ? () => navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id))
-                : undefined
-            }
+            onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
               showColumnAutomations && customAutomationsEnabled
@@ -812,8 +779,6 @@ function LineDetail({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
-  onSetupSentry,
-  onSetupJira,
   verifyListeners,
   onAddPRFeedback,
   factoryIntakes,
@@ -841,8 +806,6 @@ function LineDetail({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
-  onSetupSentry?: () => void;
-  onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   factoryIntakes: FactoriesFactoryIntake[];
@@ -947,8 +910,6 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
-          onSetupSentry={onSetupSentry}
-          onSetupJira={onSetupJira}
           verifyListeners={verifyListeners}
           onAddPRFeedback={onAddPRFeedback}
           workOrderCardContext={workOrderCardContext}
@@ -1025,7 +986,7 @@ function LineBoardSplitRunPopup({
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
-  peekOrder: FactoriesWorkOrder;
+  peekOrder: FactoriesWorkOrderSummary;
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
@@ -1034,14 +995,15 @@ function LineBoardSplitRunPopup({
   isAnalyzing: boolean;
   onClose: () => void;
 }) {
-  const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
     workOrderIds: [peekOrderId],
   });
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
-  const closer = useSplitRunFooterCloser(organizationId, factoryId, peekOrder);
+  const popupOrder = describedOrder ?? peekOrder;
+  const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   return (
@@ -1051,10 +1013,10 @@ function LineBoardSplitRunPopup({
       factoryId={factoryId}
       factoryKey={factoryKey}
       orderId={peekOrderId}
-      orderNumber={peekOrder.number}
+      orderNumber={popupOrder.number}
       lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, {
-        checks: peekChecks,
+      fixture={splitRunFixtureForWorkOrder(popupOrder, {
+        checks: describedOrder?.checks,
         artifacts: peekArtifacts,
         lineId,
         lineName: resolvedLineName,
@@ -1194,8 +1156,6 @@ function PhaseBoard({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
-  onSetupSentry,
-  onSetupJira,
   verifyListeners,
   onAddPRFeedback,
   workOrderCardContext,
@@ -1222,8 +1182,6 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
-  onSetupSentry?: () => void;
-  onSetupJira?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -1366,8 +1324,6 @@ function PhaseBoard({
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
-          onSetupSentry={onSetupSentry}
-          onSetupJira={onSetupJira}
           automations={backlogAutomations}
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}

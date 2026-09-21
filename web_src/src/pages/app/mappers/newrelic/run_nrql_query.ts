@@ -94,11 +94,12 @@ function getDetailsForNRQLResult(result: NewRelicNRQLResultPayload): Record<stri
     return details;
   }
 
-  const keys = Object.keys(firstResult);
+  const row = firstResult as Record<string, unknown>;
+  const keys = Object.keys(row);
   let allValuesEmpty = keys.length > 0;
   for (const key of keys.slice(0, 5)) {
-    details[key] = String(firstResult[key]);
-    if (firstResult[key] !== null && firstResult[key] !== undefined) {
+    details[key] = String(row[key]);
+    if (row[key] !== null && row[key] !== undefined) {
       allValuesEmpty = false;
     }
   }

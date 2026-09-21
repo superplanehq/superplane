@@ -13,10 +13,10 @@ describe("agent activity reducer", () => {
     const base = { schema_version: 2, activity_id: "activity-1", provider: "codex" } as const;
     const state = reduceAgentActivityRecords(emptyAgentActivityState, [
       { ...base, type: "activity_start", event_id: "1", sequence: 1, started_at: 100 },
-      { ...base, type: "tool_start", event_id: "2", sequence: 2, id: "a", kind: "bash", input: "echo a" },
-      { ...base, type: "tool_start", event_id: "3", sequence: 3, id: "b", kind: "read", input: "b.ts" },
-      { ...base, type: "tool_end", event_id: "4", sequence: 4, id: "b", status: "passed" },
-      { ...base, type: "tool_end", event_id: "5", sequence: 5, id: "a", status: "passed" },
+      { ...base, type: "activity_tool_start", event_id: "2", sequence: 2, id: "a", kind: "bash", input: "echo a" },
+      { ...base, type: "activity_tool_start", event_id: "3", sequence: 3, id: "b", kind: "read", input: "b.ts" },
+      { ...base, type: "activity_tool_end", event_id: "4", sequence: 4, id: "b", status: "passed" },
+      { ...base, type: "activity_tool_end", event_id: "5", sequence: 5, id: "a", status: "passed" },
     ]);
 
     expect(state.activities[0].items.map((item) => item.id)).toEqual(["a", "b"]);
@@ -161,8 +161,17 @@ describe("agent activity reducer", () => {
         sequence: 2,
         id: "tool-1",
         partial_json: '{"command":"git status"}',
+        complete: true,
       },
-      { ...base, type: "tool_input_delta", event_id: "3", sequence: 3, id: "tool-1", partial_json: "" },
+      {
+        ...base,
+        type: "tool_input_delta",
+        event_id: "3",
+        sequence: 3,
+        id: "tool-1",
+        partial_json: "",
+        complete: true,
+      },
     ]);
 
     expect(state.activities[0].items).toMatchObject([{ id: "tool-1", input: '{"command":"git status"}' }]);
@@ -174,7 +183,15 @@ describe("agent activity reducer", () => {
       { ...base, type: "tool_start", event_id: "1", sequence: 1, id: "tool-1", kind: "bash", name: "Bash", input: "" },
     ]);
     const filled = reduceAgentActivityRecords(started, [
-      { ...base, type: "tool_input_delta", event_id: "2", sequence: 2, id: "tool-1", partial_json: '{"command":"' },
+      {
+        ...base,
+        type: "tool_input_delta",
+        event_id: "2",
+        sequence: 2,
+        id: "tool-1",
+        partial_json: '{"command":"',
+        complete: false,
+      },
       {
         ...base,
         type: "tool_input_delta",
@@ -182,10 +199,38 @@ describe("agent activity reducer", () => {
         sequence: 3,
         id: "tool-1",
         partial_json: '{"command":"git status"}',
+        complete: true,
       },
     ]);
 
     expect(started.activities[0].items).toMatchObject([{ id: "tool-1", input: "" }]);
     expect(filled.activities[0].items).toMatchObject([{ id: "tool-1", input: '{"command":"git status"}' }]);
+  });
+
+  it("prefers canonical input and ignores incomplete provider JSON", () => {
+    const base = { schema_version: 2, activity_id: "activity-1", provider: "claude" } as const;
+    const state = reduceAgentActivityRecords(emptyAgentActivityState, [
+      { ...base, type: "tool_start", event_id: "1", sequence: 1, id: "tool-1", kind: "bash", name: "Bash" },
+      {
+        ...base,
+        type: "tool_input_delta",
+        event_id: "2",
+        sequence: 2,
+        id: "tool-1",
+        partial_json: '{"command":"git',
+        complete: false,
+      },
+      {
+        ...base,
+        type: "tool_input_delta",
+        event_id: "3",
+        sequence: 3,
+        id: "tool-1",
+        input: "git status",
+        complete: true,
+      },
+    ]);
+
+    expect(state.activities[0].items).toMatchObject([{ id: "tool-1", input: "git status" }]);
   });
 });

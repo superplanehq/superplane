@@ -3,7 +3,6 @@ import type { FactoriesFactoryPullRequestMergeability, FactoryPullRequestMergeab
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "./useWorkOrderChecks";
 import { factoryQueryKeys } from "./useFactoryData";
 import { invalidateFactoryWorkOrderQueries } from "./useFactoryWebsocket";
 
@@ -29,10 +28,6 @@ export function useFactoryPullRequestMergeability(
       return response.data?.mergeability ?? {};
     },
     enabled: Boolean(organizationId && factoryId && pullRequestId) && (options?.enabled ?? true),
-    refetchInterval: (query) =>
-      query.state.data?.blockedReason === "BLOCKED_REASON_CHECKS_UNFINISHED"
-        ? ANALYZING_WORK_ORDER_CHECKS_POLL_MS
-        : false,
   });
 }
 

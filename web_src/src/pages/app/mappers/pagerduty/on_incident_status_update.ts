@@ -40,7 +40,7 @@ interface OnIncidentStatusUpdateEventData {
  */
 export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data?.data as OnIncidentStatusUpdateEventData;
+    const eventData = (context.event?.data as { data?: OnIncidentStatusUpdateEventData } | undefined)?.data;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
     const subtitle = buildSubtitle(truncate(statusUpdate?.message, 50), context.event?.createdAt);
@@ -52,7 +52,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data?.data as OnIncidentStatusUpdateEventData;
+    const eventData = (context.event?.data as { data?: OnIncidentStatusUpdateEventData } | undefined)?.data;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
 

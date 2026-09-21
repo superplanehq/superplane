@@ -45,6 +45,25 @@ func wrapReleaseScopeError(err error) error {
 	return err
 }
 
+// IsRetryableAPIError reports whether the consumer should nack the message
+// so Tackle redelivers it. Rate limits, request timeouts, server errors,
+// and transport failures retry. Client errors such as 401, 403, and 404
+// do not.
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var sentryAPIError *apiError
+	if !errors.As(err, &sentryAPIError) {
+		return true
+	}
+
+	return sentryAPIError.StatusCode == http.StatusTooManyRequests ||
+		sentryAPIError.StatusCode == http.StatusRequestTimeout ||
+		sentryAPIError.StatusCode >= http.StatusInternalServerError
+}
+
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
@@ -202,6 +221,7 @@ type Issue struct {
 	Title         string         `json:"title" mapstructure:"title"`
 	Count         string         `json:"count" mapstructure:"count"`
 	Status        string         `json:"status" mapstructure:"status"`
+	Substatus     string         `json:"substatus" mapstructure:"substatus"`
 	Priority      string         `json:"priority" mapstructure:"priority"`
 	HasSeen       bool           `json:"hasSeen" mapstructure:"hasSeen"`
 	IsPublic      bool           `json:"isPublic" mapstructure:"isPublic"`
@@ -259,7 +279,7 @@ type IssueEventDetail struct {
 	Culprit     string            `json:"culprit" mapstructure:"culprit"`
 	Type        string            `json:"type" mapstructure:"type"`
 	WebURL      string            `json:"web_url" mapstructure:"web_url"`
-	Release     string            `json:"release" mapstructure:"release"`
+	Release     IssueEventRelease `json:"release" mapstructure:"release"`
 	Tags        []IssueTag        `json:"tags" mapstructure:"tags"`
 	User        map[string]any    `json:"user" mapstructure:"user"`
 	Contexts    map[string]any    `json:"contexts" mapstructure:"contexts"`
@@ -272,6 +292,50 @@ type IssueEventDetail struct {
 type IssueEventEntry struct {
 	Type string         `json:"type" mapstructure:"type"`
 	Data map[string]any `json:"data" mapstructure:"data"`
+}
+
+// IssueEventRelease is a Sentry event release. GET .../events/{id}/ returns
+// either a version string or a release object. A type mismatch must not fail
+// the whole event decode.
+type IssueEventRelease struct {
+	Version string
+}
+
+func (r IssueEventRelease) String() string {
+	return r.Version
+}
+
+func (r *IssueEventRelease) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
+		r.Version = ""
+		return nil
+	}
+
+	if data[0] == '"' {
+		var version string
+		if err := json.Unmarshal(data, &version); err != nil {
+			return err
+		}
+		r.Version = version
+		return nil
+	}
+
+	if data[0] != '{' {
+		r.Version = ""
+		return nil
+	}
+
+	var obj struct {
+		Version      string `json:"version"`
+		ShortVersion string `json:"shortVersion"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+
+	r.Version = firstNonEmpty(obj.ShortVersion, obj.Version)
+	return nil
 }
 
 func (e *IssueEventDetail) HasStack() bool {
@@ -746,14 +810,27 @@ func (c *Client) ListIssues() ([]Issue, error) {
 }
 
 func (c *Client) ListNewestUnresolvedIssues(project string, limit int) ([]Issue, error) {
+	return c.SearchUnresolvedIssues(project, "", limit)
+}
+
+// SearchUnresolvedIssues lists unresolved issues newest first. A non-empty
+// query is appended to the Sentry search, which matches the issue title,
+// message, and culprit.
+func (c *Client) SearchUnresolvedIssues(project, query string, limit int) ([]Issue, error) {
 	if limit <= 0 {
 		limit = newestUnresolvedIssueLimit
 	}
 
+	search := "is:unresolved"
+	if query = strings.TrimSpace(query); query != "" {
+		search += " " + query
+	}
+	encodedQuery := url.QueryEscape(search)
+
 	path := fmt.Sprintf(
 		"/api/0/organizations/%s/issues/?query=%s&limit=%d",
 		url.PathEscape(c.orgSlug),
-		url.QueryEscape("is:unresolved"),
+		encodedQuery,
 		limit,
 	)
 	if project = strings.TrimSpace(project); project != "" {
@@ -761,7 +838,7 @@ func (c *Client) ListNewestUnresolvedIssues(project string, limit int) ([]Issue,
 			"/api/0/projects/%s/%s/issues/?query=%s&limit=%d",
 			url.PathEscape(c.orgSlug),
 			url.PathEscape(project),
-			url.QueryEscape("is:unresolved"),
+			encodedQuery,
 			limit,
 		)
 	}

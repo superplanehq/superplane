@@ -1673,18 +1673,16 @@ export function AppPage({
       setRemoteCanvasUpdatePending,
     });
 
-  const { isConnected: canvasWebsocketConnected } = useCanvasWebsocket(
-    canvasId!,
-    organizationId!,
-    handleNodeWebsocketEvent,
-    undefined,
-    undefined,
-    handleCanvasLifecycleEvent,
+  const { isConnected: canvasWebsocketConnected } = useCanvasWebsocket({
+    canvasId: canvasId!,
+    organizationId: organizationId!,
+    onNodeEvent: handleNodeWebsocketEvent,
+    onCanvasLifecycleEvent: handleCanvasLifecycleEvent,
     shouldApplyCanvasUpdate,
-    isViewingLiveVersion,
-    true,
-    handleCanvasStagingEvent,
-  );
+    processRuntimeEvents: isViewingLiveVersion,
+    enabled: true,
+    onCanvasStagingEvent: handleCanvasStagingEvent,
+  });
   canvasWebsocketConnectedRef.current = canvasWebsocketConnected;
   const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents, !dataLoading);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
@@ -1885,7 +1883,7 @@ export function AppPage({
         setLastSavedWorkflowSnapshot(targetWorkflow);
 
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         showErrorToast(displayMessage);
@@ -2153,7 +2151,7 @@ export function AppPage({
   const handleNodeConfigurationSave = useCallback(
     async (
       nodeId: string,
-      updatedConfiguration: Record<string, any>,
+      updatedConfiguration: Record<string, unknown>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
       concurrency?: ComponentsConcurrencySpec,

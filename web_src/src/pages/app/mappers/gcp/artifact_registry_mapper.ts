@@ -10,7 +10,13 @@ import type {
 } from "../types";
 import { baseMapper } from "./base";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getArtifactOutputPayload, getArtifactData, artifactShortName } from "./artifact_registry";
+import {
+  getArtifactOutputPayload,
+  getArtifactData,
+  artifactShortName,
+  type ArtifactVersionData,
+  type GetArtifactAnalysisData,
+} from "./artifact_registry";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 
 export const getArtifactMapper: ComponentBaseMapper = {
@@ -24,34 +30,35 @@ export const getArtifactMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
+    const data = getArtifactData<ArtifactVersionData>(context.execution);
+    const metadata = data?.metadata;
     const details: Record<string, string> = {};
 
     if (payload?.timestamp) {
       details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const dockerUri = buildDockerUri(data?.metadata?.name as string | undefined);
+    const dockerUri = buildDockerUri(metadata?.name);
     if (dockerUri) {
       details["Image"] = dockerUri;
     }
 
     if (data?.createTime) {
-      const formatted = formatDateTime(data.createTime as string);
+      const formatted = formatDateTime(data.createTime);
       if (formatted) details["Image Created At"] = formatted;
     }
 
     if (data?.updateTime) {
-      const formatted = formatDateTime(data.updateTime as string);
+      const formatted = formatDateTime(data.updateTime);
       if (formatted) details["Image Updated At"] = formatted;
     }
 
-    const sizeBytes = data?.metadata?.imageSizeBytes;
+    const sizeBytes = metadata?.imageSizeBytes;
     if (sizeBytes) {
       details["Size"] = formatBytes(Number(sizeBytes));
     }
 
-    const digest = artifactShortName(data?.name as string | undefined);
+    const digest = artifactShortName(data?.name);
     if (digest) {
       details["Digest"] = digest;
     }
@@ -76,7 +83,7 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
+    const data = getArtifactData<GetArtifactAnalysisData>(context.execution);
     const details: Record<string, string> = {};
 
     if (payload?.timestamp) {
@@ -84,11 +91,11 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     }
 
     if (data?.resourceUri) {
-      details["Image"] = String(data.resourceUri);
+      details["Image"] = data.resourceUri;
     }
 
     if (data?.scanStatus) {
-      details["Scan Status"] = String(data.scanStatus);
+      details["Scan Status"] = data.scanStatus;
     }
 
     if (typeof data?.vulnerabilities === "number") {
@@ -139,7 +146,7 @@ function formatBytes(bytes: number): string {
 }
 
 function artifactActionMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const config = (node.configuration as Record<string, unknown> | undefined) ?? {};
   const inputMode = String(config.inputMode || "url").toLowerCase();
   const metadata: MetadataItem[] = [];
 

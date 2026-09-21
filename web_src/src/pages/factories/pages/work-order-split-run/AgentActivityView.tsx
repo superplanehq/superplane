@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { commandDisplayText, isCommandTool, toolInputPreview, toolLineLabel } from "@/lib/agentToolLabels";
+import { agentToolDisplayText, isCommandTool } from "@/lib/agentToolLabels";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
@@ -156,8 +156,7 @@ function ToolLine({ tool }: { tool: AgentToolItem }) {
     return <CommandLine tool={tool} />;
   }
 
-  const label = toolLineLabel(tool);
-  const input = toolInputPreview(tool);
+  const label = agentToolDisplayText(tool);
   return (
     <div
       className={cn(
@@ -167,18 +166,15 @@ function ToolLine({ tool }: { tool: AgentToolItem }) {
       data-testid={`agent-tool-${tool.id}`}
       data-status={tool.status}
     >
-      <span className="shrink-0">{label}</span>
-      {input ? (
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] opacity-80" title={input}>
-          {input}
-        </span>
-      ) : null}
+      <span className="min-w-0 flex-1 truncate" title={label}>
+        {label}
+      </span>
     </div>
   );
 }
 
 function CommandLine({ tool }: { tool: AgentToolItem }) {
-  const command = commandDisplayText(tool.input) ?? "Command";
+  const command = agentToolDisplayText(tool);
   return (
     <div className="flex min-w-0 items-center px-1 py-0.5">
       <code

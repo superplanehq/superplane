@@ -94,6 +94,18 @@ describe("WorkOrderCard source icon", () => {
     expect(icon).toHaveAttribute("aria-label", "Sentry exceptions");
   });
 
+  it("keeps the Sentry chip after the intake is gone", () => {
+    renderCard({
+      ...baseOrder,
+      origin: { url: "https://acme.sentry.io/issues/1", label: "ISSUE-1" },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon).toHaveAttribute("href", "https://acme.sentry.io/issues/1");
+    expect(icon.querySelector("img")).toHaveAttribute("src", sentryIcon);
+    expect(icon).toHaveAttribute("aria-label", "Sentry exceptions ISSUE-1");
+  });
+
   it("renders a SuperPlane source mark for a manual task", () => {
     renderCard({ ...baseOrder, state: "STATE_DRAFT" });
 

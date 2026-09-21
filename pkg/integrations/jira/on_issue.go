@@ -1,7 +1,6 @@
 package jira
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -233,7 +232,8 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 
 	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection.
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+		Events:   []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+		Projects: []string{project.Key},
 	})
 }
 
@@ -256,25 +256,40 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	payload := IssueWebhookPayload{}
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+	payloads, err := unmarshalWebhookPayloads[IssueWebhookPayload](ctx.Body)
+	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
+	for i := range payloads {
+		if err := t.emitMatchingIssueEvent(ctx, config, metadata, payloads[i]); err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+	}
+
+	return http.StatusOK, nil, nil
+}
+
+func (t *OnIssue) emitMatchingIssueEvent(
+	ctx core.WebhookRequestContext,
+	config OnIssueConfiguration,
+	metadata OnIssueMetadata,
+	payload IssueWebhookPayload,
+) error {
 	action, ok := issueEventAction(payload.WebhookEvent)
 	if !ok {
 		ctx.Logger.Infof("Ignoring event - unsupported webhookEvent %q", payload.WebhookEvent)
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	if !slices.Contains(config.Events, action) {
 		ctx.Logger.Infof("Ignoring event - action %q is not configured", action)
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	if payload.Issue == nil {
 		ctx.Logger.Info("Ignoring event - missing issue")
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	// The webhook is shared by every jira.onIssue trigger on the integration (see
@@ -284,7 +299,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	// neither source is present.
 	if metadata.Project != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.Project.Key) {
 		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.Project.Key)
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	issue := payload.Issue
@@ -293,7 +308,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	if action != "deleted" && issueFieldsIncomplete(issue) {
 		fullIssue, err := loadIssueForWebhook(ctx, issue.Key)
 		if err != nil {
-			return http.StatusInternalServerError, nil, err
+			return err
 		}
 		if fullIssue != nil {
 			issue = fullIssue
@@ -301,12 +316,11 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	event := NewIssueEvent(action, issue, payload.User, payload.Changelog, siteURLFromIntegration(ctx.Integration))
-
 	if err := ctx.Events.Emit(IssueEventPayloadType, event); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
+		return fmt.Errorf("error emitting event: %w", err)
 	}
 
-	return http.StatusOK, nil, nil
+	return nil
 }
 
 // Cleanup does nothing: the shared Jira webhook registered via RequestWebhook is torn down by

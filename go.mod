@@ -29,7 +29,6 @@ require (
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/mxschmitt/playwright-go v0.6100.0
 	github.com/nulab/autog v0.11.0
-	github.com/pierrecomputer/sdk/packages/code-storage-go v0.8.0
 	github.com/renderedtext/go-tackle v0.0.0-20251117195301-3a303949d759
 	github.com/resend/resend-go/v3 v3.0.0
 	github.com/robfig/cron/v3 v3.0.1

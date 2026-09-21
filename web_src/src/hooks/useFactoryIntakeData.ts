@@ -88,6 +88,8 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       confidencePct?: number;
       integrationId?: string;
       resourceId?: string;
+      skipInitialImport?: boolean;
+      settings?: FactoriesFactoryIntakeSettings;
     }) => {
       const response = await factoriesCreateFactoryIntake(
         withOrganizationHeader({
@@ -99,6 +101,8 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
             confidencePct: input.confidencePct,
             integrationId: input.integrationId,
             resourceId: input.resourceId,
+            skipInitialImport: input.skipInitialImport,
+            settings: input.settings,
           },
         }),
       );
@@ -141,7 +145,14 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { intakeId: string; name?: string; settings?: FactoriesFactoryIntakeSettings }) => {
+    mutationFn: async (input: {
+      intakeId: string;
+      name?: string;
+      settings?: FactoriesFactoryIntakeSettings;
+      paused?: boolean;
+      integrationId?: string;
+      resourceId?: string;
+    }) => {
       const response = await factoriesUpdateFactoryIntake(
         withOrganizationHeader({
           organizationId,
@@ -149,6 +160,9 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
           body: {
             name: input.name,
             settings: input.settings,
+            paused: input.paused,
+            integrationId: input.integrationId,
+            resourceId: input.resourceId,
           },
         }),
       );

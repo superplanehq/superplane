@@ -114,6 +114,8 @@ const WorkspaceOverviewPage = lazyNamed(() => import("./pages/factories"), "Work
 const ChecksPRFeedbackSetupPage = lazyNamed(() => import("./pages/factories"), "ChecksPRFeedbackSetupPage");
 const DiscussionPRFeedbackSetupPage = lazyNamed(() => import("./pages/factories"), "DiscussionPRFeedbackSetupPage");
 const SentryIntakeSetupPage = lazyNamed(() => import("./pages/factories"), "SentryIntakeSetupPage");
+const JiraIntakeSetupPage = lazyNamed(() => import("./pages/factories"), "JiraIntakeSetupPage");
+const ProductiveIntakeSetupPage = lazyNamed(() => import("./pages/factories"), "ProductiveIntakeSetupPage");
 const LegacyFactoryOrganizationSettingsRedirect = lazyNamed(
   () => import("./pages/factories/pages/settings/FactorySettingsRedirects"),
   "LegacyFactoryOrganizationSettingsRedirect",
@@ -195,6 +197,8 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+              <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
+              <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
             </Route>
             <Route path="automations">
               <Route index element={<AutomationsPage />} />
