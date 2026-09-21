@@ -178,9 +178,10 @@ describe("queryLogsMapper", () => {
     const longQuery = "{app=" + "a".repeat(100) + "}";
     const node = makeNode("queryLogs", { dataSource: "loki", query: longQuery });
     const details = queryLogsMapper.getExecutionDetails(makeExecutionContext(node));
+    const query = details["Query"] as string;
 
-    expect(details["Query"].length).toBeLessThanOrEqual(83); // 80 + "..."
-    expect(details["Query"].endsWith("...")).toBe(true);
+    expect(query.length).toBeLessThanOrEqual(83); // 80 + "..."
+    expect(query.endsWith("...")).toBe(true);
   });
 
   it("returns '0' log lines when outputs is undefined", () => {
@@ -233,9 +234,10 @@ describe("queryTracesMapper", () => {
     const longQuery = "{ .service.name = " + '"' + "x".repeat(100) + '" }';
     const node = makeNode("queryTraces", { dataSource: "tempo", query: longQuery });
     const details = queryTracesMapper.getExecutionDetails(makeExecutionContext(node));
+    const query = details["Query"] as string;
 
-    expect(details["Query"].length).toBeLessThanOrEqual(83);
-    expect(details["Query"].endsWith("...")).toBe(true);
+    expect(query.length).toBeLessThanOrEqual(83);
+    expect(query.endsWith("...")).toBe(true);
   });
 
   it("returns '0' traces when outputs is undefined", () => {

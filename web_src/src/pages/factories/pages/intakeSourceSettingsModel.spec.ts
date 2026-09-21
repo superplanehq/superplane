@@ -3,10 +3,13 @@ import { describe, expect, it } from "bun:test";
 import {
   addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
+  intakeSupportsPause,
+  jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
 } from "./intakeSourceSettingsModel";
@@ -74,6 +77,31 @@ describe("intakeSourceSettingsModel", () => {
     });
   });
 
+  it("round-trips the Jira completion column through the API shape", () => {
+    const settings = intakeSettingsFromApi("Jira issues", {
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "QA",
+    });
+
+    expect(settings.jiraMoveOnComplete).toBe(false);
+    expect(settings.jiraCompletionColumn).toBe("QA");
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "",
+    });
+  });
+
+  it("defaults the Jira completion move on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Jira issues", {});
+
+    expect(settings.jiraMoveOnComplete).toBe(true);
+    expect(settings.jiraCompletionColumn).toBe("");
+    expect(jiraCompletionSettingsToApi(settings)).toEqual({
+      jiraMoveOnComplete: true,
+      jiraCompletionColumn: "",
+    });
+  });
+
   it("keeps the new and re-opened toggles apart", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {
       newIssues: true,
@@ -90,5 +118,42 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
     expect(settings.superplaneLabelAdded).toBe(true);
+  });
+
+  it("round-trips Sentry events and levels through the API shape", () => {
+    const settings = intakeSettingsFromApi("Sentry exceptions", {
+      sentryNewIssues: false,
+      sentryRegressedIssues: true,
+      sentryAssignedIssues: true,
+      sentryLevels: ["error", "unknown", "fatal"],
+    });
+
+    expect(settings.sentryNewIssues).toBe(false);
+    expect(settings.sentryRegressedIssues).toBe(true);
+    expect(settings.sentryAssignedIssues).toBe(true);
+    expect(settings.sentryLevels).toEqual(["fatal", "error"]);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      sentryNewIssues: false,
+      sentryRegressedIssues: true,
+      sentryAssignedIssues: true,
+      sentryLevels: ["fatal", "error"],
+    });
+  });
+
+  it("defaults Sentry events on when the API omits them", () => {
+    const settings = intakeSettingsFromApi("Sentry exceptions", {});
+
+    expect(settings.sentryNewIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues);
+    expect(settings.sentryRegressedIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues);
+    expect(settings.sentryAssignedIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues);
+    expect(settings.sentryLevels).toEqual([]);
+  });
+
+  it("offers pause for Sentry and Jira intakes only", () => {
+    expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
+    expect(intakeSupportsPause("jira-issues")).toBe(true);
+    expect(intakeSupportsPause("github-issues")).toBe(false);
+    expect(intakeSupportsPause("productive-tasks")).toBe(false);
+    expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
   });
 });

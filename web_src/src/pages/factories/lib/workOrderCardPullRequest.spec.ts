@@ -72,10 +72,28 @@ describe("workOrderCardPullRequestVisibleLabel", () => {
 });
 
 describe("visibleWorkOrderCardAttentionReasons", () => {
+  it("hides Status checks passed when the pull request is mergeable", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(["approval", "checksPassed"], {
+        pullRequest: pr({ mergeable: true }),
+        extraCount: 0,
+      }),
+    ).toEqual([]);
+  });
+
   it("hides Waiting for user review when the shown pull request is open", () => {
     expect(
       visibleWorkOrderCardAttentionReasons(["approval", "checksPassed"], { pullRequest: pr(), extraCount: 0 }),
     ).toEqual(["checksPassed"]);
+  });
+
+  it("hides Waiting for user review when the shown pull request is merged", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(["approval", "stalled"], {
+        pullRequest: pr({ state: "STATE_MERGED" }),
+        extraCount: 0,
+      }),
+    ).toEqual(["stalled"]);
   });
 
   it("keeps Needs attention and review when the pull request is not open", () => {

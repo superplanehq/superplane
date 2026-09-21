@@ -2,6 +2,7 @@ package factories
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -138,16 +139,27 @@ func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	return automation
 }
 
-func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+func serializeFactoryIntakes(
+	tx *gorm.DB,
+	intakes []models.FactoryIntake,
+	specs map[uuid.UUID]models.LiveCanvasSpec,
+	states map[string]string,
+) []*pb.FactoryIntake {
 	result := make([]*pb.FactoryIntake, len(intakes))
 	for i := range intakes {
-		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+		result[i] = serializeFactoryIntake(tx, &intakes[i], specs[intakes[i].CanvasID], states)
 	}
 	return result
 }
 
-func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+func serializeFactoryIntake(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	spec models.LiveCanvasSpec,
+	states map[string]string,
+) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
+	health := intakeHealth(tx, intake, graph, spec, states)
 
 	serialized := &pb.FactoryIntake{
 		Id:                  intake.ID.String(),
@@ -155,11 +167,15 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		CanvasId:            intake.CanvasID.String(),
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
-		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
-		Healthy:             graph.Healthy(spec.Edges),
+		Settings:            serializeIntakeSettings(intake.Source, intakeSettingsFromGraph(intake.Source, graph, spec)),
+		Healthy:             health == pb.FactoryIntake_HEALTH_OK,
+		Health:              health,
+		IntegrationId:       graph.TriggerIntegrationID(spec),
+		ResourceId:          graph.TriggerResourceID(spec),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
+		Paused:              intake.Paused(),
 	}
 	if intake.InitialImportItemCount != nil {
 		itemCount := int32(*intake.InitialImportItemCount)
@@ -171,6 +187,35 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	}
 
 	return serialized
+}
+
+func intakeIntegrationStates(tx *gorm.DB, orgID uuid.UUID) (map[string]string, error) {
+	states := map[string]string{}
+	if tx == nil || orgID == uuid.Nil {
+		return states, nil
+	}
+
+	integrations, err := models.ListIntegrations(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range integrations {
+		states[integrations[i].ID.String()] = integrations[i].State
+	}
+	return states, nil
+}
+
+func configurationString(value any) string {
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {
@@ -384,6 +429,44 @@ func serializeWorkOrder(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
+	}, nil
+}
+
+func serializeWorkOrderSummary(
+	f *models.Factory,
+	order *models.FactoryWorkOrder,
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	createdByAutomation *factory.AutomationRef,
+	usage workOrderUsageView,
+) (*pb.WorkOrderSummary, error) {
+	statusNotes, err := serializeWorkOrderStatusNotes(order)
+	if err != nil {
+		return nil, err
+	}
+
+	displayKey := ""
+	if f != nil {
+		displayKey = f.WorkOrderKey(order.Number)
+	}
+
+	return &pb.WorkOrderSummary{
+		Id:                   order.ID.String(),
+		Title:                order.Title,
+		Description:          order.Description,
+		Number:               order.Number,
+		Key:                  displayKey,
+		State:                serializeWorkOrderState(order.State),
+		Result:               serializeWorkOrderResult(order.Result),
+		CreatedAt:            timestamppb.New(order.CreatedAt),
+		UpdatedAt:            timestamppb.New(order.UpdatedAt),
+		Assignees:            serializeWorkOrderAssignees(order.Assignees),
+		LineDispatches:       serializeWorkOrderLineDispatches(dispatches, nil),
+		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
+		TotalTokens:          usage.Totals.TotalTokens,
+		TotalCostCents:       usage.Totals.CostCents(),
+		TotalDurationSeconds: usage.Totals.DurationSeconds,
+		StatusNotes:          statusNotes,
+		Origin:               serializeWorkOrderOrigin(order),
 	}, nil
 }
 

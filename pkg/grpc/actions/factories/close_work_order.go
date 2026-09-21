@@ -57,7 +57,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	publishWorkOrderClosed(orgID, factory, order, closedBy, fromState, result, wasClosed)
+	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
 
 	order, err = factory.FindWorkOrder(db, orderID)
 	if err != nil {
@@ -78,7 +78,7 @@ func publishWorkOrderClosed(
 	orgID uuid.UUID,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
-	closedBy uuid.UUID,
+	closedBy *uuid.UUID,
 	fromState string,
 	result string,
 	wasClosed bool,
@@ -101,10 +101,12 @@ func publishWorkOrderClosed(
 		FactoryID:      factory.ID.String(),
 		OrderID:        order.ID.String(),
 		EventType:      factoryevents.EventTypeOrderStatusUpdated,
-		ActorUserID:    closedBy.String(),
 		FromState:      fromState,
 		ToState:        models.FactoryWorkOrderStateClosed,
 		Result:         result,
+	}
+	if closedBy != nil {
+		notification.ActorUserID = closedBy.String()
 	}
 	if err := notification.Publish(); err != nil {
 		logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)

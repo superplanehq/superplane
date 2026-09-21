@@ -1,13 +1,8 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import jiraIcon from "@/assets/icons/integrations/jira.svg";
-import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -24,8 +19,6 @@ import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPr
 import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
-import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
 
@@ -55,10 +48,6 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
-  /** Opens guided Sentry intake setup. Hidden when unset. */
-  onSetupSentry?: () => void;
-  /** Opens guided Jira intake setup. Hidden when unset. */
-  onSetupJira?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
   /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
@@ -97,8 +86,6 @@ export function BacklogColumn({
   analyzingOrderIds,
   intakePanel,
   onAddIntake,
-  onSetupSentry,
-  onSetupJira,
   automations,
   automationRowCount,
   onAutomationRowAction,
@@ -161,7 +148,7 @@ export function BacklogColumn({
           onRowAction: onAutomationRowAction,
           testId: "lines-backlog-automation-rows",
         })}
-        banner={<BacklogColumnBanner panel={intakePanel} onSetupSentry={onSetupSentry} onSetupJira={onSetupJira} />}
+        banner={<BacklogColumnBanner panel={intakePanel} />}
         testId="lines-backlog-column"
       >
         <BacklogColumnOrderList
@@ -236,68 +223,18 @@ function BacklogColumnHeaderActions({
   );
 }
 
-function BacklogColumnBanner({
-  panel,
-  onSetupSentry,
-  onSetupJira,
-}: {
-  panel?: BacklogIntakePanel;
-  onSetupSentry?: () => void;
-  onSetupJira?: () => void;
-}) {
-  if (!panel && !onSetupSentry && !onSetupJira) {
+function BacklogColumnBanner({ panel }: { panel?: BacklogIntakePanel }) {
+  if (!panel) {
     return null;
   }
 
   return (
-    <>
-      {panel ? (
-        <BacklogIntakeSources
-          intakes={panel.sources}
-          showAddIntake={panel.showAddIntake}
-          onOpenSettings={panel.onOpenSettings}
-          onAddIntake={panel.onAddIntake}
-        />
-      ) : null}
-      {onSetupSentry ? <BacklogSetupSentryButton onClick={onSetupSentry} /> : null}
-      {onSetupJira ? <BacklogSetupJiraButton onClick={onSetupJira} /> : null}
-    </>
-  );
-}
-
-function BacklogSetupSentryButton({ onClick }: { onClick: () => void }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      data-testid="lines-backlog-setup-sentry"
-      className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
-    >
-      <img
-        src={sentryIcon}
-        alt=""
-        className={cn("size-3.5 shrink-0 object-contain", logoDarkInvertClass(sentryIcon))}
-      />
-      {SENTRY_INTAKE_SETUP_COPY.setupButton}
-    </Button>
-  );
-}
-
-function BacklogSetupJiraButton({ onClick }: { onClick: () => void }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      data-testid="lines-backlog-setup-jira"
-      className="mb-2 h-8 w-full justify-start gap-2 px-2 text-[12px] font-medium tracking-[-0.01em]"
-    >
-      <img src={jiraIcon} alt="" className="size-3.5 shrink-0 object-contain" />
-      {JIRA_INTAKE_SETUP_COPY.setupButton}
-    </Button>
+    <BacklogIntakeSources
+      intakes={panel.sources}
+      showAddIntake={panel.showAddIntake}
+      onOpenSettings={panel.onOpenSettings}
+      onAddIntake={panel.onAddIntake}
+    />
   );
 }
 

@@ -76,8 +76,8 @@ export const listNotesMapper: ComponentBaseMapper = {
     return renderWithTimeAgo("no notes", date);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, string> = {};
 
     // Add "Checked at" timestamp
     if (context.execution.createdAt) {

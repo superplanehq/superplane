@@ -18,6 +18,25 @@ interface GetPipelineConfiguration {
   pipelineId?: string;
 }
 
+type GetPipelinePayload = {
+  ppl_id?: string;
+  name?: string;
+  wf_id?: string;
+  state?: string;
+  result?: string;
+  result_reason?: string;
+  branch_name?: string;
+  commit_sha?: string;
+  commit_message?: string;
+  yaml_file_name?: string;
+  working_directory?: string;
+  project_id?: string;
+  created_at?: string;
+  done_at?: string;
+  running_at?: string;
+  error_description?: string;
+};
+
 export const getPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -45,10 +64,10 @@ export const getPipelineMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const outputs = context.execution.outputs as { default?: { data?: any }[] } | undefined;
-    const payload = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, unknown> = {};
+    const outputs = context.execution.outputs as { default?: { data?: unknown }[] } | undefined;
+    const payload = outputs?.default?.[0]?.data as GetPipelinePayload | undefined;
 
     if (!payload || typeof payload !== "object") {
       return details;

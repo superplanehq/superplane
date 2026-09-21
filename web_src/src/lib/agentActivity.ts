@@ -85,6 +85,27 @@ export type AgentActivityState = {
 
 export const emptyAgentActivityState: AgentActivityState = { activities: [], seenEventIds: new Set() };
 
+export function parseAgentActivityRecordText(text: string): AgentActivityRecord | undefined {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) {
+    return undefined;
+  }
+  try {
+    const record = JSON.parse(trimmed) as AgentActivityRecord;
+    if (
+      record.schema_version !== 2 ||
+      typeof record.type !== "string" ||
+      !record.type ||
+      (typeof record.activity_id !== "string" && typeof record.event_id !== "string")
+    ) {
+      return undefined;
+    }
+    return record;
+  } catch {
+    return undefined;
+  }
+}
+
 export function reduceAgentActivityRecords(
   state: AgentActivityState,
   records: AgentActivityRecord[],
@@ -195,6 +216,15 @@ function newAgentActivity(id: string, provider?: string, turn?: number, startedA
   };
 }
 
+const activityRecordTypeAliases: Readonly<Record<string, string>> = {
+  activity_tool_start: "tool_start",
+  activity_tool_end: "tool_end",
+};
+
+function normalizedActivityRecordType(type?: string): string | undefined {
+  return type ? (activityRecordTypeAliases[type] ?? type) : type;
+}
+
 function applyActivityRecord(activity: AgentActivity, record: AgentActivityRecord): AgentActivity {
   const withSequence = {
     ...activity,
@@ -202,7 +232,7 @@ function applyActivityRecord(activity: AgentActivity, record: AgentActivityRecor
     turn: record.turn ?? activity.turn,
     sequence: Math.max(activity.sequence, record.sequence ?? 0),
   };
-  switch (record.type) {
+  switch (normalizedActivityRecordType(record.type)) {
     case "activity_start":
       return { ...withSequence, status: "running", startedAtMs: record.started_at ?? activity.startedAtMs };
     case "activity_end":
@@ -293,18 +323,19 @@ function updateToolInput(activity: AgentActivity, record: AgentActivityRecord): 
     item.type === "tool"
       ? {
           ...item,
-          input: nextToolInput(item.input, record.partial_json),
+          input: nextToolInput(item.input, record),
           truncated: item.truncated || Boolean(record.truncated),
         }
       : item,
   );
 }
 
-function nextToolInput(current: string, partialJson: string | undefined): string {
-  if (partialJson == null || partialJson === "") {
+function nextToolInput(current: string, record: AgentActivityRecord): string {
+  const input = record.input ?? (record.complete ? record.partial_json : undefined);
+  if (!input) {
     return current;
   }
-  return partialJson;
+  return input;
 }
 
 function endTool(activity: AgentActivity, record: AgentActivityRecord): AgentActivity {

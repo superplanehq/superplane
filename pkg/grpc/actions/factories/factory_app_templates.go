@@ -19,6 +19,7 @@ const (
 	factoryTemplateMetadataKey = models.FactoryAppTemplateMetadataKey
 	factoryTemplateVersion     = 1
 	factoryCanvasIDPlaceholder = "__FACTORY_CANVAS_ID__"
+	implementationAgentNodeID  = "implementation-agent-no-issue"
 )
 
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
@@ -70,11 +71,12 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 }
 
 type factoryTemplateInput struct {
-	appID         string
-	appName       string
-	installParams map[string]string
-	integrations  map[string]factoryTemplateIntegration
-	agent         *factoryTemplateAgent
+	appID                 string
+	appName               string
+	installParams         map[string]string
+	integrations          map[string]factoryTemplateIntegration
+	agent                 *factoryTemplateAgent
+	includeVisualEvidence *bool
 }
 
 type factoryTemplateIntegration struct {
@@ -181,6 +183,7 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		}
 		rewriteFactoryIntegrationNames(node.Configuration, input.integrations)
 		rewriteFactoryAgent(node, input.agent)
+		applyFactoryVisualEvidence(node, input.includeVisualEvidence)
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
 			if node.Metadata == nil {
@@ -211,6 +214,16 @@ func rewriteFactoryIntegrationNames(value any, integrations map[string]factoryTe
 			rewriteFactoryIntegrationNames(child, integrations)
 		}
 	}
+}
+
+func applyFactoryVisualEvidence(node *yaml.Node, includeVisualEvidence *bool) {
+	if includeVisualEvidence == nil || node.Configuration == nil {
+		return
+	}
+	if _, ok := node.Configuration["includeVisualEvidence"]; !ok {
+		return
+	}
+	node.Configuration["includeVisualEvidence"] = *includeVisualEvidence
 }
 
 func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
@@ -329,12 +342,14 @@ func deriveFactoryTemplateInput(
 	version *models.CanvasVersion,
 	template factoryAppTemplate,
 ) factoryTemplateInput {
+	includeVisualEvidence := canvasAgentIncludesVisualEvidence(version.Nodes)
 	input := factoryTemplateInput{
-		appID:         canvas.ID.String(),
-		appName:       canvas.Name,
-		installParams: deriveFactoryInstallParams(version.Nodes),
-		integrations:  map[string]factoryTemplateIntegration{},
-		agent:         resetFactoryTemplateAgent(tx, factory, version.Nodes),
+		appID:                 canvas.ID.String(),
+		appName:               canvas.Name,
+		installParams:         deriveFactoryInstallParams(version.Nodes),
+		integrations:          map[string]factoryTemplateIntegration{},
+		agent:                 resetFactoryTemplateAgent(tx, factory, version.Nodes),
+		includeVisualEvidence: &includeVisualEvidence,
 	}
 	for _, node := range version.Nodes {
 		integrationType := template.componentIntegrations[node.ComponentName()]
@@ -587,12 +602,27 @@ func materializeBacklogDefaults(
 	}, nil
 }
 
+func canvasAgentIncludesVisualEvidence(nodes []models.Node) bool {
+	node := findIntakeNode(nodes, implementationAgentNodeID)
+	if node == nil {
+		return false
+	}
+	value, ok := node.Configuration["includeVisualEvidence"].(bool)
+	return ok && value
+}
+
+func isFactoryAgentHarness(component string) bool {
+	switch component {
+	case models.SuperPlaneRunnerComponent, "runnerClaudeCode", "runnerCodex", "runnerOpenRouter":
+		return true
+	default:
+		return false
+	}
+}
+
 func intakeAgentFromCanvasNodes(nodes []models.Node) *intakeAgent {
 	for _, node := range nodes {
-		if node.ComponentName() != models.SuperPlaneRunnerComponent &&
-			node.ComponentName() != "runnerClaudeCode" &&
-			node.ComponentName() != "runnerCodex" &&
-			node.ComponentName() != "runnerOpenRouter" {
+		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
@@ -657,7 +687,7 @@ func prFeedbackVisualEvidenceEnabled(graph prFeedbackGraph, spec models.LiveCanv
 			return true
 		}
 	}
-	return false
+	return prFeedbackNodeBool(findIntakeNode(spec.Nodes, graph.RunnerNodeID), "includeVisualEvidence", false)
 }
 
 func prFeedbackResetMaximumAttempts(handler *models.FactoryPRFeedbackHandler) int {

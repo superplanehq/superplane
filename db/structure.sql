@@ -436,6 +436,7 @@ CREATE TABLE public.factory_intakes (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     initial_import_status character varying(32) DEFAULT 'unspecified'::character varying NOT NULL,
     initial_import_item_count integer,
+    paused_at timestamp with time zone,
     CONSTRAINT factory_intakes_initial_import_count_valid CHECK (((((initial_import_status)::text = 'completed'::text) AND (initial_import_item_count IS NOT NULL) AND (initial_import_item_count >= 0)) OR (((initial_import_status)::text <> 'completed'::text) AND (initial_import_item_count IS NULL)))),
     CONSTRAINT factory_intakes_initial_import_status_valid CHECK (((initial_import_status)::text = ANY ((ARRAY['unspecified'::character varying, 'pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
@@ -631,6 +632,11 @@ CREATE TABLE public.factory_pull_requests (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     current_revision_id uuid,
     active_mutation_run_id uuid,
+    mergeable boolean DEFAULT false NOT NULL,
+    merge_blocked_reason text DEFAULT ''::text NOT NULL,
+    merge_blocked_message text DEFAULT ''::text NOT NULL,
+    mergeable_head_sha text DEFAULT ''::text NOT NULL,
+    mergeable_allowed_methods text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
 );
@@ -1075,22 +1081,6 @@ CREATE TABLE public.organizations (
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
-);
-
-
---
--- Name: repositories; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.repositories (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
-    provider text NOT NULL,
-    repo_id text NOT NULL,
-    status character varying(64) DEFAULT 'pending'::character varying NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2117,22 +2107,6 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: repositories repositories_canvas_id_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_canvas_id_provider_repo_id_key UNIQUE (canvas_id, provider, repo_id);
-
-
---
--- Name: repositories repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
-
-
---
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3070,13 +3044,6 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
-
-
---
--- Name: idx_repositories_canvas_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
 
 
 --
@@ -4200,22 +4167,6 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: repositories repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
--- Name: repositories repositories_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4615,7 +4566,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918231901	f
+20260921141323	f
 \.
 
 

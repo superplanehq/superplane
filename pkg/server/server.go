@@ -26,8 +26,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/git"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -122,7 +120,6 @@ func startWorkers(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
-	gitProvider gitprovider.Provider,
 	baseURL string,
 	authService authorization.Authorization,
 	agentProvider agents.Provider,
@@ -136,6 +133,8 @@ func startWorkers(
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
+		startFactorySentryResolveConsumer(rabbitMQURL, encryptor, registry)
+		startFactoryJiraCloseConsumer(rabbitMQURL, encryptor, registry, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -148,7 +147,7 @@ func startWorkers(
 	if os.Getenv("START_RUN_FINALIZER") == "yes" {
 		log.Println("Starting Run Finalizer")
 
-		w := workers.NewRunFinalizer(rabbitMQURL, registry)
+		w := workers.NewRunFinalizer(rabbitMQURL, registry).WithEncryptor(encryptor)
 		go w.Start(context.Background())
 	}
 
@@ -156,7 +155,7 @@ func startWorkers(
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -171,7 +170,7 @@ func startWorkers(
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -199,7 +198,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -231,7 +230,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker(gitProvider, agentProvider)
+		w := workers.NewCanvasCleanupWorker(agentProvider)
 		go w.Start(context.Background())
 	}
 
@@ -239,12 +238,6 @@ func startWorkers(
 		log.Println("Starting Node Request Cleanup Worker")
 
 		w := workers.NewNodeRequestCleanupWorker()
-		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
-		log.Println("Starting Repository Provisioner")
-		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
 		go w.Start(context.Background())
 	}
 
@@ -280,7 +273,7 @@ func startWorkers(
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
+		w := workers.NewOrganizationCleanupWorker(agentProvider)
 		go w.Start(context.Background())
 	}
 
@@ -317,7 +310,6 @@ func startWorkers(
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
 			Encryptor:         encryptor,
 			ComponentRegistry: registry,
-			GitProvider:       gitProvider,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
 			UsageService:      getOptionalWorkerUsageService(),
@@ -375,13 +367,33 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go factoryNotificationConsumer.Start()
 }
 
+func startFactorySentryResolveConsumer(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	componentRegistry *registry.Registry,
+) {
+	log.Println("Starting Factory Sentry Resolve Consumer")
+	consumer := workers.NewFactorySentryResolveConsumer(rabbitMQURL, encryptor, componentRegistry)
+	go consumer.Start()
+}
+
+func startFactoryJiraCloseConsumer(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	componentRegistry *registry.Registry,
+	baseURL string,
+) {
+	log.Println("Starting Factory Jira Close Consumer")
+	consumer := workers.NewFactoryJiraCloseConsumer(rabbitMQURL, encryptor, componentRegistry, baseURL)
+	go consumer.Start()
+}
+
 func buildGRPCServices(
 	baseURL, webhooksBaseURL string,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
-	gitProvider gitprovider.Provider,
 	agentService agentsActions.AgentsService,
 ) (*grpc.Services, error) {
 	usageService, err := usage.NewServiceFromEnv()
@@ -396,7 +408,6 @@ func buildGRPCServices(
 		AuthService:     authService,
 		Registry:        registry,
 		OIDCProvider:    oidcProvider,
-		GitProvider:     gitProvider,
 		AgentService:    agentService,
 		UsageService:    usageService,
 	})
@@ -409,7 +420,6 @@ func startPublicAPI(
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
-	gitProvider gitprovider.Provider,
 	grpcServices *grpc.Services,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
@@ -428,7 +438,6 @@ func startPublicAPI(
 		registry,
 		jwtSigner,
 		oidcProvider,
-		gitProvider,
 		basePath,
 		baseURL,
 		webhooksBaseURL,
@@ -636,12 +645,6 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	log.Println("Creating Git Provider")
-	gitProvider, err := git.NewProvider()
-	if err != nil {
-		panic(fmt.Sprintf("failed to create git provider: %v", err))
-	}
-
 	log.Println("Creating blob storage provider")
 	blobProvider, err := newBlobProvider()
 	if err != nil {
@@ -702,7 +705,6 @@ func Start() {
 			authService,
 			registry,
 			oidcProvider,
-			gitProvider,
 			agentService,
 		)
 		if err != nil {
@@ -718,7 +720,6 @@ func Start() {
 			jwtSigner,
 			oidcProvider,
 			authService,
-			gitProvider,
 			grpcServices,
 		)
 	}
@@ -727,7 +728,6 @@ func Start() {
 		encryptorInstance,
 		registry,
 		oidcProvider,
-		gitProvider,
 		baseURL,
 		authService,
 		agentProvider,

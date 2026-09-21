@@ -3,8 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { SentryIntakeSetupDialog } from "./SentryIntakeSetupDialog";
-import { SENTRY_INTAKE_SEED_SIZE, SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
@@ -13,9 +14,6 @@ const mocks = vi.hoisted(() => ({
     metadata: { id: string; name: string; integrationName: string };
     status: { state: string };
   }>,
-  issues: [] as Array<{ id: string; name: string }>,
-  issuesError: false,
-  refetchIssues: vi.fn(),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -30,25 +28,15 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
   useAvailableIntegrations: () => ({ data: [{ name: "sentry", label: "Sentry" }] }),
   useCreateIntegration: () => ({ mutateAsync: mocks.createIntegration, reset: vi.fn() }),
-  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => {
-    if (resourceType === "unresolved-issue") {
-      return {
-        data: mocks.issues,
-        isLoading: false,
-        isError: mocks.issuesError,
-        refetch: mocks.refetchIssues,
-      };
-    }
-    return {
-      data: [
-        { id: "payments", name: "Payments" },
-        { id: "growth", name: "Growth" },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-  },
+  useIntegrationResources: () => ({
+    data: [
+      { id: "payments", name: "Payments" },
+      { id: "growth", name: "Growth" },
+    ],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("@/ui/IntegrationCreateDialog", () => ({
@@ -81,9 +69,6 @@ describe("SentryIntakeSetupDialog", () => {
         },
       },
     });
-    mocks.issues.splice(0);
-    mocks.issuesError = false;
-    mocks.refetchIssues.mockReset();
     mocks.connected.splice(0, mocks.connected.length, {
       metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" },
       status: { state: "ready" },
@@ -101,13 +86,9 @@ describe("SentryIntakeSetupDialog", () => {
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
       "listens for new issues",
     );
-    expect(screen.getByTestId("sentry-setup-preview-listen")).toHaveTextContent(
-      SENTRY_INTAKE_SETUP_COPY.wizardPreviewListening,
-    );
-    expect(screen.getByTestId("sentry-setup-preview-caption")).toHaveTextContent(
-      SENTRY_INTAKE_SETUP_COPY.wizardPreviewCaptionNoProject,
-    );
-    expect(screen.getAllByText(SENTRY_INTAKE_SETUP_COPY.wizardPreviewImporting)).toHaveLength(SENTRY_INTAKE_SEED_SIZE);
+    expect(screen.getByTestId("sentry-intake-setup-stepper")).toBeInTheDocument();
+    expect(screen.getByTestId("sentry-intake-setup-sphere")).toBeInTheDocument();
+    expect(screen.queryByTestId("sentry-setup-preview")).not.toBeInTheDocument();
   });
 
   it("creates a bound intake after a project is chosen", async () => {
@@ -127,9 +108,30 @@ describe("SentryIntakeSetupDialog", () => {
       });
     });
     expect(onCreated).toHaveBeenCalled();
-    expect(screen.getByTestId("sentry-setup-preview-caption")).toHaveTextContent(
-      SENTRY_INTAKE_SETUP_COPY.wizardPreviewCaption,
-    );
+  });
+
+  it("creates a bound intake without importing existing issues", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await screen.findByTestId("sentry-project-payments");
+    expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
+    expect(screen.getByTestId("sentry-skip-initial-import")).not.toBeChecked();
+    await user.click(screen.getByTestId("sentry-skip-initial-import"));
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
+    await user.click(screen.getByTestId("sentry-project-payments"));
+    await user.click(screen.getByTestId("sentry-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        integrationId: "integration-1",
+        resourceId: "payments",
+        skipInitialImport: true,
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
   });
 
   it("filters the project list by name", async () => {
@@ -163,7 +165,7 @@ describe("SentryIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(await screen.findByTestId("sentry-setup-back"));
+    await user.click(await screen.findByTestId("first-run-back"));
     await user.click(await screen.findByTestId("sentry-connection-integration-2"));
     await user.click(screen.getByTestId("sentry-setup-continue"));
 
@@ -189,19 +191,6 @@ describe("SentryIntakeSetupDialog", () => {
 
     expect(screen.getByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
     expect(screen.getByTestId("sentry-project-payments")).toBeInTheDocument();
-  });
-
-  it("keeps the project list and shows an issue-load error after a project is chosen", async () => {
-    mocks.issuesError = true;
-    const user = userEvent.setup();
-    renderDialog();
-
-    await user.click(await screen.findByTestId("sentry-project-payments"));
-
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardIssuesError)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: SENTRY_INTAKE_SETUP_COPY.wizardRetry }));
-    expect(mocks.refetchIssues).toHaveBeenCalled();
-    expect(screen.getByTestId("sentry-setup-finish")).toBeEnabled();
   });
 
   it("shows the create fallback when SuperPlane returns internal error", async () => {

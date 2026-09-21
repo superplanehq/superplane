@@ -7,14 +7,16 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
+  FactoriesWorkOrderSummary,
   FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
-import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
 import {
   FEATURE_FACTORY_CREATE_WITH_AGENT,
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -28,6 +30,8 @@ import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
   factoryHomePath,
+  factoryJiraIntakeSetupPath,
+  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -51,14 +55,30 @@ import {
   BOARD_IMPLEMENT_NOTIFY_ORDER,
 } from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
+import { DEFAULT_CHECKS_BY_ORDER_ID } from "../__fixtures__/workOrderCheckFixtures";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
-import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
+import { ADD_INTAKE_COPY } from "./lineIntakeModel";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
+
+function withBoardChecks(orders: FactoriesWorkOrder[]): FactoriesWorkOrderSummary[] {
+  return orders.map((order) => {
+    const checks = DEFAULT_CHECKS_BY_ORDER_ID[order.id ?? ""] ?? order.checks;
+    return {
+      ...order,
+      checkScores: checks?.map((check) => ({
+        key: check.key,
+        name: check.name,
+        score: check.score,
+        maxScore: check.maxScore,
+      })),
+    };
+  });
+}
 
 const LANE_BANNERS: FactoryPreviewFlags = { addIntakeControl: false, columnAutomations: false };
 const ICON_VIEW: FactoryPreviewFlags = {
@@ -86,7 +106,8 @@ function renderLinesBoard(
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
-const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
+const useWorkOrder = vi.fn(() => ({ data: undefined as FactoriesWorkOrder | undefined }));
 const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
@@ -144,7 +165,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
       return updateLineIsPending.value;
     },
   }),
-  useWorkOrder: () => ({ data: undefined }),
+  useWorkOrder: () => useWorkOrder(),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => useFactoryPullRequests(),
@@ -163,6 +184,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useDeleteFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
   useRefreshBacklog: () => ({ mutateAsync: refreshBacklogMutateAsync, isPending: false }),
@@ -210,20 +232,6 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
-const useWorkOrderChecks = vi.hoisted(() =>
-  vi.fn(
-    (
-      _organizationId: string,
-      _factoryId: string,
-      _orderId: string,
-      _options?: { enabled?: boolean; refetchInterval?: number | false },
-    ) => ({
-      data: [] as unknown[],
-      refetch: vi.fn(),
-    }),
-  ),
-);
-
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
@@ -244,11 +252,6 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
-vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks,
-  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
-}));
-
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
   useWorkOrderPlanningActivity: () => ({
@@ -265,21 +268,12 @@ vi.mock("./useWorkOrderPlanningSurvey", () => ({
   ],
 }));
 
-vi.mock("./ProductiveIntakeSetupDialog", () => ({
-  ProductiveIntakeSetupDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="productive-intake-setup" /> : null,
-}));
-
-vi.mock("./JiraIntakeSetupDialog", () => ({
-  JiraIntakeSetupDialog: ({ open }: { open: boolean }) => (open ? <div data-testid="jira-intake-setup" /> : null),
-}));
-
 async function resetLinesBoardMocks() {
-  const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
   window.localStorage.clear();
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useWorkOrder.mockReturnValue({ data: undefined });
   useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryAutomations.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
@@ -292,18 +286,6 @@ async function resetLinesBoardMocks() {
   importFactoryIntakeItem.mockReset();
   refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
-  useWorkOrderChecks.mockReset();
-  useWorkOrderChecks.mockImplementation(
-    (
-      _organizationId: string,
-      _factoryId: string,
-      orderId: string,
-      options?: { enabled?: boolean; refetchInterval?: number | false },
-    ) => ({
-      data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
-      refetch: vi.fn(),
-    }),
-  );
   useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
     if (options?.enabled === false) {
       return { data: undefined, isPending: false, isError: false };
@@ -340,23 +322,23 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
-  it("loads checks only for draft cards that can show a score", () => {
+  it("shows a score on a draft card and hides it on other columns", () => {
+    const draft = withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS)[0];
     useFactoryWorkOrders.mockReturnValue({
-      data: [...REVIEW_CANDIDATE_WORK_ORDERS, BOARD_IMPLEMENT_FAILED_ORDER],
+      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checkScores: draft.checkScores }],
     });
     renderLinesBoard();
 
-    const fetchedIds = useWorkOrderChecks.mock.calls
-      .filter(([, , orderId, options]) => Boolean(orderId) && options?.enabled !== false)
-      .map(([, , orderId]) => orderId);
-
-    expect(fetchedIds).toContain("wo-review-pay-842");
-    expect(fetchedIds).not.toContain("wo-board-implement-failed");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
   });
 
   it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
-    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const [candidate] = REVIEW_CANDIDATE_WORK_ORDERS;
+    useFactoryWorkOrders.mockReturnValue({ data: withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS) });
+    useWorkOrder.mockReturnValue({
+      data: { ...candidate, checks: DEFAULT_CHECKS_BY_ORDER_ID[candidate.id ?? ""] },
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -412,13 +394,6 @@ describe("LinesPage board", () => {
     try {
       const user = userEvent.setup();
       renderLinesBoard();
-
-      expect(
-        useWorkOrderChecks.mock.calls.some(
-          ([, , orderId, options]) =>
-            orderId === analyzingOrderId && options?.refetchInterval === ANALYZING_WORK_ORDER_CHECKS_POLL_MS,
-        ),
-      ).toBe(true);
 
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
@@ -1027,12 +1002,12 @@ describe("LinesPage board extras", () => {
     });
   });
 
-  it("hides the overflow-menu Add intake entry when the feature is off", async () => {
+  it("offers Add intake from the overflow menu", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-menu-add-intake")).toBeInTheDocument();
   });
 
   it("offers Refresh backlog when a readable intake exists", async () => {
@@ -1061,20 +1036,44 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 
-  it("opens guided Sentry setup from the overflow menu when the feature is on", async () => {
-    enabledExperimentalFeatures.add("factory_sentry_intake");
+  it("marks flagged intake sources as coming soon when the organization feature is off", async () => {
     const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
+    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
+    await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
+
+    expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
+  });
+
+  it("opens guided Sentry setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_SENTRY_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-improve-ci-runtime")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
 
@@ -1085,66 +1084,68 @@ describe("LinesPage board extras", () => {
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("opens guided Sentry setup from the backlog button when the feature is on", async () => {
-    enabledExperimentalFeatures.add("factory_sentry_intake");
+  it("marks a configured GitHub intake as already set up", async () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByRole("button", { name: SENTRY_INTAKE_SETUP_COPY.setupButton }));
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
-    expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
-    );
+    const github = screen.getByTestId("add-intake-template-github-issues");
+    expect(github).toBeDisabled();
+    expect(github).toHaveTextContent(ADD_INTAKE_COPY.sourceTaken);
   });
 
-  it("hides the backlog Sentry setup button when the feature is off", () => {
+  it("hides the backlog Sentry setup banner", () => {
     renderLinesBoard();
 
     expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-setup-jira")).not.toBeInTheDocument();
   });
 
-  it("hides the backlog Sentry setup button after Sentry intake exists", () => {
-    enabledExperimentalFeatures.add("factory_sentry_intake");
-    useFactoryIntakes.mockReturnValue({
-      data: [
-        {
-          id: SENTRY_INTAKE_ID,
-          canvasId: "app-sentry-intake",
-          name: "Sentry exceptions",
-          source: "SOURCE_SENTRY_EXCEPTIONS",
-          healthy: true,
-        },
-      ],
-    });
-    renderLinesBoard();
-
-    expect(screen.queryByTestId("lines-backlog-setup-sentry")).not.toBeInTheDocument();
-  });
-
-  it("opens guided Jira setup from the overflow menu when the feature is on", async () => {
+  it("opens guided Jira setup from the overflow menu", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-sentry-exceptions")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1`,
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
   });
 
-  it("reopens Jira intake setup when the OAuth return query is present", () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+  it("opens guided Productive.io setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const productive = screen.getByTestId("add-intake-template-productive-tasks");
+    expect(productive).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(productive);
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("sends a legacy Jira OAuth return to the setup page", () => {
     renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
       vi.fn(),
@@ -1153,40 +1154,9 @@ describe("LinesPage board extras", () => {
     );
 
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
-  });
-
-  it("opens guided Productive.io setup from the overflow menu when the feature is on", async () => {
-    enabledExperimentalFeatures.add("factory_productive_intake");
-    const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
-
-    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-sentry-exceptions")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
-    expect(screen.getByTestId("productive-intake-setup")).toBeInTheDocument();
-    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
-  });
-
-  it("offers extra sources when the Sentry, Jira, and Productive.io features are on", async () => {
-    enabledExperimentalFeatures.add("factory_sentry_intake");
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
-    enabledExperimentalFeatures.add("factory_productive_intake");
-    const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
-
-    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, { integrationId: "int-new" }),
+    );
   });
 
   it("shows only declared intakes", () => {

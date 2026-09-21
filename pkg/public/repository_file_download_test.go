@@ -1,8 +1,6 @@
 package public
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -56,7 +53,6 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
@@ -68,50 +64,50 @@ func Test__RepositoryFileDownload(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), nil)
 
 	authenticated := &r.Account.ID
 
 	t.Run("missing path -> bad request", func(t *testing.T) {
-		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "")
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "path is required")
 	})
 
 	t.Run("invalid canvas id -> bad request", func(t *testing.T) {
-		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, "invalid-id", "README.md")
+		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, "invalid-id", "canvas.yaml")
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "Invalid canvas_id")
 	})
 
 	t.Run("unauthenticated -> unauthorized", func(t *testing.T) {
-		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		response := downloadFile(t, server, signer, r.Organization.ID, nil, canvas.ID.String(), "README.md")
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		response := downloadFile(t, server, signer, r.Organization.ID, nil, canvas.ID.String(), "canvas.yaml")
 		assert.Equal(t, http.StatusUnauthorized, response.Code)
 	})
 
 	t.Run("user without canvas access -> forbidden", func(t *testing.T) {
-		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		restrictedAccount, err := models.CreateAccount("restricted@example.com", "Restricted User")
 		require.NoError(t, err)
 		_, err = models.CreateUser(r.Organization.ID, restrictedAccount.ID, restrictedAccount.Email, restrictedAccount.Name)
 		require.NoError(t, err)
 
-		response := downloadFile(t, server, signer, r.Organization.ID, &restrictedAccount.ID, canvas.ID.String(), "README.md")
+		response := downloadFile(t, server, signer, r.Organization.ID, &restrictedAccount.ID, canvas.ID.String(), "canvas.yaml")
 		assert.Equal(t, http.StatusForbidden, response.Code)
 		assert.Contains(t, response.Body.String(), "Unauthorized")
 	})
 
 	t.Run("canvas not found -> not found", func(t *testing.T) {
 		invalidID := uuid.NewString()
-		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, invalidID, "README.md")
+		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, invalidID, "canvas.yaml")
 		assert.Equal(t, http.StatusNotFound, response.Code)
 		assert.Contains(t, response.Body.String(), "Canvas not found")
 	})
 
-	t.Run("repository not found -> not found", func(t *testing.T) {
+	t.Run("non-spec path -> not found", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "README.md")
@@ -119,44 +115,11 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		assert.Contains(t, response.Body.String(), "File not found")
 	})
 
-	t.Run("canvas.yaml without repository -> generated spec", func(t *testing.T) {
+	t.Run("canvas.yaml -> generated spec", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "canvas.yaml")
 		assert.Equal(t, http.StatusOK, response.Code)
 		assert.Contains(t, response.Body.String(), "kind: Canvas")
-	})
-
-	t.Run("git provider error -> internal server error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "missing.txt")
-		assert.Equal(t, http.StatusInternalServerError, response.Code)
-		assert.Contains(t, response.Body.String(), "Failed to read file")
-	})
-
-	t.Run("returns file contents", func(t *testing.T) {
-		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
-		require.NoError(t, err)
-
-		_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, git.CommitOptions{
-			ExpectedHeadSHA: headSHA,
-			Message:         "seed readme",
-			Operations: []git.FileOperation{
-				{
-					Path:      "README.md",
-					Content:   bytes.NewReader([]byte("updated readme")),
-					SizeBytes: 14,
-				},
-			},
-		})
-		require.NoError(t, err)
-
-		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "README.md")
-		assert.Equal(t, http.StatusOK, response.Code)
-		assert.Equal(t, "updated readme", response.Body.String())
-		assert.Equal(t, "application/octet-stream", response.Header().Get("Content-Type"))
-		assert.Equal(t, "nosniff", response.Header().Get("X-Content-Type-Options"))
-		assert.Contains(t, response.Header().Get("Content-Disposition"), "README.md")
 	})
 }

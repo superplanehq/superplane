@@ -62,6 +62,13 @@ type Metadata struct {
 	// scopes. Copied into OpsScopesRequested (and cleared) only after a successful OAuth callback.
 	OpsScopesPending bool `json:"opsScopesPending,omitempty" mapstructure:"opsScopesPending,omitempty"`
 
+	// IssueWebhookScopesRequested records whether the currently stored OAuth token was granted
+	// with read:issue-details:jira. Atlassian will not deliver jira:issue_* webhooks without
+	// that scope, even when manage:jira-webhook lets SuperPlane register the callback. Existing
+	// connections that predate this flag stay Ready and get a reconnect prompt until a
+	// successful callback sets it.
+	IssueWebhookScopesRequested bool `json:"issueWebhookScopesRequested,omitempty" mapstructure:"issueWebhookScopesRequested,omitempty"`
+
 	// HostedOAuth is true when this connection uses SuperPlane's Atlassian OAuth app.
 	HostedOAuth bool `json:"hostedOAuth,omitempty" mapstructure:"hostedOAuth,omitempty"`
 
@@ -216,12 +223,16 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	// Ops features were turned on after this connection's token was granted without those scopes.
-	// Atlassian has no incremental-consent mechanism to add them to an existing grant, so this
-	// stays Ready with its current (narrower) scope in the meantime, and a reconnect prompt is
-	// attached on top rather than blocking the rest of Sync - requestAuthorization only replaces
-	// the browser action just cleared above, it doesn't touch the secrets or state set by Ready().
-	if metadata := readMetadata(ctx.Integration); jsmOpsFeaturesEnabled(ctx.Configuration) && !metadata.OpsScopesRequested {
+	// Ops features were turned on after this connection's token was granted without those scopes,
+	// or the token predates read:issue-details:jira. Atlassian has no incremental-consent
+	// mechanism to add them to an existing grant, so this stays Ready with its current
+	// (narrower) scope in the meantime, and a reconnect prompt is attached on top rather than
+	// blocking the rest of Sync - requestAuthorization only replaces the browser action just
+	// cleared above, it doesn't touch the secrets or state set by Ready().
+	metadata := readMetadata(ctx.Integration)
+	needsReconnect := !metadata.IssueWebhookScopesRequested ||
+		(jsmOpsFeaturesEnabled(ctx.Configuration) && !metadata.OpsScopesRequested)
+	if needsReconnect {
 		return j.requestAuthorization(ctx, app, callbackURL)
 	}
 
@@ -311,7 +322,7 @@ func accessTokenValidity(integration core.IntegrationContext) (time.Duration, bo
 // authorize URL too (see scopeList in client.go) but omitted here since it isn't selectable in
 // the Permissions tab at all.
 const (
-	coreJiraScopesForInstructions    = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`"
+	coreJiraScopesForInstructions    = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`, `read:issue-details:jira`"
 	jsmRequestScopesForInstructions  = "`read:servicedesk-request`, `write:servicedesk-request`"
 	jsmIncidentScopesForInstructions = "`read:incident:jira-service-management`, `write:incident:jira-service-management`"
 	jsmOpsScopesForInstructions      = "`read:ops-alert:jira-service-management`, `write:ops-alert:jira-service-management`, `delete:ops-alert:jira-service-management`, " +
@@ -398,8 +409,13 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, app oauthApp, callback
 		url.QueryEscape(*metadata.State),
 	)
 
+	description := "Click **Continue** to authorize SuperPlane to access your Jira site."
+	if accessToken, _ := findSecret(ctx.Integration, SecretOAuthAccessToken); accessToken != "" && !metadata.IssueWebhookScopesRequested {
+		description = "Click **Continue** to reconnect Jira. SuperPlane needs extra permission to receive issue events."
+	}
+
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: "Click **Continue** to authorize SuperPlane to access your Jira site.",
+		Description: description,
 		URL:         authorizeURL,
 		Method:      "GET",
 	})
@@ -507,6 +523,7 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	// Commit the scopes that were actually on the authorize URL that produced this token.
 	metadata.OpsScopesRequested = metadata.OpsScopesPending
 	metadata.OpsScopesPending = false
+	metadata.IssueWebhookScopesRequested = true
 	ctx.Integration.SetMetadata(metadata)
 
 	if err := ctx.Integration.ScheduleResync(token.GetExpiration()); err != nil {

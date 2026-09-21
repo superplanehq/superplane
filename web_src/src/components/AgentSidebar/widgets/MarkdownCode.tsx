@@ -3,7 +3,7 @@ import { CodeBlockWidget } from "./CodeBlockWidget";
 
 export function MarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
   const match = /language-(\w+)/.exec(className || "");
-  const code = String(children).replace(/\n$/, "");
+  const code = (children == null ? "" : String(children)).replace(/\n$/, "");
 
   if (match) {
     return <CodeBlockWidget code={code} language={match[1]} />;

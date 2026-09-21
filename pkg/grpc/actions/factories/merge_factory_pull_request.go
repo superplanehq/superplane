@@ -33,9 +33,15 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
-	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+	if !cached {
+		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+		}
 	}
 	if !result.CanMerge {
 		message := result.Message
@@ -61,6 +67,21 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
 	}
 
+	if result.Client == nil {
+		client, err := newFactoryGitHubAPI(db, deps, factory)
+		if err != nil {
+			if errors.Is(err, errFactoryGitHubNotConnected) {
+				return nil, factoryErrorToStatus(
+					errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedMissingIntegration)),
+					"failed to merge factory pull request",
+				)
+			}
+			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+		}
+		result.Client = client
+	}
+
+	var closeOutcome *factoryPullRequestCloseResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := assertNoActiveAutomationLocked(tx, factory, pullRequest); err != nil {
 			return err
@@ -76,19 +97,53 @@ func MergeFactoryPullRequest(
 
 		state := models.FactoryPullRequestStateMerged
 		mergedAt := time.Now()
-		return pullRequest.Update(tx, models.FactoryPullRequestPatch{
+		if err := pullRequest.Update(tx, models.FactoryPullRequestPatch{
 			State:    &state,
 			MergedAt: &mergedAt,
-		})
+		}); err != nil {
+			return err
+		}
+
+		outcome, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, true)
+		if err != nil {
+			return err
+		}
+		closeOutcome = outcome
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, errFactoryPullRequestNotMergeable) {
 			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
 		}
 		if isGitHubHeadMovedError(err) {
+			_, _ = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 			return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
 		}
-		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+		message := errFactoryPullRequestNotMergeable.Error()
+		if synced, syncErr := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); syncErr == nil {
+			if !synced.CanMerge && synced.Message != "" {
+				message = synced.Message
+			} else if synced.CanMerge {
+				_ = pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+					BlockedMessage: message,
+					HeadSHA:        pullRequest.MergeableHeadSHA,
+					AllowedMethods: pullRequest.MergeableAllowedMethods,
+				})
+			}
+		}
+		return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(message)), "failed to merge factory pull request")
+	}
+
+	if closeOutcome != nil && closeOutcome.closed {
+		publishWorkOrderClosed(
+			factory.OrganizationID,
+			factory,
+			closeOutcome.order,
+			nil,
+			closeOutcome.fromState,
+			closeOutcome.result,
+			false,
+		)
 	}
 
 	if err := messages.PublishFactoryWorkOrderUpdated(

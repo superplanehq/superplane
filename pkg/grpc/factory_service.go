@@ -5,7 +5,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	actions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -25,7 +24,6 @@ func NewFactoryService(
 	reg *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
-	gitProvider git.Provider,
 	webhookBaseURL string,
 	usageService usage.Service,
 ) *FactoryService {
@@ -35,7 +33,6 @@ func NewFactoryService(
 			Registry:       reg,
 			Encryptor:      encryptor,
 			AuthService:    authService,
-			GitProvider:    gitProvider,
 			WebhookBaseURL: webhookBaseURL,
 			UsageService:   usageService,
 		},
@@ -54,7 +51,7 @@ func (s *FactoryService) CreateFactory(ctx context.Context, req *pb.CreateFactor
 
 func (s *FactoryService) DescribeFactory(ctx context.Context, req *pb.DescribeFactoryRequest) (*pb.DescribeFactoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DescribeFactory(ctx, organizationID, req.GetId())
+	return actions.DescribeFactory(ctx, s.intakeDeps, organizationID, req.GetId())
 }
 
 func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactoryRequest) (*pb.UpdateFactoryResponse, error) {
@@ -64,7 +61,7 @@ func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactor
 
 func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.UpdateFactoryOnboardingRequest) (*pb.UpdateFactoryOnboardingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateFactoryOnboarding(ctx, organizationID, req)
+	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
@@ -169,7 +166,7 @@ func (s *FactoryService) DescribeFactoryPullRequest(ctx context.Context, req *pb
 
 func (s *FactoryService) CreateFactoryPullRequest(ctx context.Context, req *pb.CreateFactoryPullRequestRequest) (*pb.CreateFactoryPullRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreateFactoryPullRequest(ctx, organizationID, req)
+	return actions.CreateFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryPullRequest(ctx context.Context, req *pb.UpdateFactoryPullRequestRequest) (*pb.UpdateFactoryPullRequestResponse, error) {
@@ -276,11 +273,6 @@ func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.De
 func (s *FactoryService) SyncFactoryVelocity(ctx context.Context, req *pb.SyncFactoryVelocityRequest) (*pb.SyncFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SyncFactoryVelocity(ctx, organizationID, req)
-}
-
-func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListWorkOrderChecks(ctx, organizationID, req)
 }
 
 func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.DescribeFactoryUsageRequest) (*pb.DescribeFactoryUsageResponse, error) {

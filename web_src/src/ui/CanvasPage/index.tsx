@@ -139,10 +139,7 @@ export interface SidebarData {
   isComposite?: boolean;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type --
-   Having a specific type allows us to extend it with additional properties without breaking consumers.
- */
-export interface CanvasNode extends ReactFlowNode {}
+export type CanvasNode = ReactFlowNode;
 
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;

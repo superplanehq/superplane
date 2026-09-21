@@ -1,8 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { Predicate } from "../utils";
-import { formatPredicate, stringOrDash } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate, stringOrDash } from "../eventDisplay";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { TriggerProps } from "@/ui/trigger";
 import type { BaseNodeMetadata } from "./types";
@@ -98,10 +98,10 @@ export const onCheckRunTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnCheckRunEventData;
+      const { title, subtitle } = onCheckRunTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
-        title: checkRunTitle(eventData),
-        subtitle: buildGithubSubtitle(checkRunResult(eventData), lastEvent.createdAt),
+        title,
+        subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,
@@ -132,24 +132,39 @@ function appendCheckRunConfigurationMetadata(
   configuration?: OnCheckRunConfiguration,
 ): void {
   appendJoinedMetadata(metadataItems, "circle-check", configuration?.statuses);
-  if (configuration?.conclusions && configuration.conclusions.length > 0) {
-    metadataItems.push({ icon: "funnel", label: `conclusion ${configuration.conclusions.join(", ")}` });
-  }
-
-  if (configuration?.names && configuration.names.length > 0) {
-    metadataItems.push({ icon: "funnel", label: `name ${configuration.names.map(formatPredicate).join(", ")}` });
-  }
-
-  if (configuration?.branches && configuration.branches.length > 0) {
-    metadataItems.push({
-      icon: "git-branch",
-      label: `branch ${configuration.branches.map(formatPredicate).join(", ")}`,
-    });
-  }
+  appendPrefixedList(metadataItems, "funnel", "conclusion", configuration?.conclusions);
+  appendPrefixedPredicates(metadataItems, "funnel", "name", configuration?.names);
+  appendPrefixedPredicates(metadataItems, "git-branch", "branch", configuration?.branches);
 
   if (configuration?.pullRequestsOnly) {
     metadataItems.push({ icon: "git-pull-request", label: "pull requests only" });
   }
+}
+
+function appendPrefixedList(
+  metadataItems: MetadataItem[],
+  icon: string,
+  prefix: string,
+  values: string[] | undefined,
+): void {
+  if (!values || values.length === 0) {
+    return;
+  }
+
+  metadataItems.push({ icon, label: `${prefix} ${values.join(", ")}` });
+}
+
+function appendPrefixedPredicates(
+  metadataItems: MetadataItem[],
+  icon: string,
+  prefix: string,
+  predicates: Predicate[] | undefined,
+): void {
+  if (!predicates || predicates.length === 0) {
+    return;
+  }
+
+  metadataItems.push({ icon, label: `${prefix} ${predicates.map(formatPredicate).join(", ")}` });
 }
 
 function appendJoinedMetadata(metadataItems: MetadataItem[], icon: string, values: string[] | undefined): void {

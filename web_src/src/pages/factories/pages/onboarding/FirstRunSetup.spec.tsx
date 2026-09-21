@@ -35,6 +35,20 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
+    data: [
+      { id: "todo", name: "To Do" },
+      { id: "qa", name: "QA" },
+      { id: "done", name: "Done" },
+    ],
+    isLoading: false,
+    isError: false,
+    isPending: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 // The install-request recheck and the in-place bind need a query client and
 // the network; the flow tests cover the screens only.
 vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
@@ -100,6 +114,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraIntegrationId: "",
     jiraProjectId: "",
     setJiraProjectId: vi.fn(),
+    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
+    setJiraCompletion: vi.fn(),
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,

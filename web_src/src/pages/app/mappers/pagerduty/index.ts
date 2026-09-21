@@ -12,7 +12,7 @@ import { listIncidentsMapper, LIST_INCIDENTS_STATE_REGISTRY } from "./list_incid
 import { listNotesMapper } from "./list_notes";
 import { listLogEntriesMapper } from "./list_log_entries";
 import { snoozeIncidentMapper } from "./snooze_incident";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIncident: createIncidentMapper,

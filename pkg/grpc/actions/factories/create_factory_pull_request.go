@@ -13,6 +13,7 @@ import (
 
 func CreateFactoryPullRequest(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.CreateFactoryPullRequestRequest,
 ) (*pb.CreateFactoryPullRequestResponse, error) {
@@ -53,6 +54,16 @@ func CreateFactoryPullRequest(
 		factoryevents.EventTypeOrderPullRequestAdded,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if pullRequest.Provider == models.FactoryPullRequestProviderGitHub {
+		ScheduleFactoryPullRequestMergeabilityRefresh(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			pullRequest.ID,
+		)
 	}
 
 	serialized, err := serializeFactoryPullRequests(db, []models.FactoryPullRequest{*pullRequest})

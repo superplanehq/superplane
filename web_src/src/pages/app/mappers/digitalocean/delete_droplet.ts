@@ -15,6 +15,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { DropletNodeMetadata, DeleteDropletConfiguration } from "./types";
+import type { DeleteDropletResult } from "./droplet_payloads";
 
 export const deleteDropletMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -33,7 +34,7 @@ export const deleteDropletMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -41,7 +42,7 @@ export const deleteDropletMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as DeleteDropletResult | undefined;
     if (!result) return details;
 
     details["Droplet ID"] = result.dropletId?.toString() || "-";

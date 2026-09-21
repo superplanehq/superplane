@@ -24,7 +24,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/git/inmemory"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -107,8 +106,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
 	oidcProvider := support.NewOIDCProvider()
-	gitProvider := inmemory.NewProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -129,8 +127,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
-	gitProvider := inmemory.NewProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -201,11 +198,10 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
-	gitProvider := inmemory.NewProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
-	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider, gitProvider, nil)
+	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider, nil)
 
 	response := execRequest(server, requestParams{
 		method: "GET",
@@ -226,7 +222,6 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
@@ -280,6 +275,102 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 	eventCount, err := models.CountCanvasEvents(database.Conn(), canvas.ID, nodeID)
 	require.NoError(t, err)
 	assert.Zero(t, eventCount)
+}
+
+func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	secret := []byte("webhook-secret")
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), secret, []byte(webhookID.String()))
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: encrypted,
+		Configuration: datatypes.NewJSONType(any(map[string]any{
+			"eventTypes":          []string{"check_run"},
+			"repository":          "acme/app",
+			"factoryMergeability": true,
+		})),
+		AppInstallationID: &integration.ID,
+	}).Error)
+
+	body := []byte(`{"repository":{"full_name":"acme/app"},"check_run":{"head_sha":"abc","pull_requests":[{"number":1}]}}`)
+	accepted := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event":      "check_run",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, body),
+		},
+	})
+	require.Equal(t, http.StatusOK, accepted.Code)
+
+	unsigned := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
+	})
+	require.Equal(t, http.StatusForbidden, unsigned.Code)
+
+	pingBody := []byte(`{"zen":"Keep it logically awesome."}`)
+	ping := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   pingBody,
+		headers: map[string]string{
+			"X-GitHub-Event":      "ping",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, pingBody),
+		},
+	})
+	require.Equal(t, http.StatusOK, ping.Code)
+
+	plainID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     plainID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+	rejected := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + plainID.String(),
+		body:   []byte(`{"ok":true}`),
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
+	})
+	require.Equal(t, http.StatusNotFound, rejected.Code)
 }
 
 type canvasesGatewayStubServer struct {
@@ -372,6 +463,7 @@ type requestParams struct {
 	authCookie   string
 	contentType  string
 	customSource bool
+	headers      map[string]string
 }
 
 func execRequest(server *Server, params requestParams) *httptest.ResponseRecorder {
@@ -396,6 +488,10 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 
 	if params.authCookie != "" {
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: params.authCookie})
+	}
+
+	for key, value := range params.headers {
+		req.Header.Set(key, value)
 	}
 
 	res := httptest.NewRecorder()
@@ -439,7 +535,6 @@ func Test__CreateInitialWorkspaceRequiresHostedGitHubApp(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"localhost",
 		"",
@@ -476,7 +571,6 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"localhost",
 		"",
@@ -561,7 +655,6 @@ func Test__CreateInitialWorkspaceReusesPendingOrganization(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"localhost",
 		"",
@@ -625,7 +718,6 @@ func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"localhost",
 		"",
@@ -697,7 +789,6 @@ func Test__OrganizationCreationSerializesLimitChecks(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"localhost",
 		"",
@@ -768,8 +859,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		gitProvider := inmemory.NewProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, gitProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, nil, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, nil, false)
 		require.NoError(t, err)
 
 		//
@@ -820,8 +910,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		gitProvider := inmemory.NewProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, gitProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
 		require.NoError(t, err)
 
 		//
@@ -884,8 +973,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		gitProvider := inmemory.NewProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, gitProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
 		require.NoError(t, err)
 
 		body, err := json.Marshal(OrganizationCreationRequest{Name: "Duplicate Organization"})
@@ -957,7 +1045,6 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		gitProvider := inmemory.NewProvider()
 		usageService := &fakePublicUsageService{
 			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
 				Allowed: false,
@@ -975,7 +1062,6 @@ func Test__CreateOrganization(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
-			gitProvider,
 			"",
 			"localhost",
 			"",
@@ -1034,7 +1120,6 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
-			inmemory.NewProvider(),
 			"",
 			"localhost",
 			"",
@@ -1100,7 +1185,6 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
-			inmemory.NewProvider(),
 			"",
 			"localhost",
 			"",
@@ -1153,7 +1237,6 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
-			inmemory.NewProvider(),
 			"",
 			"localhost",
 			"",

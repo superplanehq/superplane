@@ -121,7 +121,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a Sentry exception is reported.",
 		triggerComponent:     "sentry.onIssue",
 		triggerName:          "On Issue Event",
-		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
+		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		analysisSubject:      "Sentry exception",
 		createTitle:          "{{ root().data.data.issue.title }}",
 		createDescription:    "{{ root().data.description }}",
@@ -205,6 +205,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Type:          yaml.NodeTypeTrigger,
 			Component:     spec.triggerComponent,
 			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Metadata:      intakeTriggerMetadata(request.Source, request.Settings),
 			Integration:   request.Binding.integrationRef(),
 			Position:      yaml.Position{X: 160, Y: 80},
 		},
@@ -213,10 +214,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	createY := 260
 
 	if intakeSourceHasFilterNode(request.Source) {
-		settings := defaultIntakeSettings()
-		if request.Source == models.FactoryIntakeSourceJiraIssues {
-			settings = defaultJiraIntakeSettings()
-		}
+		settings := intakeSettingsOrDefault(request.Source, request.Settings)
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
@@ -270,6 +268,49 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 func intakeConcurrency() *yaml.ConcurrencySpec {
 	max := intakeConcurrencyMax
 	return &yaml.ConcurrencySpec{Max: &max}
+}
+
+func ensureIntakeFilterNode(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+) ([]models.Node, []models.Edge, intakeGraph, error) {
+	if graph.FilterNodeID != "" {
+		return nodes, edges, graph, nil
+	}
+	if graph.TriggerNodeID == "" || graph.CreateNodeID == "" {
+		return nil, nil, graph, fmt.Errorf("intake automation has no filter to update")
+	}
+
+	nodes = upsertIntakeNode(nodes, models.Node{
+		ID:   intakeFilterNodeID,
+		Name: "Matches filters?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": "true",
+		},
+		Position:    models.Position{X: 160, Y: 260},
+		Concurrency: intakeModelConcurrency(),
+	})
+	graph.FilterNodeID = intakeFilterNodeID
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.TriggerNodeID && edge.TargetID == graph.CreateNodeID
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: graph.TriggerNodeID,
+		TargetID: intakeFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, graph, nil
 }
 
 func configureIntakeAuthorAccess(
@@ -395,6 +436,26 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	}
 
 	return configuration
+}
+
+func intakeTriggerMetadata(source string, settings intakeSettings) map[string]any {
+	if source != models.FactoryIntakeSourceJiraIssues {
+		return nil
+	}
+	return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
+}
+
+func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {
+	if settings.ConfidencePct != 0 {
+		return settings
+	}
+	if source == models.FactoryIntakeSourceJiraIssues {
+		return defaultJiraIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		return defaultSentryIntakeSettings()
+	}
+	return defaultIntakeSettings()
 }
 
 // intakeAnalysisConfiguration sets the machine, checkout, and steps. BYOK

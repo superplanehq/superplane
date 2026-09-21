@@ -18,6 +18,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   const [step, setStep] = useState<SentrySetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
@@ -28,13 +29,6 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
-  const issuesQuery = useIntegrationResources(
-    organizationId,
-    integrationId,
-    "unresolved-issue",
-    projectId ? { project: projectId } : undefined,
-    { enabled: Boolean(integrationId && projectId) },
-  );
 
   useEffect(() => {
     if (!integrationId && sentryIntegrations.length === 1) {
@@ -88,6 +82,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
         source: "SOURCE_SENTRY_EXCEPTIONS",
         integrationId,
         resourceId: projectId,
+        ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
     } catch (cause) {
@@ -103,6 +98,8 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     setIntegrationId,
     projectId,
     setProjectId,
+    skipInitialImport,
+    setSkipInitialImport,
     connectOpen,
     setConnectOpen,
     connecting,
@@ -111,7 +108,6 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     createIntegration,
     createIntake,
     projectsQuery,
-    issuesQuery,
     sentryIntegrations,
     sentryDefinition,
     existingNames,

@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -36,6 +38,7 @@ const (
 type RunFinalizer struct {
 	logger      *log.Entry
 	registry    *registry.Registry
+	encryptor   crypto.Encryptor
 	rabbitMQURL string
 }
 
@@ -44,6 +47,18 @@ func NewRunFinalizer(rabbitMQURL string, registry *registry.Registry) *RunFinali
 		logger:      log.WithFields(log.Fields{"worker": "RunFinalizer"}),
 		registry:    registry,
 		rabbitMQURL: rabbitMQURL,
+	}
+}
+
+func (w *RunFinalizer) WithEncryptor(encryptor crypto.Encryptor) *RunFinalizer {
+	w.encryptor = encryptor
+	return w
+}
+
+func (w *RunFinalizer) factoryIntakeDeps() factoryactions.IntakeDependencies {
+	return factoryactions.IntakeDependencies{
+		Registry:  w.registry,
+		Encryptor: w.encryptor,
 	}
 }
 
@@ -358,6 +373,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	var skippedAsFinished bool
 	var nextFactoryLineRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
+	var mergeabilityRefresh *factoryPullRequestMergeabilityRefresh
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
@@ -374,7 +390,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 			return nil
 		}
 
-		activityUpdate, err := finalizePullRequestActivityForRun(tx, runID)
+		activityUpdate, activityMergeability, err := finalizePullRequestActivityForRun(tx, runID)
 		if err != nil {
 			return err
 		}
@@ -386,6 +402,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		if activityUpdate != nil {
 			factoryOrderUpdates = append(factoryOrderUpdates, *activityUpdate)
 		}
+		mergeabilityRefresh = activityMergeability
 		return nil
 	})
 
@@ -443,6 +460,16 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		); err != nil {
 			w.logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
 		}
+	}
+
+	if mergeabilityRefresh != nil {
+		factoryactions.ScheduleFactoryPullRequestMergeabilityRefresh(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			mergeabilityRefresh.organizationID,
+			mergeabilityRefresh.factoryID,
+			mergeabilityRefresh.pullRequestID,
+		)
 	}
 
 	return nil
@@ -524,6 +551,12 @@ type factoryLinePendingRun struct {
 type factoryWorkOrderUpdate struct {
 	factoryID uuid.UUID
 	orderID   uuid.UUID
+}
+
+type factoryPullRequestMergeabilityRefresh struct {
+	organizationID uuid.UUID
+	factoryID      uuid.UUID
+	pullRequestID  uuid.UUID
 }
 
 // factoryAdmissionOutcomes converts admitted step results into the pending
@@ -658,30 +691,34 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	return pendingRuns, orderUpdates, nil
 }
 
-func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWorkOrderUpdate, error) {
+func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWorkOrderUpdate, *factoryPullRequestMergeabilityRefresh, error) {
 	activity, err := models.FindPullRequestActivityByRunID(tx, runID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
 	run, err := models.FindUnscopedCanvasRun(tx, runID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := activity.Finalize(tx, run); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var pullRequest models.FactoryPullRequest
 	if err := tx.Where("id = ?", activity.PullRequestID).First(&pullRequest).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &factoryWorkOrderUpdate{
-		factoryID: pullRequest.FactoryID,
-		orderID:   pullRequest.WorkOrderID,
-	}, nil
+			factoryID: pullRequest.FactoryID,
+			orderID:   pullRequest.WorkOrderID,
+		}, &factoryPullRequestMergeabilityRefresh{
+			organizationID: pullRequest.OrganizationID,
+			factoryID:      pullRequest.FactoryID,
+			pullRequestID:  pullRequest.ID,
+		}, nil
 }

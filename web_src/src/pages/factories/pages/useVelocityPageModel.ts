@@ -93,7 +93,7 @@ export function useVelocityPageModel(
   factoryId: string,
   onboarding: FactoriesFactory["onboarding"],
 ): VelocityPageModel {
-  const [periodDays, setPeriodDays] = useState<VelocityPeriodDays>(14);
+  const [periodDays, setPeriodDays] = useState<VelocityPeriodDays>(30);
 
   const integrationId = onboarding?.vcsIntegrationId?.trim() ?? "";
   const repository = onboarding?.appRepository?.trim() ?? "";

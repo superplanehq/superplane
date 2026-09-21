@@ -2,8 +2,12 @@ package factories
 
 import (
 	"slices"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 // intakeGraph locates the nodes of an intake inside its canvas. Node
@@ -29,6 +33,106 @@ func (g intakeGraph) Healthy(edges []models.Edge) bool {
 	}
 
 	return hasCanvasPath(edges, g.TriggerNodeID, g.CreateNodeID)
+}
+
+func (g intakeGraph) TriggerIntegrationID(spec models.LiveCanvasSpec) string {
+	trigger := findIntakeNode(spec.Nodes, g.TriggerNodeID)
+	if trigger == nil || trigger.IntegrationID == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*trigger.IntegrationID)
+}
+
+func (g intakeGraph) TriggerResourceID(spec models.LiveCanvasSpec) string {
+	trigger := findIntakeNode(spec.Nodes, g.TriggerNodeID)
+	if trigger == nil {
+		return ""
+	}
+
+	if repository, ok := trigger.Configuration["repository"].(string); ok {
+		if value := strings.TrimSpace(repository); value != "" {
+			return value
+		}
+	}
+	if project, ok := trigger.Configuration["project"].(string); ok {
+		return strings.TrimSpace(project)
+	}
+
+	return ""
+}
+
+func intakeHealth(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	graph intakeGraph,
+	spec models.LiveCanvasSpec,
+	states map[string]string,
+) pb.FactoryIntake_Health {
+	if !graph.Healthy(spec.Edges) {
+		return pb.FactoryIntake_HEALTH_GRAPH_BROKEN
+	}
+
+	integrationID := graph.TriggerIntegrationID(spec)
+	if integrationID == "" && intakeSourceAllowsRebind(intake.Source) {
+		return pb.FactoryIntake_HEALTH_MISSING_INTEGRATION
+	}
+	if integrationID != "" {
+		state, found := states[integrationID]
+		if !found {
+			return pb.FactoryIntake_HEALTH_MISSING_INTEGRATION
+		}
+		if state != models.IntegrationStateReady {
+			return pb.FactoryIntake_HEALTH_INTEGRATION_NOT_READY
+		}
+	}
+
+	if intake.Source == models.FactoryIntakeSourceJiraIssues &&
+		!jiraIntakeWebhookReady(tx, intake.CanvasID, graph.TriggerNodeID) {
+		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
+	}
+
+	return pb.FactoryIntake_HEALTH_OK
+}
+
+func intakeSourceAllowsRebind(source string) bool {
+	return source == models.FactoryIntakeSourceJiraIssues ||
+		source == models.FactoryIntakeSourceSentryExceptions ||
+		source == models.FactoryIntakeSourceProductiveTasks
+}
+
+// jiraIntakeWebhookReady reports whether the intake trigger can receive Jira
+// issue events. A pending, failed, or unregistered webhook looks like a live
+// intake in the canvas, but Atlassian never POSTs until the shared webhook is
+// ready and has a remote id.
+func jiraIntakeWebhookReady(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) bool {
+	if tx == nil || triggerNodeID == "" {
+		return false
+	}
+
+	node, err := models.FindCanvasNode(tx, canvasID, triggerNodeID)
+	if err != nil || node.WebhookID == nil {
+		return false
+	}
+
+	webhook, err := models.FindWebhookInTransaction(tx, *node.WebhookID)
+	if err != nil {
+		return false
+	}
+	if webhook.State != models.WebhookStateReady {
+		return false
+	}
+
+	return jiraWebhookHasRemoteID(webhook.Metadata.Data())
+}
+
+func jiraWebhookHasRemoteID(metadata any) bool {
+	asMap, ok := metadata.(map[string]any)
+	if !ok || asMap == nil {
+		return false
+	}
+	id, present := asMap["webhookId"]
+	return present && id != nil
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls

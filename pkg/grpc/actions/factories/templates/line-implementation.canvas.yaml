@@ -141,6 +141,8 @@ spec:
               1/ Focus on clean code.
               2/ Make long term fixes, not fast patches.
               3/ Add tests where it makes sense.
+              4/ For UI work, implement and wire the change into the production page or component.
+              5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
 
           - name: Commit and Push
             type: bash
@@ -370,7 +372,7 @@ spec:
         body: |-
           ## Visual evidence
 
-          Captured for commit `{{ substring($["Create Pull Request"].data.head.sha, 0, 7) }}`.
+          Captured for commit `{{ $["Create Pull Request"].data.head.sha[:7] }}`.
 
           {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
       position:
@@ -434,7 +436,7 @@ spec:
         body: |-
           ## Visual evidence
 
-          Captured for commit `{{ substring($["Update Pull Request"].data.head.sha, 0, 7) }}`.
+          Captured for commit `{{ $["Update Pull Request"].data.head.sha[:7] }}`.
 
           {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
       position:

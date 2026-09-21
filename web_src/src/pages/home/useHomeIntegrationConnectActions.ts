@@ -3,6 +3,7 @@ import {
   isCapabilityBasedIntegration,
   isCapabilityBasedIntegrationDefinition,
   usesHostedGitHubAppInstall,
+  usesHostedJiraOAuth,
 } from "@/lib/integrations";
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
@@ -51,11 +52,12 @@ export function useHomeIntegrationConnectActions({
    *   definition.legacySetupOnly === false → wizard at /settings/integrations/:name/setup
    * - feature off: legacySetupOnly === true →
    *   IntegrationCreateDialog + Sync browserAction (Continue on GitHub in the modal)
+   * Hosted Jira OAuth skips this dialog the same way. requestConnect opens Atlassian.
    */
   const openConnectDialog = (integrationName: string) => {
     const definition = availableIntegrations.find((item) => item.name === integrationName);
     // Hosted Connect is started by requestConnect, not this dialog.
-    if (usesHostedGitHubAppInstall(definition)) {
+    if (usesHostedGitHubAppInstall(definition) || usesHostedJiraOAuth(definition)) {
       return;
     }
     if (definition && isCapabilityBasedIntegrationDefinition(definition)) {

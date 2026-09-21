@@ -12,7 +12,8 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
     return null;
   }
 
-  return outputs.default[0].data.incident as Incident;
+  const payload = outputs.default[0].data as { incident?: Incident } | undefined;
+  return payload?.incident ?? null;
 }
 
 export function getDetailsForIncident(incident: Incident | undefined, agent?: ResourceRef): Record<string, string> {
@@ -68,8 +69,8 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
  * Includes incident details if available, and adds error in the proper format if execution failed.
  * This ensures errors are displayed as key/value pairs, not raw text.
  */
-export function buildIncidentExecutionDetails(execution: ExecutionInfo): Record<string, any> {
-  const details: Record<string, any> = {};
+export function buildIncidentExecutionDetails(execution: ExecutionInfo): Record<string, string> {
+  const details: Record<string, string> = {};
 
   // Add execution timestamp
   if (execution.createdAt) {

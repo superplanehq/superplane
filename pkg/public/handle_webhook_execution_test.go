@@ -56,7 +56,6 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
@@ -140,4 +139,99 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 
 	// ...and the execution.finished event is broadcast so the UI updates without a reload.
 	assert.True(t, finishedConsumer.HasReceivedMessage())
+}
+
+func Test__HandleWebhook_PausedIntakeIgnoresLiveEvents(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	const triggerName = "dummy-paused-jira-intake"
+
+	handleCount := 0
+	r.Registry.Triggers[triggerName] = impl.NewDummyTrigger(impl.DummyTriggerOptions{
+		Name: triggerName,
+		HandleWebhookFunc: func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+			handleCount++
+			if err := ctx.Events.Emit("jira.issue", map[string]any{"action": "created"}); err != nil {
+				return http.StatusInternalServerError, nil, err
+			}
+			return http.StatusOK, nil, nil
+		},
+	})
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+
+	nodeID := "trigger-1"
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        nodeID,
+				Name:          nodeID,
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.Len(t, nodes, 1)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", nodeID).
+		Update("webhook_id", webhookID).
+		Error)
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	intake, err := factory.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+	require.NoError(t, err)
+
+	postWebhook := func() {
+		response := execRequest(server, requestParams{
+			method: "POST",
+			path:   "/webhooks/" + webhookID.String(),
+			body:   []byte(`{"webhookEvent":"jira:issue_created"}`),
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+	}
+
+	postWebhook()
+	assert.Equal(t, 1, handleCount)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, nodeID, 1)
+
+	require.NoError(t, intake.SetPaused(database.Conn(), true))
+	postWebhook()
+	assert.Equal(t, 1, handleCount)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, nodeID, 1)
+
+	require.NoError(t, intake.SetPaused(database.Conn(), false))
+	postWebhook()
+	assert.Equal(t, 2, handleCount)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, nodeID, 2)
 }

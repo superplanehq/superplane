@@ -315,7 +315,7 @@ function createActivityStream(options = {}) {
     items.push(item);
     emit(
       {
-        type: "tool_start",
+        type: "activity_tool_start",
         id,
         kind: item.kind,
         name: item.name,
@@ -337,7 +337,7 @@ function createActivityStream(options = {}) {
     const input = boundedText(redactSensitiveText(rawInput, env), limits.commandBytes);
     item.input = input.text;
     item.truncated ||= input.truncated;
-    emit({ type: "tool_input_delta", id, partial_json: input.text, complete, truncated: item.truncated });
+    emit({ type: "tool_input_delta", id, input: input.text, complete, truncated: item.truncated });
   }
 
   function appendToolOutput(id, rawText, outputStream = "stdout") {
@@ -381,7 +381,7 @@ function createActivityStream(options = {}) {
     }
     emit(
       {
-        type: "tool_end",
+        type: "activity_tool_end",
         id,
         kind: item.kind,
         status: item.status,

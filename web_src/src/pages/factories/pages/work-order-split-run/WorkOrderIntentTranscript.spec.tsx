@@ -266,6 +266,7 @@ describe("WorkOrderIntentTranscript", () => {
 
     expect(within(note).getByRole("button", { name: /show more/i })).toBeInTheDocument();
     expect(content).toHaveStyle({ maxHeight: "220px" });
+    expect(within(note).getByTestId("work-order-description").querySelector(".sp-chat-outgoing-fade")).not.toBeNull();
 
     await user.click(within(note).getByRole("button", { name: /show more/i }));
     expect(within(note).getByRole("button", { name: /show less/i })).toBeInTheDocument();

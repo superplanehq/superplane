@@ -130,24 +130,26 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
 }
 
-/** Reopens Add Jira intake after Atlassian OAuth returns to this line. */
+/** Legacy query that opened Add Jira intake on the line board. */
 export const JIRA_INTAKE_SETUP_SEARCH_PARAM = "jiraIntake";
 /** Connection created in this OAuth round trip. The Jira callback appends it. */
 export const JIRA_INTAKE_INTEGRATION_SEARCH_PARAM = "jiraIntegrationId";
 
+/** Dedicated setup page for Jira issue intake. */
 export function factoryJiraIntakeSetupPath(
   organizationId: string,
   factoryKey: string,
-  lineId?: string | null,
+  lineId: string,
   options?: { integrationId?: string },
 ) {
-  const params = new URLSearchParams();
-  params.set(JIRA_INTAKE_SETUP_SEARCH_PARAM, "1");
+  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/jira`;
   const integrationId = options?.integrationId?.trim();
-  if (integrationId) {
-    params.set(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  if (!integrationId) {
+    return path;
   }
-  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  const params = new URLSearchParams();
+  params.set(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  return `${path}?${params.toString()}`;
 }
 
 export function isJiraIntakeSetupSearchOpen(search: string): boolean {
@@ -158,14 +160,6 @@ export function isJiraIntakeSetupSearchOpen(search: string): boolean {
 export function jiraIntakeIntegrationIdFromSearch(search: string): string {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM)?.trim() ?? "";
-}
-
-export function withoutJiraIntakeSetupSearch(pathname: string, search: string): string {
-  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  params.delete(JIRA_INTAKE_SETUP_SEARCH_PARAM);
-  params.delete(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM);
-  const next = params.toString();
-  return next === "" ? pathname : `${pathname}?${next}`;
 }
 
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
@@ -344,6 +338,11 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
 /** Dedicated setup page for Sentry exception intake. */
 export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
+/** Dedicated setup page for Productive.io task intake. */
+export function factoryProductiveIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/productive`;
 }
 
 export function automationsPath(organizationId: string, factoryKey: string) {

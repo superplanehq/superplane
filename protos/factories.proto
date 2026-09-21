@@ -591,17 +591,6 @@ service Factories {
     };
   }
 
-  rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List work order checks";
-      description: "Returns scored checks reported on a work order";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribeFactoryUsage(DescribeFactoryUsageRequest) returns (DescribeFactoryUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/usage"
@@ -1085,6 +1074,16 @@ message FactoryIntake {
     INITIAL_IMPORT_STATUS_SKIPPED = 4;
   }
 
+  // Why healthy is false. HEALTH_OK when the intake can receive items.
+  enum Health {
+    HEALTH_UNSPECIFIED = 0;
+    HEALTH_OK = 1;
+    HEALTH_MISSING_INTEGRATION = 2;
+    HEALTH_INTEGRATION_NOT_READY = 3;
+    HEALTH_WEBHOOK_NOT_READY = 4;
+    HEALTH_GRAPH_BROKEN = 5;
+  }
+
   // Settings that change what the intake does. They are stored in the canvas
   // graph, because the canvas is what the workers run. This block is a
   // read/write facade over that graph.
@@ -1121,6 +1120,22 @@ message FactoryIntake {
     optional bool superplane_label_added = 7;
     // Listen for reopened GitHub issues.
     optional bool reopened_issues = 8;
+    // When true, SuperPlane moves the Jira issue when the task completes.
+    // Jira issue intakes only. On by default.
+    optional bool jira_move_on_complete = 9;
+    // Jira status name to move the issue to. Empty means the project's Done
+    // column. Jira issue intakes only.
+    string jira_completion_column = 10;
+    // Listen for created Sentry issues. Sentry exception intakes only.
+    optional bool sentry_new_issues = 11;
+    // Listen for Sentry issues that become unresolved. Sentry exception
+    // intakes only.
+    optional bool sentry_regressed_issues = 12;
+    // Listen for assigned Sentry issues. Sentry exception intakes only.
+    optional bool sentry_assigned_issues = 13;
+    // Issue levels that still create a task. Empty means every level.
+    // Sentry exception intakes only.
+    repeated string sentry_levels = 14;
   }
 
   string id = 1;
@@ -1140,6 +1155,13 @@ message FactoryIntake {
   InitialImportStatus initial_import_status = 11;
   // Set when the initial import completed, including when it found zero items.
   optional int32 initial_import_item_count = 12;
+  // True when live items are ignored. Hand-picked import still works.
+  bool paused = 13;
+  // Live trigger connection. Empty when the intake is unbound.
+  string integration_id = 14;
+  // Live trigger resource, such as a Jira project key.
+  string resource_id = 15;
+  Health health = 16;
 }
 
 message FactoryIntakeRun {
@@ -1185,6 +1207,12 @@ message CreateFactoryIntakeRequest {
   // Optional integration and source resource selected during guided setup.
   string integration_id = 5;
   string resource_id = 6;
+  // When true, SuperPlane does not import existing issues. The intake still
+  // listens for new issues.
+  bool skip_initial_import = 7;
+  // Optional intake settings applied when the canvas is created. Used by
+  // the Jira wizard and first-run tickets step to store the completion column.
+  optional FactoryIntake.Settings settings = 8;
 }
 
 message CreateFactoryIntakeResponse {
@@ -1196,6 +1224,10 @@ message UpdateFactoryIntakeRequest {
   string intake_id = 2;
   optional string name = 3;
   optional FactoryIntake.Settings settings = 4;
+  optional bool paused = 5;
+  // Rebind the live trigger. Set both fields together.
+  optional string integration_id = 6;
+  optional string resource_id = 7;
 }
 
 message UpdateFactoryIntakeResponse {
@@ -1378,6 +1410,7 @@ message FactoryPullRequest {
   repeated FactoryPullRequestRun runs = 16;
   optional FactoryPullRequestRevision current_revision = 17;
   repeated FactoryPullRequestActivity activities = 18;
+  bool mergeable = 19;
 }
 
 message ListFactoryPullRequestsRequest {
@@ -1530,7 +1563,7 @@ message ListWorkOrdersRequest {
 }
 
 message ListWorkOrdersResponse {
-  repeated WorkOrder orders = 1;
+  repeated WorkOrderSummary orders = 1;
 }
 
 message CreateWorkOrderRequest {
@@ -1613,6 +1646,41 @@ message WorkOrder {
   // Runner machine time for this task, one row per machine type.
   // UI hides empty rows and may collapse them into one machine-time line.
   repeated UsageByMachineType usage_by_machine_type = 21;
+  // Full check rows, including summary and analysis.
+  repeated WorkOrderCheck checks = 22;
+}
+
+// WorkOrderSummary is the list row for a work order.
+// DescribeWorkOrder returns WorkOrder, which adds files, the usage
+// breakdown, the source run, and the full checks.
+message WorkOrderSummary {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  WorkOrder.State state = 4;
+  WorkOrder.Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  repeated UserRef assignees = 8;
+  WorkOrderCreator created_by = 9;
+  int64 total_tokens = 10;
+  int64 total_cost_cents = 11;
+  int64 number = 12;
+  string key = 13;
+  repeated WorkOrderLineDispatch line_dispatches = 14;
+  repeated WorkOrderStatusNote status_notes = 15;
+  WorkOrderOrigin origin = 16;
+  int64 total_duration_seconds = 17;
+  repeated WorkOrderCheckScore check_scores = 18;
+}
+
+// WorkOrderCheckScore is the board-card view of a check.
+// It carries the score only, not the analysis text.
+message WorkOrderCheckScore {
+  string key = 1;
+  string name = 2;
+  double score = 3;
+  double max_score = 4;
 }
 
 message WorkOrderOrigin {
@@ -1921,15 +1989,6 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-message ListWorkOrderChecksRequest {
-  string factory_id = 1;
-  string order_id = 2;
-}
-
-message ListWorkOrderChecksResponse {
-  repeated WorkOrderCheck checks = 1;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work

@@ -28,8 +28,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -89,7 +89,6 @@ type Server struct {
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcProvider          oidc.Provider
-	gitProvider           git.Provider
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -176,7 +175,6 @@ func NewServer(
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
-	gitProvider git.Provider,
 	basePath string,
 	baseURL string,
 	webhooksBaseURL string,
@@ -200,7 +198,6 @@ func NewServer(
 		WebhooksBaseURL:       webhooksBaseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
-		gitProvider:           gitProvider,
 		authHandler:           authHandler,
 		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
@@ -741,6 +738,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.Use(middleware.RequireInstallationAdmin())
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
@@ -1714,7 +1712,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.FindWebhook(webhookID)
+	webhook, err := models.FindWebhook(webhookID)
 	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
@@ -1740,9 +1738,28 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
-	if err != nil || len(nodes) == 0 {
+	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
+	}
+
+	eventType := r.Header.Get("X-GitHub-Event")
+	mergeabilityWebhook := factoryactions.IsFactoryMergeabilityWebhook(webhook)
+	if len(nodes) == 0 {
+		if !mergeabilityWebhook || !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+			http.Error(w, "webhook not found", http.StatusNotFound)
+			return
+		}
+		if code, err := factoryactions.VerifyGitHubFactoryMergeabilitySignature(
+			r.Context(),
+			s.encryptor,
+			webhook,
+			r.Header,
+			body,
+		); err != nil {
+			http.Error(w, "invalid signature", code)
+			return
+		}
 	}
 
 	newEvents := []models.CanvasEvent{}
@@ -1779,6 +1796,17 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if mergeabilityWebhook && factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+		payload := append([]byte(nil), body...)
+		go factoryactions.RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+			context.WithoutCancel(r.Context()),
+			factoryactions.IntakeDependencies{Registry: s.registry, Encryptor: s.encryptor},
+			webhook,
+			eventType,
+			payload,
+		)
+	}
+
 	if firstResponse != nil {
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
@@ -1799,6 +1827,15 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+	tx := database.Conn()
+	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	if skip {
+		return http.StatusOK, nil, nil
+	}
+
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -1806,7 +1843,6 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	}
 
 	logger := logging.ForNode(node)
-	tx := database.Conn()
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -1899,7 +1935,6 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution),
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 				Usage:          contexts.NewUsageContext(organizationUUID, execution),
 				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
 			}, nil
