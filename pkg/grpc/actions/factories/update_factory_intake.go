@@ -65,6 +65,12 @@ func UpdateFactoryIntake(
 		}
 	}
 
+	if req.Paused != nil {
+		if err := intake.SetPaused(db, req.GetPaused()); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory intake")
+		}
+	}
+
 	intake, err = factory.FindIntake(db, intakeID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")

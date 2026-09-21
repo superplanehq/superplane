@@ -141,7 +141,12 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { intakeId: string; name?: string; settings?: FactoriesFactoryIntakeSettings }) => {
+    mutationFn: async (input: {
+      intakeId: string;
+      name?: string;
+      settings?: FactoriesFactoryIntakeSettings;
+      paused?: boolean;
+    }) => {
       const response = await factoriesUpdateFactoryIntake(
         withOrganizationHeader({
           organizationId,
@@ -149,6 +154,7 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
           body: {
             name: input.name,
             settings: input.settings,
+            paused: input.paused,
           },
         }),
       );
