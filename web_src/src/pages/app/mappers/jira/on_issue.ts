@@ -85,27 +85,12 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as OnIssueNodeMetadata | undefined;
     const configuration = node.configuration as OnIssueConfiguration | undefined;
-    const metadataItems: MetadataItem[] = [];
-
-    const projectLabel = metadata?.project
-      ? `${metadata.project.name} (${metadata.project.key})`
-      : configuration?.project;
-    if (projectLabel) {
-      metadataItems.push({ icon: "folder", label: projectLabel });
-    }
-
-    if (configuration?.events?.length) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.events.map((event) => actionLabel(event)).join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: jiraIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: issueMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
@@ -122,3 +107,32 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function projectMetadataLabel(
+  metadata?: OnIssueNodeMetadata,
+  configuration?: OnIssueConfiguration,
+): string | undefined {
+  if (metadata?.project) {
+    return `${metadata.project.name} (${metadata.project.key})`;
+  }
+
+  return configuration?.project;
+}
+
+function issueMetadataItems(metadata?: OnIssueNodeMetadata, configuration?: OnIssueConfiguration): MetadataItem[] {
+  const metadataItems: MetadataItem[] = [];
+  const projectLabel = projectMetadataLabel(metadata, configuration);
+
+  if (projectLabel) {
+    metadataItems.push({ icon: "folder", label: projectLabel });
+  }
+
+  if (configuration?.events?.length) {
+    metadataItems.push({
+      icon: "funnel",
+      label: configuration.events.map((event) => actionLabel(event)).join(", "),
+    });
+  }
+
+  return metadataItems;
+}

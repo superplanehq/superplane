@@ -51,7 +51,7 @@ export const renderPanelMapper: ComponentBaseMapper = {
       }
     }
 
-    const output: RenderPanelOutput | undefined = payload.data;
+    const output = payload.data as RenderPanelOutput | undefined;
     if (!output) {
       details.Response = "No data returned";
       return details;
