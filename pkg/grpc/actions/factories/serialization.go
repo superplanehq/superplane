@@ -138,20 +138,27 @@ func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	return automation
 }
 
-func serializeFactoryIntakes(tx *gorm.DB, intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+func serializeFactoryIntakes(
+	tx *gorm.DB,
+	intakes []models.FactoryIntake,
+	specs map[uuid.UUID]models.LiveCanvasSpec,
+	states map[string]string,
+) []*pb.FactoryIntake {
 	result := make([]*pb.FactoryIntake, len(intakes))
 	for i := range intakes {
-		result[i] = serializeFactoryIntake(tx, &intakes[i], specs[intakes[i].CanvasID])
+		result[i] = serializeFactoryIntake(tx, &intakes[i], specs[intakes[i].CanvasID], states)
 	}
 	return result
 }
 
-func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+func serializeFactoryIntake(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	spec models.LiveCanvasSpec,
+	states map[string]string,
+) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
-	healthy := graph.Healthy(spec.Edges)
-	if healthy && intake.Source == models.FactoryIntakeSourceJiraIssues {
-		healthy = jiraIntakeWebhookReady(tx, intake.CanvasID, graph.TriggerNodeID)
-	}
+	health := intakeHealth(tx, intake, graph, spec, states)
 
 	serialized := &pb.FactoryIntake{
 		Id:                  intake.ID.String(),
@@ -160,7 +167,10 @@ func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec mode
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
 		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
-		Healthy:             healthy,
+		Healthy:             health == pb.FactoryIntake_HEALTH_OK,
+		Health:              health,
+		IntegrationId:       graph.TriggerIntegrationID(spec),
+		ResourceId:          graph.TriggerResourceID(spec),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
@@ -176,6 +186,23 @@ func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec mode
 	}
 
 	return serialized
+}
+
+func intakeIntegrationStates(tx *gorm.DB, orgID uuid.UUID) (map[string]string, error) {
+	states := map[string]string{}
+	if tx == nil || orgID == uuid.Nil {
+		return states, nil
+	}
+
+	integrations, err := models.ListIntegrations(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range integrations {
+		states[integrations[i].ID.String()] = integrations[i].State
+	}
+	return states, nil
 }
 
 func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {

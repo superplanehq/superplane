@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
@@ -109,6 +110,78 @@ func Test__jiraWebhookHasRemoteID(t *testing.T) {
 func Test__jiraIntakeWebhookReady(t *testing.T) {
 	assert.False(t, jiraIntakeWebhookReady(nil, uuid.Nil, intakeTriggerNodeID))
 	assert.False(t, jiraIntakeWebhookReady(nil, uuid.New(), ""))
+}
+
+func Test__IntakeTriggerBinding(t *testing.T) {
+	integrationID := "int-ready"
+	spec := models.LiveCanvasSpec{
+		Nodes: []models.Node{
+			triggerNodeWithIntegration(intakeTriggerNodeID, "sentry.onIssue", integrationID, "payments"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		},
+		Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+	}
+
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, spec)
+	assert.Equal(t, integrationID, graph.TriggerIntegrationID(spec))
+	assert.Equal(t, "payments", graph.TriggerResourceID(spec))
+}
+
+func Test__IntakeHealth(t *testing.T) {
+	intake := &models.FactoryIntake{Source: models.FactoryIntakeSourceSentryExceptions}
+	integrationID := "int-ready"
+	spec := models.LiveCanvasSpec{
+		Nodes: []models.Node{
+			triggerNodeWithIntegration(intakeTriggerNodeID, "sentry.onIssue", integrationID, "payments"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		},
+		Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+	}
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, spec)
+
+	t.Run("a ready integration is healthy", func(t *testing.T) {
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intakeHealth(nil, intake, graph, spec, map[string]string{
+			integrationID: models.IntegrationStateReady,
+		}))
+	})
+
+	t.Run("a missing integration needs repair", func(t *testing.T) {
+		assert.Equal(
+			t,
+			pb.FactoryIntake_HEALTH_MISSING_INTEGRATION,
+			intakeHealth(nil, intake, graph, spec, map[string]string{}),
+		)
+	})
+
+	t.Run("a not-ready integration needs repair", func(t *testing.T) {
+		assert.Equal(t, pb.FactoryIntake_HEALTH_INTEGRATION_NOT_READY, intakeHealth(nil, intake, graph, spec, map[string]string{
+			integrationID: models.IntegrationStateError,
+		}))
+	})
+
+	t.Run("a disconnected graph is broken", func(t *testing.T) {
+		broken := spec
+		broken.Edges = nil
+		assert.Equal(t, pb.FactoryIntake_HEALTH_GRAPH_BROKEN, intakeHealth(nil, intake, graph, broken, map[string]string{
+			integrationID: models.IntegrationStateReady,
+		}))
+	})
+
+	t.Run("an unbound GitHub intake stays healthy", func(t *testing.T) {
+		unbound := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode(intakeTriggerNodeID, "github.onIssue"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+		github := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, unbound)
+		assert.Equal(
+			t,
+			pb.FactoryIntake_HEALTH_OK,
+			intakeHealth(nil, &models.FactoryIntake{Source: models.FactoryIntakeSourceGitHubIssues}, github, unbound, nil),
+		)
+	})
 }
 
 func Test__BuildBacklogCanvas(t *testing.T) {
@@ -300,6 +373,13 @@ func triggerNode(nodeID, component string) models.Node {
 		Type: models.NodeTypeTrigger,
 		Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: component}},
 	}
+}
+
+func triggerNodeWithIntegration(nodeID, component, integrationID, resourceID string) models.Node {
+	node := triggerNode(nodeID, component)
+	node.IntegrationID = &integrationID
+	node.Configuration = map[string]any{"project": resourceID}
+	return node
 }
 
 func componentNode(nodeID, component string) models.Node {

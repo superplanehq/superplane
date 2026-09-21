@@ -2,9 +2,11 @@ package factories
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
 
@@ -31,6 +33,69 @@ func (g intakeGraph) Healthy(edges []models.Edge) bool {
 	}
 
 	return hasCanvasPath(edges, g.TriggerNodeID, g.CreateNodeID)
+}
+
+func (g intakeGraph) TriggerIntegrationID(spec models.LiveCanvasSpec) string {
+	trigger := findIntakeNode(spec.Nodes, g.TriggerNodeID)
+	if trigger == nil || trigger.IntegrationID == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*trigger.IntegrationID)
+}
+
+func (g intakeGraph) TriggerResourceID(spec models.LiveCanvasSpec) string {
+	trigger := findIntakeNode(spec.Nodes, g.TriggerNodeID)
+	if trigger == nil {
+		return ""
+	}
+
+	if repository, ok := trigger.Configuration["repository"].(string); ok {
+		if value := strings.TrimSpace(repository); value != "" {
+			return value
+		}
+	}
+	if project, ok := trigger.Configuration["project"].(string); ok {
+		return strings.TrimSpace(project)
+	}
+
+	return ""
+}
+
+func intakeHealth(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	graph intakeGraph,
+	spec models.LiveCanvasSpec,
+	states map[string]string,
+) pb.FactoryIntake_Health {
+	if !graph.Healthy(spec.Edges) {
+		return pb.FactoryIntake_HEALTH_GRAPH_BROKEN
+	}
+
+	integrationID := graph.TriggerIntegrationID(spec)
+	if integrationID != "" {
+		state, found := states[integrationID]
+		if !found {
+			return pb.FactoryIntake_HEALTH_MISSING_INTEGRATION
+		}
+		if state != models.IntegrationStateReady {
+			return pb.FactoryIntake_HEALTH_INTEGRATION_NOT_READY
+		}
+	}
+
+	if intake.Source == models.FactoryIntakeSourceJiraIssues &&
+		!jiraIntakeWebhookReady(tx, intake.CanvasID, graph.TriggerNodeID) {
+		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
+	}
+
+	return pb.FactoryIntake_HEALTH_OK
+}
+
+func intakeSourceAllowsRebind(source string) bool {
+	return source == models.FactoryIntakeSourceJiraIssues ||
+		source == models.FactoryIntakeSourceSentryExceptions ||
+		source == models.FactoryIntakeSourceProductiveTasks
 }
 
 // jiraIntakeWebhookReady reports whether the intake trigger can receive Jira
