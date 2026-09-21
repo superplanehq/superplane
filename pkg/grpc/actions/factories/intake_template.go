@@ -399,7 +399,7 @@ func intakeTriggerMetadata(source string, settings intakeSettings) map[string]an
 	if source != models.FactoryIntakeSourceJiraIssues {
 		return nil
 	}
-	return jiraCompletionMetadata(settings)
+	return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
 }
 
 func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {
