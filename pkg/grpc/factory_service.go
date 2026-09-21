@@ -359,3 +359,8 @@ func (s *FactoryService) DisconnectFactoryAgentResourceOAuth(ctx context.Context
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DisconnectFactoryAgentResourceOAuth(ctx, s.intakeDeps, organizationID, req)
 }
+
+func (s *FactoryService) ListFactoryAgentResourceTools(ctx context.Context, req *pb.ListFactoryAgentResourceToolsRequest) (*pb.ListFactoryAgentResourceToolsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryAgentResourceTools(ctx, s.intakeDeps, organizationID, req)
+}

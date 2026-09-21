@@ -34,6 +34,8 @@ export type PlanningReviewAgentSlot = {
   draft?: PlanningReviewDraft;
   isLoading?: boolean;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   showVisualEvidenceSetting?: boolean;
 };
@@ -44,6 +46,8 @@ export function PlanningReviewEditor({
   onSave,
   onCancel,
   organizationId,
+  factoryId,
+  factoryKey,
   automationHref,
   isLoading = false,
   showAutomationNote = true,
@@ -54,6 +58,8 @@ export function PlanningReviewEditor({
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   onCancel?: () => void;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   automationHref?: string;
   isLoading?: boolean;
   showAutomationNote?: boolean;
@@ -94,6 +100,8 @@ export function PlanningReviewEditor({
             draft={draft}
             onChange={setDraft}
             organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={factoryKey}
             showVisualEvidenceSetting={showVisualEvidenceSetting}
           />
         </PopupBody>
