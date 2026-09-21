@@ -1137,6 +1137,16 @@ message FactoryIntake {
     // Jira status name to move the issue to. Empty means the project's Done
     // column. Jira issue intakes only.
     string jira_completion_column = 10;
+    // Listen for created Sentry issues. Sentry exception intakes only.
+    optional bool sentry_new_issues = 11;
+    // Listen for Sentry issues that become unresolved. Sentry exception
+    // intakes only.
+    optional bool sentry_regressed_issues = 12;
+    // Listen for assigned Sentry issues. Sentry exception intakes only.
+    optional bool sentry_assigned_issues = 13;
+    // Issue levels that still create a task. Empty means every level.
+    // Sentry exception intakes only.
+    repeated string sentry_levels = 14;
   }
 
   string id = 1;
