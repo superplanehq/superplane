@@ -21,21 +21,29 @@ const {
   useTriggers,
   useComponents,
   useAvailableIntegrations,
+  useConnectedIntegrations,
+  useCreateIntegration,
+  useIntegrationResources,
   updateIntake,
   deleteIntake,
   useInfiniteCanvasRuns,
   useDescribeRun,
   useEventExecutions,
+  startDirectJiraConnect,
 } = vi.hoisted(() => ({
   useCanvas: vi.fn(),
   useTriggers: vi.fn(),
   useComponents: vi.fn(),
   useAvailableIntegrations: vi.fn(),
+  useConnectedIntegrations: vi.fn(),
+  useCreateIntegration: vi.fn(),
+  useIntegrationResources: vi.fn(),
   updateIntake: vi.fn(),
   deleteIntake: vi.fn(),
   useInfiniteCanvasRuns: vi.fn(),
   useDescribeRun: vi.fn(),
   useEventExecutions: vi.fn(),
+  startDirectJiraConnect: vi.fn(),
 }));
 
 vi.mock("@monaco-editor/react", () => {
@@ -62,6 +70,23 @@ vi.mock("@/hooks/useComponentData", () => ({
 vi.mock("@/hooks/useIntegrations", () => ({
   ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useAvailableIntegrations,
+  useConnectedIntegrations,
+  useCreateIntegration,
+  useIntegrationResources,
+}));
+
+vi.mock("@/lib/startDirectJiraConnect", () => ({
+  startDirectJiraConnect,
+}));
+
+vi.mock("@/ui/IntegrationCreateDialog", () => ({
+  IntegrationCreateDialog: ({ open, setupReturnTo }: { open: boolean; setupReturnTo?: string }) =>
+    open ? <div data-testid="intake-connect-dialog">{setupReturnTo}</div> : null,
+}));
+
+vi.mock("@/ui/ConfigureIntegrationDialog", () => ({
+  ConfigureIntegrationDialog: ({ integrationId }: { integrationId: string | null }) =>
+    integrationId ? <div data-testid="intake-configure-dialog">{integrationId}</div> : null,
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -100,16 +125,27 @@ const GITHUB_INTAKE_CANVAS = {
   },
 };
 
+const JIRA_INTAKE: ConfiguredLineIntakeSource = {
+  intakeId: "intake-jira",
+  appId: "app-jira-intake",
+  healthy: false,
+  paused: false,
+  health: "HEALTH_MISSING_INTEGRATION",
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" },
+  source: lineIntakeSourceById("jira-issues")!,
+};
+
 function renderHost(
   props: {
     intake?: ConfiguredLineIntakeSource;
     initialTab?: IntakeSettingsTab;
     onClose?: () => void;
+    path?: string;
   } = {},
 ) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[props.path ?? "/org-1/workspaces/rf/lines/line-plan"]}>
         <ThemeProvider>
           <TooltipProvider>
             <IntakeSettingsHost
@@ -144,11 +180,51 @@ describe("IntakeSettingsHost", () => {
       ],
       isLoading: false,
     });
-    useAvailableIntegrations.mockReturnValue({ data: [], isLoading: false });
+    useAvailableIntegrations.mockReturnValue({
+      data: [{ name: "jira", label: "Jira", hostedAppInstall: true }],
+      isLoading: false,
+    });
+    useConnectedIntegrations.mockReturnValue({
+      data: [
+        {
+          metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+          status: { state: "ready" },
+        },
+        {
+          metadata: { id: "jira-2", name: "Other Jira", integrationName: "jira" },
+          status: { state: "ready" },
+        },
+        {
+          metadata: { id: "jira-broken", name: "Broken Jira", integrationName: "jira" },
+          status: { state: "error", stateDescription: "Authorization revoked, please reconnect the account" },
+        },
+      ],
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useCreateIntegration.mockReturnValue({ mutateAsync: vi.fn(), reset: vi.fn() });
+    useIntegrationResources.mockImplementation(
+      (_organizationId: string, _integrationId: string, resourceType: string) => {
+        if (resourceType === "project") {
+          return {
+            data: [
+              { id: "ENG", name: "Engineering" },
+              { id: "OPS", name: "Operations" },
+            ],
+            isLoading: false,
+            isError: false,
+            refetch: vi.fn(),
+          };
+        }
+        return { data: [], isLoading: false, isError: false, refetch: vi.fn() };
+      },
+    );
     useDescribeRun.mockReturnValue({ data: undefined, isLoading: false, isFetched: true });
     useEventExecutions.mockReturnValue({ data: { executions: [] }, isLoading: false });
     updateIntake.mockResolvedValue({ id: "intake-github" });
     deleteIntake.mockResolvedValue(undefined);
+    startDirectJiraConnect.mockReset();
+    startDirectJiraConnect.mockResolvedValue(true);
     localStorage.clear();
     useInfiniteCanvasRuns.mockReturnValue({
       data: {
@@ -193,6 +269,7 @@ describe("IntakeSettingsHost", () => {
 
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("intake-connection")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
@@ -349,5 +426,72 @@ describe("IntakeSettingsHost", () => {
     const dialog = screen.getByTestId("intake-delete-dialog");
     expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent("delete failed");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("saves a new Jira connection and project", async () => {
+    const user = userEvent.setup();
+    renderHost({ intake: JIRA_INTAKE });
+
+    expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent("This intake has no live connection.");
+    await user.click(screen.getByTestId("intake-connection-jira-2"));
+    await user.click(screen.getByTestId("intake-connection-project-OPS"));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-jira",
+      settings: {
+        confidencePct: 65,
+        labels: [],
+        labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
+        assignment: "ASSIGNMENT_ANY",
+        authorsWithAccess: false,
+        newIssues: true,
+        reopenedIssues: true,
+        superplaneLabelAdded: true,
+      },
+      integrationId: "jira-2",
+      resourceId: "OPS",
+    });
+  });
+
+  it("selects the Jira connection returned from OAuth", () => {
+    renderHost({
+      intake: JIRA_INTAKE,
+      path: "/org-1/workspaces/rf/lines/line-plan?intake=1&intakeId=intake-jira&settings=general&jiraIntegrationId=jira-2",
+    });
+
+    expect(screen.getByTestId("intake-connection-jira-2")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-project-OPS")).toBeInTheDocument();
+  });
+
+  it("returns to intake settings after Connect Jira", async () => {
+    startDirectJiraConnect.mockResolvedValue(true);
+    const user = userEvent.setup();
+    renderHost({ intake: JIRA_INTAKE });
+
+    await user.click(screen.getByTestId("intake-connection-connect"));
+
+    expect(startDirectJiraConnect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org-1",
+        returnTo: "/org-1/workspaces/rf/lines/line-plan?intake=1&intakeId=intake-jira&settings=general",
+      }),
+    );
+  });
+
+  it("opens configure for a Jira connection that is not ready", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        ...JIRA_INTAKE,
+        health: "HEALTH_INTEGRATION_NOT_READY",
+        integrationId: "jira-broken",
+      },
+    });
+
+    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent("This connection cannot receive items.");
+    await user.click(screen.getByTestId("intake-connection-reconnect"));
+    expect(screen.getByTestId("intake-configure-dialog")).toHaveTextContent("jira-broken");
   });
 });

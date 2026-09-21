@@ -33,6 +33,7 @@ export function IntakeSourceSettingsFooter({
   onDelete,
   onSave,
   onClose,
+  saveDisabled = false,
 }: {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
@@ -48,6 +49,7 @@ export function IntakeSourceSettingsFooter({
   onDelete?: () => Promise<void> | void;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
+  saveDisabled?: boolean;
 }) {
   const sentryControls = sourceId === "sentry-exceptions";
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -105,7 +107,7 @@ export function IntakeSourceSettingsFooter({
         </div>
         <Button
           type="button"
-          disabled={savePending}
+          disabled={savePending || saveDisabled}
           onClick={async () => {
             try {
               await onSave(normalizeIntakeSourceSettings(draft));
