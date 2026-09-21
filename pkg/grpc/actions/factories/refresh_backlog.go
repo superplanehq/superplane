@@ -246,7 +246,7 @@ func archiveDraftWorkOrderIfCurrent(
 		orgID,
 		factory,
 		archivedOrder,
-		archivedBy,
+		&archivedBy,
 		models.FactoryWorkOrderStateDraft,
 		models.FactoryWorkOrderResultRejected,
 		false,

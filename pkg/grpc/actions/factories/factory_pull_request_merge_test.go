@@ -393,6 +393,30 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		assert.Equal(t, mergeBlockedMissingIntegration, message)
 	})
 
+	t.Run("closes the work order as completed", func(t *testing.T) {
+		factory := newFactory(t)
+		order := createOrder(t, factory)
+		_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateOpen,
+			Actor:   &r.User,
+		})
+		require.NoError(t, err)
+		pr := createGitHubPR(t, factory, order)
+		api := readyAPI()
+		useGitHub(t, api)
+
+		_, err = merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+		require.NoError(t, err)
+
+		reloaded, err := factory.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+		notes, err := reloaded.StatusNotes()
+		require.NoError(t, err)
+		assert.Empty(t, notes)
+	})
+
 	t.Run("persists the merged state after success", func(t *testing.T) {
 		factory := newFactory(t)
 		pr := createGitHubPR(t, factory, createOrder(t, factory))
