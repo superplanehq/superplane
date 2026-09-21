@@ -265,6 +265,23 @@ func Test__ApplyCompletionStatus(t *testing.T) {
 		assert.Equal(t, "21", payload["transition"].(map[string]any)["id"])
 	})
 
+	t.Run("keeps a retryable Jira error in the chain", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"unavailable"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = ApplyCompletionStatus(client, "TEST-1", "", DoTransitionOptions{})
+		require.Error(t, err)
+		assert.True(t, IsRetryableAPIError(err))
+	})
+
 	t.Run("returns an error when the chosen column is unreachable", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

@@ -211,7 +211,7 @@ func applyMatchedStatus(
 ) error {
 	transitions, err := client.GetIssueTransitions(issueKey)
 	if err != nil {
-		return fmt.Errorf("failed to fetch transitions: %v", err)
+		return fmt.Errorf("failed to fetch transitions: %w", err)
 	}
 
 	matches := match(transitions)
