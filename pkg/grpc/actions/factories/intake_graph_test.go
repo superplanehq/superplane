@@ -182,6 +182,54 @@ func Test__IntakeHealth(t *testing.T) {
 			intakeHealth(nil, &models.FactoryIntake{Source: models.FactoryIntakeSourceGitHubIssues}, github, unbound, nil),
 		)
 	})
+
+	t.Run("an unbound Sentry intake needs a connection", func(t *testing.T) {
+		unbound := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, unbound)
+		assert.Equal(
+			t,
+			pb.FactoryIntake_HEALTH_MISSING_INTEGRATION,
+			intakeHealth(nil, intake, graph, unbound, nil),
+		)
+	})
+
+	t.Run("an unbound Productive.io intake needs a connection", func(t *testing.T) {
+		unbound := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode(intakeTriggerNodeID, "productive.onTask"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceProductiveTasks, unbound)
+		assert.Equal(
+			t,
+			pb.FactoryIntake_HEALTH_MISSING_INTEGRATION,
+			intakeHealth(nil, &models.FactoryIntake{Source: models.FactoryIntakeSourceProductiveTasks}, graph, unbound, nil),
+		)
+	})
+
+	t.Run("an unbound Jira intake needs a connection", func(t *testing.T) {
+		unbound := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode(intakeTriggerNodeID, "jira.onIssue"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceJiraIssues, unbound)
+		assert.Equal(
+			t,
+			pb.FactoryIntake_HEALTH_MISSING_INTEGRATION,
+			intakeHealth(nil, &models.FactoryIntake{Source: models.FactoryIntakeSourceJiraIssues}, graph, unbound, nil),
+		)
+	})
 }
 
 func Test__BuildBacklogCanvas(t *testing.T) {

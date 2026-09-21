@@ -83,7 +83,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
 		assert.Equal(t, "Productive.io tasks", intake.GetName())
-		assert.True(t, intake.GetHealthy())
+		assert.False(t, intake.GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, intake.GetHealth())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		require.NoError(t, err)
@@ -312,6 +313,17 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.Len(t, response.GetIntakes(), 1)
 		assert.True(t, response.GetIntakes()[0].GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, response.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("an unbound Sentry intake needs a connection when listed", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, response.GetIntakes()[0].GetHealth())
 	})
 
 	t.Run("creating a Sentry intake with an invalid user id does not panic", func(t *testing.T) {
@@ -901,6 +913,103 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("update applies settings and a new connection together", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: oldID,
+			ResourceId:    "ENG",
+		})
+
+		newID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "OPS")
+		resourceID := "OPS"
+		newIssues := false
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &newID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues: &newIssues,
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, newID, response.GetIntake().GetIntegrationId())
+		assert.Equal(t, "OPS", response.GetIntake().GetResourceId())
+		assert.False(t, response.GetIntake().GetSettings().GetNewIssues())
+		assert.True(t, response.GetIntake().GetSettings().GetReopenedIssues())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, newID, *trigger.IntegrationID)
+		assert.Equal(t, "OPS", trigger.Configuration["project"])
+		assert.Equal(t, []any{"updated"}, trigger.Configuration["events"])
+	})
+
+	t.Run("update rejects a bad connection without keeping settings", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: oldID,
+			ResourceId:    "ENG",
+		})
+		assert.True(t, intake.GetSettings().GetNewIssues())
+
+		missingID := uuid.NewString()
+		resourceID := "OPS"
+		newIssues := false
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &missingID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues: &newIssues,
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.Equal(t, oldID, listed.GetIntakes()[0].GetIntegrationId())
+		assert.Equal(t, "ENG", listed.GetIntakes()[0].GetResourceId())
+		assert.True(t, listed.GetIntakes()[0].GetSettings().GetNewIssues())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, listed.GetIntakes()[0])
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, oldID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
+	})
+
+	t.Run("update rejects a GitHub connection change without keeping settings", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		resourceID := "acme/backlog"
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"bug"},
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.Empty(t, listed.GetIntakes()[0].GetSettings().GetLabels())
 	})
 
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {

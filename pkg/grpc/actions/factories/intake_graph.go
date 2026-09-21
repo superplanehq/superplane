@@ -74,6 +74,9 @@ func intakeHealth(
 	}
 
 	integrationID := graph.TriggerIntegrationID(spec)
+	if integrationID == "" && intakeSourceAllowsRebind(intake.Source) {
+		return pb.FactoryIntake_HEALTH_MISSING_INTEGRATION
+	}
 	if integrationID != "" {
 		state, found := states[integrationID]
 		if !found {
