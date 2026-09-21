@@ -42,6 +42,11 @@ var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
+// errStreamAborted means the worker itself is going away mid-turn, so the turn
+// has no outcome to record. It is distinct from the turn's own deadline
+// expiring, which is a real failure the user needs to see.
+var errStreamAborted = errors.New("agent stream aborted before the turn finished")
+
 var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 	return messages.NewAgentRunFinishedMessage(
 		session.OrganizationID.String(),
@@ -381,11 +386,32 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 	}
 
 	for {
+		//
+		// Without this the loop can only exit through a turn's return value, so
+		// a shutdown between turns would start another one.
+		//
+		if parentCtx.Err() != nil {
+			log.WithField("session_id", sessionID).Info("agent stream: worker shutting down, not starting another turn")
+			return nil
+		}
+
 		turnStartedAt := session.UpdatedAt
 		publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
 
 		streamErr := w.streamProviderTurn(parentCtx, session, publish)
 		closeOpenTools(sessionID, publish)
+
+		//
+		// The worker is going away, so this turn has no outcome to record.
+		// Leave the row streaming on purpose: its heartbeat stops here, so
+		// FailStuckStreamingSessions reclaims it once the grace period passes.
+		// Marking it idle or failed would strand or misreport a turn that
+		// another replica may still be able to finish.
+		//
+		if errors.Is(streamErr, errStreamAborted) {
+			log.WithField("session_id", sessionID).Info("agent stream: worker shut down mid-turn, leaving session for recovery")
+			return nil
+		}
 
 		if streamErr != nil {
 			// Conditional on turnStartedAt so a stream that errors out
@@ -459,6 +485,28 @@ func (w *AgentStreamWorker) streamProviderTurn(
 		if errors.Is(err, errSessionAlreadyReset) {
 			return nil
 		}
+
+		//
+		// A cancelled context here means one of two very different things, and
+		// collapsing them loses the turn. If the parent is gone the worker is
+		// shutting down and the turn simply has no outcome. Otherwise it was
+		// our own agentStreamTimeout firing, which is a genuine failure: the
+		// provider never emits ProviderEventTurnCompleted, so nothing else in
+		// this path will ever record one.
+		//
+		if err != nil && isContextCancel(err) {
+			if parentCtx.Err() != nil {
+				return errStreamAborted
+			}
+			if streamErr == nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					streamErr = fmt.Errorf("agent stream exceeded the %s turn deadline", agentStreamTimeout)
+				} else {
+					streamErr = fmt.Errorf("agent stream was cancelled before the turn finished: %w", err)
+				}
+			}
+		}
+
 		if streamErr == nil && err != nil && !isContextCancel(err) {
 			streamErr = err
 		}
@@ -467,6 +515,9 @@ func (w *AgentStreamWorker) streamProviderTurn(
 		}
 
 		if err := w.executeAndSendCustomToolResults(ctx, session, customTools, publish); err != nil {
+			if isContextCancel(err) && parentCtx.Err() != nil {
+				return errStreamAborted
+			}
 			return err
 		}
 	}
