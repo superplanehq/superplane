@@ -54,6 +54,24 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
 		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
+		assert.Equal(t, true, trigger.Metadata[intakeMetadataJiraMoveOnComplete])
+		assert.Equal(t, "", trigger.Metadata[intakeMetadataJiraCompletionColumn])
+	})
+
+	t.Run("a Jira intake stores the chosen completion column on the trigger", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source: models.FactoryIntakeSourceJiraIssues,
+			Settings: intakeSettings{
+				ConfidencePct:        DefaultIntakeConfidencePct,
+				JiraMoveOnComplete:   true,
+				JiraCompletionColumn: "QA",
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, true, trigger.Metadata[intakeMetadataJiraMoveOnComplete])
+		assert.Equal(t, "QA", trigger.Metadata[intakeMetadataJiraCompletionColumn])
 	})
 
 	t.Run("a Jira work order reads the plain text description, not the raw document", func(t *testing.T) {
