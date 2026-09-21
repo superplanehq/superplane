@@ -148,6 +148,8 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
       name?: string;
       settings?: FactoriesFactoryIntakeSettings;
       paused?: boolean;
+      integrationId?: string;
+      resourceId?: string;
     }) => {
       const response = await factoriesUpdateFactoryIntake(
         withOrganizationHeader({
@@ -157,6 +159,8 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
             name: input.name,
             settings: input.settings,
             paused: input.paused,
+            integrationId: input.integrationId,
+            resourceId: input.resourceId,
           },
         }),
       );

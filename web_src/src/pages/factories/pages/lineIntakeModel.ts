@@ -2,6 +2,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
   FactoriesWorkOrderArtifact,
+  FactoryIntakeHealth,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -209,6 +210,12 @@ export interface ConfiguredLineIntakeSource {
   paused: boolean;
   settings: IntakeSourceSettings;
   source: LineIntakeSource;
+  /** Why the intake is unhealthy. HEALTH_OK when it can receive items. */
+  health?: FactoryIntakeHealth;
+  /** Live trigger connection. Empty when the intake is unbound. */
+  integrationId?: string;
+  /** Live trigger resource, such as a Jira project key. */
+  resourceId?: string;
 }
 
 const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
@@ -248,6 +255,9 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         paused: intake.paused === true,
         settings: intakeSettingsFromApi(name, intake.settings),
         source: { ...source, name },
+        health: intake.health,
+        integrationId: intake.integrationId?.trim() || undefined,
+        resourceId: intake.resourceId?.trim() || undefined,
       },
     ];
   });
