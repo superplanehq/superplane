@@ -1,6 +1,6 @@
 {
   "maxAllowedInTransactionDefinitions": 154,
-  "maxAllowedDatabaseConnCalls": 171,
+  "maxAllowedDatabaseConnCalls": 170,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -284,7 +284,6 @@
     "pkg/models/repository.go:FindRepository:database.Conn()#1",
     "pkg/models/repository.go:FindRepositoryUnscoped:database.Conn()#1",
     "pkg/models/repository.go:CreatePendingRepository:database.Conn()#1",
-    "pkg/models/repository.go:ListPendingRepositories:database.Conn()#1",
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
     "pkg/models/role_metadata.go:Update:database.Conn()#1",
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
