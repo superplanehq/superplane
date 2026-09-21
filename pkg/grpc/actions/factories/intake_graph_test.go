@@ -186,48 +186,28 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 }
 
 func Test__IsDefaultLegacyBacklog(t *testing.T) {
-	t.Run("accepts the generated version 1 behavior with moved nodes", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		nodes := legacy.Nodes()
+	t.Run("accepts the version 1 Analyze node set", func(t *testing.T) {
+		nodes := legacyAnalyzeBacklogNodes(1)
 		nodes[0].Position = models.Position{X: 900, Y: 700}
 
-		assert.True(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
+		assert.True(t, isDefaultLegacyBacklog(nodes, nil))
 	})
 
-	t.Run("rejects a customized prompt", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		nodes := legacy.Nodes()
-		analysis := findModelNode(t, nodes, intakeAnalysisNodeID)
-		steps := analysis.Configuration["steps"].([]any)
-		steps[1].(map[string]any)["prompt"] = "Use the team's custom scoring rules."
+	t.Run("accepts a version 1 graph after the Analyze prompt changed", func(t *testing.T) {
+		nodes := legacyAnalyzeBacklogNodes(1)
+		nodes[1].Configuration = map[string]any{"prompt": "Use the team's custom scoring rules."}
 
-		assert.False(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
+		assert.True(t, isDefaultLegacyBacklog(nodes, nil))
 	})
 
-	t.Run("rejects a customized component", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		nodes := legacy.Nodes()
-		for i := range nodes {
-			if nodes[i].ID == intakeReportConfidenceNodeID {
-				nodes[i].Ref.Component.Name = "customReporter"
-			}
-		}
+	t.Run("rejects a version 1 graph after a node is added", func(t *testing.T) {
+		nodes := append(legacyAnalyzeBacklogNodes(1), componentNode("custom-step", "if"))
 
-		assert.False(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
+		assert.False(t, isDefaultLegacyBacklog(nodes, nil))
 	})
 
-	t.Run("rejects customized edges", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		edges := legacy.Edges()
-		edges[0].TargetID = intakeReportConfidenceNodeID
-
-		assert.False(t, isDefaultLegacyBacklog(legacy.Nodes(), edges))
-	})
-
-	t.Run("accepts the generated version 2 behavior", func(t *testing.T) {
-		v2 := buildV2BacklogCanvas(backlogCanvasRequest{})
-
-		assert.True(t, isDefaultLegacyBacklog(v2.Nodes(), v2.Edges()))
+	t.Run("accepts the version 2 Analyze node set", func(t *testing.T) {
+		assert.True(t, isDefaultLegacyBacklog(legacyAnalyzeBacklogNodes(2), nil))
 	})
 
 	t.Run("rejects version 3", func(t *testing.T) {
@@ -235,6 +215,35 @@ func Test__IsDefaultLegacyBacklog(t *testing.T) {
 
 		assert.False(t, isDefaultLegacyBacklog(current.Nodes(), current.Edges()))
 	})
+}
+
+func legacyAnalyzeBacklogNodes(version int) []models.Node {
+	componentNode := func(id, component string) models.Node {
+		return models.Node{ID: id, Ref: models.NodeRef{Component: &models.ComponentRef{Name: component}}}
+	}
+	trigger := models.Node{
+		ID:       backlogTriggerNodeID,
+		Ref:      models.NodeRef{Trigger: &models.TriggerRef{Name: factory.OnWorkOrderTriggerName}},
+		Metadata: models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, version),
+	}
+	if version == 2 {
+		return []models.Node{
+			trigger,
+			componentNode(backlogRefinementFilterNodeID, intakeFilterComponent),
+			componentNode(intakeAnalysisNodeID, "runnerClaudeCode"),
+			componentNode(backlogRefinementNodeID, "runnerClaudeCode"),
+			componentNode(intakeReportConfidenceNodeID, "reportWorkOrderCheck"),
+			componentNode("attach-intent", "addWorkOrderArtifact"),
+			componentNode(intakeAddRunErrorNodeID, intakeAddRunErrorComponent),
+		}
+	}
+	return []models.Node{
+		trigger,
+		componentNode(intakeAnalysisNodeID, "runnerClaudeCode"),
+		componentNode(intakeReportConfidenceNodeID, "reportWorkOrderCheck"),
+		componentNode("attach-intent", "addWorkOrderArtifact"),
+		componentNode(intakeAddRunErrorNodeID, intakeAddRunErrorComponent),
+	}
 }
 
 func intakeSpecFromTemplate(t *testing.T, source string) models.LiveCanvasSpec {

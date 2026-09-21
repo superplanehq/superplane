@@ -111,7 +111,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
   });
 
-  it("hides the draft model chevron on classic Start when Planning is off", async () => {
+  it("hides the draft model chevron on Start when Planning is off", async () => {
     factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     const user = userEvent.setup();
     const onDispatch = vi.fn();

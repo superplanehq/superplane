@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 
@@ -22,10 +21,11 @@ type BacklogTemplateUpgradeResult struct {
 	Skipped  int
 }
 
-// UpgradeDefaultBacklogTemplates upgrades generated version 1 Backlog graphs
-// to the current template, and refreshes a Refine Task prompt that still
-// matches an earlier default. A behavioral change to the graph makes it
-// user-owned and leaves it on the runtime compatibility path; an edited prompt
+// UpgradeDefaultBacklogTemplates upgrades generated version 1 and 2 Backlog
+// graphs to the current template, and refreshes a Refine Task prompt that
+// still matches an earlier default. Version 1 and 2 graphs still have the
+// Analyze / intent.md path. SuperPlane replaces that path. A graph that no
+// longer matches those node sets is user-owned. An edited Refine Task prompt
 // stays as the user wrote it.
 func UpgradeDefaultBacklogTemplates(
 	ctx context.Context,
@@ -184,19 +184,7 @@ func isDefaultLegacyBacklog(nodes []models.Node, edges []models.Edge) bool {
 	if !models.IsBacklogFactoryApp(nodes, edges) || backlogTemplateVersionFrom(nodes) >= backlogTemplateVersion {
 		return false
 	}
-	request := backlogCanvasRequest{
-		Agent:      intakeAgentFromCanvasNodes(nodes),
-		GitHubName: backlogGitHubIntegrationName(nodes),
-	}
-	legacy := buildLegacyBacklogCanvas(request)
-	v2 := buildV2BacklogCanvas(request)
-	return matchesBacklogSnapshot(nodes, edges, legacy.Nodes(), legacy.Edges()) ||
-		matchesBacklogSnapshot(nodes, edges, v2.Nodes(), v2.Edges())
-}
-
-func matchesBacklogSnapshot(nodes []models.Node, edges []models.Edge, expectedNodes []models.Node, expectedEdges []models.Edge) bool {
-	return reflect.DeepEqual(backlogBehaviorNodes(nodes), backlogBehaviorNodes(expectedNodes)) &&
-		reflect.DeepEqual(sortedBacklogEdges(edges), sortedBacklogEdges(expectedEdges))
+	return models.IsLegacyAnalyzeBacklog(nodes)
 }
 
 func backlogTemplateVersionFrom(nodes []models.Node) int {

@@ -89,3 +89,46 @@ func TestIsBacklogFactoryApp(t *testing.T) {
 		assert.False(t, IsBacklogFactoryApp([]Node{triggerNode("trigger", "onWorkOrder")}, nil))
 	})
 }
+
+func TestIsLegacyAnalyzeBacklog(t *testing.T) {
+	componentNode := func(id, component string) Node {
+		return Node{ID: id, Ref: NodeRef{Component: &ComponentRef{Name: component}}}
+	}
+	triggerNode := func(id, trigger string) Node {
+		return Node{ID: id, Ref: NodeRef{Trigger: &TriggerRef{Name: trigger}}}
+	}
+
+	t.Run("accepts version 1", func(t *testing.T) {
+		nodes := []Node{
+			triggerNode("trigger", "onWorkOrder"),
+			componentNode("analyze", "runnerClaudeCode"),
+			componentNode("report-confidence", "reportWorkOrderCheck"),
+			componentNode("attach-intent", "addWorkOrderArtifact"),
+			componentNode("add-run-error", "addRunError"),
+		}
+		assert.True(t, IsLegacyAnalyzeBacklog(nodes))
+	})
+
+	t.Run("accepts version 2", func(t *testing.T) {
+		nodes := []Node{
+			triggerNode("trigger", "onWorkOrder"),
+			componentNode("task-refinement-enabled", "if"),
+			componentNode("analyze", "runnerClaudeCode"),
+			componentNode("refine-task", "runnerClaudeCode"),
+			componentNode("report-confidence", "reportWorkOrderCheck"),
+			componentNode("attach-intent", "addWorkOrderArtifact"),
+			componentNode("add-run-error", "addRunError"),
+		}
+		assert.True(t, IsLegacyAnalyzeBacklog(nodes))
+	})
+
+	t.Run("rejects version 3", func(t *testing.T) {
+		nodes := []Node{
+			triggerNode("trigger", "onWorkOrder"),
+			componentNode("task-refinement-enabled", "if"),
+			componentNode("refine-task", "runnerClaudeCode"),
+			componentNode("add-run-error", "addRunError"),
+		}
+		assert.False(t, IsLegacyAnalyzeBacklog(nodes))
+	})
+}

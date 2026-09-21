@@ -135,6 +135,26 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 
+  it("keeps a started task on the analysis popup when Planning is off", () => {
+    lookupState.planning = { enabled: false, clarity: true, confidence: true };
+    const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
+    expect(fixture.footer.kind).not.toBe("draft");
+
+    renderPopup(undefined, fixture);
+
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
+  it("uses the analysis popup for a draft when Planning is off", () => {
+    lookupState.planning = { enabled: false, clarity: true, confidence: true };
+
+    renderPopup();
+
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
   it("keeps a draft on the analysis popup when artifact lookup fails", () => {
     lookupState.artifactsError = new Error("artifacts unavailable");
 

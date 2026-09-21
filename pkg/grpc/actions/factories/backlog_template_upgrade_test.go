@@ -8,10 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
@@ -77,10 +79,12 @@ func Test__UpgradeDefaultBacklogTemplatesSkipsCustomizedBacklog(t *testing.T) {
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	canvasModel, _, _ := createLegacyBacklogForUpgrade(ctx, t, r, factoryModel.ID, func(nodes []models.Node) {
-		analysis := findModelNode(t, nodes, intakeAnalysisNodeID)
-		steps := analysis.Configuration["steps"].([]any)
-		steps[1].(map[string]any)["prompt"] = "Use the team's custom scoring rules."
+	canvasModel, _, _ := createLegacyBacklogForUpgrade(ctx, t, r, factoryModel.ID, func(nodes []models.CanvasNode) []models.CanvasNode {
+		return append(nodes, models.CanvasNode{
+			NodeID: "custom-step",
+			Type:   models.NodeTypeAction,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: intakeFilterComponent}}),
+		})
 	})
 	previousVersionID := *canvasModel.LiveVersionID
 
@@ -228,30 +232,7 @@ func createV2BacklogForUpgrade(
 	factoryID uuid.UUID,
 ) (*models.Canvas, []models.Node, []models.Edge) {
 	t.Helper()
-	document := buildV2BacklogCanvas(backlogCanvasRequest{Name: "Backlog"})
-	nodes, edges, err := document.Parse(r.Registry, r.Organization.ID.String())
-	require.NoError(t, err)
-
-	created, err := canvases.CreateCanvas(
-		ctx,
-		r.Registry,
-		r.Encryptor,
-		r.AuthService,
-		r.GitProvider,
-		"http://localhost:8000",
-		r.Organization.ID,
-		document.Metadata.Name,
-		document.Metadata.Description,
-		&factoryID,
-		nodes,
-		edges,
-		nil,
-	)
-	require.NoError(t, err)
-	canvasID := uuid.MustParse(created.GetCanvas().GetMetadata().GetId())
-	canvasModel, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvasID)
-	require.NoError(t, err)
-	return canvasModel, nodes, edges
+	return createAnalyzeBacklogForUpgrade(ctx, t, r, factoryID, 2, "Backlog", nil)
 }
 
 func createLegacyBacklogForUpgrade(
@@ -259,37 +240,73 @@ func createLegacyBacklogForUpgrade(
 	t *testing.T,
 	r *support.ResourceRegistry,
 	factoryID uuid.UUID,
-	customize func([]models.Node),
+	customize func([]models.CanvasNode) []models.CanvasNode,
 ) (*models.Canvas, []models.Node, []models.Edge) {
 	t.Helper()
-	legacyDocument := buildLegacyBacklogCanvas(backlogCanvasRequest{Name: "Scores new tasks"})
-	legacyNodes, legacyEdges, err := legacyDocument.Parse(r.Registry, r.Organization.ID.String())
-	require.NoError(t, err)
-	require.Equal(t, models.FactoryAppTemplateBacklogID, models.FactoryAppTemplateID(legacyNodes))
+	return createAnalyzeBacklogForUpgrade(ctx, t, r, factoryID, 1, "Scores new tasks", customize)
+}
+
+func createAnalyzeBacklogForUpgrade(
+	ctx context.Context,
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	version int,
+	name string,
+	customize func([]models.CanvasNode) []models.CanvasNode,
+) (*models.Canvas, []models.Node, []models.Edge) {
+	t.Helper()
+	nodes := []models.CanvasNode{
+		{
+			NodeID: backlogTriggerNodeID,
+			Name:   backlogTriggerName,
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factory.OnWorkOrderTriggerName},
+			}),
+			Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, version)),
+		},
+		actionCanvasNode(intakeAnalysisNodeID, "runnerClaudeCode"),
+		actionCanvasNode(intakeReportConfidenceNodeID, "reportWorkOrderCheck"),
+		actionCanvasNode("attach-intent", "addWorkOrderArtifact"),
+		actionCanvasNode(intakeAddRunErrorNodeID, intakeAddRunErrorComponent),
+	}
+	if version == 2 {
+		nodes = []models.CanvasNode{
+			nodes[0],
+			actionCanvasNode(backlogRefinementFilterNodeID, intakeFilterComponent),
+			actionCanvasNode(intakeAnalysisNodeID, "runnerClaudeCode"),
+			actionCanvasNode(backlogRefinementNodeID, "runnerClaudeCode"),
+			actionCanvasNode(intakeReportConfidenceNodeID, "reportWorkOrderCheck"),
+			actionCanvasNode("attach-intent", "addWorkOrderArtifact"),
+			actionCanvasNode(intakeAddRunErrorNodeID, intakeAddRunErrorComponent),
+		}
+	}
 	if customize != nil {
-		customize(legacyNodes)
+		nodes = customize(nodes)
 	}
 
-	created, err := canvases.CreateCanvas(
-		ctx,
-		r.Registry,
-		r.Encryptor,
-		r.AuthService,
-		r.GitProvider,
-		"http://localhost:8000",
-		r.Organization.ID,
-		legacyDocument.Metadata.Name,
-		legacyDocument.Metadata.Description,
-		&factoryID,
-		legacyNodes,
-		legacyEdges,
-		nil,
-	)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nodes, nil)
+	require.NoError(t, database.DB(ctx).Model(canvas).Updates(map[string]any{
+		"factory_id": factoryID,
+		"name":       name,
+	}).Error)
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.DB(ctx), canvas.ID)
 	require.NoError(t, err)
-	canvasID := uuid.MustParse(created.GetCanvas().GetMetadata().GetId())
-	canvasModel, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvasID)
-	require.NoError(t, err)
-	return canvasModel, legacyNodes, legacyEdges
+	require.Equal(t, models.FactoryAppTemplateBacklogID, models.FactoryAppTemplateID(liveVersion.Nodes))
+	return canvas, liveVersion.Nodes, liveVersion.Edges
+}
+
+func actionCanvasNode(nodeID, component string) models.CanvasNode {
+	return models.CanvasNode{
+		NodeID: nodeID,
+		Name:   nodeID,
+		Type:   models.NodeTypeAction,
+		Ref: datatypes.NewJSONType(models.NodeRef{
+			Component: &models.ComponentRef{Name: component},
+		}),
+	}
 }
 
 func backlogUpgradeDependencies(r *support.ResourceRegistry) IntakeDependencies {
