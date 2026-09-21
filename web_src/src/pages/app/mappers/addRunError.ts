@@ -49,7 +49,8 @@ export const addRunErrorMapper: ComponentBaseMapper = {
       details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const message = payload?.data?.message;
+    const data = payload?.data as { message?: unknown } | undefined;
+    const message = data?.message;
     if (typeof message === "string" && message !== "") {
       details["Error Message"] = message;
     }

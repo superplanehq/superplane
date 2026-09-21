@@ -26,7 +26,7 @@ interface RunFunctionMetadata {
 
 interface RunFunctionOutput {
   requestId: string;
-  payload?: any;
+  payload?: unknown;
   payloadRaw?: string;
   functionError?: string;
   report?: {

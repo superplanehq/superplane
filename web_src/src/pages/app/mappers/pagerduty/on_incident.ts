@@ -25,7 +25,7 @@ interface OnIncidentEventData {
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data?.data as OnIncidentEventData;
+    const eventData = (context.event?.data as { data?: OnIncidentEventData } | undefined)?.data;
     const incident = eventData?.incident;
     const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
@@ -37,7 +37,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data?.data as OnIncidentEventData;
+    const eventData = (context.event?.data as { data?: OnIncidentEventData } | undefined)?.data;
     return getDetailsForIncident(eventData?.incident, eventData?.agent);
   },
 

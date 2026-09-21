@@ -56,7 +56,7 @@ export const getDashboardMapper: ComponentBaseMapper = {
       }
     }
 
-    const dashboard: DashboardDetails | undefined = payload.data;
+    const dashboard = payload.data as DashboardDetails | undefined;
     if (!dashboard) {
       details.Response = "No data returned";
       return details;

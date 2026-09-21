@@ -12,7 +12,8 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
     return null;
   }
 
-  return outputs.default[0].data.incident as Incident;
+  const payload = outputs.default[0].data as { incident?: Incident } | undefined;
+  return payload?.incident ?? null;
 }
 
 export function getDetailsForIncident(incident: Incident | undefined, agent?: ResourceRef): Record<string, string> {

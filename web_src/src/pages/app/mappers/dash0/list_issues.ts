@@ -121,7 +121,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
     return renderWithTimeAgo("no issues", date);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
