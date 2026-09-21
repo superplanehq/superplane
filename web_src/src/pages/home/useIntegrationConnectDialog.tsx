@@ -211,7 +211,7 @@ export function useIntegrationConnectDialog({
       return;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
-      void hostedConnect.jira();
+      void hostedConnect.jira(true);
       return;
     }
     openCreateIntegrationModal(integrationName);
@@ -443,7 +443,7 @@ function useHostedProviderConnect({
   };
 }
 
-function useHostedJiraConnect({
+export function useHostedJiraConnect({
   organizationId,
   returnTo,
   connected,
@@ -460,21 +460,25 @@ function useHostedJiraConnect({
     configuration?: Record<string, unknown>;
   }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
 }) {
-  return useCallback(async (): Promise<boolean> => {
-    try {
-      return await startDirectJiraConnect({
-        organizationId,
-        returnTo,
-        existingNames: existingIntegrationNames,
-        connected,
-        create: async (payload) => {
-          const response = await createIntegration(payload);
-          return response.data;
-        },
-      });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
-      return false;
-    }
-  }, [connected, createIntegration, existingIntegrationNames, organizationId, returnTo]);
+  return useCallback(
+    async (forceNew = false): Promise<boolean> => {
+      try {
+        return await startDirectJiraConnect({
+          organizationId,
+          returnTo,
+          existingNames: existingIntegrationNames,
+          connected,
+          forceNew,
+          create: async (payload) => {
+            const response = await createIntegration(payload);
+            return response.data;
+          },
+        });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
+        return false;
+      }
+    },
+    [connected, createIntegration, existingIntegrationNames, organizationId, returnTo],
+  );
 }
