@@ -12,6 +12,7 @@ export type PriceBookModelRate = {
   cache_read_cents_per_million: number;
   cache_write_cents_per_million: number;
   reasoning_cents_per_million: number;
+  selected?: boolean;
 };
 
 export type PriceBookVMRate = {
