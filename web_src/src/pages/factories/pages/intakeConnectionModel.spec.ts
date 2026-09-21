@@ -14,6 +14,7 @@ import {
   intakeProviderAppName,
   intakeReconnectLabel,
   intakeSourceAllowsRebind,
+  showIntakeConnectAction,
 } from "./intakeConnectionModel";
 
 describe("intakeConnectionModel", () => {
@@ -65,8 +66,10 @@ describe("intakeConnectionModel", () => {
   });
 
   it("labels connect and reconnect from the selected connection", () => {
-    expect(intakeConnectLabel(false, "Jira")).toBe("Connect Jira");
-    expect(intakeConnectLabel(true, "Jira")).toBe("Connect another");
+    expect(intakeConnectLabel("Jira")).toBe("Connect Jira");
+    expect(showIntakeConnectAction(0, false)).toBe(true);
+    expect(showIntakeConnectAction(1, false)).toBe(false);
+    expect(showIntakeConnectAction(0, true)).toBe(false);
     expect(intakeChooseConnectionCopy("jira-issues")).toBe("Choose the Jira site that SuperPlane will monitor.");
     expect(
       intakeReconnectLabel({

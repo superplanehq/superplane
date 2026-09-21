@@ -3,6 +3,7 @@ package jira
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -107,10 +108,43 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 	}
 
 	if status < 200 || status >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", status, string(responseBody))
+		return nil, &APIError{StatusCode: status, Body: string(responseBody)}
 	}
 
 	return responseBody, nil
+}
+
+// APIError is a non-2xx response from Jira. Consumers use StatusCode to
+// decide whether to retry.
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, e.Body)
+}
+
+// IsRetryableAPIError reports whether the consumer should nack the message
+// so Tackle redelivers it. Rate limits, request timeouts, server errors,
+// and transport failures retry. Client errors such as 401, 403, and 404
+// do not.
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusTooManyRequests ||
+			apiErr.StatusCode == http.StatusRequestTimeout ||
+			apiErr.StatusCode >= http.StatusInternalServerError
+	}
+
+	message := err.Error()
+	return strings.Contains(message, "error executing request") ||
+		strings.Contains(message, "error reading body") ||
+		strings.Contains(message, "error reading request body")
 }
 
 // recoverFromUnauthorized refreshes the access token after a 401. Atlassian's refresh tokens are
@@ -456,6 +490,47 @@ type Status struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Category string `json:"-"`
+}
+
+// UnmarshalJSON reads both the flat statusCategory string from
+// /rest/api/3/statuses/search and the nested statusCategory.key object
+// returned by issue and transition payloads.
+func (s *Status) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		StatusCategory any    `json:"statusCategory"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	s.ID = raw.ID
+	s.Name = raw.Name
+	s.Category = statusCategoryFromValue(raw.StatusCategory)
+	return nil
+}
+
+func statusCategoryFromValue(value any) string {
+	switch category := value.(type) {
+	case string:
+		if normalized := normalizeStatusCategoryName(category); normalized != "UNDEFINED" {
+			return normalized
+		}
+		return normalizeStatusCategoryKey(category)
+	case map[string]any:
+		if key, _ := category["key"].(string); strings.TrimSpace(key) != "" {
+			return normalizeStatusCategoryKey(key)
+		}
+		if name, _ := category["name"].(string); strings.TrimSpace(name) != "" {
+			return normalizeStatusCategoryName(name)
+		}
+	}
+	return "UNDEFINED"
+}
+
+func isDoneCategory(category string) bool {
+	return normalizeStatusCategoryName(category) == "DONE" ||
+		normalizeStatusCategoryKey(category) == "DONE"
 }
 
 type projectStatusCategory struct {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { LiveLogStream, type LiveLogRecordEnvelope } from "@/ui/CanvasPage/RunnerLiveLogDialog/liveLogStream";
+import { LiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/liveLogStream";
 
 import {
   emptyAgentActivityState,
@@ -78,7 +78,7 @@ export function useAgentActivityStream({
         ),
       }));
     };
-    const queueRecord = (record: LiveLogRecordEnvelope) => {
+    const queueRecord = (record: AgentActivityRecord) => {
       pendingRecords.push(record);
       if (animationFrame === undefined) {
         animationFrame = window.requestAnimationFrame(flushRecords);

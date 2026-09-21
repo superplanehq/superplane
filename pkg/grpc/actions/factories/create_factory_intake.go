@@ -101,12 +101,23 @@ func CreateFactoryIntake(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
+
+	settings := defaultIntakeSettings()
+	if source == models.FactoryIntakeSourceJiraIssues {
+		settings = defaultJiraIntakeSettings()
+	}
+	settings = parseIntakeSettings(settings, req.GetSettings())
+	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
+		settings.ConfidencePct = DefaultIntakeConfidencePct
+	}
+
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
 		OrganizationID: orgID,
 		FactoryID:      factoryID,
 		Source:         source,
 		Name:           name,
 		Binding:        binding,
+		Settings:       settings,
 	})
 	if err != nil {
 		return nil, err
@@ -182,6 +193,7 @@ type intakeCanvasRequest struct {
 	Source         string
 	Name           string
 	Binding        *intakeBinding
+	Settings       intakeSettings
 }
 
 // createIntakeCanvas builds the intake graph and commits it as the canvas's

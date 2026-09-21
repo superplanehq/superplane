@@ -295,6 +295,7 @@ func applyIntakeSettingsToGraph(
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)
 				nodes[i].Configuration = configuration
+				nodes[i].Metadata = mergeJiraCompletionMetadata(nodes[i].Metadata, updated)
 			default:
 				continue
 			}

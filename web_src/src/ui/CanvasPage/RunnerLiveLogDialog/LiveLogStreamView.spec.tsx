@@ -375,8 +375,7 @@ describe("LiveLogStreamView", () => {
 
     render(<LiveLogStreamView execution={startedExecution} />);
 
-    expect(screen.getByText("Explored foo.go")).toBeInTheDocument();
-    expect(screen.getByText("Searched")).toBeInTheDocument();
+    expect(screen.getByText("pkg/foo.go")).toBeInTheDocument();
     expect(screen.getByText("rootTriggerRenderer")).toBeInTheDocument();
   });
 

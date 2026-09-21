@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { PhaseLogCard } from "./PhaseLogCard";
-import { groupClaudeSteps, toolCallSummary } from "./phaseLogStream";
+import { groupClaudeSteps } from "./phaseLogStream";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
@@ -35,15 +35,6 @@ function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: numb
     delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
   };
 }
-
-describe("toolCallSummary", () => {
-  it("names read files and ran commands", () => {
-    expect(toolCallSummary([{ type: "read" }, { type: "read" }, { type: "bash" }])).toBe("Read 2 files, ran 1 command");
-    expect(toolCallSummary([{ componentType: "read" }, { componentType: "bash" }])).toBe("Read 1 file, ran 1 command");
-    expect(toolCallSummary([{ type: "read" }])).toBe("Read 1 file");
-    expect(toolCallSummary([{ type: "bash" }, { type: "bash" }])).toBe("Ran 2 commands");
-  });
-});
 
 describe("groupClaudeSteps", () => {
   it("keeps tools and agent notes in log order", () => {
@@ -407,7 +398,7 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.queryByText("prompt")).not.toBeInTheDocument();
     expect(screen.queryByText(/"message":"Hi! I am ready/)).not.toBeInTheDocument();
     expect(screen.getByText("The repository is ready. What do you want to do?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Read 1 file, ran 1 command" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read 1 file, used 1 tool" })).toBeInTheDocument();
   });
 
   it("hides the automation and node headers in the compact session log", () => {

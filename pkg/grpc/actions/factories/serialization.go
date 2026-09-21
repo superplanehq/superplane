@@ -2,6 +2,7 @@ package factories
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -166,7 +167,7 @@ func serializeFactoryIntake(
 		CanvasId:            intake.CanvasID.String(),
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
-		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
+		Settings:            serializeIntakeSettings(intake.Source, intakeSettingsFromGraph(intake.Source, graph, spec)),
 		Healthy:             health == pb.FactoryIntake_HEALTH_OK,
 		Health:              health,
 		IntegrationId:       graph.TriggerIntegrationID(spec),
@@ -203,6 +204,18 @@ func intakeIntegrationStates(tx *gorm.DB, orgID uuid.UUID) (map[string]string, e
 		states[integrations[i].ID.String()] = integrations[i].State
 	}
 	return states, nil
+}
+
+func configurationString(value any) string {
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {

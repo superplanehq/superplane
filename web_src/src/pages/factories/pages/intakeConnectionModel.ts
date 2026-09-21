@@ -40,7 +40,6 @@ export const INTAKE_CONNECTION_COPY = {
   chooseProductive: "Choose the Productive.io account that SuperPlane will monitor.",
   project: "Project",
   connect: "Connect",
-  connectAnother: "Connect another",
   connecting: "Connecting...",
   loadingConnections: "Loading connections...",
   loadingProjects: "Loading projects...",
@@ -112,10 +111,11 @@ export function intakeReconnectLabel(integration: OrganizationsIntegration | und
   return repairActionLabel(integration.status?.stateDescription, integration.metadata?.integrationName);
 }
 
-export function intakeConnectLabel(hasConnections: boolean, providerName: string): string {
-  if (hasConnections) {
-    return INTAKE_CONNECTION_COPY.connectAnother;
-  }
+export function showIntakeConnectAction(integrationCount: number, integrationsLoading: boolean): boolean {
+  return integrationCount === 0 && !integrationsLoading;
+}
+
+export function intakeConnectLabel(providerName: string): string {
   return `${INTAKE_CONNECTION_COPY.connect} ${providerName}`;
 }
 
