@@ -1,4 +1,9 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryIntakeSettings,
+  FactoriesFactoryLine,
+  FactoryLineStep,
+} from "@/api-client";
 import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -10,6 +15,8 @@ import { useNavigate } from "react-router";
 import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganization";
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
+import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
+import type { JiraCompletionColumnValue } from "../JiraCompletionColumnFields";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
@@ -133,7 +140,7 @@ export async function provisionWorkspace(args: {
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
-  jira?: { integrationId: string; projectId: string };
+  jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -198,9 +205,14 @@ function jiraIntakeBinding(
   issuesChoice: IssuesChoiceId | null,
   jiraId: string | undefined,
   projectId: string | undefined,
-): { integrationId: string; projectId: string } | undefined {
+  completion?: JiraCompletionColumnValue,
+): { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings } | undefined {
   if (issuesChoice !== "jira" || !jiraId || !projectId) return undefined;
-  return { integrationId: jiraId, projectId };
+  return {
+    integrationId: jiraId,
+    projectId,
+    settings: jiraCompletionSettingsToApi(completion ?? { jiraMoveOnComplete: true, jiraCompletionColumn: "" }),
+  };
 }
 
 function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: IntegrationSelections): string | undefined {
@@ -231,6 +243,7 @@ export function useFinishOnboarding(args: {
   plan: OnboardingAgentPlan | undefined;
   githubOwner?: string;
   jiraProjectId?: string;
+  jiraCompletion?: JiraCompletionColumnValue;
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
@@ -281,7 +294,7 @@ export function useFinishOnboarding(args: {
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
         agentIntegrationId: agentIntegrationIdForPlan(args.plan, args.selections),
-        jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId),
+        jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
       });
       await afterWorkspaceProvisioned({
         factory: args.factory,

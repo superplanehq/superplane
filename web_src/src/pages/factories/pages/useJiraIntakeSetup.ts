@@ -12,6 +12,8 @@ import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
+import type { JiraCompletionColumnValue } from "./JiraCompletionColumnFields";
+import { DEFAULT_JIRA_COMPLETION_SETTINGS, jiraCompletionSettingsToApi } from "./intakeSourceSettingsModel";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
 export type JiraSetupStep = "connection" | "project";
@@ -21,6 +23,9 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [skipInitialImport, setSkipInitialImport] = useState(false);
+  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>({
+    ...DEFAULT_JIRA_COMPLETION_SETTINGS,
+  });
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
@@ -72,6 +77,11 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     void connectedQuery.refetch();
   }, [stayOnConnection, step, selectIntegrationId, jiraIntegrations, integrationId, connectedQuery]);
 
+  const selectProject = (id: string) => {
+    setProjectId(id);
+    setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
+  };
+
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
     setConnectOpen(false);
@@ -105,6 +115,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
         source: "SOURCE_JIRA_ISSUES",
         integrationId,
         resourceId: projectId,
+        settings: jiraCompletionSettingsToApi(jiraCompletion),
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
@@ -120,9 +131,11 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     integrationId,
     setIntegrationId,
     projectId,
-    setProjectId,
+    setProjectId: selectProject,
     skipInitialImport,
     setSkipInitialImport,
+    jiraCompletion,
+    setJiraCompletion,
     connectOpen,
     setConnectOpen,
     connecting,

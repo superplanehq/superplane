@@ -109,6 +109,9 @@ export function IntakeSettingsHost({
     <IntakeSourceSettingsPopup
       settings={intake.settings}
       sourceId={intake.source.id}
+      organizationId={organizationId}
+      integrationId={intake.integrationId}
+      resourceId={intake.resourceId}
       labelOptions={labelOptions}
       labelOptionsLoading={repositoryLabels.isLoading}
       automationGraph={automation.graph}
