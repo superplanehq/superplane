@@ -389,9 +389,29 @@ func TestFormatStreamJsonLinesEmitsThinkingAndStartsToolsBeforeResults(t *testin
 		}
 	}
 	require.NotNil(t, input)
-	assert.Equal(t, "printf ok", input["partial_json"])
+	assert.Equal(t, "printf ok", input["input"])
+	assert.NotContains(t, input, "partial_json")
+	inputRecords := []map[string]any{}
+	for _, record := range records {
+		if record["type"] == "tool_input_delta" {
+			inputRecords = append(inputRecords, record)
+		}
+	}
+	assert.Len(t, inputRecords, 1)
 	toolEnd := typedActivityRecord(t, records, "tool_end")
 	assert.Equal(t, "passed", toolEnd["status"])
+}
+
+func TestFormatStreamJsonLinesPreservesBufferedToolInputWhenStreamEnds(t *testing.T) {
+	output := runClaudeFormatterWithActivity(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"message-1"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-a","name":"Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"git status\"}"}}}`,
+	})
+
+	input := typedActivityRecord(t, activityRecords(t, output), "tool_input_delta")
+	assert.Equal(t, "git status", input["input"])
+	assert.Equal(t, true, input["complete"])
 }
 
 func TestFormatStreamJsonLinesReportsMalformedPartialToolInput(t *testing.T) {

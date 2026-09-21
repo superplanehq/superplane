@@ -85,6 +85,27 @@ export type AgentActivityState = {
 
 export const emptyAgentActivityState: AgentActivityState = { activities: [], seenEventIds: new Set() };
 
+export function parseAgentActivityRecordText(text: string): AgentActivityRecord | undefined {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) {
+    return undefined;
+  }
+  try {
+    const record = JSON.parse(trimmed) as AgentActivityRecord;
+    if (
+      record.schema_version !== 2 ||
+      typeof record.type !== "string" ||
+      !record.type ||
+      (typeof record.activity_id !== "string" && typeof record.event_id !== "string")
+    ) {
+      return undefined;
+    }
+    return record;
+  } catch {
+    return undefined;
+  }
+}
+
 export function reduceAgentActivityRecords(
   state: AgentActivityState,
   records: AgentActivityRecord[],
@@ -293,18 +314,19 @@ function updateToolInput(activity: AgentActivity, record: AgentActivityRecord): 
     item.type === "tool"
       ? {
           ...item,
-          input: nextToolInput(item.input, record.partial_json),
+          input: nextToolInput(item.input, record),
           truncated: item.truncated || Boolean(record.truncated),
         }
       : item,
   );
 }
 
-function nextToolInput(current: string, partialJson: string | undefined): string {
-  if (partialJson == null || partialJson === "") {
+function nextToolInput(current: string, record: AgentActivityRecord): string {
+  const input = record.input ?? (record.complete ? record.partial_json : undefined);
+  if (!input) {
     return current;
   }
-  return partialJson;
+  return input;
 }
 
 function endTool(activity: AgentActivity, record: AgentActivityRecord): AgentActivity {

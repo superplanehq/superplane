@@ -1,6 +1,6 @@
 import type { AgentActivity, AgentActivityItem } from "@/lib/agentActivity";
 import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
-import { agentToolLabelText } from "@/lib/agentToolLabels";
+import { agentToolDisplayText } from "@/lib/agentToolLabels";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
@@ -167,7 +167,7 @@ function noteFromAgentActivityItem(
       noteParentId: stepId,
       noteDepth: 1,
       componentType: item.kind,
-      componentName: agentToolLabelText(item),
+      componentName: agentToolDisplayText(item),
       status: streamStatus(item.status),
       detail: output && !isHiddenAgentLiveLogText(output) ? output : undefined,
       ...orderKeyProps(orderKey),
