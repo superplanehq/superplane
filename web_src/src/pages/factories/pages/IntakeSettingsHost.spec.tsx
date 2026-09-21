@@ -493,6 +493,8 @@ describe("IntakeSettingsHost", () => {
         newIssues: true,
         reopenedIssues: true,
         superplaneLabelAdded: true,
+        jiraMoveOnComplete: true,
+        jiraCompletionColumn: "Done",
       },
       integrationId: "jira-2",
       resourceId: "OPS",
