@@ -1,8 +1,8 @@
 {
-  "maxAllowedTotalIssues": 510,
+  "maxAllowedTotalIssues": 489,
   "maxAllowedByRule": {
-    "complexity": 215,
-    "@typescript-eslint/no-explicit-any": 119,
+    "complexity": 214,
+    "@typescript-eslint/no-explicit-any": 99,
     "max-lines-per-function": 73,
     "max-statements": 61,
     "max-lines": 25,
@@ -12,8 +12,8 @@
     "no-eslint-disable-next-line": 3
   },
   "maxAllowedMetricMaximumByRule": {
-    "max-lines": 3569,
+    "max-lines": 3553,
     "complexity": 197
   },
-  "updatedAt": "2026-09-17T15:52:02.444Z"
+  "updatedAt": "2026-09-18T14:46:46.816Z"
 }

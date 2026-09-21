@@ -38,7 +38,7 @@ export const createIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] };
     if (!outputs?.default || outputs.default.length === 0) {
       if (context.execution.createdAt) {

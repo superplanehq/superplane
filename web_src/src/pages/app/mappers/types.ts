@@ -115,7 +115,7 @@ export interface ComponentDefinition {
 export interface ComponentBaseMapper {
   props(context: ComponentBaseContext): ComponentBaseProps;
   subtitle(context: SubtitleContext): string | React.ReactNode;
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any>;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown>;
 }
 
 export type ComponentBaseContext = {

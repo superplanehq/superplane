@@ -140,7 +140,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     return renderWithTimeAgo("no incidents", date);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
     if (context.execution.createdAt) {
       details["Checked at"] = new Date(context.execution.createdAt).toLocaleString();

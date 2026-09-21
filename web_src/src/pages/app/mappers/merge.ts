@@ -163,7 +163,7 @@ export const mergeMapper: ComponentBaseMapper = {
     return getMergeSubtitle(context.execution);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as ExecutionMetadata | undefined;
 
