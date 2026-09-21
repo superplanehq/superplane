@@ -56,6 +56,26 @@ describe("withOrganizationHeader", () => {
     expect("organizationId" in options).toBe(false);
   });
 
+  it("accepts headers composed from RequestInit", () => {
+    const init: RequestInit = {
+      headers: {
+        Accept: "application/json",
+      },
+    };
+
+    const options = withOrganizationHeader({
+      organizationId: "org-1",
+      headers: {
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...init.headers,
+      },
+    });
+
+    expect(options.headers.Accept).toBe("application/json");
+    expect(options.headers["x-organization-id"]).toBe("org-1");
+  });
+
   it("merges provided headers and preserves them", () => {
     setPathname("/old-org-id");
 
