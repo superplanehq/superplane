@@ -16,7 +16,7 @@ import type {
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";

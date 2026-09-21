@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type { ComponentBaseMapper, EventStateRegistry, ExecutionInfo, OutputPayload, TriggerRenderer } from "../types";
 import { defaultStateFunction } from "../stateRegistry";
 import { baseMapper } from "./base";

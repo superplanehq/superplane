@@ -2,7 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
+import { PhaseLogCard } from "./PhaseLogCard";
+import { groupClaudeSteps, toolCallSummary } from "./phaseLogStream";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 

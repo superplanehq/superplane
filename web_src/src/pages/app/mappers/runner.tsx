@@ -4,7 +4,7 @@ import { getColorClass } from "@/lib/colors";
 import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
 import { getTriggerRenderer } from "./mapperLookup";
