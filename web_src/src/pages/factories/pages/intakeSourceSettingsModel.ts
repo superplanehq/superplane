@@ -27,6 +27,10 @@ export interface IntakeSourceSettings {
   /** Also create a task when somebody adds the "superplane" label to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
+  /** Move the originating Jira issue when SuperPlane completes the task. */
+  jiraMoveOnComplete: boolean;
+  /** Jira status name to move the issue to. Empty means the Done column. */
+  jiraCompletionColumn: string;
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -40,7 +44,14 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   reopenedIssues: true,
   superplaneLabelAdded: true,
   authorsWithAccess: false,
+  jiraMoveOnComplete: true,
+  jiraCompletionColumn: "",
 };
+
+export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
+  jiraMoveOnComplete: true,
+  jiraCompletionColumn: "",
+} as const;
 
 export const INTAKE_SETTINGS_COPY = {
   title: "Intake GitHub issues",
@@ -132,6 +143,8 @@ export function intakeSettingsFromApi(
     filterByLabel: labels.length > 0,
     assignment: assignmentFromApi(settings?.assignment),
     ...intakeTogglesFromApi(settings),
+    jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
+    jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
   };
 }
 
@@ -151,6 +164,18 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     newIssues: settings.newIssues,
     reopenedIssues: settings.reopenedIssues,
     superplaneLabelAdded: settings.superplaneLabelAdded,
+    jiraMoveOnComplete: settings.jiraMoveOnComplete,
+    jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
+  };
+}
+
+export function jiraCompletionSettingsToApi(settings: {
+  jiraMoveOnComplete: boolean;
+  jiraCompletionColumn: string;
+}): Pick<FactoriesFactoryIntakeSettings, "jiraMoveOnComplete" | "jiraCompletionColumn"> {
+  return {
+    jiraMoveOnComplete: settings.jiraMoveOnComplete,
+    jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
   };
 }
 

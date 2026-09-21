@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
+import { JiraCompletionColumnFields } from "./JiraCompletionColumnFields";
 import { addIntakeLabel, toggleIntakeLabel, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
@@ -28,10 +29,16 @@ export function JiraIntakeFilterFields({
   sourceId,
   settings,
   onSettingsChange,
+  organizationId,
+  integrationId,
+  projectId,
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  organizationId?: string;
+  integrationId?: string;
+  projectId?: string;
 }) {
   if (sourceId !== "jira-issues") {
     return null;
@@ -83,6 +90,22 @@ export function JiraIntakeFilterFields({
           </div>
         </div>
       </fieldset>
+      <JiraCompletionColumnFields
+        organizationId={organizationId ?? ""}
+        integrationId={integrationId ?? ""}
+        projectId={projectId ?? ""}
+        value={{
+          jiraMoveOnComplete: settings.jiraMoveOnComplete,
+          jiraCompletionColumn: settings.jiraCompletionColumn,
+        }}
+        onChange={(next) =>
+          onSettingsChange((current) => ({
+            ...current,
+            jiraMoveOnComplete: next.jiraMoveOnComplete,
+            jiraCompletionColumn: next.jiraCompletionColumn,
+          }))
+        }
+      />
     </div>
   );
 }

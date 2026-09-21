@@ -1131,6 +1131,12 @@ message FactoryIntake {
     optional bool superplane_label_added = 7;
     // Listen for reopened GitHub issues.
     optional bool reopened_issues = 8;
+    // When true, SuperPlane moves the Jira issue when the task completes.
+    // Jira issue intakes only. On by default.
+    optional bool jira_move_on_complete = 9;
+    // Jira status name to move the issue to. Empty means the project's Done
+    // column. Jira issue intakes only.
+    string jira_completion_column = 10;
   }
 
   string id = 1;
@@ -1205,6 +1211,9 @@ message CreateFactoryIntakeRequest {
   // When true, SuperPlane does not import existing issues. The intake still
   // listens for new issues.
   bool skip_initial_import = 7;
+  // Optional intake settings applied when the canvas is created. Used by
+  // the Jira wizard and first-run tickets step to store the completion column.
+  optional FactoryIntake.Settings settings = 8;
 }
 
 message CreateFactoryIntakeResponse {
