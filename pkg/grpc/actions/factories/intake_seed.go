@@ -30,6 +30,10 @@ const (
 	// imports. The wizard tells the user this number.
 	intakeSentrySeedSize = 10
 
+	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
+	// imports. The wizard tells the user this number.
+	intakeJiraSeedSize = 10
+
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
 	intakeGitHubIssuePayloadType = "github.issue"
@@ -202,7 +206,7 @@ func seedJiraIssues(
 
 	projectKey, _ := binding.Configuration["project"].(string)
 	siteURL := jira.SiteURLFromMetadata(installation.Metadata.Data())
-	payloads, err := newestJiraIssueEvents(client, projectKey, siteURL, intakeSeedSize)
+	payloads, err := newestJiraIssueEvents(client, projectKey, siteURL, intakeJiraSeedSize)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}

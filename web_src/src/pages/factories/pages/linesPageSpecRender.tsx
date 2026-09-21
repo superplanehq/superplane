@@ -76,6 +76,10 @@ export function LinesBoardSpecHarness({
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/sentry"
                     element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
                   />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/jira"
+                    element={<div data-testid="jira-intake-setup">Jira setup page</div>}
+                  />
                   <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
                 </Routes>
                 <LocationProbe navigateTo={navigateTo} />

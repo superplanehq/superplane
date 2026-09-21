@@ -1,3 +1,4 @@
+import type { IntegrationsIntegrationDefinition } from "@/api-client";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
   useAvailableIntegrations,
@@ -6,58 +7,93 @@ import {
   useIntegrationResources,
 } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
+import { usesHostedJiraOAuth } from "@/lib/integrations";
+import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router";
 
-export type JiraSetupStep = "connection" | "project" | "complete";
+import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
-export function useJiraIntakeSetup(organizationId: string, factoryId: string, open: boolean, selectIntegrationId = "") {
+export type JiraSetupStep = "connection" | "project";
+
+export function useJiraIntakeSetup(organizationId: string, factoryId: string, selectIntegrationId = "") {
   const [step, setStep] = useState<JiraSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
+  const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
   const pickedReturnedConnection = useRef(false);
 
-  const { connectedQuery, jiraIntegrations, jiraConnections, jiraDefinition, existingNames } =
+  const { connectedQuery, availableQuery, jiraIntegrations, jiraConnections, jiraDefinition, existingNames } =
     useJiraConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project");
+  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
+    enabled: Boolean(integrationId),
+  });
 
   useEffect(() => {
-    if (!open) {
-      pickedReturnedConnection.current = false;
+    pickedReturnedConnection.current = false;
+  }, [selectIntegrationId]);
+
+  useEffect(() => {
+    if (!selectIntegrationId || pickedReturnedConnection.current) {
       return;
     }
-    setStep("connection");
-    setIntegrationId("");
-    setProjectId("");
-    setError(undefined);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !selectIntegrationId || pickedReturnedConnection.current) return;
 
     const returned = jiraConnections.find((integration) => integration.metadata?.id === selectIntegrationId);
-    if (!returned || returned.status?.state !== "ready") return;
+    if (!returned || returned.status?.state !== "ready") {
+      return;
+    }
 
     pickedReturnedConnection.current = true;
     setIntegrationId(selectIntegrationId);
+    setConnectOpen(false);
     setStep("project");
-  }, [open, selectIntegrationId, jiraConnections]);
+    void connectedQuery.refetch();
+  }, [selectIntegrationId, jiraConnections, connectedQuery]);
 
   useEffect(() => {
-    if (selectIntegrationId) return;
-    if (!integrationId && jiraIntegrations.length === 1) {
-      setIntegrationId(jiraIntegrations[0].metadata?.id ?? "");
+    if (stayOnConnection || step !== "connection") {
+      return;
     }
-  }, [integrationId, jiraIntegrations, selectIntegrationId]);
+    if (selectIntegrationId) {
+      return;
+    }
+    const readyId = readyJiraConnectionId(jiraIntegrations, integrationId);
+    if (!readyId) {
+      return;
+    }
+    setIntegrationId(readyId);
+    setConnectOpen(false);
+    setStep("project");
+    void connectedQuery.refetch();
+  }, [stayOnConnection, step, selectIntegrationId, jiraIntegrations, integrationId, connectedQuery]);
 
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
     setConnectOpen(false);
     setStep("project");
     void connectedQuery.refetch();
+  };
+
+  const { connecting, connectJira } = useJiraConnect({
+    organizationId,
+    integrations: jiraIntegrations,
+    integrationId,
+    existingNames,
+    jiraDefinition,
+    definitionLoading: availableQuery.isLoading,
+    createIntegration,
+    completeConnection,
+    setConnectOpen,
+    setError,
+  });
+
+  const returnToConnection = () => {
+    setStayOnConnection(true);
+    setStep("connection");
   };
 
   const createBoundIntake = async () => {
@@ -69,9 +105,10 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
         integrationId,
         resourceId: projectId,
       });
-      setStep("complete");
+      return true;
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "SuperPlane could not create the Jira intake."));
+      setError(getApiErrorMessage(cause, JIRA_INTAKE_SETUP_COPY.wizardCreateError));
+      return false;
     }
   };
 
@@ -84,6 +121,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
     setProjectId,
     connectOpen,
     setConnectOpen,
+    connecting,
     error,
     connectedQuery,
     createIntegration,
@@ -93,8 +131,73 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, op
     jiraDefinition,
     existingNames,
     completeConnection,
+    returnToConnection,
+    connectJira,
     createBoundIntake,
   };
+}
+
+export function readyJiraConnectionId(integrations: Array<{ metadata?: { id?: string } }>, selectedId: string): string {
+  if (selectedId && integrations.some((integration) => integration.metadata?.id === selectedId)) {
+    return selectedId;
+  }
+  return integrations[0]?.metadata?.id ?? "";
+}
+
+type JiraConnectParams = {
+  organizationId: string;
+  integrations: Array<{ metadata?: { id?: string } }>;
+  integrationId: string;
+  existingNames: Set<string>;
+  jiraDefinition?: IntegrationsIntegrationDefinition;
+  definitionLoading: boolean;
+  createIntegration: ReturnType<typeof useCreateIntegration>;
+  completeConnection: (integrationId: string) => void;
+  setConnectOpen: (open: boolean) => void;
+  setError: (message?: string) => void;
+};
+
+// Hosted Jira OAuth opens Atlassian in this tab. A private Atlassian app still
+// collects Client ID and Client Secret in the connect dialog.
+function useJiraConnect(params: JiraConnectParams) {
+  const location = useLocation();
+  const [connecting, setConnecting] = useState(false);
+  const returnPath = `${location.pathname}${location.search}`;
+
+  const connectJira = async () => {
+    params.setError(undefined);
+    const readyId = readyJiraConnectionId(params.integrations, params.integrationId);
+    if (readyId) {
+      params.completeConnection(readyId);
+      return;
+    }
+    if (params.definitionLoading) {
+      return;
+    }
+    if (!usesHostedJiraOAuth(params.jiraDefinition)) {
+      params.setConnectOpen(true);
+      return;
+    }
+
+    setConnecting(true);
+    try {
+      await startDirectJiraConnect({
+        organizationId: params.organizationId,
+        returnTo: returnPath,
+        existingNames: params.existingNames,
+        create: async (payload) => {
+          const response = await params.createIntegration.mutateAsync(payload);
+          return response.data;
+        },
+      });
+    } catch (cause) {
+      params.setError(getApiErrorMessage(cause, JIRA_INTAKE_SETUP_COPY.wizardConnectError));
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  return { connecting, connectJira };
 }
 
 function useJiraConnections(organizationId: string) {
@@ -124,6 +227,7 @@ function useJiraConnections(organizationId: string) {
 
   return {
     connectedQuery,
+    availableQuery,
     jiraIntegrations,
     jiraConnections,
     jiraDefinition: availableQuery.data?.find((integration) => integration.name === "jira"),
