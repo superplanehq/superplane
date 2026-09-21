@@ -41,7 +41,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as Record<string, unknown> | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };
