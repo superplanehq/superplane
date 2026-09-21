@@ -1826,6 +1826,15 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+	tx := database.Conn()
+	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	if skip {
+		return http.StatusOK, nil, nil
+	}
+
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -1833,7 +1842,6 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	}
 
 	logger := logging.ForNode(node)
-	tx := database.Conn()
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)

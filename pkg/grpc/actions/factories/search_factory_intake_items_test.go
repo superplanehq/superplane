@@ -148,6 +148,30 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		assert.Contains(t, message, "Connect this intake first.")
 	})
 
+	t.Run("search still returns items while a Jira intake is paused", func(t *testing.T) {
+		factory := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Jira issues")
+		intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		require.NoError(t, intake.SetPaused(database.DB(t.Context()), true))
+
+		jiraItem := IntakeItem{
+			ID:    "10001",
+			Key:   "ENG-1",
+			Title: "Login fails",
+			URL:   "https://example.atlassian.net/browse/ENG-1",
+		}
+		response, err := SearchFactoryIntakeItems(ctx, deps([]IntakeItem{jiraItem}, nil), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.NoError(t, err)
+		require.Len(t, response.GetItems(), 1)
+		assert.Equal(t, jiraItem.ID, response.GetItems()[0].GetId())
+		assert.Equal(t, jiraItem.Key, response.GetItems()[0].GetKey())
+		assert.Equal(t, jiraItem.Title, response.GetItems()[0].GetTitle())
+	})
+
 	t.Run("unsupported intake is a failed precondition", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := createIntake(t, factory)
@@ -271,6 +295,38 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, item.Title, response.GetOrder().GetTitle())
 		require.NotNil(t, response.GetOrder().GetOrigin())
 		assert.Equal(t, item.URL, response.GetOrder().GetOrigin().GetUrl())
+	})
+
+	t.Run("importing a chosen Jira item still works while the intake is paused", func(t *testing.T) {
+		factory := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Jira issues")
+		intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		require.NoError(t, intake.SetPaused(database.DB(t.Context()), true))
+
+		jiraItem := IntakeItem{
+			ID:    "10001",
+			Key:   "ENG-1",
+			Title: "Login fails",
+			Body:  "Users cannot sign in.",
+			URL:   "https://example.atlassian.net/browse/ENG-1",
+		}
+		jiraDeps := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return stubIntakeItemSource{items: []IntakeItem{jiraItem}}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, jiraDeps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    jiraItem.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder())
+		assert.Equal(t, jiraItem.Title, response.GetOrder().GetTitle())
+		require.NotNil(t, response.GetOrder().GetOrigin())
+		assert.Equal(t, jiraItem.URL, response.GetOrder().GetOrigin().GetUrl())
 	})
 
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {
