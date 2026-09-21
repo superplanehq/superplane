@@ -128,6 +128,10 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "payments", trigger.Configuration["project"])
 		assert.Equal(t, []any{"created", "unresolved"}, trigger.Configuration["actions"])
+		assert.Equal(t, integrationID, intake.GetIntegrationId())
+		assert.Equal(t, "payments", intake.GetResourceId())
+		assert.True(t, intake.GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intake.GetHealth())
 	})
 
 	t.Run("a Sentry intake listens to the production project from setup", func(t *testing.T) {
@@ -216,6 +220,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "ENG", trigger.Configuration["project"])
 		assert.Equal(t, pb.FactoryIntake_SOURCE_JIRA_ISSUES, intake.GetSource())
 		assert.False(t, intake.GetHealthy(), "a pending Jira webhook must not look like a live intake")
+		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, intake.GetHealth())
 
 		canvasID := uuid.MustParse(intake.GetCanvasId())
 		node, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, intakeTriggerNodeID)
@@ -242,12 +247,71 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, listed.GetIntakes(), 1)
 		assert.True(t, listed.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, listed.GetIntakes()[0].GetHealth())
 
 		require.NoError(t, webhook.MarkFailed(database.DB(t.Context())))
 		listed, err = ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
 		require.NoError(t, err)
 		require.Len(t, listed.GetIntakes(), 1)
 		assert.False(t, listed.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, listed.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("a listed Sentry intake is unhealthy after its integration is deleted", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+
+		integration, err := models.FindIntegrationInTransaction(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			uuid.MustParse(integrationID),
+		)
+		require.NoError(t, err)
+		require.NoError(t, integration.SoftDeleteInTransaction(database.DB(t.Context())))
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, response.GetIntakes()[0].GetHealth())
+		assert.Equal(t, integrationID, response.GetIntakes()[0].GetIntegrationId())
+		assert.Equal(t, "payments", response.GetIntakes()[0].GetResourceId())
+	})
+
+	t.Run("a listed Sentry intake is unhealthy while its integration is not ready", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+
+		require.NoError(t, database.DB(t.Context()).Model(&models.Integration{}).
+			Where("id = ?", uuid.MustParse(integrationID)).
+			Update("state", models.IntegrationStateError).Error)
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_INTEGRATION_NOT_READY, response.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("an unbound GitHub intake stays healthy when listed", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.True(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, response.GetIntakes()[0].GetHealth())
 	})
 
 	t.Run("creating a Sentry intake with an invalid user id does not panic", func(t *testing.T) {
@@ -772,6 +836,73 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.False(t, listed.GetIntakes()[0].GetPaused())
 	})
 
+	t.Run("update rebinds a Sentry intake to a ready integration", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: oldID,
+			ResourceId:    "payments",
+		})
+
+		integration, err := models.FindIntegrationInTransaction(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			uuid.MustParse(oldID),
+		)
+		require.NoError(t, err)
+		require.NoError(t, integration.SoftDeleteInTransaction(database.DB(t.Context())))
+
+		newID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		resourceID := "checkout"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &newID,
+			ResourceId:    &resourceID,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, response.GetIntake().GetHealth())
+		assert.Equal(t, newID, response.GetIntake().GetIntegrationId())
+		assert.Equal(t, "checkout", response.GetIntake().GetResourceId())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, newID, *trigger.IntegrationID)
+		assert.Equal(t, "checkout", trigger.Configuration["project"])
+	})
+
+	t.Run("update rejects a binding with only an integration", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("update rejects a GitHub connection change", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		resourceID := "acme/backlog"
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+			ResourceId:    &resourceID,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -856,7 +987,7 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 		InitialImportItemCount: &itemCount,
 	}
 
-	serialized := serializeFactoryIntake(nil, intake, models.LiveCanvasSpec{})
+	serialized := serializeFactoryIntake(nil, intake, models.LiveCanvasSpec{}, nil)
 
 	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
 	require.NotNil(t, serialized.InitialImportItemCount)
@@ -872,9 +1003,10 @@ func Test__SerializeFactoryIntakeJiraWebhookHealth(t *testing.T) {
 		Source:    models.FactoryIntakeSourceJiraIssues,
 	}
 
-	serialized := serializeFactoryIntake(nil, intake, spec)
+	serialized := serializeFactoryIntake(nil, intake, spec, nil)
 
 	assert.False(t, serialized.GetHealthy(), "a Jira intake without a ready webhook must not be healthy")
+	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, serialized.GetHealth())
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {

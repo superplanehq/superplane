@@ -77,6 +77,27 @@ func UpdateFactoryIntake(
 		}
 	}
 
+	if req.IntegrationId != nil || req.ResourceId != nil {
+		if req.IntegrationId == nil || req.ResourceId == nil {
+			return nil, factoryErrorToStatus(
+				invalidArgument("intake integration and project are required"),
+				"failed to update factory intake",
+			)
+		}
+		if err := applyIntakeBinding(
+			ctx,
+			deps,
+			db,
+			factory,
+			intake,
+			canvas,
+			req.GetIntegrationId(),
+			req.GetResourceId(),
+		); err != nil {
+			return nil, err
+		}
+	}
+
 	intake, err = factory.FindIntake(db, intakeID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
@@ -87,8 +108,13 @@ func UpdateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
 	}
 
+	states, err := intakeIntegrationStates(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory intake")
+	}
+
 	return &pb.UpdateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(db, intake, specs[intake.CanvasID]),
+		Intake: serializeFactoryIntake(db, intake, specs[intake.CanvasID], states),
 	}, nil
 }
 
@@ -181,6 +207,102 @@ func applyIntakeSettings(
 				Encryptor:      deps.Encryptor,
 				AuthService:    deps.AuthService,
 				WebhookBaseURL: deps.WebhookBaseURL,
+			},
+		)
+	})
+	if err != nil {
+		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+			return err
+		}
+		return factoryErrorToStatus(err, "failed to update factory intake")
+	}
+
+	return nil
+}
+
+func applyIntakeBinding(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	factory *models.Factory,
+	intake *models.FactoryIntake,
+	canvas *models.Canvas,
+	integrationID string,
+	resourceID string,
+) error {
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+		return factoryErrorToStatus(
+			invalidArgument("GitHub intake connection follows workspace setup"),
+			"failed to update factory intake",
+		)
+	}
+	if !intakeSourceAllowsRebind(intake.Source) {
+		return factoryErrorToStatus(
+			invalidArgument("this intake cannot change its connection"),
+			"failed to update factory intake",
+		)
+	}
+
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+
+	binding, err := resolveIntakeBinding(db, factory, intake.Source, integrationID, resourceID)
+	if err != nil {
+		return factoryErrorToStatus(err, "failed to update factory intake")
+	}
+	if binding == nil || binding.integrationRef() == nil {
+		return factoryErrorToStatus(
+			invalidArgument("intake integration and project are required"),
+			"failed to update factory intake",
+		)
+	}
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return err
+		}
+
+		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
+		graph := resolveIntakeGraph(intake.Source, spec)
+		if graph.TriggerNodeID == "" {
+			return invalidArgument("intake automation has no trigger to update")
+		}
+
+		nodes := slices.Clone(liveVersion.Nodes)
+		boundID := binding.integrationRef().ID
+		for i := range nodes {
+			if nodes[i].ID != graph.TriggerNodeID {
+				continue
+			}
+			configuration := maps.Clone(nodes[i].Configuration)
+			if configuration == nil {
+				configuration = map[string]any{}
+			}
+			for name, value := range binding.configuration() {
+				configuration[name] = value
+			}
+			nodes[i].Configuration = configuration
+			nodes[i].IntegrationID = &boundID
+		}
+
+		return canvases.PublishGeneratedCanvasNodes(
+			ctx,
+			tx,
+			canvas,
+			uuid.MustParse(userID),
+			"Update intake connection",
+			nodes,
+			liveVersion.Edges,
+			changesets.CanvasPublisherOptions{
+				Registry:       deps.Registry,
+				OrgID:          canvas.OrganizationID,
+				Encryptor:      deps.Encryptor,
+				AuthService:    deps.AuthService,
+				WebhookBaseURL: deps.WebhookBaseURL,
+				GitProvider:    deps.GitProvider,
 			},
 		)
 	})
