@@ -224,7 +224,7 @@ export function useSidebarLayoutViewport(): void {
 }
 
 /**
- * Horizontal inset for absolutely positioned canvas overlays (Console, Memory)
+ * Horizontal inset for absolutely positioned canvas overlays (Console, Memory, Files)
  * so they sit beside the tool sidebar instead of underneath it.
  */
 export function useEffectiveLeftSidebarWidth(): number {
@@ -233,4 +233,14 @@ export function useEffectiveLeftSidebarWidth(): number {
   const leftMounted = useSidebarLayoutStore((state) => state.leftMountCount > 0);
   const auxLeftMounted = useSidebarLayoutStore((state) => state.auxLeftMountCount > 0);
   return (leftMounted ? leftWidth : 0) + (auxLeftMounted ? auxLeftWidth : 0);
+}
+
+/**
+ * Right inset for canvas-column overlays (errors/warnings log) so they stay in
+ * the visible canvas strip beside absolute right panels (inspector / building blocks).
+ */
+export function useEffectiveRightSidebarWidth(): number {
+  const rightWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  const rightMounted = useSidebarLayoutStore((state) => state.rightMountCount > 0);
+  return rightMounted ? rightWidth : 0;
 }
