@@ -10,7 +10,12 @@ import type {
 } from "../types";
 import { baseMapper } from "./base";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getArtifactOutputPayload, getArtifactData, artifactShortName } from "./artifact_registry";
+import {
+  getArtifactOutputPayload,
+  getArtifactData,
+  artifactShortName,
+  type ArtifactVersionMetadata,
+} from "./artifact_registry";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 
 export const getArtifactMapper: ComponentBaseMapper = {
@@ -24,14 +29,15 @@ export const getArtifactMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
+    const data = getArtifactData(context.execution);
+    const metadata = data?.metadata as ArtifactVersionMetadata | undefined;
     const details: Record<string, string> = {};
 
     if (payload?.timestamp) {
       details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const dockerUri = buildDockerUri(data?.metadata?.name as string | undefined);
+    const dockerUri = buildDockerUri(metadata?.name);
     if (dockerUri) {
       details["Image"] = dockerUri;
     }
@@ -46,7 +52,7 @@ export const getArtifactMapper: ComponentBaseMapper = {
       if (formatted) details["Image Updated At"] = formatted;
     }
 
-    const sizeBytes = data?.metadata?.imageSizeBytes;
+    const sizeBytes = metadata?.imageSizeBytes;
     if (sizeBytes) {
       details["Size"] = formatBytes(Number(sizeBytes));
     }
@@ -76,7 +82,7 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
+    const data = getArtifactData(context.execution);
     const details: Record<string, string> = {};
 
     if (payload?.timestamp) {
@@ -139,7 +145,7 @@ function formatBytes(bytes: number): string {
 }
 
 function artifactActionMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const config = (node.configuration as Record<string, unknown> | undefined) ?? {};
   const inputMode = String(config.inputMode || "url").toLowerCase();
   const metadata: MetadataItem[] = [];
 

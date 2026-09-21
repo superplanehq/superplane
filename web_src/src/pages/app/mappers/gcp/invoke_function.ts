@@ -22,7 +22,7 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
-    const data = payload?.data as Record<string, any> | undefined;
+    const data = payload?.data as Record<string, unknown> | undefined;
 
     const details: Record<string, string> = {};
 
@@ -32,7 +32,7 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
 
     if (data?.functionName) {
       const parts = String(data.functionName).split("/");
-      details["Function"] = parts[parts.length - 1] ?? data.functionName;
+      details["Function"] = parts[parts.length - 1] ?? String(data.functionName);
     }
 
     if (data?.executionId) {

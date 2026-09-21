@@ -9,7 +9,7 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
   getEventState: (_context: TriggerEventContext) => "triggered",
 
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const data = context.event?.data as Record<string, any> | undefined;
+    const data = context.event?.data as Record<string, unknown> | undefined;
     const messageId = data?.messageId ? shortID(String(data.messageId)) : "";
     const title = messageId ? `Received Pub/Sub message · ${messageId}` : "Received Pub/Sub message";
 
@@ -22,10 +22,10 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const data = context.event?.data as Record<string, any> | undefined;
+    const data = context.event?.data as Record<string, unknown> | undefined;
     const details: Record<string, string> = {};
     if (data?.messageId) details["Message ID"] = String(data.messageId);
-    if (data?.publishTime) details["Published At"] = new Date(data.publishTime as string).toLocaleString();
+    if (data?.publishTime) details["Published At"] = new Date(String(data.publishTime)).toLocaleString();
     if (context.event?.createdAt) details["Received At"] = new Date(context.event.createdAt).toLocaleString();
     return details;
   },
