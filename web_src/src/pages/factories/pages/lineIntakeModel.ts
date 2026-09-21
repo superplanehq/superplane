@@ -209,6 +209,10 @@ export interface ConfiguredLineIntakeSource {
   paused: boolean;
   settings: IntakeSourceSettings;
   source: LineIntakeSource;
+  /** Integration bound to the intake trigger. Empty when the trigger is unbound. */
+  integrationId?: string;
+  /** Source resource the trigger listens on, such as a Jira project key. */
+  resourceId?: string;
 }
 
 const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
@@ -248,6 +252,8 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         paused: intake.paused === true,
         settings: intakeSettingsFromApi(name, intake.settings),
         source: { ...source, name },
+        integrationId: intake.integrationId?.trim() || undefined,
+        resourceId: intake.resourceId?.trim() || undefined,
       },
     ];
   });
