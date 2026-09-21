@@ -47,6 +47,7 @@ type Factory struct {
 	PlanningEnabled        bool
 	PlanningClarity        bool
 	PlanningConfidence     bool
+	PlanningSetupCompleted bool
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
@@ -55,13 +56,14 @@ type Factory struct {
 // FactoryPlanning is the workspace toggle for draft chat plus the two
 // optional scores. Defaults are all on.
 type FactoryPlanning struct {
-	Enabled    bool
-	Clarity    bool
-	Confidence bool
+	Enabled        bool
+	Clarity        bool
+	Confidence     bool
+	SetupCompleted bool
 }
 
 func DefaultFactoryPlanning() FactoryPlanning {
-	return FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}
+	return FactoryPlanning{Enabled: true, Clarity: true, Confidence: true, SetupCompleted: false}
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -150,19 +152,20 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 	planning := DefaultFactoryPlanning()
 	now := time.Now()
 	factory := &Factory{
-		ID:                    uuid.New(),
-		OrganizationID:        organizationID,
-		Name:                  name,
-		Description:           description,
-		Key:                   normalizedKey,
-		NextWorkOrderNumber:   1,
-		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
-		OnboardingCompletedAt: nil,
-		PlanningEnabled:       planning.Enabled,
-		PlanningClarity:       planning.Clarity,
-		PlanningConfidence:    planning.Confidence,
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		ID:                     uuid.New(),
+		OrganizationID:         organizationID,
+		Name:                   name,
+		Description:            description,
+		Key:                    normalizedKey,
+		NextWorkOrderNumber:    1,
+		OnboardingConfig:       datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		OnboardingCompletedAt:  nil,
+		PlanningEnabled:        planning.Enabled,
+		PlanningClarity:        planning.Clarity,
+		PlanningConfidence:     planning.Confidence,
+		PlanningSetupCompleted: planning.SetupCompleted,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
@@ -397,9 +400,10 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 
 func (f *Factory) Planning() FactoryPlanning {
 	return FactoryPlanning{
-		Enabled:    f.PlanningEnabled,
-		Clarity:    f.PlanningClarity,
-		Confidence: f.PlanningConfidence,
+		Enabled:        f.PlanningEnabled,
+		Clarity:        f.PlanningClarity,
+		Confidence:     f.PlanningConfidence,
+		SetupCompleted: f.PlanningSetupCompleted,
 	}
 }
 
@@ -407,12 +411,13 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	now := time.Now()
 	err := tx.Model(f).
 		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
-		Select("planning_enabled", "planning_clarity", "planning_confidence", "updated_at").
+		Select("planning_enabled", "planning_clarity", "planning_confidence", "planning_setup_completed", "updated_at").
 		Updates(map[string]any{
-			"planning_enabled":    planning.Enabled,
-			"planning_clarity":    planning.Clarity,
-			"planning_confidence": planning.Confidence,
-			"updated_at":          now,
+			"planning_enabled":         planning.Enabled,
+			"planning_clarity":         planning.Clarity,
+			"planning_confidence":      planning.Confidence,
+			"planning_setup_completed": planning.SetupCompleted,
+			"updated_at":               now,
 		}).Error
 	if err != nil {
 		return err
@@ -420,6 +425,7 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningEnabled = planning.Enabled
 	f.PlanningClarity = planning.Clarity
 	f.PlanningConfidence = planning.Confidence
+	f.PlanningSetupCompleted = planning.SetupCompleted
 	f.UpdatedAt = now
 	return nil
 }

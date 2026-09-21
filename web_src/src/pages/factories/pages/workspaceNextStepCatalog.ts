@@ -1,8 +1,11 @@
+import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
 import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSourceId } from "./prFeedbackSettingsModel";
 
-export type WorkspaceNextStepId = "pr-comments-handler" | "pr-checks-handler";
+export type WorkspaceNextStepId = "planning-setup" | "pr-comments-handler" | "pr-checks-handler";
 
-export type WorkspaceNextStepAction = { type: "open-pr-feedback-setup"; sourceId: PRFeedbackSourceId };
+export type WorkspaceNextStepAction =
+  | { type: "open-planning-setup" }
+  | { type: "open-pr-feedback-setup"; sourceId: PRFeedbackSourceId };
 
 export interface WorkspaceNextStep {
   id: WorkspaceNextStepId;
@@ -27,6 +30,9 @@ export interface WorkspaceNextStepContext {
   takenPRFeedbackSources: readonly PRFeedbackSourceId[];
   /** Stay hidden until PR feedback handlers have loaded. Also hide when the query fails without cached data. */
   prFeedbackHandlersReady: boolean;
+  /** Stay hidden until the factory (and its Planning flag) has loaded. */
+  planningSetupReady: boolean;
+  planningSetupCompleted: boolean;
 }
 
 export interface WorkspaceNextStepBanner {
@@ -46,6 +52,18 @@ const ONBOARDING_COMPLETED_STEP_COUNT = 2;
 
 type WorkspaceNextStepDefinition = Omit<WorkspaceNextStep, "done"> & {
   isDone: (ctx: WorkspaceNextStepContext) => boolean;
+};
+
+const PLANNING_NEXT_STEP: WorkspaceNextStepDefinition = {
+  id: "planning-setup",
+  title: "Backlog refinement",
+  bannerTitle: PLANNING_SETTINGS_COPY.wizardPageTitle,
+  badgeLabel: PLANNING_SETTINGS_COPY.wizardBadgeLabel,
+  description: PLANNING_SETTINGS_COPY.wizardBannerDescription,
+  ctaLabel: "Configure",
+  canDefer: false,
+  action: { type: "open-planning-setup" },
+  isDone: (ctx) => ctx.planningSetupCompleted,
 };
 
 const COMMENTS_NEXT_STEP: WorkspaceNextStepDefinition = {
@@ -80,7 +98,7 @@ export const WORKSPACE_NEXT_STEPS_COPY = {
   restoreLabel: (title: string) => `Show next steps. ${title}`,
 } as const;
 
-const WORKSPACE_NEXT_STEPS = [COMMENTS_NEXT_STEP, CHECKS_NEXT_STEP];
+const WORKSPACE_NEXT_STEPS = [PLANNING_NEXT_STEP, COMMENTS_NEXT_STEP, CHECKS_NEXT_STEP];
 
 export function workspaceNextStepsProgressCopy(done: number, total: number): string {
   return `${done}/${total}`;
@@ -98,7 +116,7 @@ export function isWorkspaceNextStepsQueryReady(query: {
 }
 
 export function workspaceNextSteps(ctx: WorkspaceNextStepContext): WorkspaceNextStep[] {
-  if (!ctx.onboardingComplete || !ctx.canConfigure || !ctx.prFeedbackHandlersReady) {
+  if (!ctx.onboardingComplete || !ctx.canConfigure || !ctx.prFeedbackHandlersReady || !ctx.planningSetupReady) {
     return [];
   }
   const steps = WORKSPACE_NEXT_STEPS.map(({ isDone, ...step }) => ({
@@ -144,9 +162,14 @@ export function shouldForgetDeferredWorkspaceNextStep(
 
 export function runWorkspaceNextStepAction(
   action: WorkspaceNextStepAction,
-  handlers: { openPRFeedbackSetup: (sourceId: PRFeedbackSourceId) => void },
+  handlers: {
+    openPlanningSetup: () => void;
+    openPRFeedbackSetup: (sourceId: PRFeedbackSourceId) => void;
+  },
 ) {
-  if (action.type === "open-pr-feedback-setup") {
-    handlers.openPRFeedbackSetup(action.sourceId);
+  if (action.type === "open-planning-setup") {
+    handlers.openPlanningSetup();
+    return;
   }
+  handlers.openPRFeedbackSetup(action.sourceId);
 }

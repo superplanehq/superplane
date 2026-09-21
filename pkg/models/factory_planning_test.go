@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func TestCreateFactory_DefaultsPlanningOn(t *testing.T) {
+func TestCreateFactory_DefaultsPlanningOnWithoutSetup(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -32,13 +32,24 @@ func TestFactory_UpdatePlanningKeepsScoreFlagsWhenOff(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, factory.UpdatePlanning(db, models.FactoryPlanning{
-		Enabled:    false,
-		Clarity:    true,
-		Confidence: false,
+		Enabled:        false,
+		Clarity:        true,
+		Confidence:     false,
+		SetupCompleted: true,
 	}))
-	assert.Equal(t, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: false}, factory.Planning())
+	assert.Equal(t, models.FactoryPlanning{
+		Enabled:        false,
+		Clarity:        true,
+		Confidence:     false,
+		SetupCompleted: true,
+	}, factory.Planning())
 
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: false}, reloaded.Planning())
+	assert.Equal(t, models.FactoryPlanning{
+		Enabled:        false,
+		Clarity:        true,
+		Confidence:     false,
+		SetupCompleted: true,
+	}, reloaded.Planning())
 }

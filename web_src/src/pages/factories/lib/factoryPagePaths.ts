@@ -363,6 +363,11 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
   return sourceId === "checks" ? "checks" : "comments";
 }
 
+/** Dedicated setup page for the post-onboarding Backlog Refinement wizard. */
+export function factoryPlanningSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
+}
+
 /** Dedicated setup page for Sentry exception intake. */
 export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;

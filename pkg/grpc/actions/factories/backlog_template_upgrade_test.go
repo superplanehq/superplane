@@ -82,7 +82,7 @@ func Test__UpgradeDefaultBacklogTemplatesSkipsCustomizedBacklog(t *testing.T) {
 	canvasModel, _, _ := createLegacyBacklogForUpgrade(ctx, t, r, factoryModel.ID, func(nodes []models.CanvasNode) []models.CanvasNode {
 		return append(nodes, models.CanvasNode{
 			NodeID: "custom-step",
-			Type:   models.NodeTypeAction,
+			Type:   models.NodeTypeComponent,
 			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: intakeFilterComponent}}),
 		})
 	})
@@ -301,7 +301,7 @@ func actionCanvasNode(nodeID, component string) models.CanvasNode {
 	return models.CanvasNode{
 		NodeID: nodeID,
 		Name:   nodeID,
-		Type:   models.NodeTypeAction,
+		Type:   models.NodeTypeComponent,
 		Ref: datatypes.NewJSONType(models.NodeRef{
 			Component: &models.ComponentRef{Name: component},
 		}),

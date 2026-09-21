@@ -433,4 +433,5 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 	assert.True(t, serialized.Planning.Enabled)
 	assert.True(t, serialized.Planning.Clarity)
 	assert.False(t, serialized.Planning.Confidence)
+	assert.False(t, serialized.Planning.SetupCompleted)
 }

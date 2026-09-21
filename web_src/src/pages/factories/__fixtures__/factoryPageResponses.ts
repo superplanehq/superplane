@@ -201,7 +201,12 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   },
 ];
 
-export const DEFAULT_FACTORY_PLANNING = { enabled: true, clarity: true, confidence: true } as const;
+export const DEFAULT_FACTORY_PLANNING = {
+  enabled: true,
+  clarity: true,
+  confidence: true,
+  setupCompleted: false,
+} as const;
 
 export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
@@ -211,7 +216,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
     "Handles reconciliation work: implement a change across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
   onboarding: { completedAt: LAST_WEEK },
-  planning: { ...DEFAULT_FACTORY_PLANNING },
+  planning: { ...DEFAULT_FACTORY_PLANNING, setupCompleted: true },
 };
 
 export const EMPTY_FACTORY: FactoriesFactory = {
@@ -225,7 +230,7 @@ export const EMPTY_FACTORY: FactoriesFactory = {
 
 export function factoryWithPlanning(
   factory: FactoriesFactory,
-  planning: { enabled: boolean; clarity: boolean; confidence: boolean },
+  planning: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean },
 ): FactoriesFactory {
   return { ...factory, planning };
 }

@@ -8,7 +8,7 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter, isTaskResultFooter } from "./splitRunFooter";
+import { classicSplitRunFooter, isTaskResultFooter, type SplitRunFooter } from "./splitRunFooter";
 import { defaultSplitRunPopupTab } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
@@ -63,7 +63,7 @@ export function ClassicWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(classicFixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const showPullRequestReview = isPullRequestReviewFooter(classicFixture.footer);
-  const showSidebarNote = showPullRequestReview || isTaskResultFooter(classicFixture.footer);
+  const showSidebarNote = classicShowsSidebarNote(classicFixture.footer, showPullRequestReview);
   const reviewProps = {
     footer: classicFixture.footer,
     organizationId,
@@ -145,4 +145,8 @@ export function ClassicWorkOrderPopup({
       {showPullRequestReview ? null : review}
     </PopupShell>
   );
+}
+
+function classicShowsSidebarNote(footer: SplitRunFooter, showPullRequestReview: boolean) {
+  return showPullRequestReview || isTaskResultFooter(footer);
 }

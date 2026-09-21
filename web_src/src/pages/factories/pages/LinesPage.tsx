@@ -49,6 +49,7 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
+import { factoryPlanningSetupCompleted } from "./planningSettingsModel";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -125,6 +126,7 @@ import {
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
+  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -339,6 +341,8 @@ export function LinesPage() {
     canConfigure: canUpdate,
     takenPRFeedbackSources,
     prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+    planningSetupReady: Boolean(factory),
+    planningSetupCompleted: factoryPlanningSetupCompleted(factory),
   });
   const nextStepBanner = workspaceNextStepBanner(nextSteps);
   const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
@@ -598,6 +602,9 @@ export function LinesPage() {
             collapsed={nextStepsCollapsed}
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
+                openPlanningSetup: () => {
+                  navigate(factoryPlanningSetupPath(organizationId, factoryKey, selectedLine.id));
+                },
                 openPRFeedbackSetup: (sourceId) => {
                   const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, sourceId);
                   if (href) {

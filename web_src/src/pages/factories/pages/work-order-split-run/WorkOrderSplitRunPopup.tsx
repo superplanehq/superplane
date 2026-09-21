@@ -127,8 +127,7 @@ function AnalysisWorkOrderPopup({
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
-  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
-  const viewFixture = sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture;
+  const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const draftChrome = analysisDraftChrome({
     factory,
     organizationId,
@@ -141,8 +140,8 @@ function AnalysisWorkOrderPopup({
     onDraftModelChange: setDraftModel,
     disabled: isDispatching || !canDispatch,
   });
-  const reviewArgs = {
-    fixture: viewFixture,
+  const reviewArgs = analysisReviewArgs({
+    viewFixture,
     organizationId,
     factoryId,
     factoryKey,
@@ -157,8 +156,8 @@ function AnalysisWorkOrderPopup({
     canDispatch,
     compact: showSidebarNote || (viewFixture.footer.kind === "draft" && !sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
-    confirmUnclearStart: factoryPlanningEnabled(factory),
-  };
+    factory,
+  });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
@@ -190,33 +189,20 @@ function AnalysisWorkOrderPopup({
         sidebarNote={showSidebarNote ? review : undefined}
         analysis={stripAnalysis}
         sourceOnly={sourceOnly}
-        header={(views) => (
-          <PopupHeader
-            title={edits.title}
-            onClose={onClose}
-            canEditTitle={edits.canEdit}
-            titleBusy={edits.titleBusy}
-            onTitleSave={(next) => void edits.saveTitle(next)}
-            expanded={fullPage}
-            onToggleExpanded={toggleFullPage}
-            actions={
-              <PopupHeaderActions
-                copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-                onArchive={fixture.footer.kind === "draft" ? mutations.onArchive : undefined}
-                archiveBusy={footerActions.busy}
-                taskActions={reviewActions}
-              />
-            }
-            accessory={views}
-          >
-            <OwnerTimeCostRow
-              fixture={{ ...fixture, owner: edits.owner }}
-              assigneeIds={edits.assigneeIds}
-              usageByModel={fixture.usageByModel}
-              usageByMachineType={fixture.usageByMachineType}
-            />
-          </PopupHeader>
-        )}
+        header={analysisPopupHeader({
+          edits,
+          fixture,
+          organizationId,
+          factoryKey,
+          orderNumber,
+          lineId,
+          onClose,
+          fullPage,
+          toggleFullPage,
+          mutations,
+          footerBusy: footerActions.busy,
+          reviewActions,
+        })}
       />
       {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
     </PopupShell>
@@ -241,6 +227,87 @@ function useAnalysisPopupEdits(args: {
     assigneeIds: fixture.assigneeIds ?? [],
     footerKind: fixture.footer.kind,
   });
+}
+
+function analysisPopupHeader(args: {
+  edits: ReturnType<typeof useAnalysisPopupEdits>;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
+  onClose: WorkOrderSplitRunPopupProps["onClose"];
+  fullPage: boolean;
+  toggleFullPage: () => void;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  footerBusy: boolean;
+  reviewActions: ReactNode;
+}) {
+  return (views: ReactNode) => (
+    <PopupHeader
+      title={args.edits.title}
+      onClose={args.onClose}
+      canEditTitle={args.edits.canEdit}
+      titleBusy={args.edits.titleBusy}
+      onTitleSave={(next) => void args.edits.saveTitle(next)}
+      expanded={args.fullPage}
+      onToggleExpanded={args.toggleFullPage}
+      actions={
+        <PopupHeaderActions
+          copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
+          onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
+          archiveBusy={args.footerBusy}
+          taskActions={args.reviewActions}
+        />
+      }
+      accessory={views}
+    >
+      <OwnerTimeCostRow
+        fixture={{ ...args.fixture, owner: args.edits.owner }}
+        assigneeIds={args.edits.assigneeIds}
+        usageByModel={args.fixture.usageByModel}
+        usageByMachineType={args.fixture.usageByMachineType}
+      />
+    </PopupHeader>
+  );
+}
+
+function analysisReviewArgs(args: {
+  viewFixture: WorkOrderSplitRunPopupProps["fixture"];
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderId?: string;
+  orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canUpdate: boolean;
+  draftStart: ReturnType<typeof draftStartAction>;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  isDispatching: boolean;
+  footerBusy: boolean;
+  canDispatch: boolean;
+  compact: boolean;
+  modelSelect?: ReactNode;
+  factory?: FactoriesFactory;
+}) {
+  return {
+    fixture: args.viewFixture,
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    factoryKey: args.factoryKey,
+    orderId: args.orderId,
+    orderNumber: args.orderNumber,
+    pullRequests: args.pullRequests,
+    canUpdate: args.canUpdate,
+    draftStart: args.draftStart,
+    mutations: args.mutations,
+    isDispatching: args.isDispatching,
+    footerBusy: args.footerBusy,
+    canDispatch: args.canDispatch,
+    compact: args.compact,
+    modelSelect: args.modelSelect,
+    confirmUnclearStart: factoryPlanningEnabled(args.factory),
+  };
 }
 
 function analysisPopupReview(args: {
@@ -329,6 +396,14 @@ function analysisDraftChrome(args: {
  * The refine strip only shows for a draft. It gets the ghost model select
  * and a permalink builder for tasks the agent splits off this one.
  */
+function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
+  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  return {
+    sourceOnly,
+    viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
+  };
+}
+
 function draftStripAnalysis(
   footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
   analysis: ReturnType<typeof useAnalysisPlanningSession>,

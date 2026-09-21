@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   DEFAULT_PLANNING_SETTINGS,
   factoryPlanningEnabled,
+  factoryPlanningSetupCompleted,
   factoryShowsClarity,
   factoryShowsConfidence,
   isPlanningSettingsTab,
@@ -59,12 +60,32 @@ describe("isPlanningSettingsTab", () => {
   });
 });
 
+describe("factoryPlanningSetupCompleted", () => {
+  it("is false until the wizard or settings save confirms Planning", () => {
+    expect(factoryPlanningSetupCompleted(undefined)).toBe(false);
+    expect(factoryPlanningSetupCompleted({ id: "factory-1" })).toBe(false);
+    expect(
+      factoryPlanningSetupCompleted({
+        id: "factory-1",
+        planning: { enabled: true, clarity: true, confidence: true },
+      }),
+    ).toBe(false);
+    expect(
+      factoryPlanningSetupCompleted({
+        id: "factory-1",
+        planning: { enabled: true, clarity: true, confidence: true, setupCompleted: true },
+      }),
+    ).toBe(true);
+  });
+});
+
 describe("planningSettingsToApi", () => {
-  it("sends the stored score flags when Planning is off", () => {
+  it("sends the stored score flags and marks setup complete", () => {
     expect(planningSettingsToApi({ enabled: false, clarity: true, confidence: false })).toEqual({
       enabled: false,
       clarity: true,
       confidence: false,
+      setupCompleted: true,
     });
   });
 });

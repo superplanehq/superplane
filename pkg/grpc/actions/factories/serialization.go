@@ -29,9 +29,10 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 
 func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
 	return &pb.FactoryPlanning{
-		Enabled:    planning.Enabled,
-		Clarity:    planning.Clarity,
-		Confidence: planning.Confidence,
+		Enabled:        planning.Enabled,
+		Clarity:        planning.Clarity,
+		Confidence:     planning.Confidence,
+		SetupCompleted: planning.SetupCompleted,
 	}
 }
 
@@ -40,9 +41,10 @@ func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanni
 		return models.DefaultFactoryPlanning()
 	}
 	return models.FactoryPlanning{
-		Enabled:    planning.GetEnabled(),
-		Clarity:    planning.GetClarity(),
-		Confidence: planning.GetConfidence(),
+		Enabled:        planning.GetEnabled(),
+		Clarity:        planning.GetClarity(),
+		Confidence:     planning.GetConfidence(),
+		SetupCompleted: planning.GetSetupCompleted(),
 	}
 }
 

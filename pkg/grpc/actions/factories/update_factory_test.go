@@ -124,9 +124,10 @@ func Test__UpdateFactory(t *testing.T) {
 		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
 			Id: factory.ID.String(),
 			Planning: &pb.FactoryPlanning{
-				Enabled:    false,
-				Clarity:    true,
-				Confidence: false,
+				Enabled:        false,
+				Clarity:        true,
+				Confidence:     false,
+				SetupCompleted: true,
 			},
 		})
 		require.NoError(t, err)
@@ -134,9 +135,15 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.False(t, response.Factory.Planning.Enabled)
 		assert.True(t, response.Factory.Planning.Clarity)
 		assert.False(t, response.Factory.Planning.Confidence)
+		assert.True(t, response.Factory.Planning.SetupCompleted)
 
 		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: false}, reloaded.Planning())
+		assert.Equal(t, models.FactoryPlanning{
+			Enabled:        false,
+			Clarity:        true,
+			Confidence:     false,
+			SetupCompleted: true,
+		}, reloaded.Planning())
 	})
 }

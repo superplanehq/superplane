@@ -382,6 +382,7 @@ CREATE TABLE public.factories (
     planning_enabled boolean DEFAULT true NOT NULL,
     planning_clarity boolean DEFAULT true NOT NULL,
     planning_confidence boolean DEFAULT true NOT NULL,
+    planning_setup_completed boolean DEFAULT false NOT NULL,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );

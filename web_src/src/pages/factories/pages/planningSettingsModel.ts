@@ -48,10 +48,17 @@ export function factoryShowsConfidence(factory?: FactoriesFactory | null): boole
   return settings.enabled && settings.confidence;
 }
 
-export function planningSettingsToApi(settings: PlanningDraftSettings): PlanningDraftSettings {
+export function factoryPlanningSetupCompleted(factory?: FactoriesFactory | null): boolean {
+  return factory?.planning?.setupCompleted === true;
+}
+
+export type PlanningApiSettings = PlanningDraftSettings & { setupCompleted: true };
+
+export function planningSettingsToApi(settings: PlanningDraftSettings): PlanningApiSettings {
   return {
     enabled: settings.enabled,
     clarity: settings.clarity,
     confidence: settings.confidence,
+    setupCompleted: true,
   };
 }

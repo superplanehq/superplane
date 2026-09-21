@@ -32,6 +32,7 @@ import {
   factoryJiraIntakeSetupPath,
   factoryPlanningPath,
   factoryProductiveIntakeSetupPath,
+  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -41,6 +42,8 @@ import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  DEFAULT_FACTORY_PLANNING,
+  factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
@@ -708,18 +711,32 @@ describe("LinesPage board", () => {
   });
 });
 
+const PLANNING_OPEN_FACTORY = factoryWithPlanning(REFUND_FACTORY, { ...DEFAULT_FACTORY_PLANNING });
+
 describe("LinesPage next steps", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
   });
 
-  it("shows comments as open after onboarding", () => {
+  it("shows Planning as open after onboarding", () => {
+    renderLinesBoard(undefined, vi.fn(), PLANNING_OPEN_FACTORY, LANE_BANNERS);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("How should new backlog tasks be refined?");
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/5");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "SuperPlane can open a chat and write a plan for each new draft task.",
+    );
+    expect(screen.getByTestId("workspace-next-step-cta-planning-setup")).toHaveTextContent("Configure");
+    expect(screen.queryByTestId("workspace-next-step-later")).not.toBeInTheDocument();
+  });
+
+  it("shows comments after Planning is confirmed", () => {
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should pull request comments be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("3/5");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
     );
@@ -737,7 +754,7 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should failing status checks be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("3/4");
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("4/5");
     expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent("Configure");
     expect(screen.getByTestId("workspace-next-step-later")).toHaveTextContent("Later");
   });
@@ -753,7 +770,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     const restore = screen.getByTestId("workspace-next-steps-restore");
-    expect(restore).toHaveTextContent("3/4");
+    expect(restore).toHaveTextContent("4/5");
     expect(restore).toHaveTextContent("Configure status checks");
     expect(screen.getByTestId("lines-detail-header")).toContainElement(restore);
     const trial = screen.queryByTestId("hosted-credit-header-kicker");
@@ -776,14 +793,14 @@ describe("LinesPage next steps", () => {
     const user = userEvent.setup();
     const { unmount } = renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
     await user.click(screen.getByTestId("workspace-next-step-later"));
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("4/5");
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
     unmount();
 
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("4/5");
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
   });
 
@@ -813,6 +830,18 @@ describe("LinesPage next steps", () => {
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+  });
+
+  it("opens the Planning setup page from the next-step CTA", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), PLANNING_OPEN_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-cta-planning-setup"));
+
+    expect(screen.getByTestId("planning-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryPlanningSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the comments setup page from the next-step CTA", async () => {

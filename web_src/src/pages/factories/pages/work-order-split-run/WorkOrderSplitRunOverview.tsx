@@ -110,44 +110,108 @@ export function WorkOrderSplitRunOverview({
         isAnalyzing={isAnalyzing}
         files={files}
         resultAfterBody={
-          otherChecks.length > 0 ? (
-            <section className="mt-6" data-testid="split-run-overview-other-checks" aria-label="Checks">
-              <h3 className="workspace-section-label">Checks</h3>
-              <div className="mt-1">
-                {otherChecks.map((check, index) => (
-                  <WorkOrderCheckComment
-                    key={check.id}
-                    check={check}
-                    defaultOpen={expandFirstCheck && !confidence && index === 0}
-                    runHref={
-                      organizationId && factoryKey
-                        ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
-                        : null
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null
+          <OverviewOtherChecks
+            checks={otherChecks}
+            expandFirst={expandFirstCheck && !confidence}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+          />
         }
         resultFooter={resultFooter}
-        analysis={analysis && organizationId ? { ...analysis, organizationId } : analysis}
+        analysis={analysisWithOrganization(analysis, organizationId)}
         source={source}
-        contextSidebar={
-          showContextSidebar ? (
-            <WorkOrderSplitRunOverviewSidebar
-              source={source}
-              artifacts={artifacts}
-              artifactsLoading={artifactsLoading}
-              pullRequests={pullRequests}
-              pullRequestsLoading={pullRequestsLoading}
-              pullRequestsError={pullRequestsError}
-              sidebarNote={sidebarNote}
-            />
-          ) : undefined
-        }
+        contextSidebar={overviewContextSidebar({
+          showContextSidebar,
+          source,
+          artifacts,
+          artifactsLoading,
+          pullRequests,
+          pullRequestsLoading,
+          pullRequestsError,
+          sidebarNote,
+        })}
       />
     </div>
+  );
+}
+
+function analysisWithOrganization(analysis: IntentAnalysisChat | undefined, organizationId?: string) {
+  if (!analysis || !organizationId) {
+    return analysis;
+  }
+  return { ...analysis, organizationId };
+}
+
+function overviewContextSidebar({
+  showContextSidebar,
+  source,
+  artifacts,
+  artifactsLoading,
+  pullRequests,
+  pullRequestsLoading,
+  pullRequestsError,
+  sidebarNote,
+}: {
+  showContextSidebar: boolean;
+  source?: SplitRunSource;
+  artifacts: FactoriesWorkOrderArtifact[];
+  artifactsLoading: boolean;
+  pullRequests: FactoriesFactoryPullRequest[];
+  pullRequestsLoading: boolean;
+  pullRequestsError: Error | null;
+  sidebarNote?: ReactNode;
+}) {
+  if (!showContextSidebar) {
+    return undefined;
+  }
+  return (
+    <WorkOrderSplitRunOverviewSidebar
+      source={source}
+      artifacts={artifacts}
+      artifactsLoading={artifactsLoading}
+      pullRequests={pullRequests}
+      pullRequestsLoading={pullRequestsLoading}
+      pullRequestsError={pullRequestsError}
+      sidebarNote={sidebarNote}
+    />
+  );
+}
+
+function OverviewOtherChecks({
+  checks,
+  expandFirst,
+  organizationId,
+  factoryKey,
+  orderNumber,
+}: {
+  checks: WorkOrderCheckPresentation[];
+  expandFirst: boolean;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+}) {
+  if (checks.length === 0) {
+    return null;
+  }
+  return (
+    <section className="mt-6" data-testid="split-run-overview-other-checks" aria-label="Checks">
+      <h3 className="workspace-section-label">Checks</h3>
+      <div className="mt-1">
+        {checks.map((check, index) => (
+          <WorkOrderCheckComment
+            key={check.id}
+            check={check}
+            defaultOpen={expandFirst && index === 0}
+            runHref={
+              organizationId && factoryKey
+                ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
+                : null
+            }
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
