@@ -243,6 +243,69 @@ describe("BacklogCreatePopover", () => {
     expect(onImportItem).toHaveBeenCalledWith(sentryItems[0]);
   });
 
+  it("resets results scroll when the intake tab changes", async () => {
+    const onFocusedIntakeChange = vi.fn();
+    const user = userEvent.setup();
+    const manyGithubItems = Array.from({ length: 8 }, (_, index) => ({
+      id: `gh-${index}`,
+      intakeId: "intake-github",
+      key: `#${index}`,
+      title: `Issue ${index}`,
+      body: "",
+    }));
+    const sentryItems: BacklogIntakeItem[] = [
+      {
+        id: "se-1",
+        intakeId: "intake-sentry",
+        key: "PROJ-1",
+        title: "Null pointer in checkout",
+        body: "",
+      },
+    ];
+
+    const { rerender } = render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={manyGithubItems}
+        query=""
+        focusedIntakeId="intake-github"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={onFocusedIntakeChange}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    const githubList = screen.getByTestId("lines-backlog-create-items-intake-github");
+    Object.defineProperty(githubList, "scrollHeight", { configurable: true, value: 400 });
+    Object.defineProperty(githubList, "clientHeight", { configurable: true, value: 140 });
+    githubList.scrollTop = 280;
+    fireEvent.scroll(githubList);
+    expect(githubList.scrollTop).toBe(280);
+
+    await user.click(screen.getByTestId("lines-backlog-create-tab-intake-sentry"));
+    expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-sentry");
+
+    rerender(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={sentryItems}
+        query=""
+        focusedIntakeId="intake-sentry"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={onFocusedIntakeChange}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    const sentryList = screen.getByTestId("lines-backlog-create-items-intake-sentry");
+    expect(sentryList.scrollTop).toBe(0);
+  });
+
   it("keeps a single intake as a search row without tabs", async () => {
     const user = userEvent.setup();
 

@@ -37,6 +37,48 @@ const GITHUB_ITEMS: BacklogIntakeItem[] = [
     title: "Fix checkout timeout",
     body: "",
   },
+  {
+    id: "gh-3",
+    intakeId: "intake-github",
+    key: "#21",
+    title: "Retry failed webhook deliveries",
+    body: "",
+  },
+  {
+    id: "gh-4",
+    intakeId: "intake-github",
+    key: "#24",
+    title: "Restore missing invoice PDFs",
+    body: "",
+  },
+  {
+    id: "gh-5",
+    intakeId: "intake-github",
+    key: "#27",
+    title: "Stop double-charge on retry",
+    body: "",
+  },
+  {
+    id: "gh-6",
+    intakeId: "intake-github",
+    key: "#31",
+    title: "Fix empty cart crash",
+    body: "",
+  },
+  {
+    id: "gh-7",
+    intakeId: "intake-github",
+    key: "#36",
+    title: "Show expired coupon error",
+    body: "",
+  },
+  {
+    id: "gh-8",
+    intakeId: "intake-github",
+    key: "#40",
+    title: "Keep search results on page error",
+    body: "",
+  },
 ];
 
 const PRODUCTIVE_ITEMS: BacklogIntakeItem[] = [
@@ -63,8 +105,8 @@ function CreateMenuStory({ sources, catalog }: { sources: BacklogIntakeSource[];
       focusedIntakeId={focusedIntakeId}
       onQueryChange={setQuery}
       onFocusedIntakeChange={setFocusedIntakeId}
-      onCreateManually={() => undefined}
-      onImportItem={() => undefined}
+      onCreateManually={() => console.log("create work order manually")}
+      onImportItem={(item) => console.log("import item", item)}
     />
   );
 }

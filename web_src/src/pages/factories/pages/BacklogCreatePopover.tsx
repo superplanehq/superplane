@@ -182,6 +182,7 @@ function CreateMenuSources({
 
   const searchPanel = (
     <IntakeSearchPanel
+      key={activeSource.intakeId}
       source={activeSource}
       query={query}
       showIcon={!showTabs}
