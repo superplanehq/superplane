@@ -19,7 +19,7 @@ export const VELOCITY_TIME_COLORS = {
 } as const;
 
 /**
- * The two things spend goes to. Tokens stays indigo and compute moves to teal,
+ * The two things spend goes to. Tokens stay indigo and compute moves to teal,
  * so a reader tells the two bands apart without the legend.
  */
 export const VELOCITY_COST_COLORS = {
