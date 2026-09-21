@@ -79,7 +79,9 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
-		refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		if err := refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
+			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
+		}
 	}
 }
 
@@ -94,27 +96,47 @@ func ScheduleFactoryPullRequestMergeabilityRefresh(
 		return
 	}
 	ctx = context.WithoutCancel(ctx)
-	go refreshFactoryPullRequestMergeabilityByID(ctx, deps, organizationID, factoryID, pullRequestID)
+	go retryFactoryPullRequestMergeabilityRefresh(ctx, deps, organizationID, factoryID, pullRequestID)
+}
+
+func retryFactoryPullRequestMergeabilityRefresh(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) {
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		err = refreshFactoryPullRequestMergeabilityByID(ctx, deps, organizationID, factoryID, pullRequestID)
+		if err == nil {
+			return
+		}
+		log.WithError(err).Warnf(
+			"factory mergeability: refresh attempt %d failed for pull request %s",
+			attempt,
+			pullRequestID,
+		)
+		if attempt < 3 {
+			time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+		}
+	}
 }
 
 func refreshFactoryPullRequestMergeabilityByID(
 	ctx context.Context,
 	deps IntakeDependencies,
 	organizationID, factoryID, pullRequestID uuid.UUID,
-) {
+) error {
 	db := database.DB(ctx)
 	factory, err := models.FindFactory(db, organizationID, factoryID)
 	if err != nil {
-		log.WithError(err).Warnf("factory mergeability: factory %s not found", factoryID)
-		return
+		return fmt.Errorf("factory %s not found: %w", factoryID, err)
 	}
 	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequestID})
 	if err != nil {
-		log.WithError(err).Warnf("factory mergeability: pull request %s not found", pullRequestID)
-		return
+		return fmt.Errorf("pull request %s not found: %w", pullRequestID, err)
 	}
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
-		return
+		return nil
 	}
 	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
 		log.WithError(err).Warnf(
@@ -122,7 +144,7 @@ func refreshFactoryPullRequestMergeabilityByID(
 			pullRequest.Repository,
 		)
 	}
-	refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	return refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 }
 
 func refreshFactoryPullRequestMergeability(
@@ -131,14 +153,13 @@ func refreshFactoryPullRequestMergeability(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
-) {
+) error {
 	before := storedFactoryPullRequestMergeability(pullRequest)
 	if _, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
-		log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
-		return
+		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
 	}
 	if storedFactoryPullRequestMergeability(pullRequest) == before {
-		return
+		return nil
 	}
 	if err := publishFactoryWorkOrderUpdated(
 		factory.ID.String(),
@@ -147,6 +168,7 @@ func refreshFactoryPullRequestMergeability(
 	); err != nil {
 		log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
 	}
+	return nil
 }
 
 func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest) models.FactoryPullRequestMergeabilitySnapshot {

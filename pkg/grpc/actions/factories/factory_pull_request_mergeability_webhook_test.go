@@ -172,13 +172,13 @@ func TestRefreshFactoryPullRequestMergeabilityAtRecordTime(t *testing.T) {
 	const headSHA = "abc123def456"
 	stubFactoryGitHub(t, mergeableFactoryGitHub(headSHA))
 
-	refreshFactoryPullRequestMergeabilityByID(
+	require.NoError(t, refreshFactoryPullRequestMergeabilityByID(
 		t.Context(),
 		IntakeDependencies{Encryptor: r.Encryptor},
 		factory.OrganizationID,
 		factory.ID,
 		pullRequest.ID,
-	)
+	))
 
 	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
@@ -201,26 +201,35 @@ func TestRefreshFactoryPullRequestMergeabilityAfterRunFinishes(t *testing.T) {
 	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 92)
 	const headSHA = "abc123def456"
 	stubFactoryGitHub(t, mergeableFactoryGitHub(headSHA))
+	require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      true,
+		HeadSHA:        headSHA,
+		AllowedMethods: "SQUASH,MERGE,REBASE",
+	}))
 
 	grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pullRequest.ID.String()})
 	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
 	require.NotNil(t, pullRequest.ActiveMutationRunID)
+	assert.True(t, pullRequest.Mergeable)
+	assert.False(t, serializeFactoryPullRequest(pullRequest, 1, nil, nil, nil).GetMergeable())
 
-	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
 	blocked, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
-	assert.False(t, blocked.Mergeable)
-	assert.Empty(t, blocked.MergeableHeadSHA)
+	assert.True(t, blocked.Mergeable)
+	assert.Equal(t, headSHA, blocked.MergeableHeadSHA)
+	assert.False(t, serializeFactoryPullRequest(blocked, 1, nil, nil, nil).GetMergeable())
 
 	require.NoError(t, db.Model(pullRequest).Update("active_mutation_run_id", nil).Error)
 	pullRequest.ActiveMutationRunID = nil
 
-	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
 	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
 	assert.True(t, stored.Mergeable)
 	assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+	assert.True(t, serializeFactoryPullRequest(stored, 1, nil, nil, nil).GetMergeable())
 }
 
 func TestListOpenGitHubFactoryPullRequestsForWebhookMatching(t *testing.T) {
@@ -340,15 +349,15 @@ func TestRefreshFactoryPullRequestMergeabilityPublishesOnlyOnStoredChange(t *tes
 	grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pullRequest.ID.String()})
 	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
-	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
 	assert.Equal(t, 0, published)
 
 	require.NoError(t, db.Model(pullRequest).Update("active_mutation_run_id", nil).Error)
 	pullRequest.ActiveMutationRunID = nil
-	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
 	assert.Equal(t, 1, published)
 
-	refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
 	assert.Equal(t, 1, published)
 }
 
