@@ -79,41 +79,6 @@ func (c *Canvas) CreatePendingRepositoryInTransaction(tx *gorm.DB, provider, pro
 	return r, nil
 }
 
-func ListPendingRepositories(limit int) ([]Repository, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-
-	var repositories []Repository
-	err := database.Conn().
-		Where("status = ?", RepositoryStatusPending).
-		Order("created_at ASC").
-		Limit(limit).
-		Find(&repositories).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return repositories, nil
-}
-
-func LockPendingRepository(tx *gorm.DB, id uuid.UUID) (*Repository, error) {
-	var repository Repository
-
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("id = ?", id).
-		Where("status = ?", RepositoryStatusPending).
-		First(&repository).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return &repository, nil
-}
-
 func (r *Repository) MarkReady(tx *gorm.DB) error {
 	return tx.Model(r).Updates(map[string]any{
 		"status":     RepositoryStatusReady,
