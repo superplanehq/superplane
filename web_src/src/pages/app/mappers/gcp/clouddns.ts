@@ -13,6 +13,21 @@ import type {
 import { baseMapper } from "./base";
 import gcpCloudDNSIcon from "@/assets/icons/integrations/gcp.clouddns.svg";
 
+type CloudDNSChange = {
+  id?: string | number;
+  status?: string;
+};
+
+type CloudDNSRecord = {
+  name?: string;
+  type?: string;
+};
+
+type CloudDNSOutputData = {
+  change?: CloudDNSChange;
+  record?: CloudDNSRecord;
+};
+
 export const cloudDNSMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
@@ -25,7 +40,7 @@ export const cloudDNSMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
-    const data = payload?.data as Record<string, any> | undefined;
+    const data = payload?.data as CloudDNSOutputData | undefined;
 
     const details: Record<string, string> = {};
 
@@ -33,7 +48,7 @@ export const cloudDNSMapper: ComponentBaseMapper = {
       details["Completed At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const change = data?.change as Record<string, any> | undefined;
+    const change = data?.change;
     if (change?.id) {
       details["Change ID"] = String(change.id);
     }
@@ -42,7 +57,7 @@ export const cloudDNSMapper: ComponentBaseMapper = {
       details["Status"] = String(change.status);
     }
 
-    const record = data?.record as Record<string, any> | undefined;
+    const record = data?.record;
     if (record?.name) {
       details["Record Name"] = String(record.name);
     }
