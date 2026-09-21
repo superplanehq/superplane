@@ -1,4 +1,4 @@
-import { buildSubtitle, buildExecutionSubtitle } from "../utils";
+import { buildSubtitle, buildExecutionSubtitle } from "../eventDisplay";
 
 export const buildGitlabSubtitle = buildSubtitle;
 export const buildGitlabExecutionSubtitle = buildExecutionSubtitle;

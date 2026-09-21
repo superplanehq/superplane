@@ -20,7 +20,7 @@ import type {
   SubtitleContext,
 } from "./types";
 
-import { stringOrDash } from "./utils";
+import { stringOrDash } from "./eventDisplay";
 
 const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";

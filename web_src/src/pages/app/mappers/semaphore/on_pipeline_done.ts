@@ -5,8 +5,8 @@ import type { TriggerProps } from "@/ui/trigger";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { Predicate } from "../utils";
-import { formatPredicate } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate } from "../eventDisplay";
 
 interface OnPipelineDoneMetadata {
   project?: {

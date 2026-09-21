@@ -4,7 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type { TriggerProps } from "@/ui/trigger";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 
 interface OnTopicMessageConfiguration {
   region?: string;

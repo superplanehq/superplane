@@ -4,7 +4,7 @@ import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 
 interface AlertNotificationIssue {
   id?: string;

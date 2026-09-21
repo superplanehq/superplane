@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { createIssueMapper } from "./create_issue";
 import { deleteIssueMapper } from "./delete_issue";
 import { getIssueMapper } from "./get_issue";

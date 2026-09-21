@@ -12,8 +12,8 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import type { Repository, RepositoryMetadata } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import type { Predicate } from "../utils";
-import { formatPredicate, stringOrDash } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate, stringOrDash } from "../eventDisplay";
 import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnImagePushMetadata {

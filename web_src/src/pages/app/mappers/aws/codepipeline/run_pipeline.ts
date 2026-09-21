@@ -16,7 +16,7 @@ import type React from "react";
 import { getTriggerRenderer } from "../../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import { defaultStateFunction } from "../../stateRegistry";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 

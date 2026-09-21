@@ -24,7 +24,7 @@ import { getTriggerRenderer } from "../mapperLookup";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 
 interface Configuration {
   project: string;
