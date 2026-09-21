@@ -181,7 +181,7 @@ func Test__IssueDescription(t *testing.T) {
 		body := IssueDescription(issue, &IssueEventDetail{
 			Type:    "default",
 			Message: "HTTP 500 POST /api/v1/runner/planning-sessions/specs",
-			Release: "2026.09.17",
+			Release: IssueEventRelease{Version: "2026.09.17"},
 			User: map[string]any{
 				"username": "runner",
 				"email":    "runner@example.com",
@@ -246,20 +246,152 @@ func Test__IssueDescription(t *testing.T) {
 		assert.NotContains(t, body, "Cookie")
 		assert.NotContains(t, body, "X-Api-Key")
 	})
+
+	t.Run("keeps angle brackets in markdown highlights", func(t *testing.T) {
+		body := IssueDescription(map[string]any{
+			"title":     "fmt.wrapError: proxy listen <ip>:80: bind: permission denied",
+			"permalink": "https://your-org.sentry.io/issues/9/",
+		}, nil)
+		assert.Contains(t, body, "**Title:** fmt.wrapError: proxy listen &lt;ip&gt;:80: bind: permission denied")
+		assert.NotContains(t, body, "**Title:** fmt.wrapError: proxy listen :80")
+	})
+
+	t.Run("keeps angle brackets in http request details", func(t *testing.T) {
+		body := IssueDescription(fullIssue, &IssueEventDetail{
+			Entries: []IssueEventEntry{
+				{
+					Type: "request",
+					Data: map[string]any{
+						"method":       "GET",
+						"url":          "https://<ip>:8080/checkout",
+						"query_string": "host=<ip>",
+						"headers": []any{
+							[]any{"X-Forwarded-For", "<ip>"},
+						},
+					},
+				},
+			},
+		})
+		assert.Contains(t, body, "GET https://&lt;ip&gt;:8080/checkout")
+		assert.Contains(t, body, "Query: host=&lt;ip&gt;")
+		assert.Contains(t, body, "**X-Forwarded-For:** &lt;ip&gt;")
+	})
+
+	t.Run("omits tags when the issue lists keys without values", func(t *testing.T) {
+		body := IssueDescription(map[string]any{
+			"title": "Broken deploy",
+			"tags": []any{
+				map[string]any{"key": "command", "name": "Command", "totalValues": 3.0},
+			},
+		}, nil)
+		assert.NotContains(t, body, "## Tags")
+	})
 }
 
 func Test__FetchedIssueDescription(t *testing.T) {
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			sentryMockResponse(http.StatusOK, `{"id":"123","title":"TypeError: boom","permalink":"https://sentry.io/issues/123/","count":"3"}`),
-			sentryMockResponse(http.StatusOK, `{"eventID":"evt-latest","release":"1.4.2","web_url":"https://sentry.io/issues/123/events/evt-latest/","entries":[{"type":"exception","data":{"values":[{"type":"TypeError","value":"boom","stacktrace":{"frames":[{"filename":"main.go","function":"Run","lineNo":10,"inApp":true}]}}]}}]}`),
-		},
-	}
+	t.Run("uses a string release and stack from the latest event", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `{"id":"123","title":"TypeError: boom","permalink":"https://sentry.io/issues/123/","count":"3"}`),
+				sentryMockResponse(http.StatusOK, `{"eventID":"evt-latest","release":"1.4.2","web_url":"https://sentry.io/issues/123/events/evt-latest/","entries":[{"type":"exception","data":{"values":[{"type":"TypeError","value":"boom","stacktrace":{"frames":[{"filename":"main.go","function":"Run","lineNo":10,"inApp":true}]}}]}}]}`),
+			},
+		}
 
-	body := FetchedIssueDescription(testIssueClient(httpCtx), map[string]any{"id": "123", "title": "TypeError: boom"}, nil)
-	assert.Contains(t, body, "**Count:** 3")
-	assert.Contains(t, body, "**Release:** 1.4.2")
-	assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/events/evt-latest/)")
-	assert.Contains(t, body, "Run (main.go:10) [in app]")
-	assert.NotContains(t, body, "```json")
+		body := FetchedIssueDescription(testIssueClient(httpCtx), map[string]any{"id": "123", "title": "TypeError: boom"}, nil)
+		assert.Contains(t, body, "**Count:** 3")
+		assert.Contains(t, body, "**Release:** 1.4.2")
+		assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/events/evt-latest/)")
+		assert.Contains(t, body, "Run (main.go:10) [in app]")
+		assert.NotContains(t, body, "```json")
+	})
+
+	t.Run("keeps the event when Sentry returns a release object", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, latestIssueAPIBody),
+				sentryMockResponse(http.StatusOK, latestEventAPIBody),
+			},
+		}
+
+		body := FetchedIssueDescription(
+			testIssueClient(httpCtx),
+			map[string]any{"id": "148481072", "title": "fmt.wrapError: proxy listen <ip>:80"},
+			nil,
+		)
+		assert.Contains(t, body, "**Status:** unresolved (escalating)")
+		assert.Contains(t, body, "**Release:** 4dd58c31ad607b30529d09686c0c8cc8381b2392")
+		assert.Contains(t, body, "**Event type:** error")
+		assert.Contains(t, body, "## Stack Trace")
+		assert.Contains(t, body, "newErrorEvent (/home/runner/work/wrk3/wrk3/internal/telemetry/telemetry.go:89) [in app]")
+		assert.Contains(t, body, "**command:** run")
+		assert.Contains(t, body, "**runtime:** go go1.26.8")
+		assert.Contains(t, body, "## Contexts")
+		assert.Contains(t, body, "## Additional Data")
+		assert.Contains(t, body, "## SDK")
+		assert.Contains(t, body, "sentry.go 0.31.1")
+		assert.Contains(t, body, "**Trace ID:** a96440db4d90323b020fc871a03807ff")
+		assert.Contains(t, body, "proxy listen &lt;ip&gt;:80")
+		assert.NotContains(t, body, "```json")
+	})
 }
+
+const latestIssueAPIBody = `{
+	"id":"148481072",
+	"shortId":"WRK3-2",
+	"title":"fmt.wrapError: proxy listen <ip>:80: listen tcp <ip>:80: bind: permission denied",
+	"culprit":"github.com/mytmlt/wrk3/internal/telemetry in newErrorEvent",
+	"permalink":"https://miyat-test-org-1.sentry.io/issues/148481072/",
+	"level":"error",
+	"status":"unresolved",
+	"substatus":"escalating",
+	"priority":"high",
+	"count":"3",
+	"userCount":0,
+	"project":{"id":"4512124896608336","name":"go","slug":"wrk3"},
+	"tags":[{"key":"command","name":"Command","totalValues":3},{"key":"runtime","name":"Runtime","totalValues":3}]
+}`
+
+const latestEventAPIBody = `{
+	"id":"c5764589c1fc4b96aa6bcf9e57cb291b",
+	"eventID":"c5764589c1fc4b96aa6bcf9e57cb291b",
+	"title":"fmt.wrapError: proxy listen <ip>:80: listen tcp <ip>:80: bind: permission denied",
+	"message":"proxy listen <ip>:80: listen tcp <ip>:80: bind: permission denied",
+	"type":"error",
+	"platform":"go",
+	"culprit":"github.com/mytmlt/wrk3/internal/telemetry in newErrorEvent",
+	"web_url":"https://miyat-test-org-1.sentry.io/issues/148481072/events/c5764589c1fc4b96aa6bcf9e57cb291b/",
+	"release":{
+		"id":137233750,
+		"version":"4dd58c31ad607b30529d09686c0c8cc8381b2392",
+		"shortVersion":"4dd58c31ad607b30529d09686c0c8cc8381b2392"
+	},
+	"sdk":{"name":"sentry.go","version":"0.31.1"},
+	"context":{
+		"command":"run",
+		"error_type":"fmt.wrapError",
+		"goos":"linux",
+		"message":"proxy listen <ip>:80: listen tcp <ip>:80: bind: permission denied"
+	},
+	"contexts":{
+		"os":{"name":"linux"},
+		"runtime":{"name":"go","version":"go1.26.8"},
+		"trace":{"trace_id":"a96440db4d90323b020fc871a03807ff"}
+	},
+	"tags":[
+		{"key":"command","value":"run"},
+		{"key":"runtime","value":"go go1.26.8"}
+	],
+	"entries":[
+		{"type":"message","data":{"formatted":"proxy listen <ip>:80: listen tcp <ip>:80: bind: permission denied"}},
+		{"type":"exception","data":{"values":[{
+			"type":"fmt.wrapError",
+			"value":"proxy listen <ip>:80: listen tcp <ip>:80: bind: permission denied",
+			"stacktrace":{"frames":[
+				{"filename":"/home/runner/work/wrk3/wrk3/main.go","function":"main","lineNo":32,"inApp":true},
+				{"filename":"/home/runner/work/wrk3/wrk3/internal/telemetry/telemetry.go","function":"ReportIfEnabled","lineNo":65,"inApp":true},
+				{"filename":"/home/runner/work/wrk3/wrk3/internal/telemetry/telemetry.go","function":"newErrorEvent","lineNo":89,"inApp":true}
+			]}
+		}]}},
+		{"type":"threads","data":{"values":[{"id":"0","current":true,"name":"main"}]}}
+	]
+}`
