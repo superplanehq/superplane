@@ -142,6 +142,7 @@ describe("useLiveLogStream agent activity", () => {
         type: "tool_input_delta",
         id: "tool-1",
         partial_json: '{"command":"git status"}',
+        complete: true,
         event_id: "act-1:3",
         sequence: 3,
       });
@@ -150,6 +151,7 @@ describe("useLiveLogStream agent activity", () => {
         type: "tool_input_delta",
         id: "tool-1",
         partial_json: "",
+        complete: true,
         event_id: "act-1:4",
         sequence: 4,
       });

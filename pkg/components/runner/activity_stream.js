@@ -337,7 +337,7 @@ function createActivityStream(options = {}) {
     const input = boundedText(redactSensitiveText(rawInput, env), limits.commandBytes);
     item.input = input.text;
     item.truncated ||= input.truncated;
-    emit({ type: "tool_input_delta", id, partial_json: input.text, complete, truncated: item.truncated });
+    emit({ type: "tool_input_delta", id, input: input.text, complete, truncated: item.truncated });
   }
 
   function appendToolOutput(id, rawText, outputStream = "stdout") {
