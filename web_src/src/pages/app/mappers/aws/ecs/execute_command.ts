@@ -7,7 +7,7 @@ import type {
   SubtitleContext,
 } from "../../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import { buildEcsComponentProps, ecsConsoleUrl, ecsSubtitle, MAX_METADATA_ITEMS, truncateForDisplay } from "./common";
 
 interface ExecuteCommandConfiguration {

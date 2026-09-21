@@ -1702,18 +1702,16 @@ export function AppPage({
       setRemoteCanvasUpdatePending,
     });
 
-  useCanvasWebsocket(
-    canvasId!,
-    organizationId!,
-    handleNodeWebsocketEvent,
-    undefined,
-    undefined,
-    handleCanvasLifecycleEvent,
+  useCanvasWebsocket({
+    canvasId: canvasId!,
+    organizationId: organizationId!,
+    onNodeEvent: handleNodeWebsocketEvent,
+    onCanvasLifecycleEvent: handleCanvasLifecycleEvent,
     shouldApplyCanvasUpdate,
-    isViewingLiveVersion,
-    true,
-    handleCanvasStagingEvent,
-  );
+    processRuntimeEvents: isViewingLiveVersion,
+    enabled: true,
+    onCanvasStagingEvent: handleCanvasStagingEvent,
+  });
   const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents, !dataLoading);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
   const logNodesRef = useRef<{ signature: string; nodes: ComponentsNode[] }>({ signature: "", nodes: [] });

@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { getImageTagMapper } from "./get_image_tag";
 import { onImagePushCustomFieldRenderer, onImagePushTriggerRenderer } from "./on_image_push";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getImageTag: getImageTagMapper,

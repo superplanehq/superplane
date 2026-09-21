@@ -8,7 +8,7 @@ import type {
   UpdateHttpSyntheticCheckConfiguration,
 } from "./types";
 import type { NodeInfo, OutputPayload } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 
 type SyntheticCheckFlatView = {
   target?: string;

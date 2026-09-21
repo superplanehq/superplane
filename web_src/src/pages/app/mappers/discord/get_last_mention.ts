@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";

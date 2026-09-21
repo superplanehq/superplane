@@ -8,7 +8,7 @@ import type {
 } from "../types";
 import type { ListSilencesOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { grafanaComponentBaseProps } from "./base";
 import { buildSilenceFilterMetadata } from "./silenceMetadata";
 
