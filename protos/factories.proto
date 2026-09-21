@@ -591,17 +591,6 @@ service Factories {
     };
   }
 
-  rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List work order checks";
-      description: "Returns scored checks reported on a work order";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribeFactoryUsage(DescribeFactoryUsageRequest) returns (DescribeFactoryUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/usage"
@@ -1647,6 +1636,8 @@ message WorkOrder {
   // Runner machine time for this task, one row per machine type.
   // UI hides empty rows and may collapse them into one machine-time line.
   repeated UsageByMachineType usage_by_machine_type = 21;
+  // Scored assessments reported on this task. Latest row per check key.
+  repeated WorkOrderCheck checks = 22;
 }
 
 message WorkOrderOrigin {
@@ -1955,15 +1946,6 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-message ListWorkOrderChecksRequest {
-  string factory_id = 1;
-  string order_id = 2;
-}
-
-message ListWorkOrderChecksResponse {
-  repeated WorkOrderCheck checks = 1;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work

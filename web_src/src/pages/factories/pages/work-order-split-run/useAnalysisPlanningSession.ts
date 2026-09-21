@@ -87,7 +87,7 @@ async function refreshAnalysisWorkOrder(
       queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, workOrderId),
     }),
     queryClient.invalidateQueries({
-      queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, workOrderId),
+      queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),

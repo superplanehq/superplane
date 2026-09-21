@@ -69,8 +69,6 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
-  workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
-    ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
   pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
     ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   pullRequestMergeability: (organizationId: string, factoryId: string, pullRequestId: string) =>

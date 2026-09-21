@@ -127,11 +127,6 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
-vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [], refetch: vi.fn() }),
-  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
-}));
-
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
   useWorkOrderPlanningActivity: () => ({
