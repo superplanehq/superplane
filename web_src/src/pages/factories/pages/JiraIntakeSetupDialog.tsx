@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
+import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 import { useJiraIntakeSetup, type JiraIntakeSetupModel } from "./useJiraIntakeSetup";
 
@@ -27,7 +28,9 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
   const helper =
     setup.step === "connection"
       ? JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : setup.skipInitialImport
+        ? JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
+        : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const showConnectAction =
     setup.step === "connection" && !setup.connectedQuery.isLoading && setup.jiraIntegrations.length === 0;
 
@@ -286,7 +289,12 @@ function SetupFooter({ setup, onCreated }: { setup: JiraIntakeSetupModel; onCrea
   }
 
   return (
-    <div>
+    <div className="space-y-3">
+      <IntakeSkipInitialImportField
+        checked={setup.skipInitialImport}
+        onCheckedChange={setup.setSkipInitialImport}
+        testId="jira-skip-initial-import"
+      />
       <Button
         type="button"
         className="w-full"
