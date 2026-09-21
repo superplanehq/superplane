@@ -1,6 +1,6 @@
 {
   "maxAllowedInTransactionDefinitions": 154,
-  "maxAllowedDatabaseConnCalls": 170,
+  "maxAllowedDatabaseConnCalls": 167,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -260,9 +260,6 @@
     "pkg/models/integration.go:ListRequests:database.Conn()#1",
     "pkg/models/integration_request.go:ListIntegrationRequests:database.Conn()#1",
     "pkg/models/integration_subscription.go:CreateIntegrationSubscription:database.Conn()#1",
-    "pkg/models/organization.go:ListAllOrganizations:database.Conn()#1",
-    "pkg/models/organization.go:ListAllOrganizations:database.Conn()#2",
-    "pkg/models/organization.go:ListAllOrganizations:database.Conn()#3",
     "pkg/models/organization.go:ListOrganizationsByIDs:database.Conn()#1",
     "pkg/models/organization.go:FindOrganizationByID:database.Conn()#1",
     "pkg/models/organization.go:FindOrganizationByName:database.Conn()#1",
@@ -329,5 +326,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-09-18T21:13:06Z"
+  "updatedAt": "2026-09-21T12:58:30Z"
 }
