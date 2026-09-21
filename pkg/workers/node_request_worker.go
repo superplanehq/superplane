@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -29,15 +28,13 @@ type NodeRequestWorker struct {
 	encryptor      crypto.Encryptor
 	webhookBaseURL string
 	authService    authorization.Authorization
-	gitProvider    gitprovider.Provider
 	logger         *log.Entry
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
 	return &NodeRequestWorker{
 		encryptor:      encryptor,
 		registry:       registry,
-		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
 		authService:    authService,
@@ -422,7 +419,6 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
-		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).

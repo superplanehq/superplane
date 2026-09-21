@@ -136,15 +136,6 @@ services:
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
 
       #
-      # Git storage configuration.
-      # For development environment, we use supergit.
-      # The only required configuration for supergit is the base URL.
-      # See: https://github.com/superplanehq/supergit
-      #
-      GIT_STORAGE_PROVIDER: ${GIT_STORAGE_PROVIDER:-supergit}
-      GIT_STORAGE_SUPERGIT_BASE_URL: ${GIT_STORAGE_SUPERGIT_BASE_URL:-http://supergit:8080/api}
-
-      #
       # Platform blob storage. Development uses a local directory. Hosted
       # SuperPlane uses GCS (BLOB_STORAGE_PROVIDER=gcs).
       #
@@ -153,14 +144,6 @@ services:
       BLOB_STORAGE_BUCKET: ${BLOB_STORAGE_BUCKET:-}
       BLOB_STORAGE_CREDENTIALS_FILE: ${BLOB_STORAGE_CREDENTIALS_FILE:-}
       START_FILE_CLEANUP_WORKER: ${START_FILE_CLEANUP_WORKER:-yes}
-
-      #
-      # These are required if codestorage is used as the git storage.
-      # See: https://code.storage
-      #
-      GIT_STORAGE_CODE_STORAGE_NAME: ${GIT_STORAGE_CODE_STORAGE_NAME:-}
-      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY:-}
-      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH:-}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -181,32 +164,12 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      supergit:
-        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
       - blob-data:/var/lib/superplane/blobs
-
-  supergit:
-    image: ghcr.io/superplanehq/supergit:0.1.1
-    environment:
-      SUPERGIT_ROOT: /var/lib/supergit/repos
-      SUPERGIT_PORT: "8080"
-      SUPERGIT_DEFAULT_BRANCH: ${CANVAS_STORAGE_DEFAULT_BRANCH:-main}
-      SUPERGIT_MAX_FILE_BYTES: ${CANVAS_STORAGE_MAX_FILE_BYTES:-10485760}
-      SUPERGIT_MAX_COMMIT_BYTES: ${CANVAS_STORAGE_MAX_COMMIT_BYTES:-26214400}
-    ports:
-      - ${SUPERGIT_PORT:-8080}:8080
-    volumes:
-      - supergit-data:/var/lib/supergit/repos
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -260,9 +223,6 @@ services:
       retries: 5
 
 volumes:
-  supergit-data:
-    driver: local
-
   go-pkg-cache:
     driver: local
 

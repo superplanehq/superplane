@@ -5,7 +5,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
@@ -54,7 +53,6 @@ type ServicesConfig struct {
 	AuthService     authorization.Authorization
 	Registry        *registry.Registry
 	OIDCProvider    oidc.Provider
-	GitProvider     git.Provider
 	AgentService    agentsActions.AgentsService
 	UsageService    usage.Service
 }
@@ -86,7 +84,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.AuthService,
 			cfg.Registry,
 			cfg.Encryptor,
-			cfg.GitProvider,
 			cfg.WebhooksBaseURL,
 			cfg.UsageService,
 		),
@@ -95,7 +92,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.Registry,
 			cfg.Encryptor,
 			cfg.AuthService,
-			cfg.GitProvider,
 			cfg.WebhooksBaseURL,
 			cfg.UsageService,
 		),

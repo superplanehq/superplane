@@ -1079,22 +1079,6 @@ CREATE TABLE public.organizations (
 
 
 --
--- Name: repositories; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.repositories (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
-    provider text NOT NULL,
-    repo_id text NOT NULL,
-    status character varying(64) DEFAULT 'pending'::character varying NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2117,22 +2101,6 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: repositories repositories_canvas_id_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_canvas_id_provider_repo_id_key UNIQUE (canvas_id, provider, repo_id);
-
-
---
--- Name: repositories repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
-
-
---
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3070,13 +3038,6 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
-
-
---
--- Name: idx_repositories_canvas_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
 
 
 --
@@ -4200,22 +4161,6 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: repositories repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
--- Name: repositories repositories_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repositories
-    ADD CONSTRAINT repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4615,7 +4560,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918231901	f
+20260921123752	f
 \.
 
 

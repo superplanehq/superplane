@@ -828,7 +828,6 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 				Registry:       s.registry,
 				Encryptor:      s.encryptor,
 				AuthService:    s.authService,
-				GitProvider:    s.gitProvider,
 				WebhookBaseURL: s.WebhooksBaseURL,
 				UsageService:   s.usageService,
 			},
