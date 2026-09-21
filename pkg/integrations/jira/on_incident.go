@@ -1,7 +1,6 @@
 package jira
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -171,7 +170,8 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+		Events:   []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+		Projects: []string{desk.ProjectKey},
 	})
 }
 
@@ -194,25 +194,40 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	payload := IssueWebhookPayload{}
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+	payloads, err := unmarshalWebhookPayloads[IssueWebhookPayload](ctx.Body)
+	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
+	for i := range payloads {
+		if err := t.emitMatchingIncidentEvent(ctx, config, metadata, payloads[i]); err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+	}
+
+	return http.StatusOK, nil, nil
+}
+
+func (t *OnIncident) emitMatchingIncidentEvent(
+	ctx core.WebhookRequestContext,
+	config OnIncidentConfiguration,
+	metadata OnIncidentMetadata,
+	payload IssueWebhookPayload,
+) error {
 	action, ok := issueEventAction(payload.WebhookEvent)
 	if !ok {
 		ctx.Logger.Infof("Ignoring event - unsupported webhookEvent %q", payload.WebhookEvent)
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	if !slices.Contains(config.Events, action) {
 		ctx.Logger.Infof("Ignoring event - action %q is not configured", action)
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	if payload.Issue == nil {
 		ctx.Logger.Info("Ignoring event - missing issue")
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	// Issue type ids are global to the site, not scoped to a project, so a matching type alone
@@ -220,7 +235,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	// failing closed when the payload doesn't carry one to compare.
 	if metadata.ServiceDesk != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.ServiceDesk.ProjectKey) {
 		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.ServiceDesk.ProjectKey)
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	// The webhook is shared by every trigger on the integration (see JiraWebhookHandler), so this
@@ -228,16 +243,15 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	// unrelated issue - fail closed when the payload doesn't carry an issue type to compare.
 	if !slices.Contains(metadata.IssueTypeIDs, issueTypeID(payload.Issue)) {
 		ctx.Logger.Info("Ignoring event - issue type does not match a configured request type")
-		return http.StatusOK, nil, nil
+		return nil
 	}
 
 	event := NewIssueEvent(action, payload.Issue, payload.User, payload.Changelog, siteURLFromIntegration(ctx.Integration))
-
 	if err := ctx.Events.Emit(IncidentEventPayloadType, event); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
+		return fmt.Errorf("error emitting event: %w", err)
 	}
 
-	return http.StatusOK, nil, nil
+	return nil
 }
 
 // Cleanup does nothing: the shared Jira webhook registered via RequestWebhook is torn down by

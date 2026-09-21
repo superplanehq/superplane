@@ -76,7 +76,7 @@ func UpdateFactoryIntake(
 	}
 
 	return &pb.UpdateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(intake, specs[intake.CanvasID]),
+		Intake: serializeFactoryIntake(db, intake, specs[intake.CanvasID]),
 	}, nil
 }
 

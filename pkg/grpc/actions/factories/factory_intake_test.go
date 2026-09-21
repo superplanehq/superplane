@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 
 	// The intake graph uses built-in components and integration triggers, which
 	// only reach the registry through their init functions.
@@ -143,6 +145,56 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "production", trigger.Configuration["project"])
+	})
+
+	t.Run("a Jira intake listens to the selected project and stays unhealthy until the webhook is ready", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "ENG",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+		assert.Equal(t, pb.FactoryIntake_SOURCE_JIRA_ISSUES, intake.GetSource())
+		assert.False(t, intake.GetHealthy(), "a pending Jira webhook must not look like a live intake")
+
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		node, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, intakeTriggerNodeID)
+		require.NoError(t, err)
+		reason := ""
+		if node.StateReason != nil {
+			reason = *node.StateReason
+		}
+		require.Equal(t, models.CanvasNodeStateReady, node.State, reason)
+		require.NotNil(t, node.WebhookID)
+
+		webhook, err := models.FindWebhookInTransaction(database.DB(t.Context()), *node.WebhookID)
+		require.NoError(t, err)
+		assert.Equal(t, models.WebhookStatePending, webhook.State)
+		raw, err := json.Marshal(webhook.Configuration.Data())
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), `"ENG"`)
+
+		require.NoError(t, webhook.ReadyWithMetadata(database.DB(t.Context()), map[string]any{
+			"webhookId": int64(1000),
+		}))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetHealthy())
+
+		require.NoError(t, webhook.MarkFailed(database.DB(t.Context())))
+		listed, err = ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.False(t, listed.GetIntakes()[0].GetHealthy())
 	})
 
 	t.Run("creating a Sentry intake with an invalid user id does not panic", func(t *testing.T) {
@@ -671,11 +723,25 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 		InitialImportItemCount: &itemCount,
 	}
 
-	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+	serialized := serializeFactoryIntake(nil, intake, models.LiveCanvasSpec{})
 
 	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
 	require.NotNil(t, serialized.InitialImportItemCount)
 	assert.Zero(t, serialized.GetInitialImportItemCount())
+}
+
+func Test__SerializeFactoryIntakeJiraWebhookHealth(t *testing.T) {
+	spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceJiraIssues)
+	intake := &models.FactoryIntake{
+		ID:        uuid.New(),
+		FactoryID: uuid.New(),
+		CanvasID:  uuid.New(),
+		Source:    models.FactoryIntakeSourceJiraIssues,
+	}
+
+	serialized := serializeFactoryIntake(nil, intake, spec)
+
+	assert.False(t, serialized.GetHealthy(), "a Jira intake without a ready webhook must not be healthy")
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {
@@ -743,4 +809,26 @@ func liveIntakeNodes(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryI
 	require.NoError(t, err)
 
 	return liveVersion.Nodes
+}
+
+func createReadyJiraIntakeIntegration(t *testing.T, organizationID uuid.UUID, projectKey string) string {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"jira",
+		support.RandomName("jira"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	integration.State = models.IntegrationStateReady
+	integration.Metadata = datatypes.NewJSONType(map[string]any{
+		"projects": []any{
+			map[string]any{"id": "10000", "key": projectKey, "name": projectKey},
+		},
+	})
+	require.NoError(t, database.DB(t.Context()).Save(integration).Error)
+	return integration.ID.String()
 }

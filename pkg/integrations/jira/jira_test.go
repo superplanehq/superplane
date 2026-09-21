@@ -64,6 +64,7 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Empty(t, integrationContext.BrowserAction.URL)
 		assert.Contains(t, integrationContext.BrowserAction.Description, "Atlassian Developer Console")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "manage:jira-webhook")
+		assert.Contains(t, integrationContext.BrowserAction.Description, "read:issue-details:jira")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/api/v1/integrations/")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/callback")
 
@@ -312,7 +313,10 @@ func Test__Jira__Sync(t *testing.T) {
 	// already-connected integration must prompt a fresh authorize round trip instead of silently
 	// doing nothing, which previously left incident/alert/heartbeat actions failing forever.
 	t.Run("ops features enabled after connecting - stays ready but prompts reconnect", func(t *testing.T) {
-		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OpsScopesRequested: false})
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			OpsScopesRequested:          false,
+			IssueWebhookScopesRequested: true,
+		})
 		integrationContext.Configuration = map[string]any{
 			"clientId":          "client-1",
 			"clientSecret":      "secret-1",
@@ -357,7 +361,10 @@ func Test__Jira__Sync(t *testing.T) {
 	// because the flag was already true — permanently clearing the ops reconnect while the
 	// token still lacked those scopes.
 	t.Run("ops reconnect prompt survives a subsequent Sync until callback succeeds", func(t *testing.T) {
-		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OpsScopesRequested: false})
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			OpsScopesRequested:          false,
+			IssueWebhookScopesRequested: true,
+		})
 		integrationContext.Configuration = map[string]any{
 			"clientId":          "client-1",
 			"clientSecret":      "secret-1",
@@ -396,6 +403,40 @@ func Test__Jira__Sync(t *testing.T) {
 		require.True(t, ok)
 		assert.False(t, metadata.OpsScopesRequested)
 		assert.True(t, metadata.OpsScopesPending)
+	})
+
+	// Regression test: Atlassian will not deliver jira:issue_* webhooks unless the token has
+	// read:issue-details:jira. Existing connections that predate that scope stay Ready and get
+	// a reconnect prompt until a successful callback sets IssueWebhookScopesRequested.
+	t.Run("missing issue webhook scope stays ready but prompts reconnect", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{IssueWebhookScopesRequested: false})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			HTTP:          httpContext,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+		require.NotNil(t, integrationContext.BrowserAction)
+		assert.Contains(t, integrationContext.BrowserAction.Description, "reconnect Jira")
+		assert.Contains(t, integrationContext.BrowserAction.Description, "receive issue events")
+
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		assert.Equal(t, coreScopeList, actionURL.Query().Get("scope"))
+		assert.Contains(t, actionURL.Query().Get("scope"), "read:issue-details:jira")
 	})
 
 	t.Run("credential verification failure marks the integration errored", func(t *testing.T) {
@@ -454,8 +495,9 @@ func Test__Jira__Sync(t *testing.T) {
 
 	t.Run("token close to expiring is proactively refreshed", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
-			CloudID:              testCloudID,
-			AccessTokenExpiresAt: time.Now().Add(time.Minute).Format(time.RFC3339),
+			CloudID:                     testCloudID,
+			AccessTokenExpiresAt:        time.Now().Add(time.Minute).Format(time.RFC3339),
+			IssueWebhookScopesRequested: true,
 		})
 		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
 
@@ -487,8 +529,9 @@ func Test__Jira__Sync(t *testing.T) {
 
 	t.Run("refresh failure with a still-valid token retries later instead of erroring", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
-			CloudID:              testCloudID,
-			AccessTokenExpiresAt: time.Now().Add(time.Minute).Format(time.RFC3339),
+			CloudID:                     testCloudID,
+			AccessTokenExpiresAt:        time.Now().Add(time.Minute).Format(time.RFC3339),
+			IssueWebhookScopesRequested: true,
 		})
 		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
 
@@ -516,8 +559,9 @@ func Test__Jira__Sync(t *testing.T) {
 
 	t.Run("refresh failure with an expired token clears secrets and errors", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
-			CloudID:              testCloudID,
-			AccessTokenExpiresAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+			CloudID:                     testCloudID,
+			AccessTokenExpiresAt:        time.Now().Add(-time.Minute).Format(time.RFC3339),
+			IssueWebhookScopesRequested: true,
 		})
 		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
 
@@ -547,8 +591,9 @@ func Test__Jira__Sync(t *testing.T) {
 	// already spent by the winner) must adopt what the winner stored, not wipe valid credentials.
 	t.Run("refresh failure near expiry adopts a concurrently-rotated token instead of wiping it", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
-			CloudID:              testCloudID,
-			AccessTokenExpiresAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+			CloudID:                     testCloudID,
+			AccessTokenExpiresAt:        time.Now().Add(-time.Minute).Format(time.RFC3339),
+			IssueWebhookScopesRequested: true,
 		})
 		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
 
@@ -644,6 +689,7 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		assert.Nil(t, metadata.State)
 		assert.False(t, metadata.OpsScopesRequested)
 		assert.False(t, metadata.OpsScopesPending)
+		assert.True(t, metadata.IssueWebhookScopesRequested)
 	})
 
 	// Regression test: OpsScopesRequested must be committed from OpsScopesPending only after a
@@ -692,6 +738,7 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		require.True(t, ok)
 		assert.True(t, metadata.OpsScopesRequested)
 		assert.False(t, metadata.OpsScopesPending)
+		assert.True(t, metadata.IssueWebhookScopesRequested)
 	})
 
 	// Regression test: a token response missing a refresh token means this connection could
