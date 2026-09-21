@@ -62,21 +62,23 @@ func IssueURLFragment(issueID string) string {
 }
 
 // IssueIDFromURL reads the numeric Sentry issue ID from an issue page URL.
-// It accepts `https://<org>.sentry.io/issues/<id>/` and
-// `/organizations/<org>/issues/<id>/`, with or without a trailing slash or
-// query string.
+// It accepts `/issues/<id>/` and `/organizations/<org>/issues/<id>/` on
+// sentry.io and on self-hosted instances, with or without a trailing slash
+// or query string. GitHub-style `/owner/repo/issues/<id>` paths are ignored.
 func IssueIDFromURL(rawURL string) (string, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
 		return "", false
 	}
-
-	host := strings.ToLower(parsed.Hostname())
-	if host != "sentry.io" && !strings.HasSuffix(host, ".sentry.io") {
+	if parsed.Hostname() == "" {
 		return "", false
 	}
 
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if !isSentryIssuePath(parts) {
+		return "", false
+	}
+
 	for i, part := range parts {
 		if part != "issues" || i+1 >= len(parts) {
 			continue
@@ -89,6 +91,21 @@ func IssueIDFromURL(rawURL string) (string, bool) {
 	}
 
 	return "", false
+}
+
+func isSentryIssuePath(parts []string) bool {
+	if len(parts) >= 2 && parts[0] == "issues" {
+		return true
+	}
+	if len(parts) < 4 || parts[0] != "organizations" {
+		return false
+	}
+	for i := 1; i < len(parts)-1; i++ {
+		if parts[i] == "issues" {
+			return true
+		}
+	}
+	return false
 }
 
 func isNumericIssueID(issueID string) bool {

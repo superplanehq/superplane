@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestFactoryContext_CreateWorkOrder(t *testing.T) {
@@ -248,6 +250,30 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Equal(t, 2, countOrders(factoryModel))
 	})
 
+	t.Run("skips a self-hosted Sentry issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing sentry task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://sentry.internal.example/issues/123/", Label: "boom"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("123"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
 	t.Run("creates a task when the Sentry issue has none", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -299,6 +325,55 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("serializes concurrent creates for the same Sentry issue", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		canvasOne, executionOne, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("789"))
+		canvasTwo, executionTwo, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("789"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasOne.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasTwo.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		created := make([]bool, 2)
+		errs := make([]error, 2)
+		canvases := []*models.Canvas{canvasOne, canvasTwo}
+		executions := []*models.CanvasNodeExecution{executionOne, executionTwo}
+
+		for i := 0; i < 2; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					ctx := NewFactoryContext(tx, canvases[idx], executions[idx])
+					_, didCreate, createErr := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+					created[idx] = didCreate
+					return createErr
+				})
+			}(i)
+		}
+
+		close(start)
+		wg.Wait()
+
+		for _, createErr := range errs {
+			require.NoError(t, createErr)
+		}
+
+		createdCount := 0
+		for _, didCreate := range created {
+			if didCreate {
+				createdCount++
+			}
+		}
+		assert.Equal(t, 1, createdCount)
+		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 }
 

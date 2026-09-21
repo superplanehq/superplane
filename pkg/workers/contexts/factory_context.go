@@ -180,6 +180,10 @@ func (c *FactoryContext) skipDuplicateSentryWorkOrder(factoryModel *models.Facto
 		return false, nil
 	}
 
+	if err := sentry.LockIssueWorkOrder(c.tx, factoryModel, issueID); err != nil {
+		return false, err
+	}
+
 	hasOrder, err := sentry.IssueHasWorkOrder(c.tx, factoryModel, issueID)
 	if err != nil {
 		return false, err

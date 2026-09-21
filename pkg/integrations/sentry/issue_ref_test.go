@@ -97,6 +97,23 @@ func Test__IssueIDFromURL(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("ignores a GitHub-style path on another host", func(t *testing.T) {
+		_, ok := IssueIDFromURL("https://github.internal.example/acme/payments/issues/12")
+		assert.False(t, ok)
+	})
+
+	t.Run("reads a self-hosted issue URL", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://sentry.internal.example/issues/12/")
+		require.True(t, ok)
+		assert.Equal(t, "12", issueID)
+	})
+
+	t.Run("reads a self-hosted organizations issue URL", func(t *testing.T) {
+		issueID, ok := IssueIDFromURL("https://sentry.internal.example/organizations/acme/issues/12/")
+		require.True(t, ok)
+		assert.Equal(t, "12", issueID)
+	})
+
 	t.Run("does not treat 12 as 123", func(t *testing.T) {
 		issueID, ok := IssueIDFromURL("https://acme.sentry.io/issues/123/")
 		require.True(t, ok)
