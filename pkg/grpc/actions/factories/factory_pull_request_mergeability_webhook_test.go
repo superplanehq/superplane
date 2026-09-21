@@ -3,7 +3,9 @@ package factories
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -191,11 +193,12 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 	}
 
 	closedPayload := func(repository string, number int64, merged bool) []byte {
+		closedAt := time.Now().UTC().Format(time.RFC3339)
 		mergedJSON := "false"
 		mergedAt := "null"
 		if merged {
 			mergedJSON = "true"
-			mergedAt = `"2026-09-21T16:00:00Z"`
+			mergedAt = fmt.Sprintf("%q", closedAt)
 		}
 		return []byte(fmt.Sprintf(`{
 			"action": "closed",
@@ -204,10 +207,10 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 				"number": %d,
 				"merged": %s,
 				"merged_at": %s,
-				"closed_at": "2026-09-21T16:00:00Z",
+				"closed_at": %q,
 				"head": {"sha": "abc123"}
 			}
-		}`, repository, number, mergedJSON, mergedAt))
+		}`, repository, number, mergedJSON, mergedAt, closedAt))
 	}
 
 	deliver := func(webhook *models.Webhook, body []byte) {
@@ -293,6 +296,31 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
 		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
 		assert.Equal(t, afterFirst, countStatusEvents(t, reloaded))
+	})
+
+	t.Run("concurrent closed deliveries record one close event", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 65)
+		body := closedPayload("acme/app", 65, true)
+		before := countStatusEvents(t, order)
+
+		var started sync.WaitGroup
+		started.Add(2)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		deliverOnce := func() {
+			defer wg.Done()
+			started.Done()
+			started.Wait()
+			deliver(webhook, body)
+		}
+		go deliverOnce()
+		go deliverOnce()
+		wg.Wait()
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+		assert.Equal(t, before+1, countStatusEvents(t, reloaded))
 	})
 
 	t.Run("ignores a repository with no matching pull request", func(t *testing.T) {

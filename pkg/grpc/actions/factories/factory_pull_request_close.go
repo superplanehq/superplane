@@ -135,6 +135,9 @@ func closeFactoryWorkOrderForPullRequest(
 	if err != nil {
 		return nil, err
 	}
+	if err := order.LockForUpdate(tx); err != nil {
+		return nil, err
+	}
 
 	outcome := &factoryPullRequestCloseResult{
 		order:     order,
