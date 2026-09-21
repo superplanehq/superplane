@@ -15,11 +15,7 @@ import {
   renderHost,
   SENTRY_INTAKE,
 } from "./IntakeSettingsHost.spec.fixtures";
-import {
-  DEFAULT_GITHUB_INTAKE_SETTINGS,
-  INTAKE_SETTINGS_COPY,
-  intakeSettingsToApi,
-} from "./intakeSourceSettingsModel";
+import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
 
 const {
   useCanvas,
