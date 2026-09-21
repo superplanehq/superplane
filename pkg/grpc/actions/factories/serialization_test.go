@@ -370,6 +370,28 @@ func TestSerializeWorkOrder_IncludesUsageBreakdown(t *testing.T) {
 	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, serialized.GetLineDispatches()[0].GetStepExecutions()[0].GetModels())
 }
 
+func TestSerializeFactoryPullRequest_HidesMergeableDuringActiveMutationRun(t *testing.T) {
+	now := time.Now()
+	runID := uuid.New()
+	openMergeable := &models.FactoryPullRequest{
+		ID:                  uuid.New(),
+		FactoryID:           uuid.New(),
+		WorkOrderID:         uuid.New(),
+		State:               models.FactoryPullRequestStateOpen,
+		Mergeable:           true,
+		ActiveMutationRunID: &runID,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+
+	hidden := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
+	assert.False(t, hidden.GetMergeable())
+
+	openMergeable.ActiveMutationRunID = nil
+	shown := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
+	assert.True(t, shown.GetMergeable())
+}
+
 func TestAllocateCostCents_GivesTruncatedRemaindersToTheHeader(t *testing.T) {
 	cents := allocateCostCents([]int64{6_000, 6_000}, 1)
 	assert.Equal(t, []int64{1, 0}, cents)
