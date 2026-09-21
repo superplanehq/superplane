@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
@@ -78,6 +79,44 @@ func Test__FactorySentryResolveConsumer(t *testing.T) {
 		err := newSentryResolveConsumer(r, httpCtx).process(db, completedMessage(order))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to resolve Sentry issue 55")
+	})
+
+	t.Run("retries a sentry request timeout", func(t *testing.T) {
+		order, httpCtx := seedSentryWorkOrder(t, r, factoryModel, sentryIssuePayload("4081"), sentryMockResponses(
+			http.StatusRequestTimeout, `{"detail":"timeout"}`,
+		))
+
+		err := newSentryResolveConsumer(r, httpCtx).process(db, completedMessage(order))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to resolve Sentry issue 4081")
+	})
+
+	t.Run("uses the source run version integration after the live trigger changes", func(t *testing.T) {
+		order, httpCtx := seedSentryWorkOrder(t, r, factoryModel, sentryIssuePayload("222"), sentryMockResponses(
+			http.StatusOK, `{"id":"222","status":"unresolved"}`,
+			http.StatusOK, `{"status":"resolved"}`,
+			http.StatusOK, `{"id":"222","status":"resolved"}`,
+		))
+
+		run, err := models.FindUnscopedCanvasRun(db, *order.SourceRunID)
+		require.NoError(t, err)
+		retargetLiveTriggerInstallation(t, r, run.WorkflowID, run.NodeID)
+
+		require.NoError(t, newSentryResolveConsumer(r, httpCtx).process(db, completedMessage(order)))
+		require.Len(t, httpCtx.Requests, 3)
+		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/issues/222/")
+	})
+
+	t.Run("retries a transient sentry client construction error", func(t *testing.T) {
+		order, httpCtx := seedHostedSentryWorkOrder(t, r, factoryModel, sentryIssuePayload("81"), sentryMockResponses(
+			http.StatusInternalServerError, `{"detail":"unavailable"}`,
+		))
+
+		err := newSentryResolveConsumer(r, httpCtx).process(db, completedMessage(order))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to resolve Sentry issue 81")
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/authorizations/")
 	})
 
 	t.Run("skips a permanent sentry error", func(t *testing.T) {
@@ -202,28 +241,43 @@ func seedSentryWorkOrder(
 ) (*models.FactoryWorkOrder, *supportcontexts.HTTPContext) {
 	t.Helper()
 
-	db := database.Conn()
-	integrationID := uuid.New()
-	userToken, err := r.Encryptor.Encrypt(t.Context(), []byte("user-token"), []byte(integrationID.String()))
-	require.NoError(t, err)
+	return seedSentryWorkOrderWithIntegration(t, r, factoryModel, createReadySentryIntegration(t, r), eventPayload, responses)
+}
 
-	integration, err := models.CreateIntegration(
-		integrationID,
-		r.Organization.ID,
-		sentryAppName,
-		support.RandomName("sentry"),
-		map[string]any{
-			"baseUrl":   "https://sentry.io",
-			"userToken": base64.StdEncoding.EncodeToString(userToken),
-		},
+func seedHostedSentryWorkOrder(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryModel *models.Factory,
+	eventPayload map[string]any,
+	responses []*http.Response,
+) (*models.FactoryWorkOrder, *supportcontexts.HTTPContext) {
+	t.Helper()
+
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+	return seedSentryWorkOrderWithIntegration(
+		t,
+		r,
+		factoryModel,
+		createReadyHostedSentryIntegration(t, r),
+		eventPayload,
+		responses,
 	)
-	require.NoError(t, err)
-	integration.State = models.IntegrationStateReady
-	integration.Metadata = datatypes.NewJSONType(map[string]any{
-		"organization": map[string]any{"slug": "example", "name": "Example", "id": "1"},
-	})
-	require.NoError(t, db.Save(integration).Error)
+}
 
+func seedSentryWorkOrderWithIntegration(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryModel *models.Factory,
+	integration *models.Integration,
+	eventPayload map[string]any,
+	responses []*http.Response,
+) (*models.FactoryWorkOrder, *supportcontexts.HTTPContext) {
+	t.Helper()
+
+	db := database.Conn()
 	const triggerNodeID = "trigger"
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -233,9 +287,7 @@ func seedSentryWorkOrder(
 		nil,
 	)
 	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
-	require.NoError(t, db.Model(&models.CanvasNode{}).
-		Where("workflow_id = ? AND node_id = ?", canvas.ID, triggerNodeID).
-		Update("app_installation_id", integration.ID).Error)
+	bindCanvasNodeInstallation(t, canvas.ID, triggerNodeID, integration.ID)
 
 	triggerEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, eventPayload)
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, triggerEvent)
@@ -251,6 +303,113 @@ func seedSentryWorkOrder(
 
 	httpCtx := &supportcontexts.HTTPContext{Responses: responses}
 	return order, httpCtx
+}
+
+func createReadySentryIntegration(t *testing.T, r *support.ResourceRegistry) *models.Integration {
+	t.Helper()
+
+	integrationID := uuid.New()
+	userToken, err := r.Encryptor.Encrypt(t.Context(), []byte("user-token"), []byte(integrationID.String()))
+	require.NoError(t, err)
+
+	return saveReadySentryIntegration(t, r, integrationID, map[string]any{
+		"baseUrl":   "https://sentry.io",
+		"userToken": base64.StdEncoding.EncodeToString(userToken),
+	}, map[string]any{
+		"organization": map[string]any{"slug": "example", "name": "Example", "id": "1"},
+	})
+}
+
+func createReadyHostedSentryIntegration(t *testing.T, r *support.ResourceRegistry) *models.Integration {
+	t.Helper()
+
+	integration := saveReadySentryIntegration(t, r, uuid.New(), map[string]any{}, map[string]any{
+		"hostedApp":        true,
+		"installationUUID": "install-uuid",
+		"tokenExpiresAt":   time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+		"organization":     map[string]any{"slug": "example", "name": "Example", "id": "1"},
+	})
+	saveEncryptedIntegrationSecret(t, r, integration, sentry.SecretAccessToken, "expired-token")
+	saveEncryptedIntegrationSecret(t, r, integration, sentry.SecretRefreshToken, "refresh-token")
+	return integration
+}
+
+func saveReadySentryIntegration(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	integrationID uuid.UUID,
+	config map[string]any,
+	metadata map[string]any,
+) *models.Integration {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		integrationID,
+		r.Organization.ID,
+		sentryAppName,
+		support.RandomName("sentry"),
+		config,
+	)
+	require.NoError(t, err)
+	integration.State = models.IntegrationStateReady
+	integration.Metadata = datatypes.NewJSONType(metadata)
+	require.NoError(t, database.Conn().Save(integration).Error)
+	return integration
+}
+
+func saveEncryptedIntegrationSecret(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	integration *models.Integration,
+	name, value string,
+) {
+	t.Helper()
+
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), []byte(value), []byte(integration.ID.String()))
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Create(&models.IntegrationSecret{
+		OrganizationID: integration.OrganizationID,
+		InstallationID: integration.ID,
+		Name:           name,
+		Value:          encrypted,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}).Error)
+}
+
+func bindCanvasNodeInstallation(t *testing.T, canvasID uuid.UUID, nodeID string, integrationID uuid.UUID) {
+	t.Helper()
+
+	db := database.Conn()
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).
+		Update("app_installation_id", integrationID).Error)
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
+	require.NoError(t, err)
+
+	nodes := append([]models.Node(nil), liveVersion.Nodes...)
+	for i := range nodes {
+		if nodes[i].ID != nodeID {
+			continue
+		}
+		id := integrationID.String()
+		nodes[i].IntegrationID = &id
+	}
+	require.NoError(t, db.Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+}
+
+func retargetLiveTriggerInstallation(t *testing.T, r *support.ResourceRegistry, canvasID uuid.UUID, nodeID string) {
+	t.Helper()
+
+	other := createReadySentryIntegration(t, r)
+	other.State = models.IntegrationStatePending
+	require.NoError(t, database.Conn().Save(other).Error)
+	require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).
+		Update("app_installation_id", other.ID).Error)
 }
 
 func completeWorkOrder(t *testing.T, order *models.FactoryWorkOrder) {

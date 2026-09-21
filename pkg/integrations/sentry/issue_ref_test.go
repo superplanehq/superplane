@@ -71,8 +71,9 @@ func Test__IssueStatusIsSettled(t *testing.T) {
 }
 
 func Test__IsRetryableAPIError(t *testing.T) {
-	t.Run("retries rate limits and server errors", func(t *testing.T) {
+	t.Run("retries rate limits, timeouts, and server errors", func(t *testing.T) {
 		assert.True(t, IsRetryableAPIError(&apiError{StatusCode: http.StatusTooManyRequests}))
+		assert.True(t, IsRetryableAPIError(&apiError{StatusCode: http.StatusRequestTimeout}))
 		assert.True(t, IsRetryableAPIError(&apiError{StatusCode: http.StatusInternalServerError}))
 		assert.True(t, IsRetryableAPIError(&apiError{StatusCode: http.StatusBadGateway}))
 	})

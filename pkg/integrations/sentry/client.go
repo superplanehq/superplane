@@ -46,8 +46,9 @@ func wrapReleaseScopeError(err error) error {
 }
 
 // IsRetryableAPIError reports whether the consumer should nack the message
-// so Tackle redelivers it. Rate limits, server errors, and transport
-// failures retry. Client errors such as 401, 403, and 404 do not.
+// so Tackle redelivers it. Rate limits, request timeouts, server errors,
+// and transport failures retry. Client errors such as 401, 403, and 404
+// do not.
 func IsRetryableAPIError(err error) bool {
 	if err == nil {
 		return false
@@ -59,6 +60,7 @@ func IsRetryableAPIError(err error) bool {
 	}
 
 	return sentryAPIError.StatusCode == http.StatusTooManyRequests ||
+		sentryAPIError.StatusCode == http.StatusRequestTimeout ||
 		sentryAPIError.StatusCode >= http.StatusInternalServerError
 }
 

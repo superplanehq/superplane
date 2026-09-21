@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -172,7 +173,15 @@ func resolveSentryWorkOrderOrigin(tx *gorm.DB, order *models.FactoryWorkOrder) (
 		return nil, nil
 	}
 
-	event, err := models.FindRootEventForRun(tx, *order.SourceRunID)
+	run, err := models.FindUnscopedCanvasRun(tx, *order.SourceRunID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	event, err := models.FindRootEventForRun(tx, run.ID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -185,18 +194,20 @@ func resolveSentryWorkOrderOrigin(tx *gorm.DB, order *models.FactoryWorkOrder) (
 		return nil, nil
 	}
 
-	node, err := models.FindUnscopedCanvasNode(tx, event.WorkflowID, event.NodeID)
+	version, err := models.FindCanvasVersionInTransaction(tx, run.WorkflowID, run.VersionID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if node.AppInstallationID == nil {
+
+	integrationID, ok := integrationIDFromVersionNode(version, event.NodeID)
+	if !ok {
 		return nil, nil
 	}
 
-	integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+	integration, err := models.FindUnscopedIntegrationInTransaction(tx, integrationID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -211,6 +222,29 @@ func resolveSentryWorkOrderOrigin(tx *gorm.DB, order *models.FactoryWorkOrder) (
 		IntegrationID: integration.ID,
 		IssueID:       issueID,
 	}, nil
+}
+
+func integrationIDFromVersionNode(version *models.CanvasVersion, nodeID string) (uuid.UUID, bool) {
+	if version == nil {
+		return uuid.Nil, false
+	}
+
+	for _, node := range version.Nodes {
+		if node.ID != nodeID {
+			continue
+		}
+		if node.IntegrationID == nil {
+			return uuid.Nil, false
+		}
+
+		id, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
+		if err != nil {
+			return uuid.Nil, false
+		}
+		return id, true
+	}
+
+	return uuid.Nil, false
 }
 
 func (c *FactorySentryResolveConsumer) resolveSentryIssue(tx *gorm.DB, origin *sentryWorkOrderOrigin) error {
@@ -230,8 +264,7 @@ func (c *FactorySentryResolveConsumer) resolveSentryIssue(tx *gorm.DB, origin *s
 		contexts.NewIntegrationContext(tx, nil, integration, c.Encryptor, c.Registry, nil),
 	)
 	if err != nil {
-		log.WithError(err).Warnf("Skipping Sentry resolve for issue %s: client is unavailable", origin.IssueID)
-		return nil
+		return c.mapSentryError(origin.IssueID, err)
 	}
 
 	issue, err := client.GetIssue(origin.IssueID)
