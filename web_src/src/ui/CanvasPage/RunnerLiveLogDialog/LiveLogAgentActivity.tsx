@@ -1,5 +1,5 @@
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus, AgentToolItem } from "@/lib/agentActivity";
-import { agentToolLabel, agentToolOutputPreview } from "@/lib/agentToolLabels";
+import { agentToolDisplayText, agentToolOutputPreview } from "@/lib/agentToolLabels";
 import { formatDuration } from "@/lib/duration";
 
 export function LiveLogAgentActivity({ activities }: { activities: AgentActivity[] }) {
@@ -39,18 +39,12 @@ function ActivityRow({ item }: { item: AgentActivityItem }) {
 }
 
 function ToolRow({ tool }: { tool: AgentToolItem }) {
-  const label = agentToolLabel(tool);
+  const label = agentToolDisplayText(tool);
   const preview = agentToolOutputPreview(tool);
   return (
     <div>
       <p>
-        <span>{label.action}</span>
-        {label.detail ? (
-          <>
-            {" "}
-            <span>{label.detail}</span>
-          </>
-        ) : null}
+        <span>{label}</span>
         <span className="text-gray-500 dark:text-gray-400">
           {" "}
           {activityStatusLabel(tool.status)}

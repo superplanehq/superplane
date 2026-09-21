@@ -359,7 +359,7 @@ describe("notesFromLiveLogSections", () => {
 
     expect(notes.map((note) => ({ type: note.componentType, name: note.componentName }))).toEqual([
       { type: "prompt", name: "You are implementing a fix" },
-      { type: "read", name: "Explored foo.go" },
+      { type: "read", name: "pkg/foo.go" },
       { type: "grep", name: "rootTriggerRenderer" },
     ]);
     expect(notes[1]?.detail).toBe("package foo");

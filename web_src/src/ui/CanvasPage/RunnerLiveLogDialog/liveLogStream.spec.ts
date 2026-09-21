@@ -84,6 +84,27 @@ describe("consumeLiveLogNdjsonLine", () => {
     expect(next.onLogLine).not.toHaveBeenCalled();
   });
 
+  it("unwraps a version 2 activity record that arrived as a plaintext line", () => {
+    const next = handlers({ onRecord: vi.fn(), onToolStart: vi.fn() });
+    const record = {
+      schema_version: 2,
+      type: "tool_input_delta",
+      activity_id: "activity-1",
+      event_id: "activity-1:3",
+      sequence: 3,
+      id: "call-1",
+      input: "git status",
+      complete: true,
+    };
+
+    consumeLiveLogNdjsonLine(JSON.stringify({ type: "line", text: JSON.stringify(record) }), next);
+
+    expect(next.onRecord).toHaveBeenCalledTimes(1);
+    expect(next.onRecord).toHaveBeenCalledWith(record);
+    expect(next.onToolStart).not.toHaveBeenCalled();
+    expect(next.onLogLine).not.toHaveBeenCalled();
+  });
+
   it("splits each prompt command into its own usage series", () => {
     const series = reducePromptUsageFromLiveLogLines([
       JSON.stringify({ type: "cmd_start", index: 2, text: "Implementation", kind: "prompt" }),
