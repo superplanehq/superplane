@@ -26,7 +26,7 @@ export const startTriggerRenderer: TriggerRenderer = {
     return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
   },
 
-  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+  getRootEventValues: (context: TriggerEventContext): Record<string, unknown> => {
     return flattenObject(context.event?.data || {});
   },
 
