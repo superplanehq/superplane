@@ -25,7 +25,7 @@ import (
 
 func queueWorkerForTest(r *support.ResourceRegistry) *NodeQueueWorker {
 	amqpURL, _ := config.RabbitMQURL()
-	return NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	return NewNodeQueueWorker(r.Registry, amqpURL)
 }
 
 func processQueueNode(t *testing.T, worker *NodeQueueWorker, canvasID uuid.UUID, nodeID string) {

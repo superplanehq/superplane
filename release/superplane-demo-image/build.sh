@@ -21,8 +21,6 @@ IMAGE_REPO="${DEMO_IMAGE_REPO:-ghcr.io/superplanehq/superplane-demo}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-SUPERGIT_VERSION="${SUPERGIT_VERSION:-v0.1.1}"
-
 # shellcheck source=../lib/image-build-prerequisites.sh
 source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
 
@@ -39,8 +37,6 @@ if generated_release_build_inputs_missing; then
   make dev.setup.npm
   make openapi.web.client.gen
 fi
-
-bash "${SCRIPT_DIR}/download-supergit.sh" "${SUPERGIT_VERSION}" "${ARCH}"
 
 echo "Building SuperPlane demo image (${IMAGE_REPO})"
 

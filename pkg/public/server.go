@@ -28,7 +28,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -89,7 +88,6 @@ type Server struct {
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcProvider          oidc.Provider
-	gitProvider           git.Provider
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -176,7 +174,6 @@ func NewServer(
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
-	gitProvider git.Provider,
 	basePath string,
 	baseURL string,
 	webhooksBaseURL string,
@@ -200,7 +197,6 @@ func NewServer(
 		WebhooksBaseURL:       webhooksBaseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
-		gitProvider:           gitProvider,
 		authHandler:           authHandler,
 		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
@@ -1899,7 +1895,6 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution),
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 				Usage:          contexts.NewUsageContext(organizationUUID, execution),
 				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
 			}, nil

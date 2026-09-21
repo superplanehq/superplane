@@ -56,7 +56,6 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",

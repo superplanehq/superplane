@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 154,
-  "maxAllowedDatabaseConnCalls": 167,
+  "maxAllowedInTransactionDefinitions": 152,
+  "maxAllowedDatabaseConnCalls": 164,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -130,8 +130,6 @@
     "pkg/models/organization.go:ListOrganizationsPendingUsageLimitsRefreshInTransaction",
     "pkg/models/organization.go:EnableExperimentalFeatureInTransaction",
     "pkg/models/organization.go:DisableExperimentalFeatureInTransaction",
-    "pkg/models/repository.go:FindRepositoryInTransaction",
-    "pkg/models/repository.go:CreatePendingRepositoryInTransaction",
     "pkg/models/role_metadata.go:CreateInTransaction",
     "pkg/models/role_metadata.go:UpdateInTransaction",
     "pkg/models/role_metadata.go:CreateInTransaction",
@@ -278,9 +276,6 @@
     "pkg/models/organization.go:ListOrganizationsPendingUsageLimitsRefresh:database.Conn()#1",
     "pkg/models/organization.go:EnableExperimentalFeature:database.Conn()#1",
     "pkg/models/organization.go:DisableExperimentalFeature:database.Conn()#1",
-    "pkg/models/repository.go:FindRepository:database.Conn()#1",
-    "pkg/models/repository.go:FindRepositoryUnscoped:database.Conn()#1",
-    "pkg/models/repository.go:CreatePendingRepository:database.Conn()#1",
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
     "pkg/models/role_metadata.go:Update:database.Conn()#1",
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
@@ -326,5 +321,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-09-21T12:58:30Z"
+  "updatedAt": "2026-09-21T13:31:13Z"
 }

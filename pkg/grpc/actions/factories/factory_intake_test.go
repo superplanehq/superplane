@@ -31,7 +31,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		Registry:       r.Registry,
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
-		GitProvider:    r.GitProvider,
 		WebhookBaseURL: "http://localhost:8000",
 	}
 

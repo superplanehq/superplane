@@ -253,7 +253,7 @@ func Test__OrganizationCleanupWorker_WaitsForFactories(t *testing.T) {
 	_, err = factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
-	worker := NewOrganizationCleanupWorker(r.GitProvider)
+	worker := NewOrganizationCleanupWorker()
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
 	require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).

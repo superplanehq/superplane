@@ -23,7 +23,6 @@ func newTestCanvasService(r *support.ResourceRegistry) *CanvasService {
 		r.AuthService,
 		r.Registry,
 		r.Encryptor,
-		r.GitProvider,
 		"http://localhost:8000",
 		nil,
 	)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	actions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -25,7 +24,6 @@ func NewFactoryService(
 	reg *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
-	gitProvider git.Provider,
 	webhookBaseURL string,
 	usageService usage.Service,
 ) *FactoryService {
@@ -35,7 +33,6 @@ func NewFactoryService(
 			Registry:       reg,
 			Encryptor:      encryptor,
 			AuthService:    authService,
-			GitProvider:    gitProvider,
 			WebhookBaseURL: webhookBaseURL,
 			UsageService:   usageService,
 		},
