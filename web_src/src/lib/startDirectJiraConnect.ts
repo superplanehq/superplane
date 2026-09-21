@@ -69,8 +69,8 @@ async function resumePendingJiraConnect(args: StartDirectJiraConnectArgs): Promi
 export async function startDirectJiraConnect(args: StartDirectJiraConnectArgs): Promise<boolean> {
   if (!args.forceNew && args.connected?.length) {
     const ready = findReadyJiraConnection(args.connected);
-    if (ready?.metadata?.id) {
-      args.onExistingReady?.(ready.metadata.id);
+    if (ready?.metadata?.id && args.onExistingReady) {
+      args.onExistingReady(ready.metadata.id);
       return false;
     }
 

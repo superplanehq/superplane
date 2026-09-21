@@ -106,6 +106,24 @@ describe("startDirectJiraConnect", () => {
     expect(follow).toHaveBeenCalledWith(action);
   });
 
+  it("creates a connection when a ready instance exists but the caller cannot reuse it", async () => {
+    const action = { method: "GET", url: "https://auth.atlassian.com/authorize?client_id=new" };
+    const create = vi.fn().mockResolvedValue({
+      integration: { status: { browserAction: action } },
+    });
+
+    const started = await startDirectJiraConnect({
+      organizationId: "org-1",
+      existingNames: new Set(["jira"]),
+      connected: [{ metadata: { integrationName: "jira", id: "jira-1" }, status: { state: "ready" } }],
+      create,
+    });
+
+    expect(started).toBe(true);
+    expect(create).toHaveBeenCalledWith({ integrationName: "jira", name: "jira-2" });
+    expect(follow).toHaveBeenCalledWith(action);
+  });
+
   it("resumes pending Jira authorization instead of creating another connection", async () => {
     const action = { method: "GET", url: "https://auth.atlassian.com/authorize?state=abc" };
     const create = vi.fn();
