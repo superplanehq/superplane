@@ -61,33 +61,36 @@ export function baseProps(
   };
 }
 
-export function getDetailsForIssue(issue: Issue): Record<string, string> {
-  const details: Record<string, string> = {};
-  Object.assign(details, {
-    "Created At": issue?.created_at ? new Date(issue.created_at).toLocaleString() : "-",
-    "Created By": issue?.user?.login || "-",
-  });
-
-  details["Number"] = issue?.number.toString();
-  details["ID"] = issue?.id.toString();
-  details["State"] = issue?.state;
-  details["URL"] = issue?.html_url;
-  details["Title"] = issue?.title || "-";
-  details["Author"] = issue?.user?.html_url || "-";
-
-  if (issue.closed_by) {
-    details["Closed By"] = issue?.closed_by.html_url;
-    details["Closed At"] = issue?.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
+function assignClosedIssueDetails(details: Record<string, string>, issue: Issue) {
+  if (!issue.closed_by) {
+    return;
   }
+  details["Closed By"] = issue.closed_by.html_url;
+  details["Closed At"] = issue.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
+}
 
+function assignIssueCollections(details: Record<string, string>, issue: Issue) {
   if (issue.labels) {
     details["Labels"] = issue.labels.map((label) => label.name).join(", ");
   }
-
   if (issue.assignees) {
     details["Assignees"] = issue.assignees.map((assignee) => assignee.login).join(", ");
   }
+}
 
+export function getDetailsForIssue(issue: Issue): Record<string, string> {
+  const details: Record<string, string> = {
+    "Created At": issue?.created_at ? new Date(issue.created_at).toLocaleString() : "-",
+    "Created By": issue?.user?.login || "-",
+    Number: issue?.number.toString(),
+    ID: issue?.id.toString(),
+    State: issue?.state,
+    URL: issue?.html_url,
+    Title: issue?.title || "-",
+    Author: issue?.user?.html_url || "-",
+  };
+  assignClosedIssueDetails(details, issue);
+  assignIssueCollections(details, issue);
   return details;
 }
 
