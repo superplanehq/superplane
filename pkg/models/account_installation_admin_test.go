@@ -63,7 +63,7 @@ func TestListAllOrganizations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	t.Run("returns empty list when no organizations exist", func(t *testing.T) {
-		orgs, total, err := ListAllOrganizations("", 50, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "", "")
 		require.NoError(t, err)
 		assert.Empty(t, orgs)
 		assert.Equal(t, int64(0), total)
@@ -77,7 +77,7 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Middle Org", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "name", "asc")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "name", "asc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -103,7 +103,7 @@ func TestListAllOrganizations(t *testing.T) {
 		createTestCanvas(t, midCount.ID, "Mid Canvas 1")
 		createTestCanvas(t, midCount.ID, "Mid Canvas 2")
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "canvas_count", "desc")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "canvas_count", "desc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -129,7 +129,7 @@ func TestListAllOrganizations(t *testing.T) {
 		createTestUser(t, midCount.ID, "mid-1@example.com", "Mid 1")
 		createTestUser(t, midCount.ID, "mid-2@example.com", "Mid 2")
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "member_count", "desc")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "member_count", "desc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -149,7 +149,7 @@ func TestListAllOrganizations(t *testing.T) {
 		err = SoftDeleteOrganization(toDelete.ID.String())
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "", "")
 		require.NoError(t, err)
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
@@ -164,7 +164,7 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Beta Inc", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("alpha", 50, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "alpha", 50, 0, "", "")
 		require.NoError(t, err)
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
@@ -181,12 +181,12 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Ccc", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 2, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 2, 0, "", "")
 		require.NoError(t, err)
 		assert.Len(t, orgs, 2)
 		assert.Equal(t, int64(3), total)
 
-		orgs2, _, err := ListAllOrganizations("", 2, 2, "", "")
+		orgs2, _, err := ListAllOrganizations(database.Conn(), "", 2, 2, "", "")
 		require.NoError(t, err)
 		assert.Len(t, orgs2, 1)
 	})
@@ -209,6 +209,17 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 		assert.Equal(t, org.Slug, found.Slug)
 		assert.Equal(t, "counted", found.Description)
 		assert.Equal(t, int64(2), found.CanvasCount)
+		assert.Equal(t, int64(1), found.MemberCount)
+	})
+
+	t.Run("excludes API keys from member count", func(t *testing.T) {
+		org, err := CreateOrganization("Human Members", "")
+		require.NoError(t, err)
+		createTestUser(t, org.ID, "human-member@example.com", "Human Member")
+		createTestAPIKeyUser(t, org.ID, "api-key@example.com", "API Key")
+
+		found, err := FindOrganizationWithCounts(database.Conn(), org.ID)
+		require.NoError(t, err)
 		assert.Equal(t, int64(1), found.MemberCount)
 	})
 
@@ -261,6 +272,18 @@ func createTestUser(t *testing.T, organizationID uuid.UUID, email, name string) 
 
 	_, err = CreateUser(organizationID, account.ID, account.Email, account.Name)
 	require.NoError(t, err)
+}
+
+func createTestAPIKeyUser(t *testing.T, organizationID uuid.UUID, email, name string) {
+	t.Helper()
+
+	apiKey := &User{
+		OrganizationID: organizationID,
+		Email:          &email,
+		Name:           name,
+		Type:           UserTypeAPIKey,
+	}
+	require.NoError(t, database.Conn().Create(apiKey).Error)
 }
 
 func TestListActiveUsersByOrganization(t *testing.T) {

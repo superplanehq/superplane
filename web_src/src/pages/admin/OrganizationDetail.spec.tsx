@@ -215,4 +215,34 @@ describe("OrganizationDetail", () => {
     expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "active");
     expect(await screen.findByTestId("admin-org-credit-amount")).toHaveValue("12.50");
   });
+
+  it("retries overview load after an error", async () => {
+    const user = userEvent.setup();
+    const overview = {
+      id: ORG_ID,
+      name: "Acme",
+      slug: "acme",
+      description: "Builds widgets",
+      canvas_count: 2,
+      member_count: 3,
+      created_at: "2024-01-15T12:00:00Z",
+      updated_at: "2024-02-20T12:00:00Z",
+    };
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        if (vi.mocked(fetch).mock.calls.filter(([call]) => String(call) === url).length === 1) {
+          return new Response("error", { status: 500 });
+        }
+        return jsonResponse(overview);
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Could not load this organization.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+  });
 });

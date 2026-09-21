@@ -924,7 +924,7 @@ func listAllOrganizations(ctx context.Context, search string, limit, offset int,
 	ctx, done := telemetry.Span(ctx, "organizations.list")
 	defer done(&err)
 
-	return models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+	return models.ListAllOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection)
 }
 
 func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {

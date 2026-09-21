@@ -57,8 +57,7 @@ type OrganizationWithCounts struct {
 	MemberCount int64 `gorm:"column:member_count"`
 }
 
-func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	tx := database.Conn()
+func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
 	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
@@ -118,6 +117,7 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 		Table("users").
 		Select("organization_id, COUNT(*) AS count").
 		Where("deleted_at IS NULL").
+		Where("type = ?", UserTypeHuman).
 		Group("organization_id")
 
 	return query.

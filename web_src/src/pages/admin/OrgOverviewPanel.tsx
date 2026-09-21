@@ -1,5 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
+import { Button } from "@/components/ui/button";
 import { Building } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatDate } from "./formatDate";
@@ -35,6 +36,7 @@ export function OrgOverviewPanel({ orgId }: { orgId: string }) {
   const [organization, setOrganization] = useState<OrganizationOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +69,7 @@ export function OrgOverviewPanel({ orgId }: { orgId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orgId]);
+  }, [orgId, reloadToken]);
 
   return (
     <div className="mb-8">
@@ -80,7 +82,18 @@ export function OrgOverviewPanel({ orgId }: { orgId: string }) {
       {loading ? (
         <Text className="text-gray-500 text-sm dark:text-gray-400">Loading organization...</Text>
       ) : error ? (
-        <Text className="text-red-600 text-sm dark:text-red-400">{error}</Text>
+        <div>
+          <Text className="text-red-600 text-sm dark:text-red-400">{error}</Text>
+          <Button
+            type="button"
+            className="mt-4"
+            variant="outline"
+            size="sm"
+            onClick={() => setReloadToken((token) => token + 1)}
+          >
+            Try again
+          </Button>
+        </div>
       ) : organization ? (
         <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
           <div className="grid gap-4 sm:grid-cols-2">
