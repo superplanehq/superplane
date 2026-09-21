@@ -721,7 +721,6 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 
 	nowInTZ := now
 
-	// Find next occurrence of any of the specified weekdays
 	validWeekdays := make(map[time.Weekday]bool)
 	for _, dayStr := range weekDays {
 		weekday, err := parseWeekday(dayStr)
@@ -731,10 +730,26 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 		validWeekdays[weekday] = true
 	}
 
-	nextIntervalStart := nowInTZ.AddDate(0, 0, interval*7)
+	// The week containing now is active (weeks start on Sunday), and every
+	// configured weekday in an active week fires. Candidates must be strictly
+	// after now so a fire at hour:minute doesn't re-arm to itself.
+	currentWeekStart := time.Date(nowInTZ.Year(), nowInTZ.Month(), nowInTZ.Day(), 0, 0, 0, 0, nowInTZ.Location())
+	currentWeekStart = currentWeekStart.AddDate(0, 0, -int(nowInTZ.Weekday()))
 
-	// start the search on Sunday of the next week
-	nextIntervalStart.Add(-time.Duration(nextIntervalStart.Weekday()) * time.Hour)
+	for i := 0; i < 7; i++ {
+		checkDate := currentWeekStart.AddDate(0, 0, i)
+		if !validWeekdays[checkDate.Weekday()] {
+			continue
+		}
+		candidateTime := time.Date(checkDate.Year(), checkDate.Month(), checkDate.Day(), hour, minute, 0, 0, checkDate.Location())
+		if candidateTime.After(nowInTZ) {
+			utcResult := candidateTime.UTC()
+			return &utcResult, nil
+		}
+	}
+
+	// Current week exhausted: the next active week starts a full interval later.
+	nextIntervalStart := currentWeekStart.AddDate(0, 0, interval*7)
 	for i := 0; i < 7; i++ {
 		checkDate := nextIntervalStart.AddDate(0, 0, i)
 		if validWeekdays[checkDate.Weekday()] {
