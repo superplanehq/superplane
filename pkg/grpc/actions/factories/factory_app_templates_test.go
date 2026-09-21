@@ -112,6 +112,60 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	requireValidCanvasExpressions(t, canvas)
 }
 
+func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(visualEvidenceCaseName(enabled), func(t *testing.T) {
+			seed, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+				appID:   "app-1",
+				appName: "Implement",
+			})
+			require.NoError(t, err)
+			live, err := yaml.CanvasFromYAML([]byte(seed.canvasYAML))
+			require.NoError(t, err)
+			findYAMLNode(t, live, "implementation-agent-no-issue").Configuration["includeVisualEvidence"] = enabled
+
+			includeVisualEvidence := canvasAgentIncludesVisualEvidence(live.Nodes())
+			assert.Equal(t, enabled, includeVisualEvidence)
+
+			result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+				appID:                 "app-1",
+				appName:               "Implement",
+				includeVisualEvidence: &includeVisualEvidence,
+			})
+			require.NoError(t, err)
+			defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+			require.NoError(t, err)
+			assert.Equal(
+				t,
+				enabled,
+				findYAMLNode(t, defaults, "implementation-agent-no-issue").Configuration["includeVisualEvidence"],
+			)
+		})
+	}
+}
+
+func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(visualEvidenceCaseName(enabled), func(t *testing.T) {
+			input := deriveFactoryTemplateInput(
+				nil,
+				nil,
+				&models.Canvas{ID: uuid.New(), Name: "Implement"},
+				&models.CanvasVersion{Nodes: []models.Node{{
+					ID:  "implementation-agent-no-issue",
+					Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}},
+					Configuration: map[string]any{
+						"includeVisualEvidence": enabled,
+					},
+				}}},
+				factoryAppTemplates["line-implementation"],
+			)
+			require.NotNil(t, input.includeVisualEvidence)
+			assert.Equal(t, enabled, *input.includeVisualEvidence)
+		})
+	}
+}
+
 func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.T) {
 	canvasID := uuid.New()
 	current := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
@@ -171,6 +225,39 @@ func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.
 	for _, node := range defaults.Spec.Nodes {
 		assert.NotContains(t, legacyEvidenceNodeIDs, node.ID)
 	}
+}
+
+func TestMaterializePRFeedbackChecksDefaultsKeepsVisualEvidence(t *testing.T) {
+	canvasID := uuid.New()
+	current := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository:            "acme/app",
+		IncludeVisualEvidence: true,
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+	assert.Equal(t, true, findYAMLNode(t, current, prFeedbackRunnerNodeID).Configuration["includeVisualEvidence"])
+
+	result, err := materializePRFeedbackDefaults(
+		nil,
+		&models.Factory{},
+		&models.Canvas{ID: canvasID, Name: "Fix pull request checks"},
+		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
+		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestChecks},
+	)
+	require.NoError(t, err)
+
+	defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, true, findYAMLNode(t, defaults, prFeedbackRunnerNodeID).Configuration["includeVisualEvidence"])
+}
+
+func visualEvidenceCaseName(enabled bool) string {
+	if enabled {
+		return "enabled"
+	}
+	return "disabled"
 }
 
 func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
