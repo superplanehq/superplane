@@ -67,7 +67,7 @@ export type ArtifactVersionData = {
 };
 
 type ArtifactOutputPayload = OutputPayload & {
-  data?: Record<string, unknown>;
+  data?: ArtifactVersionData | GetArtifactAnalysisData;
 };
 
 export function getArtifactOutputPayload(execution: ExecutionInfo): ArtifactOutputPayload | undefined {
@@ -81,9 +81,11 @@ export function getArtifactOutputPayload(execution: ExecutionInfo): ArtifactOutp
   return payload as ArtifactOutputPayload;
 }
 
-export function getArtifactData(execution: ExecutionInfo): Record<string, unknown> | undefined {
+export function getArtifactData<T extends ArtifactVersionData | GetArtifactAnalysisData>(
+  execution: ExecutionInfo,
+): T | undefined {
   const payload = getArtifactOutputPayload(execution);
-  return payload?.data as Record<string, unknown> | undefined;
+  return payload?.data as T | undefined;
 }
 
 export function buildArtifactSummaryDetails({ timestamp }: { timestamp?: string }): Record<string, string> {
