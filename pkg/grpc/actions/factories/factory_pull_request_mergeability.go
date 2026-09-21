@@ -197,18 +197,40 @@ func syncFactoryPullRequestIfClosedOnGitHub(
 		return false, nil
 	}
 
-	now := time.Now()
-	patch := models.FactoryPullRequestPatch{State: &nextState}
-	if nextState == models.FactoryPullRequestStateMerged {
-		patch.MergedAt = &now
-	}
-	if nextState == models.FactoryPullRequestStateClosed {
-		patch.ClosedAt = &now
-	}
-	if err := pullRequest.Update(db, patch); err != nil {
+	var corrected bool
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if pullRequest.State != models.FactoryPullRequestStateOpen {
+			return nil
+		}
+
+		patch := models.FactoryPullRequestPatch{State: &nextState}
+		if nextState == models.FactoryPullRequestStateMerged {
+			patch.MergedAt = githubTimePointer(githubPR.GetMergedAt())
+		}
+		if nextState == models.FactoryPullRequestStateClosed {
+			patch.ClosedAt = githubTimePointer(githubPR.GetClosedAt())
+		}
+		if err := pullRequest.Update(tx, patch); err != nil {
+			return err
+		}
+		corrected = true
+		return nil
+	})
+	if err != nil {
 		return false, err
 	}
-	return true, nil
+	return corrected, nil
+}
+
+func githubTimePointer(ts github.Timestamp) *time.Time {
+	if ts.Time.IsZero() {
+		return nil
+	}
+	stamp := ts.Time
+	return &stamp
 }
 
 func blockedMergeability(
