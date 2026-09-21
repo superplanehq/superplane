@@ -2,7 +2,11 @@ import { useState, type ReactElement } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_KEY,
+  STORYBOOK_ME_USER_NAME,
+} from "../../__fixtures__/factoryPageResponses";
 import { TaskPage } from "./TaskPage";
 import { CLOSED_TASK_PAGE, EMPTY_TASK_PAGE, OPEN_TASK_PAGE, RUNNING_TASK_PAGE } from "./taskPageMocks";
 import type { TaskPageRecord, TaskPageView } from "./taskPageModel";
@@ -23,25 +27,37 @@ type Story = StoryObj;
 
 const tasksPath = `workspaces/${PRIMARY_FACTORY_KEY}/tasks`;
 
-function logTitle(title: string) {
-  console.log("save title", title);
-}
-
 function logAction() {
   console.log("primary action");
 }
 
-function logComment(body: string) {
-  console.log("comment", body);
-}
+function ReadyTaskPage({ record: initial }: { record: TaskPageRecord }) {
+  const [record, setRecord] = useState(initial);
 
-function ReadyTaskPage({ record }: { record: TaskPageRecord }) {
   return (
     <TaskPage
       view={{ state: "ready", record }}
-      onTitleSave={logTitle}
+      onTitleSave={(title) => {
+        console.log("save title", title);
+        setRecord((current) => ({ ...current, title }));
+      }}
       onPrimaryAction={logAction}
-      onCommentSubmit={logComment}
+      onCommentSubmit={(body) => {
+        console.log("comment", body);
+        setRecord((current) => ({
+          ...current,
+          activity: [
+            ...current.activity,
+            {
+              id: `story-comment-${current.activity.length + 1}`,
+              actor: STORYBOOK_ME_USER_NAME,
+              text: body,
+              timeLabel: "now",
+              kind: "comment",
+            },
+          ],
+        }));
+      }}
     />
   );
 }
@@ -68,15 +84,10 @@ function LoadingTask() {
 
 function ErrorTask() {
   const [view, setView] = useState<TaskPageView>({ state: "error" });
-  return (
-    <TaskPage
-      view={view}
-      onRetry={() => setView({ state: "ready", record: OPEN_TASK_PAGE })}
-      onTitleSave={logTitle}
-      onPrimaryAction={logAction}
-      onCommentSubmit={logComment}
-    />
-  );
+  if (view.state === "ready") {
+    return <ReadyTaskPage record={view.record} />;
+  }
+  return <TaskPage view={view} onRetry={() => setView({ state: "ready", record: OPEN_TASK_PAGE })} />;
 }
 
 function taskStory(Page: () => ReactElement): Story {

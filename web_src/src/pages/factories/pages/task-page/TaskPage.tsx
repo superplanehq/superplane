@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
@@ -161,24 +162,29 @@ function TaskTitle({ title, onSave }: { title: string; onSave?: (next: string) =
 
   if (editing && onSave) {
     return (
-      <Input
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commit();
-          }
-          if (event.key === "Escape") {
-            setDraft(title);
-            setEditing(false);
-          }
-        }}
-        aria-label={TASK_PAGE_COPY.titleAriaLabel}
-        data-testid="task-page-title-input"
-        className="h-auto min-h-10 rounded-md border-border bg-background px-2 py-1 text-[26px] font-semibold leading-tight tracking-[-0.03em] shadow-none"
-      />
+      <div className="min-w-0">
+        <Label htmlFor="task-page-title-input" className="sr-only">
+          {TASK_PAGE_COPY.titleAriaLabel}
+        </Label>
+        <Input
+          id="task-page-title-input"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+            }
+            if (event.key === "Escape") {
+              setDraft(title);
+              setEditing(false);
+            }
+          }}
+          data-testid="task-page-title-input"
+          className="h-auto min-h-10 rounded-md border-border bg-background px-2 py-1 text-[26px] font-semibold leading-tight tracking-[-0.03em] shadow-none"
+        />
+      </div>
     );
   }
 
@@ -416,9 +422,9 @@ function CommentComposer({ onSubmit }: { onSubmit?: (body: string) => void }) {
 
   return (
     <form className="space-y-2" onSubmit={handleSubmit} data-testid="task-page-comment-composer">
-      <label htmlFor="task-page-comment" className="sr-only">
+      <Label htmlFor="task-page-comment" className="sr-only">
         {TASK_PAGE_COPY.commentLabel}
-      </label>
+      </Label>
       <Textarea
         id="task-page-comment"
         value={body}
