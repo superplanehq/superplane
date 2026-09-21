@@ -282,9 +282,12 @@ func MarkAgentSessionTokenUsageTracked(sessionID uuid.UUID, usage AgentSessionTo
 			return err
 		}
 
+		// UpdateColumns keeps updated_at untouched: bumping it here would
+		// break the optimistic status guard in UpdateAgentSessionStatusIfUnchanged
+		// for any turn that tracked token usage.
 		return tx.Model(&AgentSession{}).
 			Where("id = ?", sessionID).
-			Updates(map[string]any{
+			UpdateColumns(map[string]any{
 				"tracked_usage_input_tokens":       maxInt64(session.TrackedUsageInputTokens, usage.InputTokens),
 				"tracked_usage_output_tokens":      maxInt64(session.TrackedUsageOutputTokens, usage.OutputTokens),
 				"tracked_usage_cache_read_tokens":  maxInt64(session.TrackedUsageCacheReadTokens, usage.CacheReadTokens),
@@ -302,7 +305,11 @@ func MarkAgentSessionTokenUsageTracked(sessionID uuid.UUID, usage AgentSessionTo
 func FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff time.Time) ([]AgentSession, error) {
 	var stuck []AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Lock the rows so a concurrent InterruptSession cannot flip a
+		// session to idle between this read and the update below; without
+		// the lock a user Stop could be overwritten with failed.
 		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("status = ?", AgentSessionStatusStreaming).
 			Where("(heartbeat_at IS NOT NULL AND heartbeat_at < ?) OR (heartbeat_at IS NULL AND updated_at < ?)", heartbeatCutoff, legacyCutoff).
 			Find(&stuck).Error; err != nil {
@@ -317,7 +324,7 @@ func FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff time.Time) ([]Agen
 		}
 		now := time.Now()
 		return tx.Model(&AgentSession{}).
-			Where("id IN ?", ids).
+			Where("id IN ? AND status = ?", ids, AgentSessionStatusStreaming).
 			Updates(map[string]any{
 				"status":       AgentSessionStatusFailed,
 				"updated_at":   &now,
