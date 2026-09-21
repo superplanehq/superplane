@@ -1,24 +1,21 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { unmockedSrc } from "@/test/unmockedModule";
-import { TooltipProvider } from "@/ui/tooltip";
 
-import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import {
-  DEFAULT_GITHUB_INTAKE_SETTINGS,
-  INTAKE_SETTINGS_COPY,
-  type IntakeSettingsTab,
-} from "./intakeSourceSettingsModel";
-import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
+  connectedJiraIntake,
+  GITHUB_INTAKE_CANVAS,
+  JIRA_INTAKE,
+  renderHost,
+  SENTRY_INTAKE,
+} from "./IntakeSettingsHost.spec.fixtures";
+import { INTAKE_SETTINGS_COPY } from "./intakeSourceSettingsModel";
 
 const {
   useCanvas,
@@ -98,75 +95,6 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
   useDeleteFactoryIntake: () => ({ mutateAsync: deleteIntake, isPending: false, error: null }),
 }));
-
-const GITHUB_INTAKE: ConfiguredLineIntakeSource = {
-  intakeId: "intake-github",
-  appId: "app-github-issues-intake",
-  healthy: true,
-  paused: false,
-  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS },
-  source: lineIntakeSourceById("github-issues")!,
-};
-
-const GITHUB_INTAKE_CANVAS = {
-  metadata: { id: "app-github-issues-intake", name: "GitHub issues" },
-  spec: {
-    nodes: [
-      { id: "github-issues-trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-      {
-        id: "github-issues-filter",
-        name: "Matches filters?",
-        type: "TYPE_ACTION",
-        component: "if",
-        configuration: { expression: "true" },
-      },
-      { id: "github-issues-create", name: "Create Task", type: "TYPE_ACTION", component: "createWorkOrder" },
-    ],
-    edges: [
-      { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-filter" },
-      { channel: "true", sourceId: "github-issues-filter", targetId: "github-issues-create" },
-    ],
-  },
-};
-
-const JIRA_INTAKE: ConfiguredLineIntakeSource = {
-  intakeId: "intake-jira",
-  appId: "app-jira-intake",
-  healthy: false,
-  paused: false,
-  health: "HEALTH_MISSING_INTEGRATION",
-  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" },
-  source: lineIntakeSourceById("jira-issues")!,
-};
-
-function renderHost(
-  props: {
-    intake?: ConfiguredLineIntakeSource;
-    initialTab?: IntakeSettingsTab;
-    onClose?: () => void;
-    path?: string;
-  } = {},
-) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={[props.path ?? "/org-1/workspaces/rf/lines/line-plan"]}>
-        <ThemeProvider>
-          <TooltipProvider>
-            <IntakeSettingsHost
-              organizationId="org-1"
-              factoryId="factory-1"
-              factoryKey="RF"
-              lineId="line-plan"
-              intake={props.intake ?? GITHUB_INTAKE}
-              initialTab={props.initialTab}
-              onClose={props.onClose ?? vi.fn()}
-            />
-          </TooltipProvider>
-        </ThemeProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
 
 describe("IntakeSettingsHost", () => {
   beforeEach(() => {
@@ -382,16 +310,11 @@ describe("IntakeSettingsHost", () => {
   it("saves the Jira completion column from General settings", async () => {
     const user = userEvent.setup();
     renderHost({
-      intake: {
-        intakeId: "intake-jira",
+      intake: connectedJiraIntake({
         appId: "app-jira-issues-intake",
-        healthy: true,
-        paused: false,
-        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" },
-        source: lineIntakeSourceById("jira-issues")!,
         integrationId: "jira-1",
         resourceId: "ENG",
-      },
+      }),
     });
 
     expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
@@ -413,14 +336,7 @@ describe("IntakeSettingsHost", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({
-      intake: {
-        intakeId: "intake-sentry",
-        appId: "app-sentry-intake",
-        healthy: true,
-        paused: false,
-        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
-        source: lineIntakeSourceById("sentry-exceptions")!,
-      },
+      intake: SENTRY_INTAKE,
       onClose,
     });
 
@@ -438,11 +354,7 @@ describe("IntakeSettingsHost", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({
-      intake: {
-        ...JIRA_INTAKE,
-        healthy: true,
-        health: undefined,
-      },
+      intake: connectedJiraIntake(),
       onClose,
     });
 
@@ -460,12 +372,7 @@ describe("IntakeSettingsHost", () => {
   it("resumes a paused Jira intake from settings", async () => {
     const user = userEvent.setup();
     renderHost({
-      intake: {
-        ...JIRA_INTAKE,
-        healthy: true,
-        health: undefined,
-        paused: true,
-      },
+      intake: connectedJiraIntake({ paused: true }),
     });
 
     expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
@@ -477,14 +384,7 @@ describe("IntakeSettingsHost", () => {
     updateIntake.mockRejectedValue(new Error("pause failed"));
     const user = userEvent.setup();
     renderHost({
-      intake: {
-        intakeId: "intake-sentry",
-        appId: "app-sentry-intake",
-        healthy: true,
-        paused: false,
-        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
-        source: lineIntakeSourceById("sentry-exceptions")!,
-      },
+      intake: SENTRY_INTAKE,
     });
 
     await user.click(screen.getByTestId("intake-source-settings-pause"));
@@ -498,14 +398,7 @@ describe("IntakeSettingsHost", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({
-      intake: {
-        intakeId: "intake-sentry",
-        appId: "app-sentry-intake",
-        healthy: true,
-        paused: false,
-        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
-        source: lineIntakeSourceById("sentry-exceptions")!,
-      },
+      intake: SENTRY_INTAKE,
       onClose,
     });
 
