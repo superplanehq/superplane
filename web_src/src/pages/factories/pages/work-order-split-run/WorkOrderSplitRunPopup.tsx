@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-import type { FactoriesFactoryPullRequest } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
@@ -126,12 +126,17 @@ function AnalysisWorkOrderPopup({
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const modelSelects = draftModelSelects({
+  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const draftChrome = analysisDraftChrome({
+    factory,
     organizationId,
     factoryId,
+    factoryKey,
+    lineId,
     fixture,
-    value: draftModel,
-    onChange: setDraftModel,
+    analysis,
+    draftModel,
+    onDraftModelChange: setDraftModel,
     disabled: isDispatching || !canDispatch,
   });
   const reviewArgs = {
@@ -149,16 +154,12 @@ function AnalysisWorkOrderPopup({
     footerBusy: footerActions.busy,
     canDispatch,
     compact: showSidebarNote || fixture.footer.kind === "draft",
-    modelSelect: modelSelects.footer,
+    modelSelect: draftChrome.footerModelSelect,
+    confirmUnclearStart: factoryPlanningEnabled(factory),
   };
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const taskHref = createdTaskHref(organizationId, factoryKey, lineId);
-  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
-  const stripAnalysis = draftStripAnalysis(fixture.footer.kind, analysis, modelSelects.strip, taskHref, {
-    showClarity: factoryShowsClarity(factory),
-    showConfidence: factoryShowsConfidence(factory),
-  });
+  const stripAnalysis = draftChrome.stripAnalysis;
 
   return (
     <PopupShell
@@ -255,6 +256,7 @@ function analysisPopupReview(args: {
   compact: boolean;
   actionsOnly?: boolean;
   modelSelect?: ReactNode;
+  confirmUnclearStart?: boolean;
 }) {
   return (
     <SplitRunReview
@@ -275,10 +277,48 @@ function analysisPopupReview(args: {
       startDisabled={!args.canDispatch}
       compact={args.compact}
       actionsOnly={args.actionsOnly}
-      confirmUnclearStart
+      confirmUnclearStart={args.confirmUnclearStart}
       modelSelect={args.modelSelect}
     />
   );
+}
+
+function analysisDraftChrome(args: {
+  factory?: FactoriesFactory;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  lineId?: string;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  draftModel: string;
+  onDraftModelChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  if (!factoryPlanningEnabled(args.factory)) {
+    return { footerModelSelect: undefined, stripAnalysis: undefined };
+  }
+  const modelSelects = draftModelSelects({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    fixture: args.fixture,
+    value: args.draftModel,
+    onChange: args.onDraftModelChange,
+    disabled: args.disabled,
+  });
+  return {
+    footerModelSelect: modelSelects.footer,
+    stripAnalysis: draftStripAnalysis(
+      args.fixture.footer.kind,
+      args.analysis,
+      modelSelects.strip,
+      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+      {
+        showClarity: factoryShowsClarity(args.factory),
+        showConfidence: factoryShowsConfidence(args.factory),
+      },
+    ),
+  };
 }
 
 /**
