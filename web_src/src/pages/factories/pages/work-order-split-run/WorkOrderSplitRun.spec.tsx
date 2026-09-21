@@ -6,10 +6,11 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-const enabledExperimentalFeatures = new Set<string>();
+const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
 const mergeability = {
   current: {
     canMerge: true,
@@ -25,13 +26,16 @@ const mergeability = {
 };
 const mergeMutate = vi.fn();
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
-    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
-    isLoading: false,
-  }),
-}));
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: { id: "factory-1", planning: factoryPlanning.current },
+      isPending: false,
+    }),
+  };
+});
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
@@ -142,7 +146,7 @@ async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
 describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    enabledExperimentalFeatures.clear();
+    factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
     mergeMutate.mockReset();
     mergeability.current = {
       canMerge: true,
@@ -1177,7 +1181,6 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("keeps source and spec after reopen when the started card has a score", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,

@@ -90,6 +90,13 @@ describe("CardScoreBadges", () => {
     expect(screen.getByTestId("badges-confidence")).toHaveClass("text-emerald-700");
   });
 
+  it("hides a score when that Planning toggle is off", () => {
+    render(<CardScoreBadges clarity={5} confidence={2} showClarity={false} testId="badges" />);
+
+    expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2");
+  });
+
   it("keeps the verdict headline in the tooltip", async () => {
     const user = userEvent.setup();
     render(<CardScoreBadges clarity={2} confidence={5} testId="badges" />);

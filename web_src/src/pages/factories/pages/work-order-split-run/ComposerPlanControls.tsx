@@ -32,6 +32,8 @@ export function ComposerPlanStack({
   open,
   clarity,
   confidence,
+  showClarity = true,
+  showConfidence = true,
   isAnalyzing = false,
   canTogglePlan = true,
   planStatus,
@@ -42,6 +44,8 @@ export function ComposerPlanStack({
   open: boolean;
   clarity?: ComposerScore;
   confidence?: ComposerScore;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   isAnalyzing?: boolean;
   canTogglePlan?: boolean;
   planStatus?: PlanChipStatus;
@@ -49,7 +53,11 @@ export function ComposerPlanStack({
   actions?: ReactNode;
   modelSelect?: ReactNode;
 }) {
-  const readiness = liveDraftReadiness({ clarity: clarity?.score, confidence: confidence?.score, isAnalyzing });
+  const readiness = liveDraftReadiness({
+    clarity: showClarity ? clarity?.score : undefined,
+    confidence: showConfidence ? confidence?.score : undefined,
+    isAnalyzing,
+  });
   const showControls = canTogglePlan || Boolean(modelSelect) || Boolean(actions);
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
@@ -59,6 +67,8 @@ export function ComposerPlanStack({
           <ScoreEvidenceRow
             clarity={clarity}
             confidence={confidence}
+            showClarity={showClarity}
+            showConfidence={showConfidence}
             isAnalyzing={isAnalyzing}
             testIds={SCORE_TEST_IDS}
           />

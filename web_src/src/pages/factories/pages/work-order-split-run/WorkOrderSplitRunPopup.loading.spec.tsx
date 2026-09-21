@@ -5,6 +5,8 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { APPROVAL_WORK_ORDER, DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -12,20 +14,23 @@ import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 const lookupState = vi.hoisted(() => ({
-  featureEnabled: true,
-  featureLoading: false,
+  factoryPending: false,
+  planning: { enabled: true, clarity: true, confidence: true },
   sessionLoading: false,
   artifactsLoading: false,
   artifactsError: null as Error | null,
 }));
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: () => lookupState.featureEnabled,
-    enabledExperimentalFeatures: [],
-    isLoading: lookupState.featureLoading,
-  }),
-}));
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: lookupState.factoryPending ? undefined : { id: "factory-1", planning: lookupState.planning },
+      isPending: lookupState.factoryPending,
+    }),
+  };
+});
 
 vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
@@ -77,17 +82,17 @@ function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder
 
 describe("WorkOrderSplitRunPopup loading mode", () => {
   beforeEach(() => {
-    lookupState.featureEnabled = true;
-    lookupState.featureLoading = false;
+    lookupState.factoryPending = false;
+    lookupState.planning = { enabled: true, clarity: true, confidence: true };
     lookupState.sessionLoading = false;
     lookupState.artifactsLoading = false;
     lookupState.artifactsError = null;
   });
 
-  it("shows a dismissible loading popup while Task Refinement access loads", async () => {
+  it("shows a dismissible loading popup while Planning settings load", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    lookupState.featureLoading = true;
+    lookupState.factoryPending = true;
 
     renderPopup(onClose);
 

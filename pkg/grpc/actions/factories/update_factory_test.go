@@ -102,4 +102,41 @@ func Test__UpdateFactory(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, cleared.Factory.HostedSpendBudgetCents)
 	})
+
+	t.Run("defaults Planning on with both scores", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Planning)
+		assert.True(t, response.Factory.Planning.Enabled)
+		assert.True(t, response.Factory.Planning.Clarity)
+		assert.True(t, response.Factory.Planning.Confidence)
+	})
+
+	t.Run("updates Planning and keeps score flags when Planning is off", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:    false,
+				Clarity:    true,
+				Confidence: false,
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Planning)
+		assert.False(t, response.Factory.Planning.Enabled)
+		assert.True(t, response.Factory.Planning.Clarity)
+		assert.False(t, response.Factory.Planning.Confidence)
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: false}, reloaded.Planning())
+	})
 }

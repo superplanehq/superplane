@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -19,7 +18,6 @@ import (
 
 func Test__UpgradeDefaultBacklogTemplates(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -34,11 +32,6 @@ func Test__UpgradeDefaultBacklogTemplates(t *testing.T) {
 
 	deps := backlogUpgradeDependencies(r)
 	result, err := UpgradeDefaultBacklogTemplates(ctx, deps, r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, BacklogTemplateUpgradeResult{}, result)
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
-	result, err = UpgradeDefaultBacklogTemplates(ctx, deps, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, BacklogTemplateUpgradeResult{Upgraded: 1}, result)
 
@@ -67,7 +60,8 @@ func Test__UpgradeDefaultBacklogTemplates(t *testing.T) {
 	preserveBacklogNodePositions(legacyNodes, expectedNodes)
 	assert.Equal(t, backlogBehaviorNodes(expectedNodes), backlogBehaviorNodes(liveVersion.Nodes))
 	assert.Equal(t, sortedBacklogEdges(expectedEdges), sortedBacklogEdges(liveVersion.Edges))
-	assert.Equal(t, findModelNode(t, legacyNodes, intakeAnalysisNodeID).Position, findModelNode(t, liveVersion.Nodes, intakeAnalysisNodeID).Position)
+	assert.NotNil(t, findModelNode(t, liveVersion.Nodes, backlogRefinementNodeID))
+	assert.Nil(t, findModelNodeOrNil(liveVersion.Nodes, intakeAnalysisNodeID))
 
 	result, err = UpgradeDefaultBacklogTemplates(ctx, deps, r.Organization.ID)
 	require.NoError(t, err)
@@ -89,7 +83,6 @@ func Test__UpgradeDefaultBacklogTemplatesSkipsCustomizedBacklog(t *testing.T) {
 		steps[1].(map[string]any)["prompt"] = "Use the team's custom scoring rules."
 	})
 	previousVersionID := *canvasModel.LiveVersionID
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 
 	result, err := UpgradeDefaultBacklogTemplates(ctx, backlogUpgradeDependencies(r), r.Organization.ID)
 	require.NoError(t, err)
@@ -108,7 +101,6 @@ func Test__UpgradeDefaultBacklogTemplatesRefreshesStaleRefinePrompt(t *testing.T
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 
 	stalePrompt := "## 3. Score\n\nScore Clarity from 1 through 5.\n\nTask:\n{{ root().data.workOrder }}"
 	staleDigest := refinePromptDigest(stalePrompt)
@@ -151,7 +143,6 @@ func Test__UpgradeDefaultBacklogTemplatesKeepsEditedRefinePrompt(t *testing.T) {
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 
 	canvasModel, _, _ := createCurrentBacklogForUpgrade(ctx, t, r, factoryModel.ID, func(nodes []models.Node) {
 		backlogRefineStep(findModelNode(t, nodes, backlogRefinementNodeID).Configuration)["prompt"] = "Use the team's scoring rules."
@@ -164,6 +155,31 @@ func Test__UpgradeDefaultBacklogTemplatesKeepsEditedRefinePrompt(t *testing.T) {
 	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvasModel.ID)
 	require.NoError(t, err)
 	assert.Equal(t, previousVersionID, *reloaded.LiveVersionID)
+}
+
+func Test__UpgradeDefaultBacklogTemplatesUpgradesUneditedV2(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvasModel, v2Nodes, _ := createV2BacklogForUpgrade(ctx, t, r, factoryModel.ID)
+	previousVersionID := *canvasModel.LiveVersionID
+
+	result, err := UpgradeDefaultBacklogTemplates(ctx, backlogUpgradeDependencies(r), r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, BacklogTemplateUpgradeResult{Upgraded: 1}, result)
+
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvasModel.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, previousVersionID, *reloaded.LiveVersionID)
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvasModel.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, findModelNodeOrNil(liveVersion.Nodes, backlogRefinementNodeID))
+	assert.Nil(t, findModelNodeOrNil(liveVersion.Nodes, intakeAnalysisNodeID))
+	assert.False(t, isDefaultLegacyBacklog(liveVersion.Nodes, liveVersion.Edges))
+	_ = v2Nodes
 }
 
 // createCurrentBacklogForUpgrade seeds a Backlog from the current template, the
@@ -188,6 +204,39 @@ func createCurrentBacklogForUpgrade(
 		r.Registry,
 		r.Encryptor,
 		r.AuthService,
+		"http://localhost:8000",
+		r.Organization.ID,
+		document.Metadata.Name,
+		document.Metadata.Description,
+		&factoryID,
+		nodes,
+		edges,
+		nil,
+	)
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(created.GetCanvas().GetMetadata().GetId())
+	canvasModel, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	return canvasModel, nodes, edges
+}
+
+func createV2BacklogForUpgrade(
+	ctx context.Context,
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+) (*models.Canvas, []models.Node, []models.Edge) {
+	t.Helper()
+	document := buildV2BacklogCanvas(backlogCanvasRequest{Name: "Backlog"})
+	nodes, edges, err := document.Parse(r.Registry, r.Organization.ID.String())
+	require.NoError(t, err)
+
+	created, err := canvases.CreateCanvas(
+		ctx,
+		r.Registry,
+		r.Encryptor,
+		r.AuthService,
+		r.GitProvider,
 		"http://localhost:8000",
 		r.Organization.ID,
 		document.Metadata.Name,

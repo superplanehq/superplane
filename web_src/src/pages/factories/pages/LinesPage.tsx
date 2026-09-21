@@ -136,9 +136,11 @@ import {
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
   isJiraIntakeSetupSearchOpen,
+  isPlanningSearchOpen,
   isPRFeedbackSearchOpen,
   jiraIntakeIntegrationIdFromSearch,
   prFeedbackHandlerIdFromSearch,
+  planningSettingsTabFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
@@ -169,9 +171,11 @@ import {
   type AddIntakeTemplate,
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
+import { isPlanningSettingsTab } from "./planningSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
+import { PlanningSettingsHost } from "./PlanningSettingsHost";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
@@ -247,6 +251,8 @@ export function LinesPage() {
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const automationViewCanvasId = columnAutomationViewCanvasIdFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
+  const planningOpen = isPlanningSearchOpen(search);
+  const planningSettingsTab = planningSettingsTabFromSearch(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const { data: workOrders = [], isLoading: workOrdersLoading } = useFactoryWorkOrders(organizationId, factoryId);
@@ -536,6 +542,16 @@ export function LinesPage() {
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
+      {planningOpen ? (
+        <PlanningSettingsHost
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={selectedLine.id}
+          initialTab={isPlanningSettingsTab(planningSettingsTab) ? planningSettingsTab : "general"}
+          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+        />
+      ) : null}
       {prFeedbackOpen ? (
         <PRFeedbackSettingsHost
           organizationId={organizationId}
@@ -647,6 +663,7 @@ export function LinesPage() {
             peekOrder={peekOrder ?? undefined}
             onOpenWorkOrder={openWorkOrder}
             onClosePeek={closePeek}
+            planningEnabled={factory?.planning?.enabled !== false}
           />
         </div>
       </div>
@@ -794,6 +811,7 @@ function LineDetail({
   peekOrder,
   onOpenWorkOrder,
   onClosePeek,
+  planningEnabled,
 }: {
   organizationId: string;
   factoryId: string;
@@ -821,6 +839,7 @@ function LineDetail({
   peekOrder?: FactoriesWorkOrder | null;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClosePeek: () => void;
+  planningEnabled: boolean;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -848,10 +867,11 @@ function LineDetail({
         prFeedbackHandlers,
         apps,
         workOrders,
+        planningEnabled,
       });
       return applyColumnAutomationsOverlay(base, undefined, overlay.disabledIds, overlay.removedIds);
     },
-    [apps, board, factoryIntakes, overlay, prFeedbackHandlers, workOrders],
+    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, workOrders],
   );
 
   const addAutomation = useAddColumnAutomation({

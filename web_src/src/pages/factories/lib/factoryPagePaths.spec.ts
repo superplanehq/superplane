@@ -11,6 +11,7 @@ import {
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
+  factoryPlanningPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -22,9 +23,11 @@ import {
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isJiraIntakeSetupSearchOpen,
+  isPlanningSearchOpen,
   isPRFeedbackSearchOpen,
   jiraIntakeIntegrationIdFromSearch,
   prFeedbackHandlerIdFromSearch,
+  planningSettingsTabFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
   factorySettingsGeneralPathAfterKeyChange,
@@ -183,6 +186,29 @@ describe("factoryProductiveIntakeSetupPath", () => {
     expect(factoryProductiveIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/productive",
     );
+  });
+});
+
+describe("factoryPlanningPath", () => {
+  it("opens the line board with the Planning query", () => {
+    expect(factoryPlanningPath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/sp/lines/line-plan?planning=1");
+  });
+
+  it("reads the Planning query from the search string", () => {
+    expect(isPlanningSearchOpen("?planning=1")).toBe(true);
+    expect(isPlanningSearchOpen("planning=1")).toBe(true);
+    expect(isPlanningSearchOpen("")).toBe(false);
+  });
+
+  it("opens the line board on a settings tab", () => {
+    expect(factoryPlanningPath("org-1", "SP", "line-plan", "automation")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan?planning=1&planningSettings=automation",
+    );
+  });
+
+  it("reads the settings tab from the search string", () => {
+    expect(planningSettingsTabFromSearch("?planning=1&planningSettings=automation")).toBe("automation");
+    expect(planningSettingsTabFromSearch("planning=1")).toBeNull();
   });
 });
 

@@ -15,8 +15,8 @@ import (
 
 const (
 	backlogDefaultName        = "Backlog"
-	backlogDefaultDescription = "Refine new tasks or score how well an agent can complete them."
-	backlogTemplateVersion    = 2
+	backlogDefaultDescription = "Plan new draft tasks."
+	backlogTemplateVersion    = 3
 	backlogTriggerNodeID      = "trigger"
 	backlogTriggerName        = "On Task"
 	backlogAnalysisSubject    = "work order"
@@ -163,6 +163,71 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 		name = backlogDefaultName
 	}
 
+	return &yaml.Canvas{
+		APIVersion: yaml.APIVersion,
+		Kind:       yaml.KindCanvas,
+		Metadata: &yaml.CanvasMetadata{
+			Name:        name,
+			Description: backlogDefaultDescription,
+		},
+		Spec: &yaml.CanvasSpec{
+			Edges: []yaml.Edge{
+				{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: backlogRefinementFilterNodeID},
+				{Channel: "true", SourceID: backlogRefinementFilterNodeID, TargetID: backlogRefinementNodeID},
+				{Channel: "failed", SourceID: backlogRefinementNodeID, TargetID: intakeAddRunErrorNodeID},
+			},
+			Nodes: []yaml.Node{
+				{
+					ID:        backlogTriggerNodeID,
+					Name:      backlogTriggerName,
+					Type:      yaml.NodeTypeTrigger,
+					Component: factory.OnWorkOrderTriggerName,
+					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion),
+					Position:  yaml.Position{X: 160, Y: 80},
+				},
+				{
+					ID:        backlogRefinementFilterNodeID,
+					Name:      "Refine task?",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeFilterComponent,
+					Configuration: map[string]any{
+						"expression": "{{ root().data.taskRefinementEnabled == true }}",
+					},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 260},
+				},
+				{
+					ID:            backlogRefinementNodeID,
+					Name:          "Refine Task",
+					Type:          yaml.NodeTypeAction,
+					Component:     request.Agent.component(),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.GitHubName),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 160, Y: 440},
+				},
+				{
+					ID:        intakeAddRunErrorNodeID,
+					Name:      intakeAddRunErrorNodeName,
+					Type:      yaml.NodeTypeAction,
+					Component: intakeAddRunErrorComponent,
+					Configuration: map[string]any{
+						"message": intakeAddRunErrorMessage,
+					},
+					Position: yaml.Position{X: 160, Y: 620},
+				},
+			},
+		},
+	}
+}
+
+// buildV2BacklogCanvas is the version 2 graph used to identify canvases
+// that users did not customize. Keep this snapshot stable.
+func buildV2BacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		name = backlogDefaultName
+	}
+
 	spec := intakeSpec{analysisSubject: backlogAnalysisSubject}
 
 	return &yaml.Canvas{
@@ -170,7 +235,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
 			Name:        name,
-			Description: backlogDefaultDescription,
+			Description: "Refine new tasks or score how well an agent can complete them.",
 		},
 		Spec: &yaml.CanvasSpec{
 			Edges: []yaml.Edge{
@@ -188,7 +253,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:      backlogTriggerName,
 					Type:      yaml.NodeTypeTrigger,
 					Component: factory.OnWorkOrderTriggerName,
-					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion),
+					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 2),
 					Position:  yaml.Position{X: 160, Y: 80},
 				},
 				{

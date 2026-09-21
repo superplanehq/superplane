@@ -192,11 +192,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the organization LLM Models settings page",
             },
             {
-              id: "factory_create_with_agent",
-              label: "Task Refinement",
-              description: "Refine draft work orders with an agent",
-            },
-            {
               id: "workspace_agent_resources",
               label: "Agent Resources",
               description: "Add MCP servers for workspace agents",

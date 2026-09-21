@@ -456,7 +456,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.NotContains(t, trigger.Configuration, "repository")
 	})
 
-	t.Run("creating an intake also creates Backlog template version 2", func(t *testing.T) {
+	t.Run("creating an intake also creates Backlog template version 3", func(t *testing.T) {
 		factory := newFactory(t)
 		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
@@ -465,7 +465,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryAppTemplateBacklogID, models.FactoryAppTemplateID(liveVersion.Nodes))
 		assert.Equal(t, backlogTemplateVersion, backlogTemplateVersionFrom(liveVersion.Nodes))
-		assert.Len(t, liveVersion.Nodes, 7)
+		assert.Len(t, liveVersion.Nodes, 4)
+		assert.Nil(t, findModelNodeOrNil(liveVersion.Nodes, intakeAnalysisNodeID))
 	})
 
 	t.Run("creating a work order emits to the Backlog trigger", func(t *testing.T) {
@@ -486,6 +487,27 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		payload, ok := events[0].Data.Data().(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, factory.OnWorkOrderPayloadType, payload["type"])
+	})
+
+	t.Run("creating a work order does not start Backlog when Planning is off", func(t *testing.T) {
+		factoryModel := newFactory(t)
+		require.NoError(t, factoryModel.UpdatePlanning(database.DB(t.Context()), models.FactoryPlanning{
+			Enabled:    false,
+			Clarity:    true,
+			Confidence: true,
+		}))
+		create(t, factoryModel, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		_, err := CreateWorkOrder(ctx, orgID, &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Keep this as a plain draft",
+		})
+		require.NoError(t, err)
+
+		backlog := liveBacklogCanvas(t, factoryModel)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), backlog.ID, backlogTriggerNodeID, 10, nil)
+		require.NoError(t, err)
+		assert.Empty(t, events)
 	})
 
 	t.Run("the Backlog canvas does not create work orders", func(t *testing.T) {

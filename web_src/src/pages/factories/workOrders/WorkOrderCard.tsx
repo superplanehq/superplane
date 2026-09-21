@@ -71,6 +71,10 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   clarityScore?: number;
   /** Confidence score from the task, 0 to 5. Shown in the footer. */
   confidenceScore?: number;
+  /** Hide Clarity when Planning has that score off. */
+  showClarity?: boolean;
+  /** Hide Confidence when Planning has that score off. */
+  showConfidenceScore?: boolean;
   /**
    * True while the agent still works on this draft. The card shows
    * thinking states in the meter slot, even after a score exists.
@@ -112,6 +116,8 @@ export function WorkOrderCard({
   onOpen,
   clarityScore,
   confidenceScore,
+  showClarity = true,
+  showConfidenceScore = true,
   isAnalyzing = false,
   className,
   selected = false,
@@ -170,6 +176,8 @@ export function WorkOrderCard({
           isDraft={isDraft}
           clarityScore={clarityScore}
           confidenceScore={confidenceScore}
+          showClarity={showClarity}
+          showConfidenceScore={showConfidenceScore}
           isAnalyzing={agentWorking}
         />
       </div>
@@ -289,6 +297,8 @@ function WorkOrderCardMetaRow({
   isDraft,
   clarityScore,
   confidenceScore,
+  showClarity = true,
+  showConfidenceScore = true,
   isAnalyzing,
 }: {
   entry: WorkOrderListEntry;
@@ -297,10 +307,12 @@ function WorkOrderCardMetaRow({
   isDraft: boolean;
   clarityScore?: number;
   confidenceScore?: number;
+  showClarity?: boolean;
+  showConfidenceScore?: boolean;
   isAnalyzing: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
-  const hasScore = clarityScore != null || confidenceScore != null;
+  const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
   const showActions = hasScore || isAnalyzing;
   const ownerMark = isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />;
 
@@ -320,6 +332,8 @@ function WorkOrderCardMetaRow({
               entryId={entry.id}
               clarity={clarityScore}
               confidence={confidenceScore}
+              showClarity={showClarity}
+              showConfidence={showConfidenceScore}
               isAnalyzing={isAnalyzing}
             />
           ) : null}
@@ -345,11 +359,15 @@ function CardScores({
   entryId,
   clarity,
   confidence,
+  showClarity = true,
+  showConfidence = true,
   isAnalyzing,
 }: {
   entryId: string;
   clarity?: number;
   confidence?: number;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   isAnalyzing: boolean;
 }) {
   if (isAnalyzing) {
@@ -365,5 +383,13 @@ function CardScores({
   if (clarity == null && confidence == null) {
     return null;
   }
-  return <CardScoreBadges clarity={clarity} confidence={confidence} testId={`work-order-card-score-${entryId}`} />;
+  return (
+    <CardScoreBadges
+      clarity={clarity}
+      confidence={confidence}
+      showClarity={showClarity}
+      showConfidence={showConfidence}
+      testId={`work-order-card-score-${entryId}`}
+    />
+  );
 }

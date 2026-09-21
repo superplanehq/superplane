@@ -45,10 +45,6 @@ const FeatureWorkspaceModels = "workspace_models"
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
 
-// FeatureFactoryCreateWithAgent gates live agent refinement of draft work
-// orders until the flow is generally available.
-const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
-
 // FeatureFactoryCustomAutomations gates blank custom automations on Verify,
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
@@ -71,7 +67,6 @@ var registry = []Feature{
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
-	{ID: FeatureFactoryCreateWithAgent, Label: "Task Refinement", Description: "Refine draft work orders with an agent"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP servers for workspace agents"},
 }
