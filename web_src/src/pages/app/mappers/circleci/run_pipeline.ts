@@ -109,38 +109,25 @@ export const runPipelineMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const details: Record<string, string> = {};
     const outputs = context.execution.outputs as
       | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
       | undefined;
-    const payload =
-      (outputs?.success?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.failed?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.default?.[0]?.data as Record<string, any> | undefined);
+    const payload = asRunPipelineSource(
+      outputs?.success?.[0]?.data || outputs?.failed?.[0]?.data || outputs?.default?.[0]?.data,
+    );
 
-    const payloadData =
-      payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
-        ? payload.data
-        : payload;
+    const nestedData = asRunPipelineSource(payload?.data);
+    const payloadData = nestedData ?? payload;
+    const metadataFallback = payloadData ? undefined : asRunPipelineSource(context.execution.metadata);
+    const sourceData = payloadData ?? metadataFallback;
 
-    const metadataFallback =
-      (!payloadData || typeof payloadData !== "object") && context.execution.metadata
-        ? (context.execution.metadata as Record<string, any>)
-        : undefined;
-
-    const sourceData =
-      payloadData && typeof payloadData === "object"
-        ? payloadData
-        : metadataFallback && typeof metadataFallback === "object"
-          ? metadataFallback
-          : undefined;
-
-    if (!sourceData || typeof sourceData !== "object") {
+    if (!sourceData) {
       return details;
     }
 
-    const pipeline = sourceData.pipeline as Record<string, any> | undefined;
+    const pipeline = sourceData.pipeline;
 
     const addDetail = (key: string, value?: string) => {
       if (value) {
@@ -157,6 +144,25 @@ export const runPipelineMapper: ComponentBaseMapper = {
     return details;
   },
 };
+
+type RunPipelineInfo = {
+  id?: string;
+  number?: number | string;
+  pipeline_url?: string;
+};
+
+type RunPipelineSource = {
+  data?: unknown;
+  pipeline?: RunPipelineInfo;
+};
+
+function asRunPipelineSource(value: unknown): RunPipelineSource | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  return value as RunPipelineSource;
+}
 
 function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
