@@ -1,12 +1,17 @@
-import { useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
-import { intakeSettingsToApi, type IntakeSettingsTab, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import {
+  INTAKE_SETTINGS_COPY,
+  intakeSettingsToApi,
+  type IntakeSettingsTab,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
 import type { ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
 
@@ -39,6 +44,9 @@ export function IntakeSettingsHost({
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
   const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
   const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
+  const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
+  const [pauseError, setPauseError] = useState<string>();
+  const [deleteError, setDeleteError] = useState<string>();
   // An empty integration id keeps the query idle, so we never ask for labels
   // without knowing the repository they belong to.
   const repositoryLabels = useIntegrationResources(
@@ -66,6 +74,37 @@ export function IntakeSettingsHost({
     [automation, intake.intakeId, updateIntake],
   );
 
+  const pauseIntake = useCallback(async () => {
+    setPauseError(undefined);
+    try {
+      await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: true });
+    } catch (error) {
+      setPauseError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.pauseError));
+      throw error;
+    }
+  }, [intake.intakeId, updateIntake]);
+
+  const resumeIntake = useCallback(async () => {
+    setPauseError(undefined);
+    try {
+      await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: false });
+    } catch (error) {
+      setPauseError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.pauseError));
+      throw error;
+    }
+  }, [intake.intakeId, updateIntake]);
+
+  const removeIntake = useCallback(async () => {
+    setDeleteError(undefined);
+    try {
+      await deleteIntake.mutateAsync(intake.intakeId);
+      onClose();
+    } catch (error) {
+      setDeleteError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.deleteError));
+      throw error;
+    }
+  }, [deleteIntake, intake.intakeId, onClose]);
+
   return (
     <IntakeSourceSettingsPopup
       settings={intake.settings}
@@ -83,6 +122,14 @@ export function IntakeSettingsHost({
           ? getApiErrorMessage(updateIntake.error, "SuperPlane could not save the intake settings. Try again.")
           : undefined
       }
+      paused={intake.paused}
+      pausePending={updateIntake.isPending}
+      deletePending={deleteIntake.isPending}
+      pauseError={pauseError}
+      deleteError={deleteError}
+      onPause={pauseIntake}
+      onResume={resumeIntake}
+      onDelete={removeIntake}
       editAutomationHref={editAutomationHref}
       canvasId={intake.appId}
       runHrefFor={

@@ -206,6 +206,7 @@ export interface ConfiguredLineIntakeSource {
   /** Canvas that implements the intake, used to open the automation editor. */
   appId: string;
   healthy: boolean;
+  paused: boolean;
   settings: IntakeSourceSettings;
   source: LineIntakeSource;
 }
@@ -244,6 +245,7 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         intakeId,
         appId: intake.canvasId?.trim() ?? "",
         healthy: intake.healthy !== false,
+        paused: intake.paused === true,
         settings: intakeSettingsFromApi(name, intake.settings),
         source: { ...source, name },
       },
@@ -289,13 +291,18 @@ export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): 
 }
 
 /** Row title on the board. It says what the intake listens to, and nothing else. */
-export function lineIntakeListenTitle(source: LineIntakeSource): string {
+export function lineIntakeListenTitle(source: LineIntakeSource, paused = false): string {
+  if (paused) {
+    return `Listening to ${source.name} is paused`;
+  }
   return `Listening to ${source.name}`;
 }
 
 export const LINE_INTAKE_COPY = {
   needsRepair: "Needs repair",
   needsRepairHelper: "The automation can no longer create tasks. Open it to repair the steps.",
+  paused: "Paused",
+  pausedHelper: "New items do not become tasks. You can still import one item by hand.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
   analysisCompleteHeadline: "Ticket analysis finished",

@@ -11,10 +11,15 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  INTAKE_SETTINGS_COPY,
+  type IntakeSettingsTab,
+} from "./intakeSourceSettingsModel";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
@@ -117,6 +122,13 @@ function renderPopup(
     initialTab?: IntakeSettingsTab;
     labelOptions?: string[];
     labelOptionsLoading?: boolean;
+    sourceId?: LineIntakeSourceId;
+    paused?: boolean;
+    pauseError?: string;
+    deleteError?: string;
+    onPause?: () => void | Promise<void>;
+    onResume?: () => void | Promise<void>;
+    onDelete?: () => void | Promise<void>;
   } = {},
 ) {
   return render(
@@ -125,11 +137,22 @@ function renderPopup(
         <ThemeProvider>
           <TooltipProvider>
             <IntakeSourceSettingsPopup
-              settings={DEFAULT_GITHUB_INTAKE_SETTINGS}
+              settings={
+                props.sourceId === "sentry-exceptions"
+                  ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" }
+                  : DEFAULT_GITHUB_INTAKE_SETTINGS
+              }
+              sourceId={props.sourceId}
               labelOptions={props.labelOptions ?? ["bug", "enhancement"]}
               labelOptionsLoading={props.labelOptionsLoading}
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
+              paused={props.paused}
+              pauseError={props.pauseError}
+              deleteError={props.deleteError}
+              onPause={props.onPause}
+              onResume={props.onResume}
+              onDelete={props.onDelete}
               editAutomationHref={props.editAutomationHref}
               canvasId={props.canvasId}
               runHrefFor={props.runHrefFor}
@@ -328,5 +351,78 @@ describe("IntakeSourceSettingsPopup", () => {
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides pause and delete for a GitHub intake", () => {
+    renderPopup();
+
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
+  });
+
+  it("pauses, resumes, and deletes a Sentry intake after confirmation", async () => {
+    const onPause = vi.fn();
+    const onResume = vi.fn();
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({ sourceId: "sentry-exceptions", onPause, onResume, onDelete });
+
+    expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
+    expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+    expect(onPause).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-delete-cancel"));
+    expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers resume for a paused Sentry intake", async () => {
+    const onResume = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({ sourceId: "sentry-exceptions", paused: true, onResume });
+
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-resume"));
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a failed pause from rejecting and shows the error", async () => {
+    const onPause = vi.fn().mockRejectedValue(new Error("pause failed"));
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      onPause,
+      pauseError: INTAKE_SETTINGS_COPY.pauseError,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+
+    expect(onPause).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent(INTAKE_SETTINGS_COPY.pauseError);
+  });
+
+  it("shows a delete error in the confirmation dialog", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      onDelete: vi.fn().mockRejectedValue(new Error("delete failed")),
+      deleteError: INTAKE_SETTINGS_COPY.deleteError,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+
+    const dialog = screen.getByTestId("intake-delete-dialog");
+    expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteError);
+    expect(within(screen.getByTestId("intake-source-settings")).queryByRole("alert")).not.toBeInTheDocument();
   });
 });
