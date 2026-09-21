@@ -47,7 +47,7 @@ func (c *UpdateIncident) Documentation() string {
 ## Configuration
 
 - **Incident ID**: The ID of the incident to update (e.g., A12BC34567...)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 - **Status**: Update incident status (acknowledged, resolved)
 - **Priority**: Update incident priority (select from available priorities)
 - **Title**: Update incident title (optional, supports expressions)
@@ -87,7 +87,7 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			Label:       "From Email",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens.",
+			Description: "Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.",
 			Placeholder: "user@example.com",
 		},
 		{
