@@ -112,6 +112,8 @@ export function WorkOrderIntentDocument({
             resultFooter={resultFooter}
             clarity={clarity}
             confidence={confidence}
+            showClarity={analysisChat?.showClarity !== false}
+            showConfidence={analysisChat?.showConfidence !== false}
             refineOpen={refineOpen}
             collapsed={chatSolo}
             planWidth={planWidth}
@@ -233,6 +235,8 @@ function IntentSpecColumn({
   resultFooter,
   clarity,
   confidence,
+  showClarity = true,
+  showConfidence = true,
   refineOpen,
   collapsed = false,
   planWidth,
@@ -250,6 +254,8 @@ function IntentSpecColumn({
   resultFooter?: ReactNode;
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   refineOpen: boolean;
   collapsed?: boolean;
   planWidth?: string;
@@ -308,6 +314,8 @@ function IntentSpecColumn({
           <IntentSpecFooter
             clarity={clarity}
             confidence={confidence}
+            showClarity={showClarity}
+            showConfidence={showConfidence}
             isAnalyzing={isAnalyzing}
             resultFooter={resultFooter}
             contextSidebar={Boolean(contextSidebar)}
@@ -321,12 +329,16 @@ function IntentSpecColumn({
 function IntentSpecFooter({
   clarity,
   confidence,
+  showClarity = true,
+  showConfidence = true,
   isAnalyzing,
   resultFooter,
   contextSidebar,
 }: {
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
   contextSidebar: boolean;
@@ -336,7 +348,13 @@ function IntentSpecFooter({
   }
   return (
     <>
-      <WorkOrderIntentConfidenceFooter clarity={clarity} confidence={confidence} isAnalyzing={isAnalyzing} />
+      <WorkOrderIntentConfidenceFooter
+        clarity={clarity}
+        confidence={confidence}
+        showClarity={showClarity}
+        showConfidence={showConfidence}
+        isAnalyzing={isAnalyzing}
+      />
       {resultFooter}
     </>
   );

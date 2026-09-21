@@ -22,7 +22,27 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 	if factory.HostedSpendBudgetCents != nil {
 		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
 	}
+	serialized.Planning = serializeFactoryPlanning(factory.Planning())
 	return serialized
+}
+
+func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
+	return &pb.FactoryPlanning{
+		Enabled:    planning.Enabled,
+		Clarity:    planning.Clarity,
+		Confidence: planning.Confidence,
+	}
+}
+
+func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanning {
+	if planning == nil {
+		return models.DefaultFactoryPlanning()
+	}
+	return models.FactoryPlanning{
+		Enabled:    planning.GetEnabled(),
+		Clarity:    planning.GetClarity(),
+		Confidence: planning.GetConfidence(),
+	}
 }
 
 func serializeFactoryWithLines(

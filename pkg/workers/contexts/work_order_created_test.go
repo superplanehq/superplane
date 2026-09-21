@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestWorkOrderCreatedPayloadKeepsStoredFileRefs(t *testing.T) {
@@ -100,8 +102,93 @@ func TestWorkOrderCreatedPayloadSnapshotsTaskRefinementFeature(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, true, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: true}))
 	assert.Equal(t, false, workOrderCreatedPayload(db, order)[models.WorkOrderCreatedRefinementEnabledDataKey])
+}
+
+func TestEmitWorkOrderCreatedSkipsBacklogWhenPlanningOff(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: true}))
+
+	backlog, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: models.FactoryAppBacklogTriggerID,
+			Name:   "On Task",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+			Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 3)),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(backlog).Update("factory_id", factoryModel.ID).Error)
+
+	custom, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(custom).Update("factory_id", factoryModel.ID).Error)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Skip analysis", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil))
+
+	backlogEvents, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, backlogEvents)
+
+	customEvents, err := models.ListCanvasEvents(db, custom.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, customEvents, 1)
+}
+
+func TestEmitWorkOrderCreatedOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: true}))
+
+	backlog, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: models.FactoryAppBacklogTriggerID,
+			Name:   "On Task",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+			Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 3)),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(backlog).Update("factory_id", factoryModel.ID).Error)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Retry plan", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, backlog.ID))
+
+	events, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
 }
 
 func TestWorkOrderCreatedPayloadKeepsRawDescriptionWhenMintFails(t *testing.T) {

@@ -1,7 +1,6 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS, useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "./planningSettingsModel";
 import { useEffect, useMemo, useRef, type ComponentProps } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -52,9 +51,7 @@ export function LineBoardWorkOrderCard({
   isAnalyzing?: boolean;
 }) {
   const { factory } = useFactoriesLayout();
-  const refinementEnabled = useExperimentalFeature(workOrderCardContext.organizationId).has(
-    FEATURE_FACTORY_CREATE_WITH_AGENT,
-  );
+  const refinementEnabled = factoryPlanningEnabled(factory);
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
   const isDraft = entry.displayStatus === "draft";
@@ -85,7 +82,10 @@ export function LineBoardWorkOrderCard({
     }
     wasAnalyzing.current = showAnalysisActivity;
   }, [refetch, showAnalysisActivity, showConfidence]);
-  const scores = cardScores(showConfidence, checks, session.session, isAnalyzing);
+  const scores = cardScores(showConfidence, checks, session.session, isAnalyzing, {
+    showClarity: factoryShowsClarity(factory),
+    showConfidence: factoryShowsConfidence(factory),
+  });
 
   return (
     <WorkOrderCard
@@ -104,15 +104,21 @@ function cardScores(
   checks: FactoriesWorkOrderCheck[],
   session: PlanningSessionMachineInput | null,
   backlogAnalyzing: boolean,
-): Pick<ComponentProps<typeof WorkOrderCard>, "clarityScore" | "confidenceScore" | "isAnalyzing"> {
+  visibility: { showClarity: boolean; showConfidence: boolean },
+): Pick<
+  ComponentProps<typeof WorkOrderCard>,
+  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore"
+> {
   if (!showConfidence) {
-    return { isAnalyzing: false };
+    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false };
   }
-  const clarityScore = clarityScoreFromChecks(checks);
-  const confidenceScore = confidenceScoreFromChecks(checks);
+  const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
+  const confidenceScore = visibility.showConfidence ? confidenceScoreFromChecks(checks) : undefined;
   return {
     clarityScore,
     confidenceScore,
+    showClarity: visibility.showClarity,
+    showConfidenceScore: visibility.showConfidence,
     isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, clarityScore ?? confidenceScore),
   };
 }

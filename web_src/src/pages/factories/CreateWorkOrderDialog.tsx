@@ -4,9 +4,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -15,6 +13,7 @@ import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
+import { factoryPlanningEnabled } from "./pages/planningSettingsModel";
 
 interface CreateWorkOrderDialogProps {
   open: boolean;
@@ -23,14 +22,13 @@ interface CreateWorkOrderDialogProps {
 }
 
 export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
-  const { organizationId } = useFactoriesLayout();
-  const features = useExperimentalFeature(organizationId);
+  const { factory } = useFactoriesLayout();
 
-  if (!open || features.isLoading) {
+  if (!open) {
     return null;
   }
 
-  if (features.has(FEATURE_FACTORY_CREATE_WITH_AGENT)) {
+  if (factoryPlanningEnabled(factory)) {
     return <CreateWorkOrderRequestSession onClose={onClose} onCreated={onCreated} />;
   }
 

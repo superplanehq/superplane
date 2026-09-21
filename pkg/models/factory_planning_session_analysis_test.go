@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -497,6 +496,34 @@ func TestFactoryPlanningSession_ProposeClarityAndConfidenceAreSeparateChecks(t *
 	assert.Equal(t, FactoryWorkOrderCheckLevelCaution, byKey[PlanningConfidenceCheckKey].Level)
 }
 
+func TestFactoryPlanningSession_RejectsDisabledScores(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-score-off")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	err = session.ProposeClarity(db, 4, "The path is mapped.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	require.NoError(t, session.ProposeConfidence(db, 3, "The change is a mixed fit."))
+
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
+	err = session.ProposeConfidence(db, 2, "The change still needs a test.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+}
+
 func TestValidatePlanningScoreRejectsZero(t *testing.T) {
 	err := validatePlanningScore(planningConfidenceScore, 0)
 	require.Error(t, err)
@@ -763,7 +790,6 @@ func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	canvas.Name = "Triage incoming tasks"
 	require.NoError(t, db.Model(canvas).Update("name", canvas.Name).Error)
-	require.NoError(t, EnableExperimentalFeature(org.ID, features.FeatureFactoryCreateWithAgent))
 	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", nil, nil, nil)
 	require.NoError(t, err)
 	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
@@ -784,7 +810,6 @@ func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.
 			},
 		}),
 	}
-	require.NoError(t, DisableExperimentalFeature(org.ID, features.FeatureFactoryCreateWithAgent))
 	require.NoError(t, MaybeAttachAnalysisSession(db, canvas, event, run))
 	require.NoError(t, MaybeAttachAnalysisSession(db, canvas, event, run))
 
