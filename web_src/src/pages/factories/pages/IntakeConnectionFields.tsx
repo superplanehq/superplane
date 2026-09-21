@@ -13,6 +13,7 @@ import {
   intakeProviderDisplayName,
   intakeReconnectLabel,
   selectedIntakeIntegration,
+  showIntakeConnectAction,
   type IntakeConnectionBinding,
 } from "./intakeConnectionModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
@@ -56,21 +57,24 @@ export function IntakeConnectionFields({
   const selectedReady = selected?.status?.state === "ready";
   const reconnectLabel = intakeReconnectLabel(selected);
   const showReconnect = Boolean(selected && !selectedReady && onReconnect);
+  const showConnect = showIntakeConnectAction(integrations.length, integrationsLoading);
 
   return (
     <section className="flex flex-col gap-4" data-testid="intake-connection">
       <div className="flex items-start justify-between gap-3">
         <h3 className="workspace-section-title">{INTAKE_CONNECTION_COPY.section}</h3>
-        <Button
-          type="button"
-          variant={integrations.length > 0 ? "outline" : "default"}
-          size="sm"
-          disabled={connecting}
-          onClick={onConnect}
-          data-testid="intake-connection-connect"
-        >
-          {connecting ? INTAKE_CONNECTION_COPY.connecting : intakeConnectLabel(integrations.length > 0, providerName)}
-        </Button>
+        {showConnect ? (
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            disabled={connecting}
+            onClick={onConnect}
+            data-testid="intake-connection-connect"
+          >
+            {connecting ? INTAKE_CONNECTION_COPY.connecting : intakeConnectLabel(providerName)}
+          </Button>
+        ) : null}
       </div>
       {banner ? (
         <p

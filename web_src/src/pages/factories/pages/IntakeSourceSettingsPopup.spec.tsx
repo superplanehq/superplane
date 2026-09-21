@@ -194,6 +194,22 @@ function renderPopup(
   );
 }
 
+function intakeConnection(overrides: Partial<IntakeSettingsConnection> = {}): IntakeSettingsConnection {
+  return {
+    binding: { integrationId: "", resourceId: "" },
+    integrations: [
+      {
+        metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+        status: { state: "ready" },
+      },
+    ],
+    projects: [],
+    onBindingChange: vi.fn(),
+    onConnect: vi.fn(),
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   localStorage.clear();
 });
@@ -390,19 +406,7 @@ describe("IntakeSourceSettingsPopup", () => {
   it("shows Connection fields for a Jira intake that needs a live connection", () => {
     renderPopup({
       sourceId: "jira-issues",
-      connection: {
-        health: "HEALTH_MISSING_INTEGRATION",
-        binding: { integrationId: "", resourceId: "" },
-        integrations: [
-          {
-            metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
-            status: { state: "ready" },
-          },
-        ],
-        projects: [],
-        onBindingChange: vi.fn(),
-        onConnect: vi.fn(),
-      },
+      connection: intakeConnection({ health: "HEALTH_MISSING_INTEGRATION" }),
     });
 
     expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
@@ -412,23 +416,56 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByTestId("intake-connection-jira-1")).toHaveTextContent("Atlassian");
   });
 
-  it("keeps Save disabled until the Jira project is chosen", () => {
+  it("hides Connect when a Jira intake already has an account", () => {
     renderPopup({
       sourceId: "jira-issues",
-      connection: {
-        health: "HEALTH_MISSING_INTEGRATION",
-        binding: { integrationId: "jira-1", resourceId: "" },
+      connection: intakeConnection({
+        binding: { integrationId: "jira-1", resourceId: "ENG" },
+        projects: [{ id: "ENG", name: "Engineering" }],
+      }),
+    });
+
+    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-jira-1")).toBeInTheDocument();
+  });
+
+  it("shows Connect Jira when the intake has no account", () => {
+    renderPopup({
+      sourceId: "jira-issues",
+      connection: intakeConnection({ integrations: [] }),
+    });
+
+    expect(screen.getByTestId("intake-connection-connect")).toHaveTextContent("Connect Jira");
+  });
+
+  it("hides Connect when a Sentry intake already has an account", () => {
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      connection: intakeConnection({
+        binding: { integrationId: "sentry-1", resourceId: "proj-1" },
         integrations: [
           {
-            metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+            metadata: { id: "sentry-1", name: "Sentry org", integrationName: "sentry" },
             status: { state: "ready" },
           },
         ],
+        projects: [{ id: "proj-1", name: "Frontend" }],
+      }),
+    });
+
+    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-sentry-1")).toBeInTheDocument();
+  });
+
+  it("keeps Save disabled until the Jira project is chosen", () => {
+    renderPopup({
+      sourceId: "jira-issues",
+      connection: intakeConnection({
+        health: "HEALTH_MISSING_INTEGRATION",
+        binding: { integrationId: "jira-1", resourceId: "" },
         projects: [{ id: "ENG", name: "Engineering" }],
         saveDisabled: true,
-        onBindingChange: vi.fn(),
-        onConnect: vi.fn(),
-      },
+      }),
     });
 
     expect(screen.getByTestId("intake-source-settings-save")).toBeDisabled();
