@@ -178,11 +178,6 @@ function useJiraConnect(params: JiraConnectParams) {
 
   const connectJira = async () => {
     params.setError(undefined);
-    const readyId = readyJiraConnectionId(params.integrations, params.integrationId);
-    if (readyId) {
-      params.completeConnection(readyId);
-      return;
-    }
     if (params.definitionLoading) {
       return;
     }
@@ -197,6 +192,8 @@ function useJiraConnect(params: JiraConnectParams) {
         organizationId: params.organizationId,
         returnTo: returnPath,
         existingNames: params.existingNames,
+        connected: params.integrations,
+        onExistingReady: params.completeConnection,
         create: async (payload) => {
           const response = await params.createIntegration.mutateAsync(payload);
           return response.data;

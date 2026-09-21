@@ -1174,6 +1174,61 @@ func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookR
 	return nil, fmt.Errorf("unrecognized create webhook response: %s", string(responseBody))
 }
 
+// IssueWebhook is one dynamic webhook registered by this OAuth app.
+type IssueWebhook struct {
+	ID             int64    `json:"id"`
+	URL            string   `json:"url"`
+	JQLFilter      string   `json:"jqlFilter"`
+	Events         []string `json:"events"`
+	ExpirationDate string   `json:"expirationDate"`
+}
+
+type issueWebhooksPage struct {
+	Values     []IssueWebhook `json:"values"`
+	IsLast     bool           `json:"isLast"`
+	StartAt    int            `json:"startAt"`
+	MaxResults int            `json:"maxResults"`
+	Total      int            `json:"total"`
+}
+
+const issueWebhookListPageSize = 100
+const issueWebhookListPageLimit = 20
+
+// ListIssueWebhooks returns every dynamic webhook registered by this OAuth app.
+func (c *Client) ListIssueWebhooks() ([]IssueWebhook, error) {
+	var webhooks []IssueWebhook
+	startAt := 0
+
+	for range issueWebhookListPageLimit {
+		pageURL, err := url.Parse(c.apiURL("/rest/api/3/webhook"))
+		if err != nil {
+			return nil, fmt.Errorf("parse webhook list URL: %w", err)
+		}
+		query := pageURL.Query()
+		query.Set("startAt", strconv.Itoa(startAt))
+		query.Set("maxResults", strconv.Itoa(issueWebhookListPageSize))
+		pageURL.RawQuery = query.Encode()
+
+		responseBody, err := c.execRequest(http.MethodGet, pageURL.String(), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page issueWebhooksPage
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse webhook list response: %w", err)
+		}
+
+		webhooks = append(webhooks, page.Values...)
+		if page.IsLast || len(page.Values) == 0 {
+			return webhooks, nil
+		}
+		startAt += len(page.Values)
+	}
+
+	return nil, fmt.Errorf("webhook list exceeded page limit")
+}
+
 // DeleteIssueWebhooks removes previously-registered dynamic webhooks by id.
 func (c *Client) DeleteIssueWebhooks(webhookIDs []int64) error {
 	if len(webhookIDs) == 0 {
