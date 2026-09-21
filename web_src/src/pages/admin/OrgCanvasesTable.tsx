@@ -51,14 +51,14 @@ export function OrgCanvasesTable({ orgId }: { orgId: string }) {
         <div className="flex items-center gap-2">
           <Palette size={16} className="text-gray-600 dark:text-gray-400" />
           <Heading level={2} className="text-gray-800 text-base dark:text-gray-100">
-            Canvases ({total})
+            Automations ({total})
           </Heading>
         </div>
         <div className="relative w-56">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
-            placeholder="Search canvases..."
+            placeholder="Search automations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
