@@ -164,6 +164,7 @@ func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec mode
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
+		Paused:              intake.Paused(),
 	}
 	if intake.InitialImportItemCount != nil {
 		itemCount := int32(*intake.InitialImportItemCount)

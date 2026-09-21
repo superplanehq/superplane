@@ -670,6 +670,55 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE, settings.GetLabelFilterMode())
 	})
 
+	t.Run("update sets and clears paused, and list returns it", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		assert.False(t, intake.GetPaused())
+
+		paused := true
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+
+		paused = false
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetPaused())
+	})
+
+	t.Run("update rejects pause for a GitHub intake", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		paused := true
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.False(t, intake.GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.False(t, listed.GetIntakes()[0].GetPaused())
+	})
+
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -686,6 +735,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		assert.Error(t, err)
+	})
+
+	t.Run("deleting an intake leaves existing work orders", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		origin := models.WorkOrderOrigin{
+			URL:   "https://acme.sentry.io/issues/1",
+			Label: "ISSUE-1",
+		}
+		order, err := factory.CreateWorkOrderWithOrigin(
+			database.DB(t.Context()),
+			"Crash in checkout",
+			"The checkout page panics.",
+			nil,
+			[]uuid.UUID{},
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		_, err = DeleteFactoryIntake(ctx, orgID, &pb.DeleteFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+
+		found, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
+		require.NoError(t, err)
+		require.NotNil(t, found.Origin())
+		assert.Equal(t, origin.URL, found.Origin().URL)
+		assert.Equal(t, origin.Label, found.Origin().Label)
 	})
 
 	t.Run("a missing intake reports not found", func(t *testing.T) {
