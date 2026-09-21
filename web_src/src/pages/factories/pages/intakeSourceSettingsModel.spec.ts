@@ -7,6 +7,7 @@ import {
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
+  intakeSupportsPause,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
 } from "./intakeSourceSettingsModel";
@@ -90,5 +91,13 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
     expect(settings.superplaneLabelAdded).toBe(true);
+  });
+
+  it("offers pause for Sentry and Jira intakes only", () => {
+    expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
+    expect(intakeSupportsPause("jira-issues")).toBe(true);
+    expect(intakeSupportsPause("github-issues")).toBe(false);
+    expect(intakeSupportsPause("productive-tasks")).toBe(false);
+    expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
   });
 });
