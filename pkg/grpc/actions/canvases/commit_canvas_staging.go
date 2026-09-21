@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -30,7 +29,6 @@ import (
 func CommitCanvasStaging(
 	ctx context.Context,
 	db *gorm.DB,
-	gitProvider gitprovider.Provider,
 	usageService usage.Service,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -116,7 +114,6 @@ func CommitCanvasStaging(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
-				GitProvider:    gitProvider,
 			},
 		)
 

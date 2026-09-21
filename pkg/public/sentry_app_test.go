@@ -52,7 +52,7 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-client-secret")
 	server, err := NewServer(
-		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider,
+		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
 		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
 	)
 	require.NoError(t, err)

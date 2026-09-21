@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -25,7 +24,6 @@ type CanvasService struct {
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
-	gitProvider    git.Provider
 	webhookBaseURL string
 	usageService   usage.Service
 }
@@ -34,7 +32,6 @@ func NewCanvasService(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
-	gitProvider git.Provider,
 	webhookBaseURL string,
 	usageService usage.Service,
 ) *CanvasService {
@@ -42,7 +39,6 @@ func NewCanvasService(
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
-		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
 		usageService:   usageService,
 	}
@@ -81,7 +77,6 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		s.registry,
 		s.encryptor,
 		s.authService,
-		s.gitProvider,
 		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
 		req.GetName(),
@@ -462,7 +457,6 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 	return canvases.CommitCanvasStaging(
 		ctx,
 		db,
-		s.gitProvider,
 		s.usageService,
 		s.encryptor,
 		s.registry,

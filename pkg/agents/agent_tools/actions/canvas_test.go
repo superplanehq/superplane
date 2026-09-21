@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	canvaslayout "github.com/superplanehq/superplane/pkg/layout"
@@ -664,7 +662,7 @@ func TestAppAgentTool_ListFilesWithoutRepositoryReturnsSpecFiles(t *testing.T) {
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	registry := NewDefaultRegistry(Dependencies{})
 	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
@@ -678,28 +676,17 @@ func TestAppAgentTool_ListFilesWithoutRepositoryReturnsSpecFiles(t *testing.T) {
 	assert.Equal(t, []string{files.CanvasYAMLPath, files.ConsoleYAMLPath}, list.Files)
 }
 
-func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {
+func TestAppAgentTool_ReadFileRejectsNonSpecPath(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	registry := NewDefaultRegistry(Dependencies{})
 
-	_, err := models.UpsertStagedFile(
-		database.DB(t.Context()),
-		canvas.ID,
-		r.User,
-		liveVersion.ID,
-		canvas.OrganizationID,
-		"README.md",
-		"draft readme\n",
-	)
-	require.NoError(t, err)
-
-	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+	_, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
@@ -710,24 +697,20 @@ func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {
 		Path:      "README.md",
 	})
 
-	require.NoError(t, err)
-	read, ok := result.(fileReadResult)
-	require.True(t, ok)
-	require.Len(t, read.Files, 1)
-	assert.Equal(t, "README.md", read.Files[0].Path)
-	assert.Equal(t, "draft readme\n", read.Files[0].Content)
-	assert.Equal(t, "staging", read.Files[0].Source)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "only canvas.yaml and console.yaml are readable")
 }
 
 func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
+	upsertUserStagingYAML(t, canvas, r.User, "draft: omitted-version\n")
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	registry := NewDefaultRegistry(Dependencies{})
 	session := agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
@@ -735,20 +718,9 @@ func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 		CanvasID:       canvas.ID.String(),
 	}
 
-	_, err := models.UpsertStagedFile(
-		database.DB(t.Context()),
-		canvas.ID,
-		r.User,
-		liveVersion.ID,
-		canvas.OrganizationID,
-		"README.md",
-		"draft readme\n",
-	)
-	require.NoError(t, err)
-
 	result, err := registry.Execute(ctx, session, Input{
 		Action: "read_file",
-		Path:   "README.md",
+		Path:   canvasRepository.CanvasYAMLRepositoryPath,
 	})
 
 	require.NoError(t, err)
@@ -756,49 +728,8 @@ func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, read.Files, 1)
 	assert.Equal(t, liveVersion.ID.String(), read.Files[0].VersionID)
-	assert.Equal(t, "draft readme\n", read.Files[0].Content)
+	assert.Equal(t, "draft: omitted-version\n", read.Files[0].Content)
 	assert.Equal(t, "staging", read.Files[0].Source)
-}
-
-func TestAppAgentTool_ReadFileReturnsLiveCommittedContent(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
-	require.NoError(t, err)
-	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: head,
-		Message:         "Add notes",
-		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
-		Operations: []gitprovider.FileOperation{
-			{Path: "notes.md", Content: strings.NewReader("live content\n"), SizeBytes: int64(len("live content\n"))},
-		},
-	})
-	require.NoError(t, err)
-
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
-	result, err := registry.Execute(ctx, agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}, Input{
-		Action: "read_file",
-		Path:   "notes.md",
-	})
-
-	require.NoError(t, err)
-	read, ok := result.(fileReadResult)
-	require.True(t, ok)
-	require.Len(t, read.Files, 1)
-	assert.Equal(t, "notes.md", read.Files[0].Path)
-	assert.Equal(t, "live content\n", read.Files[0].Content)
-	assert.Equal(t, "live", read.Files[0].Source)
-	assert.Empty(t, read.Files[0].VersionID)
 }
 
 func TestAppAgentTool_ReadFileReturnsStagedSpecFileContent(t *testing.T) {
@@ -810,7 +741,7 @@ func TestAppAgentTool_ReadFileReturnsStagedSpecFileContent(t *testing.T) {
 	upsertUserStagingYAML(t, canvas, r.User, "draft: staged\n")
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	registry := NewDefaultRegistry(Dependencies{})
 	result, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
