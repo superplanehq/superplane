@@ -504,3 +504,112 @@ func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, finalEvents, 2)
 }
+
+func Test__JiraSeedSkipsKnownIssues(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factoryModel.ID.String(),
+		Source:    pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+	})
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(response.GetIntake().GetCanvasId())
+	tx := database.DB(t.Context())
+	siteURL := "https://acme.atlassian.net"
+
+	createOriginOrder := func(issueKey, title, state, result string) {
+		t.Helper()
+		origin := models.WorkOrderOrigin{
+			URL:   jira.IssueURL(siteURL, issueKey),
+			Label: issueKey,
+		}
+		order, createErr := factoryModel.CreateWorkOrderWithOrigin(tx, title, "", nil, nil, nil, origin)
+		require.NoError(t, createErr)
+		switch {
+		case state == models.FactoryWorkOrderStateDraft:
+			return
+		case state == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected:
+			_, updateErr := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateClosed,
+				Result:  models.FactoryWorkOrderResultRejected,
+			})
+			require.NoError(t, updateErr)
+		case state == models.FactoryWorkOrderStateClosed:
+			_, updateErr := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateOpen,
+			})
+			require.NoError(t, updateErr)
+			_, closeErr := order.Close(tx, result, nil)
+			require.NoError(t, closeErr)
+		}
+	}
+
+	load := func(issueKey string) (*jira.Issue, error) {
+		return &jira.Issue{
+			Key: issueKey,
+			Fields: map[string]any{
+				"summary": "Summary of " + issueKey,
+			},
+		}, nil
+	}
+
+	createOriginOrder("ENG-11", "Draft issue", models.FactoryWorkOrderStateDraft, "")
+	createOriginOrder("ENG-22", "Closed issue", models.FactoryWorkOrderStateClosed, models.FactoryWorkOrderResultCompleted)
+	createOriginOrder("ENG-33", "Archived issue", models.FactoryWorkOrderStateClosed, models.FactoryWorkOrderResultRejected)
+
+	queued := []jira.IssueSearchHit{{Key: "ENG-44"}}
+	first, err := seedKnownJiraIssues(tx, canvasID, load, queued, siteURL)
+	require.NoError(t, err)
+	assert.Equal(t, 1, first.itemCount)
+
+	before, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, before, 1)
+
+	result, err := seedKnownJiraIssues(tx, canvasID, load, []jira.IssueSearchHit{
+		{Key: "ENG-11"},
+		{Key: "ENG-22"},
+		{Key: "ENG-33"},
+		{Key: "ENG-44"},
+		{Key: "ENG-55"},
+	}, siteURL)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.itemCount)
+
+	after, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, after, 2)
+
+	freshKeys := map[string]bool{}
+	for i := range after {
+		issueKey, ok := jira.IssueKeyFromEventData(after[i].Data.Data())
+		require.True(t, ok)
+		freshKeys[issueKey] = true
+	}
+	assert.Equal(t, map[string]bool{"ENG-44": true, "ENG-55": true}, freshKeys)
+
+	repeat, err := seedKnownJiraIssues(tx, canvasID, load, []jira.IssueSearchHit{
+		{Key: "ENG-11"},
+		{Key: "ENG-22"},
+		{Key: "ENG-33"},
+		{Key: "ENG-44"},
+		{Key: "ENG-55"},
+	}, siteURL)
+	require.NoError(t, err)
+	assert.Equal(t, 0, repeat.itemCount)
+
+	finalEvents, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	assert.Len(t, finalEvents, 2)
+}
