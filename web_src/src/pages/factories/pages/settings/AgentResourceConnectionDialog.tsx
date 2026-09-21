@@ -117,7 +117,7 @@ export function AgentResourceConnectionDialog({
   const isEdit = Boolean(resource);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
-  const [auth, setAuth] = useState<FactoryAgentResourceAuth>("AUTH_HEADERS");
+  const [auth, setAuth] = useState<FactoryAgentResourceAuth>("AUTH_OAUTH");
   const [headers, setHeaders] = useState<HeaderDraft[]>([emptyHeader()]);
   const [nameError, setNameError] = useState("");
   const [urlError, setUrlError] = useState("");
@@ -129,7 +129,7 @@ export function AgentResourceConnectionDialog({
     }
     setName(resource?.name ?? "");
     setUrl(resource?.url ?? "");
-    setAuth(resource?.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS");
+    setAuth(resource ? (resource.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS") : "AUTH_OAUTH");
     setHeaders(headersFromResource(resource));
     setNameError("");
     setUrlError("");
@@ -272,8 +272,8 @@ function ConnectionDialogFields({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="AUTH_HEADERS">{AGENT_RESOURCES_COPY.authHeader}</SelectItem>
             <SelectItem value="AUTH_OAUTH">{AGENT_RESOURCES_COPY.authSignIn}</SelectItem>
+            <SelectItem value="AUTH_HEADERS">{AGENT_RESOURCES_COPY.authHeader}</SelectItem>
           </SelectContent>
         </Select>
       </div>
