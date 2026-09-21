@@ -19,7 +19,12 @@ import {
   PR_CLOSURE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
-import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
+import {
+  factoryColumnAutomationViewPath,
+  factoryIntakePath,
+  factoryPlanningPath,
+  factoryPRFeedbackPath,
+} from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
@@ -73,6 +78,7 @@ export type ColumnAutomationsInput = {
   prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
   apps?: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders?: FactoriesWorkOrder[];
+  planningEnabled?: boolean;
 };
 
 const PHASE_KEY_PATTERN = /^phase-(\d+)$/;
@@ -135,7 +141,10 @@ function automationsForColumn(
   workOrders: FactoriesWorkOrder[],
 ): ColumnAutomation[] {
   if (key === "backlog") {
-    return [...intakeAutomations(input.intakes ?? [], workOrders), ...analysisAutomation(input.apps ?? [], workOrders)];
+    return [
+      ...intakeAutomations(input.intakes ?? [], workOrders),
+      ...analysisAutomation(input.apps ?? [], workOrders, input.planningEnabled !== false),
+    ];
   }
   if (key === "verify") {
     return [
@@ -190,6 +199,7 @@ function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: Factor
 function analysisAutomation(
   apps: Array<{ id?: string; name?: string }>,
   workOrders: FactoriesWorkOrder[],
+  planningEnabled: boolean,
 ): ColumnAutomation[] {
   const app = findBacklogAutomationApp(apps);
   if (!app) {
@@ -204,7 +214,7 @@ function analysisAutomation(
       action: ANALYSIS_ENTRY.action,
       iconSrc: ANALYSIS_ENTRY.iconSrc,
       iconAlt: ANALYSIS_ENTRY.iconAlt,
-      health: "healthy",
+      health: planningEnabled ? "healthy" : "disabled",
       runningCount: runningCountForApp(app.id, workOrders),
       catalogId: ANALYSIS_CATALOG_ID,
       canvasId: app.id,
@@ -360,6 +370,9 @@ export function columnAutomationOpenPath(
   }
   if (automation.kind === "pr-discussion" || automation.kind === "pr-checks") {
     return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
+  }
+  if (automation.kind === "analysis") {
+    return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
   }
   if (!automation.canvasId) {
     return undefined;

@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
@@ -690,10 +689,10 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
 
 	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
+	require.NoError(t, factoryModel.UpdatePlanning(database.Conn(), models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: true}))
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factoryModel.ID)
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Ship feature", "Implement and open PR", &r.User, nil, nil)
 	require.NoError(t, err)
@@ -723,7 +722,7 @@ func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T)
 	require.True(t, ok)
 	assert.NotContains(t, orderPayload, "spec")
 
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCreateWithAgent))
+	require.NoError(t, factoryModel.UpdatePlanning(database.Conn(), models.FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
 
 	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
 		Type: models.FactoryWorkOrderArtifactTypeMarkdown,

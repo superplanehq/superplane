@@ -1,10 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-import type { FactoriesFactoryPullRequest } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
@@ -15,7 +14,7 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -27,6 +26,7 @@ import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
+import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -36,8 +36,9 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  */
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const { organizationId, factoryId, orderId, fixture, fixed = false, onClose, canUpdate = true } = props;
-  const refinementFeature = useExperimentalFeature(organizationId);
-  const refinementEnabled = refinementFeature.has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const factoryQuery = useFactory(organizationId ?? "", factoryId ?? "");
+  const refinementEnabled = factoryPlanningEnabled(factoryQuery.data);
+  const refinementFeature = { isLoading: factoryQuery.isPending };
   const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
@@ -119,23 +120,29 @@ function AnalysisWorkOrderPopup({
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
-  const initialTab = defaultSplitRunPopupTab(fixture);
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const modelSelects = draftModelSelects({
+  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  const viewFixture = sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture;
+  const draftChrome = analysisDraftChrome({
+    factory,
     organizationId,
     factoryId,
-    fixture,
-    value: draftModel,
-    onChange: setDraftModel,
+    factoryKey,
+    lineId,
+    fixture: viewFixture,
+    analysis,
+    draftModel,
+    onDraftModelChange: setDraftModel,
     disabled: isDispatching || !canDispatch,
   });
   const reviewArgs = {
-    fixture,
+    fixture: viewFixture,
     organizationId,
     factoryId,
     factoryKey,
@@ -148,24 +155,25 @@ function AnalysisWorkOrderPopup({
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
-    compact: showSidebarNote || fixture.footer.kind === "draft",
-    modelSelect: modelSelects.footer,
+    compact: showSidebarNote || (viewFixture.footer.kind === "draft" && !sourceOnly),
+    modelSelect: draftChrome.footerModelSelect,
+    confirmUnclearStart: factoryPlanningEnabled(factory),
   };
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const taskHref = createdTaskHref(organizationId, factoryKey, lineId);
-  const stripAnalysis = draftStripAnalysis(fixture.footer.kind, analysis, modelSelects.strip, taskHref);
+  const stripAnalysis = draftChrome.stripAnalysis;
+  const descriptionReview = !sourceOnly && !showSidebarNote && tab === "description" ? review : undefined;
 
   return (
     <PopupShell
       testId="work-order-split-run"
       fixed={fixed}
       fullPage={fullPage}
-      className={fullPage ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
+      className={fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
       onDismiss={onClose}
     >
       <SplitRunPopupTabs
-        fixture={fixture}
+        fixture={viewFixture}
         edits={edits}
         popupData={popupData}
         organizationId={organizationId}
@@ -178,9 +186,10 @@ function AnalysisWorkOrderPopup({
         onTabChange={setTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
-        resultFooter={!showSidebarNote && tab === "description" ? review : undefined}
+        resultFooter={descriptionReview}
         sidebarNote={showSidebarNote ? review : undefined}
         analysis={stripAnalysis}
+        sourceOnly={sourceOnly}
         header={(views) => (
           <PopupHeader
             title={edits.title}
@@ -209,7 +218,7 @@ function AnalysisWorkOrderPopup({
           </PopupHeader>
         )}
       />
-      {!showSidebarNote && tab !== "description" ? review : null}
+      {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
     </PopupShell>
   );
 }
@@ -251,6 +260,7 @@ function analysisPopupReview(args: {
   compact: boolean;
   actionsOnly?: boolean;
   modelSelect?: ReactNode;
+  confirmUnclearStart?: boolean;
 }) {
   return (
     <SplitRunReview
@@ -271,10 +281,48 @@ function analysisPopupReview(args: {
       startDisabled={!args.canDispatch}
       compact={args.compact}
       actionsOnly={args.actionsOnly}
-      confirmUnclearStart
+      confirmUnclearStart={args.confirmUnclearStart}
       modelSelect={args.modelSelect}
     />
   );
+}
+
+function analysisDraftChrome(args: {
+  factory?: FactoriesFactory;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  lineId?: string;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  draftModel: string;
+  onDraftModelChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  if (!factoryPlanningEnabled(args.factory)) {
+    return { footerModelSelect: undefined, stripAnalysis: undefined };
+  }
+  const modelSelects = draftModelSelects({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    fixture: args.fixture,
+    value: args.draftModel,
+    onChange: args.onDraftModelChange,
+    disabled: args.disabled,
+  });
+  return {
+    footerModelSelect: modelSelects.footer,
+    stripAnalysis: draftStripAnalysis(
+      args.fixture.footer.kind,
+      args.analysis,
+      modelSelects.strip,
+      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+      {
+        showClarity: factoryShowsClarity(args.factory),
+        showConfidence: factoryShowsConfidence(args.factory),
+      },
+    ),
+  };
 }
 
 /**
@@ -286,11 +334,12 @@ function draftStripAnalysis(
   analysis: ReturnType<typeof useAnalysisPlanningSession>,
   modelSelect: ReactNode | undefined,
   taskHref: CreatedTaskHref,
+  scores: { showClarity: boolean; showConfidence: boolean },
 ) {
   if (footerKind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref };
+  return { ...analysis, modelSelect, taskHref, ...scores };
 }
 
 /**

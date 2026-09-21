@@ -379,6 +379,9 @@ CREATE TABLE public.factories (
     onboarding_completed_at timestamp with time zone,
     onboarding_config jsonb DEFAULT '{}'::jsonb NOT NULL,
     hosted_spend_budget_cents bigint,
+    planning_enabled boolean DEFAULT true NOT NULL,
+    planning_clarity boolean DEFAULT true NOT NULL,
+    planning_confidence boolean DEFAULT true NOT NULL,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -4615,7 +4618,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260918231901	f
+20260921071654	f
 \.
 
 

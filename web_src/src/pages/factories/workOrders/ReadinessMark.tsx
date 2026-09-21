@@ -33,11 +33,19 @@ export function ReadinessDot({ tone, className }: { tone: DraftReadinessTone; cl
 
 type ScoreRow = { key: "clarity" | "confidence"; label: string; short: string; score?: number };
 
-function scoreRows(clarity?: number, confidence?: number): ScoreRow[] {
-  return [
-    { key: "clarity", label: CLARITY_CHECK_NAME, short: "Clarity", score: clarity },
-    { key: "confidence", label: CONFIDENCE_CHECK_NAME, short: "Confidence", score: confidence },
-  ];
+function scoreRows(
+  clarity?: number,
+  confidence?: number,
+  visibility: { showClarity?: boolean; showConfidence?: boolean } = {},
+): ScoreRow[] {
+  const rows: ScoreRow[] = [];
+  if (visibility.showClarity !== false) {
+    rows.push({ key: "clarity", label: CLARITY_CHECK_NAME, short: "Clarity", score: clarity });
+  }
+  if (visibility.showConfidence !== false) {
+    rows.push({ key: "confidence", label: CONFIDENCE_CHECK_NAME, short: "Confidence", score: confidence });
+  }
+  return rows;
 }
 
 const BADGE_TONE: Record<ConfidenceBand, string> = {
@@ -56,16 +64,23 @@ const BADGE_MUTED = "border-border bg-muted/40 text-muted-foreground";
 export function CardScoreBadges({
   clarity,
   confidence,
+  showClarity = true,
+  showConfidence = true,
   className,
   testId,
 }: {
   clarity?: number;
   confidence?: number;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   className?: string;
   testId?: string;
 }) {
-  const readiness = draftReadiness({ clarity, confidence });
-  const rows = scoreRows(clarity, confidence);
+  const readiness = draftReadiness({
+    clarity: showClarity ? clarity : undefined,
+    confidence: showConfidence ? confidence : undefined,
+  });
+  const rows = scoreRows(clarity, confidence, { showClarity, showConfidence });
   const speech = [readiness.headline, ...rows.map(scoreSpeech)].join(". ");
 
   return (

@@ -201,6 +201,8 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   },
 ];
 
+export const DEFAULT_FACTORY_PLANNING = { enabled: true, clarity: true, confidence: true } as const;
+
 export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
   name: "Semaphore",
@@ -209,6 +211,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
     "Handles reconciliation work: implement a change across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
   onboarding: { completedAt: LAST_WEEK },
+  planning: { ...DEFAULT_FACTORY_PLANNING },
 };
 
 export const EMPTY_FACTORY: FactoriesFactory = {
@@ -217,7 +220,15 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   key: "PF",
   description: "New factory. No lines or tasks configured yet.",
   lines: [],
+  planning: { ...DEFAULT_FACTORY_PLANNING },
 };
+
+export function factoryWithPlanning(
+  factory: FactoriesFactory,
+  planning: { enabled: boolean; clarity: boolean; confidence: boolean },
+): FactoriesFactory {
+  return { ...factory, planning };
+}
 
 const ACME_ONBOARDING_DONE_APP_ID = "app-acme-done";
 const ACME_ONBOARDING_BACKLOG_APP_ID = "app-acme-backlog";
@@ -265,6 +276,7 @@ export const ACME_ONBOARDING_FACTORY: FactoriesFactory = {
   description: "Empty first-run workspace. The board has no tickets yet.",
   lines: [ACME_ONBOARDING_LINE],
   onboarding: { completedAt: LAST_WEEK },
+  planning: { ...DEFAULT_FACTORY_PLANNING },
 };
 
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [

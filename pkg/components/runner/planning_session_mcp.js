@@ -2,7 +2,7 @@
 "use strict";
 
 const fs = require("fs");
-const { isCompactStatusText } = require("./analysis_protocol");
+const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
 
 /**
  * Stdio MCP server for task refinement.
@@ -332,7 +332,7 @@ async function handleRequest(message) {
     return;
   }
   if (method === "tools/list") {
-    sendResult(id, { tools: TOOLS });
+    sendResult(id, { tools: planningTools() });
     return;
   }
   if (method === "tools/call") {
@@ -343,8 +343,16 @@ async function handleRequest(message) {
       if (name === "propose_spec") {
         result = await proposeSpec(args);
       } else if (name === "propose_clarity") {
+        if (!planningClarityEnabled()) {
+          sendError(id, -32601, "Unknown tool: propose_clarity");
+          return;
+        }
         result = await proposeClarity(args);
       } else if (name === "propose_confidence") {
+        if (!planningConfidenceEnabled()) {
+          sendError(id, -32601, "Unknown tool: propose_confidence");
+          return;
+        }
         result = await proposeConfidence(args);
       } else if (name === "survey") {
         result = await proposeSurvey(args);
@@ -508,6 +516,18 @@ if (require.main === module) {
   main();
 }
 
+function planningTools(env = process.env) {
+  return TOOLS.filter((tool) => {
+    if (tool.name === "propose_clarity") {
+      return planningClarityEnabled(env);
+    }
+    if (tool.name === "propose_confidence") {
+      return planningConfidenceEnabled(env);
+    }
+    return true;
+  });
+}
+
 module.exports = {
   proposeSpec,
   proposeClarity,
@@ -517,6 +537,7 @@ module.exports = {
   recordAgentMessage,
   surveyQuestions,
   TOOLS,
+  planningTools,
   writeAnalysisOutputs,
   analysisOutputPaths,
   parseFrames,

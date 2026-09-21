@@ -43,12 +43,16 @@ export function ScoreEvidenceRow({
   clarity,
   confidence,
   isAnalyzing = false,
+  showClarity = true,
+  showConfidence = true,
   testIds,
   className,
 }: {
   clarity?: ScoreEvidenceValue;
   confidence?: ScoreEvidenceValue;
   isAnalyzing?: boolean;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   testIds?: Partial<Record<ScoreKind, string>>;
   className?: string;
 }) {
@@ -58,9 +62,23 @@ export function ScoreEvidenceRow({
       className={cn("flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1", className)}
       data-testid="score-evidence-row"
     >
-      {SCORE_KINDS.map((kind) => (
-        <ScoreEvidence key={kind} kind={kind} value={values[kind]} isAnalyzing={isAnalyzing} testId={testIds?.[kind]} />
-      ))}
+      {SCORE_KINDS.map((kind) => {
+        if (kind === "clarity" && !showClarity) {
+          return null;
+        }
+        if (kind === "confidence" && !showConfidence) {
+          return null;
+        }
+        return (
+          <ScoreEvidence
+            key={kind}
+            kind={kind}
+            value={values[kind]}
+            isAnalyzing={isAnalyzing}
+            testId={testIds?.[kind]}
+          />
+        );
+      })}
     </div>
   );
 }

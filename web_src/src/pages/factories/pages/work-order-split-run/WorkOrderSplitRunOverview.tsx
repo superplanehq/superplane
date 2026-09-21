@@ -8,11 +8,16 @@ import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
 import { WorkOrderIntentDocument, type IntentAnalysisChat } from "./WorkOrderIntentDocument";
 import type { SplitRunSource } from "./splitRunSource";
+import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
 import { WorkOrderSplitRunOverviewSidebar } from "./WorkOrderSplitRunOverviewSidebar";
+
+const SOURCE_ONLY_PANE_CLASS =
+  "flex min-h-0 min-w-0 w-full flex-1 flex-col border-b border-border lg:w-[40%] lg:min-w-[14rem] lg:flex-none lg:border-r lg:border-b-0";
 
 /**
  * Description tab. Drafts keep analysis chat on the left. After Start,
- * the left pane shows source, artifacts, and pull requests.
+ * the left pane shows source, artifacts, and pull requests. A Planning-off
+ * draft uses that same source pane and the task description on the right.
  */
 export function WorkOrderSplitRunOverview({
   title,
@@ -25,6 +30,7 @@ export function WorkOrderSplitRunOverview({
   checks,
   isAnalyzing = false,
   organizationId,
+  factoryId,
   factoryKey,
   orderId,
   orderNumber,
@@ -34,6 +40,10 @@ export function WorkOrderSplitRunOverview({
   analysis,
   source,
   showContextSidebar = false,
+  sourceOnly = false,
+  canEditDescription = false,
+  descriptionBusy = false,
+  onDescriptionSave,
   sidebarNote,
 }: {
   title: string;
@@ -46,6 +56,7 @@ export function WorkOrderSplitRunOverview({
   checks: WorkOrderCheckPresentation[];
   isAnalyzing?: boolean;
   organizationId?: string;
+  factoryId?: string;
   factoryKey?: string;
   orderId?: string;
   orderNumber?: string;
@@ -55,8 +66,33 @@ export function WorkOrderSplitRunOverview({
   analysis?: IntentAnalysisChat;
   source?: SplitRunSource;
   showContextSidebar?: boolean;
+  sourceOnly?: boolean;
+  canEditDescription?: boolean;
+  descriptionBusy?: boolean;
+  onDescriptionSave?: (next: string) => void | Promise<void>;
   sidebarNote?: ReactNode;
 }) {
+  if (sourceOnly) {
+    return (
+      <SourceOnlyOverview
+        description={description}
+        artifacts={artifacts}
+        artifactsLoading={artifactsLoading}
+        pullRequests={pullRequests}
+        pullRequestsLoading={pullRequestsLoading}
+        pullRequestsError={pullRequestsError}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        files={files}
+        source={source}
+        canEditDescription={canEditDescription}
+        descriptionBusy={descriptionBusy}
+        onDescriptionSave={onDescriptionSave}
+        sidebarNote={sidebarNote}
+      />
+    );
+  }
   const clarity = checks.find((check) => check.name === CLARITY_CHECK_NAME);
   const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
   const otherChecks = checks.filter((check) => !isScoreCheckName(check.name));
@@ -111,6 +147,74 @@ export function WorkOrderSplitRunOverview({
           ) : undefined
         }
       />
+    </div>
+  );
+}
+
+function SourceOnlyOverview({
+  description,
+  artifacts,
+  artifactsLoading,
+  pullRequests,
+  pullRequestsLoading,
+  pullRequestsError,
+  organizationId,
+  factoryId,
+  orderId,
+  files,
+  source,
+  canEditDescription,
+  descriptionBusy,
+  onDescriptionSave,
+  sidebarNote,
+}: {
+  description: string;
+  artifacts: FactoriesWorkOrderArtifact[];
+  artifactsLoading: boolean;
+  pullRequests: FactoriesFactoryPullRequest[];
+  pullRequestsLoading: boolean;
+  pullRequestsError: Error | null;
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  files?: FilesFile[];
+  source?: SplitRunSource;
+  canEditDescription: boolean;
+  descriptionBusy: boolean;
+  onDescriptionSave?: (next: string) => void | Promise<void>;
+  sidebarNote?: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-work-order-tab">
+      <article className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="split-run-intent-document">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+          <div className={SOURCE_ONLY_PANE_CLASS} data-testid="split-run-intent-request">
+            <WorkOrderSplitRunOverviewSidebar
+              source={source}
+              artifacts={artifacts}
+              artifactsLoading={artifactsLoading}
+              pullRequests={pullRequests}
+              pullRequestsLoading={pullRequestsLoading}
+              pullRequestsError={pullRequestsError}
+              sidebarNote={sidebarNote}
+            />
+          </div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="split-run-intent-result">
+            <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+              <WorkOrderSplitRunDescription
+                description={description}
+                canEdit={canEditDescription}
+                busy={descriptionBusy}
+                onSave={onDescriptionSave}
+                files={files}
+                organizationId={organizationId}
+                factoryId={factoryId}
+                orderId={orderId}
+              />
+            </div>
+          </div>
+        </div>
+      </article>
     </div>
   );
 }

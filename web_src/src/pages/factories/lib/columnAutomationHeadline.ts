@@ -13,14 +13,19 @@ export function columnAutomationHeadline(automation: ColumnAutomation): string {
   if (automation.kind === "agent-step") {
     return `Runs the ${automation.name} agent`;
   }
+  if (automation.kind === "analysis") {
+    return automation.health === "disabled" ? "Planning is off" : "Plans new tasks";
+  }
   if (automation.kind === "custom") {
     return automation.name;
   }
   return FIXED_HEADLINES[automation.kind];
 }
 
-const FIXED_HEADLINES: Record<Exclude<ColumnAutomationKind, "intake" | "agent-step" | "custom">, string> = {
-  analysis: "Scores new tasks",
+const FIXED_HEADLINES: Record<
+  Exclude<ColumnAutomationKind, "intake" | "agent-step" | "custom" | "analysis">,
+  string
+> = {
   "pr-discussion": "Addresses pull request comments",
   "pr-checks": "Fixes failing status checks",
   "pr-closure": "Closes tasks when pull requests merge",

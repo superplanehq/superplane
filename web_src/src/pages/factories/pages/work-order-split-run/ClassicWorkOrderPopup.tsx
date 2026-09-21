@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import { useFactory } from "@/hooks/useFactoryData";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
@@ -19,6 +18,7 @@ import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunPopup";
 import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
+import { factoryPlanningEnabled } from "../planningSettingsModel";
 
 type ClassicWorkOrderPopupProps = WorkOrderSplitRunPopupProps & {
   popupData: ReturnType<typeof useSplitRunPopupData>;
@@ -43,7 +43,7 @@ export function ClassicWorkOrderPopup({
   sessionLookupError,
 }: ClassicWorkOrderPopupProps) {
   const classicFixture = useMemo(() => ({ ...fixture, footer: classicSplitRunFooter(fixture.footer) }), [fixture]);
-  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_CREATE_WITH_AGENT);
+  const canPickDraftStartModel = factoryPlanningEnabled(useFactory(organizationId ?? "", factoryId ?? "").data);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, classicFixture, dismissCurrentPopup);

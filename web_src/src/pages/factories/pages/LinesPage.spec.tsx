@@ -11,11 +11,7 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
-import {
-  FEATURE_FACTORY_CREATE_WITH_AGENT,
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_JIRA_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -28,6 +24,7 @@ import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
   factoryHomePath,
+  factoryPlanningPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -135,6 +132,13 @@ const CONFIGURED_INTAKES: FactoriesFactoryIntake[] = [
 ];
 
 vi.mock("@/hooks/useFactoryData", () => ({
+  useFactory: () => ({
+    data: { id: "factory-1", planning: { enabled: true, clarity: true, confidence: true } },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
@@ -379,14 +383,10 @@ describe("LinesPage board", () => {
     );
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("tab", { name: "Automations" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Clarity");
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence");
-    expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "This task is ready to start" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-intent-document")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
@@ -402,7 +402,6 @@ describe("LinesPage board", () => {
   });
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const analyzingOrder = { ...REVIEW_CANDIDATE_WORK_ORDERS[0], id: "wo-fresh-analyzing" };
     useFactoryWorkOrders.mockReturnValue({ data: [analyzingOrder] });
     const analyzingOrderId = analyzingOrder.id;
@@ -613,7 +612,7 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("opens an existing analysis automation in the board view popup", async () => {
+  it("opens Planning settings from the Task analysis row", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
@@ -621,11 +620,10 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
-
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-backlog"),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
