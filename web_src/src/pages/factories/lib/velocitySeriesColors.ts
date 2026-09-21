@@ -19,12 +19,12 @@ export const VELOCITY_TIME_COLORS = {
 } as const;
 
 /**
- * The two things spend goes to. Both bands keep one hue in two tints, so a
- * stacked cost bar reads as one total before it reads as a split.
+ * The two things spend goes to. Tokens stays indigo and compute moves to teal,
+ * so a reader tells the two bands apart without the legend.
  */
 export const VELOCITY_COST_COLORS = {
   model: "#6366f1",
-  compute: "#a5b4fc",
+  compute: "#0d9488",
 } as const;
 
 /**
