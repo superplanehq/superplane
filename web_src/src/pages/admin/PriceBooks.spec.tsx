@@ -447,4 +447,121 @@ describe("PriceBooks", () => {
     expect(screen.queryByDisplayValue("e1-large-amd64")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });
+
+  it("shows selected model in selected group and unselected in other group", async () => {
+    const catalog = {
+      ...currentCatalog,
+      models: [
+        {
+          ...currentCatalog.models[0],
+          selected: true,
+        },
+        {
+          match_key: "other-model",
+          match_mode: "prefix",
+          input_cents_per_million: 100,
+          output_cents_per_million: 500,
+          cache_read_cents_per_million: 10,
+          cache_write_cents_per_million: 50,
+          reasoning_cents_per_million: 0,
+          selected: false,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(catalog)),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Selected models")).toBeInTheDocument();
+    expect(screen.getByText("Other models")).toBeInTheDocument();
+    expect(screen.getByText("claude-sonnet")).toBeInTheDocument();
+    expect(screen.getByText("other-model")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no model is selected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(currentCatalog)),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Selected models")).toBeInTheDocument();
+    expect(screen.getByText("No models are selected in Hosted LLM settings.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Hosted LLM settings" })).toHaveAttribute("href", "/admin/settings");
+  });
+
+  it("shows empty state when every model rate is selected", async () => {
+    const catalog = {
+      ...currentCatalog,
+      models: [
+        {
+          ...currentCatalog.models[0],
+          selected: true,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(catalog)),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Other models")).toBeInTheDocument();
+    expect(screen.getByText("No other model rates in this version.")).toBeInTheDocument();
+    expect(screen.getByText("claude-sonnet")).toBeInTheDocument();
+  });
+
+  it("edits a rate in the other models group", async () => {
+    const catalog = {
+      ...currentCatalog,
+      models: [
+        {
+          ...currentCatalog.models[0],
+          selected: true,
+        },
+        {
+          match_key: "other-model",
+          match_mode: "prefix",
+          input_cents_per_million: 100,
+          output_cents_per_million: 500,
+          cache_read_cents_per_million: 10,
+          cache_write_cents_per_million: 50,
+          reasoning_cents_per_million: 0,
+          selected: false,
+        },
+      ],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
+        const body = JSON.parse(String(init.body)) as {
+          models: { input_cents_per_million: number }[];
+        };
+        expect(body.models[1].input_cents_per_million).toBe(200);
+        return jsonResponse(savedCatalog);
+      }
+      return jsonResponse(catalog);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("other-model")).toBeInTheDocument();
+    const inputs = screen.getAllByDisplayValue("1.00");
+    const otherInput = inputs.find((input) => input.closest("tr")?.textContent?.includes("other-model"));
+    expect(otherInput).toBeTruthy();
+    await user.clear(otherInput!);
+    await user.type(otherInput!, "2");
+    await user.tab();
+
+    await user.click(screen.getByTestId("admin-price-book-save"));
+    await waitFor(() => {
+      expect(showSuccessToast).toHaveBeenCalled();
+    });
+  });
 });
