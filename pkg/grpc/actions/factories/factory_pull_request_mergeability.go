@@ -135,6 +135,121 @@ func evaluateFactoryPullRequestMergeability(
 	return result, nil
 }
 
+func persistFactoryPullRequestMergeability(
+	db *gorm.DB,
+	pullRequest *models.FactoryPullRequest,
+	result *factoryPullRequestMergeability,
+) error {
+	if pullRequest == nil || result == nil {
+		return nil
+	}
+	if result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
+		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
+		return nil
+	}
+	return pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      result.CanMerge,
+		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
+		BlockedMessage: result.Message,
+		HeadSHA:        result.HeadSHA,
+	})
+}
+
+func syncFactoryPullRequestMergeability(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*factoryPullRequestMergeability, error) {
+	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	if err != nil {
+		return nil, err
+	}
+	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func mergeabilityFromCache(
+	db *gorm.DB,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*factoryPullRequestMergeability, bool, error) {
+	result := &factoryPullRequestMergeability{
+		PullRequest:    pullRequest,
+		HeadSHA:        pullRequest.MergeableHeadSHA,
+		AllowedMethods: cachedMergeMethods(),
+	}
+	active, err := factoryPullRequestHasActiveAutomation(db, factory, pullRequest)
+	if err != nil {
+		return nil, false, err
+	}
+	if active {
+		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, mergeBlockedActiveRun), true, nil
+	}
+	if !pullRequest.HasCachedMergeability() {
+		return result, false, nil
+	}
+	reason := mergeabilityBlockedReasonFromName(pullRequest.MergeBlockedReason)
+	if reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
+		reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
+		return result, false, nil
+	}
+	if pullRequest.Mergeable {
+		result.CanMerge = true
+		return result, true, nil
+	}
+	return blockedMergeability(result, reason, pullRequest.MergeBlockedMessage), true, nil
+}
+
+func cachedMergeMethods() []pb.FactoryPullRequestMergeability_MergeMethod {
+	return []pb.FactoryPullRequestMergeability_MergeMethod{
+		pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
+		pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE,
+		pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE,
+	}
+}
+
+func mergeabilityBlockedReasonName(reason pb.FactoryPullRequestMergeability_BlockedReason) string {
+	switch reason {
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN:
+		return "ACTIVE_RUN"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED:
+		return "CHECKS_UNFINISHED"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED:
+		return "CHECK_FAILED"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT:
+		return "DRAFT"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING:
+		return "CONFLICTING"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION:
+		return "MISSING_INTEGRATION"
+	default:
+		return ""
+	}
+}
+
+func mergeabilityBlockedReasonFromName(name string) pb.FactoryPullRequestMergeability_BlockedReason {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "ACTIVE_RUN":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN
+	case "CHECKS_UNFINISHED":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED
+	case "CHECK_FAILED":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED
+	case "DRAFT":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT
+	case "CONFLICTING":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING
+	case "MISSING_INTEGRATION":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION
+	default:
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED
+	}
+}
+
 func blockedMergeability(
 	result *factoryPullRequestMergeability,
 	reason pb.FactoryPullRequestMergeability_BlockedReason,

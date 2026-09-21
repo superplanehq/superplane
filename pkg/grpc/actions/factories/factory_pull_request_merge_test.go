@@ -828,6 +828,25 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		}, got.GetAllowedMethods())
 		assert.Equal(t, headSHA, got.GetHeadSha())
 	})
+
+	t.Run("reuses a stored mergeable snapshot", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		combined, checks := successChecks()
+		useGitHub(t, &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    combined,
+			checkRuns:   checks,
+			repository:  allMethodsRepository(),
+		})
+		first := describe(t, factory, pr)
+		assert.True(t, first.GetCanMerge())
+
+		useGitHub(t, &fakeFactoryGitHub{})
+		second := describe(t, factory, pr)
+		assert.True(t, second.GetCanMerge())
+		assert.Equal(t, headSHA, second.GetHeadSha())
+	})
 }
 
 func grantExclusivePullRequestAccess(

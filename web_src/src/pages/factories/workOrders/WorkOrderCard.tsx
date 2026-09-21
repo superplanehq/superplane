@@ -4,7 +4,11 @@ import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
-import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
+import {
+  selectWorkOrderCardPullRequest,
+  visibleWorkOrderCardAttentionReasons,
+  workOrderCardPullRequestIsMergeable,
+} from "../lib/workOrderCardPullRequest";
 import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
@@ -12,7 +16,7 @@ import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
 import { CardScoreBadges } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
-import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
+import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
@@ -235,7 +239,10 @@ function WorkOrderCardStatusRow({
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
       {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
-        <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
+        <>
+          <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
+          {workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest) ? <WorkOrderMergeableChip /> : null}
+        </>
       ) : null}
       {reasons.map((reason) => (
         <WorkOrderAttentionChip
