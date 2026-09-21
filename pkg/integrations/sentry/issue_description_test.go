@@ -256,6 +256,27 @@ func Test__IssueDescription(t *testing.T) {
 		assert.NotContains(t, body, "**Title:** fmt.wrapError: proxy listen :80")
 	})
 
+	t.Run("keeps angle brackets in http request details", func(t *testing.T) {
+		body := IssueDescription(fullIssue, &IssueEventDetail{
+			Entries: []IssueEventEntry{
+				{
+					Type: "request",
+					Data: map[string]any{
+						"method":       "GET",
+						"url":          "https://<ip>:8080/checkout",
+						"query_string": "host=<ip>",
+						"headers": []any{
+							[]any{"X-Forwarded-For", "<ip>"},
+						},
+					},
+				},
+			},
+		})
+		assert.Contains(t, body, "GET https://&lt;ip&gt;:8080/checkout")
+		assert.Contains(t, body, "Query: host=&lt;ip&gt;")
+		assert.Contains(t, body, "**X-Forwarded-For:** &lt;ip&gt;")
+	})
+
 	t.Run("omits tags when the issue lists keys without values", func(t *testing.T) {
 		body := IssueDescription(map[string]any{
 			"title": "Broken deploy",

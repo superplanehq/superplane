@@ -170,17 +170,17 @@ func writeHTTPRequest(b *strings.Builder, event *IssueEventDetail) {
 
 	b.WriteString("## HTTP Request\n\n")
 	if line != "" {
-		fmt.Fprintf(b, "%s\n", line)
+		fmt.Fprintf(b, "%s\n", markdownInline(line))
 	}
 	if query != "" {
-		fmt.Fprintf(b, "\nQuery: %s\n", query)
+		fmt.Fprintf(b, "\nQuery: %s\n", markdownInline(query))
 	}
 	if len(headers) > 0 {
 		if line != "" || query != "" {
 			b.WriteString("\n")
 		}
 		for _, header := range headers {
-			fmt.Fprintf(b, "- **%s:** %s\n", header.name, header.value)
+			fmt.Fprintf(b, "- **%s:** %s\n", markdownInline(header.name), markdownInline(header.value))
 		}
 	}
 	if body != "" {
