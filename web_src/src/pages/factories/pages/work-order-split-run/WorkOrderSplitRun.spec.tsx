@@ -1131,6 +1131,32 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
+  it("shows source, artifacts, and the classic Start footer on a Planning-off draft", () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
+    const request = screen.getByTestId("split-run-intent-request");
+    const result = screen.getByTestId("split-run-intent-result");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(result).getByTestId("split-run-description")).toHaveTextContent("emoji reactions");
+    expect(within(result).queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
+    expect(within(result).queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
+    expect(within(result).queryByTestId("split-run-review")).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveTextContent("This task is ready to start");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+  });
+
   it("tells a draft is under analysis and keeps Archive in the header", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {

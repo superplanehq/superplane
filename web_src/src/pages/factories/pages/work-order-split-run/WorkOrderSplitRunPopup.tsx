@@ -14,7 +14,7 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -127,20 +127,22 @@ function AnalysisWorkOrderPopup({
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  const viewFixture = sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture;
   const draftChrome = analysisDraftChrome({
     factory,
     organizationId,
     factoryId,
     factoryKey,
     lineId,
-    fixture,
+    fixture: viewFixture,
     analysis,
     draftModel,
     onDraftModelChange: setDraftModel,
     disabled: isDispatching || !canDispatch,
   });
   const reviewArgs = {
-    fixture,
+    fixture: viewFixture,
     organizationId,
     factoryId,
     factoryKey,
@@ -153,24 +155,25 @@ function AnalysisWorkOrderPopup({
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
-    compact: showSidebarNote || fixture.footer.kind === "draft",
+    compact: showSidebarNote || (viewFixture.footer.kind === "draft" && !sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     confirmUnclearStart: factoryPlanningEnabled(factory),
   };
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
+  const descriptionReview = !sourceOnly && !showSidebarNote && tab === "description" ? review : undefined;
 
   return (
     <PopupShell
       testId="work-order-split-run"
       fixed={fixed}
       fullPage={fullPage}
-      className={fullPage ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
+      className={fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
       onDismiss={onClose}
     >
       <SplitRunPopupTabs
-        fixture={fixture}
+        fixture={viewFixture}
         edits={edits}
         popupData={popupData}
         organizationId={organizationId}
@@ -183,9 +186,10 @@ function AnalysisWorkOrderPopup({
         onTabChange={setTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
-        resultFooter={!showSidebarNote && tab === "description" ? review : undefined}
+        resultFooter={descriptionReview}
         sidebarNote={showSidebarNote ? review : undefined}
         analysis={stripAnalysis}
+        sourceOnly={sourceOnly}
         header={(views) => (
           <PopupHeader
             title={edits.title}
@@ -214,7 +218,7 @@ function AnalysisWorkOrderPopup({
           </PopupHeader>
         )}
       />
-      {!showSidebarNote && tab !== "description" ? review : null}
+      {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
     </PopupShell>
   );
 }

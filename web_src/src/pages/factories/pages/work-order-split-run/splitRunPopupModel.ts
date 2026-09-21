@@ -23,7 +23,11 @@ export type SplitRunPopupTab = "description" | "log";
 export function refinePopupShowsAutomations(args: {
   mode: "classic" | "analysis";
   footerKind: SplitRunFixture["footer"]["kind"];
+  sourceOnly?: boolean;
 }) {
+  if (args.sourceOnly) {
+    return true;
+  }
   return !(args.mode === "analysis" && args.footerKind === "draft");
 }
 
