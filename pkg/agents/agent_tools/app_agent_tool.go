@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
@@ -22,7 +21,6 @@ func init() {
 		return NewAppAgentTool(AppAgentToolOptions{
 			Encryptor:      deps.Encryptor,
 			Registry:       deps.ComponentRegistry,
-			GitProvider:    deps.GitProvider,
 			WebhookBaseURL: deps.WebhookBaseURL,
 			AuthService:    deps.AuthService,
 			UsageService:   deps.UsageService,
@@ -39,7 +37,6 @@ type AppAgentTool struct {
 type AppAgentToolOptions struct {
 	Encryptor      crypto.Encryptor
 	Registry       *registry.Registry
-	GitProvider    gitprovider.Provider
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
 	UsageService   usage.Service
@@ -50,7 +47,6 @@ func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
 		actions: canvasactions.NewDefaultRegistry(canvasactions.Dependencies{
 			Encryptor:      opts.Encryptor,
 			Registry:       opts.Registry,
-			GitProvider:    opts.GitProvider,
 			WebhookBaseURL: opts.WebhookBaseURL,
 			AuthService:    opts.AuthService,
 			UsageService:   opts.UsageService,

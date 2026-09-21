@@ -181,7 +181,6 @@ func applyIntakeSettings(
 				Encryptor:      deps.Encryptor,
 				AuthService:    deps.AuthService,
 				WebhookBaseURL: deps.WebhookBaseURL,
-				GitProvider:    deps.GitProvider,
 			},
 		)
 	})

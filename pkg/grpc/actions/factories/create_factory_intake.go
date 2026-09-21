@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -25,7 +24,6 @@ type IntakeDependencies struct {
 	Registry       *registry.Registry
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
-	GitProvider    git.Provider
 	WebhookBaseURL string
 	UsageService   usage.Service
 	NewItemSource  IntakeItemSourceFactory
@@ -199,7 +197,6 @@ func createIntakeCanvas(
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
-		deps.GitProvider,
 		deps.WebhookBaseURL,
 		orgID,
 		canvasDoc.Metadata.Name,

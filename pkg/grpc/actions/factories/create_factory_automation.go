@@ -59,7 +59,6 @@ func CreateFactoryAutomation(
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
-		deps.GitProvider,
 		deps.WebhookBaseURL,
 		orgID,
 		name,
