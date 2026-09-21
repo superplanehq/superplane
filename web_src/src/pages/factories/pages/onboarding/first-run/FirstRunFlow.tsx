@@ -11,6 +11,8 @@ import { canAnalyzeTicketSource } from "./firstRunTicketSource";
 import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
 import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
+import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
+import type { JiraCompletionColumnValue } from "../../JiraCompletionColumnFields";
 
 const STORY_JIRA_PROJECTS = [
   { id: "PAY", name: "Payments" },
@@ -40,6 +42,9 @@ export function FirstRunFlow({
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
   const [jiraConnected, setJiraConnected] = useState(false);
   const [jiraProjectId, setJiraProjectId] = useState("");
+  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>({
+    ...DEFAULT_JIRA_COMPLETION_SETTINGS,
+  });
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
 
@@ -100,12 +105,19 @@ export function FirstRunFlow({
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
+        jiraCompletion={jiraCompletion}
+        organizationId="org-1"
+        jiraIntegrationId={jiraConnected ? "jira-story" : ""}
         onSelectTicketSource={setTicketSource}
         onConnectJira={() => {
           setTicketSource("jira");
           setJiraConnected(true);
         }}
-        onSelectJiraProject={setJiraProjectId}
+        onSelectJiraProject={(id) => {
+          setJiraProjectId(id);
+          setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
+        }}
+        onJiraCompletionChange={setJiraCompletion}
         onAnalyzeTickets={() => {
           if (!canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId })) return;
           setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
