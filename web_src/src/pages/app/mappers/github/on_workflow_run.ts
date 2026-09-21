@@ -54,28 +54,21 @@ interface OnWorkflowRunEventData {
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnWorkflowRunEventData;
-    const workflowName =
-      eventData?.workflow_run?.display_title ||
-      eventData?.workflow_run?.name ||
-      eventData?.workflow?.name ||
-      "Workflow";
-    const conclusion = eventData?.workflow_run?.conclusion || "";
 
     return {
-      title: workflowName,
-      subtitle: buildGithubSubtitle(conclusion, context.event?.createdAt),
+      title: workflowRunTitle(eventData),
+      subtitle: buildGithubSubtitle(workflowRunConclusion(eventData), context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnWorkflowRunEventData;
-    const receivedAt = context.event?.createdAt ? new Date(context.event?.createdAt || "").toLocaleString() : "";
 
     return {
-      "Received at": receivedAt,
-      Conclusion: eventData?.workflow_run?.conclusion || "",
-      "Triggered by": eventData?.workflow_run?.event || "",
-      "Workflow link": eventData?.workflow_run?.html_url || "",
+      "Received at": receivedAtLabel(context.event?.createdAt),
+      Conclusion: workflowRunConclusion(eventData),
+      "Triggered by": workflowRunEvent(eventData),
+      "Workflow link": workflowRunUrl(eventData),
     };
   },
 
@@ -83,58 +76,21 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnWorkflowRunConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.conclusions && configuration.conclusions.length > 0) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.conclusions.join(", "),
-      });
-    }
-
-    // Build specs for workflow files (shown as expandable tooltip like filter/approval components)
-    const specs =
-      configuration?.workflowFiles && configuration.workflowFiles.length > 0
-        ? [
-            {
-              title: "workflow file",
-              tooltipTitle: "workflow files",
-              iconSlug: "file-code",
-              values: configuration.workflowFiles.map((file) => ({
-                badges: [{ label: file, bgColor: "bg-gray-100", textColor: "text-gray-700" }],
-              })),
-            },
-          ]
-        : undefined;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
-      specs,
+      metadata: workflowRunMetadataItems(metadata?.repository?.name, configuration),
+      specs: workflowFileSpecs(configuration),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnWorkflowRunEventData;
-      const workflowName =
-        eventData?.workflow_run?.display_title ||
-        eventData?.workflow_run?.name ||
-        eventData?.workflow?.name ||
-        "Workflow";
-      const conclusion = eventData?.workflow_run?.conclusion || "";
-
+      const { title, subtitle } = onWorkflowRunTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
-        title: workflowName,
-        subtitle: buildGithubSubtitle(conclusion, lastEvent.createdAt),
+        title,
+        subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,
@@ -144,3 +100,66 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function workflowRunTitle(eventData?: OnWorkflowRunEventData): string {
+  return (
+    eventData?.workflow_run?.display_title || eventData?.workflow_run?.name || eventData?.workflow?.name || "Workflow"
+  );
+}
+
+function workflowRunConclusion(eventData?: OnWorkflowRunEventData): string {
+  return eventData?.workflow_run?.conclusion || "";
+}
+
+function workflowRunEvent(eventData?: OnWorkflowRunEventData): string {
+  return eventData?.workflow_run?.event || "";
+}
+
+function workflowRunUrl(eventData?: OnWorkflowRunEventData): string {
+  return eventData?.workflow_run?.html_url || "";
+}
+
+function receivedAtLabel(createdAt?: string): string {
+  if (!createdAt) {
+    return "";
+  }
+
+  return new Date(createdAt).toLocaleString();
+}
+
+function workflowRunMetadataItems(repositoryName: string | undefined, configuration?: OnWorkflowRunConfiguration) {
+  const metadataItems = [];
+
+  if (repositoryName) {
+    metadataItems.push({
+      icon: "book",
+      label: repositoryName,
+    });
+  }
+
+  if (configuration?.conclusions && configuration.conclusions.length > 0) {
+    metadataItems.push({
+      icon: "funnel",
+      label: configuration.conclusions.join(", "),
+    });
+  }
+
+  return metadataItems;
+}
+
+function workflowFileSpecs(configuration?: OnWorkflowRunConfiguration) {
+  if (!configuration?.workflowFiles || configuration.workflowFiles.length === 0) {
+    return undefined;
+  }
+
+  return [
+    {
+      title: "workflow file",
+      tooltipTitle: "workflow files",
+      iconSlug: "file-code",
+      values: configuration.workflowFiles.map((file) => ({
+        badges: [{ label: file, bgColor: "bg-gray-100", textColor: "text-gray-700" }],
+      })),
+    },
+  ];
+}
