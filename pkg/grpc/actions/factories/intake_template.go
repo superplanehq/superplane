@@ -270,6 +270,49 @@ func intakeConcurrency() *yaml.ConcurrencySpec {
 	return &yaml.ConcurrencySpec{Max: &max}
 }
 
+func ensureIntakeFilterNode(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+) ([]models.Node, []models.Edge, intakeGraph, error) {
+	if graph.FilterNodeID != "" {
+		return nodes, edges, graph, nil
+	}
+	if graph.TriggerNodeID == "" || graph.CreateNodeID == "" {
+		return nil, nil, graph, fmt.Errorf("intake automation has no filter to update")
+	}
+
+	nodes = upsertIntakeNode(nodes, models.Node{
+		ID:   intakeFilterNodeID,
+		Name: "Matches filters?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": "true",
+		},
+		Position:    models.Position{X: 160, Y: 260},
+		Concurrency: intakeModelConcurrency(),
+	})
+	graph.FilterNodeID = intakeFilterNodeID
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.TriggerNodeID && edge.TargetID == graph.CreateNodeID
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: graph.TriggerNodeID,
+		TargetID: intakeFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, graph, nil
+}
+
 func configureIntakeAuthorAccess(
 	nodes []models.Node,
 	edges []models.Edge,

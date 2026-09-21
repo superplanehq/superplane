@@ -209,6 +209,60 @@ func Test__IntakeFilterExpression(t *testing.T) {
 	})
 }
 
+func Test__ensureIntakeFilterNode(t *testing.T) {
+	t.Run("inserts a filter between the trigger and the work order", func(t *testing.T) {
+		nodes := []models.Node{
+			triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+		}
+		graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, CreateNodeID: intakeCreateNodeID}
+
+		nodes, edges, graph, err := ensureIntakeFilterNode(nodes, edges, graph)
+		require.NoError(t, err)
+
+		filter := findModelNode(t, nodes, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.ComponentName())
+		assert.Equal(t, "true", filter.Configuration["expression"])
+		assert.Equal(t, intakeFilterNodeID, graph.FilterNodeID)
+		assert.ElementsMatch(t, []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, edges)
+	})
+
+	t.Run("keeps an existing filter in place", func(t *testing.T) {
+		nodes := []models.Node{
+			triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+			componentNode(intakeFilterNodeID, intakeFilterComponent),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}
+		graph := intakeGraph{
+			TriggerNodeID: intakeTriggerNodeID,
+			FilterNodeID:  intakeFilterNodeID,
+			CreateNodeID:  intakeCreateNodeID,
+		}
+
+		updatedNodes, updatedEdges, updatedGraph, err := ensureIntakeFilterNode(nodes, edges, graph)
+		require.NoError(t, err)
+
+		assert.Equal(t, nodes, updatedNodes)
+		assert.Equal(t, edges, updatedEdges)
+		assert.Equal(t, graph, updatedGraph)
+	})
+
+	t.Run("rejects a graph that cannot receive a filter", func(t *testing.T) {
+		_, _, _, err := ensureIntakeFilterNode(nil, nil, intakeGraph{TriggerNodeID: intakeTriggerNodeID})
+		require.EqualError(t, err, "intake automation has no filter to update")
+	})
+}
+
 func Test__ConfigureIntakeAuthorAccess(t *testing.T) {
 	t.Run("adds a repository permission gate", func(t *testing.T) {
 		integrationID := "integration-1"

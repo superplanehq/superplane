@@ -1,6 +1,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { Dispatch, SetStateAction } from "react";
+import { useId, type Dispatch, type SetStateAction } from "react";
 
 import { SENTRY_INTAKE_LEVELS, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
@@ -35,6 +36,7 @@ export function SentryIntakeFilterFields({
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
 }) {
+  const idPrefix = useId();
   if (sourceId !== "sentry-exceptions") {
     return null;
   }
@@ -58,16 +60,19 @@ export function SentryIntakeFilterFields({
         <legend className="workspace-section-title">{SENTRY_INTAKE_SETTINGS_COPY.intakeSection}</legend>
         <div className="mt-2 flex flex-col gap-2">
           <IntakeSettingsCheckbox
+            id={`${idPrefix}-new-issues`}
             title={SENTRY_INTAKE_SETTINGS_COPY.newIssues}
             checked={settings.sentryNewIssues}
             onChange={() => update("sentryNewIssues", !settings.sentryNewIssues)}
           />
           <IntakeSettingsCheckbox
+            id={`${idPrefix}-regressed-issues`}
             title={SENTRY_INTAKE_SETTINGS_COPY.regressedIssues}
             checked={settings.sentryRegressedIssues}
             onChange={() => update("sentryRegressedIssues", !settings.sentryRegressedIssues)}
           />
           <IntakeSettingsCheckbox
+            id={`${idPrefix}-assigned-issues`}
             title={SENTRY_INTAKE_SETTINGS_COPY.assignedIssues}
             checked={settings.sentryAssignedIssues}
             onChange={() => update("sentryAssignedIssues", !settings.sentryAssignedIssues)}
@@ -80,6 +85,7 @@ export function SentryIntakeFilterFields({
           {SENTRY_INTAKE_LEVELS.map((level) => (
             <IntakeSettingsCheckbox
               key={level}
+              id={`${idPrefix}-level-${level}`}
               title={SENTRY_LEVEL_COPY[level]}
               checked={settings.sentryLevels.includes(level)}
               onChange={() => toggleLevel(level)}
@@ -92,23 +98,27 @@ export function SentryIntakeFilterFields({
 }
 
 function IntakeSettingsCheckbox({
+  id,
   title,
   checked,
   onChange,
 }: {
+  id: string;
   title: string;
   checked: boolean;
   onChange: () => void;
 }) {
   return (
-    <label
+    <div
       className={cn(
-        "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+        "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
         checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
       )}
     >
-      <Checkbox checked={checked} onChange={onChange} aria-label={title} />
-      <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
-    </label>
+      <Checkbox id={id} checked={checked} onChange={onChange} />
+      <Label htmlFor={id} className="min-w-0 cursor-pointer text-[13px] font-medium tracking-[-0.01em] text-foreground">
+        {title}
+      </Label>
+    </div>
   );
 }

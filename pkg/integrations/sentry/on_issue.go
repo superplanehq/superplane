@@ -196,7 +196,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return nil
 	}
 
-	if len(config.Actions) > 0 && !slices.Contains(config.Actions, message.Action) {
+	if !slices.Contains(config.Actions, message.Action) {
 		return nil
 	}
 

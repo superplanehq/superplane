@@ -88,4 +88,15 @@ describe("SentryIntakeFilterFields", () => {
       sentryLevels: ["fatal", "error"],
     });
   });
+
+  it("toggles a filter when the associated label is clicked", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(<FilterHarness sourceId="sentry-exceptions" initial={DEFAULT_SENTRY_INTAKE_SETTINGS} onSave={onSave} />);
+
+    await user.click(screen.getByText("Error"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sentryLevels: ["error"] }));
+  });
 });
