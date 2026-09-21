@@ -63,8 +63,8 @@ const githubAutomationGraph = githubIntakeGraph();
 
 /** Same pipeline the canvas editor uses, so the popup renders editor nodes. */
 function githubIntakeGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-github-issues-intake", name: "GitHub issues", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -84,19 +84,19 @@ function githubIntakeGraph(): IntakeAutomationGraph {
         ],
       },
     },
-    [{ name: "github.onIssue", label: "On Issue" }],
-    [
+    triggers: [{ name: "github.onIssue", label: "On Issue" }],
+    components: [
       { name: "if", label: "If" },
       { name: "createWorkOrder", label: "Create Task" },
     ],
-    {},
-    {},
-    {},
-    "app-github-issues-intake",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-github-issues-intake",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
 
   return {
     nodes,

@@ -14,7 +14,7 @@ import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "./mapperLookup";
-import { stringOrDash } from "./utils";
+import { stringOrDash } from "./eventDisplay";
 import graphqlIcon from "@/assets/icons/graphql.svg";
 
 // Same states as HTTP — GraphQL uses the same success/failure output shape.

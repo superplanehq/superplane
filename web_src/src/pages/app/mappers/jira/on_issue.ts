@@ -4,7 +4,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { JiraIssue, JiraIssueFields, JiraProject, JiraUser } from "./types";
 

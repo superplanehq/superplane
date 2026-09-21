@@ -151,20 +151,19 @@ export function useRunCanvasData({
         ),
       );
     }
-    const prepared = prepareData(
-      selectedRunCanvas,
-      allTriggers,
-      allComponents,
+    const prepared = prepareData({
+      workflow: selectedRunCanvas,
+      triggers: allTriggers,
+      components: allComponents,
       nodeEventsMap,
       nodeExecutionsMap,
-      {},
-      canvasId!,
+      nodeQueueItemsMap: {},
+      workflowId: canvasId!,
       queryClient,
-      me,
-      "live",
-      undefined,
+      user: me,
+      canvasMode: "live",
       organizationId,
-    );
+    });
     return {
       nodes: stripCanvasNodeSetupWarningsForRunsView(prepared.nodes),
       edges: prepared.edges,

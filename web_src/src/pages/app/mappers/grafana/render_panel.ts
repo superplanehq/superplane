@@ -10,7 +10,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { buildGrafanaEventSections } from "./base";
 import { buildDashboardSelectionMetadata, buildPanelMetadata, buildTimeRangeMetadata } from "./dashboard_shared";
 import type { DashboardNodeMetadata, RenderPanelConfiguration, RenderPanelOutput } from "./types";
