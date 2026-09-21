@@ -51,9 +51,9 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(screen.getByRole("tab", { name: "7d" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "14d" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "30d" })).toBeInTheDocument();
-    expect(velocityHookCalls.at(-1)).toMatchObject({ periodDays: 14 });
+    expect(screen.getByRole("tab", { name: "14d" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
+    expect(velocityHookCalls.at(-1)).toMatchObject({ periodDays: 30 });
 
     await user.click(screen.getByRole("tab", { name: "7d" }));
 
@@ -224,7 +224,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     const summary = screen.getByTestId("velocity-summary");
-    expect(summary).toHaveTextContent("Compared with the previous 14 days");
+    expect(summary).toHaveTextContent("Compared with the previous 30 days");
     // Waste fell from 50% to 25% of the tasks that closed.
     expect(summary).toHaveTextContent("25 pp");
   });

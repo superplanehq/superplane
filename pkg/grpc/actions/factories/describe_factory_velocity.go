@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	velocityPeriodDaysDefault = 14
+	velocityPeriodDaysDefault = 30
 	velocityPeriodDaysMax     = 30
 
 	velocityPeoplePageSizeDefault = 5
