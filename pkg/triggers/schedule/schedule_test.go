@@ -160,6 +160,54 @@ func TestGetNextTrigger(t *testing.T) {
 			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
 		},
 		{
+			name: "months configuration on day 31 does not skip a month",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(15),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-01-31T10:00:00Z"),
+			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
+		},
+		{
+			name: "months configuration clamps dayOfMonth to the target month's length",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(31),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-01-10T10:00:00Z"),
+			expectNext: mustParseTime("2025-02-28T14:30:00Z"),
+		},
+		{
+			name: "months configuration keeps dayOfMonth 31 in months that have it",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(31),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-02-10T10:00:00Z"),
+			expectNext: mustParseTime("2025-03-31T14:30:00Z"),
+		},
+		{
+			name: "months configuration crosses a year boundary",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(2),
+				DayOfMonth:     intPtr(15),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-11-30T10:00:00Z"),
+			expectNext: mustParseTime("2026-01-15T14:30:00Z"),
+		},
+		{
 			name: "cron configuration",
 			config: Configuration{
 				Type:           TypeCron,
