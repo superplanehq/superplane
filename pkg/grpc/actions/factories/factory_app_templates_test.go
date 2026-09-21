@@ -152,7 +152,7 @@ func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
 				nil,
 				&models.Canvas{ID: uuid.New(), Name: "Implement"},
 				&models.CanvasVersion{Nodes: []models.Node{{
-					ID:  "implementation-agent-no-issue",
+					ID:  implementationAgentNodeID,
 					Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}},
 					Configuration: map[string]any{
 						"includeVisualEvidence": enabled,
@@ -164,6 +164,37 @@ func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
 			assert.Equal(t, enabled, *input.includeVisualEvidence)
 		})
 	}
+}
+
+func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) {
+	nodes := []models.Node{
+		{
+			ID:  "extra-runner",
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerOpenRouter"}},
+			Configuration: map[string]any{
+				"includeVisualEvidence": true,
+			},
+		},
+		{
+			ID:  implementationAgentNodeID,
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}},
+			Configuration: map[string]any{
+				"includeVisualEvidence": false,
+			},
+		},
+	}
+
+	assert.False(t, canvasAgentIncludesVisualEvidence(nodes))
+
+	input := deriveFactoryTemplateInput(
+		nil,
+		nil,
+		&models.Canvas{ID: uuid.New(), Name: "Implement"},
+		&models.CanvasVersion{Nodes: nodes},
+		factoryAppTemplates["line-implementation"],
+	)
+	require.NotNil(t, input.includeVisualEvidence)
+	assert.False(t, *input.includeVisualEvidence)
 }
 
 func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.T) {

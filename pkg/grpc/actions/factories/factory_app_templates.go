@@ -19,6 +19,7 @@ const (
 	factoryTemplateMetadataKey = models.FactoryAppTemplateMetadataKey
 	factoryTemplateVersion     = 1
 	factoryCanvasIDPlaceholder = "__FACTORY_CANVAS_ID__"
+	implementationAgentNodeID  = "implementation-agent-no-issue"
 )
 
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
@@ -602,15 +603,12 @@ func materializeBacklogDefaults(
 }
 
 func canvasAgentIncludesVisualEvidence(nodes []models.Node) bool {
-	for _, node := range nodes {
-		if !isFactoryAgentHarness(node.ComponentName()) {
-			continue
-		}
-		if value, ok := node.Configuration["includeVisualEvidence"].(bool); ok && value {
-			return true
-		}
+	node := findIntakeNode(nodes, implementationAgentNodeID)
+	if node == nil {
+		return false
 	}
-	return false
+	value, ok := node.Configuration["includeVisualEvidence"].(bool)
+	return ok && value
 }
 
 func isFactoryAgentHarness(component string) bool {
