@@ -13,6 +13,9 @@ var exampleOutputCreateReleaseBytes []byte
 //go:embed payloads/get_release.json
 var exampleOutputGetReleaseBytes []byte
 
+//go:embed payloads/get_file_content.json
+var exampleOutputGetFileContentBytes []byte
+
 //go:embed payloads/update_release.json
 var exampleOutputUpdateReleaseBytes []byte
 
@@ -36,6 +39,9 @@ var exampleOutputCreateRelease map[string]any
 
 var exampleOutputGetReleaseOnce sync.Once
 var exampleOutputGetRelease map[string]any
+
+var exampleOutputGetFileContentOnce sync.Once
+var exampleOutputGetFileContent map[string]any
 
 var exampleOutputUpdateReleaseOnce sync.Once
 var exampleOutputUpdateRelease map[string]any
@@ -61,6 +67,10 @@ func (c *CreateRelease) ExampleOutput() map[string]any {
 
 func (c *GetRelease) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetReleaseOnce, exampleOutputGetReleaseBytes, &exampleOutputGetRelease)
+}
+
+func (c *GetFileContent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetFileContentOnce, exampleOutputGetFileContentBytes, &exampleOutputGetFileContent)
 }
 
 func (c *UpdateRelease) ExampleOutput() map[string]any {
