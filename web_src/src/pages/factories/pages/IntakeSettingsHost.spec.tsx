@@ -22,6 +22,7 @@ const {
   useComponents,
   useAvailableIntegrations,
   updateIntake,
+  deleteIntake,
   useInfiniteCanvasRuns,
   useDescribeRun,
   useEventExecutions,
@@ -31,6 +32,7 @@ const {
   useComponents: vi.fn(),
   useAvailableIntegrations: vi.fn(),
   updateIntake: vi.fn(),
+  deleteIntake: vi.fn(),
   useInfiniteCanvasRuns: vi.fn(),
   useDescribeRun: vi.fn(),
   useEventExecutions: vi.fn(),
@@ -65,12 +67,14 @@ vi.mock("@/hooks/useIntegrations", () => ({
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
+  useDeleteFactoryIntake: () => ({ mutateAsync: deleteIntake, isPending: false, error: null }),
 }));
 
 const GITHUB_INTAKE: ConfiguredLineIntakeSource = {
   intakeId: "intake-github",
   appId: "app-github-issues-intake",
   healthy: true,
+  paused: false,
   settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS },
   source: lineIntakeSourceById("github-issues")!,
 };
@@ -144,6 +148,7 @@ describe("IntakeSettingsHost", () => {
     useDescribeRun.mockReturnValue({ data: undefined, isLoading: false, isFetched: true });
     useEventExecutions.mockReturnValue({ data: { executions: [] }, isLoading: false });
     updateIntake.mockResolvedValue({ id: "intake-github" });
+    deleteIntake.mockResolvedValue(undefined);
     localStorage.clear();
     useInfiniteCanvasRuns.mockReturnValue({
       data: {
@@ -275,5 +280,30 @@ describe("IntakeSettingsHost", () => {
         superplaneLabelAdded: true,
       },
     });
+  });
+
+  it("pauses and deletes a Sentry intake from settings", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        intakeId: "intake-sentry",
+        appId: "app-sentry-intake",
+        healthy: true,
+        paused: false,
+        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
+        source: lineIntakeSourceById("sentry-exceptions")!,
+      },
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-sentry", paused: true });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(deleteIntake).toHaveBeenCalledWith("intake-sentry");
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

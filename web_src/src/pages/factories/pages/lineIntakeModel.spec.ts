@@ -65,6 +65,7 @@ describe("lineIntakeModel", () => {
 
     expect(intake?.source.name).toBe("GitHub issues");
     expect(intake?.healthy).toBe(false);
+    expect(intake?.paused).toBe(false);
     expect(intake?.settings).toMatchObject({
       name: "GitHub issues",
       confidencePct: 80,
@@ -73,6 +74,20 @@ describe("lineIntakeModel", () => {
       labelFilterMode: "exclude",
       assignment: "unassigned",
     });
+  });
+
+  it("carries the paused state from the intake API", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-1",
+        canvasId: "canvas-1",
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        paused: true,
+      },
+    ]);
+
+    expect(intake?.paused).toBe(true);
+    expect(intake?.source.id).toBe("sentry-exceptions");
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
