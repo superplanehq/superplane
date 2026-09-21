@@ -1,0 +1,190 @@
+---
+title: "SSH"
+---
+
+Run shell commands on a remote host over SSH and react to the exit code, stdout, and stderr.
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard
+    title="Run command"
+    href="#run-command"
+    description="Execute one or more shell commands on a remote host over SSH and read the result"
+  />
+</CardGrid>
+
+<a id="run-command"></a>
+
+## Run command
+
+**Action key:** `ssh`
+
+The SSH action opens an SSH connection to a remote host, runs a shell command (or a script loaded from a file), and publishes the result on the `success` or `failed` channel depending on the exit code.
+
+The action emits exactly one event per execution:
+
+```json
+{
+  "type": "ssh.command.executed",
+  "data": {
+    "stdout": "Hello, World!\n",
+    "stderr": "",
+    "exitCode": 0
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
+}
+```
+
+Channels:
+
+- **`success`** — exit code `0`
+- **`failed`** — any non-zero exit code, a connection error, or an authentication failure
+
+The action is **action-only**: it has no triggers. Wire it as a step inside a canvas to run after another node (for example, after a GitHub push or a manual trigger).
+
+### Use cases
+
+- **Deploy scripts** — run `scripts/deploy.sh` on a host when a new commit lands on `main`
+- **Server health checks** — exec a probe command and branch on exit code
+- **Rolling restarts** — load a script from the app repo and run it on a fleet of hosts
+- **Configuration changes** — apply `kubectl apply`, `systemctl reload`, or `ansible-playbook` runs from a canvas
+- **Database migrations** — trigger migrations on a bastion host from a workflow
+
+### Configuration
+
+#### Connection
+
+- **`host`** *(required)* — Hostname or IP address of the SSH server.
+- **`port`** — SSH port. Defaults to `22`.
+- **`username`** *(required)* — User to log in as on the remote host.
+
+#### Authentication
+
+- **`authentication`** *(required)* — How to authenticate to the host and which credentials to use. Pick one of the methods below.
+
+  - **`authMethod: "ssh_key"`** — Public-key authentication. Requires a stored credential with the private key.
+    - **`privateKey`** *(required)* — Stored credential that holds the SSH private key in PEM or OpenSSH format.
+    - **`passphrase`** — Stored credential for the key passphrase, if the key is encrypted.
+  - **`authMethod: "password"`** — Password authentication.
+    - **`password`** *(required)* — Stored credential that holds the login password.
+
+> **Tip — how the stored credentials work.** SuperPlane stores credentials in a per-app secret vault. Create the credential once in the app, then reference it from any node. The private key never leaves the worker; only the connection sees it.
+
+#### Command
+
+- **`commandSource`** — Where the commands come from.
+  - **`inline`** *(default)* — Type commands directly into the node.
+  - **`file`** — Load commands from a file in the app's repository (e.g. `scripts/deploy.sh`). The file path is relative to the app's repo root.
+
+- **`commands`** — One or more commands to run on the remote host, one per line. Newlines are joined with `&&` so the action fails fast on the first failing command. Used when `commandSource: "inline"`.
+- **`commandFile`** — Path to a file in the app's repository (e.g. `scripts/deploy.sh`). Used when `commandSource: "file"`. The file is capped at 256 KB to keep the worker from blowing up on a runaway script.
+
+#### Environment
+
+- **`workingDirectory`** *(optional)* — Change to this directory on the remote host before running the command.
+- **`environment`** *(optional)* — Key/value pairs available to the command as exported environment variables. Variable names must match `[A-Za-z_][A-Za-z0-9_]*`.
+- **`timeout`** — Maximum number of seconds to wait for the command to finish. The connection is killed when the timeout fires, which marks the run as failed.
+
+#### Retries
+
+- **`connectionRetry`** *(optional)* — Retry the SSH handshake on transient network errors.
+  - **`enabled`** — Set to `true` to enable.
+  - **`retries`** — Maximum number of additional attempts.
+  - **`intervalSeconds`** — Wait this many seconds between attempts.
+- **`executionRetry`** *(optional)* — Retry the command on a non-zero exit code or a connection drop mid-run.
+  - **`enabled`** — Set to `true` to enable.
+  - **`retries`** — Maximum number of additional attempts.
+  - **`intervalSeconds`** — Wait this many seconds between attempts.
+
+### Output
+
+Each run emits a single event with:
+
+- **`stdout`** — Standard output of the command (UTF-8 string). Multi-line output is preserved.
+- **`stderr`** — Standard error of the command (UTF-8 string). Multi-line output is preserved.
+- **`exitCode`** — Exit code of the command. `0` means success; anything else is routed to the `failed` channel.
+
+A missing field, a connection refused, an authentication failure, or a timeout all surface as a non-zero exit code or a `failed` event.
+
+### Examples
+
+#### Deploy on push to main
+
+Run `scripts/deploy.sh` on the production host every time a commit lands on the `main` branch:
+
+```yaml
+type: ssh
+spec:
+  host: deploy.example.com
+  port: 22
+  username: deploy
+  authentication:
+    authMethod: ssh_key
+    privateKey: prod-deploy-key
+  commandSource: file
+  commandFile: scripts/deploy.sh
+  workingDirectory: /srv/app
+  timeout: 600
+  connectionRetry:
+    enabled: true
+    retries: 3
+    intervalSeconds: 10
+  executionRetry:
+    enabled: true
+    retries: 2
+    intervalSeconds: 30
+```
+
+#### Probe a service and branch on the exit code
+
+```yaml
+type: ssh
+spec:
+  host: web-1.example.com
+  username: ops
+  authentication:
+    authMethod: password
+    password: ops-password
+  commandSource: inline
+  commands: |
+    systemctl is-active --quiet nginx && exit 0 || exit 1
+  timeout: 30
+```
+
+#### Apply a Kubernetes manifest from a script in the app repo
+
+```yaml
+type: ssh
+spec:
+  host: bastion.example.com
+  username: ops
+  authentication:
+    authMethod: ssh_key
+    privateKey: bastion-key
+  commandSource: file
+  commandFile: k8s/apply.sh
+  environment:
+    - name: KUBECONFIG
+      value: /home/ops/.kube/config
+    - name: NAMESPACE
+      value: prod
+  timeout: 300
+```
+
+### Troubleshooting
+
+- **`Permission denied (publickey)`** — The stored private key is not authorized on the host. Add the corresponding public key to `~/.ssh/authorized_keys` for the configured user.
+- **`Invalid key format`** — The stored private key is not in PEM or OpenSSH format. Re-export the key in one of those formats.
+- **Command times out** — Increase the `timeout` field, or wrap long-running commands with `nohup ... &` and have the script return immediately.
+- **`No such file or directory`** when using `commandFile` — The path is relative to the app's repository root. Double-check the path and confirm the file is committed to the repo the app is bound to.
+- **Connection drops mid-run** — Enable `executionRetry` so the command is retried on the new connection.
+
+### Security notes
+
+- Use SSH key authentication whenever possible. Passwords are transmitted in cleartext over the encrypted channel, but key-based auth is harder to leak via keyloggers and easier to rotate.
+- Store the private key in the app's secret vault, not in the canvas YAML. The vault is per-app and never leaves the worker that runs the action.
+- Rotate keys regularly. SuperPlane does not auto-rotate credentials; do it as part of your normal secret-rotation policy.
+- The remote host's `known_hosts` is honored by the worker's SSH client. If you see a host-key verification error, the host's key has changed — verify and update the host's entry in your inventory.
