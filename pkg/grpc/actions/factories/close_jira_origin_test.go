@@ -92,6 +92,6 @@ func TestJiraCompletionCommentFor(t *testing.T) {
 	order := &models.FactoryWorkOrder{OrganizationID: orgID, Number: 7}
 
 	comment := jiraCompletionCommentFor("https://app.example.com/", factory, order)
-	assert.Equal(t, jiraCompletionComment+" https://app.example.com/"+order.URLPath("SP"), comment)
+	assert.Equal(t, jiraCompletionComment+" https://app.example.com"+order.URLPath("SP"), comment)
 	assert.Equal(t, jiraCompletionComment, jiraCompletionCommentFor("", factory, order))
 }
