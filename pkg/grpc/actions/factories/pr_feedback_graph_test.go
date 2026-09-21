@@ -453,8 +453,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
 		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
 		assert.NotContains(t, checkout, "x-access-token")
-		_, hasVisualEvidence := runner.Configuration["includeVisualEvidence"]
-		assert.False(t, hasVisualEvidence)
+		assert.Equal(t, false, runner.Configuration["includeVisualEvidence"])
 	})
 
 	t.Run("action nodes serialize per pull request", func(t *testing.T) {

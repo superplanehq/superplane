@@ -185,6 +185,7 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 	configuration := map[string]any{
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
+		"includeVisualEvidence":   request.IncludeVisualEvidence,
 		"steps":                   prFeedbackChecksRunnerSteps(),
 		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
