@@ -432,6 +432,44 @@ func serializeWorkOrder(
 	}, nil
 }
 
+func serializeWorkOrderSummary(
+	f *models.Factory,
+	order *models.FactoryWorkOrder,
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	createdByAutomation *factory.AutomationRef,
+	usage workOrderUsageView,
+) (*pb.WorkOrderSummary, error) {
+	statusNotes, err := serializeWorkOrderStatusNotes(order)
+	if err != nil {
+		return nil, err
+	}
+
+	displayKey := ""
+	if f != nil {
+		displayKey = f.WorkOrderKey(order.Number)
+	}
+
+	return &pb.WorkOrderSummary{
+		Id:                   order.ID.String(),
+		Title:                order.Title,
+		Description:          order.Description,
+		Number:               order.Number,
+		Key:                  displayKey,
+		State:                serializeWorkOrderState(order.State),
+		Result:               serializeWorkOrderResult(order.Result),
+		CreatedAt:            timestamppb.New(order.CreatedAt),
+		UpdatedAt:            timestamppb.New(order.UpdatedAt),
+		Assignees:            serializeWorkOrderAssignees(order.Assignees),
+		LineDispatches:       serializeWorkOrderLineDispatches(dispatches, nil),
+		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
+		TotalTokens:          usage.Totals.TotalTokens,
+		TotalCostCents:       usage.Totals.CostCents(),
+		TotalDurationSeconds: usage.Totals.DurationSeconds,
+		StatusNotes:          statusNotes,
+		Origin:               serializeWorkOrderOrigin(order),
+	}, nil
+}
+
 const microsPerCent = 10_000
 
 func serializeWorkOrderUsageBreakdown(

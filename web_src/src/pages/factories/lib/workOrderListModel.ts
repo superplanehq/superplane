@@ -1,9 +1,9 @@
 import type {
   FactoriesFactory,
   FactoriesLineRef,
-  FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { workOrderListSource } from "./workOrderCardSource";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -19,7 +19,7 @@ import {
 } from "./workOrderProgress";
 
 /**
- * Presentation model built on top of a `FactoriesWorkOrder`. It centralizes
+ * Presentation model built on top of a listed work order. It centralizes
  * every derived value the Tasks layouts need — identifiers, status,
  * latest line and step, usage, assignee summary, and search text — so
  * board/list/table stay display-only and can share the same reducers.
@@ -29,7 +29,7 @@ import {
  * everything else the reference application shows.
  */
 export interface WorkOrderListEntry {
-  order: FactoriesWorkOrder;
+  order: FactoriesWorkOrderSummary;
   id: string;
   displayKey: string;
   /** Numeric part of `displayKey`, used to order by ID. */
@@ -61,7 +61,7 @@ export interface WorkOrderListEntry {
 }
 
 export function buildWorkOrderListEntry(
-  order: FactoriesWorkOrder,
+  order: FactoriesWorkOrderSummary,
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry {
   const dispatches = order.lineDispatches ?? [];
@@ -129,7 +129,7 @@ function trimOrNull(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function isDispatchableState(state: FactoriesWorkOrder["state"]): boolean {
+function isDispatchableState(state: FactoriesWorkOrderSummary["state"]): boolean {
   return state === "STATE_DRAFT" || state === "STATE_OPEN";
 }
 
@@ -194,7 +194,7 @@ function collectLines(dispatches: FactoriesWorkOrderLineDispatch[]): { ids: stri
  * the executions so older payloads still show usage.
  */
 function sumUsage(
-  order: FactoriesWorkOrder,
+  order: FactoriesWorkOrderSummary,
   executions: FactoriesWorkOrderExecution[],
 ): { totalTokens: number; totalCostCents: number; durationSeconds: number } {
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
@@ -213,7 +213,7 @@ function sumUsage(
   );
 }
 
-function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; assigneeNames: string[] } {
+function collectAssignees(order: FactoriesWorkOrderSummary): { assigneeIds: string[]; assigneeNames: string[] } {
   const owner = order.assignees?.[0];
   if (!owner?.id) {
     return { assigneeIds: [], assigneeNames: [] };
@@ -226,7 +226,7 @@ function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; a
 }
 
 export function buildWorkOrderListEntries(
-  orders: FactoriesWorkOrder[],
+  orders: FactoriesWorkOrderSummary[],
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry[] {
   return orders.map((order) => buildWorkOrderListEntry(order, factory));

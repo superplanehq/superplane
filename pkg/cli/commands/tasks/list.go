@@ -76,7 +76,7 @@ func (c *taskListCommand) Execute(ctx core.CommandContext) error {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
-				taskDisplayID(task),
+				taskDisplayID(&task),
 				task.GetTitle(),
 				formatTaskState(task.GetState()),
 				formatTaskResult(task.GetResult()),
