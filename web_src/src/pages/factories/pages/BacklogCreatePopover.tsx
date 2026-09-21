@@ -1,6 +1,7 @@
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
@@ -259,7 +260,7 @@ function IntakeSearchPanel({
   const searchId = `lines-backlog-create-search-${source.intakeId}`;
   return (
     <div data-testid={`lines-backlog-create-source-${source.intakeId}`}>
-      <label htmlFor={searchId} className="mt-1 flex items-center gap-2.5 px-2.5 py-1.5">
+      <Label htmlFor={searchId} className="mt-1 gap-2.5 px-2.5 py-1.5 font-normal">
         {showIcon ? <IntakeSourceIcon source={source} /> : null}
         <Input
           ref={inputRef}
@@ -271,7 +272,7 @@ function IntakeSearchPanel({
           data-testid={searchId}
           className="h-8 px-2.5 text-sm"
         />
-      </label>
+      </Label>
       <IntakeSearchResults
         intakeId={source.intakeId}
         items={items}
