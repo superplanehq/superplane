@@ -295,9 +295,9 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	assert.Equal(t, "reasoning", records[1]["channel"])
 	reasoningEnd := findActivityRecord(t, records, "content_end")
 	assert.Equal(t, float64(12500), reasoningEnd["duration_ms"])
-	toolStart := findActivityRecord(t, records, "tool_start")
-	assert.Equal(t, "tool_start", toolStart["type"])
-	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "tool_start"))
+	toolStart := findActivityRecord(t, records, "activity_tool_start")
+	assert.Equal(t, "activity_tool_start", toolStart["type"])
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "activity_tool_start"))
 	assert.Equal(t, "printf first\nprintf second", toolStart["input"])
 	var outputText string
 	for _, record := range records {
@@ -306,7 +306,7 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "first", outputText)
-	assert.Equal(t, "passed", findActivityRecord(t, records, "tool_end")["status"])
+	assert.Equal(t, "passed", findActivityRecord(t, records, "activity_tool_end")["status"])
 }
 
 func TestFormatOpenCodeJsonLinesCompletesAssistantContentBeforeNextTool(t *testing.T) {
@@ -316,7 +316,7 @@ func TestFormatOpenCodeJsonLinesCompletesAssistantContentBeforeNextTool(t *testi
 	})
 
 	records := activityRecords(t, output)
-	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "tool_start"))
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "activity_tool_start"))
 }
 
 func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
@@ -329,7 +329,7 @@ func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
 	records := activityRecords(t, output)
 	var starts []map[string]any
 	for _, record := range records {
-		if record["type"] == "tool_start" {
+		if record["type"] == "activity_tool_start" {
 			starts = append(starts, record)
 		}
 	}

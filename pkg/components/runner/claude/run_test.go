@@ -379,7 +379,7 @@ func TestFormatStreamJsonLinesEmitsThinkingAndStartsToolsBeforeResults(t *testin
 	require.NotEmpty(t, records)
 	assert.Equal(t, "activity_start", records[0]["type"])
 	assert.Equal(t, "reasoning", records[1]["channel"])
-	toolStart := typedActivityRecord(t, records, "tool_start")
+	toolStart := typedActivityRecord(t, records, "activity_tool_start")
 	assert.Equal(t, "tool-a", toolStart["id"])
 	var input map[string]any
 	for _, record := range records {
@@ -398,7 +398,7 @@ func TestFormatStreamJsonLinesEmitsThinkingAndStartsToolsBeforeResults(t *testin
 		}
 	}
 	assert.Len(t, inputRecords, 1)
-	toolEnd := typedActivityRecord(t, records, "tool_end")
+	toolEnd := typedActivityRecord(t, records, "activity_tool_end")
 	assert.Equal(t, "passed", toolEnd["status"])
 }
 
