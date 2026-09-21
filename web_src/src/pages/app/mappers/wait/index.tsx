@@ -63,12 +63,12 @@ export const waitMapper: ComponentBaseMapper = {
     return subtitle || "";
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, unknown> = {};
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
-    const data = payload?.data as Record<string, any> | undefined;
-    const actor = data?.actor as { email?: string; display_name?: string } | undefined;
+    const data = payload?.data as WaitOutputData | undefined;
+    const actor = data?.actor;
     const metadata = context.execution.metadata as { interval_duration?: number; start_time?: string } | undefined;
 
     const startedAt = formatDateValue(data?.started_at) || formatDateValue(metadata?.start_time);
@@ -278,6 +278,17 @@ function getWaitEventSections(
 
   return [eventSection];
 }
+
+type WaitOutputData = {
+  started_at?: string;
+  finished_at?: string;
+  result?: unknown;
+  reason?: unknown;
+  actor?: {
+    email?: string;
+    display_name?: string;
+  };
+};
 
 type WaitConfiguration = {
   mode: "interval" | "countdown";
