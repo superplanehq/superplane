@@ -1,6 +1,7 @@
 package sentry
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -32,6 +33,44 @@ func Test__GetIssueEvent(t *testing.T) {
 		"https://sentry.io/api/0/organizations/example/issues/123/events/latest/",
 		httpCtx.Requests[0].URL.String(),
 	)
+}
+
+func Test__GetIssueEvent__AcceptsObjectRelease(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			sentryMockResponse(http.StatusOK, latestEventAPIBody),
+		},
+	}
+
+	event, err := testIssueClient(httpCtx).GetIssueEvent("148481072", IssueEventLatest)
+	require.NoError(t, err)
+	require.NotNil(t, event)
+	assert.Equal(t, "c5764589c1fc4b96aa6bcf9e57cb291b", event.EventID)
+	assert.Equal(t, "4dd58c31ad607b30529d09686c0c8cc8381b2392", event.Release.String())
+	assert.True(t, event.HasStack())
+	assert.Equal(t, "error", event.Type)
+	require.Len(t, event.Tags, 2)
+	assert.Equal(t, "run", event.Tags[0].Value)
+}
+
+func Test__IssueEventRelease__UnmarshalJSON(t *testing.T) {
+	t.Run("reads a version string", func(t *testing.T) {
+		var release IssueEventRelease
+		require.NoError(t, json.Unmarshal([]byte(`"1.4.2"`), &release))
+		assert.Equal(t, "1.4.2", release.String())
+	})
+
+	t.Run("reads shortVersion from a release object", func(t *testing.T) {
+		var release IssueEventRelease
+		require.NoError(t, json.Unmarshal([]byte(`{"version":"full","shortVersion":"short"}`), &release))
+		assert.Equal(t, "short", release.String())
+	})
+
+	t.Run("treats null as empty", func(t *testing.T) {
+		var release IssueEventRelease
+		require.NoError(t, json.Unmarshal([]byte(`null`), &release))
+		assert.Empty(t, release.String())
+	})
 }
 
 func Test__GetPreferredIssueEvent(t *testing.T) {
