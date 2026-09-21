@@ -192,6 +192,37 @@ func TestListAllOrganizations(t *testing.T) {
 	})
 }
 
+func TestFindOrganizationWithCounts(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	t.Run("returns organization with canvas and member counts", func(t *testing.T) {
+		org, err := CreateOrganization("Counted Org", "counted")
+		require.NoError(t, err)
+		createTestCanvas(t, org.ID, "Canvas 1")
+		createTestCanvas(t, org.ID, "Canvas 2")
+		createTestUser(t, org.ID, "member-1@example.com", "Member 1")
+
+		found, err := FindOrganizationWithCounts(database.Conn(), org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, org.ID, found.ID)
+		assert.Equal(t, org.Name, found.Name)
+		assert.Equal(t, org.Slug, found.Slug)
+		assert.Equal(t, "counted", found.Description)
+		assert.Equal(t, int64(2), found.CanvasCount)
+		assert.Equal(t, int64(1), found.MemberCount)
+	})
+
+	t.Run("returns not found for deleted organization", func(t *testing.T) {
+		org, err := CreateOrganization("Soon Deleted", "")
+		require.NoError(t, err)
+		require.NoError(t, SoftDeleteOrganization(org.ID.String()))
+
+		_, err = FindOrganizationWithCounts(database.Conn(), org.ID)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+}
+
 func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
 	t.Helper()
 
