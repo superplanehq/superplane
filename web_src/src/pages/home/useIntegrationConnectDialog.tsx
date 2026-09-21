@@ -436,6 +436,7 @@ function useHostedProviderConnect({
     jira: useHostedJiraConnect({
       organizationId,
       returnTo,
+      connected,
       existingIntegrationNames,
       createIntegration,
     }),
@@ -445,11 +446,13 @@ function useHostedProviderConnect({
 function useHostedJiraConnect({
   organizationId,
   returnTo,
+  connected,
   existingIntegrationNames,
   createIntegration,
 }: {
   organizationId: string;
   returnTo?: string;
+  connected: OrganizationsIntegration[];
   existingIntegrationNames: Set<string>;
   createIntegration: (payload: {
     integrationName: string;
@@ -463,6 +466,7 @@ function useHostedJiraConnect({
         organizationId,
         returnTo,
         existingNames: existingIntegrationNames,
+        connected,
         create: async (payload) => {
           const response = await createIntegration(payload);
           return response.data;
@@ -472,5 +476,5 @@ function useHostedJiraConnect({
       showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
       return false;
     }
-  }, [createIntegration, existingIntegrationNames, organizationId, returnTo]);
+  }, [connected, createIntegration, existingIntegrationNames, organizationId, returnTo]);
 }

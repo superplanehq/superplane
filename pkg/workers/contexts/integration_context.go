@@ -346,6 +346,28 @@ func (c *IntegrationContext) Persist() error {
 	})
 }
 
+// PersistMetadata writes only the metadata column. Webhook Setup and Cleanup
+// mirror provider state onto the integration (Jira keeps the registration id
+// its refresh hook must extend), and those handlers run outside any code path
+// that saves the integration afterwards. Only metadata is written so a sync
+// running at the same time does not lose its own state or secret updates.
+func (c *IntegrationContext) PersistMetadata() error {
+	if c.tx == nil || c.integration == nil {
+		return nil
+	}
+
+	// The column is NOT NULL, and a handler that clears every key leaves a nil
+	// map behind. Writing NULL would fail the caller's transaction.
+	metadata := c.integration.Metadata.Data()
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+
+	return c.tx.Model(c.integration).
+		Update("metadata", metadata).
+		Error
+}
+
 func (c *IntegrationContext) GetState() string {
 	return c.integration.State
 }

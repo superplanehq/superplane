@@ -63,6 +63,7 @@ export function useIntakeConnection(args: {
       sourceId: args.sourceId,
       organizationId: args.organizationId,
       returnPath,
+      connected: queries.connectedQuery.data ?? [],
       existingNames: queries.existingNames,
       definition: queries.definition,
       definitionLoading: queries.availableQuery.isLoading,
@@ -189,6 +190,7 @@ function useReturnedIntakeConnection({
 type ConnectArgs = {
   organizationId: string;
   returnPath: string;
+  connected: OrganizationsIntegration[];
   existingNames: Set<string>;
   createIntegration: ReturnType<typeof useCreateIntegration>;
   setConnectOpen: (open: boolean) => void;
@@ -230,6 +232,7 @@ async function connectJira(
   args: ConnectArgs & {
     definition?: IntegrationsIntegrationDefinition;
     definitionLoading: boolean;
+    completeConnection: (integrationId: string) => void;
   },
 ) {
   if (args.definitionLoading) {
@@ -246,6 +249,8 @@ async function connectJira(
       organizationId: args.organizationId,
       returnTo: args.returnPath,
       existingNames: args.existingNames,
+      connected: args.connected,
+      onExistingReady: args.completeConnection,
       create: async (payload) => {
         const response = await args.createIntegration.mutateAsync(payload);
         return response.data;

@@ -2,6 +2,7 @@ package jira
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -451,6 +452,231 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		storedMetadata := Metadata{}
 		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
 		assert.Nil(t, storedMetadata.WebhookID)
+	})
+}
+
+const (
+	testRequestedWebhookURL = "https://app.superplane.com/api/v1/webhooks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	testBlockerWebhookURL   = "https://app.superplane.com/api/v1/webhooks/ed13e750-bd47-4ae4-9400-4d75ef42eab6"
+	testBlockerWebhookID    = "ed13e750-bd47-4ae4-9400-4d75ef42eab6"
+)
+
+func urlConflictResponse(blockerURL string) *http.Response {
+	body := fmt.Sprintf(
+		`{"webhookRegistrationResult":[{"errors":["Only a single URL per user is allowed to be registered via REST API. The currently used URL: %s"]}]}`,
+		blockerURL,
+	)
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
+}
+
+func Test__WebhookHandler__Setup__RecoversStaleURLConflict(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("deletes the matching stale registration and retries create", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				urlConflictResponse(testBlockerWebhookURL),
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [
+						{"id":1000,"url":"` + testBlockerWebhookURL + `"},
+						{"id":1001,"url":"https://app.superplane.com/api/v1/webhooks/cccccccc-cccc-4ccc-8ccc-cccccccccccc"}
+					]
+				}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           testRequestedWebhookURL,
+				Configuration: WebhookConfiguration{Projects: []string{"WRK3"}},
+			},
+		})
+		require.NoError(t, err)
+
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, int64(2000), *webhookMetadata.WebhookID)
+
+		require.Len(t, httpCtx.Requests, 4)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[1].Method)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[2].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[2].Body)
+		assert.Contains(t, string(body), "1000")
+		assert.NotContains(t, string(body), "1001")
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[3].Method)
+	})
+
+	t.Run("paginates the remote list before deleting the blocker", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				urlConflictResponse(testBlockerWebhookURL),
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": false,
+					"values": [{"id":999,"url":"https://app.superplane.com/api/v1/webhooks/cccccccc-cccc-4ccc-8ccc-cccccccccccc"}]
+				}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [{"id":1000,"url":"` + testBlockerWebhookURL + `"}]
+				}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           testRequestedWebhookURL,
+				Configuration: WebhookConfiguration{Projects: []string{"WRK3"}},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 5)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[1].Method)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[2].Method)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[3].Method)
+	})
+
+	t.Run("clears a mirrored integration webhook id that was deleted", func(t *testing.T) {
+		staleID := int64(1000)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				urlConflictResponse(testBlockerWebhookURL),
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [{"id":1000,"url":"` + testBlockerWebhookURL + `"}]
+				}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:                     testCloudID,
+			SiteURL:                     testSiteURL,
+			IssueWebhookScopesRequested: true,
+			WebhookID:                   &staleID,
+		})
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           testRequestedWebhookURL,
+				Configuration: WebhookConfiguration{Projects: []string{"WRK3"}},
+			},
+		})
+		require.NoError(t, err)
+
+		storedMetadata := Metadata{}
+		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
+		require.NotNil(t, storedMetadata.WebhookID)
+		assert.Equal(t, int64(2000), *storedMetadata.WebhookID)
+	})
+
+	t.Run("refuses takeover when the blocking webhook still has active consumers", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				urlConflictResponse(testBlockerWebhookURL),
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:             testRequestedWebhookURL,
+				Configuration:   WebhookConfiguration{Projects: []string{"WRK3"}},
+				ActiveCallbacks: map[string]bool{testBlockerWebhookID: true},
+			},
+		})
+		require.ErrorContains(t, err, "still has active consumers")
+		require.Len(t, httpCtx.Requests, 1)
+	})
+
+	t.Run("refuses a blocking URL on a different origin", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				urlConflictResponse("https://other.example.com/api/v1/webhooks/" + testBlockerWebhookID),
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           testRequestedWebhookURL,
+				Configuration: WebhookConfiguration{Projects: []string{"WRK3"}},
+			},
+		})
+		require.ErrorContains(t, err, "not a SuperPlane callback on this origin")
+		require.Len(t, httpCtx.Requests, 1)
+	})
+
+	t.Run("surfaces an empty or mismatched Jira listing", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				urlConflictResponse(testBlockerWebhookURL),
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [{"id":1001,"url":"https://app.superplane.com/api/v1/webhooks/cccccccc-cccc-4ccc-8ccc-cccccccccccc"}]
+				}`))},
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           testRequestedWebhookURL,
+				Configuration: WebhookConfiguration{Projects: []string{"WRK3"}},
+			},
+		})
+		require.ErrorContains(t, err, "no registered Jira webhook matches")
+		require.Len(t, httpCtx.Requests, 2)
+	})
+
+	t.Run("recovers a URL conflict after replacing a previous registration", func(t *testing.T) {
+		previousID := int64(500)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				urlConflictResponse(testBlockerWebhookURL),
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [{"id":1000,"url":"` + testBlockerWebhookURL + `"}]
+				}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+			},
+		}
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           testRequestedWebhookURL,
+				Metadata:      WebhookMetadata{WebhookID: &previousID},
+				Configuration: WebhookConfiguration{Projects: []string{"WRK3"}},
+			},
+		})
+		require.NoError(t, err)
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, int64(2000), *webhookMetadata.WebhookID)
+		require.Len(t, httpCtx.Requests, 5)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[2].Method)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[3].Method)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[4].Method)
 	})
 }
 

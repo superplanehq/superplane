@@ -309,7 +309,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, listed.GetIntakes(), 1)
 		assert.False(t, listed.GetIntakes()[0].GetHealthy())
-		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, listed.GetIntakes()[0].GetHealth())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, listed.GetIntakes()[0].GetHealth(),
+			"a webhook out of retries must not look like one that is still registering")
 	})
 
 	t.Run("a listed Sentry intake is unhealthy after its integration is deleted", func(t *testing.T) {
