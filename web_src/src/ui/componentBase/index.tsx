@@ -12,14 +12,11 @@ import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { FactoryNodeCard } from "../factoryNodeChrome";
-import { DEFAULT_EVENT_STATE_MAP as defaultEventStateMap } from "./defaultEventStateMap";
+import { DEFAULT_EVENT_STATE_MAP } from "./defaultEventStateMap";
 import { EventSectionDisplay } from "./EventSectionDisplay";
 import type { EventSection, EventStateMap } from "./eventState";
 
 export type { EventState, EventStateStyle, EventStateMap, EventSection } from "./eventState";
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const DEFAULT_EVENT_STATE_MAP = defaultEventStateMap;
 
 export interface SpecBadge {
   label: string;

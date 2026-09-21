@@ -10,7 +10,7 @@ import type {
   OutputPayload,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getTriggerRenderer } from "./mapperLookup";
 import { truncate } from "./safeMappers";
 import type React from "react";
