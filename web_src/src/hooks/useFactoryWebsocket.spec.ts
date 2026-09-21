@@ -1,8 +1,8 @@
+import * as apiClient from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
-import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 
 const { useWebSocketMock } = vi.hoisted(() => ({
@@ -16,7 +16,7 @@ vi.mock("@/lib/reactUseWebsocket", () => ({
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 
 afterEach(() => {
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 function lastCall() {
@@ -35,10 +35,10 @@ function renderFactoryWebsocket(organizationId = "org-1", factoryId = "factory-1
   return { queryClient, invalidateSpy };
 }
 
-function emit(payload: unknown) {
+async function emit(payload: unknown) {
   const [, options] = lastCall();
   const onMessage = options.onMessage as (e: MessageEvent<unknown>) => void;
-  act(() => {
+  await act(async () => {
     onMessage(
       new MessageEvent("message", {
         data: JSON.stringify(payload),
@@ -67,71 +67,83 @@ describe("useFactoryWebsocket", () => {
     expect(enabled).toBe(false);
   });
 
-  it("invalidates work-order list on work_order_updated", () => {
-    const { invalidateSpy } = renderFactoryWebsocket();
-    emit({
-      event: "work_order_updated",
-      payload: { factoryId: "factory-1", orderId: "order-1", reason: "order.opened" },
-    });
-
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.workOrderEvents("org-1", "factory-1", "order-1"),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ["backlog-analysis-runs", "org-1"],
-    });
-  });
-
-  it("invalidates described canvas runs for the updated task", () => {
+  it("loads that task and patches the cached row", async () => {
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue({
+      data: {
+        order: {
+          id: "order-1",
+          title: "New",
+          checks: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5, analysis: "long" }],
+          planningSession: {
+            id: "ps-1",
+            state: "running",
+            waitState: "pending",
+            executionId: "exec-1",
+            survey: { id: "survey-1", questions: [{ prompt: "Which?", options: ["A"] }] },
+          },
+        },
+      },
+    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
     const { queryClient, invalidateSpy } = renderFactoryWebsocket();
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
-      {
-        id: "order-1",
-        lineDispatches: [
-          {
-            stepExecutions: [{ run: { id: "run-1", appId: "app-1" } }],
-          },
-        ],
-      },
+      { id: "order-1", title: "Old" },
+      { id: "order-2", title: "Other" },
     ]);
-    invalidateSpy.mockClear();
 
-    emit({
+    await emit({
       event: "work_order_updated",
-      payload: { factoryId: "factory-1", orderId: "order-1", reason: "run_started" },
+      payload: { factoryId: "factory-1", orderId: "order-1", reason: "order.agent_question" },
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.run("app-1", "run-1"),
+    expect(describeWorkOrder).toHaveBeenCalledTimes(1);
+    const orders = queryClient.getQueryData<Array<{ id?: string; planningSession?: { activities?: unknown } }>>(
+      factoryQueryKeys.workOrders("org-1", "factory-1"),
+    );
+    expect(orders?.[0]).toMatchObject({
+      id: "order-1",
+      title: "New",
+      checkScores: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5 }],
+      planningSession: {
+        id: "ps-1",
+        state: "running",
+        waitState: "pending",
+        executionId: "exec-1",
+        survey: { id: "survey-1", questions: [{ prompt: "Which?", options: ["A"] }] },
+      },
     });
-  });
-
-  it("ignores events for a different factory", () => {
-    const { invalidateSpy } = renderFactoryWebsocket();
-    invalidateSpy.mockClear();
-    emit({
-      event: "work_order_updated",
-      payload: { factoryId: "other-factory", orderId: "order-1" },
-    });
+    expect(orders?.[1]).toEqual({ id: "order-2", title: "Other" });
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
-  it("skips invalidation on the first open and invalidates on reconnect", () => {
+  it("leaves a task that is not in the loaded list", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue({
+      data: { order: { id: "order-1", title: "New", checks: [] } },
+    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+    const { queryClient } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [{ id: "order-2", title: "Other" }]);
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual([
+      { id: "order-2", title: "Other" },
+    ]);
+  });
+
+  it("ignores events for a different factory", async () => {
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+    const { invalidateSpy } = renderFactoryWebsocket();
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "other-factory", orderId: "order-1" },
+    });
+    expect(describeWorkOrder).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it("skips invalidation on the first open and refreshes the orders list on reconnect", () => {
     const { invalidateSpy } = renderFactoryWebsocket();
     invalidateSpy.mockClear();
     const [, options] = lastCall();
@@ -145,11 +157,10 @@ describe("useFactoryWebsocket", () => {
     act(() => {
       onOpen();
     });
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
+      exact: true,
     });
   });
 });

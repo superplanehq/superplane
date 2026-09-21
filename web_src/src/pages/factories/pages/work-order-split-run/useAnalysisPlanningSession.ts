@@ -16,9 +16,12 @@ import {
   type PlanningSessionPayload,
 } from "../planningSessionView";
 import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
-import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 
 const POLL_MS = 1500;
+
+export function workOrderPlanningSessionQueryKey(organizationId: string, factoryId: string, workOrderId: string) {
+  return ["planning-session-by-work-order", organizationId, factoryId, workOrderId] as const;
+}
 
 export const ANALYSIS_PLANNING_COPY = {
   composerPlaceholder: "Tell the agent more about this task",

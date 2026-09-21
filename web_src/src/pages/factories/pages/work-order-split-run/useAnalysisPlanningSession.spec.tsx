@@ -11,11 +11,11 @@ import {
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
-import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 import {
   analysisSessionPollInterval,
   analysisWorkOrderRefreshKey,
   useAnalysisPlanningSession,
+  workOrderPlanningSessionQueryKey,
 } from "./useAnalysisPlanningSession";
 
 vi.mock("../planningSessionClient", () => ({
