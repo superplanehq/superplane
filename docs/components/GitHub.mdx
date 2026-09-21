@@ -41,6 +41,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find an existing pull request in a GitHub repository by branch" />
   <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined GitHub commit status for a commit, branch, or tag" />
+  <LinkCard title="Get File Content" href="#get-file-content" description="Read a file from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
@@ -3803,6 +3804,53 @@ Emits a combined commit status object on the default output channel. The payload
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.combinedCommitStatus"
+}
+```
+
+<a id="get-file-content"></a>
+
+## Get File Content
+
+**Component key:** `github.getFileContent`
+
+The Get File Content component reads a file from a GitHub repository without cloning the repository.
+
+### Use Cases
+
+- **Configuration checks**: Read configuration files before making workflow decisions
+- **Documentation automation**: Retrieve README files or other text documents
+- **Repository comparisons**: Read files from branches, tags, or commits for comparison steps
+- **Agent context**: Provide small repository files to downstream agents or actions
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the file
+- **Path**: Path to the file from the repository root (supports expressions)
+- **Ref**: Optional branch name, tag, or commit SHA. When omitted, GitHub uses the repository's default branch.
+
+### Output
+
+Returns the decoded file content together with its name, path, SHA, size, URLs, and the requested ref.
+
+This component reads files only. Directory paths are rejected; use a path that points to a single file.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "content": "# Widget service\n\nConfiguration and deployment notes for the widget service.\n",
+    "download_url": "https://raw.githubusercontent.com/acme/widgets/main/docs/README.md",
+    "html_url": "https://github.com/acme/widgets/blob/main/docs/README.md",
+    "name": "README.md",
+    "path": "docs/README.md",
+    "ref": "main",
+    "sha": "4d4ba9968a4c7c80e25b715bd7522f2c4dc51f3f",
+    "size": 75,
+    "url": "https://api.github.com/repos/acme/widgets/contents/docs/README.md?ref=main"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.fileContent"
 }
 ```
 

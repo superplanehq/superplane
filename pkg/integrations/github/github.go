@@ -116,6 +116,7 @@ func (g *GitHub) Actions() []core.Action {
 		&checks.WaitForPullRequestChecks{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
+		&contents.GetFileContent{},
 		&contents.GetRelease{},
 		&contents.UpdateRelease{},
 		&contents.DeleteRelease{},
