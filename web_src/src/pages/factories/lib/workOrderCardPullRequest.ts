@@ -51,15 +51,20 @@ export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactor
 }
 
 /**
- * An open Review pill already asks for review. Keep other attention,
- * including Needs attention and notes next to a closed or merged
+ * An open Review pill already asks for review. A merged request is
+ * already done, so hide the review wait until the task closes. Keep
+ * other attention, including Needs attention, next to a closed
  * request. A Mergeable pill already says checks passed.
  */
 export function visibleWorkOrderCardAttentionReasons(
   reasons: WorkOrderAttentionReason[],
   cardPullRequest: WorkOrderCardPullRequest | null,
 ): WorkOrderAttentionReason[] {
-  if (!cardPullRequest || pullRequestState(cardPullRequest.pullRequest.state) !== "open") {
+  if (!cardPullRequest) {
+    return reasons;
+  }
+  const state = pullRequestState(cardPullRequest.pullRequest.state);
+  if (state !== "open" && state !== "merged") {
     return reasons;
   }
   return reasons.filter((reason) => {

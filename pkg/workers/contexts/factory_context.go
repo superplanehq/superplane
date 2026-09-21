@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -160,6 +161,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateJiraWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
@@ -199,6 +208,35 @@ func (c *FactoryContext) skipDuplicateSentryWorkOrder(factoryModel *models.Facto
 	}
 	if hasOrder {
 		log.Infof("skipping Sentry issue %s: work order already exists", issueID)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := jira.IssueRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := jira.LockIssueWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := jira.IssueHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
 	}
 	return hasOrder, nil
 }

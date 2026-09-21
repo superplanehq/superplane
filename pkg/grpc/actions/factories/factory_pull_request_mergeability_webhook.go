@@ -35,10 +35,11 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 		return
 	}
 
-	repository, numbers, sha := githubMergeabilityWebhookRef(eventType, body)
-	if repository == "" {
+	payload, ok := parseGitHubMergeabilityWebhookPayload(eventType, body)
+	if !ok {
 		return
 	}
+	repository := strings.TrimSpace(payload.Repository.FullName)
 	configured := factoryMergeabilityWebhookRepository(webhook.Configuration.Data())
 	if configured != "" && !strings.EqualFold(configured, repository) {
 		return
@@ -51,6 +52,12 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 		return
 	}
 
+	if isGitHubPullRequestClosedEvent(eventType, payload) {
+		closeFactoryWorkOrdersFromGitHubPullRequestClosed(db, integration, payload)
+		return
+	}
+
+	_, numbers, sha := githubMergeabilityWebhookRefFromPayload(payload)
 	pullRequests, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(
 		db,
 		integration.OrganizationID,
@@ -185,12 +192,16 @@ func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest
 }
 
 type githubMergeabilityWebhookPayload struct {
+	Action     string `json:"action"`
 	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
 	PullRequest *struct {
-		Number int64 `json:"number"`
-		Head   struct {
+		Number   int64  `json:"number"`
+		Merged   bool   `json:"merged"`
+		MergedAt string `json:"merged_at"`
+		ClosedAt string `json:"closed_at"`
+		Head     struct {
 			SHA string `json:"sha"`
 		} `json:"head"`
 	} `json:"pull_request"`
@@ -403,17 +414,38 @@ func VerifyGitHubFactoryMergeabilitySignature(
 	return http.StatusOK, nil
 }
 
-func githubMergeabilityWebhookRef(eventType string, body []byte) (repository string, numbers []int64, sha string) {
+func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeabilityWebhookPayload) bool {
+	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
+		strings.EqualFold(strings.TrimSpace(payload.Action), "closed") &&
+		payload.PullRequest != nil
+}
+
+func parseGitHubMergeabilityWebhookPayload(eventType string, body []byte) (githubMergeabilityWebhookPayload, bool) {
 	switch strings.ToLower(strings.TrimSpace(eventType)) {
 	case "pull_request", "check_run", "check_suite", "status":
 	default:
-		return "", nil, ""
+		return githubMergeabilityWebhookPayload{}, false
 	}
 
 	var payload githubMergeabilityWebhookPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
+		return githubMergeabilityWebhookPayload{}, false
+	}
+	if strings.TrimSpace(payload.Repository.FullName) == "" {
+		return githubMergeabilityWebhookPayload{}, false
+	}
+	return payload, true
+}
+
+func githubMergeabilityWebhookRef(eventType string, body []byte) (repository string, numbers []int64, sha string) {
+	payload, ok := parseGitHubMergeabilityWebhookPayload(eventType, body)
+	if !ok {
 		return "", nil, ""
 	}
+	return githubMergeabilityWebhookRefFromPayload(payload)
+}
+
+func githubMergeabilityWebhookRefFromPayload(payload githubMergeabilityWebhookPayload) (repository string, numbers []int64, sha string) {
 	repository = strings.TrimSpace(payload.Repository.FullName)
 	if repository == "" {
 		return "", nil, ""

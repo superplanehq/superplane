@@ -293,6 +293,28 @@ func Test__FactoryPullRequest(t *testing.T) {
 		assert.Equal(t, "sha-old", stale.MergeableHeadSHA)
 		assert.True(t, stale.Mergeable)
 	})
+
+	t.Run("lists GitHub pull requests for a closed webhook without a state filter", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		order := createOrder(t, factoryModel)
+		pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/app/pull/91",
+		})
+		require.NoError(t, err)
+		state := models.FactoryPullRequestStateMerged
+		require.NoError(t, pullRequest.Update(db, models.FactoryPullRequestPatch{State: &state}))
+
+		open, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(db, r.Organization.ID, "acme/app", []int64{91}, "")
+		require.NoError(t, err)
+		assert.Empty(t, open)
+
+		matched, err := models.ListGitHubFactoryPullRequestsForWebhook(db, r.Organization.ID, "acme/app", []int64{91})
+		require.NoError(t, err)
+		require.Len(t, matched, 1)
+		assert.Equal(t, pullRequest.ID, matched[0].ID)
+		assert.Equal(t, models.FactoryPullRequestStateMerged, matched[0].State)
+	})
 }
 
 func findWorkOrderEventType(t *testing.T, events []models.FactoryWorkOrderEvent, eventType string) models.FactoryWorkOrderEvent {

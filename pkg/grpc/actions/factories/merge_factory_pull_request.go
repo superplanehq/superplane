@@ -81,6 +81,7 @@ func MergeFactoryPullRequest(
 		result.Client = client
 	}
 
+	var closeOutcome *factoryPullRequestCloseResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := assertNoActiveAutomationLocked(tx, factory, pullRequest); err != nil {
 			return err
@@ -96,10 +97,19 @@ func MergeFactoryPullRequest(
 
 		state := models.FactoryPullRequestStateMerged
 		mergedAt := time.Now()
-		return pullRequest.Update(tx, models.FactoryPullRequestPatch{
+		if err := pullRequest.Update(tx, models.FactoryPullRequestPatch{
 			State:    &state,
 			MergedAt: &mergedAt,
-		})
+		}); err != nil {
+			return err
+		}
+
+		outcome, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, true)
+		if err != nil {
+			return err
+		}
+		closeOutcome = outcome
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, errFactoryPullRequestNotMergeable) {
@@ -122,6 +132,18 @@ func MergeFactoryPullRequest(
 			}
 		}
 		return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(message)), "failed to merge factory pull request")
+	}
+
+	if closeOutcome != nil && closeOutcome.closed {
+		publishWorkOrderClosed(
+			factory.OrganizationID,
+			factory,
+			closeOutcome.order,
+			nil,
+			closeOutcome.fromState,
+			closeOutcome.result,
+			false,
+		)
 	}
 
 	if err := messages.PublishFactoryWorkOrderUpdated(

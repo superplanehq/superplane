@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
   intakeSettingsFromApi,
@@ -117,6 +118,35 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
     expect(settings.superplaneLabelAdded).toBe(true);
+  });
+
+  it("round-trips Sentry events and levels through the API shape", () => {
+    const settings = intakeSettingsFromApi("Sentry exceptions", {
+      sentryNewIssues: false,
+      sentryRegressedIssues: true,
+      sentryAssignedIssues: true,
+      sentryLevels: ["error", "unknown", "fatal"],
+    });
+
+    expect(settings.sentryNewIssues).toBe(false);
+    expect(settings.sentryRegressedIssues).toBe(true);
+    expect(settings.sentryAssignedIssues).toBe(true);
+    expect(settings.sentryLevels).toEqual(["fatal", "error"]);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      sentryNewIssues: false,
+      sentryRegressedIssues: true,
+      sentryAssignedIssues: true,
+      sentryLevels: ["fatal", "error"],
+    });
+  });
+
+  it("defaults Sentry events on when the API omits them", () => {
+    const settings = intakeSettingsFromApi("Sentry exceptions", {});
+
+    expect(settings.sentryNewIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues);
+    expect(settings.sentryRegressedIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues);
+    expect(settings.sentryAssignedIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues);
+    expect(settings.sentryLevels).toEqual([]);
   });
 
   it("offers pause for Sentry and Jira intakes only", () => {

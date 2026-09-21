@@ -45,6 +45,10 @@ const (
 
 	intakeMetadataJiraMoveOnComplete   = "jiraMoveOnComplete"
 	intakeMetadataJiraCompletionColumn = "jiraCompletionColumn"
+
+	intakeSentryActionCreated    = "created"
+	intakeSentryActionUnresolved = "unresolved"
+	intakeSentryActionAssigned   = "assigned"
 )
 
 // intakeSettings is what a user can change about an intake without editing the
@@ -64,7 +68,17 @@ type intakeSettings struct {
 	JiraMoveOnComplete bool
 	// Jira status name to move the issue to. Empty means the Done column.
 	JiraCompletionColumn string
+	// Listen for created Sentry issues.
+	SentryNewIssues bool
+	// Listen for Sentry issues that become unresolved.
+	SentryRegressedIssues bool
+	// Listen for assigned Sentry issues.
+	SentryAssignedIssues bool
+	// Issue levels that still create a task. Empty means every level.
+	SentryLevels []string
 }
+
+var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
 
 func defaultIntakeSettings() intakeSettings {
 	return intakeSettings{
@@ -88,9 +102,19 @@ func defaultJiraIntakeSettings() intakeSettings {
 	return settings
 }
 
+func defaultSentryIntakeSettings() intakeSettings {
+	settings := defaultIntakeSettings()
+	settings.SentryNewIssues = true
+	settings.SentryRegressedIssues = true
+	settings.SentryAssignedIssues = false
+	settings.SentryLevels = []string{}
+	return settings
+}
+
 func intakeSourceHasFilterNode(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
-		source == models.FactoryIntakeSourceJiraIssues
+		source == models.FactoryIntakeSourceJiraIssues ||
+		source == models.FactoryIntakeSourceSentryExceptions
 }
 
 func (s intakeSettings) normalized() intakeSettings {
@@ -112,8 +136,24 @@ func (s intakeSettings) normalized() intakeSettings {
 	}
 	s.Labels = labels
 	s.JiraCompletionColumn = strings.TrimSpace(s.JiraCompletionColumn)
+	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
 
 	return s
+}
+
+func normalizeSentryLevels(levels []string) []string {
+	selected := make(map[string]bool, len(levels))
+	for _, level := range levels {
+		selected[strings.ToLower(strings.TrimSpace(level))] = true
+	}
+
+	normalized := make([]string, 0, len(intakeSentryKnownLevels))
+	for _, level := range intakeSentryKnownLevels {
+		if selected[level] {
+			normalized = append(normalized, level)
+		}
+	}
+	return normalized
 }
 
 // intakeFilterExpressionFor builds the gate in front of the work order from
@@ -126,6 +166,8 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeGitHubFilterExpression(settings)
 	case models.FactoryIntakeSourceJiraIssues:
 		return intakeJiraFilterExpression(settings)
+	case models.FactoryIntakeSourceSentryExceptions:
+		return intakeSentryFilterExpression(settings)
 	default:
 		return "true"
 	}
@@ -187,6 +229,19 @@ func intakeJiraFilterExpression(settings intakeSettings) string {
 	return strings.Join(conditions, " && ")
 }
 
+func intakeSentryFilterExpression(settings intakeSettings) string {
+	if len(settings.SentryLevels) == 0 {
+		return "true"
+	}
+
+	levels, err := json.Marshal(settings.SentryLevels)
+	if err != nil {
+		return "true"
+	}
+
+	return fmt.Sprintf(`(root().data.data.issue?.level ?? "") in %s`, levels)
+}
+
 func intakeTriggerActionsFor(settings intakeSettings) []any {
 	actions := []any{}
 	if settings.NewIssues {
@@ -212,10 +267,29 @@ func intakeTriggerEventsFor(settings intakeSettings) []any {
 	return events
 }
 
+func intakeSentryActionsFor(settings intakeSettings) []any {
+	actions := []any{}
+	if settings.SentryNewIssues {
+		actions = append(actions, intakeSentryActionCreated)
+	}
+	if settings.SentryRegressedIssues {
+		actions = append(actions, intakeSentryActionUnresolved)
+	}
+	if settings.SentryAssignedIssues {
+		actions = append(actions, intakeSentryActionAssigned)
+	}
+	return actions
+}
+
 func intakeSettingsChangeTrigger(source string, current, updated intakeSettings) bool {
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return current.NewIssues != updated.NewIssues ||
 			current.ReopenedIssues != updated.ReopenedIssues
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		return current.SentryNewIssues != updated.SentryNewIssues ||
+			current.SentryRegressedIssues != updated.SentryRegressedIssues ||
+			current.SentryAssignedIssues != updated.SentryAssignedIssues
 	}
 	return current.NewIssues != updated.NewIssues ||
 		current.ReopenedIssues != updated.ReopenedIssues ||
@@ -235,15 +309,10 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 	if current.AuthorsWithAccess != updated.AuthorsWithAccess {
 		return true
 	}
-	if len(current.Labels) != len(updated.Labels) {
+	if !slices.Equal(current.Labels, updated.Labels) {
 		return true
 	}
-	for i := range current.Labels {
-		if current.Labels[i] != updated.Labels[i] {
-			return true
-		}
-	}
-	return false
+	return !slices.Equal(current.SentryLevels, updated.SentryLevels)
 }
 
 // The second alternative is the expression built before the label filter was
@@ -257,13 +326,20 @@ var intakeJiraLabelsPattern = regexp.MustCompile(
 	`(!\()?any\(root\(\)\.data\.issue\.fields\.labels, # in (\[[^\]]*\])\)`,
 )
 
+var intakeSentryLevelsPattern = regexp.MustCompile(
+	`\(root\(\)\.data\.data\.issue\?\.level \?\? ""\) in (\[[^\]]*\])`,
+)
+
 // intakeSettingsFromGraph reads the settings back out of the filter
 // expression. A hand-edited expression that no longer matches reports defaults
 // rather than a wrong value.
 func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveCanvasSpec) intakeSettings {
 	settings := defaultIntakeSettings()
-	if source == models.FactoryIntakeSourceJiraIssues {
+	switch source {
+	case models.FactoryIntakeSourceJiraIssues:
 		settings = defaultJiraIntakeSettings()
+	case models.FactoryIntakeSourceSentryExceptions:
+		settings = defaultSentryIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
 
@@ -275,6 +351,11 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.NewIssues = slices.Contains(events, "created")
 			settings.ReopenedIssues = slices.Contains(events, "updated")
 			settings = jiraCompletionSettingsFromMetadata(trigger.Metadata, settings)
+		case models.FactoryIntakeSourceSentryExceptions:
+			actions := configurationStrings(trigger.Configuration["actions"])
+			settings.SentryNewIssues = slices.Contains(actions, intakeSentryActionCreated)
+			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
+			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
 		default:
 			actions := configurationStrings(trigger.Configuration["actions"])
 			settings.NewIssues = slices.Contains(actions, "opened")
@@ -291,6 +372,17 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 	expression, _ := filter.Configuration["expression"].(string)
 	if expression == "" {
 		return settings
+	}
+
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		if match := intakeSentryLevelsPattern.FindStringSubmatch(expression); match != nil {
+			var levels []string
+			if err := json.Unmarshal([]byte(match[1]), &levels); err == nil {
+				settings.SentryLevels = levels
+			}
+		}
+
+		return settings.normalized()
 	}
 
 	if source == models.FactoryIntakeSourceJiraIssues {
@@ -354,6 +446,12 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.JiraMoveOnComplete = proto.Bool(settings.JiraMoveOnComplete)
 		serialized.JiraCompletionColumn = settings.JiraCompletionColumn
 	}
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		serialized.SentryNewIssues = proto.Bool(settings.SentryNewIssues)
+		serialized.SentryRegressedIssues = proto.Bool(settings.SentryRegressedIssues)
+		serialized.SentryAssignedIssues = proto.Bool(settings.SentryAssignedIssues)
+		serialized.SentryLevels = settings.SentryLevels
+	}
 	return serialized
 }
 
@@ -388,6 +486,16 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.JiraMoveOnComplete = requested.GetJiraMoveOnComplete()
 	}
 	updated.JiraCompletionColumn = strings.TrimSpace(requested.GetJiraCompletionColumn())
+	if requested.SentryNewIssues != nil {
+		updated.SentryNewIssues = requested.GetSentryNewIssues()
+	}
+	if requested.SentryRegressedIssues != nil {
+		updated.SentryRegressedIssues = requested.GetSentryRegressedIssues()
+	}
+	if requested.SentryAssignedIssues != nil {
+		updated.SentryAssignedIssues = requested.GetSentryAssignedIssues()
+	}
+	updated.SentryLevels = requested.GetSentryLevels()
 
 	return updated.normalized()
 }
