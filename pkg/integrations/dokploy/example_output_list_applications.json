@@ -1,0 +1,27 @@
+{
+  "type": "dokploy.applications.listed",
+  "data": {
+    "count": 2,
+    "applications": [
+      {
+        "applicationId": "l9xKq2mP4vRt7nB",
+        "name": "web",
+        "status": "done",
+        "projectId": "pR3tYw8kLm1QzXc",
+        "project": "storefront",
+        "environmentId": "eV6bN4jH9sDf2Kl",
+        "environment": "production"
+      },
+      {
+        "applicationId": "a2WgT5cZ8yUi3oE",
+        "name": "api",
+        "status": "idle",
+        "projectId": "pR3tYw8kLm1QzXc",
+        "project": "storefront",
+        "environmentId": "eV6bN4jH9sDf2Kl",
+        "environment": "production"
+      }
+    ]
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
