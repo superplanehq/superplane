@@ -62,6 +62,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "x-access-token")
 	assert.NotContains(t, result.canvasYAML, `git rev-parse '@{upstream}'`)
 	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")
+	assert.Contains(t, result.canvasYAML, "implement and wire the change into the production page or component")
+	assert.Contains(t, result.canvasYAML, "does not replace the product implementation unless the task explicitly requests")
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
