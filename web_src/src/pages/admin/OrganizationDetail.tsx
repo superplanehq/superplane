@@ -1,14 +1,22 @@
-import { ArrowLeft } from "lucide-react";
-import React from "react";
-import { Link, useParams } from "react-router";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { ArrowLeft } from "lucide-react";
+import React, { useState } from "react";
+import { Link, useParams } from "react-router";
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
 import { OrgUsersTable } from "./OrgUsersTable";
 
+type OrganizationTab = "users" | "automations" | "features" | "credits";
+
+function isOrganizationTab(value: string): value is OrganizationTab {
+  return value === "users" || value === "automations" || value === "features" || value === "credits";
+}
+
 const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
+  const [tab, setTab] = useState<OrganizationTab>("users");
 
   useReportPageReady(true);
 
@@ -21,10 +29,33 @@ const OrganizationDetail: React.FC = () => {
         <ArrowLeft size={14} />
         All organizations
       </Link>
-      <OrgLLMCreditSection orgId={orgId!} />
-      <OrgUsersTable orgId={orgId!} />
-      <OrgCanvasesTable orgId={orgId!} />
-      <OrgExperimentalFeaturesTable orgId={orgId!} />
+      <Tabs
+        value={tab}
+        onValueChange={(nextTab) => {
+          if (isOrganizationTab(nextTab)) {
+            setTab(nextTab);
+          }
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="automations">Automations</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
+          <TabsTrigger value="credits">Credits</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users" className="mt-3">
+          <OrgUsersTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="automations" className="mt-3">
+          <OrgCanvasesTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="features" className="mt-3">
+          <OrgExperimentalFeaturesTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="credits" forceMount className="mt-3 data-[state=inactive]:hidden">
+          <OrgLLMCreditSection orgId={orgId!} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
