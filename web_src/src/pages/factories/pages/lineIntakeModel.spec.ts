@@ -64,11 +64,17 @@ describe("lineIntakeModel", () => {
           labelFilterMode: "LABEL_FILTER_MODE_EXCLUDE",
           assignment: "ASSIGNMENT_UNASSIGNED",
         },
+        health: "HEALTH_MISSING_INTEGRATION",
+        integrationId: "jira-1",
+        resourceId: "ENG",
       },
     ]);
 
     expect(intake?.source.name).toBe("GitHub issues");
     expect(intake?.healthy).toBe(false);
+    expect(intake?.health).toBe("HEALTH_MISSING_INTEGRATION");
+    expect(intake?.integrationId).toBe("jira-1");
+    expect(intake?.resourceId).toBe("ENG");
     expect(intake?.paused).toBe(false);
     expect(intake?.settings).toMatchObject({
       name: "GitHub issues",

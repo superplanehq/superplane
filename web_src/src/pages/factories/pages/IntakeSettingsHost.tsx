@@ -2,8 +2,12 @@ import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFacto
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useCallback, useMemo, useState } from "react";
+import { useLocation } from "react-router";
 
-import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryAppRunPath, jiraIntakeIntegrationIdFromSearch } from "../lib/factoryPagePaths";
+import { factoryIntakeUpdateInput, intakeConnectionFromSource } from "./intakeConnectionModel";
+import { IntakeConnectionDialogs } from "./IntakeConnectionDialogs";
+import { intakeSettingsConnectionProps } from "./intakeSettingsConnectionProps";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
@@ -14,6 +18,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import type { ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
+import { useIntakeConnection } from "./useIntakeConnection";
 
 interface IntakeSettingsHostProps {
   organizationId: string;
@@ -41,12 +46,36 @@ export function IntakeSettingsHost({
   initialTab = "general",
   onClose,
 }: IntakeSettingsHostProps) {
+  const { search } = useLocation();
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
   const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
   const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
   const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
-  const [pauseError, setPauseError] = useState<string>();
-  const [deleteError, setDeleteError] = useState<string>();
+  const integrationId = intake.integrationId;
+  const resourceId = intake.resourceId;
+  const savedBinding = useMemo(
+    () => intakeConnectionFromSource({ integrationId, resourceId }),
+    [integrationId, resourceId],
+  );
+  const connection = useIntakeConnection({
+    organizationId,
+    factoryKey,
+    lineId,
+    intakeId: intake.intakeId,
+    sourceId: intake.source.id,
+    initialBinding: savedBinding,
+    returnedIntegrationId: jiraIntakeIntegrationIdFromSearch(search),
+  });
+  const actions = useIntakeSettingsActions({
+    intakeId: intake.intakeId,
+    savedBinding,
+    connectionBinding: connection.binding,
+    connectionEnabled: connection.enabled,
+    updateIntake,
+    deleteIntake,
+    automationRefetch: automation.refetch,
+    onClose,
+  });
   // An empty integration id keeps the query idle, so we never ask for labels
   // without knowing the repository they belong to.
   const repositoryLabels = useIntegrationResources(
@@ -63,93 +92,127 @@ export function IntakeSettingsHost({
     ? factoryAppConfigurePath(organizationId, factoryKey, intake.appId, { from: "lines", lineId })
     : undefined;
 
+  return (
+    <>
+      <IntakeSourceSettingsPopup
+        settings={intake.settings}
+        sourceId={intake.source.id}
+        labelOptions={labelOptions}
+        labelOptionsLoading={repositoryLabels.isLoading}
+        automationGraph={automation.graph}
+        automationLoading={automation.isLoading}
+        automationError={automation.isError}
+        onRetryAutomation={automation.refetch}
+        onSave={actions.saveSettings}
+        savePending={updateIntake.isPending || automation.isLoading}
+        saveError={
+          updateIntake.error
+            ? getApiErrorMessage(updateIntake.error, "SuperPlane could not save the intake settings. Try again.")
+            : undefined
+        }
+        paused={intake.paused}
+        pausePending={updateIntake.isPending}
+        deletePending={deleteIntake.isPending}
+        pauseError={actions.pauseError}
+        deleteError={actions.deleteError}
+        onPause={actions.pauseIntake}
+        onResume={actions.resumeIntake}
+        onDelete={actions.removeIntake}
+        editAutomationHref={editAutomationHref}
+        canvasId={intake.appId}
+        runHrefFor={
+          intake.appId
+            ? (runId) => factoryAppRunPath(organizationId, factoryKey, intake.appId, runId, { from: "lines", lineId })
+            : undefined
+        }
+        agent={
+          agent.agentNode
+            ? {
+                draft: agent.draft ?? undefined,
+                isLoading: agent.isLoading || !agent.draft,
+                organizationId,
+                onSave: agent.save,
+              }
+            : undefined
+        }
+        onClose={onClose}
+        initialTab={initialTab}
+        connection={intakeSettingsConnectionProps(intake, connection, savedBinding)}
+        fixed
+      />
+      <IntakeConnectionDialogs organizationId={organizationId} sourceId={intake.source.id} connection={connection} />
+    </>
+  );
+}
+
+function useIntakeSettingsActions({
+  intakeId,
+  savedBinding,
+  connectionBinding,
+  connectionEnabled,
+  updateIntake,
+  deleteIntake,
+  automationRefetch,
+  onClose,
+}: {
+  intakeId: string;
+  savedBinding: ReturnType<typeof intakeConnectionFromSource>;
+  connectionBinding: ReturnType<typeof intakeConnectionFromSource>;
+  connectionEnabled: boolean;
+  updateIntake: ReturnType<typeof useUpdateFactoryIntake>;
+  deleteIntake: ReturnType<typeof useDeleteFactoryIntake>;
+  automationRefetch: () => Promise<unknown>;
+  onClose: () => void;
+}) {
+  const [pauseError, setPauseError] = useState<string>();
+  const [deleteError, setDeleteError] = useState<string>();
+
   const saveSettings = useCallback(
     async (next: IntakeSourceSettings) => {
-      await updateIntake.mutateAsync({
-        intakeId: intake.intakeId,
-        settings: intakeSettingsToApi(next),
-      });
-      await automation.refetch();
+      await updateIntake.mutateAsync(
+        factoryIntakeUpdateInput(
+          intakeId,
+          intakeSettingsToApi(next),
+          savedBinding,
+          connectionBinding,
+          connectionEnabled,
+        ),
+      );
+      await automationRefetch();
     },
-    [automation, intake.intakeId, updateIntake],
+    [automationRefetch, connectionBinding, connectionEnabled, intakeId, savedBinding, updateIntake],
   );
 
   const pauseIntake = useCallback(async () => {
     setPauseError(undefined);
     try {
-      await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: true });
+      await updateIntake.mutateAsync({ intakeId, paused: true });
     } catch (error) {
       setPauseError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.pauseError));
       throw error;
     }
-  }, [intake.intakeId, updateIntake]);
+  }, [intakeId, updateIntake]);
 
   const resumeIntake = useCallback(async () => {
     setPauseError(undefined);
     try {
-      await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: false });
+      await updateIntake.mutateAsync({ intakeId, paused: false });
     } catch (error) {
       setPauseError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.pauseError));
       throw error;
     }
-  }, [intake.intakeId, updateIntake]);
+  }, [intakeId, updateIntake]);
 
   const removeIntake = useCallback(async () => {
     setDeleteError(undefined);
     try {
-      await deleteIntake.mutateAsync(intake.intakeId);
+      await deleteIntake.mutateAsync(intakeId);
       onClose();
     } catch (error) {
       setDeleteError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.deleteError));
       throw error;
     }
-  }, [deleteIntake, intake.intakeId, onClose]);
+  }, [deleteIntake, intakeId, onClose]);
 
-  return (
-    <IntakeSourceSettingsPopup
-      settings={intake.settings}
-      sourceId={intake.source.id}
-      labelOptions={labelOptions}
-      labelOptionsLoading={repositoryLabels.isLoading}
-      automationGraph={automation.graph}
-      automationLoading={automation.isLoading}
-      automationError={automation.isError}
-      onRetryAutomation={automation.refetch}
-      onSave={saveSettings}
-      savePending={updateIntake.isPending || automation.isLoading}
-      saveError={
-        updateIntake.error
-          ? getApiErrorMessage(updateIntake.error, "SuperPlane could not save the intake settings. Try again.")
-          : undefined
-      }
-      paused={intake.paused}
-      pausePending={updateIntake.isPending}
-      deletePending={deleteIntake.isPending}
-      pauseError={pauseError}
-      deleteError={deleteError}
-      onPause={pauseIntake}
-      onResume={resumeIntake}
-      onDelete={removeIntake}
-      editAutomationHref={editAutomationHref}
-      canvasId={intake.appId}
-      runHrefFor={
-        intake.appId
-          ? (runId) => factoryAppRunPath(organizationId, factoryKey, intake.appId, runId, { from: "lines", lineId })
-          : undefined
-      }
-      agent={
-        agent.agentNode
-          ? {
-              draft: agent.draft ?? undefined,
-              isLoading: agent.isLoading || !agent.draft,
-              organizationId,
-              onSave: agent.save,
-            }
-          : undefined
-      }
-      onClose={onClose}
-      initialTab={initialTab}
-      fixed
-    />
-  );
+  return { pauseError, deleteError, saveSettings, pauseIntake, resumeIntake, removeIntake };
 }
