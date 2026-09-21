@@ -47,12 +47,7 @@ func CloseJiraOrigin(
 		return nil
 	}
 
-	origin := order.Origin()
-	if origin == nil {
-		return nil
-	}
-
-	target, err := resolveJiraCloseTarget(tx, factory, origin.URL)
+	target, err := resolveJiraCloseTarget(tx, factory, order)
 	if err != nil {
 		return err
 	}
@@ -63,9 +58,17 @@ func CloseJiraOrigin(
 	return closeJiraIssue(tx, closeCtx, factory, order, target)
 }
 
-func resolveJiraCloseTarget(tx *gorm.DB, factory *models.Factory, originURL string) (*jiraCloseTarget, error) {
-	originURL = strings.TrimSpace(originURL)
-	if factory == nil || originURL == "" {
+func resolveJiraCloseTarget(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder) (*jiraCloseTarget, error) {
+	if factory == nil || order == nil {
+		return nil, nil
+	}
+
+	origin := order.Origin()
+	if origin == nil {
+		return nil, nil
+	}
+	originURL := strings.TrimSpace(origin.URL)
+	if originURL == "" {
 		return nil, nil
 	}
 
@@ -92,6 +95,12 @@ func resolveJiraCloseTarget(tx *gorm.DB, factory *models.Factory, originURL stri
 		return nil, err
 	}
 
+	preferredCanvasID, err := canvasIDFromSourceRun(tx, order)
+	if err != nil {
+		return nil, err
+	}
+
+	var fallback *jiraCloseTarget
 	for i := range jiraIntakes {
 		intake := &jiraIntakes[i]
 		spec := specs[intake.CanvasID]
@@ -133,15 +142,37 @@ func resolveJiraCloseTarget(tx *gorm.DB, factory *models.Factory, originURL stri
 		}
 
 		settings := jiraCompletionSettingsFromMetadata(trigger.Metadata, defaultJiraIntakeSettings())
-		return &jiraCloseTarget{
+		target := &jiraCloseTarget{
 			Integration:    integration,
 			IssueKey:       issueKey,
 			MoveOnComplete: settings.JiraMoveOnComplete,
 			Column:         settings.JiraCompletionColumn,
-		}, nil
+		}
+		if preferredCanvasID != uuid.Nil && intake.CanvasID == preferredCanvasID {
+			return target, nil
+		}
+		if fallback == nil {
+			fallback = target
+		}
 	}
 
-	return nil, nil
+	return fallback, nil
+}
+
+func canvasIDFromSourceRun(tx *gorm.DB, order *models.FactoryWorkOrder) (uuid.UUID, error) {
+	if order == nil || order.SourceRunID == nil {
+		return uuid.Nil, nil
+	}
+
+	run, err := models.FindUnscopedCanvasRun(tx, *order.SourceRunID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return uuid.Nil, nil
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return run.WorkflowID, nil
 }
 
 func closeJiraIssue(

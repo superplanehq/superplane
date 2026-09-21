@@ -398,7 +398,9 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Type = updatedNode.Type
 	existingNode.Ref = datatypes.NewJSONType(updatedNode.Ref)
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
-	existingNode.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(updatedNode.Metadata))
+	existingNode.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(
+		mergeNodeMetadata(existingNode.Metadata.Data(), updatedNode.Metadata),
+	))
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
 	existingNode.SetConcurrencySpec(updatedNode.Concurrency)

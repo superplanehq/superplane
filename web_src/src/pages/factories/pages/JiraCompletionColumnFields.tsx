@@ -56,7 +56,8 @@ export function JiraCompletionColumnFields({
     <fieldset className="min-w-0" data-testid="jira-completion-column">
       <legend className="workspace-section-title">{JIRA_COMPLETION_COLUMN_COPY.section}</legend>
       <div className="mt-2 flex flex-col gap-2">
-        <label
+        <Label
+          htmlFor="jira-move-on-complete"
           className={cn(
             "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
             value.jiraMoveOnComplete
@@ -65,15 +66,15 @@ export function JiraCompletionColumnFields({
           )}
         >
           <Checkbox
+            id="jira-move-on-complete"
             checked={value.jiraMoveOnComplete}
             onChange={() => onChange({ ...value, jiraMoveOnComplete: !value.jiraMoveOnComplete })}
-            aria-label={JIRA_COMPLETION_COLUMN_COPY.move}
             data-testid="jira-move-on-complete"
           />
           <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">
             {JIRA_COMPLETION_COLUMN_COPY.move}
           </span>
-        </label>
+        </Label>
         {value.jiraMoveOnComplete ? (
           <div className="flex flex-col gap-1.5 pl-1">
             <Label htmlFor="jira-completion-column-select">{JIRA_COMPLETION_COLUMN_COPY.column}</Label>
