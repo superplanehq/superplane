@@ -361,7 +361,8 @@ func (c *IntegrationContext) Persist() error {
 // any code path that saves the integration afterwards. The row is locked and
 // each changed key is applied only when the stored value still matches the
 // snapshot from load, so a sync running at the same time does not lose OAuth
-// expiration, user, or project data.
+// expiration, user, or project data. A conflicting write returns an error so
+// webhook setup retries instead of reporting ready without a stored id.
 func (c *IntegrationContext) PersistMetadata() error {
 	if c.tx == nil || c.integration == nil {
 		return nil
@@ -383,7 +384,9 @@ func (c *IntegrationContext) PersistMetadata() error {
 		}
 
 		merged := cloneMetadataMap(latest.Metadata.Data())
-		applyMetadataDelta(merged, c.loadedMetadata, current)
+		if applyMetadataDelta(merged, c.loadedMetadata, current) {
+			return errIntegrationMetadataConflict
+		}
 
 		// The column is NOT NULL, and a handler that clears every key leaves a
 		// nil map behind. Writing NULL would fail the caller's transaction.
@@ -599,6 +602,8 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 	return c.secretStorage
 }
 
+var errIntegrationMetadataConflict = errors.New("integration metadata changed concurrently")
+
 func cloneMetadataMap(metadata map[string]any) map[string]any {
 	cloned := map[string]any{}
 	if len(metadata) == 0 {
@@ -627,8 +632,9 @@ func metadataHasDelta(original, current map[string]any) bool {
 	return false
 }
 
-func applyMetadataDelta(latest, original, current map[string]any) {
+func applyMetadataDelta(latest, original, current map[string]any) bool {
 	keys := metadataKeyUnion(original, current)
+	conflict := false
 	for key := range keys {
 		originalValue, originalExists := original[key]
 		currentValue, currentExists := current[key]
@@ -638,6 +644,11 @@ func applyMetadataDelta(latest, original, current map[string]any) {
 
 		latestValue, latestExists := latest[key]
 		if latestExists != originalExists || !metadataValuesEqual(latestValue, originalValue) {
+			// A skipped delete leaves the newer value in place. A skipped write
+			// must fail so webhook setup retries instead of reporting ready.
+			if currentExists {
+				conflict = true
+			}
 			continue
 		}
 
@@ -647,6 +658,7 @@ func applyMetadataDelta(latest, original, current map[string]any) {
 		}
 		delete(latest, key)
 	}
+	return conflict
 }
 
 func metadataKeyUnion(left, right map[string]any) map[string]struct{} {
