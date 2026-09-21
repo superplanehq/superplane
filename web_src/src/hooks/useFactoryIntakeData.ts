@@ -89,6 +89,7 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       integrationId?: string;
       resourceId?: string;
       skipInitialImport?: boolean;
+      settings?: FactoriesFactoryIntakeSettings;
     }) => {
       const response = await factoriesCreateFactoryIntake(
         withOrganizationHeader({
@@ -101,6 +102,7 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
             integrationId: input.integrationId,
             resourceId: input.resourceId,
             skipInitialImport: input.skipInitialImport,
+            settings: input.settings,
           },
         }),
       );

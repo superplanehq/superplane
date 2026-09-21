@@ -200,6 +200,60 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "ENG", trigger.Configuration["project"])
 	})
 
+	t.Run("a Jira intake stores the completion column on the trigger", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		move := true
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId:     integrationID,
+			ResourceId:        "ENG",
+			SkipInitialImport: true,
+			Settings: &pb.FactoryIntake_Settings{
+				JiraMoveOnComplete:   &move,
+				JiraCompletionColumn: "In Review",
+			},
+		})
+
+		assert.Equal(t, integrationID, intake.GetIntegrationId())
+		assert.Equal(t, "ENG", intake.GetResourceId())
+		assert.True(t, intake.GetSettings().GetJiraMoveOnComplete())
+		assert.Equal(t, "In Review", intake.GetSettings().GetJiraCompletionColumn())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, true, trigger.Metadata[intakeMetadataJiraMoveOnComplete])
+		assert.Equal(t, "In Review", trigger.Metadata[intakeMetadataJiraCompletionColumn])
+	})
+
+	t.Run("updating Jira intake settings can disable the completion move", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:            pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId:     integrationID,
+			ResourceId:        "ENG",
+			SkipInitialImport: true,
+		})
+		assert.True(t, intake.GetSettings().GetJiraMoveOnComplete())
+		assert.Empty(t, intake.GetSettings().GetJiraCompletionColumn())
+
+		move := false
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				NewIssues:            protoBool(true),
+				ReopenedIssues:       protoBool(true),
+				JiraMoveOnComplete:   &move,
+				JiraCompletionColumn: "Done",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetSettings().GetJiraMoveOnComplete())
+		assert.Equal(t, "Done", response.GetIntake().GetSettings().GetJiraCompletionColumn())
+	})
+
 	t.Run("a Jira intake listens to the selected project and stays unhealthy until the webhook is ready", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
@@ -958,10 +1012,16 @@ func createReadyJiraIntakeIntegration(t *testing.T, organizationID uuid.UUID, pr
 
 	integration.State = models.IntegrationStateReady
 	integration.Metadata = datatypes.NewJSONType(map[string]any{
+		"cloudId": "jira-cloud-1",
+		"siteUrl": "https://acme.atlassian.net",
 		"projects": []any{
 			map[string]any{"id": "10000", "key": projectKey, "name": projectKey},
 		},
 	})
 	require.NoError(t, database.DB(t.Context()).Save(integration).Error)
 	return integration.ID.String()
+}
+
+func protoBool(value bool) *bool {
+	return &value
 }

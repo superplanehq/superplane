@@ -80,6 +80,24 @@ describe("lineIntakeModel", () => {
     });
   });
 
+  it("maps the Jira integration and project from the intake API", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-jira",
+        canvasId: "canvas-jira",
+        source: "SOURCE_JIRA_ISSUES",
+        integrationId: "jira-1",
+        resourceId: "ENG",
+        settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "Done" },
+      },
+    ]);
+
+    expect(intake?.integrationId).toBe("jira-1");
+    expect(intake?.resourceId).toBe("ENG");
+    expect(intake?.settings.jiraMoveOnComplete).toBe(true);
+    expect(intake?.settings.jiraCompletionColumn).toBe("Done");
+  });
+
   it("carries the paused state from the intake API", () => {
     const [intake] = intakeSourcesFromFactoryIntakes([
       {

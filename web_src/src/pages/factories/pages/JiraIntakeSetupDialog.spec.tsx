@@ -34,15 +34,30 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
   useAvailableIntegrations: () => ({ data: [mocks.jiraDefinition], isLoading: false }),
   useCreateIntegration: () => ({ mutateAsync: mocks.createIntegration, reset: vi.fn() }),
-  useIntegrationResources: () => ({
-    data: [
-      { id: "ENG", name: "Engineering (ENG)" },
-      { id: "OPS", name: "Operations (OPS)" },
-    ],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => {
+    if (resourceType === "issueStatus") {
+      return {
+        data: [
+          { id: "todo", name: "To Do" },
+          { id: "progress", name: "In Progress" },
+          { id: "qa", name: "QA" },
+          { id: "done", name: "Done" },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      };
+    }
+    return {
+      data: [
+        { id: "ENG", name: "Engineering (ENG)" },
+        { id: "OPS", name: "Operations (OPS)" },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 vi.mock("@/lib/browserAction", () => ({
@@ -81,6 +96,14 @@ function renderDialog(onCreated = vi.fn(), selectIntegrationId = "") {
       />
     </MemoryRouter>,
   );
+}
+
+async function chooseProjectAndWaitForDone(user: ReturnType<typeof userEvent.setup>, projectId = "ENG") {
+  await user.click(await screen.findByTestId(`jira-project-${projectId}`));
+  expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByTestId("jira-completion-column-select")).toHaveTextContent("Done");
+  });
 }
 
 describe("JiraIntakeSetupDialog", () => {
@@ -123,8 +146,7 @@ describe("JiraIntakeSetupDialog", () => {
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    await screen.findByTestId("jira-project-ENG");
-    await user.click(screen.getByTestId("jira-project-ENG"));
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -132,6 +154,10 @@ describe("JiraIntakeSetupDialog", () => {
         source: "SOURCE_JIRA_ISSUES",
         integrationId: "integration-1",
         resourceId: "ENG",
+        settings: {
+          jiraMoveOnComplete: true,
+          jiraCompletionColumn: "Done",
+        },
       });
     });
     expect(onCreated).toHaveBeenCalled();
@@ -147,7 +173,7 @@ describe("JiraIntakeSetupDialog", () => {
     expect(screen.getByTestId("jira-skip-initial-import")).not.toBeChecked();
     await user.click(screen.getByTestId("jira-skip-initial-import"));
     expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
-    await user.click(screen.getByTestId("jira-project-ENG"));
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -156,6 +182,10 @@ describe("JiraIntakeSetupDialog", () => {
         integrationId: "integration-1",
         resourceId: "ENG",
         skipInitialImport: true,
+        settings: {
+          jiraMoveOnComplete: true,
+          jiraCompletionColumn: "Done",
+        },
       });
     });
     expect(onCreated).toHaveBeenCalled();
@@ -198,7 +228,7 @@ describe("JiraIntakeSetupDialog", () => {
     await user.click(await screen.findByTestId("jira-connection-integration-2"));
     await user.click(screen.getByTestId("jira-setup-continue"));
 
-    await user.click(await screen.findByTestId("jira-project-ENG"));
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -206,6 +236,10 @@ describe("JiraIntakeSetupDialog", () => {
         source: "SOURCE_JIRA_ISSUES",
         integrationId: "integration-2",
         resourceId: "ENG",
+        settings: {
+          jiraMoveOnComplete: true,
+          jiraCompletionColumn: "Done",
+        },
       });
     });
   });
@@ -262,8 +296,7 @@ describe("JiraIntakeSetupDialog", () => {
     const onCreated = vi.fn();
     renderDialog(onCreated, "integration-new");
 
-    expect(await screen.findByTestId("jira-project-ENG")).toBeInTheDocument();
-    await user.click(screen.getByTestId("jira-project-ENG"));
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
@@ -271,6 +304,10 @@ describe("JiraIntakeSetupDialog", () => {
         source: "SOURCE_JIRA_ISSUES",
         integrationId: "integration-new",
         resourceId: "ENG",
+        settings: {
+          jiraMoveOnComplete: true,
+          jiraCompletionColumn: "Done",
+        },
       });
     });
   });
@@ -293,9 +330,56 @@ describe("JiraIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(await screen.findByTestId("jira-project-ENG"));
+    await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(JIRA_INTAKE_SETUP_COPY.wizardCreateError);
+  });
+
+  it("creates a bound intake with the chosen completion column", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await chooseProjectAndWaitForDone(user);
+    const select = screen.getByTestId("jira-completion-column-select");
+    await user.click(select);
+    await user.click(screen.getByRole("option", { name: "QA" }));
+    await user.click(screen.getByTestId("jira-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_JIRA_ISSUES",
+        integrationId: "integration-1",
+        resourceId: "ENG",
+        settings: {
+          jiraMoveOnComplete: true,
+          jiraCompletionColumn: "QA",
+        },
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("creates a bound intake that leaves the Jira issue in its column", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await chooseProjectAndWaitForDone(user);
+    await user.click(screen.getByTestId("jira-move-on-complete"));
+    expect(screen.queryByTestId("jira-completion-column-select")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("jira-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_JIRA_ISSUES",
+        integrationId: "integration-1",
+        resourceId: "ENG",
+        settings: {
+          jiraMoveOnComplete: false,
+          jiraCompletionColumn: "",
+        },
+      });
+    });
   });
 });

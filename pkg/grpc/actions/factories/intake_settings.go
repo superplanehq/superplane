@@ -3,6 +3,7 @@ package factories
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -41,6 +42,9 @@ const (
 
 	intakeJiraAssignedCondition   = "root().data.issue.fields.assignee != null"
 	intakeJiraUnassignedCondition = "root().data.issue.fields.assignee == null"
+
+	intakeMetadataJiraMoveOnComplete   = "jiraMoveOnComplete"
+	intakeMetadataJiraCompletionColumn = "jiraCompletionColumn"
 )
 
 // intakeSettings is what a user can change about an intake without editing the
@@ -56,6 +60,10 @@ type intakeSettings struct {
 	ReopenedIssues    bool
 	// Create a task when somebody adds the "superplane" label to an open issue.
 	SuperplaneLabelAdded bool
+	// Move the originating Jira issue when the work order completes.
+	JiraMoveOnComplete bool
+	// Jira status name to move the issue to. Empty means the Done column.
+	JiraCompletionColumn string
 }
 
 func defaultIntakeSettings() intakeSettings {
@@ -67,6 +75,7 @@ func defaultIntakeSettings() intakeSettings {
 		NewIssues:            true,
 		ReopenedIssues:       true,
 		SuperplaneLabelAdded: true,
+		JiraMoveOnComplete:   true,
 		// AuthorsWithAccess is off by default: false.
 	}
 }
@@ -75,6 +84,7 @@ func defaultJiraIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.ReopenedIssues = true
 	settings.SuperplaneLabelAdded = false
+	settings.JiraMoveOnComplete = true
 	return settings
 }
 
@@ -101,6 +111,7 @@ func (s intakeSettings) normalized() intakeSettings {
 		}
 	}
 	s.Labels = labels
+	s.JiraCompletionColumn = strings.TrimSpace(s.JiraCompletionColumn)
 
 	return s
 }
@@ -263,6 +274,7 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			events := configurationStrings(trigger.Configuration["events"])
 			settings.NewIssues = slices.Contains(events, "created")
 			settings.ReopenedIssues = slices.Contains(events, "updated")
+			settings = jiraCompletionSettingsFromMetadata(trigger.Metadata, settings)
 		default:
 			actions := configurationStrings(trigger.Configuration["actions"])
 			settings.NewIssues = slices.Contains(actions, "opened")
@@ -327,8 +339,8 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 	return settings.normalized()
 }
 
-func serializeIntakeSettings(settings intakeSettings) *pb.FactoryIntake_Settings {
-	return &pb.FactoryIntake_Settings{
+func serializeIntakeSettings(source string, settings intakeSettings) *pb.FactoryIntake_Settings {
+	serialized := &pb.FactoryIntake_Settings{
 		ConfidencePct:        int32(settings.ConfidencePct),
 		Labels:               settings.Labels,
 		LabelFilterMode:      serializeIntakeLabelFilterMode(settings.LabelFilterMode),
@@ -338,6 +350,11 @@ func serializeIntakeSettings(settings intakeSettings) *pb.FactoryIntake_Settings
 		ReopenedIssues:       proto.Bool(settings.ReopenedIssues),
 		SuperplaneLabelAdded: proto.Bool(settings.SuperplaneLabelAdded),
 	}
+	if source == models.FactoryIntakeSourceJiraIssues {
+		serialized.JiraMoveOnComplete = proto.Bool(settings.JiraMoveOnComplete)
+		serialized.JiraCompletionColumn = settings.JiraCompletionColumn
+	}
+	return serialized
 }
 
 // parseIntakeSettings merges a request over what the graph already says, so a
@@ -367,8 +384,61 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	if requested.SuperplaneLabelAdded != nil {
 		updated.SuperplaneLabelAdded = requested.GetSuperplaneLabelAdded()
 	}
+	if requested.JiraMoveOnComplete != nil {
+		updated.JiraMoveOnComplete = requested.GetJiraMoveOnComplete()
+	}
+	updated.JiraCompletionColumn = strings.TrimSpace(requested.GetJiraCompletionColumn())
 
 	return updated.normalized()
+}
+
+func jiraCompletionSettingsFromMetadata(metadata map[string]any, settings intakeSettings) intakeSettings {
+	if metadata == nil {
+		return settings
+	}
+	if value, ok := metadata[intakeMetadataJiraMoveOnComplete]; ok {
+		settings.JiraMoveOnComplete = metadataBool(value, settings.JiraMoveOnComplete)
+	}
+	if value, ok := metadata[intakeMetadataJiraCompletionColumn]; ok {
+		if column, ok := value.(string); ok {
+			settings.JiraCompletionColumn = strings.TrimSpace(column)
+		}
+	}
+	return settings
+}
+
+func jiraCompletionMetadata(settings intakeSettings) map[string]any {
+	return map[string]any{
+		intakeMetadataJiraMoveOnComplete:   settings.JiraMoveOnComplete,
+		intakeMetadataJiraCompletionColumn: settings.JiraCompletionColumn,
+	}
+}
+
+func mergeJiraCompletionMetadata(metadata map[string]any, settings intakeSettings) map[string]any {
+	if metadata == nil {
+		metadata = map[string]any{}
+	} else {
+		metadata = maps.Clone(metadata)
+	}
+	for key, value := range jiraCompletionMetadata(settings) {
+		metadata[key] = value
+	}
+	return metadata
+}
+
+func metadataBool(value any, fallback bool) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "true":
+			return true
+		case "false":
+			return false
+		}
+	}
+	return fallback
 }
 
 func configurationStrings(value any) []string {
