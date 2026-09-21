@@ -7,11 +7,6 @@ import (
 
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
-		{Method: "DELETE", Pattern: "/api/v1/canvas-folders/{id}"}: {
-			Resource:   "canvases",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "DELETE", Pattern: "/api/v1/canvases/{canvas_id}/memory/{memory_id}"}: {
 			Resource:           "canvases",
 			Action:             "update",
@@ -128,11 +123,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "GET", Pattern: "/api/v1/canvas-folders"}: {
-			Resource:   "canvases",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "GET", Pattern: "/api/v1/canvases"}: {
 			Resource:   "canvases",
@@ -504,11 +494,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "PATCH", Pattern: "/api/v1/canvas-folders/{id}/position"}: {
-			Resource:   "canvases",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/assignees"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
@@ -679,11 +664,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:                       "create",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/canvas-folders"}: {
-			Resource:   "canvases",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/canvases"}: {
 			Resource:   "canvases",
@@ -932,11 +912,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/api-keys/{id}/token"}: {
 			Resource:   "api_keys",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "PUT", Pattern: "/api/v1/canvas-folders/{id}"}: {
-			Resource:   "canvases",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
