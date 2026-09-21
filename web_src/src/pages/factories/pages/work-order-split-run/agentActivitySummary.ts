@@ -1,7 +1,7 @@
 import { commandText, isCommandTool, toolFilePaths } from "@/lib/agentToolLabels";
 import type { AgentActivityItem, AgentToolItem } from "./agentActivity";
 
-export { commandDisplayText, commandText, isCommandTool, toolFilePaths } from "@/lib/agentToolLabels";
+export { commandText, isCommandTool, toolFilePaths } from "@/lib/agentToolLabels";
 
 export type ToolActivityGroup = {
   type: "tool_activity_group";

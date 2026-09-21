@@ -1,10 +1,13 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
+import { isCommandKind } from "@/lib/agentToolLabels";
 
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
 export function toolCallSummary(tools: Array<{ type?: string; componentType?: string }>): string {
-  const files = tools.filter((tool) => (tool.type ?? tool.componentType) === "read").length;
-  const commands = tools.length - files;
+  const kinds = tools.map((tool) => tool.type ?? tool.componentType ?? "");
+  const files = kinds.filter((kind) => kind === "read").length;
+  const commands = kinds.filter(isCommandKind).length;
+  const otherTools = tools.length - files - commands;
   const parts: string[] = [];
   if (files > 0) {
     parts.push(files === 1 ? "Read 1 file" : `Read ${files} files`);
@@ -12,6 +15,10 @@ export function toolCallSummary(tools: Array<{ type?: string; componentType?: st
   if (commands > 0) {
     const ran = commands === 1 ? "ran 1 command" : `ran ${commands} commands`;
     parts.push(parts.length === 0 ? ran.charAt(0).toUpperCase() + ran.slice(1) : ran);
+  }
+  if (otherTools > 0) {
+    const used = otherTools === 1 ? "used 1 tool" : `used ${otherTools} tools`;
+    parts.push(parts.length === 0 ? used.charAt(0).toUpperCase() + used.slice(1) : used);
   }
   return parts.join(", ");
 }
