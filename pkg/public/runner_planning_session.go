@@ -293,7 +293,22 @@ func (s *Server) handleRunnerPlanningScore(
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
+	publishPlanningScore(session)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func publishPlanningScore(session *models.FactoryPlanningSession) {
+	if session == nil || session.DraftWorkOrderID == nil {
+		return
+	}
+	err := messages.PublishFactoryWorkOrderUpdated(
+		session.FactoryID.String(),
+		session.DraftWorkOrderID.String(),
+		factoryevents.EventTypeOrderCheckReported,
+	)
+	if err != nil {
+		log.WithError(err).Warn("failed to publish planning score update")
+	}
 }
 
 func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Request) {
