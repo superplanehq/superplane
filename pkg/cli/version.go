@@ -8,11 +8,17 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // Version is set at build time via -ldflags.
 // Defaults to "dev" for development builds.
 var Version = "dev"
+
+// updateCheckInterval controls how often StartUpdateCheck is allowed to hit
+// the GitHub releases API. We only need to know about new releases once a
+// day, so there's no reason to pay that network cost on every command.
+const updateCheckInterval = 24 * time.Hour
 
 var updateCheckResult <-chan *updateInfo
 
@@ -52,12 +58,40 @@ func StartUpdateCheck() {
 		return
 	}
 
+	recordUpdateCheck()
+
 	ch := make(chan *updateInfo, 1)
 	updateCheckResult = ch
 	go func() {
 		release, err := fetchLatestRelease()
 		ch <- &updateInfo{release: release, err: err}
 	}()
+}
+
+// ShouldCheckForUpdateNow reports whether enough time has passed since the
+// last update check for it to be worth hitting the GitHub releases API
+// again. The timestamp of the last check is persisted in the CLI
+// configuration file, so this holds across separate command invocations.
+func ShouldCheckForUpdateNow() bool {
+	last := viper.GetString(ConfigKeyLastUpdateCheck)
+	if last == "" {
+		return true
+	}
+
+	lastChecked, err := time.Parse(time.RFC3339, last)
+	if err != nil {
+		return true
+	}
+
+	return time.Since(lastChecked) >= updateCheckInterval
+}
+
+// recordUpdateCheck persists the current time as the last update check
+// timestamp. Failures to persist it are non-fatal: at worst, we check for
+// updates again earlier than strictly necessary next time.
+func recordUpdateCheck() {
+	viper.Set(ConfigKeyLastUpdateCheck, time.Now().UTC().Format(time.RFC3339))
+	_ = WriteConfig()
 }
 
 func ShouldStartUpdateCheck(args []string) bool {

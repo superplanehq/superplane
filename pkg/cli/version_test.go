@@ -2,7 +2,9 @@ package cli
 
 import (
 	"testing"
+	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -119,4 +121,28 @@ func TestBuildUpdateNoticeEmptyWhenAlreadyCurrent(t *testing.T) {
 	release := &releaseInfo{TagName: "v0.17.0"}
 
 	require.Empty(t, buildUpdateNotice("v0.17.0", release, "linux", "amd64"))
+}
+
+func TestShouldCheckForUpdateNow(t *testing.T) {
+	setupViper(t)
+
+	require.True(t, ShouldCheckForUpdateNow(), "expected a check when no timestamp has been recorded yet")
+
+	viper.Set(ConfigKeyLastUpdateCheck, time.Now().UTC().Format(time.RFC3339))
+	require.False(t, ShouldCheckForUpdateNow(), "expected no check right after one was just recorded")
+
+	viper.Set(ConfigKeyLastUpdateCheck, time.Now().UTC().Add(-25*time.Hour).Format(time.RFC3339))
+	require.True(t, ShouldCheckForUpdateNow(), "expected a check once the interval has elapsed")
+
+	viper.Set(ConfigKeyLastUpdateCheck, "not-a-timestamp")
+	require.True(t, ShouldCheckForUpdateNow(), "expected a check when the stored timestamp can't be parsed")
+}
+
+func TestRecordUpdateCheckPersistsTimestamp(t *testing.T) {
+	setupViper(t)
+
+	require.True(t, ShouldCheckForUpdateNow())
+	recordUpdateCheck()
+	require.False(t, ShouldCheckForUpdateNow(), "expected the recorded timestamp to be picked up immediately")
+	require.NotEmpty(t, viper.GetString(ConfigKeyLastUpdateCheck))
 }
