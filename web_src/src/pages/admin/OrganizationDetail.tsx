@@ -17,6 +17,7 @@ function isOrganizationTab(value: string): value is OrganizationTab {
 const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
   const [tab, setTab] = useState<OrganizationTab>("users");
+  const [creditsVisited, setCreditsVisited] = useState(false);
 
   useReportPageReady(true);
 
@@ -32,9 +33,13 @@ const OrganizationDetail: React.FC = () => {
       <Tabs
         value={tab}
         onValueChange={(nextTab) => {
-          if (isOrganizationTab(nextTab)) {
-            setTab(nextTab);
+          if (!isOrganizationTab(nextTab)) {
+            return;
           }
+          if (nextTab === "credits") {
+            setCreditsVisited(true);
+          }
+          setTab(nextTab);
         }}
       >
         <TabsList>
@@ -52,7 +57,11 @@ const OrganizationDetail: React.FC = () => {
         <TabsContent value="features" className="mt-3">
           <OrgExperimentalFeaturesTable orgId={orgId!} />
         </TabsContent>
-        <TabsContent value="credits" forceMount className="mt-3 data-[state=inactive]:hidden">
+        <TabsContent
+          value="credits"
+          forceMount={creditsVisited || undefined}
+          className="mt-3 data-[state=inactive]:hidden"
+        >
           <OrgLLMCreditSection orgId={orgId!} />
         </TabsContent>
       </Tabs>

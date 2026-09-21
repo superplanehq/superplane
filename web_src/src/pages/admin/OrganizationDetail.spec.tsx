@@ -120,6 +120,16 @@ describe("OrganizationDetail", () => {
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
   });
 
+  it("does not load credits until the credits tab opens", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.includes("/llm-credit"))).toBe(false);
+    expect(urls.some((url) => url.includes("/billing-plan"))).toBe(false);
+  });
+
   it("opens features and credits after tab clicks", async () => {
     const user = userEvent.setup();
     renderPage();
