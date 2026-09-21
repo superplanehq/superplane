@@ -52,6 +52,8 @@ function SettingsTabPlayground() {
       mode="edit"
       nodeId="node_renderer_coverage"
       nodeName={nodeName}
+      nodeLabel="Create Issue Comment"
+      blockName="github.createIssueComment"
       configuration={configuration}
       configurationFields={settingsTabFields}
       onSave={(updatedConfiguration, updatedNodeName, updatedIntegrationRef) => {
