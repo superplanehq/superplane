@@ -84,8 +84,15 @@ func AttachWorkspaceAgentResources(
 		return environment, files
 	}
 
-	environment, files = attachWorkspaceMCPServers(ctx, db, mcpServers, environment, files)
-	files = appendWorkspaceSkillFiles(skills, files)
+	disabled := disabledAgentResourceIDs(ctx.Configuration)
+	mcpServers = rejectDisabledAgentResources(mcpServers, disabled)
+	skills = rejectDisabledAgentResources(skills, disabled)
+
+	var mcpNames []string
+	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, environment, files)
+	var skillNames []string
+	files, skillNames = appendWorkspaceSkillFiles(skills, files)
+	files = appendWorkspaceAgentResourcesHint(files, mcpNames, skillNames)
 	return environment, files
 }
 
@@ -95,9 +102,9 @@ func attachWorkspaceMCPServers(
 	resources []models.FactoryAgentResource,
 	environment []BrokerEnvironmentVariable,
 	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+) ([]BrokerEnvironmentVariable, []BrokerTaskFile, []string) {
 	if len(resources) == 0 {
-		return environment, files
+		return environment, files, nil
 	}
 	logger := workspaceAgentResourcesLogger(ctx)
 	encryptor, _ := crypto.FromEnv()
@@ -111,15 +118,19 @@ func attachWorkspaceMCPServers(
 		servers = append(servers, server)
 	}
 	if len(servers) == 0 {
-		return environment, files
+		return environment, files, nil
 	}
 
 	payload, err := json.Marshal(workspaceMCPFile{Servers: servers})
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace agent resources: encode failed")
-		return environment, files
+		return environment, files, nil
 	}
 
+	names := make([]string, 0, len(servers))
+	for _, server := range servers {
+		names = append(names, server.Name)
+	}
 	files = append(files, BrokerTaskFile{
 		Path:    WorkspaceMCPConfigPath,
 		Content: string(payload) + "\n",
@@ -129,10 +140,11 @@ func attachWorkspaceMCPServers(
 		Name:  EnvSuperplaneWorkspaceMCPConfig,
 		Value: workspaceMCPConfigEnvValue,
 	})
-	return environment, files
+	return environment, files, names
 }
 
-func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) ([]BrokerTaskFile, []string) {
+	names := make([]string, 0, len(resources))
 	for i := range resources {
 		markdown := strings.TrimSpace(resources[i].Config.Data().Markdown)
 		if markdown == "" || resources[i].Name == models.ReservedFactoryAgentResourceName {
@@ -146,8 +158,9 @@ func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []
 			BrokerTaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
 			BrokerTaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
 		)
+		names = append(names, resources[i].Name)
 	}
-	return files
+	return files, names
 }
 
 func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {
@@ -206,4 +219,84 @@ func assembleWorkspaceMCPServer(
 		URL:     config.URL,
 		Headers: headers,
 	}, true
+}
+
+const workspaceAgentResourcesHintPrefix = "You can use these resources."
+
+func disabledAgentResourceIDs(configuration any) map[string]struct{} {
+	ids := map[string]struct{}{}
+	config, ok := configuration.(map[string]any)
+	if !ok {
+		return ids
+	}
+	switch values := config["disabledAgentResourceIds"].(type) {
+	case []string:
+		for _, id := range values {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				ids[id] = struct{}{}
+			}
+		}
+	case []any:
+		for _, value := range values {
+			id, ok := value.(string)
+			if !ok {
+				continue
+			}
+			id = strings.TrimSpace(id)
+			if id != "" {
+				ids[id] = struct{}{}
+			}
+		}
+	}
+	return ids
+}
+
+func rejectDisabledAgentResources(resources []models.FactoryAgentResource, disabled map[string]struct{}) []models.FactoryAgentResource {
+	if len(disabled) == 0 {
+		return resources
+	}
+	out := make([]models.FactoryAgentResource, 0, len(resources))
+	for i := range resources {
+		if _, skip := disabled[resources[i].ID.String()]; skip {
+			continue
+		}
+		out = append(out, resources[i])
+	}
+	return out
+}
+
+func workspaceAgentResourcesHint(mcpNames, skillNames []string) string {
+	if len(mcpNames) == 0 && len(skillNames) == 0 {
+		return ""
+	}
+	var builder strings.Builder
+	builder.WriteString(workspaceAgentResourcesHintPrefix)
+	if len(mcpNames) > 0 {
+		builder.WriteString("\nMCP servers: ")
+		builder.WriteString(strings.Join(mcpNames, ", "))
+	}
+	if len(skillNames) > 0 {
+		builder.WriteString("\nSkills: ")
+		builder.WriteString(strings.Join(skillNames, ", "))
+	}
+	return builder.String()
+}
+
+func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames, skillNames []string) []BrokerTaskFile {
+	hint := workspaceAgentResourcesHint(mcpNames, skillNames)
+	if hint == "" {
+		return files
+	}
+	for i := range files {
+		if !strings.HasPrefix(files[i].Path, "prompts/") || !strings.HasSuffix(files[i].Path, ".txt") {
+			continue
+		}
+		if strings.Contains(files[i].Content, workspaceAgentResourcesHintPrefix) {
+			continue
+		}
+		content := strings.TrimRight(files[i].Content, "\n")
+		files[i].Content = content + "\n\n" + hint + "\n"
+	}
+	return files
 }

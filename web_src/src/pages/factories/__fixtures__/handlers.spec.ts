@@ -409,4 +409,20 @@ describe("factory agent resources fixture", () => {
       }),
     });
   });
+
+  it("lists tools for an MCP server", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+    };
+
+    const listed = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources/${HEADER_MCP_RESOURCE.id}/tools`,
+      undefined,
+      fixture,
+    );
+    await expect(listed.json()).resolves.toMatchObject({
+      tools: expect.arrayContaining([expect.objectContaining({ name: "search" })]),
+    });
+  });
 });

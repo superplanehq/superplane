@@ -456,8 +456,36 @@ function requestedAgentResourceKind(url: URL): FactoriesFactoryAgentResource["ki
   return url.searchParams.get("kind") === "KIND_SKILL" ? "KIND_SKILL" : "KIND_MCP_SERVER";
 }
 
+const DEFAULT_MCP_TOOLS = [
+  { name: "search", description: "Search the catalog." },
+  { name: "create_issue", description: "Create an issue." },
+];
+
+function toolsForAgentResource(
+  fixture: FactoriesFixture,
+  resourceId: string,
+): Array<{ name: string; description?: string }> {
+  return fixture.agentResourceToolsById?.[resourceId] ?? DEFAULT_MCP_TOOLS;
+}
+
+function factoryAgentResourceToolsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/tools"),
+    resolve: (match, method) => {
+      if (method !== "GET") return { json: {} };
+      const resources = ensureAgentResources(fixture, match[1]);
+      const resource = resources.find((entry) => entry.id === match[2]);
+      if (!resource || resource.kind === "KIND_SKILL") {
+        return { json: { tools: [] } };
+      }
+      return { json: { tools: toolsForAgentResource(fixture, match[2]) } };
+    },
+  };
+}
+
 function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
+    factoryAgentResourceToolsRoute(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:start"),
       resolve: (match, method) => {

@@ -728,6 +728,17 @@ service Factories {
     };
   }
 
+  rpc ListFactoryAgentResourceTools(ListFactoryAgentResourceToolsRequest) returns (ListFactoryAgentResourceToolsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List MCP tools";
+      description: "Calls tools/list on a connected MCP server. The result is read-only.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -2509,6 +2520,20 @@ message DisconnectFactoryAgentResourceOAuthRequest {
 
 message DisconnectFactoryAgentResourceOAuthResponse {
   FactoryAgentResource resource = 1;
+}
+
+message FactoryAgentResourceTool {
+  string name = 1;
+  string description = 2;
+}
+
+message ListFactoryAgentResourceToolsRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message ListFactoryAgentResourceToolsResponse {
+  repeated FactoryAgentResourceTool tools = 1;
 }
 
 message UsageByModel {
