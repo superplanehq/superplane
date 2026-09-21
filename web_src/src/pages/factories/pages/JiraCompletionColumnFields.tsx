@@ -6,20 +6,7 @@ import { cn } from "@/lib/utils";
 import { useLayoutEffect, useMemo } from "react";
 
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
-
-export type JiraCompletionColumnValue = {
-  jiraMoveOnComplete: boolean;
-  jiraCompletionColumn: string;
-};
-
-export function preferredJiraCompletionColumn(names: string[], current: string): string {
-  const trimmed = current.trim();
-  if (trimmed && names.some((name) => name === trimmed)) {
-    return trimmed;
-  }
-  const done = names.find((name) => name.toLowerCase() === "done");
-  return done ?? names[0] ?? "";
-}
+import { preferredJiraCompletionColumn, type JiraCompletionColumnValue } from "./jiraCompletionColumn";
 
 export function JiraCompletionColumnFields({
   organizationId,

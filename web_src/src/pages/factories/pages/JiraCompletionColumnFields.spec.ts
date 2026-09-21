@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { preferredJiraCompletionColumn } from "./JiraCompletionColumnFields";
+import { preferredJiraCompletionColumn } from "./jiraCompletionColumn";
 
 describe("preferredJiraCompletionColumn", () => {
   it("keeps the current column when it is still available", () => {

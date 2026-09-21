@@ -12,7 +12,7 @@ import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
-import type { JiraCompletionColumnValue } from "./JiraCompletionColumnFields";
+import type { JiraCompletionColumnValue } from "./jiraCompletionColumn";
 import { DEFAULT_JIRA_COMPLETION_SETTINGS, jiraCompletionSettingsToApi } from "./intakeSourceSettingsModel";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
@@ -61,10 +61,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
   }, [selectIntegrationId, jiraConnections, connectedQuery]);
 
   useEffect(() => {
-    if (stayOnConnection || step !== "connection") {
-      return;
-    }
-    if (selectIntegrationId) {
+    if (stayOnConnection || step !== "connection" || selectIntegrationId) {
       return;
     }
     const readyId = readyJiraConnectionId(jiraIntegrations, integrationId);
@@ -81,7 +78,6 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     setProjectId(id);
     setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
   };
-
   const completeConnection = (connectedIntegrationId: string) => {
     setIntegrationId(connectedIntegrationId);
     setConnectOpen(false);
@@ -106,7 +102,6 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     setStayOnConnection(true);
     setStep("connection");
   };
-
   const createBoundIntake = async () => {
     if (!integrationId || !projectId) return;
     setError(undefined);
