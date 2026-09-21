@@ -46,7 +46,6 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
-	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
 	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
@@ -357,11 +356,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
-	err = pbCanvasFolders.RegisterCanvasFoldersHandlerServer(ctx, grpcGatewayMux, services.CanvasFolders)
-	if err != nil {
-		return err
-	}
-
 	err = pbFactories.RegisterFactoriesHandlerServer(ctx, grpcGatewayMux, services.Factories)
 	if err != nil {
 		return err
@@ -435,7 +429,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/canvas-folders").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
