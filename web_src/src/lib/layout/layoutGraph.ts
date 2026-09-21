@@ -53,27 +53,6 @@ export function appendUniqueChannels(first: string[], second: string[]): string[
   return result;
 }
 
-export function resolveElkOutputChannels(args: {
-  metadataChannels: string[];
-  connectedChannels: string[];
-  isVertical: boolean;
-}): string[] {
-  const connected = new Set(args.connectedChannels);
-  const channels =
-    args.isVertical && connected.size > 0
-      ? appendUniqueChannels(
-          args.metadataChannels.filter((channel) => connected.has(channel)),
-          args.connectedChannels,
-        )
-      : appendUniqueChannels(args.metadataChannels, args.connectedChannels);
-
-  if (channels.length === 0) {
-    return ["default"];
-  }
-
-  return channels;
-}
-
 function hasLayoutPath(layoutEdges: LayoutEdge[], startNodeId: string, targetNodeId: string): boolean {
   const adjacencyByNodeId = new Map<string, string[]>();
   layoutEdges.forEach((edge) => {

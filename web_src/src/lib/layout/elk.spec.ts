@@ -442,7 +442,7 @@ describe("ElkLayoutEngine", () => {
     expect(byId.get("when-true")!.position!.x!).toBeLessThan(byId.get("when-false")!.position!.x!);
   });
 
-  it("does not reserve an unused vertical branch port", () => {
+  it("reserves unused vertical branch ports so edit handles stay aligned", () => {
     const workflow: CanvasesCanvas = {
       metadata: { id: "canvas-if-true-only", name: "if-true-only" },
       spec: {
@@ -464,35 +464,7 @@ describe("ElkLayoutEngine", () => {
     );
     const ifNode = graph.children?.find((child) => child.id === "if");
 
-    expect(ifNode?.ports?.map((port) => port.id)).toEqual(["if__input", "if__true"]);
-  });
-
-  it("centers a single connected vertical branch under its parent", async () => {
-    const workflow: CanvasesCanvas = {
-      metadata: { id: "canvas-if-centered", name: "if-centered", factoryId: "factory-1" },
-      spec: {
-        nodes: [
-          { id: "if", name: "if", type: "TYPE_ACTION", component: "control.if", position: { x: 0, y: 0 } },
-          { id: "when-true", name: "true", type: "TYPE_ACTION", component: "noop", position: { x: 400, y: 300 } },
-        ],
-        edges: [{ sourceId: "if", targetId: "when-true", channel: "true" }],
-      },
-    };
-
-    const autoLayout = new ElkLayoutEngine();
-    const result = await autoLayout.apply(workflow, {
-      scope: "full-canvas",
-      direction: "vertical",
-      components: [
-        {
-          name: "control.if",
-          outputChannels: [{ name: "true" }, { name: "false" }],
-        } as ActionsAction,
-      ],
-    });
-    const byId = new Map((result.spec?.nodes || []).map((node) => [node.id!, node]));
-
-    expect(byId.get("when-true")!.position!.x!).toBe(byId.get("if")!.position!.x!);
+    expect(ifNode?.ports?.map((port) => port.id)).toEqual(["if__input", "if__true", "if__false"]);
   });
 
   it("keeps layout edges when node positions are missing", () => {
