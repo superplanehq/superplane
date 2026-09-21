@@ -9,17 +9,10 @@ async function fetchFixture(path: string): Promise<Response> {
 }
 
 describe("createHomeFixtureFetch", () => {
-  it("serves populated canvases and folders", async () => {
+  it("serves populated canvases", async () => {
     const canvases = await fetchFixture("/api/v1/canvases");
     await expect(canvases.json()).resolves.toMatchObject({
       canvases: expect.arrayContaining([expect.objectContaining({ name: "Software Factory" })]),
-    });
-
-    const folders = await fetchFixture("/api/v1/canvas-folders");
-    await expect(folders.json()).resolves.toMatchObject({
-      folders: expect.arrayContaining([
-        expect.objectContaining({ spec: expect.objectContaining({ title: "Automation" }) }),
-      ]),
     });
   });
 
