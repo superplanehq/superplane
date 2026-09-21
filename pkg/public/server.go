@@ -592,6 +592,8 @@ func (s *Server) RegisterWebSocketRoutes() {
 func (s *Server) RegisterWebRoutes(webBasePath string) {
 	log.Infof("Registering web routes with base path: %s", webBasePath)
 
+	registerUnknownAPINotFound(s.Router)
+
 	//
 	// In development mode, we proxy to the Vite dev server.
 	//
@@ -1992,16 +1994,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	<-client.Done
 }
 
+func isAPIPath(path string) bool {
+	return strings.HasPrefix(path, "/admin/api") || strings.HasPrefix(path, "/api")
+}
+
 func shouldProxyToVite(path string) bool {
-	if strings.HasPrefix(path, "/admin/api") {
-		return false
-	}
+	return !isAPIPath(path)
+}
 
-	if strings.HasPrefix(path, "/api") {
-		return false
-	}
-
-	return true
+func registerUnknownAPINotFound(router *mux.Router) {
+	router.PathPrefix("/api").HandlerFunc(http.NotFound)
+	router.PathPrefix("/admin/api").HandlerFunc(http.NotFound)
 }
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server
