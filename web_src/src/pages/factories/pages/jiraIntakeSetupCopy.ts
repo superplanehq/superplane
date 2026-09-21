@@ -6,6 +6,7 @@ export const JIRA_INTAKE_SETUP_COPY = {
   wizardStepProject: "Which Jira project should create tasks?",
   wizardStepProjectHelper:
     "SuperPlane adds the 10 newest unresolved issues of this project. SuperPlane also listens for new issues.",
+  wizardStepProjectHelperSkip: "SuperPlane listens for new issues. SuperPlane does not import existing issues.",
   wizardConnect: "Connect Jira",
   wizardConnecting: "Connecting...",
   wizardConnectError: "SuperPlane could not open Atlassian authorization.",

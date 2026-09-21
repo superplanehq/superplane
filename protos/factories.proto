@@ -1185,6 +1185,9 @@ message CreateFactoryIntakeRequest {
   // Optional integration and source resource selected during guided setup.
   string integration_id = 5;
   string resource_id = 6;
+  // When true, SuperPlane does not import existing issues. The intake still
+  // listens for new issues.
+  bool skip_initial_import = 7;
 }
 
 message CreateFactoryIntakeResponse {
