@@ -27,13 +27,10 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-
 	completedMessage := func(order *models.FactoryWorkOrder) messages.FactoryWorkOrderNotificationMessage {
 		return messages.FactoryWorkOrderNotificationMessage{
 			OrganizationID: r.Organization.ID.String(),
-			FactoryID:      factoryModel.ID.String(),
+			FactoryID:      order.FactoryID.String(),
 			OrderID:        order.ID.String(),
 			EventType:      factoryevents.EventTypeOrderStatusUpdated,
 			FromState:      models.FactoryWorkOrderStateOpen,
@@ -43,7 +40,7 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	}
 
 	t.Run("moves the originating jira issue to done on completed", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-42", nil, jiraMockResponses(
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-42", nil, jiraMockResponses(
 			http.StatusOK, `{"key":"ENG-42","fields":{"status":{"name":"In Progress","statusCategory":{"key":"indeterminate"}}}}`,
 			http.StatusOK, `{"transitions":[{"id":"31","name":"Resolve","to":{"id":"10003","name":"Done","statusCategory":{"key":"done"}},"fields":{"resolution":{"required":true},"comment":{"required":false}}}]}`,
 			http.StatusOK, `[{"id":"10000","name":"Done"}]`,
@@ -64,7 +61,7 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	})
 
 	t.Run("uses the chosen column", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-7", map[string]any{
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-7", map[string]any{
 			"jiraMoveOnComplete":   true,
 			"jiraCompletionColumn": "QA",
 		}, jiraMockResponses(
@@ -83,7 +80,7 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	})
 
 	t.Run("skips when the issue is already in the column", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-1", nil, jiraMockResponses(
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-1", nil, jiraMockResponses(
 			http.StatusOK, `{"key":"ENG-1","fields":{"status":{"name":"Done","statusCategory":{"key":"done"}}}}`,
 		))
 
@@ -92,7 +89,7 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	})
 
 	t.Run("skips an unreachable column without failing complete", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-8", map[string]any{
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-8", map[string]any{
 			"jiraMoveOnComplete":   true,
 			"jiraCompletionColumn": "Done",
 		}, jiraMockResponses(
@@ -109,7 +106,7 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	})
 
 	t.Run("does not call jira when move is off", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-3", map[string]any{
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-3", map[string]any{
 			"jiraMoveOnComplete": false,
 		}, nil)
 
@@ -118,7 +115,7 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	})
 
 	t.Run("skips rejected closes", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-4", nil, nil)
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-4", nil, nil)
 		message := completedMessage(order)
 		message.Result = models.FactoryWorkOrderResultRejected
 
@@ -127,14 +124,14 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 	})
 
 	t.Run("skips a different project", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "OPS-1", nil, nil)
+		order, httpCtx := seedJiraWorkOrder(t, r, "OPS-1", nil, nil)
 
 		require.NoError(t, newJiraCloseConsumer(r, httpCtx).process(db, completedMessage(order)))
 		assert.Empty(t, httpCtx.Requests)
 	})
 
 	t.Run("retries a transient jira error", func(t *testing.T) {
-		order, httpCtx := seedJiraWorkOrder(t, r, factoryModel, "ENG-5", nil, jiraMockResponses(
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-5", nil, jiraMockResponses(
 			http.StatusInternalServerError, `{"error":"unavailable"}`,
 		))
 
@@ -159,7 +156,6 @@ func newJiraCloseConsumer(r *support.ResourceRegistry, httpCtx *supportcontexts.
 func seedJiraWorkOrder(
 	t *testing.T,
 	r *support.ResourceRegistry,
-	factoryModel *models.Factory,
 	issueKey string,
 	metadata map[string]any,
 	responses []*http.Response,
@@ -167,6 +163,8 @@ func seedJiraWorkOrder(
 	t.Helper()
 
 	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
 	integration := createReadyJiraIntegration(t, r)
 	const triggerNodeID = "trigger"
 	integrationID := integration.ID.String()

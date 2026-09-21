@@ -1345,6 +1345,18 @@ func canvasPublisherOptions(r *support.ResourceRegistry) CanvasPublisherOptions 
 	}
 }
 
+func Test__mergeNodeMetadata(t *testing.T) {
+	merged := mergeNodeMetadata(
+		map[string]any{"jiraMoveOnComplete": true, "jiraCompletionColumn": "QA"},
+		map[string]any{"project": map[string]any{"key": "ENG"}},
+	)
+	require.Equal(t, true, merged["jiraMoveOnComplete"])
+	require.Equal(t, "QA", merged["jiraCompletionColumn"])
+	project, ok := merged["project"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "ENG", project["key"])
+}
+
 func findCanvasNode(t *testing.T, nodes []models.CanvasNode, nodeID string) models.CanvasNode {
 	t.Helper()
 
