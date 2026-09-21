@@ -1,8 +1,11 @@
 package factories
 
 import (
+	"fmt"
 	"net/http"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -143,5 +147,192 @@ func TestVerifyGitHubFactoryMergeabilitySignature(t *testing.T) {
 		code, err := VerifyGitHubFactoryMergeabilitySignature(t.Context(), r.Encryptor, webhook, headers, body)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, code)
+	})
+}
+
+func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	setupOpenOrder := func(t *testing.T, repository string, number int64) (
+		*models.Factory,
+		*models.FactoryWorkOrder,
+		*models.Webhook,
+	) {
+		t.Helper()
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateOpen,
+			Actor:   &r.User,
+		})
+		require.NoError(t, err)
+		_, err = order.SetStatusNote(db, models.FactoryWorkOrderStatusNoteParams{
+			Key:      "pr-review",
+			Headline: "Waiting for user review",
+		})
+		require.NoError(t, err)
+		_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL:        fmt.Sprintf("https://github.com/%s/pull/%d", repository, number),
+			Repository: repository,
+			Number:     number,
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+		integration, err := models.CreateIntegration(
+			uuid.New(),
+			r.Organization.ID,
+			"github",
+			support.RandomName("github"),
+			map[string]any{},
+		)
+		require.NoError(t, err)
+		return factory, order, &models.Webhook{AppInstallationID: &integration.ID}
+	}
+
+	closedPayload := func(repository string, number int64, merged bool) []byte {
+		closedAt := time.Now().UTC().Format(time.RFC3339)
+		mergedJSON := "false"
+		mergedAt := "null"
+		if merged {
+			mergedJSON = "true"
+			mergedAt = fmt.Sprintf("%q", closedAt)
+		}
+		return []byte(fmt.Sprintf(`{
+			"action": "closed",
+			"repository": {"full_name": %q},
+			"pull_request": {
+				"number": %d,
+				"merged": %s,
+				"merged_at": %s,
+				"closed_at": %q,
+				"head": {"sha": "abc123"}
+			}
+		}`, repository, number, mergedJSON, mergedAt, closedAt))
+	}
+
+	deliver := func(webhook *models.Webhook, body []byte) {
+		RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+			t.Context(),
+			IntakeDependencies{},
+			webhook,
+			"pull_request",
+			body,
+		)
+	}
+
+	countStatusEvents := func(t *testing.T, order *models.FactoryWorkOrder) int {
+		t.Helper()
+		events, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		count := 0
+		for _, event := range events {
+			if event.Type == factoryevents.EventTypeOrderStatusUpdated {
+				count++
+			}
+		}
+		return count
+	}
+
+	reload := func(t *testing.T, factory *models.Factory, orderID uuid.UUID) *models.FactoryWorkOrder {
+		t.Helper()
+		reloaded, err := factory.FindWorkOrder(db, orderID)
+		require.NoError(t, err)
+		return reloaded
+	}
+
+	t.Run("closes a merged pull request as completed and clears the review note", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 61)
+		deliver(webhook, closedPayload("acme/app", 61, true))
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+		notes, err := reloaded.StatusNotes()
+		require.NoError(t, err)
+		assert.Empty(t, notes)
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/app",
+			Number:     61,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateMerged, stored.State)
+		require.NotNil(t, stored.MergedAt)
+	})
+
+	t.Run("closes a pull request without a merge as rejected", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 62)
+		deliver(webhook, closedPayload("acme/app", 62, false))
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/app",
+			Number:     62,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateClosed, stored.State)
+		require.NotNil(t, stored.ClosedAt)
+	})
+
+	t.Run("repeats do nothing and add no second status event", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 63)
+		body := closedPayload("acme/app", 63, true)
+		deliver(webhook, body)
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		afterFirst := countStatusEvents(t, reloaded)
+
+		deliver(webhook, body)
+		reloaded = reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+		assert.Equal(t, afterFirst, countStatusEvents(t, reloaded))
+	})
+
+	t.Run("concurrent closed deliveries record one close event", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 65)
+		body := closedPayload("acme/app", 65, true)
+		before := countStatusEvents(t, order)
+
+		var started sync.WaitGroup
+		started.Add(2)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		deliverOnce := func() {
+			defer wg.Done()
+			started.Done()
+			started.Wait()
+			deliver(webhook, body)
+		}
+		go deliverOnce()
+		go deliverOnce()
+		wg.Wait()
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+		assert.Equal(t, before+1, countStatusEvents(t, reloaded))
+	})
+
+	t.Run("ignores a repository with no matching pull request", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 64)
+		deliver(webhook, closedPayload("acme/other", 64, true))
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+		assert.Empty(t, reloaded.Result)
+		notes, err := reloaded.StatusNotes()
+		require.NoError(t, err)
+		require.Len(t, notes, 1)
+		assert.Equal(t, "pr-review", notes[0].Key)
 	})
 }
