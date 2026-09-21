@@ -3,14 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { ArrowLeft, Check, Loader2, Search } from "lucide-react";
+import { Check, Loader2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
-import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
-import { SentryIntakeSetupPreview } from "./SentryIntakeSetupPreview";
+import { IntakeSetupWizard } from "./IntakeSetupWizard";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
-import { useSentryIntakeSetup, type SentryIntakeSetupModel, type SentrySetupStep } from "./useSentryIntakeSetup";
+import { useSentryIntakeSetup, type SentryIntakeSetupModel } from "./useSentryIntakeSetup";
 
 interface SentryIntakeSetupDialogProps {
   organizationId: string;
@@ -21,34 +19,57 @@ interface SentryIntakeSetupDialogProps {
 
 export function SentryIntakeSetupDialog(props: SentryIntakeSetupDialogProps) {
   const setup = useSentryIntakeSetup(props.organizationId, props.factoryId);
-  const issueNames = (setup.issuesQuery.data ?? []).map((issue) => issue.name?.trim() ?? "").filter(Boolean);
+  const title =
+    setup.step === "connection"
+      ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnect
+      : SENTRY_INTAKE_SETUP_COPY.wizardStepProject;
+  const helper =
+    setup.step === "connection"
+      ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnectHelper
+      : SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+  const showConnectAction =
+    setup.step === "connection" && !setup.connectedQuery.isLoading && setup.sentryIntegrations.length === 0;
 
   return (
     <>
-      <PRFeedbackSetupWizardShell
+      <IntakeSetupWizard
         testId="sentry-intake-setup"
-        preview={<SentryIntakeSetupPreview issueNames={issueNames} hasProject={Boolean(setup.projectId)} />}
+        integrationName="Sentry"
+        step={setup.step}
+        title={title}
+        helper={helper}
+        stepAction={
+          showConnectAction ? (
+            <Button
+              type="button"
+              disabled={setup.connecting}
+              onClick={() => void setup.connectSentry()}
+              data-testid="sentry-setup-connect"
+            >
+              {setup.connecting ? "Connecting..." : SENTRY_INTAKE_SETUP_COPY.wizardConnect}
+            </Button>
+          ) : undefined
+        }
+        footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
+        onBack={() => {
+          if (setup.step === "project") {
+            setup.returnToConnection();
+            return;
+          }
+          props.onClose();
+        }}
       >
-        <SetupHeader
-          step={setup.step}
-          onBack={() => {
-            if (setup.step === "project") {
-              setup.returnToConnection();
-              return;
-            }
-            props.onClose();
-          }}
-        />
-        <div>
-          <SetupStepBody setup={setup} />
-          {setup.error ? (
-            <p className="workspace-body-text mt-4 text-destructive" role="alert">
-              {setup.error}
-            </p>
-          ) : null}
-        </div>
-        <SetupFooter setup={setup} onCreated={props.onCreated} />
-      </PRFeedbackSetupWizardShell>
+        {showConnectAction && !setup.error ? null : (
+          <div>
+            <SetupStepBody setup={setup} />
+            {setup.error ? (
+              <p className="workspace-body-text mt-4 text-destructive" role="alert">
+                {setup.error}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}
         onOpenChange={setup.setConnectOpen}
@@ -67,36 +88,6 @@ export function SentryIntakeSetupDialog(props: SentryIntakeSetupDialogProps) {
   );
 }
 
-function SetupHeader({ step, onBack }: { step: SentrySetupStep; onBack: () => void }) {
-  return (
-    <header className="text-left">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="mb-6 h-auto gap-1.5 px-0 text-[13px] text-muted-foreground hover:bg-transparent hover:text-foreground"
-        onClick={onBack}
-        data-testid="sentry-setup-back"
-      >
-        <ArrowLeft className="size-4 shrink-0" aria-hidden />
-        <span>
-          {step === "project" ? SENTRY_INTAKE_SETUP_COPY.wizardBack : SENTRY_INTAKE_SETUP_COPY.wizardBackToBoard}
-        </span>
-      </Button>
-      <h1 className={factoryPageTitleClassName}>
-        {step === "connection"
-          ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnect
-          : SENTRY_INTAKE_SETUP_COPY.wizardStepProject}
-      </h1>
-      <p className="workspace-body-text mt-2 text-muted-foreground">
-        {step === "connection"
-          ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnectHelper
-          : SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper}
-      </p>
-    </header>
-  );
-}
-
 function SetupStepBody({ setup }: { setup: SentryIntakeSetupModel }) {
   if (setup.step === "connection") {
     return (
@@ -104,9 +95,7 @@ function SetupStepBody({ setup }: { setup: SentryIntakeSetupModel }) {
         integrations={setup.sentryIntegrations}
         selectedId={setup.integrationId}
         loading={setup.connectedQuery.isLoading}
-        connecting={setup.connecting}
         onSelect={setup.setIntegrationId}
-        onConnect={() => void setup.connectSentry()}
       />
     );
   }
@@ -119,8 +108,6 @@ function SetupStepBody({ setup }: { setup: SentryIntakeSetupModel }) {
       error={setup.projectsQuery.isError}
       onSelect={setup.setProjectId}
       onRetry={() => void setup.projectsQuery.refetch()}
-      issuesError={Boolean(setup.projectId) && setup.issuesQuery.isError}
-      onRetryIssues={() => void setup.issuesQuery.refetch()}
     />
   );
 }
@@ -129,16 +116,12 @@ function ConnectionStep({
   integrations,
   selectedId,
   loading,
-  connecting,
   onSelect,
-  onConnect,
 }: {
   integrations: OrganizationsIntegration[];
   selectedId: string;
   loading: boolean;
-  connecting: boolean;
   onSelect: (id: string) => void;
-  onConnect: () => void;
 }) {
   if (loading) {
     return (
@@ -148,38 +131,33 @@ function ConnectionStep({
       </p>
     );
   }
+  if (integrations.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="space-y-4">
-      {integrations.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-[13px] font-medium">{SENTRY_INTAKE_SETUP_COPY.wizardStepConnectExisting}</p>
-          {integrations.map((integration) => {
-            const id = integration.metadata?.id ?? "";
-            const selected = id === selectedId;
-            return (
-              <Button
-                key={id}
-                type="button"
-                variant="ghost"
-                onClick={() => onSelect(id)}
-                data-testid={`sentry-connection-${id}`}
-                className={cn(
-                  "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
-                  selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Sentry"}</span>
-                {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
-              </Button>
-            );
-          })}
-        </div>
-      ) : (
-        <Button type="button" disabled={connecting} onClick={onConnect} data-testid="sentry-setup-connect">
-          {connecting ? "Connecting..." : SENTRY_INTAKE_SETUP_COPY.wizardConnect}
-        </Button>
-      )}
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium">{SENTRY_INTAKE_SETUP_COPY.wizardStepConnectExisting}</p>
+      {integrations.map((integration) => {
+        const id = integration.metadata?.id ?? "";
+        const selected = id === selectedId;
+        return (
+          <Button
+            key={id}
+            type="button"
+            variant="ghost"
+            onClick={() => onSelect(id)}
+            data-testid={`sentry-connection-${id}`}
+            className={cn(
+              "h-auto w-full justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
+              selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
+            )}
+          >
+            <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Sentry"}</span>
+            {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+          </Button>
+        );
+      })}
     </div>
   );
 }
@@ -191,8 +169,6 @@ function ProjectStep({
   error,
   onSelect,
   onRetry,
-  issuesError,
-  onRetryIssues,
 }: {
   projects: Array<{ id?: string; name?: string }>;
   selectedId: string;
@@ -200,8 +176,6 @@ function ProjectStep({
   error: boolean;
   onSelect: (id: string) => void;
   onRetry: () => void;
-  issuesError: boolean;
-  onRetryIssues: () => void;
 }) {
   if (loading) {
     return (
@@ -224,21 +198,7 @@ function ProjectStep({
   if (projects.length === 0) {
     return <p className="workspace-body-text text-muted-foreground">{SENTRY_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>;
   }
-  return (
-    <div className="space-y-4">
-      <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />
-      {issuesError ? (
-        <div className="space-y-3">
-          <p className="workspace-body-text text-destructive" role="alert">
-            {SENTRY_INTAKE_SETUP_COPY.wizardIssuesError}
-          </p>
-          <Button type="button" variant="outline" size="sm" onClick={onRetryIssues}>
-            {SENTRY_INTAKE_SETUP_COPY.wizardRetry}
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  );
+  return <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />;
 }
 
 function ProjectPicker({
@@ -309,9 +269,10 @@ function ProjectPicker({
 function SetupFooter({ setup, onCreated }: { setup: SentryIntakeSetupModel; onCreated: () => void }) {
   if (setup.step === "connection") {
     return (
-      <div className="space-y-3">
+      <div>
         <Button
           type="button"
+          className="w-full"
           disabled={!setup.integrationId}
           onClick={() => setup.setStep("project")}
           data-testid="sentry-setup-continue"
@@ -323,9 +284,10 @@ function SetupFooter({ setup, onCreated }: { setup: SentryIntakeSetupModel; onCr
   }
 
   return (
-    <div className="space-y-3">
+    <div>
       <Button
         type="button"
+        className="w-full"
         disabled={!setup.projectId || setup.createIntake.isPending}
         onClick={() => {
           void setup.createBoundIntake().then((created) => {

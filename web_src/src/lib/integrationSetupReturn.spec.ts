@@ -130,10 +130,10 @@ describe("integration setup return", () => {
 
   it("adds setupReturnPath when a return path is present", () => {
     expect(
-      configurationWithSetupReturnPath({ clientId: "id" }, "/org-1/workspaces/sp/lines/line-1?jiraIntake=1"),
+      configurationWithSetupReturnPath({ clientId: "id" }, "/org-1/workspaces/sp/lines/line-1/setup/jira"),
     ).toEqual({
       clientId: "id",
-      setupReturnPath: "/org-1/workspaces/sp/lines/line-1?jiraIntake=1",
+      setupReturnPath: "/org-1/workspaces/sp/lines/line-1/setup/jira",
     });
     expect(configurationWithSetupReturnPath({ clientId: "id" })).toEqual({ clientId: "id" });
   });

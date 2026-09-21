@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
+import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+
 import {
   ADD_INTAKE_TEMPLATES,
+  addIntakeTemplatesForOrg,
   apiIntakeSource,
-  filterAddIntakeTemplates,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
@@ -290,10 +292,38 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists eight add-intake templates including CI and page performance", () => {
-    expect(ADD_INTAKE_TEMPLATES).toHaveLength(8);
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-ci-runtime");
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-page-performance");
+  it("lists GitHub, Jira, Sentry, and coming-soon DataDog and Notion add-intake sources", () => {
+    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
+      "github-issues",
+      "jira-issues",
+      "sentry-exceptions",
+      "datadog",
+      "notion",
+    ]);
+    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual([
+      "datadog",
+      "notion",
+    ]);
+  });
+
+  it("marks Jira and Sentry as coming soon when their organization features are off", () => {
+    const templates = addIntakeTemplatesForOrg(() => false);
+
+    expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
+  });
+
+  it("keeps Jira and Sentry live when their organization features are on", () => {
+    const templates = addIntakeTemplatesForOrg((featureId) =>
+      [FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE].includes(featureId),
+    );
+
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
   });
 
   it("maps every intake template id to an API source the picker can create", () => {
@@ -305,12 +335,5 @@ describe("lineIntakeModel", () => {
     }
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
-  });
-
-  it("filters add-intake templates by name or description", () => {
-    expect(filterAddIntakeTemplates("unresolved").map((template) => template.id)).toEqual(["sentry-exceptions"]);
-    expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
-    expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("")).toHaveLength(8);
   });
 });

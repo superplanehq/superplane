@@ -121,13 +121,13 @@ func Test__callbackRedirectURL(t *testing.T) {
 			Integration: &contexts.IntegrationContext{
 				IntegrationID: integrationID,
 				Metadata: Metadata{
-					SetupReturnPath: "/org-1/workspaces/acme/lines/line-1?jiraIntake=1",
+					SetupReturnPath: "/org-1/workspaces/acme/lines/line-1/setup/jira",
 				},
 			},
 		}, settingsURL)
 
 		assert.Equal(t,
-			"https://app.example/org-1/workspaces/acme/lines/line-1?jiraIntake=1&jiraIntegrationId="+integrationID,
+			"https://app.example/org-1/workspaces/acme/lines/line-1/setup/jira?jiraIntegrationId="+integrationID,
 			got,
 		)
 	})
