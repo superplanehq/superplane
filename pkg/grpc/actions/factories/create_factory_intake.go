@@ -150,8 +150,13 @@ func CreateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
+	states, err := intakeIntegrationStates(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
 	return &pb.CreateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(db, intake, spec[canvasID]),
+		Intake: serializeFactoryIntake(db, intake, spec[canvasID], states),
 	}, nil
 }
 
