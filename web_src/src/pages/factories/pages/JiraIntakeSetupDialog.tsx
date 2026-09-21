@@ -9,6 +9,7 @@ import { useLocation } from "react-router";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
 import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
+import { JiraCompletionColumnFields } from "./JiraCompletionColumnFields";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 import { useJiraIntakeSetup, type JiraIntakeSetupModel } from "./useJiraIntakeSetup";
 
@@ -65,7 +66,7 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
       >
         {showConnectAction && !setup.error ? null : (
           <div>
-            <SetupStepBody setup={setup} />
+            <SetupStepBody organizationId={props.organizationId} setup={setup} />
             {setup.error ? (
               <p className="workspace-body-text mt-4 text-destructive" role="alert">
                 {setup.error}
@@ -93,7 +94,7 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
   );
 }
 
-function SetupStepBody({ setup }: { setup: JiraIntakeSetupModel }) {
+function SetupStepBody({ organizationId, setup }: { organizationId: string; setup: JiraIntakeSetupModel }) {
   if (setup.step === "connection") {
     return (
       <ConnectionStep
@@ -107,12 +108,16 @@ function SetupStepBody({ setup }: { setup: JiraIntakeSetupModel }) {
 
   return (
     <ProjectStep
+      organizationId={organizationId}
+      integrationId={setup.integrationId}
       projects={setup.projectsQuery.data ?? []}
       selectedId={setup.projectId}
       loading={setup.projectsQuery.isLoading}
       error={setup.projectsQuery.isError}
       onSelect={setup.setProjectId}
       onRetry={() => void setup.projectsQuery.refetch()}
+      completion={setup.jiraCompletion}
+      onCompletionChange={setup.setJiraCompletion}
     />
   );
 }
@@ -168,19 +173,27 @@ function ConnectionStep({
 }
 
 function ProjectStep({
+  organizationId,
+  integrationId,
   projects,
   selectedId,
   loading,
   error,
   onSelect,
   onRetry,
+  completion,
+  onCompletionChange,
 }: {
+  organizationId: string;
+  integrationId: string;
   projects: Array<{ id?: string; name?: string }>;
   selectedId: string;
   loading: boolean;
   error: boolean;
   onSelect: (id: string) => void;
   onRetry: () => void;
+  completion: JiraIntakeSetupModel["jiraCompletion"];
+  onCompletionChange: JiraIntakeSetupModel["setJiraCompletion"];
 }) {
   if (loading) {
     return (
@@ -203,7 +216,20 @@ function ProjectStep({
   if (projects.length === 0) {
     return <p className="workspace-body-text text-muted-foreground">{JIRA_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>;
   }
-  return <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />;
+  return (
+    <div className="space-y-6">
+      <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />
+      {selectedId ? (
+        <JiraCompletionColumnFields
+          organizationId={organizationId}
+          integrationId={integrationId}
+          projectId={selectedId}
+          value={completion}
+          onChange={onCompletionChange}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function ProjectPicker({

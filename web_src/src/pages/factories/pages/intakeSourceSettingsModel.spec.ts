@@ -7,6 +7,7 @@ import {
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
+  jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
 } from "./intakeSourceSettingsModel";
@@ -71,6 +72,31 @@ describe("intakeSourceSettingsModel", () => {
       newIssues: false,
       reopenedIssues: true,
       superplaneLabelAdded: true,
+    });
+  });
+
+  it("round-trips the Jira completion column through the API shape", () => {
+    const settings = intakeSettingsFromApi("Jira issues", {
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "QA",
+    });
+
+    expect(settings.jiraMoveOnComplete).toBe(false);
+    expect(settings.jiraCompletionColumn).toBe("QA");
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "",
+    });
+  });
+
+  it("defaults the Jira completion move on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Jira issues", {});
+
+    expect(settings.jiraMoveOnComplete).toBe(true);
+    expect(settings.jiraCompletionColumn).toBe("");
+    expect(jiraCompletionSettingsToApi(settings)).toEqual({
+      jiraMoveOnComplete: true,
+      jiraCompletionColumn: "",
     });
   });
 

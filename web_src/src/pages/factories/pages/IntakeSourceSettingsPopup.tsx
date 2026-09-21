@@ -26,6 +26,9 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
   sourceId?: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   automationGraph?: IntakeAutomationGraph;
@@ -55,6 +58,9 @@ interface IntakeSourceSettingsPopupProps {
 export function IntakeSourceSettingsPopup({
   settings,
   sourceId = "github-issues",
+  organizationId,
+  integrationId,
+  resourceId,
   labelOptions,
   labelOptionsLoading,
   automationGraph,
@@ -125,6 +131,9 @@ export function IntakeSourceSettingsPopup({
       <IntakeSettingsTabPanel
         tab={tab}
         sourceId={sourceId}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        resourceId={resourceId}
         labelOptions={labelOptions}
         labelOptionsLoading={labelOptionsLoading}
         draft={draft}
@@ -157,6 +166,9 @@ export function IntakeSourceSettingsPopup({
 function IntakeSettingsTabPanel({
   tab,
   sourceId,
+  organizationId,
+  integrationId,
+  resourceId,
   labelOptions,
   labelOptionsLoading,
   draft,
@@ -184,6 +196,9 @@ function IntakeSettingsTabPanel({
 }: {
   tab: IntakeSettingsTab;
   sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
@@ -238,6 +253,9 @@ function IntakeSettingsTabPanel({
   return (
     <IntakeGeneralTab
       sourceId={sourceId}
+      organizationId={organizationId}
+      integrationId={integrationId}
+      resourceId={resourceId}
       labelOptions={labelOptions}
       labelOptionsLoading={labelOptionsLoading}
       draft={draft}
@@ -260,6 +278,9 @@ function IntakeSettingsTabPanel({
 
 function IntakeGeneralTab({
   sourceId,
+  organizationId,
+  integrationId,
+  resourceId,
   labelOptions,
   labelOptionsLoading,
   draft,
@@ -278,6 +299,9 @@ function IntakeGeneralTab({
   onClose,
 }: {
   sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
@@ -306,7 +330,14 @@ function IntakeGeneralTab({
             labelOptions={labelOptions}
             labelOptionsLoading={labelOptionsLoading}
           />
-          <JiraIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <JiraIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            projectId={resourceId}
+          />
         </div>
       </div>
       <IntakeSourceSettingsFooter
