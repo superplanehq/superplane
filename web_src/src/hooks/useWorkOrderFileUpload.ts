@@ -5,9 +5,11 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
+  isInlineWorkOrderVideo,
   MAX_WORK_ORDER_FILE_BYTES,
   setWorkOrderFilePreviewUrl,
   workOrderFileRef,
+  workOrderUploadContentType,
 } from "@/lib/workOrderFiles";
 import { useCallback, useState } from "react";
 
@@ -18,6 +20,7 @@ export type UploadedWorkOrderFile = {
   ref: string;
   previewUrl: string;
   isImage: boolean;
+  isVideo?: boolean;
 };
 
 export function useWorkOrderFileUpload({
@@ -67,9 +70,11 @@ async function uploadOneWorkOrderFile(
     return null;
   }
   if (file.size > MAX_WORK_ORDER_FILE_BYTES) {
-    showErrorToast("Each file must be 10 MB or smaller.");
+    showErrorToast("Each file must be 50 MB or smaller.");
     return null;
   }
+
+  const contentType = workOrderUploadContentType(file);
 
   try {
     const created = args.orderId
@@ -77,14 +82,14 @@ async function uploadOneWorkOrderFile(
           withOrganizationHeader({
             organizationId: args.organizationId,
             path: { factoryId: args.factoryId, orderId: args.orderId },
-            body: { filename: file.name, contentType: file.type },
+            body: { filename: file.name, contentType },
           }),
         )
       : await filesCreateFactoryFile(
           withOrganizationHeader({
             organizationId: args.organizationId,
             path: { factoryId: args.factoryId },
-            body: { filename: file.name, contentType: file.type },
+            body: { filename: file.name, contentType },
           }),
         );
     const createdFile = created.data?.file;
@@ -100,7 +105,7 @@ async function uploadOneWorkOrderFile(
       credentials: "include",
       headers: {
         "x-organization-id": args.organizationId,
-        "Content-Type": file.type || "application/octet-stream",
+        "Content-Type": contentType || "application/octet-stream",
       },
       body: file,
     });
@@ -114,10 +119,11 @@ async function uploadOneWorkOrderFile(
     return {
       id,
       filename: file.name,
-      contentType: file.type,
+      contentType,
       ref: workOrderFileRef(id),
       previewUrl,
-      isImage: isInlineWorkOrderImage(file.type),
+      isImage: isInlineWorkOrderImage(contentType),
+      isVideo: isInlineWorkOrderVideo(contentType),
     };
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "The file could not be stored."));

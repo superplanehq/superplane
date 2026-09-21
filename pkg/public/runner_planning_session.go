@@ -205,7 +205,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 					return
 				}
-				text, err := mintPlanningWaitText(r.Context(), session, result)
+				text, files, err := mintPlanningWait(r.Context(), session, result)
 				if err != nil {
 					restorePlanningWait(session, result)
 					writePlanningWaitError(w, r, session, err)
@@ -216,6 +216,9 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 					restorePlanningWait(session, result)
 					writePlanningWaitError(w, r, session, bodyErr)
 					return
+				}
+				if len(files) > 0 {
+					body["files"] = files
 				}
 				if err := writeJSON(w, http.StatusOK, body); err != nil {
 					restorePlanningWait(session, result)
@@ -483,17 +486,17 @@ func planningWaitMessageBody(
 	return body, nil
 }
 
-func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, error) {
+func mintPlanningWait(ctx context.Context, session *models.FactoryPlanningSession, result models.PlanningWaitResult) (string, []map[string]any, error) {
 	if result.Kind != models.PlanningWaitKindMessage {
-		return result.Text, nil
+		return result.Text, nil, nil
 	}
 	if session.DraftWorkOrderID == nil {
-		return result.Text, nil
+		return result.Text, nil, nil
 	}
 	if len(blob.FileIDsInMarkdown(result.Text)) == 0 {
-		return result.Text, nil
+		return result.Text, nil, nil
 	}
-	rewritten, _, err := storedfiles.DescriptionForDispatch(
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
 		ctx,
 		database.DB(ctx),
 		blob.Current(),
@@ -504,9 +507,13 @@ func mintPlanningWaitText(ctx context.Context, session *models.FactoryPlanningSe
 		blob.DispatchDownloadTTL(0),
 	)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return rewritten, nil
+	payload := make([]map[string]any, 0, len(files))
+	for _, file := range files {
+		payload = append(payload, file.Map())
+	}
+	return rewritten, payload, nil
 }
 
 func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (models.PlanningWaitResult, bool, error) {

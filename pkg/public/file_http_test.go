@@ -83,9 +83,133 @@ func TestFileContentUploadAndPublicDownload(t *testing.T) {
 	assert.Equal(t, http.StatusOK, getRec.Code)
 	assert.Equal(t, "image/png", getRec.Header().Get("Content-Type"))
 	assert.Equal(t, "png-bytes", getRec.Body.String())
+	assert.Equal(t, "bytes", getRec.Header().Get("Accept-Ranges"))
+
+	rangeReq := httptest.NewRequest(http.MethodGet, parsed.RequestURI(), nil)
+	rangeReq.Header.Set("Range", "bytes=4-6")
+	rangeRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rangeRec, rangeReq)
+	assert.Equal(t, http.StatusPartialContent, rangeRec.Code)
+	assert.Equal(t, "byt", rangeRec.Body.String())
+	assert.Contains(t, rangeRec.Header().Get("Content-Range"), "bytes 4-6/")
 
 	badReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/public/files/%s?expires=1&sig=deadbeef&sp_file=1", file.ID), nil)
 	badRec := httptest.NewRecorder()
 	server.Router.ServeHTTP(badRec, badReq)
 	assert.Equal(t, http.StatusForbidden, badRec.Code)
+}
+
+func TestFileContentUploadRejectsOversizedContentLength(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	file, err := models.CreatePendingFile(database.Conn(), models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "clip.mp4",
+		ContentType:    "video/mp4",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("x")))
+	req.ContentLength = models.MaxFileBytes + 1
+	req.Header.Set("x-organization-id", r.Organization.ID.String())
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}
+
+func TestFileContentUploadAcceptsExactMaxContentLength(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	file, err := models.CreatePendingFile(database.Conn(), models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "clip.mp4",
+		ContentType:    "video/mp4",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("exact")))
+	req.ContentLength = models.MaxFileBytes
+	req.Header.Set("x-organization-id", r.Organization.ID.String())
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+}
+
+func TestParseBytesRange(t *testing.T) {
+	start, length, ok := parseBytesRange("bytes=4-6", 9)
+	assert.True(t, ok)
+	assert.Equal(t, int64(4), start)
+	assert.Equal(t, int64(3), length)
+
+	start, length, ok = parseBytesRange("bytes=8-", 9)
+	assert.True(t, ok)
+	assert.Equal(t, int64(8), start)
+	assert.Equal(t, int64(1), length)
+
+	_, _, ok = parseBytesRange("bytes=9-10", 9)
+	assert.False(t, ok)
 }

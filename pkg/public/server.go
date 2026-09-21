@@ -1686,11 +1686,12 @@ func (s *Server) Serve(host string, port int) error {
 	s.wsHub.Run()
 
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", host, port),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 70 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		Handler:      s.Router,
+		Addr:              fmt.Sprintf("%s:%d", host, port),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Minute,
+		WriteTimeout:      15 * time.Minute,
+		IdleTimeout:       60 * time.Second,
+		Handler:           s.Router,
 	}
 
 	return s.httpServer.ListenAndServe()

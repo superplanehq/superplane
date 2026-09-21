@@ -102,7 +102,8 @@ To run Runner nodes locally, start `make dev` in the runner repository.
 Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
 only for a remote broker (see `.env.example`).
 
-The runner `make dev` image includes Claude Code, Codex, OpenCode, git, `gh`, and `jq`.
+The runner `make dev` image includes Claude Code, Codex, OpenCode, git, `gh`, `jq`,
+ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model.
 Factory line apps run on that worker. Do not install those CLIs on the host.
 Connect GitHub and Claude integrations in the organization before you dispatch
 a factory line. Factory nodes use those integrations, not `.env`
@@ -110,6 +111,8 @@ a factory line. Factory nodes use those integrations, not `.env`
 again so Compose rebuilds the worker. Check tools with `make doctor-local` in
 the runner repository. OpenCode must be on the runner `PATH` for Run OpenRouter
 Agent. SuperPlane does not download OpenCode in the prompt prepare step.
+Video task files need ffmpeg, ffprobe, whisper-cli, and the baked Whisper model.
+Missing media tools fail the setup step. Do not download models during a task.
 
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default

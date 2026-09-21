@@ -62,6 +62,14 @@ func (s *Store) Put(_ context.Context, key string, r io.Reader, _ blob.PutOption
 }
 
 func (s *Store) Get(_ context.Context, key string) (io.ReadCloser, error) {
+	return s.open(key, 0, -1)
+}
+
+func (s *Store) GetRange(_ context.Context, key string, offset, length int64) (io.ReadCloser, error) {
+	return s.open(key, offset, length)
+}
+
+func (s *Store) open(key string, offset, length int64) (io.ReadCloser, error) {
 	path, err := s.pathFor(key)
 	if err != nil {
 		return nil, err
@@ -73,7 +81,19 @@ func (s *Store) Get(_ context.Context, key string) (io.ReadCloser, error) {
 		}
 		return nil, fmt.Errorf("open blob file: %w", err)
 	}
-	return file, nil
+	if offset > 0 {
+		if _, err := file.Seek(offset, io.SeekStart); err != nil {
+			_ = file.Close()
+			return nil, fmt.Errorf("seek blob file: %w", err)
+		}
+	}
+	if length < 0 {
+		return file, nil
+	}
+	return struct {
+		io.Reader
+		io.Closer
+	}{io.LimitReader(file, length), file}, nil
 }
 
 func (s *Store) Head(_ context.Context, key string) (*blob.ObjectInfo, error) {

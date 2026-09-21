@@ -67,7 +67,7 @@ Do not reinvent these pieces.
 
 ### Provider
 
-Interface: `Put`, `Get`, `Head`, `Delete`, `SignedGetURL` in
+Interface: `Put`, `Get`, `GetRange`, `Head`, `Delete`, `SignedGetURL` in
 [pkg/blob/provider.go](../../pkg/blob/provider.go).
 
 | Provider | When | Env |
@@ -91,14 +91,26 @@ States: `pending` → `ready` or `failed`.
 
 Limits:
 
-- Max file size: 10 MiB
+- Max file size: 50 MiB
 - Max files per task: 20 (`pending` plus `ready` on create)
 - Max ready bytes per organization: 10 GiB
 - Max filename: 255 runes
 - Stale pending or failed age: 1 hour
+- Max video duration: 15 minutes
+- Max frames per video: 24
+- Max frame width: 1280 pixels
+- Per-file video processing timeout: 120 seconds
+- Task attachment disk budget: 2 GiB
 
 Allowed content types: `image/png`, `image/jpeg`, `image/gif`,
-`image/webp`, `application/pdf`, `text/plain`, `text/markdown`.
+`image/webp`, `application/pdf`, `text/plain`, `text/markdown`,
+`video/mp4`, `video/webm`, `video/quicktime`, `video/ogg`,
+`video/x-m4v`, `video/x-matroska`.
+
+Upload acceptance, runner decodability, and browser playback are
+separate checks. SuperPlane stores MP4, MOV, M4V, WebM, Matroska, and
+Ogg video. The UI plays MP4, WebM, and Ogg inline. Other containers
+stay downloadable.
 
 ### APIs
 
@@ -133,6 +145,8 @@ There is no create or list RPC for `app` or `organization` scopes.
 
 1. Create a pending catalog row (`workspace` or `task`).
 2. Stream bytes with `PUT /api/v1/files/{id}/content`.
+   The handler rejects `Content-Length` above 50 MiB, wraps the body
+   with `http.MaxBytesReader`, and uses a 15-minute request timeout.
 3. SuperPlane writes the object, runs `Head`, and marks `ready`.
 
 Create-dialog attach uses workspace scope. On work order create, update, or
@@ -159,7 +173,11 @@ Scheme constant: `sp-file` in [pkg/blob/markdown.go](../../pkg/blob/markdown.go)
 
 Dispatch rewrite (`DescriptionForDispatch`) replaces refs with signed GETs
 and adds `files[]` on `order()` / `task()` (`id`, `filename`,
-`content_type`, `size_bytes`, `url`).
+`content_type`, `size_bytes`, `checksum`, `url`).
+
+Public filesystem and GCS downloads honor HTTP `Range` so local and
+self-hosted video seeking works. The public GET sets `Accept-Ranges:
+bytes`.
 
 TTL:
 
@@ -185,9 +203,33 @@ Call sites: `import_factory_intake_item.go` and
 A signed URL in the prompt is reachable. Claude Code `Read` sees local
 files only.
 
-At broker-task build, SuperPlane curls each signed file URL into
-`$SUPERPLANE_TASK_DIR/attachments/` before the model starts. See
+At broker-task build, SuperPlane writes `attachments/manifest.json` and
+curls each signed file URL into `$SUPERPLANE_TASK_DIR/attachments/`
+before the model starts. See
 [pkg/components/runner/agent_task.go](../../pkg/components/runner/agent_task.go).
+
+When the manifest includes a video, the runner then runs **Process video
+attachments**. That step probes the actual bytes, extracts timestamped
+frames, and transcribes audio with `whisper-cli` and the baked
+`ggml-tiny.bin` model. Missing `ffmpeg`, `ffprobe`, `whisper-cli`, or
+the model fails the setup step. Do not skip video context.
+
+A file with no audio is a success. A transcription failure is a partial
+result. Malformed, over-duration, or unsupported media is marked failed
+in the manifest. The agent still receives `INDEX.md`.
+
+The same contract applies to the first refinement turn, later
+refinement messages, and implementation. Follow-up messages include
+`files[]` metadata. The wait loop downloads only unseen files and
+reprocesses new videos.
+
+The agent reads frames and the transcript. SuperPlane does not send the
+raw video into the model. The original file stays in `attachments/` and
+stays an `sp-file://` ref for the UI.
+
+Land and deploy the runner media toolchain before you enable video
+acceptance. Rebuild local and production runners. Verify
+`make doctor-local` and one real media task per architecture.
 
 Do not inline bytes in `BrokerTaskFile`.
 
@@ -250,7 +292,7 @@ Keep the schema ready. Do not block these with a new key layout.
 
 - Installation and organization file RPCs and UI
 - `run` scope for canvas-run recordings
-- Video MIME types and direct-to-GCS resumable upload
+- Direct-to-GCS resumable upload
 - Signed PUT from the browser
 - Delete-file RPC
 - Unbind when the user removes a ref from markdown

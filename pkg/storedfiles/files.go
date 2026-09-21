@@ -311,17 +311,22 @@ type DispatchFile struct {
 	Filename    string
 	ContentType string
 	SizeBytes   int64
+	Checksum    string
 	URL         string
 }
 
 func (f DispatchFile) Map() map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id":           f.ID.String(),
 		"filename":     f.Filename,
 		"content_type": f.ContentType,
 		"size_bytes":   f.SizeBytes,
 		"url":          f.URL,
 	}
+	if f.Checksum != "" {
+		out["checksum"] = f.Checksum
+	}
+	return out
 }
 
 func DescriptionForDispatch(
@@ -361,11 +366,16 @@ func DescriptionForDispatch(
 			return markdown, nil, err
 		}
 		urls[id] = downloadURL
+		checksum := ""
+		if file.Checksum != nil {
+			checksum = *file.Checksum
+		}
 		dispatched = append(dispatched, DispatchFile{
 			ID:          file.ID,
 			Filename:    file.Filename,
 			ContentType: file.ContentType,
 			SizeBytes:   file.SizeBytes,
+			Checksum:    checksum,
 			URL:         downloadURL,
 		})
 	}
@@ -542,6 +552,18 @@ func filenameFromURL(rawURL, contentType string) string {
 			base += ".webp"
 		case "application/pdf":
 			base += ".pdf"
+		case "video/mp4":
+			base += ".mp4"
+		case "video/webm":
+			base += ".webm"
+		case "video/quicktime":
+			base += ".mov"
+		case "video/ogg":
+			base += ".ogv"
+		case "video/x-m4v":
+			base += ".m4v"
+		case "video/x-matroska":
+			base += ".mkv"
 		}
 	}
 	return base
@@ -566,6 +588,18 @@ func normalizeFetchedContentType(header, rawURL string) string {
 		return "image/webp"
 	case ".pdf":
 		return "application/pdf"
+	case ".mp4":
+		return "video/mp4"
+	case ".webm":
+		return "video/webm"
+	case ".mov":
+		return "video/quicktime"
+	case ".ogv", ".ogg":
+		return "video/ogg"
+	case ".m4v":
+		return "video/x-m4v"
+	case ".mkv":
+		return "video/x-matroska"
 	default:
 		return value
 	}
