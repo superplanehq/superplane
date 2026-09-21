@@ -3,6 +3,7 @@ package sentry
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -47,6 +48,59 @@ func IssueIDFromEventData(eventData any) (string, bool) {
 		return "", false
 	}
 	return issueID, true
+}
+
+// IssueURLFragment is the origin-URL substring that identifies a Sentry
+// issue. Callers use it for a coarse lookup, then confirm with
+// IssueIDFromURL so `/issues/12` cannot match `/issues/123`.
+func IssueURLFragment(issueID string) string {
+	issueID = strings.TrimSpace(issueID)
+	if issueID == "" {
+		return ""
+	}
+	return "/issues/" + issueID
+}
+
+// IssueIDFromURL reads the numeric Sentry issue ID from an issue page URL.
+// It accepts `https://<org>.sentry.io/issues/<id>/` and
+// `/organizations/<org>/issues/<id>/`, with or without a trailing slash or
+// query string.
+func IssueIDFromURL(rawURL string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return "", false
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host != "sentry.io" && !strings.HasSuffix(host, ".sentry.io") {
+		return "", false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	for i, part := range parts {
+		if part != "issues" || i+1 >= len(parts) {
+			continue
+		}
+		issueID := strings.TrimSpace(parts[i+1])
+		if !isNumericIssueID(issueID) {
+			return "", false
+		}
+		return issueID, true
+	}
+
+	return "", false
+}
+
+func isNumericIssueID(issueID string) bool {
+	if issueID == "" {
+		return false
+	}
+	for _, r := range issueID {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // IssueStatusIsSettled reports whether SuperPlane should leave the Sentry
