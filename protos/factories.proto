@@ -591,17 +591,6 @@ service Factories {
     };
   }
 
-  rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List work order checks";
-      description: "Returns scored checks reported on a work order";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribeFactoryUsage(DescribeFactoryUsageRequest) returns (DescribeFactoryUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/usage"
@@ -1574,7 +1563,7 @@ message ListWorkOrdersRequest {
 }
 
 message ListWorkOrdersResponse {
-  repeated WorkOrder orders = 1;
+  repeated WorkOrderSummary orders = 1;
 }
 
 message CreateWorkOrderRequest {
@@ -1657,6 +1646,41 @@ message WorkOrder {
   // Runner machine time for this task, one row per machine type.
   // UI hides empty rows and may collapse them into one machine-time line.
   repeated UsageByMachineType usage_by_machine_type = 21;
+  // Full check rows, including summary and analysis.
+  repeated WorkOrderCheck checks = 22;
+}
+
+// WorkOrderSummary is the list row for a work order.
+// DescribeWorkOrder returns WorkOrder, which adds files, the usage
+// breakdown, the source run, and the full checks.
+message WorkOrderSummary {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  WorkOrder.State state = 4;
+  WorkOrder.Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  repeated UserRef assignees = 8;
+  WorkOrderCreator created_by = 9;
+  int64 total_tokens = 10;
+  int64 total_cost_cents = 11;
+  int64 number = 12;
+  string key = 13;
+  repeated WorkOrderLineDispatch line_dispatches = 14;
+  repeated WorkOrderStatusNote status_notes = 15;
+  WorkOrderOrigin origin = 16;
+  int64 total_duration_seconds = 17;
+  repeated WorkOrderCheckScore check_scores = 18;
+}
+
+// WorkOrderCheckScore is the board-card view of a check.
+// It carries the score only, not the analysis text.
+message WorkOrderCheckScore {
+  string key = 1;
+  string name = 2;
+  double score = 3;
+  double max_score = 4;
 }
 
 message WorkOrderOrigin {
@@ -1965,15 +1989,6 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-message ListWorkOrderChecksRequest {
-  string factory_id = 1;
-  string order_id = 2;
-}
-
-message ListWorkOrderChecksResponse {
-  repeated WorkOrderCheck checks = 1;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work

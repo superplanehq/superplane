@@ -67,9 +67,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** Clarity score from ListWorkOrderChecks, 0 to 5. Shown in the footer. */
+  /** Clarity score from the task, 0 to 5. Shown in the footer. */
   clarityScore?: number;
-  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown in the footer. */
+  /** Confidence score from the task, 0 to 5. Shown in the footer. */
   confidenceScore?: number;
   /**
    * True while the agent still works on this draft. The card shows

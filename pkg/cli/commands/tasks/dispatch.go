@@ -56,7 +56,7 @@ func (c *taskDispatchCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(
 			stdout,
 			"Task dispatched: %s -> line %q (state: %s)\n",
-			taskDisplayID(task),
+			taskDisplayID(&task),
 			lineName,
 			formatTaskState(task.GetState()),
 		)

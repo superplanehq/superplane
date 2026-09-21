@@ -264,6 +264,11 @@ func TestFactoryWorkOrder_ListChecks_OrdersByFirstReport(t *testing.T) {
 	checks, err := order.ListChecks(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, checks, 3)
+
+	grouped, err := ListChecksForWorkOrders(database.Conn(), []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	require.Len(t, grouped[order.ID], 3)
+	assert.Equal(t, checks[0].Key, grouped[order.ID][0].Key)
 	assert.Equal(t, "risk-review", checks[0].Key)
 	assert.Equal(t, "code-coverage", checks[1].Key)
 	assert.Equal(t, "confidence", checks[2].Key)

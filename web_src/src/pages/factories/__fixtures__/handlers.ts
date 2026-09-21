@@ -718,6 +718,38 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
   };
 }
 
+function orderWithChecks(fixture: FactoriesFixture, order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (!order.id) {
+    return order;
+  }
+  const checks = fixture.checksByOrderId?.[order.id] ?? DEFAULT_CHECKS_BY_ORDER_ID[order.id];
+  if (!checks) {
+    return order;
+  }
+  return { ...order, checks };
+}
+
+function orderWithListChecks(fixture: FactoriesFixture, order: FactoriesWorkOrder) {
+  const withChecks = orderWithChecks(fixture, order);
+  const {
+    checks,
+    usageByModel: _usageByModel,
+    usageByMachineType: _usageByMachineType,
+    files: _files,
+    sourceRunId: _sourceRunId,
+    ...listed
+  } = withChecks;
+  return {
+    ...listed,
+    checkScores: checks?.map((check) => ({
+      key: check.key,
+      name: check.name,
+      score: check.score,
+      maxScore: check.maxScore,
+    })),
+  };
+}
+
 function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string) {
   const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
   return orders.find((entry) => entry.id === orderId);
@@ -810,7 +842,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       pattern: re("/api/v1/factories/([^/]+)/orders"),
       resolve: (match, method, body) => {
         const orders = ensureFactoryWorkOrders(fixture, match[1]);
-        if (method !== "POST") return { json: { orders } };
+        if (method !== "POST") return { json: { orders: orders.map((order) => orderWithListChecks(fixture, order)) } };
         const created = createWorkOrderFromRequest((body ?? {}) as RequestBody, orders.length);
         orders.unshift(created);
         return { json: { order: created } };
@@ -831,7 +863,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           }
           order.updatedAt = new Date().toISOString();
         }
-        return { json: { order } };
+        return { json: { order: orderWithChecks(fixture, order) } };
       },
     },
     {
@@ -900,14 +932,6 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         if (method !== "GET") return { json: {} };
         const artifacts = fixture.artifactsByOrderId?.[match[2]] ?? DEFAULT_ARTIFACTS_BY_ORDER_ID[match[2]] ?? [];
         return { json: { artifacts } };
-      },
-    },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/checks"),
-      resolve: (match, method) => {
-        if (method !== "GET") return { json: {} };
-        const checks = fixture.checksByOrderId?.[match[2]] ?? DEFAULT_CHECKS_BY_ORDER_ID[match[2]] ?? [];
-        return { json: { checks } };
       },
     },
     {

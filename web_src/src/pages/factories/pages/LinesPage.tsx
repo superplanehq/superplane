@@ -4,6 +4,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesFactoryPrFeedbackHandler,
   FactoriesWorkOrder,
+  FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
@@ -13,6 +14,7 @@ import {
   useFactoryPullRequests,
   useFactoryWorkOrders,
   useUpdateFactoryLine,
+  useWorkOrder,
   useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
@@ -21,7 +23,6 @@ import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryInt
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -985,7 +986,7 @@ function LineBoardSplitRunPopup({
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
-  peekOrder: FactoriesWorkOrder;
+  peekOrder: FactoriesWorkOrderSummary;
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
@@ -994,14 +995,15 @@ function LineBoardSplitRunPopup({
   isAnalyzing: boolean;
   onClose: () => void;
 }) {
-  const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
     workOrderIds: [peekOrderId],
   });
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
-  const closer = useSplitRunFooterCloser(organizationId, factoryId, peekOrder);
+  const popupOrder = describedOrder ?? peekOrder;
+  const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   return (
@@ -1011,10 +1013,10 @@ function LineBoardSplitRunPopup({
       factoryId={factoryId}
       factoryKey={factoryKey}
       orderId={peekOrderId}
-      orderNumber={peekOrder.number}
+      orderNumber={popupOrder.number}
       lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, {
-        checks: peekChecks,
+      fixture={splitRunFixtureForWorkOrder(popupOrder, {
+        checks: describedOrder?.checks,
         artifacts: peekArtifacts,
         lineId,
         lineName: resolvedLineName,

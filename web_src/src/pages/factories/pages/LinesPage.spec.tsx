@@ -7,10 +7,10 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
+  FactoriesWorkOrderSummary,
   FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
-import { ANALYZING_WORK_ORDER_CHECKS_POLL_MS } from "@/hooks/useWorkOrderChecks";
 import {
   FEATURE_FACTORY_CREATE_WITH_AGENT,
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
@@ -55,6 +55,7 @@ import {
   BOARD_IMPLEMENT_NOTIFY_ORDER,
 } from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
+import { DEFAULT_CHECKS_BY_ORDER_ID } from "../__fixtures__/workOrderCheckFixtures";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
@@ -63,6 +64,21 @@ import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { ADD_INTAKE_COPY } from "./lineIntakeModel";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
+
+function withBoardChecks(orders: FactoriesWorkOrder[]): FactoriesWorkOrderSummary[] {
+  return orders.map((order) => {
+    const checks = DEFAULT_CHECKS_BY_ORDER_ID[order.id ?? ""] ?? order.checks;
+    return {
+      ...order,
+      checkScores: checks?.map((check) => ({
+        key: check.key,
+        name: check.name,
+        score: check.score,
+        maxScore: check.maxScore,
+      })),
+    };
+  });
+}
 
 const LANE_BANNERS: FactoryPreviewFlags = { addIntakeControl: false, columnAutomations: false };
 const ICON_VIEW: FactoryPreviewFlags = {
@@ -90,7 +106,8 @@ function renderLinesBoard(
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
-const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
+const useWorkOrder = vi.fn(() => ({ data: undefined as FactoriesWorkOrder | undefined }));
 const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
@@ -148,7 +165,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
       return updateLineIsPending.value;
     },
   }),
-  useWorkOrder: () => ({ data: undefined }),
+  useWorkOrder: () => useWorkOrder(),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => useFactoryPullRequests(),
@@ -215,20 +232,6 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
-const useWorkOrderChecks = vi.hoisted(() =>
-  vi.fn(
-    (
-      _organizationId: string,
-      _factoryId: string,
-      _orderId: string,
-      _options?: { enabled?: boolean; refetchInterval?: number | false },
-    ) => ({
-      data: [] as unknown[],
-      refetch: vi.fn(),
-    }),
-  ),
-);
-
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
@@ -249,11 +252,6 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
-vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks,
-  ANALYZING_WORK_ORDER_CHECKS_POLL_MS: 1500,
-}));
-
 vi.mock("./useWorkOrderPlanningSurvey", () => ({
   useWorkOrderPlanningSurvey: () => false,
   useWorkOrderPlanningActivity: () => ({
@@ -271,11 +269,11 @@ vi.mock("./useWorkOrderPlanningSurvey", () => ({
 }));
 
 async function resetLinesBoardMocks() {
-  const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
   window.localStorage.clear();
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useWorkOrder.mockReturnValue({ data: undefined });
   useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryAutomations.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
@@ -288,18 +286,6 @@ async function resetLinesBoardMocks() {
   importFactoryIntakeItem.mockReset();
   refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
-  useWorkOrderChecks.mockReset();
-  useWorkOrderChecks.mockImplementation(
-    (
-      _organizationId: string,
-      _factoryId: string,
-      orderId: string,
-      options?: { enabled?: boolean; refetchInterval?: number | false },
-    ) => ({
-      data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
-      refetch: vi.fn(),
-    }),
-  );
   useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
     if (options?.enabled === false) {
       return { data: undefined, isPending: false, isError: false };
@@ -336,23 +322,23 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
-  it("loads checks only for draft cards that can show a score", () => {
+  it("shows a score on a draft card and hides it on other columns", () => {
+    const draft = withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS)[0];
     useFactoryWorkOrders.mockReturnValue({
-      data: [...REVIEW_CANDIDATE_WORK_ORDERS, BOARD_IMPLEMENT_FAILED_ORDER],
+      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checkScores: draft.checkScores }],
     });
     renderLinesBoard();
 
-    const fetchedIds = useWorkOrderChecks.mock.calls
-      .filter(([, , orderId, options]) => Boolean(orderId) && options?.enabled !== false)
-      .map(([, , orderId]) => orderId);
-
-    expect(fetchedIds).toContain("wo-review-pay-842");
-    expect(fetchedIds).not.toContain("wo-board-implement-failed");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
   });
 
   it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
-    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const [candidate] = REVIEW_CANDIDATE_WORK_ORDERS;
+    useFactoryWorkOrders.mockReturnValue({ data: withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS) });
+    useWorkOrder.mockReturnValue({
+      data: { ...candidate, checks: DEFAULT_CHECKS_BY_ORDER_ID[candidate.id ?? ""] },
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -408,13 +394,6 @@ describe("LinesPage board", () => {
     try {
       const user = userEvent.setup();
       renderLinesBoard();
-
-      expect(
-        useWorkOrderChecks.mock.calls.some(
-          ([, , orderId, options]) =>
-            orderId === analyzingOrderId && options?.refetchInterval === ANALYZING_WORK_ORDER_CHECKS_POLL_MS,
-        ),
-      ).toBe(true);
 
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 

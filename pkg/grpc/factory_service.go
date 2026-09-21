@@ -275,11 +275,6 @@ func (s *FactoryService) SyncFactoryVelocity(ctx context.Context, req *pb.SyncFa
 	return actions.SyncFactoryVelocity(ctx, organizationID, req)
 }
 
-func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListWorkOrderChecks(ctx, organizationID, req)
-}
-
 func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.DescribeFactoryUsageRequest) (*pb.DescribeFactoryUsageResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryUsage(ctx, organizationID, req)

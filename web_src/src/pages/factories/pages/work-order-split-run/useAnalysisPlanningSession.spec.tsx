@@ -117,7 +117,7 @@ describe("useAnalysisPlanningSession", () => {
 
     await waitFor(() => {
       expect(invalidateQueries).toHaveBeenCalledWith({
-        queryKey: factoryQueryKeys.workOrderChecks("org-1", "factory-1", "order-1"),
+        queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
       });
       expect(invalidateQueries).toHaveBeenCalledWith({
         queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
