@@ -11,28 +11,38 @@ interface GithubConfiguration {
   paths?: string[];
 }
 
+function pushShortSha(eventData?: Push): string {
+  return eventData?.head_commit?.id?.slice(0, 7) || "";
+}
+
+function pushCommitMessage(eventData?: Push): string {
+  return eventData?.head_commit?.message || "";
+}
+
+function pushRootEventValues(eventData?: Push): Record<string, string> {
+  const headCommit = eventData?.head_commit;
+  return {
+    Commit: headCommit?.message || "",
+    SHA: headCommit?.id || "",
+    Author: headCommit?.author?.name || "",
+  };
+}
+
 /**
  * Renderer for the "github.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as Push;
-    const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 
     return {
-      title: eventData?.head_commit?.message || "",
-      subtitle: buildGithubSubtitle(shortSha, context.event?.createdAt),
+      title: pushCommitMessage(eventData),
+      subtitle: buildGithubSubtitle(pushShortSha(eventData), context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as Push;
-
-    return {
-      Commit: eventData?.head_commit?.message || "",
-      SHA: eventData?.head_commit?.id || "",
-      Author: eventData?.head_commit?.author?.name || "",
-    };
+    return pushRootEventValues(context.event?.data as Push);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
@@ -50,10 +60,9 @@ export const onPushTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as Push;
-      const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
       props.lastEventData = {
-        title: eventData?.head_commit?.message || "",
-        subtitle: buildGithubSubtitle(shortSha, lastEvent.createdAt),
+        title: pushCommitMessage(eventData),
+        subtitle: buildGithubSubtitle(pushShortSha(eventData), lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
