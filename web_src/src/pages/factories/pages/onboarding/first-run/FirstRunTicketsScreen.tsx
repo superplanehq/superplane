@@ -1,5 +1,7 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
+import { JiraCompletionColumnFields, type JiraCompletionColumnValue } from "../../JiraCompletionColumnFields";
+import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -22,10 +24,14 @@ export function FirstRunTicketsScreen({
   jiraProjectsLoading = false,
   jiraProjectsError = false,
   jiraProjectId = "",
+  jiraCompletion = DEFAULT_JIRA_COMPLETION_SETTINGS,
+  organizationId = "",
+  jiraIntegrationId = "",
   onSelectTicketSource,
   onAnalyzeTickets,
   onConnectJira,
   onSelectJiraProject,
+  onJiraCompletionChange,
   onRetryJiraProjects,
 }: {
   ticketSource: FirstRunTicketSource | null;
@@ -40,10 +46,14 @@ export function FirstRunTicketsScreen({
   jiraProjectsLoading?: boolean;
   jiraProjectsError?: boolean;
   jiraProjectId?: string;
+  jiraCompletion?: JiraCompletionColumnValue;
+  organizationId?: string;
+  jiraIntegrationId?: string;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
+  onJiraCompletionChange?: (next: JiraCompletionColumnValue) => void;
   onRetryJiraProjects?: () => void;
 }) {
   const copy = FIRST_RUN_COPY.tickets;
@@ -99,6 +109,17 @@ export function FirstRunTicketsScreen({
                   onSelect={(id) => onSelectJiraProject?.(id)}
                   onRetry={() => onRetryJiraProjects?.()}
                 />
+                {jiraProjectId && organizationId && jiraIntegrationId ? (
+                  <div className="mt-4">
+                    <JiraCompletionColumnFields
+                      organizationId={organizationId}
+                      integrationId={jiraIntegrationId}
+                      projectId={jiraProjectId}
+                      value={jiraCompletion}
+                      onChange={(next) => onJiraCompletionChange?.(next)}
+                    />
+                  </div>
+                ) : null}
               </fieldset>
             </div>
           ) : null}

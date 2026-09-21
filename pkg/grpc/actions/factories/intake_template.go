@@ -205,6 +205,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Type:          yaml.NodeTypeTrigger,
 			Component:     spec.triggerComponent,
 			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Metadata:      intakeTriggerMetadata(request.Source, request.Settings),
 			Integration:   request.Binding.integrationRef(),
 			Position:      yaml.Position{X: 160, Y: 80},
 		},
@@ -213,10 +214,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	createY := 260
 
 	if intakeSourceHasFilterNode(request.Source) {
-		settings := defaultIntakeSettings()
-		if request.Source == models.FactoryIntakeSourceJiraIssues {
-			settings = defaultJiraIntakeSettings()
-		}
+		settings := intakeSettingsOrDefault(request.Source, request.Settings)
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
@@ -395,6 +393,23 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	}
 
 	return configuration
+}
+
+func intakeTriggerMetadata(source string, settings intakeSettings) map[string]any {
+	if source != models.FactoryIntakeSourceJiraIssues {
+		return nil
+	}
+	return jiraCompletionMetadata(settings)
+}
+
+func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {
+	if settings.ConfidencePct != 0 {
+		return settings
+	}
+	if source == models.FactoryIntakeSourceJiraIssues {
+		return defaultJiraIntakeSettings()
+	}
+	return defaultIntakeSettings()
 }
 
 // intakeAnalysisConfiguration sets the machine, checkout, and steps. BYOK

@@ -62,6 +62,24 @@ vi.mock("@/hooks/useComponentData", () => ({
 vi.mock("@/hooks/useIntegrations", () => ({
   ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useAvailableIntegrations,
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => {
+    if (resourceType === "issueStatus") {
+      return {
+        data: [
+          { id: "todo", name: "To Do" },
+          { id: "qa", name: "QA" },
+          { id: "done", name: "Done" },
+        ],
+        isLoading: false,
+        isError: false,
+      };
+    }
+    return {
+      data: [{ name: "bug" }, { name: "enhancement" }],
+      isLoading: false,
+      isError: false,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -278,7 +296,39 @@ describe("IntakeSettingsHost", () => {
         newIssues: true,
         reopenedIssues: true,
         superplaneLabelAdded: true,
+        jiraMoveOnComplete: true,
+        jiraCompletionColumn: "",
       },
+    });
+  });
+
+  it("saves the Jira completion column from General settings", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        intakeId: "intake-jira",
+        appId: "app-jira-issues-intake",
+        healthy: true,
+        paused: false,
+        settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" },
+        source: lineIntakeSourceById("jira-issues")!,
+        integrationId: "jira-1",
+        resourceId: "ENG",
+      },
+    });
+
+    expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
+    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
+    await user.click(screen.getByTestId("jira-completion-column-select"));
+    await user.click(screen.getByRole("option", { name: "QA" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-jira",
+      settings: expect.objectContaining({
+        jiraMoveOnComplete: true,
+        jiraCompletionColumn: "QA",
+      }),
     });
   });
 
