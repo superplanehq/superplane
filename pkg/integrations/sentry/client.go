@@ -45,6 +45,25 @@ func wrapReleaseScopeError(err error) error {
 	return err
 }
 
+// IsRetryableAPIError reports whether the consumer should nack the message
+// so Tackle redelivers it. Rate limits, request timeouts, server errors,
+// and transport failures retry. Client errors such as 401, 403, and 404
+// do not.
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var sentryAPIError *apiError
+	if !errors.As(err, &sentryAPIError) {
+		return true
+	}
+
+	return sentryAPIError.StatusCode == http.StatusTooManyRequests ||
+		sentryAPIError.StatusCode == http.StatusRequestTimeout ||
+		sentryAPIError.StatusCode >= http.StatusInternalServerError
+}
+
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
