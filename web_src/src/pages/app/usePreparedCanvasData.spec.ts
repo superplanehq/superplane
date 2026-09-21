@@ -59,19 +59,19 @@ describe("usePreparedCanvasData", () => {
       }),
     );
 
-    expect(prepareData).toHaveBeenCalledWith(
-      canvas,
-      [],
-      [],
-      {},
-      {},
-      {},
-      "canvas-1",
+    expect(prepareData).toHaveBeenCalledWith({
+      workflow: canvas,
+      triggers: [],
+      components: [],
+      nodeEventsMap: {},
+      nodeExecutionsMap: {},
+      nodeQueueItemsMap: {},
+      workflowId: "canvas-1",
       queryClient,
-      null,
-      "live",
-      undefined,
-      "org-1",
-    );
+      user: null,
+      canvasMode: "live",
+      openModal: undefined,
+      organizationId: "org-1",
+    });
   });
 });
