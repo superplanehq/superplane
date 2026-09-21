@@ -257,6 +257,28 @@ describe("provisionJiraIntake", () => {
     expect(intake.id).toBe("intake-jira");
   });
 
+  it("creates the Jira intake with the chosen completion column", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
+
+    await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+      settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+      settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+    });
+  });
+
   it("reuses a Jira intake whose connection and project still match", async () => {
     const listIntakes = vi.fn().mockResolvedValue([boundJiraIntake("intake-1", "jira-1", "PAY")]);
     const createIntake = vi.fn();

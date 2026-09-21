@@ -451,6 +451,7 @@ export function useOnboardingPageModel(args: {
     plan: agent.plan,
     githubOwner,
     jiraProjectId: jira.jiraProjectId,
+    jiraCompletion: jira.jiraCompletion,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;

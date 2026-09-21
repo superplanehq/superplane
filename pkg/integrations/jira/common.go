@@ -187,24 +187,44 @@ func applyStatus(client *Client, issueKey, status string) error {
 // error so the user can either drop the resolution or configure the
 // workflow's transition screen.
 func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTransitionOptions) error {
+	return applyMatchedStatus(client, issueKey, status, opts, matchTransitionsByName(status), false)
+}
+
+// ApplyCompletionStatus moves an issue to the chosen column, or to a reachable
+// Done-category status when column is empty. Prefer a status named Done.
+func ApplyCompletionStatus(client *Client, issueKey, column string, opts DoTransitionOptions) error {
+	column = strings.TrimSpace(column)
+	matcher := matchTransitionsByName(column)
+	if column == "" {
+		matcher = matchDoneCategoryTransitions
+		column = "Done"
+	}
+	return applyMatchedStatus(client, issueKey, column, opts, matcher, true)
+}
+
+func applyMatchedStatus(
+	client *Client,
+	issueKey, status string,
+	opts DoTransitionOptions,
+	match func([]Transition) []Transition,
+	defaultResolution bool,
+) error {
 	transitions, err := client.GetIssueTransitions(issueKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch transitions: %v", err)
 	}
 
-	var matches []Transition
-	for _, t := range transitions {
-		if strings.EqualFold(t.To.Name, status) {
-			matches = append(matches, t)
-		}
-	}
-
+	matches := match(transitions)
 	if len(matches) == 0 {
 		available := make([]string, 0, len(transitions))
 		for _, t := range transitions {
 			available = append(available, t.To.Name)
 		}
 		return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
+	}
+
+	if defaultResolution && strings.TrimSpace(opts.Resolution) == "" && anyTransitionHasField(matches, "resolution") {
+		opts.Resolution = defaultResolutionName(client)
 	}
 
 	// Resolution and comment differ in how strictly Jira gates them:
@@ -244,6 +264,89 @@ func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTran
 		"transition to %q does not allow setting a resolution; configure the resolution field on the transition screen for %v in Jira, or leave Resolution empty",
 		status, names,
 	)
+}
+
+func matchTransitionsByName(status string) func([]Transition) []Transition {
+	return func(transitions []Transition) []Transition {
+		var matches []Transition
+		for _, t := range transitions {
+			if strings.EqualFold(t.To.Name, status) {
+				matches = append(matches, t)
+			}
+		}
+		return matches
+	}
+}
+
+func matchDoneCategoryTransitions(transitions []Transition) []Transition {
+	var namedDone []Transition
+	var anyDone []Transition
+	for _, t := range transitions {
+		if !isDoneCategory(t.To.Category) {
+			continue
+		}
+		anyDone = append(anyDone, t)
+		if strings.EqualFold(strings.TrimSpace(t.To.Name), "Done") {
+			namedDone = append(namedDone, t)
+		}
+	}
+	if len(namedDone) > 0 {
+		return namedDone
+	}
+	return anyDone
+}
+
+func anyTransitionHasField(transitions []Transition, fieldID string) bool {
+	for _, t := range transitions {
+		if t.HasField(fieldID) {
+			return true
+		}
+	}
+	return false
+}
+
+func defaultResolutionName(client *Client) string {
+	resolutions, err := client.ListResolutions()
+	if err != nil || len(resolutions) == 0 {
+		return ""
+	}
+	for _, preferred := range []string{"Done", "Fixed", "Resolved"} {
+		for _, resolution := range resolutions {
+			if strings.EqualFold(resolution.Name, preferred) {
+				return resolution.Name
+			}
+		}
+	}
+	return resolutions[0].Name
+}
+
+// IssueStatusName reads the current workflow status name of an issue.
+func IssueStatusName(issue *Issue) string {
+	status := issueStatusMap(issue)
+	name, _ := status["name"].(string)
+	return strings.TrimSpace(name)
+}
+
+// IssueStatusCategory reads the current workflow status category of an issue.
+func IssueStatusCategory(issue *Issue) string {
+	status := issueStatusMap(issue)
+	return statusCategoryFromValue(status["statusCategory"])
+}
+
+func issueStatusMap(issue *Issue) map[string]any {
+	if issue == nil || issue.Fields == nil {
+		return nil
+	}
+	status, _ := issue.Fields["status"].(map[string]any)
+	return status
+}
+
+func IssueAlreadyInColumn(issue *Issue, column string) bool {
+	column = strings.TrimSpace(column)
+	if column != "" {
+		return strings.EqualFold(IssueStatusName(issue), column)
+	}
+	return isDoneCategory(IssueStatusCategory(issue))
 }
 
 // resolveCloudID returns the Atlassian cloud id stored during the OAuth connect flow.

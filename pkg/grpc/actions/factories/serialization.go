@@ -2,6 +2,7 @@ package factories
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -159,7 +160,7 @@ func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec mode
 		CanvasId:            intake.CanvasID.String(),
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
-		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(intake.Source, graph, spec)),
+		Settings:            serializeIntakeSettings(intake.Source, intakeSettingsFromGraph(intake.Source, graph, spec)),
 		Healthy:             healthy,
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
@@ -175,7 +176,40 @@ func serializeFactoryIntake(tx *gorm.DB, intake *models.FactoryIntake, spec mode
 		serialized.Description = intake.Canvas.Description
 	}
 
+	if trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID); trigger != nil {
+		serialized.IntegrationId = strings.TrimSpace(derefString(trigger.IntegrationID))
+		serialized.ResourceId = intakeTriggerResourceID(intake.Source, trigger)
+	}
+
 	return serialized
+}
+
+func intakeTriggerResourceID(source string, trigger *models.Node) string {
+	if trigger == nil {
+		return ""
+	}
+	switch source {
+	case models.FactoryIntakeSourceGitHubIssues:
+		return configurationString(trigger.Configuration["repository"])
+	case models.FactoryIntakeSourceJiraIssues,
+		models.FactoryIntakeSourceProductiveTasks,
+		models.FactoryIntakeSourceSentryExceptions:
+		return configurationString(trigger.Configuration["project"])
+	default:
+		return ""
+	}
+}
+
+func configurationString(value any) string {
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {
