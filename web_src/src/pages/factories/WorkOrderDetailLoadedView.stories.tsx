@@ -194,7 +194,7 @@ export const WithCriticalCheck: Story = {
 
 /**
  * Status notes — automations announce the next step and what resolves
- * it. Set by setWorkOrderStatusNote, keyed so several notes can sit
+ * it. Each note has a key so several notes can sit
  * side by side; cleared on any state change. Shown whenever the order
  * has notes, including while a line is still running.
  */
