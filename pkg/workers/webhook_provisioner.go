@@ -268,12 +268,20 @@ func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *mod
 		WithField("source", "webhook").
 		Info("Calling integration webhook setup handler")
 
+	integrationContext := contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil)
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil),
+		Integration: integrationContext,
 		Webhook:     contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})
+
+	// Persist on failure too: Setup can change remote state and mirror it onto
+	// the integration before it fails, so dropping those writes leaves the
+	// integration pointing at a registration that no longer exists.
+	if persistErr := integrationContext.PersistMetadata(); persistErr != nil {
+		logger.Errorf("Error persisting integration metadata after webhook setup: %v", persistErr)
+	}
 
 	return metadata, instance.AppName, err
 }

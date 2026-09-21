@@ -139,6 +139,89 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	assert.Equal(t, 3, updatedWebhook.RetryCount)
 }
 
+func Test__WebhookProvisioner_PersistsIntegrationMetadataWrittenBySetup(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
+			ctx.Integration.SetMetadata(map[string]any{"webhookId": 34})
+			return map[string]any{}, nil
+		},
+	})
+
+	integration := createDummyIntegration(t, r)
+	webhook := createPendingWebhook(t, integration.ID)
+
+	require.NoError(t, provisioner.LockAndProcessWebhook(logger, webhook))
+
+	assertIntegrationMetadata(t, integration.ID, float64(34))
+}
+
+func Test__WebhookProvisioner_PersistsIntegrationMetadataWhenSetupFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
+			ctx.Integration.SetMetadata(map[string]any{"webhookId": 35})
+			return nil, errors.New("registration rejected after the remote change")
+		},
+	})
+
+	integration := createDummyIntegration(t, r)
+	webhook := createPendingWebhook(t, integration.ID)
+
+	require.NoError(t, provisioner.LockAndProcessWebhook(logger, webhook))
+
+	assertIntegrationMetadata(t, integration.ID, float64(35))
+}
+
+func createDummyIntegration(t *testing.T, r *support.ResourceRegistry) *models.Integration {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+	return integration
+}
+
+func createPendingWebhook(t *testing.T, integrationID uuid.UUID) models.Webhook {
+	t.Helper()
+
+	webhook := models.Webhook{
+		ID:                uuid.New(),
+		State:             models.WebhookStatePending,
+		Secret:            []byte("encrypted-secret"),
+		AppInstallationID: &integrationID,
+		RetryCount:        0,
+		MaxRetries:        3,
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+	return webhook
+}
+
+func assertIntegrationMetadata(t *testing.T, integrationID uuid.UUID, webhookID any) {
+	t.Helper()
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integrationID).First(&stored).Error)
+	assert.Equal(t, webhookID, stored.Metadata.Data()["webhookId"])
+}
+
 func Test__WebhookProvisioner_ConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

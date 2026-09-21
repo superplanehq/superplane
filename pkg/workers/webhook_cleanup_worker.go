@@ -128,15 +128,22 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 		return err
 	}
 
+	integrationContext := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil)
 	err = handler.Cleanup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContextInTransaction(tx),
-		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil),
+		Integration: integrationContext,
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.WithIntegration(logger, *instance),
 	})
 
 	if err != nil {
 		logger.Errorf("Best-effort cleanup failed for webhook: %v", err)
+	}
+
+	// Cleanup clears the mirrored registration id, so a refresh hook still in
+	// flight stops retrying against a webhook that no longer exists.
+	if persistErr := integrationContext.PersistMetadata(); persistErr != nil {
+		logger.Errorf("Error persisting integration metadata after webhook cleanup: %v", persistErr)
 	}
 
 	return tx.Unscoped().Delete(webhook).Error

@@ -179,7 +179,7 @@ func (h *JiraWebhookHandler) setupIssueWebhook(ctx core.WebhookHandlerContext, c
 	var webhookID int64
 	createWebhook := func() error {
 		var createErr error
-		webhookID, createErr = client.CreateIssueWebhook(ctx.Webhook.GetURL(), jqlFilter, events)
+		webhookID, createErr = h.createIssueWebhookRecoveringURLConflict(client, ctx, jqlFilter, events)
 		return createErr
 	}
 

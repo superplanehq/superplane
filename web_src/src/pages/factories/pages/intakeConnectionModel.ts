@@ -49,6 +49,7 @@ export const INTAKE_CONNECTION_COPY = {
   missing: "This intake has no live connection.",
   notReady: "This connection cannot receive items.",
   webhook: "SuperPlane is still registering the Jira webhook.",
+  webhookFailed: "SuperPlane could not register the Jira webhook. Save the intake again to retry.",
   graph: "This automation cannot create tasks. Open the Automation tab to repair the steps.",
   connectError: "SuperPlane could not open the connection setup.",
 } as const;
@@ -72,6 +73,9 @@ export function intakeHealthBanner(health: FactoryIntakeHealth | undefined): str
   }
   if (health === "HEALTH_WEBHOOK_NOT_READY") {
     return INTAKE_CONNECTION_COPY.webhook;
+  }
+  if (health === "HEALTH_WEBHOOK_FAILED") {
+    return INTAKE_CONNECTION_COPY.webhookFailed;
   }
   if (health === "HEALTH_GRAPH_BROKEN") {
     return INTAKE_CONNECTION_COPY.graph;
