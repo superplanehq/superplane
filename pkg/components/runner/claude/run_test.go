@@ -389,7 +389,15 @@ func TestFormatStreamJsonLinesEmitsThinkingAndStartsToolsBeforeResults(t *testin
 		}
 	}
 	require.NotNil(t, input)
-	assert.Equal(t, "printf ok", input["partial_json"])
+	assert.Equal(t, "printf ok", input["input"])
+	assert.NotContains(t, input, "partial_json")
+	inputRecords := []map[string]any{}
+	for _, record := range records {
+		if record["type"] == "tool_input_delta" {
+			inputRecords = append(inputRecords, record)
+		}
+	}
+	assert.Len(t, inputRecords, 1)
 	toolEnd := typedActivityRecord(t, records, "tool_end")
 	assert.Equal(t, "passed", toolEnd["status"])
 }

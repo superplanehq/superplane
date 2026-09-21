@@ -1,3 +1,4 @@
+import { parseAgentActivityRecordText, type AgentActivityRecord } from "@/lib/agentActivity";
 import {
   applyPromptUsageRecord,
   emptyPromptUsageState,
@@ -48,7 +49,7 @@ type LiveLogSessionResponse = {
 
 export type LiveLogStreamHandlers = {
   onOpen?: () => void;
-  onRecord?: (record: LiveLogRecordEnvelope) => void;
+  onRecord?: (record: AgentActivityRecord) => void;
   onLogLine: (text: string, commandIndex?: number) => void;
   onStreamError: (message: string) => void;
   onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
@@ -134,6 +135,11 @@ function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamH
   const nestedTurn = parseAgentTurnLiveLogText(rec.text);
   if (nestedTurn) {
     handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message);
+    return true;
+  }
+  const nestedActivity = parseAgentActivityRecordText(rec.text);
+  if (nestedActivity) {
+    handlers.onRecord?.(nestedActivity);
     return true;
   }
   if (typeof rec.index === "number") {
@@ -224,8 +230,8 @@ function dispatchCmdEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStrea
 }
 
 function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
-  handlers.onRecord?.(rec);
   if (rec.schema_version === 2) {
+    handlers.onRecord?.(rec);
     return;
   }
   if (dispatchLineRecord(rec, handlers)) {

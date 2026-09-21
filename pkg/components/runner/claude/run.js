@@ -924,7 +924,6 @@ function handleClaudeActivityEvent(payload, activity, blocks, messageId) {
       activity.appendContent("reasoning", tracked.id, delta.thinking || "");
     } else if (delta.type === "input_json_delta" && tracked.kind === "tool") {
       tracked.partialInput += String(delta.partial_json || "");
-      activity.updateToolInput(tracked.id, tracked.partialInput, false);
     }
     return;
   }
