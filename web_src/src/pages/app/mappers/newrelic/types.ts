@@ -33,7 +33,7 @@ export interface ReportMetricConfiguration {
   metricName?: string;
   metricType?: string;
   value?: number;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
   timestamp?: number;
 }
 

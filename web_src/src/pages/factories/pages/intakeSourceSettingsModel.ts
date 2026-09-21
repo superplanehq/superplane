@@ -70,6 +70,19 @@ export const INTAKE_SETTINGS_COPY = {
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
+  pause: "Pause intake",
+  resume: "Resume intake",
+  pausing: "Pausing",
+  resuming: "Resuming",
+  pauseHelper: "SuperPlane stops new Sentry items. Tasks in Backlog stay.",
+  delete: "Delete intake",
+  deleteTitle: "Delete this intake?",
+  deleteDescription:
+    "SuperPlane stops new Sentry items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
+  deleteCancel: "Keep intake",
+  deleteConfirm: "Delete intake",
+  pauseError: "SuperPlane could not change the intake. Try again.",
+  deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {

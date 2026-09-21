@@ -33,7 +33,7 @@ func ListFactoryIntakes(ctx context.Context, organizationID string, req *pb.List
 	}
 
 	return &pb.ListFactoryIntakesResponse{
-		Intakes: serializeFactoryIntakes(intakes, specs),
+		Intakes: serializeFactoryIntakes(db, intakes, specs),
 	}, nil
 }
 

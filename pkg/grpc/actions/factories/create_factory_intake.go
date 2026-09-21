@@ -145,7 +145,7 @@ func CreateFactoryIntake(
 	}
 
 	return &pb.CreateFactoryIntakeResponse{
-		Intake: serializeFactoryIntake(intake, spec[canvasID]),
+		Intake: serializeFactoryIntake(db, intake, spec[canvasID]),
 	}, nil
 }
 

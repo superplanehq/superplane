@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 
 	// The intake graph uses built-in components and integration triggers, which
 	// only reach the registry through their init functions.
@@ -142,6 +144,56 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "production", trigger.Configuration["project"])
+	})
+
+	t.Run("a Jira intake listens to the selected project and stays unhealthy until the webhook is ready", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "ENG",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "ENG", trigger.Configuration["project"])
+		assert.Equal(t, pb.FactoryIntake_SOURCE_JIRA_ISSUES, intake.GetSource())
+		assert.False(t, intake.GetHealthy(), "a pending Jira webhook must not look like a live intake")
+
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		node, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, intakeTriggerNodeID)
+		require.NoError(t, err)
+		reason := ""
+		if node.StateReason != nil {
+			reason = *node.StateReason
+		}
+		require.Equal(t, models.CanvasNodeStateReady, node.State, reason)
+		require.NotNil(t, node.WebhookID)
+
+		webhook, err := models.FindWebhookInTransaction(database.DB(t.Context()), *node.WebhookID)
+		require.NoError(t, err)
+		assert.Equal(t, models.WebhookStatePending, webhook.State)
+		raw, err := json.Marshal(webhook.Configuration.Data())
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), `"ENG"`)
+
+		require.NoError(t, webhook.ReadyWithMetadata(database.DB(t.Context()), map[string]any{
+			"webhookId": int64(1000),
+		}))
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetHealthy())
+
+		require.NoError(t, webhook.MarkFailed(database.DB(t.Context())))
+		listed, err = ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.False(t, listed.GetIntakes()[0].GetHealthy())
 	})
 
 	t.Run("creating a Sentry intake with an invalid user id does not panic", func(t *testing.T) {
@@ -617,6 +669,55 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE, settings.GetLabelFilterMode())
 	})
 
+	t.Run("update sets and clears paused, and list returns it", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		assert.False(t, intake.GetPaused())
+
+		paused := true
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+
+		paused = false
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetPaused())
+	})
+
+	t.Run("update rejects pause for a GitHub intake", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		paused := true
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.False(t, intake.GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.False(t, listed.GetIntakes()[0].GetPaused())
+	})
+
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -633,6 +734,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		assert.Error(t, err)
+	})
+
+	t.Run("deleting an intake leaves existing work orders", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		origin := models.WorkOrderOrigin{
+			URL:   "https://acme.sentry.io/issues/1",
+			Label: "ISSUE-1",
+		}
+		order, err := factory.CreateWorkOrderWithOrigin(
+			database.DB(t.Context()),
+			"Crash in checkout",
+			"The checkout page panics.",
+			nil,
+			[]uuid.UUID{},
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		_, err = DeleteFactoryIntake(ctx, orgID, &pb.DeleteFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+		})
+		require.NoError(t, err)
+
+		found, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
+		require.NoError(t, err)
+		require.NotNil(t, found.Origin())
+		assert.Equal(t, origin.URL, found.Origin().URL)
+		assert.Equal(t, origin.Label, found.Origin().Label)
 	})
 
 	t.Run("a missing intake reports not found", func(t *testing.T) {
@@ -670,11 +802,25 @@ func Test__SerializeFactoryIntakeInitialImport(t *testing.T) {
 		InitialImportItemCount: &itemCount,
 	}
 
-	serialized := serializeFactoryIntake(intake, models.LiveCanvasSpec{})
+	serialized := serializeFactoryIntake(nil, intake, models.LiveCanvasSpec{})
 
 	assert.Equal(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_COMPLETED, serialized.GetInitialImportStatus())
 	require.NotNil(t, serialized.InitialImportItemCount)
 	assert.Zero(t, serialized.GetInitialImportItemCount())
+}
+
+func Test__SerializeFactoryIntakeJiraWebhookHealth(t *testing.T) {
+	spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceJiraIssues)
+	intake := &models.FactoryIntake{
+		ID:        uuid.New(),
+		FactoryID: uuid.New(),
+		CanvasID:  uuid.New(),
+		Source:    models.FactoryIntakeSourceJiraIssues,
+	}
+
+	serialized := serializeFactoryIntake(nil, intake, spec)
+
+	assert.False(t, serialized.GetHealthy(), "a Jira intake without a ready webhook must not be healthy")
 }
 
 func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {
@@ -742,4 +888,26 @@ func liveIntakeNodes(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryI
 	require.NoError(t, err)
 
 	return liveVersion.Nodes
+}
+
+func createReadyJiraIntakeIntegration(t *testing.T, organizationID uuid.UUID, projectKey string) string {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"jira",
+		support.RandomName("jira"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	integration.State = models.IntegrationStateReady
+	integration.Metadata = datatypes.NewJSONType(map[string]any{
+		"projects": []any{
+			map[string]any{"id": "10000", "key": projectKey, "name": projectKey},
+		},
+	})
+	require.NoError(t, database.DB(t.Context()).Save(integration).Error)
+	return integration.ID.String()
 }

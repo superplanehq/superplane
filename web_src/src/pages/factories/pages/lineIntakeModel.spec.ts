@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 
 import {
   ADD_INTAKE_TEMPLATES,
@@ -65,6 +69,7 @@ describe("lineIntakeModel", () => {
 
     expect(intake?.source.name).toBe("GitHub issues");
     expect(intake?.healthy).toBe(false);
+    expect(intake?.paused).toBe(false);
     expect(intake?.settings).toMatchObject({
       name: "GitHub issues",
       confidencePct: 80,
@@ -73,6 +78,20 @@ describe("lineIntakeModel", () => {
       labelFilterMode: "exclude",
       assignment: "unassigned",
     });
+  });
+
+  it("carries the paused state from the intake API", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-1",
+        canvasId: "canvas-1",
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        paused: true,
+      },
+    ]);
+
+    expect(intake?.paused).toBe(true);
+    expect(intake?.source.id).toBe("sentry-exceptions");
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
@@ -292,11 +311,12 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists GitHub, Jira, Sentry, and coming-soon DataDog and Notion add-intake sources", () => {
+  it("lists GitHub, Jira, Sentry, Productive.io, and coming-soon DataDog and Notion add-intake sources", () => {
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
       "github-issues",
       "jira-issues",
       "sentry-exceptions",
+      "productive-tasks",
       "datadog",
       "notion",
     ]);
@@ -306,23 +326,27 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("marks Jira and Sentry as coming soon when their organization features are off", () => {
+  it("marks Jira, Sentry, and Productive.io as coming soon when their organization features are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
-  it("keeps Jira and Sentry live when their organization features are on", () => {
+  it("keeps Jira, Sentry, and Productive.io live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
-      [FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE].includes(featureId),
+      [FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(
+        featureId,
+      ),
     );
 
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
   });
 

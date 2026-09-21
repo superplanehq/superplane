@@ -5,7 +5,7 @@ import type {
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type React from "react";
 import type {
@@ -121,7 +121,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
     return renderWithTimeAgo("no issues", date);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {

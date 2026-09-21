@@ -15,6 +15,7 @@ import {
   FEATURE_FACTORY_CREATE_WITH_AGENT,
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -30,6 +31,7 @@ import {
   factoryColumnAutomationViewPath,
   factoryHomePath,
   factoryJiraIntakeSetupPath,
+  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -165,6 +167,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useDeleteFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
   useRefreshBacklog: () => ({ mutateAsync: refreshBacklogMutateAsync, isPending: false }),
@@ -265,11 +268,6 @@ vi.mock("./useWorkOrderPlanningSurvey", () => ({
     factoryId,
     workOrderId,
   ],
-}));
-
-vi.mock("./ProductiveIntakeSetupDialog", () => ({
-  ProductiveIntakeSetupDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="productive-intake-setup" /> : null,
 }));
 
 async function resetLinesBoardMocks() {
@@ -1069,14 +1067,17 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
+    await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
 
     expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
   });
 
   it("opens guided Sentry setup from the overflow menu", async () => {
@@ -1093,7 +1094,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
 
@@ -1135,7 +1136,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
@@ -1143,6 +1144,26 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
+  });
+
+  it("opens guided Productive.io setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const productive = screen.getByTestId("add-intake-template-productive-tasks");
+    expect(productive).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(productive);
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("sends a legacy Jira OAuth return to the setup page", () => {

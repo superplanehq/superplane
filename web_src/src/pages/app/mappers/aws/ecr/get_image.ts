@@ -17,7 +17,7 @@ import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { EcrImageDetail, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 import { formatTags, getRepositoryLabel } from "./utils";
-import { formatBytes, stringOrDash } from "../../utils";
+import { formatBytes, stringOrDash } from "../../eventDisplay";
 
 export const getImageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {

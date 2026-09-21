@@ -10,6 +10,7 @@ import {
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
+  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -173,6 +174,14 @@ describe("factorySentryIntakeSetupPath", () => {
   it("opens the Sentry intake setup page on the line board", () => {
     expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
+    );
+  });
+});
+
+describe("factoryProductiveIntakeSetupPath", () => {
+  it("opens the Productive.io intake setup page on the line board", () => {
+    expect(factoryProductiveIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/productive",
     );
   });
 });

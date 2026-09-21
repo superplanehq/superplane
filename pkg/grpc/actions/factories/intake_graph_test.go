@@ -3,6 +3,7 @@ package factories
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/factory"
@@ -94,6 +95,20 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 		assert.Equal(t, intakeAnalysisNodeID, graph.AnalysisNodeID)
 		assert.True(t, graph.Healthy(spec.Edges))
 	})
+}
+
+func Test__jiraWebhookHasRemoteID(t *testing.T) {
+	assert.False(t, jiraWebhookHasRemoteID(nil))
+	assert.False(t, jiraWebhookHasRemoteID("ready"))
+	assert.False(t, jiraWebhookHasRemoteID(map[string]any{}))
+	assert.False(t, jiraWebhookHasRemoteID(map[string]any{"webhookId": nil}))
+	assert.True(t, jiraWebhookHasRemoteID(map[string]any{"webhookId": float64(1000)}))
+	assert.True(t, jiraWebhookHasRemoteID(map[string]any{"webhookId": int64(1000)}))
+}
+
+func Test__jiraIntakeWebhookReady(t *testing.T) {
+	assert.False(t, jiraIntakeWebhookReady(nil, uuid.Nil, intakeTriggerNodeID))
+	assert.False(t, jiraIntakeWebhookReady(nil, uuid.New(), ""))
 }
 
 func Test__BuildBacklogCanvas(t *testing.T) {

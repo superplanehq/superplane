@@ -32,7 +32,7 @@ export interface TriggerRenderer {
    * @param context The context for the trigger event
    * @returns The values to display
    */
-  getRootEventValues: (context: TriggerEventContext) => Record<string, any>;
+  getRootEventValues: (context: TriggerEventContext) => Record<string, string>;
 
   /**
    * Get the title and subtitle for the trigger.
@@ -66,7 +66,7 @@ export type EventInfo =
       id: string;
       createdAt: string;
       customName?: string;
-      data: any;
+      data: unknown;
       nodeId: string;
       type: string;
     }
@@ -215,5 +215,5 @@ export interface CustomFieldRenderer {
 export interface OutputPayload {
   type: string;
   timestamp: string;
-  data: any;
+  data: unknown;
 }

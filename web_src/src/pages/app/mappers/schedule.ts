@@ -338,7 +338,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     return {
-      Timestamp: (context.event?.data?.["timestamp"] as string) || "n/a",
+      Timestamp: ((context.event?.data as Record<string, unknown> | undefined)?.timestamp as string) || "n/a",
     };
   },
 

@@ -373,6 +373,26 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (s *Server) adminGetOrganization(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+
+	organization, err := models.FindOrganizationWithCounts(database.DB(r.Context()), orgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Organization not found", http.StatusNotFound)
+			return
+		}
+		log.Errorf("admin: failed to load organization %s: %v", orgID, err)
+		http.Error(w, "Failed to load organization", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, serializeAdminOrganization(*organization))
+}
+
 // adminListCanvases returns paginated canvases for a given organization.
 func (s *Server) adminListCanvases(w http.ResponseWriter, r *http.Request) {
 	orgID := mux.Vars(r)["orgId"]
@@ -891,17 +911,19 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 type adminOrgItem struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
 	Description string  `json:"description"`
 	CanvasCount int64   `json:"canvas_count"`
 	MemberCount int64   `json:"member_count"`
 	CreatedAt   *string `json:"created_at,omitempty"`
+	UpdatedAt   *string `json:"updated_at,omitempty"`
 }
 
 func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
 	ctx, done := telemetry.Span(ctx, "organizations.list")
 	defer done(&err)
 
-	return models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+	return models.ListAllOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection)
 }
 
 func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {
@@ -911,20 +933,7 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 
 	items := make([]adminOrgItem, 0, len(organizations))
 	for _, org := range organizations {
-		item := adminOrgItem{
-			ID:          org.ID.String(),
-			Name:        org.Name,
-			Description: org.Description,
-			CanvasCount: org.CanvasCount,
-			MemberCount: org.MemberCount,
-		}
-
-		if org.CreatedAt != nil {
-			formatted := org.CreatedAt.Format(time.RFC3339)
-			item.CreatedAt = &formatted
-		}
-
-		items = append(items, item)
+		items = append(items, serializeAdminOrganization(org))
 	}
 
 	if span := trace.SpanFromContext(ctx); span.IsRecording() {
@@ -932,4 +941,27 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 	}
 
 	return items
+}
+
+func serializeAdminOrganization(org models.OrganizationWithCounts) adminOrgItem {
+	item := adminOrgItem{
+		ID:          org.ID.String(),
+		Name:        org.Name,
+		Slug:        org.Slug,
+		Description: org.Description,
+		CanvasCount: org.CanvasCount,
+		MemberCount: org.MemberCount,
+	}
+
+	if org.CreatedAt != nil {
+		formatted := org.CreatedAt.Format(time.RFC3339)
+		item.CreatedAt = &formatted
+	}
+
+	if org.UpdatedAt != nil {
+		formatted := org.UpdatedAt.Format(time.RFC3339)
+		item.UpdatedAt = &formatted
+	}
+
+	return item
 }

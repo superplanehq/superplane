@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getTriggerRenderer, getState, getStateMap } from "./mapperLookup";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -116,9 +116,9 @@ export const ifMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const configuration = context.execution.configuration as IfConfiguration;
-    const details: Record<string, any> = {
+    const details: Record<string, string> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       Expression: configuration.expression,
     };

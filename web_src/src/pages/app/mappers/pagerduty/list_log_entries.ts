@@ -77,7 +77,7 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
-    const details: Record<string, any> = {};
+    const details: Record<string, string> = {};
 
     // Add "Checked at" timestamp
     if (context.execution.createdAt) {
