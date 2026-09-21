@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -177,6 +178,7 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 		ID:          nodeID,
 		Name:        node.Name,
 		Concurrency: node.Concurrency,
+		Metadata:    maps.Clone(node.Metadata),
 	}
 	if node.IsCollapsed != nil {
 		newNode.IsCollapsed = *node.IsCollapsed
@@ -325,6 +327,10 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 
 	if node.IsCollapsed != nil {
 		currentNode.IsCollapsed = *node.IsCollapsed
+	}
+
+	if node.Metadata != nil {
+		currentNode.Metadata = maps.Clone(node.Metadata)
 	}
 
 	if node.Block != "" {

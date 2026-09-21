@@ -17,6 +17,7 @@ import {
   INTAKE_SETTINGS_COPY,
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
+import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -39,6 +40,18 @@ vi.mock("@/hooks/useCanvasData", () => {
     useInfiniteCanvasRuns,
   };
 });
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
+    data: [
+      { id: "todo", name: "To Do" },
+      { id: "qa", name: "QA" },
+      { id: "done", name: "Done" },
+    ],
+    isLoading: false,
+    isError: false,
+  }),
+}));
 
 useInfiniteCanvasRuns.mockReturnValue({
   data: {
@@ -125,6 +138,10 @@ function renderPopup(
     labelOptionsLoading?: boolean;
     sourceId?: LineIntakeSourceId;
     connection?: IntakeSettingsConnection;
+    settings?: typeof DEFAULT_GITHUB_INTAKE_SETTINGS;
+    organizationId?: string;
+    integrationId?: string;
+    resourceId?: string;
     paused?: boolean;
     pauseError?: string;
     deleteError?: string;
@@ -140,14 +157,18 @@ function renderPopup(
           <TooltipProvider>
             <IntakeSourceSettingsPopup
               settings={
-                props.sourceId === "sentry-exceptions"
+                props.settings ??
+                (props.sourceId === "sentry-exceptions"
                   ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" }
                   : props.sourceId === "jira-issues"
                     ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
-                    : DEFAULT_GITHUB_INTAKE_SETTINGS
+                    : DEFAULT_GITHUB_INTAKE_SETTINGS)
               }
               sourceId={props.sourceId}
               connection={props.connection}
+              organizationId={props.organizationId}
+              integrationId={props.integrationId}
+              resourceId={props.resourceId}
               labelOptions={props.labelOptions ?? ["bug", "enhancement"]}
               labelOptionsLoading={props.labelOptionsLoading}
               automationGraph={githubAutomationGraph}
@@ -353,6 +374,8 @@ describe("IntakeSourceSettingsPopup", () => {
         reopenedIssues: false,
         superplaneLabelAdded: true,
         authorsWithAccess: true,
+        jiraMoveOnComplete: true,
+        jiraCompletionColumn: "",
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -482,5 +505,32 @@ describe("IntakeSourceSettingsPopup", () => {
     const dialog = screen.getByTestId("intake-delete-dialog");
     expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteError);
     expect(within(screen.getByTestId("intake-source-settings")).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows the Jira completion column on the General tab", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "jira-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" },
+      organizationId: "org-1",
+      integrationId: "jira-1",
+      resourceId: "ENG",
+      onSave,
+    });
+
+    expect(screen.getByRole("heading", { name: "Intake Jira issues" })).toBeInTheDocument();
+    expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
+    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
+    await user.click(screen.getByTestId("jira-completion-column-select"));
+    await user.click(screen.getByRole("option", { name: "QA" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jiraMoveOnComplete: true,
+        jiraCompletionColumn: "QA",
+      }),
+    );
   });
 });

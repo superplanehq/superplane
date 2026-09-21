@@ -136,6 +136,29 @@ describe("provisionWorkspace", () => {
     expect(issuesSourceCalls).toEqual(["ISSUES_SOURCE_JIRA"]);
   });
 
+  it("creates a Jira intake with the chosen completion column", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" });
+
+    await provisionWorkspace(
+      provisionArgs({
+        issuesChoice: "jira",
+        createIntake,
+        jira: {
+          integrationId: "jira-1",
+          projectId: "PAY",
+          settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+        },
+      }),
+    );
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_JIRA_ISSUES",
+      integrationId: "jira-1",
+      resourceId: "PAY",
+      settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+    });
+  });
+
   it("does not create a comments handler during workspace setup", async () => {
     await provisionWorkspace(provisionArgs());
   });
