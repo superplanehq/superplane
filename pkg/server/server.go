@@ -136,6 +136,7 @@ func startWorkers(
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
+		startFactorySentryResolveConsumer(rabbitMQURL, encryptor, registry)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -373,6 +374,16 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Factory Notification Consumer")
 	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
 	go factoryNotificationConsumer.Start()
+}
+
+func startFactorySentryResolveConsumer(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	componentRegistry *registry.Registry,
+) {
+	log.Println("Starting Factory Sentry Resolve Consumer")
+	consumer := workers.NewFactorySentryResolveConsumer(rabbitMQURL, encryptor, componentRegistry)
+	go consumer.Start()
 }
 
 func buildGRPCServices(
