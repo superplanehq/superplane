@@ -10,7 +10,8 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
+import { INTAKE_CONNECTION_COPY } from "./intakeConnectionModel";
+import { IntakeSourceSettingsPopup, type IntakeSettingsConnection } from "./IntakeSourceSettingsPopup";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   INTAKE_SETTINGS_COPY,
@@ -123,6 +124,7 @@ function renderPopup(
     labelOptions?: string[];
     labelOptionsLoading?: boolean;
     sourceId?: LineIntakeSourceId;
+    connection?: IntakeSettingsConnection;
     paused?: boolean;
     pauseError?: string;
     deleteError?: string;
@@ -140,9 +142,12 @@ function renderPopup(
               settings={
                 props.sourceId === "sentry-exceptions"
                   ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" }
-                  : DEFAULT_GITHUB_INTAKE_SETTINGS
+                  : props.sourceId === "jira-issues"
+                    ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
+                    : DEFAULT_GITHUB_INTAKE_SETTINGS
               }
               sourceId={props.sourceId}
+              connection={props.connection}
               labelOptions={props.labelOptions ?? ["bug", "enhancement"]}
               labelOptionsLoading={props.labelOptionsLoading}
               automationGraph={githubAutomationGraph}
@@ -351,6 +356,59 @@ describe("IntakeSourceSettingsPopup", () => {
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the Connection section for a GitHub intake", () => {
+    renderPopup();
+
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+  });
+
+  it("shows Connection fields for a Jira intake that needs a live connection", () => {
+    renderPopup({
+      sourceId: "jira-issues",
+      connection: {
+        health: "HEALTH_MISSING_INTEGRATION",
+        binding: { integrationId: "", resourceId: "" },
+        integrations: [
+          {
+            metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+            status: { state: "ready" },
+          },
+        ],
+        projects: [],
+        onBindingChange: vi.fn(),
+        onConnect: vi.fn(),
+      },
+    });
+
+    expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: INTAKE_CONNECTION_COPY.section })).toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent(INTAKE_CONNECTION_COPY.missing);
+    expect(screen.getByText("Choose the Jira site that SuperPlane will monitor.")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-jira-1")).toHaveTextContent("Atlassian");
+  });
+
+  it("keeps Save disabled until the Jira project is chosen", () => {
+    renderPopup({
+      sourceId: "jira-issues",
+      connection: {
+        health: "HEALTH_MISSING_INTEGRATION",
+        binding: { integrationId: "jira-1", resourceId: "" },
+        integrations: [
+          {
+            metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+            status: { state: "ready" },
+          },
+        ],
+        projects: [{ id: "ENG", name: "Engineering" }],
+        saveDisabled: true,
+        onBindingChange: vi.fn(),
+        onConnect: vi.fn(),
+      },
+    });
+
+    expect(screen.getByTestId("intake-source-settings-save")).toBeDisabled();
   });
 
   it("hides pause and delete for a GitHub intake", () => {
