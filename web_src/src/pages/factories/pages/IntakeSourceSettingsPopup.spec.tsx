@@ -365,22 +365,11 @@ describe("IntakeSourceSettingsPopup", () => {
 
     await waitFor(() =>
       expect(onSave).toHaveBeenCalledWith({
-        name: "GitHub issues",
-        confidencePct: 65,
-        labelFilterMode: "include",
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
         labels: ["bug"],
         filterByLabel: true,
-        assignment: "any",
-        newIssues: true,
         reopenedIssues: false,
-        superplaneLabelAdded: true,
         authorsWithAccess: true,
-        jiraMoveOnComplete: true,
-        jiraCompletionColumn: "",
-        sentryNewIssues: true,
-        sentryRegressedIssues: true,
-        sentryAssignedIssues: false,
-        sentryLevels: [],
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
