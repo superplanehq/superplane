@@ -340,6 +340,11 @@ export function factorySentryIntakeSetupPath(organizationId: string, factoryKey:
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
 }
 
+/** Dedicated setup page for Productive.io task intake. */
+export function factoryProductiveIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/productive`;
+}
+
 export function automationsPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/automations`;
 }
