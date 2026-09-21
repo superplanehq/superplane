@@ -83,6 +83,48 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	}
 }
 
+var publishFactoryWorkOrderUpdated = messages.PublishFactoryWorkOrderUpdated
+
+func ScheduleFactoryPullRequestMergeabilityRefresh(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) {
+	if organizationID == uuid.Nil || factoryID == uuid.Nil || pullRequestID == uuid.Nil {
+		return
+	}
+	ctx = context.WithoutCancel(ctx)
+	go refreshFactoryPullRequestMergeabilityByID(ctx, deps, organizationID, factoryID, pullRequestID)
+}
+
+func refreshFactoryPullRequestMergeabilityByID(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) {
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, organizationID, factoryID)
+	if err != nil {
+		log.WithError(err).Warnf("factory mergeability: factory %s not found", factoryID)
+		return
+	}
+	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequestID})
+	if err != nil {
+		log.WithError(err).Warnf("factory mergeability: pull request %s not found", pullRequestID)
+		return
+	}
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+		return
+	}
+	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
+		log.WithError(err).Warnf(
+			"factory mergeability: failed to ensure webhook for %s",
+			pullRequest.Repository,
+		)
+	}
+	refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+}
+
 func refreshFactoryPullRequestMergeability(
 	ctx context.Context,
 	db *gorm.DB,
@@ -90,34 +132,33 @@ func refreshFactoryPullRequestMergeability(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 ) {
-	before := models.FactoryPullRequestMergeabilitySnapshot{
-		Mergeable:      pullRequest.Mergeable,
-		BlockedReason:  pullRequest.MergeBlockedReason,
-		BlockedMessage: pullRequest.MergeBlockedMessage,
-		HeadSHA:        pullRequest.MergeableHeadSHA,
-		AllowedMethods: pullRequest.MergeableAllowedMethods,
-	}
-	result, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-	if err != nil {
+	before := storedFactoryPullRequestMergeability(pullRequest)
+	if _, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
 		log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
 		return
 	}
-	after := models.FactoryPullRequestMergeabilitySnapshot{
-		Mergeable:      result.CanMerge,
-		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
-		BlockedMessage: result.Message,
-		HeadSHA:        result.HeadSHA,
-		AllowedMethods: mergeMethodNames(result.AllowedMethods),
-	}
-	if before == after {
+	if storedFactoryPullRequestMergeability(pullRequest) == before {
 		return
 	}
-	if err := messages.PublishFactoryWorkOrderUpdated(
+	if err := publishFactoryWorkOrderUpdated(
 		factory.ID.String(),
 		pullRequest.WorkOrderID.String(),
 		factoryevents.EventTypeOrderPullRequestUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
+	}
+}
+
+func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest) models.FactoryPullRequestMergeabilitySnapshot {
+	if pullRequest == nil {
+		return models.FactoryPullRequestMergeabilitySnapshot{}
+	}
+	return models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      pullRequest.Mergeable,
+		BlockedReason:  pullRequest.MergeBlockedReason,
+		BlockedMessage: pullRequest.MergeBlockedMessage,
+		HeadSHA:        pullRequest.MergeableHeadSHA,
+		AllowedMethods: pullRequest.MergeableAllowedMethods,
 	}
 }
 
@@ -164,13 +205,31 @@ func ensureFactoryMergeabilityWebhook(
 	deps IntakeDependencies,
 	factory *models.Factory,
 ) error {
+	if factory == nil {
+		return nil
+	}
+	return ensureFactoryMergeabilityWebhookForRepository(
+		ctx,
+		tx,
+		deps,
+		factory,
+		factory.OnboardingConfigValue().AppRepository,
+	)
+}
+
+func ensureFactoryMergeabilityWebhookForRepository(
+	ctx context.Context,
+	tx *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	repository string,
+) error {
 	if deps.Encryptor == nil || factory == nil {
 		return nil
 	}
 
-	config := factory.OnboardingConfigValue()
-	repository := strings.TrimSpace(config.AppRepository)
-	integrationID := strings.TrimSpace(config.VCSIntegrationID)
+	repository = strings.TrimSpace(repository)
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
 	if repository == "" || integrationID == "" {
 		return nil
 	}

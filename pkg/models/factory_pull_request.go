@@ -404,11 +404,16 @@ func ListOpenGitHubFactoryPullRequestsForWebhook(
 	revisionIDs := tx.Model(&FactoryPullRequestRevision{}).Select("id").Where("sha = ?", sha)
 	switch {
 	case len(numbers) > 0 && sha != "":
-		query = query.Where("number IN ? OR current_revision_id IN (?)", numbers, revisionIDs)
+		query = query.Where(
+			"(number IN ? OR current_revision_id IN (?) OR mergeable_head_sha = ?)",
+			numbers,
+			revisionIDs,
+			sha,
+		)
 	case len(numbers) > 0:
 		query = query.Where("number IN ?", numbers)
 	default:
-		query = query.Where("current_revision_id IN (?)", revisionIDs)
+		query = query.Where("(current_revision_id IN (?) OR mergeable_head_sha = ?)", revisionIDs, sha)
 	}
 
 	var pullRequests []FactoryPullRequest

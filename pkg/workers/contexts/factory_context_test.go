@@ -774,6 +774,51 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_AddPullRequest_NotifiesGitHubRecorded(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Tracked", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	var recordedOrg, recordedFactory, recordedPR uuid.UUID
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithGitHubPullRequestRecorded(func(organizationID, factoryID, pullRequestID uuid.UUID) {
+			recordedOrg = organizationID
+			recordedFactory = factoryID
+			recordedPR = pullRequestID
+		})
+
+	created, err := ctx.AddPullRequest(core.AddPullRequestParams{
+		OrderID:    order.ID.String(),
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     44,
+		URL:        "https://github.com/acme/app/pull/44",
+		Title:      "Ready",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, factory.OrganizationID, recordedOrg)
+	assert.Equal(t, factory.ID, recordedFactory)
+	assert.Equal(t, created.ID, recordedPR.String())
+
+	recordedPR = uuid.Nil
+	_, err = ctx.AddPullRequest(core.AddPullRequestParams{
+		OrderID:    order.ID.String(),
+		Provider:   models.FactoryPullRequestProviderBitbucket,
+		Repository: "acme/app",
+		Number:     45,
+		URL:        "https://bitbucket.org/acme/app/pull-requests/45",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uuid.Nil, recordedPR)
+}
+
 func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
