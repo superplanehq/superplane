@@ -26,13 +26,13 @@ func Test__DescribeFactory_AcceptsKey(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("describes by workspace key", func(t *testing.T) {
-		resp, err := DescribeFactory(ctx, r.Organization.ID.String(), "super")
+		resp, err := DescribeFactory(ctx, IntakeDependencies{}, r.Organization.ID.String(), "super")
 		require.NoError(t, err)
 		assert.Equal(t, factoryModel.ID.String(), resp.Factory.GetId())
 	})
 
 	t.Run("rejects a workspace name", func(t *testing.T) {
-		_, err := DescribeFactory(ctx, r.Organization.ID.String(), "SuperPlane")
+		_, err := DescribeFactory(ctx, IntakeDependencies{}, r.Organization.ID.String(), "SuperPlane")
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
@@ -54,7 +54,7 @@ func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 		_, err = factoryModel.CreateLine(db, "idle", nil)
 		require.NoError(t, err)
 
-		resp, err := DescribeFactory(ctx, r.Organization.ID.String(), factoryModel.ID.String())
+		resp, err := DescribeFactory(ctx, IntakeDependencies{}, r.Organization.ID.String(), factoryModel.ID.String())
 		require.NoError(t, err)
 		require.Len(t, resp.Factory.Lines, 1)
 		assert.Nil(t, resp.Factory.Lines[0].Metrics)
@@ -79,7 +79,7 @@ func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := DescribeFactory(ctx, r.Organization.ID.String(), factoryModel.ID.String())
+		resp, err := DescribeFactory(ctx, IntakeDependencies{}, r.Organization.ID.String(), factoryModel.ID.String())
 		require.NoError(t, err)
 		require.Len(t, resp.Factory.Lines, 2)
 

@@ -1384,6 +1384,7 @@ message FactoryPullRequest {
   repeated FactoryPullRequestRun runs = 16;
   optional FactoryPullRequestRevision current_revision = 17;
   repeated FactoryPullRequestActivity activities = 18;
+  bool mergeable = 19;
 }
 
 message ListFactoryPullRequestsRequest {

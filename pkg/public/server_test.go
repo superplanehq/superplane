@@ -277,6 +277,102 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 	assert.Zero(t, eventCount)
 }
 
+func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	secret := []byte("webhook-secret")
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), secret, []byte(webhookID.String()))
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: encrypted,
+		Configuration: datatypes.NewJSONType(any(map[string]any{
+			"eventTypes":          []string{"check_run"},
+			"repository":          "acme/app",
+			"factoryMergeability": true,
+		})),
+		AppInstallationID: &integration.ID,
+	}).Error)
+
+	body := []byte(`{"repository":{"full_name":"acme/app"},"check_run":{"head_sha":"abc","pull_requests":[{"number":1}]}}`)
+	accepted := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event":      "check_run",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, body),
+		},
+	})
+	require.Equal(t, http.StatusOK, accepted.Code)
+
+	unsigned := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
+	})
+	require.Equal(t, http.StatusForbidden, unsigned.Code)
+
+	pingBody := []byte(`{"zen":"Keep it logically awesome."}`)
+	ping := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   pingBody,
+		headers: map[string]string{
+			"X-GitHub-Event":      "ping",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, pingBody),
+		},
+	})
+	require.Equal(t, http.StatusOK, ping.Code)
+
+	plainID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     plainID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+	rejected := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + plainID.String(),
+		body:   []byte(`{"ok":true}`),
+		headers: map[string]string{
+			"X-GitHub-Event": "check_run",
+		},
+	})
+	require.Equal(t, http.StatusNotFound, rejected.Code)
+}
+
 type canvasesGatewayStubServer struct {
 	pbCanvases.UnimplementedCanvasesServer
 	createCanvasCalled bool
@@ -367,6 +463,7 @@ type requestParams struct {
 	authCookie   string
 	contentType  string
 	customSource bool
+	headers      map[string]string
 }
 
 func execRequest(server *Server, params requestParams) *httptest.ResponseRecorder {
@@ -391,6 +488,10 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 
 	if params.authCookie != "" {
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: params.authCookie})
+	}
+
+	for key, value := range params.headers {
+		req.Header.Set(key, value)
 	}
 
 	res := httptest.NewRecorder()
