@@ -140,6 +140,17 @@ func Test__FactoryJiraCloseConsumer(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to close Jira issue ENG-5")
 	})
 
+	t.Run("retries a transient jira error while listing transitions", func(t *testing.T) {
+		order, httpCtx := seedJiraWorkOrder(t, r, "ENG-6", nil, jiraMockResponses(
+			http.StatusOK, `{"key":"ENG-6","fields":{"status":{"name":"In Progress","statusCategory":{"key":"indeterminate"}}}}`,
+			http.StatusInternalServerError, `{"error":"unavailable"}`,
+		))
+
+		err := newJiraCloseConsumer(r, httpCtx).process(db, completedMessage(order))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to close Jira issue ENG-6")
+	})
+
 	t.Run("consume rejects invalid json", func(t *testing.T) {
 		err := newJiraCloseConsumer(r, &supportcontexts.HTTPContext{}).
 			Consume(tackle.NewFakeDelivery([]byte("{")))
