@@ -20,6 +20,9 @@ func (t *testWebhookContext) GetSecret() ([]byte, error)    { return t.secret, n
 func (t *testWebhookContext) GetMetadata() any              { return nil }
 func (t *testWebhookContext) GetConfiguration() any         { return t.configuration }
 func (t *testWebhookContext) SetSecret(secret []byte) error { t.secret = secret; return nil }
+func (t *testWebhookContext) CallbackHasActiveNodes(string) (bool, error) {
+	return false, nil
+}
 
 func Test__PrometheusWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &PrometheusWebhookHandler{}

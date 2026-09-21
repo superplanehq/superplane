@@ -107,9 +107,9 @@ func Test__jiraWebhookHasRemoteID(t *testing.T) {
 	assert.True(t, jiraWebhookHasRemoteID(map[string]any{"webhookId": int64(1000)}))
 }
 
-func Test__jiraIntakeWebhookReady(t *testing.T) {
-	assert.False(t, jiraIntakeWebhookReady(nil, uuid.Nil, intakeTriggerNodeID))
-	assert.False(t, jiraIntakeWebhookReady(nil, uuid.New(), ""))
+func Test__jiraIntakeWebhookHealth(t *testing.T) {
+	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, jiraIntakeWebhookHealth(nil, uuid.Nil, intakeTriggerNodeID))
+	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, jiraIntakeWebhookHealth(nil, uuid.New(), ""))
 }
 
 func Test__IntakeTriggerBinding(t *testing.T) {
