@@ -1,8 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { Predicate } from "../utils";
-import { formatPredicate, stringOrDash } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate, stringOrDash } from "../eventDisplay";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { TriggerProps } from "@/ui/trigger";
 import type { BaseNodeMetadata } from "./types";

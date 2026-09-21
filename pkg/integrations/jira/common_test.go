@@ -199,3 +199,32 @@ func Test__applyStatusWithOptions(t *testing.T) {
 		assert.Contains(t, err.Error(), "In Progress")
 	})
 }
+
+func Test__unmarshalWebhookPayloads(t *testing.T) {
+	t.Run("wraps a single object", func(t *testing.T) {
+		payloads, err := unmarshalWebhookPayloads[IssueWebhookPayload]([]byte(
+			`{"webhookEvent":"jira:issue_created","issue":{"key":"ENG-1"}}`,
+		))
+		require.NoError(t, err)
+		require.Len(t, payloads, 1)
+		assert.Equal(t, issueEventCreated, payloads[0].WebhookEvent)
+		require.NotNil(t, payloads[0].Issue)
+		assert.Equal(t, "ENG-1", payloads[0].Issue.Key)
+	})
+
+	t.Run("parses a JSON array", func(t *testing.T) {
+		payloads, err := unmarshalWebhookPayloads[IssueWebhookPayload]([]byte(`[
+			{"webhookEvent":"jira:issue_created","issue":{"key":"ENG-1"}},
+			{"webhookEvent":"jira:issue_updated","issue":{"key":"ENG-2"}}
+		]`))
+		require.NoError(t, err)
+		require.Len(t, payloads, 2)
+		assert.Equal(t, "ENG-1", payloads[0].Issue.Key)
+		assert.Equal(t, "ENG-2", payloads[1].Issue.Key)
+	})
+
+	t.Run("rejects an empty body", func(t *testing.T) {
+		_, err := unmarshalWebhookPayloads[IssueWebhookPayload]([]byte("  "))
+		require.ErrorContains(t, err, "request body is empty")
+	})
+}

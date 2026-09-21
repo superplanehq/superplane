@@ -4,7 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerProps } from "@/ui/trigger";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 
 interface OnAppMentionConfiguration {
   channel?: string;

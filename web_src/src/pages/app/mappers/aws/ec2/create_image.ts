@@ -14,7 +14,7 @@ import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import type { Ec2Image } from "./types";
 
 interface Configuration {

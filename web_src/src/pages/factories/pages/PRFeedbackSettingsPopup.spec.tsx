@@ -169,8 +169,8 @@ function renderChecksPopup(
 const automationGraph = prFeedbackGraph();
 
 function prFeedbackGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-pr-feedback", name: "Address PR feedback", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -189,8 +189,8 @@ function prFeedbackGraph(): IntakeAutomationGraph {
         ],
       },
     },
-    [{ name: "github.onPRComment", label: "On PR Comment" }],
-    [
+    triggers: [{ name: "github.onPRComment", label: "On PR Comment" }],
+    components: [
       {
         name: "findPullRequest",
         label: "Find Pull Request",
@@ -198,14 +198,14 @@ function prFeedbackGraph(): IntakeAutomationGraph {
       },
       { name: "runnerClaude", label: "Run Claude Code", outputChannels: [{ name: "passed" }, { name: "failed" }] },
     ],
-    {},
-    {},
-    {},
-    "app-pr-feedback",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-pr-feedback",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
 
   return {
     nodes,

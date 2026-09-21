@@ -8,35 +8,39 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useMemo, useState } from "react";
 
-export type ProductiveSetupStep = "connection" | "project" | "complete";
+import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
 
-export function useProductiveIntakeSetup(organizationId: string, factoryId: string, open: boolean) {
+export type ProductiveSetupStep = "connection" | "project";
+
+export function useProductiveIntakeSetup(organizationId: string, factoryId: string) {
   const [step, setStep] = useState<ProductiveSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
+  const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
 
   const { connectedQuery, productiveIntegrations, productiveDefinition, existingNames } =
     useProductiveConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project");
+  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
+    enabled: Boolean(integrationId),
+  });
 
   useEffect(() => {
-    if (open) {
-      setStep("connection");
-      setIntegrationId("");
-      setProjectId("");
-      setError(undefined);
+    if (stayOnConnection || step !== "connection") {
+      return;
     }
-  }, [open]);
-
-  useEffect(() => {
-    if (!integrationId && productiveIntegrations.length === 1) {
-      setIntegrationId(productiveIntegrations[0].metadata?.id ?? "");
+    const readyId = readyProductiveConnectionId(productiveIntegrations, integrationId);
+    if (!readyId) {
+      return;
     }
-  }, [integrationId, productiveIntegrations]);
+    setIntegrationId(readyId);
+    setConnectOpen(false);
+    setStep("project");
+    void connectedQuery.refetch();
+  }, [stayOnConnection, step, productiveIntegrations, integrationId, connectedQuery]);
 
   // A new connection is the reason the user opened the connect dialog, so the
   // wizard adopts it and moves on instead of asking them to pick it again.
@@ -45,6 +49,11 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
     setConnectOpen(false);
     setStep("project");
     void connectedQuery.refetch();
+  };
+
+  const returnToConnection = () => {
+    setStayOnConnection(true);
+    setStep("connection");
   };
 
   // Creating the intake is the last answer the wizard needs: the backend seeds
@@ -58,9 +67,10 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
         integrationId,
         resourceId: projectId,
       });
-      setStep("complete");
+      return true;
     } catch (cause) {
-      setError(getApiErrorMessage(cause, "SuperPlane could not create the Productive.io intake."));
+      setError(getApiErrorMessage(cause, PRODUCTIVE_INTAKE_SETUP_COPY.wizardCreateError));
+      return false;
     }
   };
 
@@ -82,8 +92,19 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
     productiveDefinition,
     existingNames,
     completeConnection,
+    returnToConnection,
     createBoundIntake,
   };
+}
+
+export function readyProductiveConnectionId(
+  integrations: Array<{ metadata?: { id?: string } }>,
+  selectedId: string,
+): string {
+  if (selectedId && integrations.some((integration) => integration.metadata?.id === selectedId)) {
+    return selectedId;
+  }
+  return integrations[0]?.metadata?.id ?? "";
 }
 
 function useProductiveConnections(organizationId: string) {

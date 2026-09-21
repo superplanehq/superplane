@@ -9,7 +9,7 @@ import type {
 } from "../types";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import type { MetadataItem } from "@/ui/metadataList";

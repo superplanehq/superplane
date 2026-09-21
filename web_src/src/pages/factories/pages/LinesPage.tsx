@@ -123,6 +123,7 @@ import {
   factoryHomePath,
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
+  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -158,7 +159,6 @@ import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline"
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import {
   addIntakeTemplatesForOrg,
   apiIntakeSource,
@@ -268,7 +268,6 @@ export function LinesPage() {
   );
   const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
-  const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -427,7 +426,9 @@ export function LinesPage() {
       return;
     }
     if (template.id === "productive-tasks") {
-      setProductiveIntakeSetupOpen(true);
+      if (selectedLine.id) {
+        navigate(factoryProductiveIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
       return;
     }
     if (template.id === "jira-issues") {
@@ -515,12 +516,6 @@ export function LinesPage() {
         onSelect={createIntakeFromTemplate}
         templates={addIntakeTemplates}
         takenSourceIds={takenIntakeSourceIds}
-      />
-      <ProductiveIntakeSetupDialog
-        open={productiveIntakeSetupOpen}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        onClose={() => setProductiveIntakeSetupOpen(false)}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}

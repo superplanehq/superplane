@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
@@ -50,6 +50,18 @@ describe("OrganizationDetail", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        if (url === `/admin/api/organizations/${ORG_ID}`) {
+          return jsonResponse({
+            id: ORG_ID,
+            name: "Acme",
+            slug: "acme",
+            description: "Builds widgets",
+            canvas_count: 2,
+            member_count: 3,
+            created_at: "2024-01-15T12:00:00Z",
+            updated_at: "2024-02-20T12:00:00Z",
+          });
+        }
         if (url.startsWith(`/admin/api/organizations/${ORG_ID}/users`)) {
           return jsonResponse({
             items: [{ id: "user-1", name: "Ada Lovelace", email: "ada@example.com", account_id: "acc-1" }],
@@ -99,18 +111,53 @@ describe("OrganizationDetail", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows users first and opens automations after a tab click", async () => {
-    const user = userEvent.setup();
+  it("renders overview values on load", async () => {
     renderPage();
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Overview",
       "Users",
       "Automations",
       "Features",
       "Credits",
     ]);
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    const panel = screen.getByRole("tabpanel", { name: "Overview" });
+    expect(within(panel).getByText("Acme")).toBeInTheDocument();
+    expect(within(panel).getByText("acme")).toBeInTheDocument();
+    expect(within(panel).getByText(ORG_ID)).toBeInTheDocument();
+    expect(within(panel).getByText("Builds widgets")).toBeInTheDocument();
+    expect(within(panel).getByText("3")).toBeInTheDocument();
+    expect(within(panel).getByText("2")).toBeInTheDocument();
+    expect(within(panel).getByText("Name")).toBeInTheDocument();
+    expect(within(panel).getByText("Slug")).toBeInTheDocument();
+    expect(within(panel).getByText("Organization ID")).toBeInTheDocument();
+    expect(within(panel).getByText("Description")).toBeInTheDocument();
+    expect(within(panel).getByText("Created")).toBeInTheDocument();
+    expect(within(panel).getByText("Updated")).toBeInTheDocument();
+    expect(within(panel).getByText("Members")).toBeInTheDocument();
+    expect(within(panel).getByText("Automations")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+  });
+
+  it("loads users after a tab switch", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Users" }));
+
     expect(await screen.findByPlaceholderText("Search users...")).toBeInTheDocument();
     expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+  });
+
+  it("shows overview first and opens automations after a tab click", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search automations...")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Automations" }));
@@ -123,7 +170,7 @@ describe("OrganizationDetail", () => {
   it("does not load credits until the credits tab opens", async () => {
     renderPage();
 
-    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
 
     const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
     expect(urls.some((url) => url.includes("/llm-credit"))).toBe(false);
@@ -134,7 +181,7 @@ describe("OrganizationDetail", () => {
     const user = userEvent.setup();
     renderPage();
 
-    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Features" }));
 
@@ -167,5 +214,35 @@ describe("OrganizationDetail", () => {
     await user.click(screen.getByRole("tab", { name: "Credits" }));
     expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "active");
     expect(await screen.findByTestId("admin-org-credit-amount")).toHaveValue("12.50");
+  });
+
+  it("retries overview load after an error", async () => {
+    const user = userEvent.setup();
+    const overview = {
+      id: ORG_ID,
+      name: "Acme",
+      slug: "acme",
+      description: "Builds widgets",
+      canvas_count: 2,
+      member_count: 3,
+      created_at: "2024-01-15T12:00:00Z",
+      updated_at: "2024-02-20T12:00:00Z",
+    };
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        if (vi.mocked(fetch).mock.calls.filter(([call]) => String(call) === url).length === 1) {
+          return new Response("error", { status: 500 });
+        }
+        return jsonResponse(overview);
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Could not load this organization.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
   });
 });

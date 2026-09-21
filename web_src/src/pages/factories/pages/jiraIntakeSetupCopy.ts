@@ -1,7 +1,8 @@
 export const JIRA_INTAKE_SETUP_COPY = {
   pageTitle: "How should Jira issues become tasks?",
   wizardStepConnect: "Connect Jira",
-  wizardStepConnectHelper: "Connect Jira so SuperPlane can read issues and listen for new ones.",
+  wizardStepConnectHelper:
+    "Connect Jira so SuperPlane can read issues and receive new issue events. If SuperPlane already has this Jira site, open the integration and authorize it again.",
   wizardStepConnectExisting: "Choose the Jira site that SuperPlane will monitor.",
   wizardStepProject: "Which Jira project should create tasks?",
   wizardStepProjectHelper:

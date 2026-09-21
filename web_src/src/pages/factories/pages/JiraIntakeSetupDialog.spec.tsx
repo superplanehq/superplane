@@ -179,6 +179,8 @@ describe("JiraIntakeSetupDialog", () => {
     await user.click(await screen.findByTestId("first-run-back"));
 
     expect(screen.getByRole("heading", { name: JIRA_INTAKE_SETUP_COPY.wizardStepConnect })).toBeInTheDocument();
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper)).toBeInTheDocument();
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper)).toHaveTextContent("authorize it again");
     expect(screen.queryByTestId("jira-project-ENG")).not.toBeInTheDocument();
   });
 

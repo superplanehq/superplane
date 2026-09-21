@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { createAlertRuleMapper } from "./create_alert_rule";
 import { createAnnotationMapper } from "./create_annotation";
 import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";

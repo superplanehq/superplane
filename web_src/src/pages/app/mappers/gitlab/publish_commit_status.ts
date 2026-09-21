@@ -8,7 +8,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { baseProps } from "./base";
 import type { CommitStatus, GitLabNodeMetadata } from "./types";
 import { buildGitlabExecutionSubtitle, shortSha } from "./utils";

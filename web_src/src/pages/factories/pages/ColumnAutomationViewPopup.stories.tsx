@@ -9,8 +9,8 @@ import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 function implementGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-refund-implementer", name: "Implement", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -20,16 +20,16 @@ function implementGraph(): IntakeAutomationGraph {
         edges: [{ channel: "default", sourceId: "on-run", targetId: "agent" }],
       },
     },
-    [{ name: "onRun", label: "On run" }],
-    [{ name: "runnerClaudeCode", label: "Claude Code" }],
-    {},
-    {},
-    {},
-    "app-refund-implementer",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    triggers: [{ name: "onRun", label: "On run" }],
+    components: [{ name: "runnerClaudeCode", label: "Claude Code" }],
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-refund-implementer",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
   return { nodes, edges, factoryId: "factory-1" };
 }
 
