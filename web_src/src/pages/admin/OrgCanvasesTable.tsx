@@ -68,7 +68,7 @@ export function OrgCanvasesTable({ orgId }: { orgId: string }) {
 
       {canvases.length === 0 ? (
         <Text className="text-gray-500 text-sm dark:text-gray-400">
-          {search ? "No canvases match your search." : "No canvases in this organization."}
+          {search ? "No automations match your search." : "No automations in this organization."}
         </Text>
       ) : (
         <>

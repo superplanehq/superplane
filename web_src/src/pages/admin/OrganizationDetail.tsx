@@ -52,7 +52,7 @@ const OrganizationDetail: React.FC = () => {
         <TabsContent value="features" className="mt-3">
           <OrgExperimentalFeaturesTable orgId={orgId!} />
         </TabsContent>
-        <TabsContent value="credits" className="mt-3">
+        <TabsContent value="credits" forceMount className="mt-3 data-[state=inactive]:hidden">
           <OrgLLMCreditSection orgId={orgId!} />
         </TabsContent>
       </Tabs>

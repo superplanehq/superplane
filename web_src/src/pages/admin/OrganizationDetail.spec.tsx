@@ -62,6 +62,12 @@ describe("OrganizationDetail", () => {
             total: 1,
           });
         }
+        if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
+          return jsonResponse({
+            features: [{ id: "factories", label: "Factories", description: "Software factories", released: false }],
+            enabled: ["factories"],
+          });
+        }
         if (url.includes("/llm-credit")) {
           return jsonResponse({
             remaining_credit_cents: 5000,
@@ -112,5 +118,44 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByPlaceholderText("Search automations...")).toBeInTheDocument();
     expect(await screen.findByText("Deploy pipeline")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+  });
+
+  it("opens features and credits after tab clicks", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Features" }));
+
+    expect(await screen.findByText("Factories")).toBeVisible();
+    expect(screen.getByRole("switch", { name: "Toggle Factories" })).toBeVisible();
+    expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Credits" }));
+
+    expect(await screen.findByText("Hosted credit")).toBeVisible();
+    expect(await screen.findByTestId("admin-org-credit-amount")).toBeVisible();
+    expect(screen.queryByText("Factories")).not.toBeInTheDocument();
+  });
+
+  it("keeps unsaved credit edits after switching tabs", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("tab", { name: "Credits" }));
+
+    const amount = await screen.findByTestId("admin-org-credit-amount");
+    await user.clear(amount);
+    await user.type(amount, "12.50");
+
+    await user.click(screen.getByRole("tab", { name: "Users" }));
+    expect(await screen.findByText("Ada Lovelace")).toBeVisible();
+    expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "inactive");
+    expect(screen.getByTestId("admin-org-credit-amount")).toHaveValue("12.50");
+
+    await user.click(screen.getByRole("tab", { name: "Credits" }));
+    expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "active");
+    expect(await screen.findByTestId("admin-org-credit-amount")).toHaveValue("12.50");
   });
 });
