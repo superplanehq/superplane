@@ -104,6 +104,85 @@ func Test__WebhookHandler__Merge(t *testing.T) {
 		assert.False(t, changed)
 		assert.Equal(t, current, merged)
 	})
+
+	t.Run("widens projects when the requested config adds a new one", func(t *testing.T) {
+		current := WebhookConfiguration{
+			Events:   []string{issueEventCreated},
+			Projects: []string{"ENG"},
+		}
+		requested := WebhookConfiguration{
+			Events:   []string{issueEventCreated},
+			Projects: []string{"OPS"},
+		}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events:   []string{issueEventCreated},
+			Projects: []string{"ENG", "OPS"},
+		}, merged)
+	})
+
+	t.Run("reports no change when the requested projects are already covered", func(t *testing.T) {
+		current := WebhookConfiguration{
+			Events:   []string{issueEventCreated},
+			Projects: []string{"ENG", "OPS"},
+		}
+		requested := WebhookConfiguration{
+			Events:   []string{issueEventCreated},
+			Projects: []string{"ENG"},
+		}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, current, merged)
+	})
+
+	t.Run("adds the requested project to a legacy row that stored none", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted}}
+		requested := WebhookConfiguration{
+			Events:   []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+			Projects: []string{"ENG"},
+		}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events:   []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+			Projects: []string{"ENG"},
+		}, merged)
+	})
+}
+
+func Test__issueWebhookJQLFilter(t *testing.T) {
+	t.Run("a single project uses equality", func(t *testing.T) {
+		jql, err := issueWebhookJQLFilter([]string{"ENG"})
+		require.NoError(t, err)
+		assert.Equal(t, `project = "ENG"`, jql)
+	})
+
+	t.Run("several projects use IN", func(t *testing.T) {
+		jql, err := issueWebhookJQLFilter([]string{"ENG", "OPS"})
+		require.NoError(t, err)
+		assert.Equal(t, `project IN ("ENG","OPS")`, jql)
+	})
+
+	t.Run("blank keys are ignored", func(t *testing.T) {
+		jql, err := issueWebhookJQLFilter([]string{"", " ENG ", "OPS"})
+		require.NoError(t, err)
+		assert.Equal(t, `project IN ("ENG","OPS")`, jql)
+	})
+
+	t.Run("no project is an error", func(t *testing.T) {
+		_, err := issueWebhookJQLFilter(nil)
+		require.ErrorContains(t, err, "at least one project")
+
+		_, err = issueWebhookJQLFilter([]string{"", "  "})
+		require.ErrorContains(t, err, "at least one project")
+	})
 }
 
 func Test__WebhookHandler__Setup(t *testing.T) {
@@ -127,6 +206,7 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 						issueEventCreated, issueEventUpdated, issueEventDeleted,
 						commentEventCreated, commentEventUpdated, commentEventDeleted,
 					},
+					Projects: []string{"ENG"},
 				},
 			},
 		})
@@ -149,10 +229,9 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Contains(t, string(body), `"comment_created"`)
 		assert.Contains(t, string(body), `"comment_updated"`)
 		assert.Contains(t, string(body), `"comment_deleted"`)
-		// Regression test: Atlassian rejects an empty jqlFilter outright ("Empty JQL search not
-		// supported", confirmed live) even though the key must be present - this must be a real,
-		// always-true clause instead.
-		assert.Contains(t, string(body), `"jqlFilter":"project != EMPTY"`)
+		// Dynamic webhook JQL only accepts project with =, !=, IN, or NOT IN.
+		// project != EMPTY can register and still match nothing.
+		assert.Contains(t, string(body), `"jqlFilter":"project = \"ENG\""`)
 
 		// The id is mirrored onto the integration and a refresh is scheduled, since Atlassian
 		// expires this webhook in 30 days otherwise.
@@ -164,6 +243,46 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		require.Len(t, integration.ActionRequests, 1)
 		assert.Equal(t, refreshWebhookHookName, integration.ActionRequests[0].ActionName)
 		assert.Equal(t, webhookRefreshInterval, integration.ActionRequests[0].Interval)
+	})
+
+	t.Run("registers project IN when several triggers share the webhook", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL: "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{
+					Events:   []string{issueEventCreated},
+					Projects: []string{"ENG", "OPS"},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), `"jqlFilter":"project IN (\"ENG\",\"OPS\")"`)
+	})
+
+	t.Run("refuses to register an issue webhook without a project", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}},
+			},
+		})
+		require.ErrorContains(t, err, "at least one project")
+		assert.Empty(t, httpCtx.Requests)
 	})
 
 	// Regression test: re-running Setup on a webhook that already has a Jira registration (e.g. a
@@ -185,7 +304,7 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 			Webhook: &contexts.WebhookContext{
 				URL:           "https://sp.test/webhooks/w1",
 				Metadata:      WebhookMetadata{WebhookID: &previousID},
-				Configuration: WebhookConfiguration{Events: []string{issueEventCreated, commentEventCreated}},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated, commentEventCreated}, Projects: []string{"ENG"}},
 			},
 		})
 		require.NoError(t, err)
@@ -222,7 +341,7 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 			Webhook: &contexts.WebhookContext{
 				URL:           "https://sp.test/webhooks/w1",
 				Metadata:      WebhookMetadata{WebhookID: &previousID},
-				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}, Projects: []string{"ENG"}},
 			},
 		})
 		require.NoError(t, err)
@@ -251,7 +370,7 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 			Webhook: &contexts.WebhookContext{
 				URL:           "https://sp.test/webhooks/w1",
 				Metadata:      WebhookMetadata{WebhookID: &previousID},
-				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}, Projects: []string{"ENG"}},
 			},
 		})
 		require.ErrorContains(t, err, "failed to create Jira webhook")
@@ -269,7 +388,10 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		_, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: integration,
-			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{Projects: []string{"ENG"}},
+			},
 		})
 		require.NoError(t, err)
 
@@ -291,7 +413,10 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		_, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: integration,
-			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{Projects: []string{"ENG"}},
+			},
 		})
 		require.ErrorContains(t, err, "failed to create Jira webhook")
 		assert.Empty(t, integration.ActionRequests, "must not schedule a refresh when creation failed")
@@ -310,7 +435,10 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		_, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: integration,
-			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{Projects: []string{"ENG"}},
+			},
 		})
 		require.ErrorContains(t, err, "failed to schedule webhook refresh")
 

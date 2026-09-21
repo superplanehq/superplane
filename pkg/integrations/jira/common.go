@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -8,6 +9,26 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+func unmarshalWebhookPayloads[T any](body []byte) ([]T, error) {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return nil, fmt.Errorf("request body is empty")
+	}
+	if body[0] == '[' {
+		var payloads []T
+		if err := json.Unmarshal(body, &payloads); err != nil {
+			return nil, err
+		}
+		return payloads, nil
+	}
+
+	var payload T
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+	return []T{payload}, nil
+}
 
 // NodeMetadata stores metadata on action component nodes.
 type NodeMetadata struct {

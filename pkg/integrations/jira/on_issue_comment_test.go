@@ -66,7 +66,8 @@ func Test__OnIssueComment__Setup(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		require.Len(t, integration.WebhookRequests, 1)
 		assert.Equal(t, WebhookConfiguration{
-			Events: []string{commentEventCreated, commentEventUpdated, commentEventDeleted},
+			Events:   []string{commentEventCreated, commentEventUpdated, commentEventDeleted},
+			Projects: []string{"ENG"},
 		}, integration.WebhookRequests[0])
 	})
 }
