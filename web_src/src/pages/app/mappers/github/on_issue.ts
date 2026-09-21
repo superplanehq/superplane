@@ -15,6 +15,30 @@ interface OnIssueEventData {
   issue?: Issue;
 }
 
+function issueEventTitle(eventData?: OnIssueEventData): string {
+  return `#${eventData?.issue?.number} - ${eventData?.issue?.title}`;
+}
+
+function buildOnIssueMetadataItems(metadata?: BaseNodeMetadata, configuration?: OnIssueConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.repository?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.repository.name,
+    });
+  }
+
+  if (configuration?.actions) {
+    metadataItems.push({
+      icon: "funnel",
+      label: configuration.actions.join(", "),
+    });
+  }
+
+  return metadataItems;
+}
+
 /**
  * Renderer for the "github.onIssue" trigger
  */
@@ -23,7 +47,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnIssueEventData;
 
     return {
-      title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
+      title: issueEventTitle(eventData),
       subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
@@ -38,35 +62,20 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.actions) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.actions.join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildOnIssueMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnIssueEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
+        title: issueEventTitle(eventData),
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

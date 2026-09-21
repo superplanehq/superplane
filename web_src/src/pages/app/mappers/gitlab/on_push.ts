@@ -82,6 +82,18 @@ function pushEventTitle(eventData?: OnPushEventData): string {
   return branch !== "-" ? `Push to ${branch}` : "Push";
 }
 
+function pushRootEventValues(eventData?: OnPushEventData, createdAt?: string): Record<string, string> {
+  const commit = headCommit(eventData);
+  return {
+    "Received At": formatReceivedAt(createdAt),
+    Branch: branchName(eventData?.ref),
+    Commit: commitMessage(commit) || "-",
+    Author: pushAuthor(eventData) || "-",
+    Commits: eventData?.total_commits_count != null ? String(eventData.total_commits_count) : "-",
+    "Commit URL": commit?.url || "-",
+  };
+}
+
 function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnPushConfiguration) {
   const metadataItems = [];
 
@@ -114,17 +126,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnPushEventData;
-    const commit = headCommit(eventData);
-
-    return {
-      "Received At": formatReceivedAt(context.event?.createdAt),
-      Branch: branchName(eventData?.ref),
-      Commit: commitMessage(commit) || "-",
-      Author: pushAuthor(eventData) || "-",
-      Commits: eventData?.total_commits_count != null ? String(eventData.total_commits_count) : "-",
-      "Commit URL": commit?.url || "-",
-    };
+    return pushRootEventValues(context.event?.data as OnPushEventData, context.event?.createdAt);
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {

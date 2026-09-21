@@ -15,6 +15,23 @@ interface Configuration {
   alarms?: Predicate[];
 }
 
+function alarmTitle(detail?: CloudWatchAlarmEvent["detail"]): string {
+  const alarmName = detail?.alarmName;
+  const state = detail?.state?.value;
+  const previousState = detail?.previousState?.value;
+  if (alarmName && state && previousState) {
+    return `${alarmName} - ${previousState} → ${state}`;
+  }
+  if (alarmName) {
+    return alarmName;
+  }
+  return "CloudWatch alarm";
+}
+
+function createdAtSubtitle(createdAt?: string) {
+  return createdAt ? renderTimeAgo(new Date(createdAt)) : "";
+}
+
 function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
   const items: MetadataItem[] = [];
   const region = configuration?.region;
@@ -32,10 +49,11 @@ function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
     });
   }
 
-  if (configuration?.alarms && configuration.alarms?.length > 0) {
+  const alarms = configuration?.alarms;
+  if (alarms && alarms.length > 0) {
     items.push({
       icon: "funnel",
-      label: configuration.alarms?.map(formatPredicate).join(", "),
+      label: alarms.map(formatPredicate).join(", "),
     });
   }
 
@@ -48,20 +66,10 @@ function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
 export const onAlarmTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as CloudWatchAlarmEvent;
-    const detail = eventData?.detail;
-    const alarmName = detail?.alarmName;
-    const state = detail?.state?.value;
-    const previousState = detail?.previousState?.value;
-
-    let title = "CloudWatch alarm";
-    if (alarmName && state && previousState) {
-      title = `${alarmName} - ${previousState} → ${state}`;
-    } else if (alarmName) {
-      title = alarmName;
-    }
-
-    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
-    return { title, subtitle };
+    return {
+      title: alarmTitle(eventData?.detail),
+      subtitle: createdAtSubtitle(context.event?.createdAt),
+    };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
