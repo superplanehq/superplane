@@ -33,7 +33,7 @@ const (
 	// required to get a refresh token, so it's requested here directly rather than shown in the
 	// setup instructions.
 	coreScopeList = "read:jira-work write:jira-work manage:jira-webhook read:jira-user " +
-		"read:servicedesk-request write:servicedesk-request offline_access"
+		"read:issue-details:jira read:servicedesk-request write:servicedesk-request offline_access"
 
 	// jsmOpsScopeList is appended to coreScopeList only when the "Enable Ops features" config
 	// option is on (see jira.go's Configuration() and jsmOpsFeaturesEnabled). Most Jira Cloud

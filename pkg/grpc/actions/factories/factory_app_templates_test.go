@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -77,7 +79,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	commentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence")
 	assert.Equal(t, "github.createIssueComment", commentEvidence.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, commentEvidence.Integration)
-	assert.Contains(t, commentEvidence.Configuration["body"], `substring($["Create Pull Request"].data.head.sha, 0, 7)`)
+	assert.Contains(t, commentEvidence.Configuration["body"], `$["Create Pull Request"].data.head.sha[:7]`)
 	assert.Contains(t, commentEvidence.Configuration["body"], "## Visual evidence")
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "attach-pr-artifact", TargetID: "has-visual-evidence", Channel: "default"})
 	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
@@ -93,7 +95,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		hasUpdatedEvidence.Configuration["expression"],
 	)
 	updatedCommentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence-updated")
-	assert.Contains(t, updatedCommentEvidence.Configuration["body"], `substring($["Update Pull Request"].data.head.sha, 0, 7)`)
+	assert.Contains(t, updatedCommentEvidence.Configuration["body"], `$["Update Pull Request"].data.head.sha[:7]`)
 
 	updatePR := findYAMLNode(t, canvas, "update-pr")
 	updateBody, ok := updatePR.Configuration["body"].(string)
@@ -104,6 +106,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "app-1", console.Metadata.CanvasID)
 	assert.Equal(t, "Implement refunds", console.Metadata.Name)
+
+	requireValidCanvasExpressions(t, canvas)
 }
 
 func TestMaterializePRFeedbackDefaultsPreservesVisualEvidence(t *testing.T) {
@@ -365,4 +369,56 @@ func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {
 	}
 	t.Fatalf("node %q not found", id)
 	return nil
+}
+
+func requireValidCanvasExpressions(t *testing.T, canvas *yaml.Canvas) {
+	t.Helper()
+
+	knownNodeNames := make(map[string]struct{}, len(canvas.Spec.Nodes))
+	for _, node := range canvas.Spec.Nodes {
+		if node.Name == "" {
+			continue
+		}
+		knownNodeNames[node.Name] = struct{}{}
+	}
+
+	checked := 0
+	for _, node := range canvas.Spec.Nodes {
+		checked += requireValidConfigurationExpressions(t, node.Configuration, knownNodeNames)
+	}
+	require.Greater(t, checked, 0)
+}
+
+func requireValidConfigurationExpressions(t *testing.T, value any, knownNodeNames map[string]struct{}) int {
+	t.Helper()
+
+	switch v := value.(type) {
+	case string:
+		return requireValidTemplateExpressionsWithNodes(t, v, knownNodeNames)
+	case map[string]any:
+		checked := 0
+		for _, child := range v {
+			checked += requireValidConfigurationExpressions(t, child, knownNodeNames)
+		}
+		return checked
+	case []any:
+		checked := 0
+		for _, child := range v {
+			checked += requireValidConfigurationExpressions(t, child, knownNodeNames)
+		}
+		return checked
+	default:
+		return 0
+	}
+}
+
+func requireValidTemplateExpressionsWithNodes(t *testing.T, value string, knownNodeNames map[string]struct{}) int {
+	t.Helper()
+
+	matches := configuration.ExpressionPlaceholderRegex.FindAllString(value, -1)
+	for _, match := range matches {
+		source := match[2 : len(match)-2]
+		require.NoError(t, expressionvalidation.ValidateExpression(source, knownNodeNames), match)
+	}
+	return len(matches)
 }

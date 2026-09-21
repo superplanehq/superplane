@@ -370,7 +370,7 @@ spec:
         body: |-
           ## Visual evidence
 
-          Captured for commit `{{ substring($["Create Pull Request"].data.head.sha, 0, 7) }}`.
+          Captured for commit `{{ $["Create Pull Request"].data.head.sha[:7] }}`.
 
           {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
       position:
@@ -434,7 +434,7 @@ spec:
         body: |-
           ## Visual evidence
 
-          Captured for commit `{{ substring($["Update Pull Request"].data.head.sha, 0, 7) }}`.
+          Captured for commit `{{ $["Update Pull Request"].data.head.sha[:7] }}`.
 
           {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
       position:

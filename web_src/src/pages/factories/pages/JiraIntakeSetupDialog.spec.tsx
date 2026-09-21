@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
@@ -136,6 +137,30 @@ describe("JiraIntakeSetupDialog", () => {
     expect(onCreated).toHaveBeenCalled();
   });
 
+  it("creates a bound intake without importing existing issues", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await screen.findByTestId("jira-project-ENG");
+    expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
+    expect(screen.getByTestId("jira-skip-initial-import")).not.toBeChecked();
+    await user.click(screen.getByTestId("jira-skip-initial-import"));
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
+    await user.click(screen.getByTestId("jira-project-ENG"));
+    await user.click(screen.getByTestId("jira-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_JIRA_ISSUES",
+        integrationId: "integration-1",
+        resourceId: "ENG",
+        skipInitialImport: true,
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
   it("filters the project list by name", async () => {
     const user = userEvent.setup();
     renderDialog();
@@ -154,6 +179,8 @@ describe("JiraIntakeSetupDialog", () => {
     await user.click(await screen.findByTestId("first-run-back"));
 
     expect(screen.getByRole("heading", { name: JIRA_INTAKE_SETUP_COPY.wizardStepConnect })).toBeInTheDocument();
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper)).toBeInTheDocument();
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper)).toHaveTextContent("authorize it again");
     expect(screen.queryByTestId("jira-project-ENG")).not.toBeInTheDocument();
   });
 

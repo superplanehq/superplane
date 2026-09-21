@@ -532,3 +532,84 @@ func Test__IntegrationContext_ListSubscriptions_UsesOnEventsCallback(t *testing.
 	assert.Equal(t, node.NodeID, newEvents[0].NodeID)
 	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 1)
 }
+
+func Test__IntegrationSubscriptionContext_PausedIntakeIgnoresLiveMessages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerName := "dummy.paused-intake-trigger"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{
+			impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{
+				Name: triggerName,
+				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
+					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "trigger-1",
+				Name:          "trigger-1",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NotNil(t, canvas)
+	require.Len(t, nodes, 1)
+
+	node := nodes[0]
+	node.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&node).Error)
+
+	intake, err := factory.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceSentryExceptions)
+	require.NoError(t, err)
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, onNewEvents)
+	_, err = ctx.Subscribe(map[string]any{"enabled": true})
+	require.NoError(t, err)
+
+	subscriptions, err := ctx.ListSubscriptions()
+	require.NoError(t, err)
+	require.Len(t, subscriptions, 1)
+
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "world"}))
+	require.Len(t, newEvents, 1)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 1)
+
+	require.NoError(t, intake.SetPaused(database.Conn(), true))
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "paused"}))
+	assert.Len(t, newEvents, 1)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 1)
+
+	require.NoError(t, intake.SetPaused(database.Conn(), false))
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "resumed"}))
+	assert.Len(t, newEvents, 2)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 2)
+}

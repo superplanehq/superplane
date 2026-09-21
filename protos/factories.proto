@@ -1140,6 +1140,8 @@ message FactoryIntake {
   InitialImportStatus initial_import_status = 11;
   // Set when the initial import completed, including when it found zero items.
   optional int32 initial_import_item_count = 12;
+  // True when live items are ignored. Hand-picked import still works.
+  bool paused = 13;
 }
 
 message FactoryIntakeRun {
@@ -1185,6 +1187,9 @@ message CreateFactoryIntakeRequest {
   // Optional integration and source resource selected during guided setup.
   string integration_id = 5;
   string resource_id = 6;
+  // When true, SuperPlane does not import existing issues. The intake still
+  // listens for new issues.
+  bool skip_initial_import = 7;
 }
 
 message CreateFactoryIntakeResponse {
@@ -1196,6 +1201,7 @@ message UpdateFactoryIntakeRequest {
   string intake_id = 2;
   optional string name = 3;
   optional FactoryIntake.Settings settings = 4;
+  optional bool paused = 5;
 }
 
 message UpdateFactoryIntakeResponse {
