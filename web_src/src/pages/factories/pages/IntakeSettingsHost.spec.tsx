@@ -513,6 +513,11 @@ describe("IntakeSettingsHost", () => {
 
   it("returns to intake settings after Connect Jira", async () => {
     startDirectJiraConnect.mockResolvedValue(true);
+    useConnectedIntegrations.mockReturnValue({
+      data: [],
+      isLoading: false,
+      refetch: vi.fn(),
+    });
     const user = userEvent.setup();
     renderHost({ intake: JIRA_INTAKE });
 
