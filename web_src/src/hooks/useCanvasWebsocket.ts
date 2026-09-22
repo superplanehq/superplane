@@ -137,9 +137,6 @@ export function useCanvasWebsocket({
     [canvasId, organizationId, queryClient, onCanvasLifecycleEvent, shouldApplyCanvasUpdate],
   );
 
-  const hasConnectedOnce = useRef(false);
-  const missedMessagesBeforeOpen = useRef(false);
-
   const patchRunInCache = useCallback(
     (run: CanvasesCanvasRun) => {
       const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
@@ -231,7 +228,20 @@ export function useCanvasWebsocket({
       // Memory updates can happen from manual mutations regardless of the live
       // view, so they bypass the runtime-event gate as well.
       const isMemoryUpdatedEvent = data.event === "memory_updated";
-      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !isMemoryUpdatedEvent && !processRuntimeEvents) {
+      // Run state is shared query data. Keep it current even when the canvas is
+      // showing a historical version and live execution rendering is disabled.
+      const isRunStateEvent =
+        data.event === "run_pending" ||
+        data.event === "run_started" ||
+        data.event === "run_cancelling" ||
+        data.event === "run_finished";
+      if (
+        !isCanvasLifecycleEvent &&
+        !isCanvasStagingEvent &&
+        !isMemoryUpdatedEvent &&
+        !isRunStateEvent &&
+        !processRuntimeEvents
+      ) {
         return;
       }
 
@@ -431,24 +441,14 @@ export function useCanvasWebsocket({
   );
 
   const handleWebSocketOpen = useCallback(() => {
-    const isFirstSuccessfulConnection = !hasConnectedOnce.current;
-    hasConnectedOnce.current = true;
-
-    const shouldResyncRuns = missedMessagesBeforeOpen.current || !isFirstSuccessfulConnection;
-    missedMessagesBeforeOpen.current = false;
-    if (!shouldResyncRuns) {
-      return;
-    }
-
+    // The initial REST snapshot can complete before the subscription opens.
+    // Resync after every successful connection to close that gap and to recover
+    // messages missed during later disconnects.
     invalidateRuns();
     // Refresh memory in case mutations happened while we were disconnected; we
     // no longer poll, so the websocket is the only push channel.
     invalidateMemoryEntries();
   }, [invalidateRuns, invalidateMemoryEntries]);
-
-  const handleWebSocketDisconnect = useCallback(() => {
-    missedMessagesBeforeOpen.current = true;
-  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -468,8 +468,8 @@ export function useCanvasWebsocket({
       heartbeat: false,
       reconnectInterval: 3000,
       onOpen: handleWebSocketOpen,
-      onError: handleWebSocketDisconnect,
-      onClose: handleWebSocketDisconnect,
+      onError: () => {},
+      onClose: () => {},
       share: false,
       onMessage: onMessage,
     },

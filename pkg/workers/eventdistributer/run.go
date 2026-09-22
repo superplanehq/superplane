@@ -157,7 +157,25 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 		return uuid.Nil, "", err
 	}
 
-	serializedRun, err := canvases.SerializeCanvasRun(db, *run, rootEvent, executions, queueItems, nil, map[string][]models.CanvasRun{})
+	executionIDs := make([]uuid.UUID, len(executions))
+	for i, execution := range executions {
+		executionIDs[i] = execution.ID
+	}
+
+	childRuns, err := models.ListChildRunsByParentExecutions(db, workflowUUID, executionIDs)
+	if err != nil {
+		return uuid.Nil, "", fmt.Errorf("failed to find child runs: %w", err)
+	}
+
+	serializedRun, err := canvases.SerializeCanvasRun(
+		db,
+		*run,
+		rootEvent,
+		executions,
+		queueItems,
+		nil,
+		groupChildRunsByExecutionID(childRuns),
+	)
 	if err != nil {
 		return uuid.Nil, "", fmt.Errorf("failed to serialize run: %w", err)
 	}
@@ -179,6 +197,20 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
 	return runUUID, eventName, nil
+}
+
+func groupChildRunsByExecutionID(runs []models.CanvasRun) map[string][]models.CanvasRun {
+	grouped := make(map[string][]models.CanvasRun)
+	for _, run := range runs {
+		if run.ParentExecutionID == nil {
+			continue
+		}
+
+		executionID := run.ParentExecutionID.String()
+		grouped[executionID] = append(grouped[executionID], run)
+	}
+
+	return grouped
 }
 
 func broadcastFactoryWorkOrderForRun(wsHub *ws.Hub, runID uuid.UUID, reason string) {

@@ -386,14 +386,14 @@ describe("useCanvasWebsocket", () => {
     expect(describedRun?.run?.result).toBe("RESULT_PASSED");
   });
 
-  it("does not invalidate runs on initial websocket connect", () => {
+  it("invalidates runs on initial websocket connect to close the REST snapshot race", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
     renderCanvasWebsocketHook(queryClient);
     emitWebSocketOpen();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
   it("invalidates runs on websocket reconnect", () => {
@@ -404,7 +404,7 @@ describe("useCanvasWebsocket", () => {
     emitWebSocketOpen();
     emitWebSocketOpen();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(2);
   });
 
   it("invalidates runs when the first connection succeeds after a failed attempt", () => {
@@ -416,6 +416,35 @@ describe("useCanvasWebsocket", () => {
     emitWebSocketOpen();
 
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
+  });
+
+  it("patches run caches when live canvas rendering is disabled", () => {
+    const queryClient = new QueryClient();
+    seedInfiniteRuns(queryClient, []);
+
+    renderHook(
+      () =>
+        useCanvasWebsocket({
+          canvasId: testCanvasId,
+          organizationId: testOrganizationId,
+          processRuntimeEvents: false,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(QueryClientProvider, { client: queryClient }, children),
+      },
+    );
+
+    emitWebsocketMessage("run_started", {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_STARTED",
+      createdAt: "2026-06-01T12:00:00.000Z",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+    });
+
+    const runs = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(canvasKeys.infiniteRuns(testCanvasId));
+    expect(runs?.pages[0]?.runs?.[0]?.id).toBe("run-1");
   });
 
   it("invalidates live canvas queries for canvas updates when viewing live", () => {
