@@ -75,21 +75,7 @@ export const octopusTriggerRenderer: TriggerRenderer = {
       "Event Type": stringOrDash(event?.eventType),
     };
 
-    if (event?.projectId) {
-      values["Project"] = event.projectName || event.projectId;
-    }
-    if (event?.environmentId) {
-      values["Environment"] = event.environmentName || event.environmentId;
-    }
-    if (event?.releaseId) {
-      values["Release"] = event.releaseName || event.releaseId;
-    }
-    if (event?.deploymentId) {
-      values["Deployment ID"] = event.deploymentId;
-    }
-    if (event?.message) {
-      values["Message"] = event.message;
-    }
+    assignRootEventResourceValues(values, event);
 
     return values;
   },
@@ -122,6 +108,24 @@ export const octopusTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function assignRootEventResourceValues(values: Record<string, string>, event: OctopusEventData | undefined) {
+  if (event?.projectId) {
+    values["Project"] = event.projectName || event.projectId;
+  }
+  if (event?.environmentId) {
+    values["Environment"] = event.environmentName || event.environmentId;
+  }
+  if (event?.releaseId) {
+    values["Release"] = event.releaseName || event.releaseId;
+  }
+  if (event?.deploymentId) {
+    values["Deployment ID"] = event.deploymentId;
+  }
+  if (event?.message) {
+    values["Message"] = event.message;
+  }
+}
 
 function buildMetadata(
   configuration: OnDeploymentEventConfiguration | undefined,

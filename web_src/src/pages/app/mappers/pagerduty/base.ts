@@ -18,25 +18,57 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
 
 export function getDetailsForIncident(incident: Incident | undefined, agent?: ResourceRef): Record<string, string> {
   const details: Record<string, string> = {};
-  Object.assign(details, {
-    "Created At": incident?.created_at ? new Date(incident.created_at).toLocaleString() : "-",
-    "Updated At": incident?.updated_at ? new Date(incident.updated_at).toLocaleString() : "-",
-  });
-
-  details.ID = incident?.id || "-";
-  details.Key = incident?.incident_key || "-";
-  details.Title = incident?.title || "-";
-  details.Urgency = incident?.urgency || "-";
-  details.Status = incident?.status || "-";
-  details["Incident URL"] = incident?.html_url || "-";
-
-  if (incident?.incident_number) {
-    details.Number = incident.incident_number;
+  const record = incident ?? ({} as Incident);
+  const createdAt = formatIncidentTime(record.created_at);
+  details["Created At"] = createdAt;
+  const updatedAt = formatIncidentTime(record.updated_at);
+  details["Updated At"] = updatedAt;
+  const id = textOrDash(record.id);
+  details.ID = id;
+  const key = textOrDash(record.incident_key);
+  details.Key = key;
+  const title = textOrDash(record.title);
+  details.Title = title;
+  const urgency = textOrDash(record.urgency);
+  details.Urgency = urgency;
+  const status = textOrDash(record.status);
+  details.Status = status;
+  const htmlUrl = textOrDash(record.html_url);
+  details["Incident URL"] = htmlUrl;
+  const incidentNumber = record.incident_number;
+  if (incidentNumber) {
+    details.Number = incidentNumber;
   }
 
+  assignIncidentRelatedResources(details, incident);
+
+  const lastStatusChangeAt = record.last_status_change_at;
+  if (lastStatusChangeAt) {
+    details["Last Status Change"] = new Date(lastStatusChangeAt).toLocaleString();
+  }
+
+  const resolvedAt = record.resolved_at;
+  if (resolvedAt) {
+    details["Resolved At"] = new Date(resolvedAt).toLocaleString();
+  }
+
+  assignIncidentAgent(details, agent);
+
+  return details;
+}
+
+function textOrDash(value: string | undefined): string {
+  return value || "-";
+}
+
+function formatIncidentTime(value: string | undefined): string {
+  return value ? new Date(value).toLocaleString() : "-";
+}
+
+function assignIncidentRelatedResources(details: Record<string, string>, incident: Incident | undefined) {
   if (incident?.service) {
-    details.Service = incident?.service.summary || "-";
-    details["Service URL"] = incident?.service.html_url || "-";
+    details.Service = incident.service.summary || "-";
+    details["Service URL"] = incident.service.html_url || "-";
   }
 
   if (incident?.escalation_policy) {
@@ -47,21 +79,13 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
   if (incident?.assignments) {
     details["Assignments"] = incident.assignments.map((i) => i.assignee.summary).join(", ");
   }
+}
 
-  if (incident?.last_status_change_at) {
-    details["Last Status Change"] = new Date(incident.last_status_change_at).toLocaleString();
-  }
-
-  if (incident?.resolved_at) {
-    details["Resolved At"] = new Date(incident.resolved_at).toLocaleString();
-  }
-
+function assignIncidentAgent(details: Record<string, string>, agent?: ResourceRef) {
   if (agent) {
     details["Agent"] = agent.summary || "-";
     details["Agent URL"] = agent.html_url || "-";
   }
-
-  return details;
 }
 
 /**
