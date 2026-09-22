@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import type { ActionsAction, CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
 import type { ResyncStagedOptions } from "@/hooks/useCanvasStagingResync";
@@ -9,6 +9,8 @@ import {
   type FactoryConfigureSaveOptions,
 } from "./factoryConfigureActions";
 import { useFactoryConfigureEnter } from "./useFactoryConfigureEnter";
+import { getWorkflowSpecSignature } from "./lib/draft-canvas-sync";
+import { applyFactoryCanvasLayout } from "./useTopologyMutationCommit";
 
 export type FactoryConfigureActions = {
   save: (options?: FactoryConfigureSaveOptions) => Promise<void>;
@@ -21,7 +23,7 @@ export type FactoryConfigureActions = {
    * onto the live canvas snapshot). Leaves the session dirty — the caller
    * still needs Save to persist it.
    */
-  applyDraftSpec: (spec: NonNullable<CanvasesCanvas["spec"]>) => void;
+  applyDraftSpec: (spec: NonNullable<CanvasesCanvas["spec"]>) => Promise<void>;
 };
 
 type UpdateCanvasVersionMutation = {
@@ -65,6 +67,8 @@ type UseFactoryConfigureSessionOptions = {
   hasStagingChanges: boolean;
   hasUncommittedCanvasDraftChanges: boolean;
   applyLocalWorkflowUpdate: (updatedWorkflow: CanvasesCanvas) => void;
+  factoryAutoLayout?: boolean;
+  components?: ActionsAction[];
 };
 
 /**
@@ -97,15 +101,23 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
     applyLocalWorkflowUpdate,
+    factoryAutoLayout,
+    components,
   } = options;
 
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
   onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
   const onFactoryConfigureSavedRef = useRef(onFactoryConfigureSaved);
   onFactoryConfigureSavedRef.current = onFactoryConfigureSaved;
+  const editSessionActiveRef = useRef(editSessionActive);
+  editSessionActiveRef.current = editSessionActive;
+  const factoryAutoLayoutRef = useRef(factoryAutoLayout);
+  factoryAutoLayoutRef.current = factoryAutoLayout;
+  const componentsRef = useRef(components);
+  componentsRef.current = components;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
-  const { allowNextConfigureEnter } = useFactoryConfigureEnter(options);
+  const { allowNextConfigureEnter, configureVisitIdRef } = useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
@@ -158,12 +170,35 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               onDone: () => onFactoryConfigureDoneRef.current?.(),
             });
           },
-          applyDraftSpec: (spec) => {
+          applyDraftSpec: async (spec) => {
             const current = getCurrentWorkflowSnapshot();
             if (!current) {
               return;
             }
-            applyLocalWorkflowUpdate({ ...current, spec });
+            const requestedVisitId = configureVisitIdRef.current;
+            const requestedVersionId = activeCanvasVersionIdRef.current;
+            const requestedEditSessionActive = editSessionActiveRef.current;
+            const sessionMatches = () =>
+              configureVisitIdRef.current === requestedVisitId &&
+              activeCanvasVersionIdRef.current === requestedVersionId &&
+              editSessionActiveRef.current === requestedEditSessionActive;
+            const merged = { ...current, spec };
+            applyLocalWorkflowUpdate(merged);
+            if (!factoryAutoLayoutRef.current) {
+              return;
+            }
+            const nextWorkflow = await applyFactoryCanvasLayout(merged, componentsRef.current || []);
+            if (!sessionMatches()) {
+              return;
+            }
+            const latestDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionIdRef.current);
+            if (
+              latestDraftSpec != null &&
+              getWorkflowSpecSignature(latestDraftSpec) !== getWorkflowSpecSignature(merged.spec)
+            ) {
+              return;
+            }
+            applyLocalWorkflowUpdate(nextWorkflow);
           },
         };
   }
