@@ -6,7 +6,12 @@ import { client } from "@/api-client/client.gen";
 
 import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  IN_FOURTEEN_DAYS,
+  IN_SEVENTEEN_DAYS,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 import {
   ADMIN_ORGANIZATION_BILLING,
   BUSINESS_ORGANIZATION_BILLING,
@@ -18,8 +23,8 @@ import {
 import { BILLING_SPEND_ORDER_COPY } from "../../lib/billingCreditBuckets";
 import { billingSubscriptionEndsCopy } from "../../lib/billingPlans";
 
-const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
-const BUSINESS_PERIOD_END = "2026-10-09T12:00:00.000Z";
+const WELCOME_EXPIRY_LABEL = new Date(IN_FOURTEEN_DAYS).toLocaleDateString();
+const BUSINESS_PERIOD_END = IN_SEVENTEEN_DAYS;
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({
