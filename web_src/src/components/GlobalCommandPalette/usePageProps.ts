@@ -3,7 +3,7 @@ import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
 import { useAPIKeys } from "@/hooks/useApiKeys";
 import { appPath } from "@/lib/appPaths";
 import { Key, Palette, Plug } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DOCS_URL } from "./constants";
 import type { CommandPaletteModel } from "./model";
@@ -14,17 +14,23 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   const [expandedSection, setExpandedSection] = useState<"apps" | "integrations" | null>(null);
   const organizationId = model.canvasListProps.organizationId ?? "";
   const goTo = model.canvasListProps.goTo;
+  const canFetchIntegrations = canFetchPaletteData(organizationId, model.canReadIntegrations);
+  const canFetchInviteLink = canFetchPaletteData(organizationId, model.canManageInviteLink);
+  const canFetchAPIKeys = canFetchPaletteData(organizationId, model.canReadAPIKeys);
 
-  // Reset expanded section when palette closes
-  useEffect(() => {
-    if (!model.open) setExpandedSection(null);
-  }, [model.open]);
-
-  const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId, {
-    enabled: !!organizationId,
+  const { data: connectedIntegrations = [], isLoading: integrationsLoading } = useConnectedIntegrations(
+    organizationId,
+    {
+      enabled: canFetchIntegrations,
+    },
+  );
+  const { data: inviteLink, isLoading: inviteLinkLoading } = useOrganizationInviteLink(
+    organizationId,
+    canFetchInviteLink,
+  );
+  const { data: apiKeys = [], isLoading: apiKeysLoading } = useAPIKeys(organizationId, {
+    enabled: canFetchAPIKeys,
   });
-  const { data: inviteLink } = useOrganizationInviteLink(organizationId, !!organizationId && model.canManageInviteLink);
-  const { data: apiKeys = [] } = useAPIKeys(organizationId);
   const inviteLinkToken = inviteLink?.enabled ? inviteLink.token : undefined;
 
   const integrations = useMemo<IntegrationItem[]>(
@@ -81,7 +87,7 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
     },
     onCopyInviteLink: handleCopyInviteLink,
     showCopyInviteLink: model.canManageInviteLink,
-    copyInviteLinkDisabled: !inviteLinkToken,
+    copyInviteLinkDisabled: inviteLinkLoading || !inviteLinkToken,
     onExpandApps: () => setExpandedSection("apps"),
     onExpandIntegrations: () => setExpandedSection("integrations"),
     onCollapse: () => setExpandedSection(null),
@@ -109,6 +115,7 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
     createAppLabel: model.rootActions.find((a) => a.id === "new-canvas")?.label ?? "New App",
     createAppDisabled: model.rootActions.find((a) => a.id === "new-canvas")?.disabled ?? true,
     searchActive: !!model.search,
+    searchLoading: [model.canvasListProps.canvasesLoading, integrationsLoading, apiKeysLoading].some(Boolean),
     searchResults,
     handleSetSearch,
     handleOpenChange: (open: boolean) => {
@@ -119,6 +126,10 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
       }
     },
   };
+}
+
+function canFetchPaletteData(organizationId: string, allowed: boolean) {
+  return Boolean(organizationId) && allowed;
 }
 
 type APIKeySearchItem = {

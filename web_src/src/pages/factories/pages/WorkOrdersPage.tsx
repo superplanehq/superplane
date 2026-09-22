@@ -1,6 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
-import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
@@ -22,8 +21,7 @@ import { factoryContentBodyClassName, factorySectionHeaderClassName } from "./fa
  */
 export function WorkOrdersPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: me } = useMe(false);
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
 
   usePageTitle(["Tasks", factory?.name ?? "Workspace"]);
 
@@ -79,7 +77,7 @@ export function WorkOrdersPage() {
       workOrders={workOrders}
       pullRequests={pullRequests}
       state={state}
-      currentUserId={me?.id}
+      currentUserId={currentUserId}
       canCreate={canCreate}
       onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}

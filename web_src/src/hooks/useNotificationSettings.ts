@@ -2,7 +2,10 @@ import {
   meDescribeNotificationSettings,
   meUpdateNotificationSettings,
   type MeNotificationSettings,
+  type SuperplaneMeUser,
 } from "@/api-client";
+import { meKeys } from "@/hooks/useMe";
+import { accountNotificationsFromSettings } from "@/lib/notificationSettings";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -37,6 +40,17 @@ export function useUpdateNotificationSettings(organizationId: string) {
     },
     onSuccess: (settings) => {
       queryClient.setQueryData(notificationSettingsKey(organizationId), settings);
+      const form = accountNotificationsFromSettings(settings);
+      queryClient.setQueriesData<SuperplaneMeUser | null>({ queryKey: meKeys.organization(organizationId) }, (user) => {
+        if (!user) return user;
+        return {
+          ...user,
+          browserNotificationPreferences: {
+            enabled: form.browserEnabled,
+            showWhileViewing: form.browserShowWhileViewing,
+          },
+        };
+      });
     },
   });
 }
