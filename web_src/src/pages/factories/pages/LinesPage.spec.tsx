@@ -325,6 +325,21 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
   });
 
+  it("holds the empty board while the first task pages load", () => {
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [],
+      isLoading: true,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    renderLinesBoard();
+
+    expect(screen.getByRole("status", { name: "Loading the board" })).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-board")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing here.")).not.toBeInTheDocument();
+  });
+
   it("sets a pastel colour on the backlog from circular swatches", async () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);

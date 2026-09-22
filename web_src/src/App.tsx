@@ -63,6 +63,7 @@ import {
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
@@ -114,13 +115,15 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
 );
 
 const withAuthPermissionAndFactoriesFeature = (Component: React.ComponentType, resource: string, action: string) => (
-  <AuthGuard>
-    <RequirePermission resource={resource} action={action}>
-      <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
-        <Component />
-      </RequireExperimentalFeature>
-    </RequirePermission>
-  </AuthGuard>
+  <WorkspaceLoadingProvider>
+    <AuthGuard>
+      <RequirePermission resource={resource} action={action}>
+        <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+          <Component />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    </AuthGuard>
+  </WorkspaceLoadingProvider>
 );
 
 function organizationScopedRouteTree() {
