@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -139,6 +140,9 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 	db := database.DB(t.Context())
 	deps := IntakeDependencies{}
 	const headSHA = "abc123def456"
+
+	err := models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge)
+	require.NoError(t, err)
 
 	newFactory := func(t *testing.T) *models.Factory {
 		t.Helper()
@@ -447,6 +451,77 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 	})
 }
 
+func Test__FactoryPullRequestMerge_FlagOff(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	db := database.DB(t.Context())
+	deps := IntakeDependencies{}
+	const headSHA = "abc123def456"
+
+	require.False(t, r.Organization.HasExperimentalFeature(features.FeatureFactoryPullRequestMerge))
+
+	newFactory := func(t *testing.T) *models.Factory {
+		t.Helper()
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		return factory
+	}
+
+	createOrder := func(t *testing.T, factory *models.Factory) *models.FactoryWorkOrder {
+		t.Helper()
+		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		return order
+	}
+
+	createGitHubPR := func(t *testing.T, factory *models.Factory, order *models.FactoryWorkOrder) *pb.FactoryPullRequest {
+		t.Helper()
+		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
+			FactoryId:   factory.ID.String(),
+			WorkOrderId: order.ID.String(),
+			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
+			Repository:  "acme/app",
+			Number:      42,
+			Url:         "https://github.com/acme/app/pull/42",
+			Title:       "Ready",
+			State:       pb.FactoryPullRequest_STATE_OPEN,
+		})
+		require.NoError(t, err)
+		return resp.GetPullRequest()
+	}
+
+	api := &fakeFactoryGitHub{
+		pullRequest: mergeableGitHubPullRequest(headSHA),
+		combined:    &github.CombinedStatus{State: github.Ptr("success")},
+		checkRuns:   &github.ListCheckRunsResults{},
+		repository:  allMethodsRepository(),
+	}
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return api, nil
+	}
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+
+	t.Run("refuses merge when the flag is off", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createGitHubPR(t, factory, createOrder(t, factory))
+
+		_, err := MergeFactoryPullRequest(ctx, deps, orgID, &pb.MergeFactoryPullRequestRequest{
+			FactoryId:       factory.ID.String(),
+			PrId:            pr.GetId(),
+			MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
+			ExpectedHeadSha: headSHA,
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "Pull request merge is not enabled for this organization.", message)
+		assert.Equal(t, 0, api.mergeCalls)
+	})
+}
+
 func Test__FactoryPullRequestMergeability(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -454,6 +529,9 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 	db := database.DB(t.Context())
 	deps := IntakeDependencies{}
 	const headSHA = "abc123def456"
+
+	err := models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge)
+	require.NoError(t, err)
 
 	newFactory := func(t *testing.T) *models.Factory {
 		t.Helper()
