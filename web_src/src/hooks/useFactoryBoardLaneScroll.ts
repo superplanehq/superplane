@@ -14,6 +14,7 @@ export function resetFactoryBoardLaneScrollPositions() {
 
 export function useFactoryBoardLaneScroll(scrollPersistenceKey: string | undefined) {
   const scrollRef = useRef<HTMLUListElement>(null);
+  const persistenceKeyRef = useRef(scrollPersistenceKey);
 
   const handleScroll = useCallback(
     (event: UIEvent<HTMLUListElement>) => {
@@ -27,26 +28,35 @@ export function useFactoryBoardLaneScroll(scrollPersistenceKey: string | undefin
 
   useLayoutEffect(() => {
     const element = scrollRef.current;
-    if (!element || !scrollPersistenceKey) {
+    const previousKey = persistenceKeyRef.current;
+
+    if (element && previousKey && previousKey !== scrollPersistenceKey) {
+      persistedScrollTops.set(previousKey, element.scrollTop);
+    }
+
+    persistenceKeyRef.current = scrollPersistenceKey;
+
+    if (!element) {
       return;
     }
 
-    const scrollTop = persistedScrollTops.get(scrollPersistenceKey);
-    if (scrollTop == null) {
+    if (!scrollPersistenceKey) {
+      element.scrollTop = 0;
       return;
     }
 
-    element.scrollTop = scrollTop;
+    element.scrollTop = persistedScrollTops.get(scrollPersistenceKey) ?? 0;
   }, [scrollPersistenceKey]);
 
   useEffect(() => {
     const element = scrollRef.current;
 
     return () => {
-      if (!element || !scrollPersistenceKey) {
+      const key = persistenceKeyRef.current;
+      if (!element || !key) {
         return;
       }
-      persistedScrollTops.set(scrollPersistenceKey, element.scrollTop);
+      persistedScrollTops.set(key, element.scrollTop);
     };
   }, [scrollPersistenceKey]);
 
