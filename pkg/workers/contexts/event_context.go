@@ -26,19 +26,6 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, run *models.CanvasRun
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
-	if s.run == nil {
-		canStart, err := s.canStartRun()
-		if err != nil {
-			return err
-		}
-
-		if !canStart {
-			logging.ForNode(*s.node).
-				Warnf("skipping event %s: canvas %s cannot start a run", payloadType, s.node.WorkflowID)
-			return nil
-		}
-	}
-
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),
@@ -83,6 +70,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 
 	err = s.tx.Create(&event).Error
 	if err != nil {
+		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
+			logging.ForNode(*s.node).
+				Warnf("skipping event %s: canvas %s cannot start a run", payloadType, s.node.WorkflowID)
+			return nil
+		}
+
 		return err
 	}
 
@@ -129,20 +122,4 @@ func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string,
 	}
 
 	return &resolvedName, nil
-}
-
-// canStartRun reports whether the canvas of this node can start a new run.
-// A canvas that is gone, or one without a live version, cannot — so events
-// that would need a new run cannot run either.
-func (s *EventContext) canStartRun() (bool, error) {
-	_, err := models.FindLiveCanvasVersionInTransaction(s.tx, s.node.WorkflowID)
-	if err == nil {
-		return true, nil
-	}
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-
-	return false, err
 }
