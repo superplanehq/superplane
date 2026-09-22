@@ -52,7 +52,7 @@ export const baseMapper: ComponentBaseMapper = {
     }
 
     if (context.node.componentName === "daytona.getPreviewUrl") {
-      if (typeof responseData.sandbox === "string" && responseData.sandbox.length > 0) {
+      if (isNonEmptyString(responseData.sandbox)) {
         details["Sandbox"] = responseData.sandbox;
       }
 
@@ -68,11 +68,11 @@ export const baseMapper: ComponentBaseMapper = {
         details["Expires In Seconds"] = String(responseData.expiresInSeconds);
       }
 
-      if (typeof responseData.token === "string" && responseData.token.length > 0) {
+      if (isNonEmptyString(responseData.token)) {
         details["Token"] = responseData.token;
       }
 
-      if (typeof responseData.url === "string" && responseData.url.length > 0) {
+      if (isNonEmptyString(responseData.url)) {
         details["Preview URL"] = responseData.url;
       }
     }
@@ -96,6 +96,10 @@ export const baseMapper: ComponentBaseMapper = {
     );
   },
 };
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
 
 function getFirstOutputPayload(outputs: unknown): OutputPayload | undefined {
   const typedOutputs = outputs as

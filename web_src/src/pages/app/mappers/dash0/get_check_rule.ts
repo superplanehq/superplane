@@ -36,7 +36,7 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
+    if (!hasDefaultPayload(outputs)) {
       return { Response: "No data returned" };
     }
 
@@ -48,34 +48,32 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
     }
 
     const details: Record<string, string> = {};
+    const fetchedAt = payload.timestamp;
+    const name = responseData.name;
+    const id = responseData.id;
+    const expression = responseData.expression;
+    const interval = responseData.interval;
+    const forDuration = responseData.for;
+    const keepFiringFor = responseData.keepFiringFor;
+    const enabled = responseData.enabled;
 
-    if (payload?.timestamp) details["Fetched At"] = new Date(payload.timestamp).toLocaleString();
-    if (responseData.name) details["Name"] = String(responseData.name);
-    if (responseData.id) details["ID"] = String(responseData.id);
+    if (fetchedAt) details["Fetched At"] = new Date(fetchedAt).toLocaleString();
+    if (name) details["Name"] = String(name);
+    if (id) details["ID"] = String(id);
 
-    if (responseData.expression) {
-      const expr = String(responseData.expression);
+    if (expression) {
+      const expr = String(expression);
       details["Expression"] = expr.length > 100 ? expr.substring(0, 100) + "..." : expr;
     }
 
-    if (responseData.thresholds) {
-      const parts: string[] = [];
-      if (responseData.thresholds.degraded != null) parts.push(`Degraded: ${responseData.thresholds.degraded}`);
-      if (responseData.thresholds.critical != null) parts.push(`Critical: ${responseData.thresholds.critical}`);
-      if (parts.length > 0) details["Thresholds"] = parts.join(", ");
-    }
+    addCheckRuleThresholds(details, responseData);
 
-    if (responseData.interval) details["Interval"] = String(responseData.interval);
-    if (responseData.for) details["For"] = String(responseData.for);
-    if (responseData.keepFiringFor) details["Keep Firing For"] = String(responseData.keepFiringFor);
-    if (responseData.enabled != null) details["Enabled"] = responseData.enabled ? "Yes" : "No";
+    if (interval) details["Interval"] = String(interval);
+    if (forDuration) details["For"] = String(forDuration);
+    if (keepFiringFor) details["Keep Firing For"] = String(keepFiringFor);
+    if (enabled != null) details["Enabled"] = enabled ? "Yes" : "No";
 
-    if (responseData.labels && Object.keys(responseData.labels).length > 0) {
-      const labels = Object.entries(responseData.labels)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(", ");
-      details["Labels"] = labels;
-    }
+    addCheckRuleLabels(details, responseData);
 
     return details;
   },
@@ -85,6 +83,30 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function hasDefaultPayload(
+  outputs: { default?: OutputPayload[] } | undefined,
+): outputs is { default: OutputPayload[] } {
+  return !!outputs?.default && outputs.default.length > 0;
+}
+
+function addCheckRuleThresholds(details: Record<string, string>, responseData: CheckRulePayload) {
+  if (responseData.thresholds) {
+    const parts: string[] = [];
+    if (responseData.thresholds.degraded != null) parts.push(`Degraded: ${responseData.thresholds.degraded}`);
+    if (responseData.thresholds.critical != null) parts.push(`Critical: ${responseData.thresholds.critical}`);
+    if (parts.length > 0) details["Thresholds"] = parts.join(", ");
+  }
+}
+
+function addCheckRuleLabels(details: Record<string, string>, responseData: CheckRulePayload) {
+  if (responseData.labels && Object.keys(responseData.labels).length > 0) {
+    const labels = Object.entries(responseData.labels)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    details["Labels"] = labels;
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
