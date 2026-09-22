@@ -315,7 +315,7 @@ function createActivityStream(options = {}) {
     items.push(item);
     emit(
       {
-        type: "tool_start",
+        type: "activity_tool_start",
         id,
         kind: item.kind,
         name: item.name,
@@ -381,7 +381,7 @@ function createActivityStream(options = {}) {
     }
     emit(
       {
-        type: "tool_end",
+        type: "activity_tool_end",
         id,
         kind: item.kind,
         status: item.status,

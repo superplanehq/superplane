@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"gorm.io/datatypes"
 )
 
 func TestAdminGetPriceBooks(t *testing.T) {
@@ -223,6 +224,103 @@ func TestAdminSyncPriceBooks_RequiresPricedProvider(t *testing.T) {
 	assert.Contains(t, response.Body.String(), "No enabled provider publishes catalog prices")
 }
 
+func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	t.Run("no allowlist means no selected rates", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		for _, m := range body.Models {
+			assert.False(t, m.Selected, "rate %s/%s should not be selected", m.MatchKey, m.MatchMode)
+		}
+	})
+
+	t.Run("prefix allowlist selects matching prefix rate", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      "openai",
+			APIKey:        []byte("encrypted"),
+			AllowedModels: datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}),
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		sonnet := findModelRate(body.Models, "claude-sonnet")
+		require.NotNil(t, sonnet, "claude-sonnet should exist in rates")
+		assert.True(t, sonnet.Selected, "claude-sonnet should be selected when an allowlist entry matches")
+
+		nonSelected := findModelRate(body.Models, "gpt-4o")
+		require.NotNil(t, nonSelected, "gpt-4o should exist in rates")
+		assert.False(t, nonSelected.Selected, "gpt-4o should not be selected with an anthropic allowlist")
+	})
+
+	t.Run("family allowlist selects matching family rate", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      "openai",
+			APIKey:        []byte("encrypted"),
+			AllowedModels: datatypes.NewJSONSlice([]string{"some-vendor/sonnet-v3"}),
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books?version=2026-08-31.1",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		sonnet := findModelRate(body.Models, "sonnet")
+		require.NotNil(t, sonnet, "sonnet family rate should exist in 2026-08-31.1")
+		assert.True(t, sonnet.Selected, "sonnet family rate should be selected when an allowlist entry matches the family token")
+	})
+
+	t.Run("keyless provider allowlist does not select rates", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      "openai",
+			AllowedModels: datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}),
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		sonnet := findModelRate(body.Models, "claude-sonnet")
+		require.NotNil(t, sonnet, "claude-sonnet should exist in rates")
+		assert.False(t, sonnet.Selected, "claude-sonnet should not be selected without a hosted API key")
+	})
+}
+
 func TestFilterCatalogPrices_MatchesAllowlistAndNormalizedIDs(t *testing.T) {
 	prices := []llm.CatalogPrice{
 		{ID: "anthropic/claude-sonnet-4-6", Rate: pricebook.Rate{Input: 400}},
@@ -240,6 +338,15 @@ func containsModelRate(rates []adminPriceBookModelRate, matchKey string) bool {
 	return slices.ContainsFunc(rates, func(rate adminPriceBookModelRate) bool {
 		return rate.MatchKey == matchKey
 	})
+}
+
+func findModelRate(rates []adminPriceBookModelRate, matchKey string) *adminPriceBookModelRate {
+	for i := range rates {
+		if rates[i].MatchKey == matchKey {
+			return &rates[i]
+		}
+	}
+	return nil
 }
 
 func containsVMRate(rates []adminPriceBookVMRate, matchKey string, microsPerSecond int64) bool {

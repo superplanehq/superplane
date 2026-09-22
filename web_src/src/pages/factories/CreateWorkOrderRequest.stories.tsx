@@ -72,7 +72,7 @@ function RequestDialogPlayground({
 
 /**
  * Presentational request composer. The live create dialog uses this when
- * Task Refinement is on.
+ * Planning is on.
  */
 const meta = {
   title: "Factories/Pages/Create Task/Request card",

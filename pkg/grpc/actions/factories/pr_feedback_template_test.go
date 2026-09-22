@@ -139,6 +139,35 @@ func TestPrFeedbackReviewActivityTitleExpression(t *testing.T) {
 	)
 }
 
+func TestPrFeedbackReviewAcknowledgeCommentIDExpression(t *testing.T) {
+	requireValidTemplateExpressions(t, prFeedbackReviewAcknowledgeCommentIDExpression())
+	source := templateExpressionSource(t, prFeedbackReviewAcknowledgeCommentIDExpression())
+
+	t.Run("yields the first inline comment ID", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"review_comments": []any{
+				map[string]any{"id": 111, "body": "first"},
+				map[string]any{"id": 222, "body": "second"},
+			},
+		})
+		assert.Equal(t, 111, got)
+	})
+
+	t.Run("yields an empty string when review comments are missing", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"review": map[string]any{"body": "LGTM"},
+		})
+		assert.Equal(t, "", got)
+	})
+
+	t.Run("yields an empty string when review comments are empty", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"review_comments": []any{},
+		})
+		assert.Equal(t, "", got)
+	})
+}
+
 func TestPrFeedbackPRNumberExpression_IssueCommentPayload(t *testing.T) {
 	source := templateExpressionSource(t, prFeedbackPRNumberExpression())
 

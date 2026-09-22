@@ -194,6 +194,8 @@ function useIntegrationCatalogActions({
           organizationId,
           integrationsBasePath,
           integrationNames,
+          organizationIntegrations,
+          navigate,
           createIntegrationMutation,
         })
       ) {
@@ -356,12 +358,16 @@ function startCatalogHostedJiraConnect({
   organizationId,
   integrationsBasePath,
   integrationNames,
+  organizationIntegrations,
+  navigate,
   createIntegrationMutation,
 }: {
   integration: IntegrationsIntegrationDefinition;
   organizationId: string;
   integrationsBasePath: string;
   integrationNames: Set<string>;
+  organizationIntegrations: ReturnType<typeof useConnectedIntegrations>["data"];
+  navigate: ReturnType<typeof useNavigate>;
   createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
 }): boolean {
   if (!usesHostedJiraOAuth(integration)) {
@@ -373,6 +379,10 @@ function startCatalogHostedJiraConnect({
     organizationId,
     returnTo: integrationsBasePath,
     existingNames: integrationNames,
+    connected: organizationIntegrations ?? [],
+    onExistingReady: (integrationId) => {
+      navigate(integrationDetailPath(integrationsBasePath, integrationId));
+    },
     create: async (payload) => {
       const response = await createIntegrationMutation.mutateAsync(payload);
       return response.data;

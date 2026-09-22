@@ -270,14 +270,11 @@ export const listIssuesStateFunction: StateFunction = (execution: ExecutionInfo)
       let hasDegraded = false;
 
       for (const result of results) {
-        // For instant queries, check the value field: [timestamp, "status"]
-        if (result.value && Array.isArray(result.value) && result.value.length >= 2) {
-          const status = String(result.value[1]);
-          if (status === "2") {
-            hasCritical = true;
-          } else if (status === "1") {
-            hasDegraded = true;
-          }
+        const status = instantQueryStatus(result);
+        if (status === "2") {
+          hasCritical = true;
+        } else if (status === "1") {
+          hasDegraded = true;
         }
       }
 
@@ -307,6 +304,13 @@ export const LIST_ISSUES_STATE_REGISTRY: EventStateRegistry = {
   getState: listIssuesStateFunction,
 };
 
+function instantQueryStatus(result: PrometheusResponse["data"]["result"][number]): string | undefined {
+  if (!result.value || !Array.isArray(result.value) || result.value.length < 2) {
+    return undefined;
+  }
+  return String(result.value[1]);
+}
+
 function getIssueCounts(execution: ExecutionInfo): { critical: number; degraded: number } {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) {
@@ -324,13 +328,11 @@ function getIssueCounts(execution: ExecutionInfo): { critical: number; degraded:
   let degraded = 0;
 
   for (const result of results) {
-    if (result.value && Array.isArray(result.value) && result.value.length >= 2) {
-      const status = String(result.value[1]);
-      if (status === "2") {
-        critical++;
-      } else if (status === "1") {
-        degraded++;
-      }
+    const status = instantQueryStatus(result);
+    if (status === "2") {
+      critical++;
+    } else if (status === "1") {
+      degraded++;
     }
   }
 

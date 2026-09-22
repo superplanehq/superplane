@@ -55,14 +55,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
 	})
 
-	t.Run("known id returns task refinement feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryCreateWithAgent)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryCreateWithAgent, f.ID)
-		assert.Equal(t, "Task Refinement", f.Label)
-		assert.Equal(t, "Refine draft work orders with an agent", f.Description)
-	})
-
 	t.Run("known id returns custom automations feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryCustomAutomations)
 		assert.True(t, ok)
@@ -100,7 +92,6 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
-	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceAgentResources))
 	assert.False(t, Exists("factory_visual_evidence"))

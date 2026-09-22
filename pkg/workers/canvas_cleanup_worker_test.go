@@ -376,11 +376,13 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 				Ref: datatypes.NewJSONType(models.NodeRef{
 					Component: &models.ComponentRef{Name: "noop"},
 				}),
-				WebhookID: &webhookID,
 			},
 		},
 		[]models.Edge{},
 	)
+	require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
+		Update("webhook_id", webhookID).Error)
 
 	//
 	// Soft delete the canvas using the new soft delete method
@@ -427,7 +429,96 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	var webhookInDb models.Webhook
 	err = database.Conn().Unscoped().Where("id = ?", webhookID).First(&webhookInDb).Error
 	require.NoError(t, err)
-	assert.NotNil(t, webhookInDb.DeletedAt)
+	assert.True(t, webhookInDb.DeletedAt.Valid)
+}
+
+func Test__CanvasCleanupWorker_PreservesSharedWebhookWhenOtherCanvasActive(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewCanvasCleanupWorker()
+
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+
+	retired := createCanvasWithWebhook(t, r, webhookID)
+	_ = createCanvasWithWebhook(t, r, webhookID)
+
+	require.NoError(t, retired.SoftDelete())
+	processExpiredCanvasCleanup(t, worker, retired.ID)
+
+	_, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+}
+
+func Test__CanvasCleanupWorker_SoftDeletesSharedWebhookWhenLastReferenceRemoved(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewCanvasCleanupWorker()
+
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+
+	first := createCanvasWithWebhook(t, r, webhookID)
+	second := createCanvasWithWebhook(t, r, webhookID)
+
+	require.NoError(t, first.SoftDelete())
+	processExpiredCanvasCleanup(t, worker, first.ID)
+	_, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+
+	require.NoError(t, second.SoftDelete())
+	processExpiredCanvasCleanup(t, worker, second.ID)
+
+	var stored models.Webhook
+	require.NoError(t, database.Conn().Unscoped().First(&stored, webhookID).Error)
+	assert.True(t, stored.DeletedAt.Valid)
+}
+
+func createCanvasWithWebhook(t *testing.T, r *support.ResourceRegistry, webhookID uuid.UUID) *models.Canvas {
+	t.Helper()
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.Len(t, nodes, 1)
+	require.NoError(t, database.Conn().Model(&nodes[0]).Update("webhook_id", webhookID).Error)
+	return canvas
+}
+
+func processExpiredCanvasCleanup(t *testing.T, worker *CanvasCleanupWorker, canvasID uuid.UUID) {
+	t.Helper()
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvasID).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+	deleted, err := models.FindUnscopedCanvas(canvasID)
+	require.NoError(t, err)
+
+	for range 10 {
+		require.NoError(t, worker.LockAndProcessCanvas(*deleted))
+		var count int64
+		database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvasID).Count(&count)
+		if count == 0 {
+			return
+		}
+	}
+	t.Fatalf("canvas %s was not fully cleaned up", canvasID)
 }
 
 func Test__CanvasCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {

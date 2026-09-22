@@ -48,23 +48,7 @@ export const cloudDNSMapper: ComponentBaseMapper = {
       details["Completed At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const change = data?.change;
-    if (change?.id) {
-      details["Change ID"] = String(change.id);
-    }
-
-    if (change?.status) {
-      details["Status"] = String(change.status);
-    }
-
-    const record = data?.record;
-    if (record?.name) {
-      details["Record Name"] = String(record.name);
-    }
-
-    if (record?.type) {
-      details["Record Type"] = String(record.type);
-    }
+    Object.assign(details, cloudDNSOutputDetails(data));
 
     return details;
   },
@@ -74,6 +58,29 @@ export const cloudDNSMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
+
+function cloudDNSOutputDetails(data: CloudDNSOutputData | undefined): Record<string, string> {
+  const details: Record<string, string> = {};
+  const change = data?.change;
+  if (change?.id) {
+    details["Change ID"] = String(change.id);
+  }
+
+  if (change?.status) {
+    details["Status"] = String(change.status);
+  }
+
+  const record = data?.record;
+  if (record?.name) {
+    details["Record Name"] = String(record.name);
+  }
+
+  if (record?.type) {
+    details["Record Type"] = String(record.type);
+  }
+
+  return details;
+}
 
 function cloudDNSMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

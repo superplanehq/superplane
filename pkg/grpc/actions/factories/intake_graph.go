@@ -87,9 +87,10 @@ func intakeHealth(
 		}
 	}
 
-	if intake.Source == models.FactoryIntakeSourceJiraIssues &&
-		!jiraIntakeWebhookReady(tx, intake.CanvasID, graph.TriggerNodeID) {
-		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
+	if intake.Source == models.FactoryIntakeSourceJiraIssues {
+		if health := jiraIntakeWebhookHealth(tx, intake.CanvasID, graph.TriggerNodeID); health != pb.FactoryIntake_HEALTH_OK {
+			return health
+		}
 	}
 
 	return pb.FactoryIntake_HEALTH_OK
@@ -101,29 +102,35 @@ func intakeSourceAllowsRebind(source string) bool {
 		source == models.FactoryIntakeSourceProductiveTasks
 }
 
-// jiraIntakeWebhookReady reports whether the intake trigger can receive Jira
+// jiraIntakeWebhookHealth reports whether the intake trigger can receive Jira
 // issue events. A pending, failed, or unregistered webhook looks like a live
 // intake in the canvas, but Atlassian never POSTs until the shared webhook is
-// ready and has a remote id.
-func jiraIntakeWebhookReady(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) bool {
+// ready and has a remote id. A failed webhook is reported apart from a pending
+// one, because it is out of retries and waiting does not repair it.
+func jiraIntakeWebhookHealth(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) pb.FactoryIntake_Health {
 	if tx == nil || triggerNodeID == "" {
-		return false
+		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
 	}
 
 	node, err := models.FindCanvasNode(tx, canvasID, triggerNodeID)
 	if err != nil || node.WebhookID == nil {
-		return false
+		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
 	}
 
 	webhook, err := models.FindWebhookInTransaction(tx, *node.WebhookID)
 	if err != nil {
-		return false
-	}
-	if webhook.State != models.WebhookStateReady {
-		return false
+		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
 	}
 
-	return jiraWebhookHasRemoteID(webhook.Metadata.Data())
+	if webhook.State == models.WebhookStateFailed {
+		return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED
+	}
+
+	if webhook.State != models.WebhookStateReady || !jiraWebhookHasRemoteID(webhook.Metadata.Data()) {
+		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
+	}
+
+	return pb.FactoryIntake_HEALTH_OK
 }
 
 func jiraWebhookHasRemoteID(metadata any) bool {

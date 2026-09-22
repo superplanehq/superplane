@@ -613,3 +613,160 @@ func Test__IntegrationSubscriptionContext_PausedIntakeIgnoresLiveMessages(t *tes
 	assert.Len(t, newEvents, 2)
 	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 2)
 }
+
+func Test_applyMetadataDelta(t *testing.T) {
+	t.Run("writes only the changed key onto concurrent metadata", func(t *testing.T) {
+		latest := map[string]any{"user": "newer-user", "accessTokenExpiresAt": "later"}
+		original := map[string]any{"user": "original-user", "accessTokenExpiresAt": "earlier"}
+		current := map[string]any{"user": "original-user", "accessTokenExpiresAt": "earlier", "webhookId": 34}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.False(t, conflict)
+		assert.Equal(t, "newer-user", latest["user"])
+		assert.Equal(t, "later", latest["accessTokenExpiresAt"])
+		assert.Equal(t, float64(34), latest["webhookId"])
+	})
+
+	t.Run("clears a key when the stored value still matches the snapshot", func(t *testing.T) {
+		latest := map[string]any{"user": "newer-user", "webhookId": float64(34)}
+		original := map[string]any{"user": "original-user", "webhookId": float64(34)}
+		current := map[string]any{"user": "original-user"}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.False(t, conflict)
+		assert.Equal(t, "newer-user", latest["user"])
+		assert.NotContains(t, latest, "webhookId")
+	})
+
+	t.Run("does not revert a key another writer already changed", func(t *testing.T) {
+		latest := map[string]any{"user": "newer-user", "webhookId": float64(99)}
+		original := map[string]any{"webhookId": float64(34)}
+		current := map[string]any{}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.False(t, conflict)
+		assert.Equal(t, "newer-user", latest["user"])
+		assert.Equal(t, float64(99), latest["webhookId"])
+	})
+
+	t.Run("reports conflict when a write is skipped", func(t *testing.T) {
+		latest := map[string]any{"webhookId": float64(99)}
+		original := map[string]any{}
+		current := map[string]any{"webhookId": float64(34)}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.True(t, conflict)
+		assert.Equal(t, float64(99), latest["webhookId"])
+	})
+}
+
+func Test__IntegrationContext_PersistMetadata_PreservesConcurrentUpdates(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{
+			"user":                 "original-user",
+			"accessTokenExpiresAt": "earlier",
+		}),
+	).Error)
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(integration).Error)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{
+			"user":                 "newer-user",
+			"accessTokenExpiresAt": "later",
+		}),
+	).Error)
+
+	ctx.SetMetadata(map[string]any{
+		"user":                 "original-user",
+		"accessTokenExpiresAt": "earlier",
+		"webhookId":            34,
+	})
+	require.NoError(t, ctx.PersistMetadata())
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(&stored).Error)
+	assert.Equal(t, "newer-user", stored.Metadata.Data()["user"])
+	assert.Equal(t, "later", stored.Metadata.Data()["accessTokenExpiresAt"])
+	assert.Equal(t, float64(34), stored.Metadata.Data()["webhookId"])
+}
+
+func Test__IntegrationContext_PersistMetadata_DoesNotClearAReplacedWebhookID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{"webhookId": 34}),
+	).Error)
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(integration).Error)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{"user": "newer-user", "webhookId": 99}),
+	).Error)
+
+	ctx.SetMetadata(map[string]any{})
+	require.NoError(t, ctx.PersistMetadata())
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(&stored).Error)
+	assert.Equal(t, "newer-user", stored.Metadata.Data()["user"])
+	assert.Equal(t, float64(99), stored.Metadata.Data()["webhookId"])
+}
+
+func Test__IntegrationContext_PersistMetadata_ReturnsErrorWhenWebhookIDWriteConflicts(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{"webhookId": 99}),
+	).Error)
+
+	ctx.SetMetadata(map[string]any{"webhookId": 34})
+	require.ErrorIs(t, ctx.PersistMetadata(), errIntegrationMetadataConflict)
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(&stored).Error)
+	assert.Equal(t, float64(99), stored.Metadata.Data()["webhookId"])
+}

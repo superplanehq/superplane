@@ -829,6 +829,8 @@ message UpdateFactoryRequest {
   optional int64 hosted_spend_budget_cents = 5;
   // When true, remove the hosted spend cap. Takes precedence over hosted_spend_budget_cents.
   bool clear_hosted_spend_budget = 6;
+  // Full replacement of Planning settings. Absent means do not change.
+  optional FactoryPlanning planning = 7;
 }
 
 message UpdateFactoryResponse {
@@ -933,6 +935,16 @@ message Factory {
   FactoryOnboarding onboarding = 6;
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
+  FactoryPlanning planning = 8;
+}
+
+// Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
+message FactoryPlanning {
+  bool enabled = 1;
+  bool clarity = 2;
+  bool confidence = 3;
+  // True after the post-onboarding Planning wizard or a Planning settings save.
+  bool setup_completed = 4;
 }
 
 message FactoryLine {
@@ -1082,6 +1094,7 @@ message FactoryIntake {
     HEALTH_INTEGRATION_NOT_READY = 3;
     HEALTH_WEBHOOK_NOT_READY = 4;
     HEALTH_GRAPH_BROKEN = 5;
+    HEALTH_WEBHOOK_FAILED = 6;
   }
 
   // Settings that change what the intake does. They are stored in the canvas
@@ -1648,11 +1661,14 @@ message WorkOrder {
   repeated UsageByMachineType usage_by_machine_type = 21;
   // Full check rows, including summary and analysis.
   repeated WorkOrderCheck checks = 22;
+  // Board fields for the analysis session. The opened card loads the full session.
+  PlanningSessionSummary planning_session = 23;
 }
 
 // WorkOrderSummary is the list row for a work order.
 // DescribeWorkOrder returns WorkOrder, which adds files, the usage
-// breakdown, the source run, and the full checks.
+// breakdown, the source run, and the full checks. Both carry
+// PlanningSessionSummary.
 message WorkOrderSummary {
   string id = 1;
   string title = 2;
@@ -1672,6 +1688,8 @@ message WorkOrderSummary {
   WorkOrderOrigin origin = 16;
   int64 total_duration_seconds = 17;
   repeated WorkOrderCheckScore check_scores = 18;
+  // Analysis session fields the board needs. The opened card loads the full session.
+  PlanningSessionSummary planning_session = 19;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2592,6 +2610,16 @@ message PlanningSessionSurveyQuestion {
 message PlanningSessionSurvey {
   string id = 1;
   repeated PlanningSessionSurveyQuestion questions = 2;
+}
+
+// PlanningSessionSummary is the lines-board view of an analysis session.
+// It omits messages, activities, and the draft body.
+message PlanningSessionSummary {
+  string id = 1;
+  string state = 2;
+  string wait_state = 3;
+  string execution_id = 4;
+  PlanningSessionSurvey survey = 5;
 }
 
 message PlanningSession {

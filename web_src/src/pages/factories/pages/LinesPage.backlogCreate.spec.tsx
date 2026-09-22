@@ -45,6 +45,12 @@ const searchFactoryIntakeItems = vi.fn(() => ({
 const importFactoryIntakeItem = vi.fn();
 const enabledExperimentalFeatures = new Set<string>();
 
+vi.mock("./planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: vi.fn(async () => null),
+  sendPlanningSessionMessage: vi.fn(),
+  answerPlanningSessionSurvey: vi.fn(),
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
@@ -73,6 +79,12 @@ async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
 }
 
 vi.mock("@/hooks/useFactoryData", () => ({
+  useFactory: () => ({
+    data: { id: "factory-1", planning: { enabled: true, clarity: true, confidence: true } },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -125,22 +137,6 @@ vi.mock("@/hooks/usePageTitle", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
-}));
-
-vi.mock("./useWorkOrderPlanningSurvey", () => ({
-  useWorkOrderPlanningSurvey: () => false,
-  useWorkOrderPlanningActivity: () => ({
-    hasAgentQuestion: false,
-    isWaiting: false,
-    isWorking: false,
-    session: null,
-  }),
-  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
-    "planning-session-by-work-order",
-    organizationId,
-    factoryId,
-    workOrderId,
-  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -238,9 +234,8 @@ describe("LinesPage backlog create", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
 
-    expect(
-      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
-    ).not.toBeInTheDocument();
+    const attentionNote = await screen.findByTestId("split-run-attention-note");
+    expect(within(attentionNote).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
   });
 
