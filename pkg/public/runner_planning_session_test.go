@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -386,6 +388,79 @@ func TestWritePlanningWaitError(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		writePlanningWaitError(rec, req, session, lookupCanceled)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+
+	t.Run("dropped database connection returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+		lookupReset := fmt.Errorf("lookup: %w", errors.New("write tcp 10.96.2.5:43492->10.32.160.2:5432: write: connection reset by peer"))
+
+		writePlanningWaitError(rec, req, session, lookupReset)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("wrapped connection reset op error returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+		lookupReset := fmt.Errorf("lookup: %w", &net.OpError{
+			Op:  "write",
+			Net: "tcp",
+			Err: syscall.ECONNRESET,
+		})
+
+		writePlanningWaitError(rec, req, session, lookupReset)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("deadlock with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+		deadlock := fmt.Errorf("lookup: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"})
+
+		writePlanningWaitError(rec, req, session, deadlock)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+
+	t.Run("generic lookup error with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, errors.New("lookup failed"))
 
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
 		assert.Equal(t, "Lookup failed\n", rec.Body.String())
