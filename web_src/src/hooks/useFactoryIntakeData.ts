@@ -20,6 +20,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
+import { applyWorkOrderToListCaches } from "./workOrderListCache";
 
 const factoryIntakeQueryKeys = {
   list: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "intakes"] as const,
@@ -117,6 +118,9 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       // A new intake seeds the newest items of its source, so the Backlog
       // already holds tasks the cached list does not know about.
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }
@@ -137,6 +141,9 @@ export function useDeleteFactoryIntake(organizationId: string, factoryId: string
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }
@@ -240,11 +247,11 @@ export function useImportFactoryIntakeItem(organizationId: string, factoryId: st
       return response.data.order;
     },
     onSuccess: (order) => {
-      queryClient.setQueryData<FactoriesWorkOrder[]>(
-        factoryQueryKeys.workOrders(organizationId, factoryId),
-        (current) => upsertImportedWorkOrder(current, order),
-      );
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, order.id ?? "", order);
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
       if (order.id) {
         queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, order.id), order);
         void queryClient.invalidateQueries({
@@ -253,22 +260,6 @@ export function useImportFactoryIntakeItem(organizationId: string, factoryId: st
       }
     },
   });
-}
-
-function upsertImportedWorkOrder(
-  current: FactoriesWorkOrder[] | undefined,
-  order: FactoriesWorkOrder,
-): FactoriesWorkOrder[] {
-  if (!order.id) {
-    return current ?? [];
-  }
-  if (!current) {
-    return [order];
-  }
-  if (current.some((existing) => existing.id === order.id)) {
-    return current.map((existing) => (existing.id === order.id ? order : existing));
-  }
-  return [order, ...current];
 }
 
 export type RefreshBacklogResult = {
@@ -297,6 +288,9 @@ export function useRefreshBacklog(organizationId: string, factoryId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }
