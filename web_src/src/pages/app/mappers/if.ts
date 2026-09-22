@@ -39,11 +39,7 @@ export const IF_STATE_MAP: EventStateMap = {
 export const ifStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
+  if (isIfExecutionError(execution)) {
     return "error";
   }
 
@@ -70,6 +66,22 @@ export const ifStateFunction: StateFunction = (execution: ExecutionInfo): EventS
 
   return "failed";
 };
+
+function isIfExecutionError(execution: ExecutionInfo): boolean {
+  if (!execution.resultMessage) {
+    return false;
+  }
+
+  if (execution.resultReason === "RESULT_REASON_ERROR") {
+    return true;
+  }
+
+  if (execution.result !== "RESULT_FAILED") {
+    return false;
+  }
+
+  return execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED";
+}
 
 export const IF_STATE_REGISTRY: EventStateRegistry = {
   stateMap: IF_STATE_MAP,

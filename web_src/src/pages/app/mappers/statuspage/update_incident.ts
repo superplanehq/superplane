@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, ComponentBaseSpecValue } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "../mapperLookup";
@@ -96,40 +96,18 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
   };
   const values: ComponentBaseSpec["values"] = [];
 
-  const typeLabel = configuration?.incidentType === "scheduled" ? "Scheduled" : "Realtime";
-  values.push({
-    badges: [
-      { label: "Type:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-      { label: typeLabel, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-    ],
-  });
+  values.push(optionBadgeRow("Type:", incidentTypeLabel(configuration?.incidentType)));
 
-  const status = configuration?.statusRealtime || configuration?.statusScheduled;
+  const status = incidentStatusLabel(configuration);
   if (status) {
-    values.push({
-      badges: [
-        { label: "Status:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: status, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
+    values.push(optionBadgeRow("Status:", status));
   }
 
   if (configuration?.body) {
-    const bodyPreview = truncateForDisplay(configuration.body, 50);
-    values.push({
-      badges: [
-        { label: "Body:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: bodyPreview, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
+    values.push(optionBadgeRow("Body:", truncateForDisplay(configuration.body, 50)));
   }
   if (configuration?.impactOverride) {
-    values.push({
-      badges: [
-        { label: "Impact:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: configuration.impactOverride, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
+    values.push(optionBadgeRow("Impact:", configuration.impactOverride));
   }
   if (configuration?.components && configuration.components.length > 0) {
     const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
@@ -137,12 +115,7 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
         ? nodeMetadata.componentNames.join(", ")
         : `${configuration.components.length} component(s)`;
-    values.push({
-      badges: [
-        { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: truncateForDisplay(componentLabel, 60), bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
+    values.push(optionBadgeRow("Components:", truncateForDisplay(componentLabel, 60)));
   }
 
   return [
@@ -153,4 +126,25 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values,
     },
   ];
+}
+
+function incidentTypeLabel(incidentType?: string): string {
+  if (incidentType === "scheduled") {
+    return "Scheduled";
+  }
+
+  return "Realtime";
+}
+
+function incidentStatusLabel(configuration: { statusRealtime?: string; statusScheduled?: string }): string | undefined {
+  return configuration?.statusRealtime || configuration?.statusScheduled;
+}
+
+function optionBadgeRow(label: string, value: string): ComponentBaseSpecValue {
+  return {
+    badges: [
+      { label, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+      { label: value, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+    ],
+  };
 }

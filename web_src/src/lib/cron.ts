@@ -103,20 +103,7 @@ function matchesCronField(field: string, value: number, min: number, max: number
 
   // Handle step values (*/5, 2-10/3, MON-FRI/2)
   if (field.includes("/")) {
-    const [range, step] = field.split("/");
-    const stepNum = parseInt(step);
-
-    if (range === "*") {
-      return (value - min) % stepNum === 0;
-    } else if (range.includes("-")) {
-      const [start, end] = parseRange(range, min, max);
-      if (start === -1 || end === -1) return false;
-      return value >= start && value <= end && (value - start) % stepNum === 0;
-    } else {
-      const start = parseValue(range, min, max);
-      if (start === -1) return false;
-      return value >= start && (value - start) % stepNum === 0;
-    }
+    return matchesCronStep(field, value, min, max);
   }
 
   // Handle ranges (2-5 or MON-FRI)
@@ -129,6 +116,25 @@ function matchesCronField(field: string, value: number, min: number, max: number
   // Handle single values (including named days)
   const parsedValue = parseValue(field, min, max);
   return parsedValue !== -1 && parsedValue === value;
+}
+
+function matchesCronStep(field: string, value: number, min: number, max: number): boolean {
+  const [range, step] = field.split("/");
+  const stepNum = parseInt(step);
+
+  if (range === "*") {
+    return (value - min) % stepNum === 0;
+  }
+
+  if (range.includes("-")) {
+    const [start, end] = parseRange(range, min, max);
+    if (start === -1 || end === -1) return false;
+    return value >= start && value <= end && (value - start) % stepNum === 0;
+  }
+
+  const start = parseValue(range, min, max);
+  if (start === -1) return false;
+  return value >= start && (value - start) % stepNum === 0;
 }
 
 function parseValue(field: string, min: number, max: number): number {
