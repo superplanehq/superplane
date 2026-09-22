@@ -260,7 +260,9 @@ test("runLoop ends cleanly after consecutive unreachable waits", async () => {
   assert.equal(code, 0);
   assert.equal(waits, 3);
   assert.equal(sleeps.length, 2);
-  assert.deepEqual(logs, []);
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /stopped waiting after 3 consecutive unreachable SuperPlane contacts/);
+  assert.doesNotMatch(logs[0], /fail/i);
 });
 
 test("safeWaitRequest treats an abort as unreachable pending", async () => {

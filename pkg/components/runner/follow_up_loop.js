@@ -211,6 +211,7 @@ async function runLoop(helpers) {
     if (isUnreachableWait(result)) {
       unreachableStreak += 1;
       if (unreachableStreak >= maxUnreachable) {
+        log(`stopped waiting after ${unreachableStreak} consecutive unreachable SuperPlane contacts\n`);
         return 0;
       }
     } else {
