@@ -12,7 +12,33 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   "application/pdf",
   "text/plain",
   "text/markdown",
+  "application/json",
+  "text/csv",
+  "application/yaml",
 ] as const;
+
+const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".json": "application/json",
+  ".csv": "text/csv",
+  ".yaml": "application/yaml",
+  ".yml": "application/yaml",
+};
+
+const WORK_ORDER_FILE_EXTENSIONS = Object.keys(WORK_ORDER_FILE_TYPES_BY_EXTENSION);
+
+/** Accept attribute for work-order file inputs: every allowed type plus the extensions some browsers map to them. */
+export const WORK_ORDER_FILE_ACCEPT = [
+  ...ALLOWED_WORK_ORDER_FILE_TYPES,
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".pdf",
+  ...WORK_ORDER_FILE_EXTENSIONS,
+].join(",");
 
 const previewUrls = new Map<string, string>();
 const downloadUrls = new Map<string, string>();
@@ -35,9 +61,12 @@ export function workOrderFileRef(id: string): string {
   return `${FILE_REF_SCHEME}://${id}`;
 }
 
+function isAllowedWorkOrderContentType(contentType: string): boolean {
+  return (ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
+}
+
 export function isAllowedWorkOrderFile(file: File): boolean {
-  const type = normalizeWorkOrderFileType(file.type);
-  return (ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(type) && file.size > 0;
+  return isAllowedWorkOrderContentType(resolveWorkOrderFileMimeType(file)) && file.size > 0;
 }
 
 export function isInlineWorkOrderImage(contentType: string | undefined): boolean {
@@ -57,7 +86,27 @@ export function normalizeWorkOrderFileType(contentType: string | undefined): str
   if (value === "image/jpg") {
     return "image/jpeg";
   }
+  if (value === "text/yaml" || value === "application/x-yaml") {
+    return "application/yaml";
+  }
   return value;
+}
+
+/** Resolves the MIME type a file is stored with. Browsers send an empty type or application/octet-stream for many text files, so the filename decides. */
+export function resolveWorkOrderFileMimeType(file: Pick<File, "name" | "type">): string {
+  const declared = normalizeWorkOrderFileType(file.type);
+  if (declared && declared !== "application/octet-stream") {
+    return declared;
+  }
+  return workOrderMimeTypeFromFilename(file.name);
+}
+
+export function workOrderMimeTypeFromFilename(filename: string): string {
+  const extension = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  if (!extension.startsWith(".")) {
+    return "";
+  }
+  return WORK_ORDER_FILE_TYPES_BY_EXTENSION[extension] ?? "";
 }
 
 export function setWorkOrderFilePreviewUrl(id: string, url: string): void {
