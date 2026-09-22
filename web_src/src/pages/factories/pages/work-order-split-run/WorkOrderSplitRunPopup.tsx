@@ -204,7 +204,7 @@ function AnalysisWorkOrderPopup({
             reviewActions,
           })}
         />
-        {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
+        {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
@@ -404,6 +404,18 @@ function analysisReviewCompact(
 
 function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
   return !sourceOnly && !showSidebarNote && tab === "description";
+}
+
+function analysisShellReview(
+  sourceOnly: boolean,
+  showSidebarNote: boolean,
+  tab: string,
+  review: ReactNode,
+) {
+  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
+    return review;
+  }
+  return null;
 }
 
 /** The split-run dialog width applies only to the Planning layout in a fixed popup. */
