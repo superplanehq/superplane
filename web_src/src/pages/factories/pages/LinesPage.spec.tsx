@@ -112,7 +112,7 @@ const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fe
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
 const useFactoryBoardWorkOrders = vi.fn(() => ({
   workOrders: useFactoryWorkOrders().data ?? [],
-  isLoading: Boolean(useFactoryWorkOrders().isLoading),
+  isLoading: false,
   backlog: idleBoardPage(),
   open: idleBoardPage(),
   done: idleBoardPage(),
@@ -285,7 +285,7 @@ async function resetLinesBoardMocks() {
   useFactoryWorkOrders.mockReturnValue({ data: [] });
   useFactoryBoardWorkOrders.mockImplementation(() => ({
     workOrders: useFactoryWorkOrders().data ?? [],
-    isLoading: Boolean(useFactoryWorkOrders().isLoading),
+    isLoading: false,
     backlog: idleBoardPage(),
     open: idleBoardPage(),
     done: idleBoardPage(),

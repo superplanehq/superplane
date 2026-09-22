@@ -38,7 +38,7 @@ const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fe
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryBoardWorkOrders = vi.fn(() => ({
   workOrders: useFactoryWorkOrders().data ?? [],
-  isLoading: Boolean(useFactoryWorkOrders().isLoading),
+  isLoading: false,
   backlog: idleBoardPage(),
   open: idleBoardPage(),
   done: idleBoardPage(),

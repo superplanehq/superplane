@@ -68,7 +68,7 @@ export function factoryWorkOrdersPageKey(
   const normalized = normalizeWorkOrdersPageQuery(query);
   return [
     ...factoryWorkOrdersPagePrefix(organizationId, factoryId),
-    [...states].toSorted().join(","),
+    [...states].sort().join(","),
     normalized.userId ?? "",
     normalized.unassigned ? "unassigned" : "",
   ] as const;

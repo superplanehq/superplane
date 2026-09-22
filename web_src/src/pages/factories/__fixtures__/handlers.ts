@@ -866,7 +866,7 @@ function listWorkOrdersFixture(
     return { orders: [], hasNextPage: false };
   }
 
-  filtered = filtered.toSorted((left, right) => {
+  filtered.sort((left, right) => {
     const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
     const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
     if (leftTime !== rightTime) {
