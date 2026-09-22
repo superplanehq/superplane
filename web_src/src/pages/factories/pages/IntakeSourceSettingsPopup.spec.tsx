@@ -465,7 +465,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByTestId("intake-source-settings-save")).toBeDisabled();
   });
 
-  it.each(["github-issues", "sentry-exceptions", "jira-issues"] as const)(
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "pauses, resumes, and deletes a %s intake after confirmation",
     async (sourceId) => {
       const onPause = vi.fn();
@@ -493,7 +493,7 @@ describe("IntakeSourceSettingsPopup", () => {
     },
   );
 
-  it.each(["github-issues", "sentry-exceptions", "jira-issues"] as const)(
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "offers resume for a paused %s intake",
     async (sourceId) => {
       const onResume = vi.fn();
