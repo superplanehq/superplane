@@ -4507,7 +4507,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260922122447	f
+20260922193722	f
 \.
 
 
@@ -4552,4 +4552,3 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
-
