@@ -40,19 +40,7 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as PackageVersionEvent;
     const detail = eventData?.detail as PackageVersionDetail;
-
-    const values: Record<string, string> = {
-      Domain: stringOrDash(detail?.domainName),
-      Repository: stringOrDash(detail?.repositoryName),
-      "Package Format": stringOrDash(detail?.packageFormat),
-      Namespace: stringOrDash(detail?.packageNamespace ?? undefined),
-      Package: stringOrDash(formatPackageName(detail?.packageNamespace, detail?.packageName)),
-      Version: stringOrDash(detail?.packageVersion),
-      State: stringOrDash(detail?.packageVersionState),
-      Operation: stringOrDash(detail?.operationType),
-      Region: stringOrDash(eventData?.region),
-      Account: stringOrDash(eventData?.account),
-    };
+    const values = packageVersionRootFields(detail, eventData);
 
     const changes = detail?.changes;
     if (changes) {
@@ -92,6 +80,24 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function packageVersionRootFields(
+  detail: PackageVersionDetail | undefined,
+  eventData: PackageVersionEvent | undefined,
+): Record<string, string> {
+  return {
+    Domain: stringOrDash(detail?.domainName),
+    Repository: stringOrDash(detail?.repositoryName),
+    "Package Format": stringOrDash(detail?.packageFormat),
+    Namespace: stringOrDash(detail?.packageNamespace ?? undefined),
+    Package: stringOrDash(formatPackageName(detail?.packageNamespace, detail?.packageName)),
+    Version: stringOrDash(detail?.packageVersion),
+    State: stringOrDash(detail?.packageVersionState),
+    Operation: stringOrDash(detail?.operationType),
+    Region: stringOrDash(eventData?.region),
+    Account: stringOrDash(eventData?.account),
+  };
+}
 
 function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
   const items: MetadataItem[] = [];
