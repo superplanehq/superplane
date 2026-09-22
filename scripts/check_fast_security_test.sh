@@ -53,7 +53,90 @@ expect_fail "postinstall hook" bash ./scripts/check_install_hooks.sh "$tmp"
 python3 - <<'PY'
 from pathlib import Path
 
-import yaml
+
+def load_mapping(text):
+    entries = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        entries.append((indent, stripped))
+
+    def parse_inline(value):
+        if value in ("[]", "{}"):
+            return [] if value == "[]" else {}
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            return value[1:-1]
+        return value
+
+    def split_kv(content):
+        colon = content.find(":")
+        if colon < 0:
+            raise SystemExit(f"semaphore.yml line is not a mapping: {content}")
+        key = content[:colon]
+        rest = content[colon + 1 :].strip()
+        if rest == "":
+            return key, None, False
+        return key, rest, True
+
+    def parse_at(index, min_indent):
+        if index >= len(entries):
+            return None, index
+        indent, content = entries[index]
+        if indent < min_indent:
+            return None, index
+        if content.startswith("- "):
+            return parse_list(index, indent)
+        return parse_map(index, indent)
+
+    def parse_list(index, list_indent):
+        result = []
+        while index < len(entries):
+            indent, content = entries[index]
+            if indent != list_indent or not content.startswith("- "):
+                break
+            item_body = content[2:]
+            index += 1
+            if ":" not in item_body:
+                result.append(parse_inline(item_body))
+                continue
+            key, val, has_val = split_kv(item_body)
+            item = {key: parse_inline(val) if has_val else None}
+            if not has_val:
+                nested, index = parse_at(index, list_indent + 1)
+                item[key] = nested
+            while index < len(entries):
+                nindent, ncontent = entries[index]
+                if nindent <= list_indent or ncontent.startswith("- "):
+                    break
+                key, val, has_val = split_kv(ncontent)
+                index += 1
+                if has_val:
+                    item[key] = parse_inline(val)
+                    continue
+                nested, index = parse_at(index, nindent + 1)
+                item[key] = nested
+            result.append(item)
+        return result, index
+
+    def parse_map(index, map_indent):
+        result = {}
+        while index < len(entries):
+            indent, content = entries[index]
+            if indent != map_indent or content.startswith("- "):
+                break
+            key, val, has_val = split_kv(content)
+            index += 1
+            if has_val:
+                result[key] = parse_inline(val)
+                continue
+            nested, index = parse_at(index, map_indent + 1)
+            result[key] = nested
+        return result, index
+
+    data, _ = parse_map(0, 0)
+    return data
 
 
 def cmd_list(node):
@@ -97,7 +180,7 @@ def job_paths(data):
     return paths
 
 
-data = yaml.safe_load(Path(".semaphore/semaphore.yml").read_text())
+data = load_mapping(Path(".semaphore/semaphore.yml").read_text())
 if not isinstance(data, dict):
     raise SystemExit("semaphore.yml did not parse as a mapping")
 
