@@ -158,7 +158,10 @@ function AnalysisWorkOrderPopup({
     compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     factory,
-    agentWorking: refineAgentIsWorking(analysis.view.machineStatus),
+    agentWorking: refineAgentIsWorking({
+      hasSession: Boolean(analysis.session),
+      machineStatus: analysis.view.machineStatus,
+    }),
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;

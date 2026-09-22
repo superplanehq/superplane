@@ -68,6 +68,9 @@ export function needsStartConfirm(input: StartConfirmInput): boolean {
   return startConfirmTone(input) != null;
 }
 
-export function refineAgentIsWorking(machineStatus: string | undefined): boolean {
-  return machineStatus === "starting" || machineStatus === "running";
+export function refineAgentIsWorking(input: { hasSession: boolean; machineStatus?: string }): boolean {
+  if (!input.hasSession) {
+    return false;
+  }
+  return input.machineStatus === "starting" || input.machineStatus === "running";
 }
