@@ -34,7 +34,15 @@ function renderLinesBoard(
   return render(<LinesBoardSpecHarness path={path} openCreateWorkOrder={openCreateWorkOrder} factory={factory} />);
 }
 
+const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryBoardWorkOrders = vi.fn(() => ({
+  workOrders: useFactoryWorkOrders().data ?? [],
+  isLoading: false,
+  backlog: idleBoardPage(),
+  open: idleBoardPage(),
+  done: idleBoardPage(),
+}));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const searchFactoryIntakeItems = vi.fn(() => ({
@@ -86,6 +94,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
     refetch: vi.fn(),
   }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
+  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -234,8 +243,8 @@ describe("LinesPage backlog create", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
 
-    const attentionNote = await screen.findByTestId("split-run-attention-note");
-    expect(within(attentionNote).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
+    const dialog = await screen.findByTestId("work-order-split-run");
+    expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
   });
 
@@ -260,7 +269,8 @@ describe("LinesPage backlog create", () => {
     await waitFor(() => {
       expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
   });
 
   it("opens the popup from a just-imported order that already has a number", async () => {

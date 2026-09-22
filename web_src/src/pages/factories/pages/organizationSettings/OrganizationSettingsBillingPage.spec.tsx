@@ -18,6 +18,7 @@ import {
   PURCHASED_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
   ACTIVE_TRIAL_ENDS_AT,
+  ACTIVE_BILLING_PERIOD_ENDS_AT,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
 
@@ -321,7 +322,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent("Included usage");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent(
-      `Resets ${new Date("2026-10-09T12:00:00.000Z").toLocaleDateString()}`,
+      `Resets ${new Date(ACTIVE_BILLING_PERIOD_ENDS_AT).toLocaleDateString()}`,
     );
     expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$41.24 remaining");
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");

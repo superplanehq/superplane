@@ -1,6 +1,8 @@
-const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+import { IN_FOURTEEN_DAYS, IN_SEVENTEEN_DAYS, THIRTY_DAYS_AGO } from "./factoryPageIds";
 
-export const ACTIVE_TRIAL_ENDS_AT = new Date(Date.now() + FOURTEEN_DAYS_MS).toISOString();
+export const ACTIVE_TRIAL_ENDS_AT = IN_FOURTEEN_DAYS;
+export const ACTIVE_BILLING_PERIOD_ENDS_AT = IN_SEVENTEEN_DAYS;
+export const EXPIRED_TRIAL_ENDED_AT = THIRTY_DAYS_AGO;
 
 /** Storybook payload for factory Usage and org workspace usage reports. */
 export interface StorybookUsageReport {
@@ -109,7 +111,7 @@ export const LOW_TRIAL_USAGE_REPORT: StorybookUsageReport = {
 
 export const EXPIRED_WELCOME_USAGE_REPORT: StorybookUsageReport = {
   ...SPENT_CREDIT_USAGE_REPORT,
-  welcomeCreditExpiresAt: "2026-08-15T12:00:00.000Z",
+  welcomeCreditExpiresAt: EXPIRED_TRIAL_ENDED_AT,
 };
 
 export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
@@ -152,7 +154,7 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   includedRemainingCents: "5000",
   purchasedRemainingCents: "5000",
   welcomeRemainingCents: "4124",
-  currentPeriodEnd: "2026-10-09T12:00:00.000Z",
+  currentPeriodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
   billingEnabled: true,
   subscriptionCheckoutEnabled: true,
   creditPurchaseAllowed: true,
@@ -173,7 +175,7 @@ export const ADMIN_ORGANIZATION_BILLING = {
 export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
   planSource: "system",
-  trialEndsAt: "2026-08-15T12:00:00.000Z",
+  trialEndsAt: EXPIRED_TRIAL_ENDED_AT,
   remainingCreditCents: "0",
   includedRemainingCents: "0",
   purchasedRemainingCents: "0",
@@ -192,7 +194,7 @@ export const LAPSED_ORGANIZATION_BILLING = {
   includedRemainingCents: "0",
   purchasedRemainingCents: "5000",
   welcomeRemainingCents: "0",
-  currentPeriodEnd: "2026-10-09T12:00:00.000Z",
+  currentPeriodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
   billingEnabled: true,
   subscriptionCheckoutEnabled: true,
   creditPurchaseAllowed: false,

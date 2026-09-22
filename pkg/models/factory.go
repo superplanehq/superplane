@@ -21,6 +21,8 @@ const (
 
 	FactoryKeyMinLength = 2
 	FactoryKeyMaxLength = 5
+
+	DefaultFactoryWorkOrderListLimit = 100
 )
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
@@ -812,14 +814,22 @@ func (f *Factory) FindWorkOrderByRef(tx *gorm.DB, ref string) (*FactoryWorkOrder
 }
 
 type ListFactoryWorkOrdersFilters struct {
-	AssigneeIDs []uuid.UUID
-	States      []string
-	Results     []string
-	Unassigned  *bool
-	Mine        *uuid.UUID
+	States     []string
+	Results    []string
+	Unassigned *bool
+	UserID     *uuid.UUID
+	// Limit pages the result. Zero uses DefaultFactoryWorkOrderListLimit.
+	Limit int
+	// BeforeID is a keyset cursor. The query returns rows older than that
+	// order in updated_at DESC, id DESC order.
+	BeforeID *uuid.UUID
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	if filters.Limit <= 0 {
+		filters.Limit = DefaultFactoryWorkOrderListLimit
+	}
+
 	query := tx.
 		Model(&FactoryWorkOrder{}).
 		Preload("CreatedBy").
@@ -836,44 +846,86 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 		query = query.Where("factory_work_orders.result IN ?", filters.Results)
 	}
 
-	if filters.Unassigned != nil && *filters.Unassigned {
-		query = query.Where(`
+	query = applyWorkOrderUserFilters(query, filters)
+
+	if filters.BeforeID != nil {
+		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return []FactoryWorkOrder{}, nil
+			}
+			return nil, err
+		}
+		query = query.Where(
+			"(factory_work_orders.updated_at, factory_work_orders.id) < (?, ?)",
+			cursor.UpdatedAt,
+			cursor.ID,
+		)
+	}
+
+	query = query.
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(filters.Limit)
+
+	var orders []FactoryWorkOrder
+	err := query.Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
+	unassigned := filters.Unassigned != nil && *filters.Unassigned
+	if filters.UserID == nil && !unassigned {
+		return query
+	}
+
+	if filters.UserID != nil && unassigned {
+		return query.Where(`
+			NOT EXISTS (
+				SELECT 1 FROM factory_work_order_assignees
+				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+			)
+			OR EXISTS (
+				SELECT 1 FROM factory_work_order_assignees
+				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				AND factory_work_order_assignees.user_id = ?
+			)
+			OR factory_work_orders.created_by_id = ?`, *filters.UserID, *filters.UserID)
+	}
+
+	if unassigned {
+		return query.Where(`
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 			)`)
 	}
 
-	if len(filters.AssigneeIDs) > 0 {
-		query = query.Where(`
-			EXISTS (
-				SELECT 1 FROM factory_work_order_assignees
-				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-				AND factory_work_order_assignees.user_id IN ?
-			)`, filters.AssigneeIDs)
-	}
+	return query.Where(`
+		EXISTS (
+			SELECT 1 FROM factory_work_order_assignees
+			WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+			AND factory_work_order_assignees.user_id = ?
+		)
+		OR factory_work_orders.created_by_id = ?`, *filters.UserID, *filters.UserID)
+}
 
-	if filters.Mine != nil {
-		query = query.Where(`
-			EXISTS (
-				SELECT 1 FROM factory_work_order_assignees
-				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-				AND factory_work_order_assignees.user_id = ?
-			)
-			OR factory_work_orders.created_by_id = ?`, *filters.Mine, *filters.Mine)
-	}
-
-	var orders []FactoryWorkOrder
-	err := query.
-		Order("factory_work_orders.created_at DESC").
-		Order("factory_work_orders.id DESC").
-		Find(&orders).
-		Error
+func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
+	var cursor FactoryWorkOrder
+	err := tx.
+		Select("id", "updated_at").
+		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
+		Where("factory_work_orders.factory_id = ?", f.ID).
+		Where("factory_work_orders.id = ?", beforeID).
+		Take(&cursor).Error
 	if err != nil {
 		return nil, err
 	}
-
-	return orders, nil
+	return &cursor, nil
 }
 
 func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {

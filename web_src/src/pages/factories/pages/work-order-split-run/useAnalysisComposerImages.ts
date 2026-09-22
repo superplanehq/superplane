@@ -34,11 +34,10 @@ export function useAnalysisComposerImages({
     if (selected.rejectedCount > 0) {
       showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images.`);
     }
-    const accepted = selected.accepted.filter(isSupportedImageFile);
-    if (accepted.length === 0) {
+    if (selected.accepted.length === 0) {
       return;
     }
-    const uploaded = (await onUploadFiles(accepted)).filter((file) => file.isImage);
+    const uploaded = await onUploadFiles(selected.accepted);
     if (uploaded.length === 0) {
       return;
     }
@@ -48,9 +47,10 @@ export function useAnalysisComposerImages({
 
   return {
     pending,
+    pendingFiles: pending.filter((file) => !file.isImage),
     previewImages: mergeCreateWorkOrderRequestImages([], pending),
     transcriptFiles: uploadedFiles.map(uploadedWorkOrderFileAsTranscriptFile),
-    canAttach: Boolean(onUploadFiles) && !disabled && pending.length < MAX_IMAGE_ATTACHMENTS,
+    canAttach: Boolean(onUploadFiles) && !disabled,
     attach,
     remove: (id: string) => {
       setPending((current) => current.filter((file) => file.id !== id));

@@ -45,6 +45,7 @@ import {
   type PhaseAgentUsageEntry,
 } from "./phaseAgentUsageContext";
 import { PhaseUsageSpendButton } from "./PhaseUsageChartButton";
+import { useReportLiveHeaderSpend } from "./liveHeaderSpendContext";
 import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
@@ -910,6 +911,14 @@ function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents
   return { tokens, cents };
 }
 
+function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
+  const live = livePhaseSpend(agents);
+  return {
+    tokens: Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens),
+    cents: Math.max(parseWorkOrderMetric(phase.costCents), live.cents),
+  };
+}
+
 function PhaseMetrics({
   phase,
   onUsageOpenChange,
@@ -923,9 +932,8 @@ function PhaseMetrics({
     ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
     : formatGoDurationLabel(phase.duration ?? "");
   const agents = usePhaseAgentUsageAgents();
-  const live = livePhaseSpend(agents);
-  const tokens = Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens);
-  const cents = Math.max(parseWorkOrderMetric(phase.costCents), live.cents);
+  const { tokens, cents } = displayedPhaseSpend(phase, agents);
+  useReportLiveHeaderSpend(phase.id, tokens, cents);
   const model = displayRunnerModel(phase.model ?? "");
   const spendParts: string[] = [];
   if (cents > 0) {

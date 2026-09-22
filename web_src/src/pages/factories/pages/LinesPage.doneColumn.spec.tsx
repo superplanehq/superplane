@@ -26,10 +26,19 @@ import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LinesPage } from "./LinesPage";
 
+const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryBoardWorkOrders = vi.fn(() => ({
+  workOrders: useFactoryWorkOrders().data ?? [],
+  isLoading: false,
+  backlog: idleBoardPage(),
+  open: idleBoardPage(),
+  done: idleBoardPage(),
+}));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
+  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
   useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),

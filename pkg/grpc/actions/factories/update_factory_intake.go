@@ -109,8 +109,10 @@ func validateIntakePause(source string, paused *bool) error {
 }
 
 func intakeSourceSupportsPause(source string) bool {
-	return source == models.FactoryIntakeSourceSentryExceptions ||
-		source == models.FactoryIntakeSourceJiraIssues
+	return source == models.FactoryIntakeSourceGitHubIssues ||
+		source == models.FactoryIntakeSourceSentryExceptions ||
+		source == models.FactoryIntakeSourceJiraIssues ||
+		source == models.FactoryIntakeSourceProductiveTasks
 }
 
 func resolveUpdatedIntakeBinding(
