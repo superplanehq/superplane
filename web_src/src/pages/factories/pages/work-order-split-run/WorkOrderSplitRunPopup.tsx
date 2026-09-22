@@ -154,21 +154,21 @@ function AnalysisWorkOrderPopup({
     isDispatching,
     footerBusy: footerActions.busy,
     canDispatch,
-    compact: showSidebarNote || (viewFixture.footer.kind === "draft" && !sourceOnly),
+    compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     factory,
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
-  const descriptionReview = !sourceOnly && !showSidebarNote && tab === "description" ? review : undefined;
+  const descriptionReview = showsDescriptionReview(sourceOnly, showSidebarNote, tab) ? review : undefined;
 
   return (
     <PopupShell
       testId="work-order-split-run"
       fixed={fixed}
       fullPage={fullPage}
-      className={fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME}
+      className={analysisPopupClassName(fullPage, sourceOnly)}
       onDismiss={onClose}
     >
       <SplitRunPopupTabs
@@ -390,6 +390,24 @@ function analysisDraftChrome(args: {
       },
     ),
   };
+}
+
+/** A draft with Planning on uses the compact review; a source-only draft keeps the classic one. */
+function analysisReviewCompact(
+  showSidebarNote: boolean,
+  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
+  sourceOnly: boolean,
+) {
+  return showSidebarNote || (footerKind === "draft" && !sourceOnly);
+}
+
+function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
+  return !sourceOnly && !showSidebarNote && tab === "description";
+}
+
+/** The split-run dialog width applies only to the Planning layout in a fixed popup. */
+function analysisPopupClassName(fullPage: boolean, sourceOnly: boolean) {
+  return fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
 }
 
 /**
