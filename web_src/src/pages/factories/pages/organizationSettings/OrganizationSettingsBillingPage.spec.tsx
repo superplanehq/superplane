@@ -17,10 +17,11 @@ import {
   LAPSED_TOPUP_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+  DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
 
-const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
+const WELCOME_EXPIRY_LABEL = new Date(DEFAULT_WELCOME_CREDIT_EXPIRES_AT).toLocaleDateString();
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({

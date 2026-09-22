@@ -18,12 +18,13 @@ import {
   BUSINESS_ORGANIZATION_BILLING,
   LAPSED_ORGANIZATION_BILLING,
   LAPSED_TOPUP_USAGE_REPORT,
+  DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
 } from "../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(DEFAULT_WELCOME_CREDIT_EXPIRES_AT));
 
 describe("WorkOrdersPage hosted credit banner", () => {
   beforeAll(() => {
