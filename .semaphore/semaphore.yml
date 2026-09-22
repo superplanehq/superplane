@@ -26,6 +26,8 @@ global_job_config:
   prologue:
     commands:
       - checkout
+      # Lifecycle hooks run during npm install. Scan them first.
+      - bash ./scripts/check_install_hooks.sh
       - mkdir -p tmp/go tmp/go-build
 
 auto_cancel:
