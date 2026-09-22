@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderCheckScore, FactoriesWorkOrderSummary } from "@/api-client";
 import { factoriesDescribeWorkOrder } from "@/api-client";
+import { getApiErrorMessage } from "@/lib/errors";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
@@ -296,7 +297,14 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
         orderId,
         () => refreshVersion.current.get(orderId) === version,
       ).catch((error) => {
-        console.warn("factory ws: failed to refresh work order", error);
+        if (refreshVersion.current.get(orderId) !== version) {
+          return;
+        }
+        const message = getApiErrorMessage(error, "");
+        if (message) {
+          console.warn("factory ws: failed to refresh work order", message);
+        }
+        invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
       });
     },
     [queryClient, organizationId, factoryId],
