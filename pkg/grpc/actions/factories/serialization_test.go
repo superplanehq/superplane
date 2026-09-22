@@ -417,3 +417,21 @@ func TestSerializeWorkOrder_ReconcilesSubCentBreakdownToHeader(t *testing.T) {
 	require.Len(t, serialized.GetUsageByModel(), 2)
 	assert.EqualValues(t, 1, serialized.GetUsageByModel()[0].GetCostCents()+serialized.GetUsageByModel()[1].GetCostCents())
 }
+
+func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
+	factory := &models.Factory{
+		ID:                 uuid.New(),
+		Name:               "Payments",
+		Key:                "PAY",
+		PlanningEnabled:    true,
+		PlanningClarity:    true,
+		PlanningConfidence: false,
+	}
+
+	serialized := serializeFactory(factory)
+	require.NotNil(t, serialized.Planning)
+	assert.True(t, serialized.Planning.Enabled)
+	assert.True(t, serialized.Planning.Clarity)
+	assert.False(t, serialized.Planning.Confidence)
+	assert.False(t, serialized.Planning.SetupCompleted)
+}

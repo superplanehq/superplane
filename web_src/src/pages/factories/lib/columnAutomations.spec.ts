@@ -16,7 +16,13 @@ import {
   phaseIndexFromColumnKey,
   takenCatalogIds,
 } from "./columnAutomations";
-import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
+import {
+  factoryColumnAutomationViewPath,
+  factoryIntakePath,
+  factoryPlanningPath,
+  factoryPlanningSetupPath,
+  factoryPRFeedbackPath,
+} from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import type { LinePhaseColumn } from "./linePhaseRuns";
 
@@ -144,8 +150,22 @@ describe("buildColumnAutomations", () => {
       kind: "analysis",
       name: "Task analysis",
       trigger: "On task in Backlog",
-      action: "Score the task",
+      action: "Plan the task",
       catalogId: "analysis",
+      health: "healthy",
+    });
+  });
+
+  it("marks Task analysis disabled when Planning is off", () => {
+    const automations = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [{ id: "app-refund-backlog", name: "Ingest" }],
+      planningEnabled: false,
+    });
+
+    expect(automations[0]).toMatchObject({
+      kind: "analysis",
+      health: "disabled",
     });
   });
 
@@ -360,27 +380,36 @@ describe("columnAutomationOpenPath", () => {
     ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-implementer"));
   });
 
-  it("does not open the full-screen editor for a canvas automation", () => {
-    const href = columnAutomationOpenPath(
-      {
-        id: "analysis-app-refund-backlog",
-        kind: "analysis",
-        name: "Task analysis",
-        trigger: "On task in Backlog",
-        action: "Score the task",
-        iconSrc: "",
-        iconAlt: "",
-        health: "healthy",
-        runningCount: 0,
-        catalogId: "analysis",
-        canvasId: "app-refund-backlog",
-      },
-      nav,
-    );
+  const analysisAutomation = {
+    id: "analysis-app-refund-backlog",
+    kind: "analysis",
+    name: "Task analysis",
+    trigger: "On task in Backlog",
+    action: "Plan the task",
+    iconSrc: "",
+    iconAlt: "",
+    health: "healthy",
+    runningCount: 0,
+    catalogId: "analysis",
+    canvasId: "app-refund-backlog",
+  } as const;
 
-    expect(href).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-backlog"));
+  it("opens Planning settings for Task analysis", () => {
+    const href = columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: true });
+
+    expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
+  });
+
+  it("opens the Planning setup wizard for Task analysis until setup is confirmed", () => {
+    expect(columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: false })).toBe(
+      factoryPlanningSetupPath("org-1", "RF", "line-plan"),
+    );
+  });
+
+  it("opens Planning settings for Task analysis when the setup state is unknown", () => {
+    expect(columnAutomationOpenPath(analysisAutomation, nav)).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
   });
 
   it("opens the intake settings popup on the first tab", () => {

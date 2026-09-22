@@ -33,6 +33,7 @@ describe("splitRunPopupModel", () => {
   it("hides Automations on a draft refine popup", () => {
     expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "draft" })).toBe(false);
     expect(refinePopupShowsAutomations({ mode: "classic", footerKind: "draft" })).toBe(true);
+    expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "draft", sourceOnly: true })).toBe(true);
     expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "running" })).toBe(true);
   });
 

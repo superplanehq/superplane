@@ -14,6 +14,8 @@ const FOOTER_TEST_IDS = {
 type WorkOrderIntentConfidenceFooterProps = {
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  showClarity?: boolean;
+  showConfidence?: boolean;
   isAnalyzing: boolean;
   flush?: boolean;
 };
@@ -32,10 +34,14 @@ function evidenceValue(check?: WorkOrderCheckPresentation): ScoreEvidenceValue |
 export function WorkOrderIntentConfidenceFooter({
   clarity,
   confidence,
+  showClarity = true,
+  showConfidence = true,
   isAnalyzing,
   flush = false,
 }: WorkOrderIntentConfidenceFooterProps) {
-  const hasScore = Boolean(clarity || confidence);
+  const visibleClarity = showClarity ? clarity : undefined;
+  const visibleConfidence = showConfidence ? confidence : undefined;
+  const hasScore = Boolean(visibleClarity || visibleConfidence);
 
   if (!hasScore && !isAnalyzing) {
     return (
@@ -48,8 +54,10 @@ export function WorkOrderIntentConfidenceFooter({
   return (
     <ScoreFooterShell flush={flush}>
       <ScoreEvidenceRow
-        clarity={evidenceValue(clarity)}
-        confidence={evidenceValue(confidence)}
+        clarity={evidenceValue(visibleClarity)}
+        confidence={evidenceValue(visibleConfidence)}
+        showClarity={showClarity}
+        showConfidence={showConfidence}
         isAnalyzing={isAnalyzing && !hasScore}
         testIds={FOOTER_TEST_IDS}
         className="gap-x-3 text-[13px]"

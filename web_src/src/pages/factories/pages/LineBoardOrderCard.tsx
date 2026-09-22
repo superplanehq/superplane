@@ -10,6 +10,7 @@ import {
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { draftCardAgentIsWorking, planningSessionHasPendingSurvey } from "./planningSessionView";
+import { factoryShowsClarity, factoryShowsConfidence } from "./planningSettingsModel";
 
 export function LineBoardOrderCard({
   order,
@@ -51,7 +52,10 @@ export function LineBoardWorkOrderCard({
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
   const session = order.planningSession;
-  const scores = cardScores(showConfidence, order.checkScores, session, isAnalyzing);
+  const scores = cardScores(showConfidence, order.checkScores, session, isAnalyzing, {
+    showClarity: factoryShowsClarity(factory),
+    showConfidence: factoryShowsConfidence(factory),
+  });
 
   return (
     <WorkOrderCard
@@ -74,15 +78,21 @@ function cardScores(
   checks: FactoriesWorkOrderCheckScore[] | undefined,
   session: FactoriesWorkOrderSummary["planningSession"],
   backlogAnalyzing: boolean,
-): Pick<ComponentProps<typeof WorkOrderCard>, "clarityScore" | "confidenceScore" | "isAnalyzing"> {
+  visibility: { showClarity: boolean; showConfidence: boolean },
+): Pick<
+  ComponentProps<typeof WorkOrderCard>,
+  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore"
+> {
   if (!showConfidence) {
-    return { isAnalyzing: false };
+    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false };
   }
-  const clarityScore = clarityScoreFromChecks(checks);
-  const confidenceScore = confidenceScoreFromChecks(checks);
+  const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
+  const confidenceScore = visibility.showConfidence ? confidenceScoreFromChecks(checks) : undefined;
   return {
     clarityScore,
     confidenceScore,
+    showClarity: visibility.showClarity,
+    showConfidenceScore: visibility.showConfidence,
     isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, clarityScore ?? confidenceScore),
   };
 }

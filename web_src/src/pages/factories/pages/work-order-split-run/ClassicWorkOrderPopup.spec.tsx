@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -11,6 +13,18 @@ import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
+
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: { id: "factory-1", planning: { enabled: false, clarity: false, confidence: false } },
+      isPending: false,
+      isError: false,
+    }),
+  };
+});
 
 function renderClassicPopup() {
   const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);

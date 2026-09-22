@@ -5,11 +5,14 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { handleStopMock, handleRejectMock, handleArchiveMock, enabledExperimentalFeatures } = vi.hoisted(() => ({
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
+
+const { handleStopMock, handleRejectMock, handleArchiveMock, factoryPlanning } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
   handleRejectMock: vi.fn(),
   handleArchiveMock: vi.fn(),
-  enabledExperimentalFeatures: new Set<string>(),
+  factoryPlanning: { current: { enabled: true, clarity: true, confidence: true } },
 }));
 
 vi.mock("./useSplitRunFooterActions", () => ({
@@ -22,13 +25,16 @@ vi.mock("./useSplitRunFooterActions", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
-    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
-    isLoading: false,
-  }),
-}));
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: { id: "factory-1", planning: factoryPlanning.current },
+      isPending: false,
+    }),
+  };
+});
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: () => ({
@@ -45,7 +51,6 @@ beforeAll(() => {
 });
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -71,7 +76,7 @@ function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fix
 describe("WorkOrderSplitRunPopup decision footer", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    enabledExperimentalFeatures.clear();
+    factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
     handleArchiveMock.mockReset().mockResolvedValue(true);
@@ -106,7 +111,8 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
   });
 
-  it("hides the draft model chevron on classic Start when Task Refinement is off", async () => {
+  it("hides the draft model chevron on Start when Planning is off", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -151,7 +157,6 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
   });
 
   it("starts and archives a draft from the note", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(

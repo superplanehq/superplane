@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type * as ApiClient from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -25,13 +26,16 @@ vi.mock("@/api-client", () => {
   };
 });
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: () => false,
-    enabledExperimentalFeatures: [],
-    isLoading: false,
-  }),
-}));
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: { id: "factory-1", planning: { enabled: true, clarity: true, confidence: true } },
+      isPending: false,
+    }),
+  };
+});
 
 function renderRunningPopup() {
   return render(

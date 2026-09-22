@@ -52,6 +52,7 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
+	mustEnableClarityCheck(t, db, factoryModel)
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
@@ -101,6 +102,7 @@ func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
+	mustEnableClarityCheck(t, db, factoryModel)
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
@@ -404,8 +406,9 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
 	r := support.Setup(t)
 	transport := bindTestSentryHub(t)
-	server, session, _, token := mustPlanningRunnerSession(t, r)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
+	mustEnableClarityCheck(t, db, factoryModel)
 	session.DraftWorkOrderID = nil
 	require.NoError(t, db.Model(session).Updates(map[string]any{
 		"draft_work_order_id": nil,
@@ -976,6 +979,15 @@ func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Serv
 	})
 	require.NoError(t, err)
 	return server, session, factoryModel, mustPlanningRunnerToken(t, signer, session)
+}
+
+// mustEnableClarityCheck turns the opt-in Clarity check on so the clarity
+// route accepts the request. New factories start with Clarity off.
+func mustEnableClarityCheck(t *testing.T, db *gorm.DB, factoryModel *models.Factory) {
+	t.Helper()
+	planning := factoryModel.Planning()
+	planning.Clarity = true
+	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
 }
 
 func mustPlanningRunnerToken(t *testing.T, signer *jwt.Signer, session *models.FactoryPlanningSession) string {

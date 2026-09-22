@@ -5,6 +5,8 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { APPROVAL_WORK_ORDER, DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -12,20 +14,23 @@ import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 const lookupState = vi.hoisted(() => ({
-  featureEnabled: true,
-  featureLoading: false,
+  factoryPending: false,
+  planning: { enabled: true, clarity: true, confidence: true },
   sessionLoading: false,
   artifactsLoading: false,
   artifactsError: null as Error | null,
 }));
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: () => lookupState.featureEnabled,
-    enabledExperimentalFeatures: [],
-    isLoading: lookupState.featureLoading,
-  }),
-}));
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: lookupState.factoryPending ? undefined : { id: "factory-1", planning: lookupState.planning },
+      isPending: lookupState.factoryPending,
+    }),
+  };
+});
 
 vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
@@ -77,17 +82,17 @@ function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder
 
 describe("WorkOrderSplitRunPopup loading mode", () => {
   beforeEach(() => {
-    lookupState.featureEnabled = true;
-    lookupState.featureLoading = false;
+    lookupState.factoryPending = false;
+    lookupState.planning = { enabled: true, clarity: true, confidence: true };
     lookupState.sessionLoading = false;
     lookupState.artifactsLoading = false;
     lookupState.artifactsError = null;
   });
 
-  it("shows a dismissible loading popup while Task Refinement access loads", async () => {
+  it("shows a dismissible loading popup while Planning settings load", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    lookupState.featureLoading = true;
+    lookupState.factoryPending = true;
 
     renderPopup(onClose);
 
@@ -127,6 +132,26 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
+  it("keeps a started task on the analysis popup when Planning is off", () => {
+    lookupState.planning = { enabled: false, clarity: true, confidence: true };
+    const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
+    expect(fixture.footer.kind).not.toBe("draft");
+
+    renderPopup(undefined, fixture);
+
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
+  it("uses the analysis popup for a draft when Planning is off", () => {
+    lookupState.planning = { enabled: false, clarity: true, confidence: true };
+
+    renderPopup();
+
+    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 
