@@ -9,6 +9,7 @@ import {
   PRIMARY_FACTORY_KEY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { IN_FOURTEEN_DAYS } from "../__fixtures__/factoryPageIds";
 import {
   BUSINESS_ORGANIZATION_BILLING,
   LAPSED_ORGANIZATION_BILLING,
@@ -19,7 +20,7 @@ import {
 } from "../__fixtures__/usageReportFixtures";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(IN_FOURTEEN_DAYS));
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {

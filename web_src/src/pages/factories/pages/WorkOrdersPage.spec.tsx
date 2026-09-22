@@ -9,6 +9,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_KEY,
 } from "../__fixtures__/factoryPageResponses";
+import { IN_FOURTEEN_DAYS } from "../__fixtures__/factoryPageIds";
 import {
   EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
@@ -23,7 +24,7 @@ import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(IN_FOURTEEN_DAYS));
 
 describe("WorkOrdersPage hosted credit banner", () => {
   beforeAll(() => {
