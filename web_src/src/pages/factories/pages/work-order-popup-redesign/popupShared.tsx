@@ -19,6 +19,7 @@ import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderAssigneesPopover } from "../../WorkOrderAssigneesPopover";
 import { WorkOrderStatusNote } from "../../WorkOrderStatusNote";
 import { RunOverlayBoardBackdrop, RunOverlayFrame } from "../work-order-run-overlay/runOverlayShared";
+import { overlayHeaderSpend, type LiveHeaderSpend } from "./overlayHeaderSpend";
 import type { PopupFixture, PopupLogEntry, PopupLogState } from "./workOrderPopupMocks";
 
 export { RunOverlayBoardBackdrop };
@@ -157,6 +158,7 @@ export function OwnerTimeCostRow({
   onOwnerSave,
   usageByModel,
   usageByMachineType,
+  liveSpend,
 }: {
   fixture: OwnerTimeCostFields;
   className?: string;
@@ -168,7 +170,9 @@ export function OwnerTimeCostRow({
   onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
   usageByModel?: WorkOrderUsageByModel[];
   usageByMachineType?: WorkOrderUsageByMachineType[];
+  liveSpend?: LiveHeaderSpend;
 }) {
+  const spend = overlayHeaderSpend(fixture.costUsd, fixture.tokensLabel, liveSpend);
   const ownerMark = (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       {assigneeIds.length > 0 || !canEditOwner ? (
@@ -210,12 +214,8 @@ export function OwnerTimeCostRow({
         ownerMark
       )}
       <span className="text-foreground">
-        <OwnerSpendValue
-          costUsd={fixture.costUsd}
-          usageByModel={usageByModel}
-          usageByMachineType={usageByMachineType}
-        />{" "}
-        <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
+        <OwnerSpendValue costUsd={spend.costUsd} usageByModel={usageByModel} usageByMachineType={usageByMachineType} />{" "}
+        <span className="text-muted-foreground">·</span> {spend.tokensLabel}
       </span>
       {children}
     </div>

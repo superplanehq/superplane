@@ -208,7 +208,11 @@ export function SplitRunPopupTabs({
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
         {description}
       </TabsContent>
-      <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <TabsContent
+        value="log"
+        forceMount
+        className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+      >
         <WorkOrderSplitRunBody
           organizationId={organizationId}
           factoryId={factoryId}
