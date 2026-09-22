@@ -329,9 +329,12 @@ func TestFactoryPlanningSession_ProposeSurveyAndSendClearsIt(t *testing.T) {
 	}))
 	assert.Equal(t, "What is the priority?", session.CurrentSurvey().Questions[0].Prompt)
 
+	assert.False(t, session.HasPendingQuestion())
 	require.NoError(t, session.BeginWait(db))
+	assert.True(t, session.HasPendingQuestion())
 	require.NoError(t, session.SendUserMessage(db, "Priority: High\nScope: skipped", uuid.Nil))
 	assert.Empty(t, session.CurrentSurvey().Questions)
+	assert.False(t, session.HasPendingQuestion())
 	assert.Equal(t, PlanningWaitKindMessage, session.Wait().Kind)
 	assert.Equal(t, "Priority: High\nScope: skipped", session.Wait().Text)
 }

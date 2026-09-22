@@ -437,7 +437,7 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 		return nil
 	}
 	messages.PublishPlanningBoardStatus(session)
-	if !hasOutstandingPlanningQuestion(session) {
+	if !session.HasPendingQuestion() {
 		return nil
 	}
 	messages.PublishPlanningAgentQuestion(session)
@@ -454,10 +454,6 @@ func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSe
 	}
 	messages.PublishPlanningPlanReady(db, session)
 	return nil
-}
-
-func hasOutstandingPlanningQuestion(session *models.FactoryPlanningSession) bool {
-	return len(session.CurrentSurvey().Questions) > 0
 }
 
 func planningWaitMessageBody(

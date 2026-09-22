@@ -97,6 +97,30 @@ function reviewStartEmphasis(footer: SplitRunFooter, startTone?: DraftReadinessT
   return startEmphasisForTone(startTone ?? draftReadiness(splitRunFooterScores(footer)).tone);
 }
 
+function shouldConfirmUnclearStart(confirmUnclearStart: boolean, footer: SplitRunFooter, agentWorking: boolean) {
+  return confirmUnclearStart && needsStartConfirm({ ...splitRunFooterScores(footer), agentWorking });
+}
+
+function requestUnclearStart({
+  confirmUnclearStart,
+  footer,
+  agentWorking,
+  onStart,
+  openConfirm,
+}: {
+  confirmUnclearStart: boolean;
+  footer: SplitRunFooter;
+  agentWorking: boolean;
+  onStart?: () => void | Promise<void>;
+  openConfirm: () => void;
+}) {
+  if (shouldConfirmUnclearStart(confirmUnclearStart, footer, agentWorking)) {
+    openConfirm();
+    return;
+  }
+  void onStart?.();
+}
+
 /**
  * Decision note under the plan on Description, and under Automations.
  */
@@ -122,6 +146,7 @@ export function SplitRunReview({
   actionsOnly = false,
   confirmUnclearStart = false,
   startTone,
+  agentWorking,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -145,6 +170,8 @@ export function SplitRunReview({
   confirmUnclearStart?: boolean;
   /** Verdict that sets the Start weight on the refine strip. Defaults to the footer scores. */
   startTone?: DraftReadinessTone;
+  /** True while the refine session starts or runs. Start still warns even when scores exist. */
+  agentWorking?: boolean;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   if (!footer.attentionCard || !footer.note) {
@@ -155,13 +182,14 @@ export function SplitRunReview({
   const actions = canAct
     ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
     : [];
-  const requestStart = () => {
-    if (confirmUnclearStart && needsStartConfirm(splitRunFooterScores(footer))) {
-      setConfirmOpen(true);
-      return;
-    }
-    void onStart?.();
-  };
+  const requestStart = () =>
+    requestUnclearStart({
+      confirmUnclearStart,
+      footer,
+      agentWorking: Boolean(agentWorking),
+      onStart,
+      openConfirm: () => setConfirmOpen(true),
+    });
   const confirmStart = (skipNext: boolean) => {
     if (skipNext) {
       persistSkipStartConfirm();
@@ -199,6 +227,7 @@ export function SplitRunReview({
         <StartConfirmDialog
           open={confirmOpen}
           scores={splitRunFooterScores(footer)}
+          agentWorking={agentWorking}
           onOpenChange={setConfirmOpen}
           onConfirm={confirmStart}
         />

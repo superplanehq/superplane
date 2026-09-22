@@ -450,6 +450,28 @@ func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	require.Len(t, reloaded.CurrentSurvey().Questions, 1)
 	assert.Equal(t, "What is the priority?", reloaded.CurrentSurvey().Questions[0].Prompt)
 	assert.Equal(t, []string{"High", "Low"}, reloaded.CurrentSurvey().Questions[0].Options)
+	assert.False(t, reloaded.HasPendingQuestion())
+}
+
+func TestRunnerPlanningSessionSurvey_PublishesOrderUpdateWhileRunning(t *testing.T) {
+	r := support.Setup(t)
+	server, _, _, token := mustPlanningRunnerSession(t, r)
+
+	var reasons []string
+	restore := messages.SetPlanningBoardPublisherForTest(func(_, _, reason string) error {
+		reasons = append(reasons, reason)
+		return nil
+	})
+	defer restore()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/surveys", bytes.NewReader([]byte(
+		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"]}]}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{factoryevents.EventTypeOrderUpdated}, reasons)
 }
 
 func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {
@@ -1014,14 +1036,20 @@ func TestBeginPlanningWaitAndNotify_PublishesAfterWaitCommits(t *testing.T) {
 	}))
 
 	published := []messages.FactoryWorkOrderNotificationMessage{}
-	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+	restoreNotify := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
 		reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.PlanningWaitPending, reloaded.WaitState)
 		published = append(published, message)
 		return nil
 	})
-	defer restore()
+	defer restoreNotify()
+	var boardReasons []string
+	restoreBoard := messages.SetPlanningBoardPublisherForTest(func(_, _, reason string) error {
+		boardReasons = append(boardReasons, reason)
+		return nil
+	})
+	defer restoreBoard()
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 	require.Len(t, published, 1)
@@ -1029,9 +1057,11 @@ func TestBeginPlanningWaitAndNotify_PublishesAfterWaitCommits(t *testing.T) {
 	assert.Equal(t, session.DraftWorkOrderID.String(), published[0].OrderID)
 	assert.Equal(t, "Which service owns retries?", published[0].QuestionPrompt)
 	assert.Empty(t, published[0].ActorUserID)
+	assert.Equal(t, []string{factoryevents.EventTypeOrderAgentQuestion}, boardReasons)
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 	require.Len(t, published, 1)
+	assert.Equal(t, []string{factoryevents.EventTypeOrderAgentQuestion}, boardReasons)
 }
 
 func TestBeginPlanningWaitAndNotify_SkipsSessionWithoutTask(t *testing.T) {

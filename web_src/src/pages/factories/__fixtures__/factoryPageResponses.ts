@@ -31,6 +31,7 @@ import {
   GITHUB_ISSUES_INTAKE_APP_ID,
   EMPTY_FACTORY_ID,
   FACTORIES_ORGANIZATION_ID,
+  IN_FOURTEEN_DAYS,
   LAST_WEEK,
   PRIMARY_FACTORY_ID,
   REFUND_LINE_HOTFIX_ID,
@@ -424,7 +425,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationBilling: {
     plan: "trial",
     planSource: "system",
-    trialEndsAt: "2026-09-22T12:00:00.000Z",
+    trialEndsAt: IN_FOURTEEN_DAYS,
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",
