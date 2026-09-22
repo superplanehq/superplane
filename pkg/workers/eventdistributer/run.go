@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 type RunStateWebsocketEvent struct {
@@ -24,6 +25,7 @@ type RunStateWebsocketEvent struct {
 }
 
 const (
+	RunPendingEvent    = "run_pending"
 	RunStartedEvent    = "run_started"
 	RunCancellingEvent = "run_cancelling"
 	RunFinishedEvent   = "run_finished"
@@ -32,16 +34,38 @@ const (
 func HandleCanvasRun(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received run event")
 
-	pbMsg := &pb.CanvasRunMessage{}
-	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal run event: %w", err)
+	pbMsg, err := parseCanvasRunMessage(messageBody)
+	if err != nil {
+		return err
 	}
 
 	return handleRunState(pbMsg.CanvasId, pbMsg.Id, wsHub)
 }
 
+func HandlePendingCanvasRun(messageBody []byte, wsHub *ws.Hub) error {
+	log.Debugf("Received pending run event")
+
+	pbMsg, err := parseCanvasRunMessage(messageBody)
+	if err != nil {
+		return err
+	}
+
+	return handlePendingRunState(pbMsg.CanvasId, pbMsg.Id, wsHub)
+}
+
+func parseCanvasRunMessage(messageBody []byte) (*pb.CanvasRunMessage, error) {
+	pbMsg := &pb.CanvasRunMessage{}
+	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal run event: %w", err)
+	}
+
+	return pbMsg, nil
+}
+
 func runStateToWsEvent(runState string) string {
 	switch runState {
+	case models.CanvasRunStatePending:
+		return RunPendingEvent
 	case models.CanvasRunStateStarted:
 		return RunStartedEvent
 	case models.CanvasRunStateCancelling:
@@ -54,25 +78,40 @@ func runStateToWsEvent(runState string) string {
 }
 
 func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
+	runUUID, eventName, err := broadcastRunState(workflowID, runID, wsHub)
+	if err != nil {
+		return err
+	}
+
+	broadcastFactoryWorkOrderForRun(wsHub, runUUID, eventName)
+	return nil
+}
+
+func handlePendingRunState(workflowID string, runID string, wsHub *ws.Hub) error {
+	_, _, err := broadcastRunState(workflowID, runID, wsHub)
+	return err
+}
+
+func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUID, string, error) {
 	workflowUUID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return fmt.Errorf("failed to parse workflow id: %w", err)
+		return uuid.Nil, "", fmt.Errorf("failed to parse workflow id: %w", err)
 	}
 
 	runUUID, err := uuid.Parse(runID)
 	if err != nil {
-		return fmt.Errorf("failed to parse run id: %w", err)
+		return uuid.Nil, "", fmt.Errorf("failed to parse run id: %w", err)
 	}
 
 	db := database.Conn()
 	run, err := models.FindCanvasRunInTransaction(db, workflowUUID, runUUID)
 	if err != nil {
-		return fmt.Errorf("failed to find run: %w", err)
+		return uuid.Nil, "", fmt.Errorf("failed to find run: %w", err)
 	}
 
 	eventName := runStateToWsEvent(run.State)
 	if eventName == "" {
-		return fmt.Errorf("unknown run state: %s", run.State)
+		return uuid.Nil, "", fmt.Errorf("unknown run state: %s", run.State)
 	}
 
 	var executions []models.CanvasNodeExecution
@@ -107,7 +146,7 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 			Where("execution_id IS NULL").
 			First(&rootEvent).
 			Error
-		if err != nil {
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("failed to find run root event: %w", err)
 		}
 
@@ -115,17 +154,35 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		return err
+		return uuid.Nil, "", err
 	}
 
-	serializedRun, err := canvases.SerializeCanvasRun(db, *run, rootEvent, executions, queueItems, nil, map[string][]models.CanvasRun{})
+	executionIDs := make([]uuid.UUID, len(executions))
+	for i, execution := range executions {
+		executionIDs[i] = execution.ID
+	}
+
+	childRuns, err := models.ListChildRunsByParentExecutions(db, workflowUUID, executionIDs)
 	if err != nil {
-		return fmt.Errorf("failed to serialize run: %w", err)
+		return uuid.Nil, "", fmt.Errorf("failed to find child runs: %w", err)
+	}
+
+	serializedRun, err := canvases.SerializeCanvasRun(
+		db,
+		*run,
+		rootEvent,
+		executions,
+		queueItems,
+		nil,
+		groupChildRunsByExecutionID(childRuns),
+	)
+	if err != nil {
+		return uuid.Nil, "", fmt.Errorf("failed to serialize run: %w", err)
 	}
 
 	serializedRunJSON, err := marshalCanvasRunJSON(serializedRun)
 	if err != nil {
-		return fmt.Errorf("failed to marshal run: %w", err)
+		return uuid.Nil, "", fmt.Errorf("failed to marshal run: %w", err)
 	}
 
 	event, err := json.Marshal(RunStateWebsocketEvent{
@@ -133,15 +190,27 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 		Payload: json.RawMessage(serializedRunJSON),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal websocket event: %w", err)
+		return uuid.Nil, "", fmt.Errorf("failed to marshal websocket event: %w", err)
 	}
 
 	wsHub.BroadcastToWorkflow(workflowID, event)
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
-	broadcastFactoryWorkOrderForRun(wsHub, runUUID, eventName)
+	return runUUID, eventName, nil
+}
 
-	return nil
+func groupChildRunsByExecutionID(runs []models.CanvasRun) map[string][]models.CanvasRun {
+	grouped := make(map[string][]models.CanvasRun)
+	for _, run := range runs {
+		if run.ParentExecutionID == nil {
+			continue
+		}
+
+		executionID := run.ParentExecutionID.String()
+		grouped[executionID] = append(grouped[executionID], run)
+	}
+
+	return grouped
 }
 
 func broadcastFactoryWorkOrderForRun(wsHub *ws.Hub, runID uuid.UUID, reason string) {

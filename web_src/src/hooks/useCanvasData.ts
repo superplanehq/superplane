@@ -769,9 +769,9 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      // Full refetches (poll / invalidate / refetch()) walk every already-
+      // Full refetches (invalidate / refetch()) walk every already-
       // loaded cursor sequentially — TanStack Query's infinite behavior. To
-      // avoid re-issuing N ListRuns calls each minute for a canvas whose
+      // avoid re-issuing N ListRuns calls during a resync for a canvas whose
       // shared cache holds many pages, we reuse any page that already lives
       // in the cache for its cursor *and* still matches page 1's totalCount.
       // Page 1 (pageParam == null) always hits the network so fresh runs and
@@ -806,7 +806,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.runs?.length || 0), 0);
       // Page 1 is the only page guaranteed to carry a fresh totalCount on
-      // poll/refetch; tail pages may be cache-reused and must not drive this.
+      // refetch; tail pages may be cache-reused and must not drive this.
       const totalCount = allPages[0]?.totalCount ?? lastPage?.totalCount ?? 0;
 
       if (currentLoadedCount >= totalCount) return undefined;
@@ -814,7 +814,6 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
-    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });

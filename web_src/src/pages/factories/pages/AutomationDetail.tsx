@@ -3,6 +3,7 @@ import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -39,6 +40,7 @@ export function AutomationDetail({
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const canvasId = app.id ?? "";
+  useCanvasRuntimeWebsocket(canvasId, organizationId, Boolean(canvasId));
   const {
     data: runsPages,
     isLoading: runsLoading,
