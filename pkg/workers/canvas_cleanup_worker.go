@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
@@ -247,8 +248,23 @@ func (w *CanvasCleanupWorker) cleanRemainingResources(canvas models.Canvas) (boo
 }
 
 func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, error) {
+	var webhookIDs []uuid.UUID
+	if err := tx.Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("webhook_id IS NOT NULL").
+		Distinct("webhook_id").
+		Pluck("webhook_id", &webhookIDs).Error; err != nil {
+		return nil, fmt.Errorf("list canvas webhook ids: %w", err)
+	}
+
 	if err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Delete(&models.CanvasNode{}).Error; err != nil {
 		return nil, fmt.Errorf("failed to delete canvas nodes: %w", err)
+	}
+
+	for _, webhookID := range webhookIDs {
+		if err := models.SoftDeleteWebhookIfUnreferenced(tx, webhookID); err != nil {
+			return nil, fmt.Errorf("soft-delete unreferenced webhook %s: %w", webhookID, err)
+		}
 	}
 
 	sessions, err := models.ListAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID)

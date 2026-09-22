@@ -1082,6 +1082,7 @@ message FactoryIntake {
     HEALTH_INTEGRATION_NOT_READY = 3;
     HEALTH_WEBHOOK_NOT_READY = 4;
     HEALTH_GRAPH_BROKEN = 5;
+    HEALTH_WEBHOOK_FAILED = 6;
   }
 
   // Settings that change what the intake does. They are stored in the canvas
