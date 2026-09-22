@@ -244,3 +244,19 @@ func createOrphanNodeRequests(t *testing.T, workflowID uuid.UUID, nodeID string,
 		require.NoError(t, database.Conn().Create(&request).Error)
 	}
 }
+
+func TestFindCanvasesByIDs(t *testing.T) {
+	r := support.Setup(t)
+	first, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	second, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+
+	found, err := models.FindCanvasesByIDs(database.Conn(), []uuid.UUID{first.ID, second.ID, uuid.New()})
+	require.NoError(t, err)
+	require.Len(t, found, 2)
+	require.Equal(t, first.OrganizationID, found[first.ID].OrganizationID)
+	require.Equal(t, second.OrganizationID, found[second.ID].OrganizationID)
+
+	empty, err := models.FindCanvasesByIDs(database.Conn(), nil)
+	require.NoError(t, err)
+	require.Empty(t, empty)
+}

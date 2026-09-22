@@ -7,16 +7,14 @@ import {
   FEATURE_WORKSPACE_AGENT_RESOURCES,
   FEATURE_WORKSPACE_MODELS,
 } from "@/lib/experimentalFeatures";
-import {
-  FactorySettingsAccountNotificationsPage,
-  FactorySettingsAccountProfilePage,
-  FactorySettingsAccountSecurityPage,
-  FactorySettingsGeneralPage,
-  FactorySettingsModelsPage,
-  FactorySettingsAgentResourcesPage,
-  FactorySettingsRepositoryPage,
-  OrganizationSettingsOverviewPage,
-} from "@/pages/factories";
+import { OrganizationSettingsOverviewPage } from "../organizationSettings/OrganizationSettingsOverviewPage";
+import { FactorySettingsAccountNotificationsPage } from "./FactorySettingsAccountNotificationsPage";
+import { FactorySettingsAccountProfilePage } from "./FactorySettingsAccountProfilePage";
+import { FactorySettingsAccountSecurityPage } from "./FactorySettingsAccountSecurityPage";
+import { FactorySettingsAgentResourcesPage } from "./FactorySettingsAgentResourcesPage";
+import { FactorySettingsGeneralPage } from "./FactorySettingsGeneralPage";
+import { FactorySettingsModelsPage } from "./FactorySettingsModelsPage";
+import { FactorySettingsRepositoryPage } from "./FactorySettingsRepositoryPage";
 import {
   OrganizationIntegrationDetailsPage,
   OrganizationIntegrationSetupPage,

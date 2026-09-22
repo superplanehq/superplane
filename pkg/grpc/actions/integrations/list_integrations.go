@@ -7,10 +7,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/models"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -42,6 +44,12 @@ func organizationIDFromContext(ctx context.Context) (uuid.UUID, error) {
 }
 
 func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []core.Integration) []*pb.IntegrationDefinition {
+	useNewFlow, err := models.HasExperimentalFeature(orgID, features.FeatureNewIntegrationSetupFlow)
+	if err != nil {
+		useNewFlow = false
+	}
+	hostedGitHub := github.UseHostedApp(orgID.String())
+
 	out := make([]*pb.IntegrationDefinition, len(in))
 	for i, integration := range in {
 		configFields := integration.Configuration()
@@ -52,8 +60,8 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 
 		// Hosted GitHub install and the setup wizard are independent.
 		// Connect uses HostedAppInstall. The wizard needs new_integration_setup_flow.
-		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
-		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name()) ||
+		useNewFlowForIntegration := useNewFlow && registry.SupportsNewSetupFlow(integration.Name())
+		hostedAppInstall := (hostedGitHub && integration.Name() == "github") ||
 			jira.UseHostedInstall(integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
@@ -64,7 +72,7 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 			Configuration:    configuration,
 			Capabilities:     serializeCapabilities(registry, integration),
 			CapabilityGroups: serializeCapabilityGroups(registry, integration),
-			LegacySetupOnly:  !useNewFlow,
+			LegacySetupOnly:  !useNewFlowForIntegration,
 			HostedAppInstall: hostedAppInstall,
 		}
 	}

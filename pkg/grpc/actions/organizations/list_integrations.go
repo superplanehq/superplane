@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -24,9 +25,19 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID st
 		return nil, grpcerrors.Internal(err, "failed to list integrations")
 	}
 
+	installationIDs := make([]uuid.UUID, len(integrations))
+	for i, integration := range integrations {
+		installationIDs[i] = integration.ID
+	}
+	secretsByInstallation, err := models.ListIntegrationSecretsForInstallations(db, installationIDs)
+	if err != nil {
+		log.Errorf("failed to list integration secrets for organization %s: %v", orgID, err)
+		return nil, grpcerrors.Internal(err, "failed to list integrations")
+	}
+
 	protos := []*pb.Integration{}
 	for _, integration := range integrations {
-		proto, err := serializeIntegration(registry, &integration, []models.CanvasNodeReference{})
+		proto, err := serializeIntegrationWithSecrets(registry, &integration, []models.CanvasNodeReference{}, secretsByInstallation[integration.ID])
 
 		//
 		// If we have an issue serializing an integration,

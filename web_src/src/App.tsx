@@ -1,6 +1,6 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { Suspense } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
@@ -29,63 +29,15 @@ import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboard
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
-import { CanvasSettingsPage } from "./pages/canvas/settings";
-import {
-  AutomationsPage,
-  CreateWorkOrderComposeRedirect,
-  FactoriesIndexPage,
-  FactoriesLayout,
-  FactoryAppCanvasPage,
-  FactoryAppSplitRunPage,
-  FactoryHomeRedirect,
-  FactoryLineEditPage,
-  FactorySettingsLayout,
-  LegacyFactoryAppRedirect,
-  LegacyFactoryAppSplitRunRedirect,
-  LegacyWorkOrderDetailRedirect,
-  LegacyWorkOrderPermalinkRedirect,
-  LegacyWorkOrdersRedirect,
-  LinesPage,
-  MissionsPage,
-  NewWorkspacePage,
-  OnboardingGate,
-  OnboardingPage,
-  VelocityPage,
-  WikiPage,
-  WorkOrderDetailPage,
-  WorkOrdersPage,
-  WorkspaceOverviewPage,
-  ChecksPRFeedbackSetupPage,
-  DiscussionPRFeedbackSetupPage,
-  JiraIntakeSetupPage,
-  ProductiveIntakeSetupPage,
-  SentryIntakeSetupPage,
-} from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
-import {
-  LegacyFactoryOrganizationSettingsRedirect,
-  LegacyOrganizationSettingsRedirect,
-} from "./pages/factories/pages/settings/FactorySettingsRedirects";
-import { factorySettingsSectionRoutes } from "./pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { HomePage } from "./pages/home";
-import { NewAppPage } from "./pages/home/NewAppPage";
-import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
-import { OrganizationSettings } from "./pages/organization/settings";
-import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
-import AdminLayout from "./pages/admin/AdminLayout";
-import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
-import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
-import AccountsListAdmin from "./pages/admin/AccountsList";
-import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
-import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
-import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
-import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
+import { Skeleton } from "./ui/skeleton";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -97,6 +49,89 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function lazyNamed<TModule extends Record<PropertyKey, unknown>, TName extends keyof TModule>(
+  loader: () => Promise<TModule>,
+  exportName: TName,
+) {
+  type Exported = TModule[TName];
+  type Props = Exported extends React.ComponentType<infer P> ? P : never;
+  return React.lazy(async () => {
+    const loaded = await loader();
+    return { default: loaded[exportName] as React.ComponentType<Props> };
+  });
+}
+
+const CanvasSettingsPage = lazyNamed(() => import("./pages/canvas/settings"), "CanvasSettingsPage");
+const AppDefaultTabGate = lazyNamed(() => import("./pages/app/AppDefaultTabGate"), "AppDefaultTabGate");
+const NewAppPage = lazyNamed(() => import("./pages/home/NewAppPage"), "NewAppPage");
+const GitHubInstallApprovedPage = lazyNamed(
+  () => import("./pages/github/GitHubInstallApprovedPage"),
+  "GitHubInstallApprovedPage",
+);
+const OrganizationSettings = lazyNamed(() => import("./pages/organization/settings"), "OrganizationSettings");
+const AdminLayout = React.lazy(() => import("./pages/admin/AdminLayout"));
+const OrganizationsListAdmin = React.lazy(() => import("./pages/admin/OrganizationsList"));
+const OrganizationDetailAdmin = React.lazy(() => import("./pages/admin/OrganizationDetail"));
+const AccountsListAdmin = React.lazy(() => import("./pages/admin/AccountsList"));
+const InstallationSettingsAdmin = React.lazy(() => import("./pages/admin/InstallationSettings"));
+const RunnerTasksAdmin = React.lazy(() => import("./pages/admin/RunnerTasks"));
+const PolarWebhooksAdmin = lazyNamed(() => import("./pages/admin/PolarWebhooks"), "PolarWebhooks");
+const PriceBooksAdmin = lazyNamed(() => import("./pages/admin/PriceBooks"), "PriceBooks");
+const AutomationsPage = lazyNamed(() => import("./pages/factories"), "AutomationsPage");
+const CreateWorkOrderComposeRedirect = lazyNamed(() => import("./pages/factories"), "CreateWorkOrderComposeRedirect");
+const FactoriesIndexPage = lazyNamed(() => import("./pages/factories"), "FactoriesIndexPage");
+const FactoriesLayout = lazyNamed(() => import("./pages/factories"), "FactoriesLayout");
+const FactoryAppCanvasPage = lazyNamed(() => import("./pages/factories"), "FactoryAppCanvasPage");
+const FactoryAppSplitRunPage = lazyNamed(() => import("./pages/factories"), "FactoryAppSplitRunPage");
+const FactoryHomeRedirect = lazyNamed(() => import("./pages/factories"), "FactoryHomeRedirect");
+const FactoryLineEditPage = lazyNamed(() => import("./pages/factories"), "FactoryLineEditPage");
+const FactorySettingsRoutes = lazyNamed(
+  () => import("./pages/factories/pages/settings/FactorySettingsRoutes"),
+  "FactorySettingsRoutes",
+);
+const LegacyFactoryAppRedirect = lazyNamed(() => import("./pages/factories"), "LegacyFactoryAppRedirect");
+const LegacyFactoryAppSplitRunRedirect = lazyNamed(
+  () => import("./pages/factories"),
+  "LegacyFactoryAppSplitRunRedirect",
+);
+const LegacyWorkOrderDetailRedirect = lazyNamed(() => import("./pages/factories"), "LegacyWorkOrderDetailRedirect");
+const LegacyWorkOrderPermalinkRedirect = lazyNamed(
+  () => import("./pages/factories"),
+  "LegacyWorkOrderPermalinkRedirect",
+);
+const LegacyWorkOrdersRedirect = lazyNamed(() => import("./pages/factories"), "LegacyWorkOrdersRedirect");
+const LinesPage = lazyNamed(() => import("./pages/factories"), "LinesPage");
+const MissionsPage = lazyNamed(() => import("./pages/factories"), "MissionsPage");
+const NewWorkspacePage = lazyNamed(() => import("./pages/factories"), "NewWorkspacePage");
+const OnboardingGate = lazyNamed(() => import("./pages/factories"), "OnboardingGate");
+const OnboardingPage = lazyNamed(() => import("./pages/factories"), "OnboardingPage");
+const VelocityPage = lazyNamed(() => import("./pages/factories"), "VelocityPage");
+const WikiPage = lazyNamed(() => import("./pages/factories"), "WikiPage");
+const WorkOrderDetailPage = lazyNamed(() => import("./pages/factories"), "WorkOrderDetailPage");
+const WorkOrdersPage = lazyNamed(() => import("./pages/factories"), "WorkOrdersPage");
+const WorkspaceOverviewPage = lazyNamed(() => import("./pages/factories"), "WorkspaceOverviewPage");
+const ChecksPRFeedbackSetupPage = lazyNamed(() => import("./pages/factories"), "ChecksPRFeedbackSetupPage");
+const DiscussionPRFeedbackSetupPage = lazyNamed(() => import("./pages/factories"), "DiscussionPRFeedbackSetupPage");
+const SentryIntakeSetupPage = lazyNamed(() => import("./pages/factories"), "SentryIntakeSetupPage");
+const JiraIntakeSetupPage = lazyNamed(() => import("./pages/factories"), "JiraIntakeSetupPage");
+const ProductiveIntakeSetupPage = lazyNamed(() => import("./pages/factories"), "ProductiveIntakeSetupPage");
+const LegacyFactoryOrganizationSettingsRedirect = lazyNamed(
+  () => import("./pages/factories/pages/settings/FactorySettingsRedirects"),
+  "LegacyFactoryOrganizationSettingsRedirect",
+);
+const LegacyOrganizationSettingsRedirect = lazyNamed(
+  () => import("./pages/factories/pages/settings/FactorySettingsRedirects"),
+  "LegacyOrganizationSettingsRedirect",
+);
+
+function RouteFallback() {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <Skeleton className="h-8 w-40" />
+    </div>
+  );
+}
 
 const withAuthOnly = (Component: React.ComponentType) => (
   <AuthGuard>
@@ -177,11 +212,9 @@ function organizationScopedRouteTree() {
           </Route>
         </Route>
         <Route
-          path=":factoryKey/settings"
-          element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
-        >
-          {factorySettingsSectionRoutes}
-        </Route>
+          path=":factoryKey/settings/*"
+          element={withAuthPermissionAndFactoriesFeature(FactorySettingsRoutes, "factories", "read")}
+        />
         <Route
           path=":factoryKey/organization/*"
           element={withAuthPermissionAndFactoriesFeature(
@@ -230,28 +263,30 @@ function AppRouter() {
         <div className="relative flex-1 overflow-auto">
           <SetupGuard>
             <GlobalCommandPalette />
-            <Routes>
-              <Route path="login" element={<Login />} />
-              <Route path="signup" element={<Login mode="signup" />} />
-              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
-              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
-              <Route path="setup" element={<OwnerSetup />} />
-              <Route path="admin" element={<AdminLayout />}>
-                <Route index element={<OrganizationsListAdmin />} />
-                <Route path="accounts" element={<AccountsListAdmin />} />
-                <Route path="settings" element={<InstallationSettingsAdmin />} />
-                <Route path="price-books" element={<PriceBooksAdmin />} />
-                <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
-                <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
-                <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
-              </Route>
-              <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
-              <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
-              {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
-              <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
-              {organizationScopedRouteTree()}
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="login" element={<Login />} />
+                <Route path="signup" element={<Login mode="signup" />} />
+                <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
+                <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
+                <Route path="setup" element={<OwnerSetup />} />
+                <Route path="admin" element={<AdminLayout />}>
+                  <Route index element={<OrganizationsListAdmin />} />
+                  <Route path="accounts" element={<AccountsListAdmin />} />
+                  <Route path="settings" element={<InstallationSettingsAdmin />} />
+                  <Route path="price-books" element={<PriceBooksAdmin />} />
+                  <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
+                  <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
+                  <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
+                </Route>
+                <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
+                <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+                {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
+                <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
+                {organizationScopedRouteTree()}
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </Suspense>
           </SetupGuard>
         </div>
       </div>

@@ -93,6 +93,24 @@ func ListIntegrationSecretsInTransaction(tx *gorm.DB, installationID uuid.UUID) 
 	return secrets, nil
 }
 
+func ListIntegrationSecretsForInstallations(tx *gorm.DB, installationIDs []uuid.UUID) (map[uuid.UUID][]IntegrationSecret, error) {
+	secretsByInstallation := make(map[uuid.UUID][]IntegrationSecret, len(installationIDs))
+	if len(installationIDs) == 0 {
+		return secretsByInstallation, nil
+	}
+
+	var secrets []IntegrationSecret
+	err := tx.Where("installation_id IN ?", installationIDs).Find(&secrets).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, secret := range secrets {
+		secretsByInstallation[secret.InstallationID] = append(secretsByInstallation[secret.InstallationID], secret)
+	}
+	return secretsByInstallation, nil
+}
+
 type BrowserAction struct {
 	URL         string
 	Method      string

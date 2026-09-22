@@ -85,6 +85,8 @@ const (
 // appropriate for latency histograms recorded in seconds. The OTel SDK default
 // boundaries assume milliseconds, which collapses sub-second values into the
 // (0, 5] bucket and makes histogram_quantile estimates misleading.
+// HTTP server duration uses the same buckets so interactive API p90 stays
+// readable below the 10s long-poll cap.
 var durationSecondsHistogramBoundaries = []float64{
 	0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
 }
@@ -93,6 +95,20 @@ func durationSecondsHistogramView() sdkmetric.Option {
 	return sdkmetric.WithView(sdkmetric.NewView(
 		sdkmetric.Instrument{
 			Name: "*duration.seconds",
+			Unit: "s",
+		},
+		sdkmetric.Stream{
+			Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
+				Boundaries: durationSecondsHistogramBoundaries,
+			},
+		},
+	))
+}
+
+func httpServerDurationHistogramView() sdkmetric.Option {
+	return sdkmetric.WithView(sdkmetric.NewView(
+		sdkmetric.Instrument{
+			Name: "http.server.request.duration",
 			Unit: "s",
 		},
 		sdkmetric.Stream{
@@ -120,6 +136,7 @@ func InitMetrics(ctx context.Context) error {
 			sdkmetric.NewPeriodicReader(exporter),
 		),
 		durationSecondsHistogramView(),
+		httpServerDurationHistogramView(),
 	)
 
 	otel.SetMeterProvider(provider)

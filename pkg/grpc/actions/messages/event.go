@@ -1,7 +1,10 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -35,16 +38,45 @@ func (m CanvasEventCreatedMessage) Publish() error {
 }
 
 func PublishCanvasEventCreatedMessage(event *models.CanvasEvent) error {
-	canvas, err := models.FindCanvasWithoutOrgScope(event.WorkflowID)
+	return PublishCanvasEventCreatedMessages([]models.CanvasEvent{*event})
+}
+
+func PublishCanvasEventCreatedMessages(events []models.CanvasEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	workflowIDs := make([]uuid.UUID, 0, len(events))
+	seen := make(map[uuid.UUID]struct{}, len(events))
+	for _, event := range events {
+		if _, ok := seen[event.WorkflowID]; ok {
+			continue
+		}
+		seen[event.WorkflowID] = struct{}{}
+		workflowIDs = append(workflowIDs, event.WorkflowID)
+	}
+
+	canvases, err := models.FindCanvasesByIDs(database.Conn(), workflowIDs)
 	if err != nil {
 		return err
 	}
 
-	return NewCanvasEventCreatedMessage(
-		event.WorkflowID.String(),
-		canvas.OrganizationID.String(),
-		event,
-	).Publish()
+	for i := range events {
+		event := events[i]
+		canvas, ok := canvases[event.WorkflowID]
+		if !ok {
+			return fmt.Errorf("canvas %s not found for event %s", event.WorkflowID, event.ID)
+		}
+		if err := NewCanvasEventCreatedMessage(
+			event.WorkflowID.String(),
+			canvas.OrganizationID.String(),
+			&event,
+		).Publish(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type CanvasEventTerminalMessage struct {
