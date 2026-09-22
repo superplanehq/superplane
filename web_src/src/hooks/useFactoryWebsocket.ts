@@ -162,7 +162,7 @@ function patchCachedWorkOrder(
   }
   const index = orders.findIndex((order) => order.id === orderId);
   if (index < 0) {
-    return [...orders, patchedWorkOrder({ id: described.id ?? orderId }, described)];
+    return [patchedWorkOrder({ id: described.id ?? orderId }, described), ...orders];
   }
   return orders.map((order) => (order.id === orderId ? patchedWorkOrder(order, described) : order));
 }

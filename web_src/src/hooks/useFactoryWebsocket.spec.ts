@@ -1,9 +1,16 @@
 import * as apiClient from "@/api-client";
+import type { FactoriesWorkOrder } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+
+type DescribeWorkOrderResult = Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>;
+
+function describeResponse(order: FactoriesWorkOrder): DescribeWorkOrderResult {
+  return { data: { order }, error: undefined } as unknown as DescribeWorkOrderResult;
+}
 
 const { useWebSocketMock } = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
@@ -68,22 +75,20 @@ describe("useFactoryWebsocket", () => {
   });
 
   it("loads that task and patches the cached row", async () => {
-    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue({
-      data: {
-        order: {
-          id: "order-1",
-          title: "New",
-          checks: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5, analysis: "long" }],
-          planningSession: {
-            id: "ps-1",
-            state: "running",
-            waitState: "pending",
-            executionId: "exec-1",
-            survey: { id: "survey-1", questions: [{ prompt: "Which?", options: ["A"] }] },
-          },
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({
+        id: "order-1",
+        title: "New",
+        checks: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5, analysis: "long" }],
+        planningSession: {
+          id: "ps-1",
+          state: "running",
+          waitState: "pending",
+          executionId: "exec-1",
+          survey: { id: "survey-1", questions: [{ prompt: "Which?", options: ["A"] }] },
         },
-      },
-    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+      }),
+    );
     const { queryClient, invalidateSpy } = renderFactoryWebsocket();
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
       { id: "order-1", title: "Old" },
@@ -130,9 +135,9 @@ describe("useFactoryWebsocket", () => {
   });
 
   it("adds a task that is not in the loaded list", async () => {
-    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue({
-      data: { order: { id: "order-1", title: "New", checks: [] } },
-    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({ id: "order-1", title: "New", checks: [] }),
+    );
     const { queryClient } = renderFactoryWebsocket();
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [{ id: "order-2", title: "Other" }]);
 
@@ -142,21 +147,19 @@ describe("useFactoryWebsocket", () => {
     });
 
     expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual([
-      { id: "order-2", title: "Other" },
       expect.objectContaining({ id: "order-1", title: "New" }),
+      { id: "order-2", title: "Other" },
     ]);
   });
 
   it("ignores an older describe that finishes after a newer one", async () => {
-    let releaseOlder: (value: Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>) => void = () => {};
-    const older = new Promise<Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>>((resolve) => {
+    let releaseOlder: (value: DescribeWorkOrderResult) => void = () => {};
+    const older = new Promise<DescribeWorkOrderResult>((resolve) => {
       releaseOlder = resolve;
     });
     const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
-    describeWorkOrder.mockImplementationOnce(() => older);
-    describeWorkOrder.mockResolvedValueOnce({
-      data: { order: { id: "order-1", title: "Newer", checks: [] } },
-    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+    describeWorkOrder.mockImplementationOnce(() => older as ReturnType<typeof apiClient.factoriesDescribeWorkOrder>);
+    describeWorkOrder.mockResolvedValueOnce(describeResponse({ id: "order-1", title: "Newer", checks: [] }));
     const { queryClient } = renderFactoryWebsocket();
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [{ id: "order-1", title: "Old" }]);
 
@@ -168,9 +171,7 @@ describe("useFactoryWebsocket", () => {
       event: "work_order_updated",
       payload: { factoryId: "factory-1", orderId: "order-1" },
     });
-    releaseOlder({
-      data: { order: { id: "order-1", title: "Older", checks: [] } },
-    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+    releaseOlder(describeResponse({ id: "order-1", title: "Older", checks: [] }));
     await act(async () => {
       await older;
     });
