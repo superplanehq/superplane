@@ -228,7 +228,7 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -412,7 +412,7 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [analyzingOrder] });
     const analyzingOrderId = analyzingOrder.id;
     // The board optimistically knows this draft is analyzing before its Backlog
-    // run appears in the polled list. The popup must match the board card.
+    // run appears through the live subscription. The popup must match the board card.
     markBacklogAnalysisPending(analyzingOrderId);
     try {
       const user = userEvent.setup();

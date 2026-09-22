@@ -136,7 +136,7 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
