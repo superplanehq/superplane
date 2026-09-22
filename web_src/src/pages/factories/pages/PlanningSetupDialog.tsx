@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
+import { planningSetupChildStep, planningSetupParentStep, type PlanningSetupStep } from "./planningSetupCaption";
 import { PlanningSetupPreview } from "./PlanningSetupPreview";
 import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
 import { usePlanningSetup, type PlanningSetupModel } from "./usePlanningSetup";
@@ -18,7 +19,7 @@ interface PlanningSetupDialogProps {
 
 export function PlanningSetupDialog(props: PlanningSetupDialogProps) {
   const setup = usePlanningSetup(props.organizationId, props.factoryId, props.factory);
-  const canLeaveStep = setup.step === "scores";
+  const parentStep = planningSetupParentStep(setup.step);
 
   return (
     <PRFeedbackSetupWizardShell
@@ -35,15 +36,15 @@ export function PlanningSetupDialog(props: PlanningSetupDialogProps) {
       <SetupHeader
         step={setup.step}
         onBack={() => {
-          if (canLeaveStep) {
-            setup.setStep("refine");
+          if (parentStep) {
+            setup.setStep(parentStep);
             return;
           }
           props.onClose();
         }}
       />
       <div>
-        {setup.step === "refine" ? <RefineStep setup={setup} /> : <ScoresStep setup={setup} />}
+        <SetupStepBody setup={setup} />
         {setup.error ? (
           <p className="workspace-body-text mt-4 text-destructive" role="alert">
             {setup.error}
@@ -55,11 +56,7 @@ export function PlanningSetupDialog(props: PlanningSetupDialogProps) {
   );
 }
 
-function SetupHeader({ step, onBack }: { step: PlanningSetupModel["step"]; onBack: () => void }) {
-  const stepTitle =
-    step === "refine" ? PLANNING_SETTINGS_COPY.wizardStepRefine : PLANNING_SETTINGS_COPY.wizardStepScores;
-  const stepIntro = step === "scores" ? PLANNING_SETTINGS_COPY.wizardScoresIntro : undefined;
-
+function SetupHeader({ step, onBack }: { step: PlanningSetupStep; onBack: () => void }) {
   return (
     <header className="text-left">
       <button
@@ -69,11 +66,42 @@ function SetupHeader({ step, onBack }: { step: PlanningSetupModel["step"]; onBac
         data-testid="planning-setup-back"
       >
         <ArrowLeft className="size-4 shrink-0" aria-hidden />
-        <span>{step === "scores" ? PLANNING_SETTINGS_COPY.wizardBack : PLANNING_SETTINGS_COPY.wizardBackToBoard}</span>
+        <span>{step === "refine" ? PLANNING_SETTINGS_COPY.wizardBackToBoard : PLANNING_SETTINGS_COPY.wizardBack}</span>
       </button>
-      <h1 className={factoryPageTitleClassName}>{stepTitle}</h1>
-      {stepIntro ? <p className="workspace-body-text mt-2 text-muted-foreground">{stepIntro}</p> : null}
+      <h1 className={factoryPageTitleClassName}>{setupStepTitle(step)}</h1>
     </header>
+  );
+}
+
+function SetupStepBody({ setup }: { setup: PlanningSetupModel }) {
+  if (setup.step === "refine") {
+    return <RefineStep setup={setup} />;
+  }
+  if (setup.step === "confidence") {
+    return (
+      <ScoreStep
+        name="planning-setup-confidence"
+        checked={setup.confidence}
+        ariaLabel={PLANNING_SETTINGS_COPY.wizardStepConfidence}
+        onTitle={PLANNING_SETTINGS_COPY.wizardConfidenceOnOption}
+        onHelper={PLANNING_SETTINGS_COPY.wizardConfidenceOnHelper}
+        offTitle={PLANNING_SETTINGS_COPY.wizardConfidenceOffOption}
+        offHelper={PLANNING_SETTINGS_COPY.wizardConfidenceOffHelper}
+        onChange={setup.setConfidence}
+      />
+    );
+  }
+  return (
+    <ScoreStep
+      name="planning-setup-clarity"
+      checked={setup.clarity}
+      ariaLabel={PLANNING_SETTINGS_COPY.wizardStepClarity}
+      onTitle={PLANNING_SETTINGS_COPY.wizardClarityOnOption}
+      onHelper={PLANNING_SETTINGS_COPY.wizardClarityOnHelper}
+      offTitle={PLANNING_SETTINGS_COPY.wizardClarityOffOption}
+      offHelper={PLANNING_SETTINGS_COPY.wizardClarityOffHelper}
+      onChange={setup.setClarity}
+    />
   );
 }
 
@@ -100,63 +128,57 @@ function RefineStep({ setup }: { setup: PlanningSetupModel }) {
   );
 }
 
-function ScoresStep({ setup }: { setup: PlanningSetupModel }) {
+function ScoreStep({
+  name,
+  checked,
+  ariaLabel,
+  onTitle,
+  onHelper,
+  offTitle,
+  offHelper,
+  onChange,
+}: {
+  name: string;
+  checked: boolean;
+  ariaLabel: string;
+  onTitle: string;
+  onHelper: string;
+  offTitle: string;
+  offHelper: string;
+  onChange: (next: boolean) => void;
+}) {
   return (
-    <div className="space-y-5">
-      <section
-        className="flex flex-col gap-2"
-        role="radiogroup"
-        aria-label={PLANNING_SETTINGS_COPY.wizardClarityOnOption}
-      >
-        <IntakeSettingsRadioOption
-          name="planning-setup-clarity"
-          value="on"
-          checked={setup.clarity}
-          title={PLANNING_SETTINGS_COPY.wizardClarityOnOption}
-          helper={PLANNING_SETTINGS_COPY.wizardClarityOnHelper}
-          onChange={() => setup.setClarity(true)}
-        />
-        <IntakeSettingsRadioOption
-          name="planning-setup-clarity"
-          value="off"
-          checked={!setup.clarity}
-          title={PLANNING_SETTINGS_COPY.wizardClarityOffOption}
-          helper={PLANNING_SETTINGS_COPY.wizardClarityOffHelper}
-          onChange={() => setup.setClarity(false)}
-        />
-      </section>
-      <section
-        className="flex flex-col gap-2"
-        role="radiogroup"
-        aria-label={PLANNING_SETTINGS_COPY.wizardConfidenceOnOption}
-      >
-        <IntakeSettingsRadioOption
-          name="planning-setup-confidence"
-          value="on"
-          checked={setup.confidence}
-          title={PLANNING_SETTINGS_COPY.wizardConfidenceOnOption}
-          helper={PLANNING_SETTINGS_COPY.wizardConfidenceOnHelper}
-          onChange={() => setup.setConfidence(true)}
-        />
-        <IntakeSettingsRadioOption
-          name="planning-setup-confidence"
-          value="off"
-          checked={!setup.confidence}
-          title={PLANNING_SETTINGS_COPY.wizardConfidenceOffOption}
-          helper={PLANNING_SETTINGS_COPY.wizardConfidenceOffHelper}
-          onChange={() => setup.setConfidence(false)}
-        />
-      </section>
-    </div>
+    <section className="flex flex-col gap-2" role="radiogroup" aria-label={ariaLabel}>
+      <IntakeSettingsRadioOption
+        name={name}
+        value="on"
+        checked={checked}
+        title={onTitle}
+        helper={onHelper}
+        onChange={() => onChange(true)}
+      />
+      <IntakeSettingsRadioOption
+        name={name}
+        value="off"
+        checked={!checked}
+        title={offTitle}
+        helper={offHelper}
+        onChange={() => onChange(false)}
+      />
+    </section>
   );
 }
 
 function SetupFooter({ setup, onFinished }: { setup: PlanningSetupModel; onFinished: () => void }) {
-  const finishOnThisStep = setup.step === "scores" || !setup.enabled;
+  const nextStep = planningSetupChildStep(setup.step, setup.enabled);
 
   return (
     <footer className="flex items-center justify-end gap-3 pt-2">
-      {finishOnThisStep ? (
+      {nextStep ? (
+        <Button type="button" onClick={() => setup.setStep(nextStep)} data-testid="planning-setup-continue">
+          {PLANNING_SETTINGS_COPY.wizardContinue}
+        </Button>
+      ) : (
         <Button
           type="button"
           disabled={setup.saving}
@@ -171,11 +193,17 @@ function SetupFooter({ setup, onFinished }: { setup: PlanningSetupModel; onFinis
         >
           {setup.saving ? PLANNING_SETTINGS_COPY.wizardFinishing : PLANNING_SETTINGS_COPY.wizardFinish}
         </Button>
-      ) : (
-        <Button type="button" onClick={() => setup.setStep("scores")} data-testid="planning-setup-continue">
-          {PLANNING_SETTINGS_COPY.wizardContinue}
-        </Button>
       )}
     </footer>
   );
+}
+
+function setupStepTitle(step: PlanningSetupStep): string {
+  if (step === "refine") {
+    return PLANNING_SETTINGS_COPY.wizardStepRefine;
+  }
+  if (step === "confidence") {
+    return PLANNING_SETTINGS_COPY.wizardStepConfidence;
+  }
+  return PLANNING_SETTINGS_COPY.wizardStepClarity;
 }
