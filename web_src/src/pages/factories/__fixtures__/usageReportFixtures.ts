@@ -1,3 +1,7 @@
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+export const ACTIVE_TRIAL_ENDS_AT = new Date(Date.now() + FOURTEEN_DAYS_MS).toISOString();
+
 /** Storybook payload for factory Usage and org workspace usage reports. */
 export interface StorybookUsageReport {
   totalTokens: string;
@@ -41,7 +45,7 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "0",
   remainingCreditWarning: false,
-  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+  welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
 export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
@@ -79,7 +83,7 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "876",
   remainingCreditWarning: false,
-  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+  welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
 /** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
@@ -113,7 +117,7 @@ export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   remainingCreditCents: "14124",
   grantTotalCents: "15000",
   purchasedCreditCents: "5000",
-  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+  welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
 /** Purchased hosted credit remains, but the balance is at or below $20. */
@@ -143,7 +147,7 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   plan: "business",
   planSource: "polar",
   polarSubscriptionStatus: "active",
-  trialEndsAt: "2026-09-22T12:00:00.000Z",
+  trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
   remainingCreditCents: "14124",
   includedRemainingCents: "5000",
   purchasedRemainingCents: "5000",
@@ -199,7 +203,7 @@ export const RESTORED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
   planSource: "polar",
   polarSubscriptionStatus: "canceled",
-  trialEndsAt: "2026-09-22T12:00:00.000Z",
+  trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
   remainingCreditCents: "5000",
   includedRemainingCents: "0",
   purchasedRemainingCents: "0",
