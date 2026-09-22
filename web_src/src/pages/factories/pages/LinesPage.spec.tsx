@@ -397,6 +397,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
+    expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => {
@@ -405,6 +406,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+    expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
   });
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {

@@ -46,3 +46,20 @@ export function lastLoadingMessage(messages: Record<string, string>): string | u
   const values = Object.values(messages);
   return values[values.length - 1];
 }
+
+/** Overlay shown this render. The active message wins so a new load does not wait for an effect. */
+export function workspaceLoadingOverlay(
+  activeMessage: string | undefined,
+  leavingMessage: string | undefined,
+  lastActiveMessage: string | undefined,
+  reduceMotion: boolean,
+): { message?: string; exiting: boolean } {
+  if (activeMessage) {
+    return { message: activeMessage, exiting: false };
+  }
+  if (reduceMotion) {
+    return {};
+  }
+  const message = leavingMessage ?? lastActiveMessage;
+  return { message, exiting: Boolean(message) };
+}
