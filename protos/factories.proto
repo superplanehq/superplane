@@ -310,19 +310,6 @@ service Factories {
     };
   }
 
-  rpc ListFactoryPullRequests(
-    ListFactoryPullRequestsRequest
-  ) returns (ListFactoryPullRequestsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/prs"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory pull requests";
-      description: "Returns pull requests tracked by a factory";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribeFactoryPullRequest(
     DescribeFactoryPullRequestRequest
   ) returns (DescribeFactoryPullRequestResponse) {
@@ -1426,16 +1413,6 @@ message FactoryPullRequest {
   bool mergeable = 19;
 }
 
-message ListFactoryPullRequestsRequest {
-  string factory_id = 1;
-  optional int64 order = 2;
-  repeated string work_order_ids = 3;
-}
-
-message ListFactoryPullRequestsResponse {
-  repeated FactoryPullRequest pull_requests = 1;
-}
-
 message DescribeFactoryPullRequestRequest {
   string factory_id = 1;
   string pr_id = 2;
@@ -1667,6 +1644,8 @@ message WorkOrder {
   repeated WorkOrderCheck checks = 22;
   // Board fields for the analysis session. The opened card loads the full session.
   PlanningSessionSummary planning_session = 23;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 24;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1694,6 +1673,8 @@ message WorkOrderSummary {
   repeated WorkOrderCheckScore check_scores = 18;
   // Analysis session fields the board needs. The opened card loads the full session.
   PlanningSessionSummary planning_session = 19;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 20;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
