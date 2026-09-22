@@ -1,9 +1,11 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { ActionsAction, CanvasesCanvas } from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
+import { getWorkflowSpecSignature } from "./lib/draft-canvas-sync";
 import { materializeCanvasSpec } from "./lib/workflow-spec-files";
+import { applyFactoryCanvasLayout } from "./useTopologyMutationCommit";
 
 type StagingSummary = {
   hasStaging?: boolean;
@@ -52,6 +54,17 @@ export type FactoryConfigureDiscardDeps = {
   handleResetStaging: () => Promise<void> | Promise<unknown>;
   handleExitEditSession: () => void;
   onDone?: () => void;
+};
+
+export type FactoryConfigureApplyDraftSpecDeps = {
+  getCurrentWorkflowSnapshot: () => CanvasesCanvas | null | undefined;
+  applyLocalWorkflowUpdate: (updatedWorkflow: CanvasesCanvas) => void;
+  configureVisitIdRef: MutableRefObject<number>;
+  activeCanvasVersionIdRef: MutableRefObject<string>;
+  editSessionActiveRef: MutableRefObject<boolean>;
+  factoryAutoLayout: boolean;
+  components: ActionsAction[] | undefined;
+  draftCanvasSpecsRef: MutableRefObject<Map<string, CanvasesCanvas["spec"] | null>>;
 };
 
 /** Merge a renamed canvas name into the workflow snapshot used for canvas.yaml. */
@@ -175,4 +188,50 @@ export async function runFactoryConfigureDiscard(deps: FactoryConfigureDiscardDe
   } finally {
     deps.setSavePending(false);
   }
+}
+
+function factoryConfigureSessionMatches(
+  deps: FactoryConfigureApplyDraftSpecDeps,
+  visitId: number,
+  versionId: string,
+  editSessionActive: boolean,
+) {
+  return (
+    deps.configureVisitIdRef.current === visitId &&
+    deps.activeCanvasVersionIdRef.current === versionId &&
+    deps.editSessionActiveRef.current === editSessionActive
+  );
+}
+
+function factoryConfigureDraftChanged(deps: FactoryConfigureApplyDraftSpecDeps, requestedSpec: CanvasesCanvas["spec"]) {
+  const latestDraftSpec = deps.draftCanvasSpecsRef.current.get(deps.activeCanvasVersionIdRef.current);
+  return (
+    latestDraftSpec != null && getWorkflowSpecSignature(latestDraftSpec) !== getWorkflowSpecSignature(requestedSpec)
+  );
+}
+
+export async function runFactoryConfigureApplyDraftSpec(
+  deps: FactoryConfigureApplyDraftSpecDeps,
+  spec: NonNullable<CanvasesCanvas["spec"]>,
+): Promise<void> {
+  const current = deps.getCurrentWorkflowSnapshot();
+  if (!current) {
+    return;
+  }
+  const requestedVisitId = deps.configureVisitIdRef.current;
+  const requestedVersionId = deps.activeCanvasVersionIdRef.current;
+  const requestedEditSessionActive = deps.editSessionActiveRef.current;
+  const merged = { ...current, spec };
+  deps.applyLocalWorkflowUpdate(merged);
+  if (!deps.factoryAutoLayout) {
+    return;
+  }
+  const nextWorkflow = await applyFactoryCanvasLayout(merged, deps.components || []);
+  if (
+    !factoryConfigureSessionMatches(deps, requestedVisitId, requestedVersionId, requestedEditSessionActive) ||
+    factoryConfigureDraftChanged(deps, merged.spec)
+  ) {
+    return;
+  }
+  deps.applyLocalWorkflowUpdate(nextWorkflow);
 }
