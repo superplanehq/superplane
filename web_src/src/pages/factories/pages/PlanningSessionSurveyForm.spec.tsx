@@ -29,6 +29,7 @@ describe("PlanningSessionSurveyForm", () => {
     await user.click(high);
     expect(high).toHaveAttribute("aria-pressed", "true");
     expect(high).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(high).not.toHaveClass("dark:text-gray-300");
     expect(screen.getByRole("button", { name: /Low/ })).toHaveClass("bg-background");
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
@@ -55,6 +56,49 @@ describe("PlanningSessionSurveyForm", () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("What is the scope?")).toBeInTheDocument();
+  });
+
+  it("clears the current choice on a second click", async () => {
+    const user = userEvent.setup();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={vi.fn()} />);
+
+    const high = screen.getByRole("button", { name: /High/ });
+    await user.click(high);
+    await user.click(high);
+
+    expect(high).toHaveAttribute("aria-pressed", "false");
+    expect(high).toHaveClass("bg-background", "text-foreground");
+    expect(high).not.toHaveClass("bg-primary");
+  });
+
+  it("replaces the current choice when a different option is clicked", async () => {
+    const user = userEvent.setup();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={vi.fn()} />);
+
+    const high = screen.getByRole("button", { name: /High/ });
+    const low = screen.getByRole("button", { name: /Low/ });
+    await user.click(high);
+    await user.click(low);
+
+    expect(high).toHaveAttribute("aria-pressed", "false");
+    expect(low).toHaveAttribute("aria-pressed", "true");
+    expect(low).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(low).not.toHaveClass("dark:text-gray-300");
+  });
+
+  it("keeps send disabled after the last choice is cleared", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+    const oneFile = screen.getByRole("button", { name: /One file/ });
+    await user.click(oneFile);
+    await user.click(oneFile);
+
+    expect(oneFile).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("hides page controls when there is one question", () => {

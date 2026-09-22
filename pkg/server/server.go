@@ -147,7 +147,7 @@ func startWorkers(
 	if os.Getenv("START_RUN_FINALIZER") == "yes" {
 		log.Println("Starting Run Finalizer")
 
-		w := workers.NewRunFinalizer(rabbitMQURL, registry)
+		w := workers.NewRunFinalizer(rabbitMQURL, registry).WithEncryptor(encryptor)
 		go w.Start(context.Background())
 	}
 

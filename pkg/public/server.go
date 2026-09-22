@@ -46,7 +46,6 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
-	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
 	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
@@ -357,11 +356,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
-	err = pbCanvasFolders.RegisterCanvasFoldersHandlerServer(ctx, grpcGatewayMux, services.CanvasFolders)
-	if err != nil {
-		return err
-	}
-
 	err = pbFactories.RegisterFactoriesHandlerServer(ctx, grpcGatewayMux, services.Factories)
 	if err != nil {
 		return err
@@ -435,7 +429,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/canvas-folders").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
@@ -598,6 +591,8 @@ func (s *Server) RegisterWebSocketRoutes() {
 
 func (s *Server) RegisterWebRoutes(webBasePath string) {
 	log.Infof("Registering web routes with base path: %s", webBasePath)
+
+	registerUnknownAPINotFound(s.Router)
 
 	//
 	// In development mode, we proxy to the Vite dev server.
@@ -1826,6 +1821,15 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+	tx := database.Conn()
+	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	if skip {
+		return http.StatusOK, nil, nil
+	}
+
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -1833,7 +1837,6 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	}
 
 	logger := logging.ForNode(node)
-	tx := database.Conn()
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -1991,16 +1994,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	<-client.Done
 }
 
+func isAPIPath(path string) bool {
+	return strings.HasPrefix(path, "/admin/api") || strings.HasPrefix(path, "/api")
+}
+
 func shouldProxyToVite(path string) bool {
-	if strings.HasPrefix(path, "/admin/api") {
-		return false
-	}
+	return !isAPIPath(path)
+}
 
-	if strings.HasPrefix(path, "/api") {
-		return false
-	}
-
-	return true
+func registerUnknownAPINotFound(router *mux.Router) {
+	router.PathPrefix("/api").HandlerFunc(http.NotFound)
+	router.PathPrefix("/admin/api").HandlerFunc(http.NotFound)
 }
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server

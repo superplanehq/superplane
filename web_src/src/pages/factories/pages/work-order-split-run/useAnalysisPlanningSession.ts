@@ -16,14 +16,18 @@ import {
   type PlanningSessionPayload,
 } from "../planningSessionView";
 import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
-import { workOrderPlanningSessionQueryKey } from "../useWorkOrderPlanningSurvey";
 
-const POLL_MS = 1500;
+export function workOrderPlanningSessionQueryKey(organizationId: string, factoryId: string, workOrderId: string) {
+  return factoryQueryKeys.planningSession(organizationId, factoryId, workOrderId);
+}
 
 export const ANALYSIS_PLANNING_COPY = {
   composerPlaceholder: "Tell the agent more about this task",
   send: "Send",
   sendShortcut: "Enter",
+  dictate: "Dictate",
+  stopDictation: "Stop dictation",
+  microphoneDenied: "Microphone access was denied. Allow access and try again.",
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
   failedLoad: "The analysis session did not load. Try again.",
@@ -34,31 +38,20 @@ type AnalysisPlanningSessionArgs = {
   factoryId?: string;
   workOrderId?: string;
   enabled: boolean;
-  pollForSession?: boolean;
   canUpdate: boolean;
   analysisDelivered?: boolean;
   isUploading?: boolean;
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 };
 
-export function analysisSessionPollInterval(
-  pollForSession: boolean,
-  session: PlanningSessionPayload | null | undefined,
-) {
-  if (session && session.state !== "ended") {
-    return POLL_MS;
-  }
-  return pollForSession && !session ? POLL_MS : false;
-}
-
 function usePlanningSessionLookup(
-  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled" | "pollForSession">> & {
+  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled">> & {
     organizationId: string;
     factoryId: string;
     workOrderId: string;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled, pollForSession } = args;
+  const { organizationId, factoryId, workOrderId, enabled } = args;
   return useQuery<PlanningSessionPayload | null>({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -68,8 +61,7 @@ function usePlanningSessionLookup(
         previous as PlanningSessionPayload | null | undefined,
         next as PlanningSessionPayload | null,
       ),
-    refetchInterval: (current) =>
-      analysisSessionPollInterval(pollForSession, current.state.data as PlanningSessionPayload | null | undefined),
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -87,7 +79,10 @@ async function refreshAnalysisWorkOrder(
       queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, workOrderId),
     }),
     queryClient.invalidateQueries({
-      queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, workOrderId),
+      queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
@@ -157,7 +152,6 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId = "",
     workOrderId = "",
     enabled,
-    pollForSession = false,
     canUpdate,
     analysisDelivered = false,
     isUploading = false,
@@ -172,7 +166,6 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
-    pollForSession,
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({

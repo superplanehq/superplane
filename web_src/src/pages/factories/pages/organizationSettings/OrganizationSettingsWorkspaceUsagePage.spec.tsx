@@ -104,7 +104,9 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
    * anchor keeps the key stable across quick remounts.
    */
   it("keeps showing the previous report on a return visit while the report revalidates", async () => {
-    setSystemTime(new Date());
+    const now = new Date();
+    now.setUTCSeconds(30, 0);
+    setSystemTime(now);
     organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

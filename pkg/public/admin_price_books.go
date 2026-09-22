@@ -30,6 +30,7 @@ type adminPriceBookModelRate struct {
 	CacheReadCentsPerMillion  int64  `json:"cache_read_cents_per_million"`
 	CacheWriteCentsPerMillion int64  `json:"cache_write_cents_per_million"`
 	ReasoningCentsPerMillion  int64  `json:"reasoning_cents_per_million"`
+	Selected                  bool   `json:"selected"`
 }
 
 type adminPriceBookVMRate struct {
@@ -372,7 +373,13 @@ func loadAdminPriceBooks(tx *gorm.DB, requestedVersion string) (adminPriceBooksR
 		return adminPriceBooksResponse{}, http.StatusInternalServerError, "Failed to load price books"
 	}
 
-	return buildAdminPriceBooksResponse(current.Version, selected, books, rows), http.StatusOK, ""
+	providers, err := models.ListHostedLLMProviders(tx)
+	if err != nil {
+		log.Errorf("admin: failed to list providers: %v", err)
+		return adminPriceBooksResponse{}, http.StatusInternalServerError, "Failed to load providers"
+	}
+
+	return buildAdminPriceBooksResponse(current.Version, selected, books, rows, providers), http.StatusOK, ""
 }
 
 func emptyAdminPriceBooksResponse() adminPriceBooksResponse {
@@ -388,6 +395,7 @@ func buildAdminPriceBooksResponse(
 	selected models.UsagePriceBook,
 	books []models.UsagePriceBook,
 	rows []models.UsagePriceBookRate,
+	providers []models.HostedLLMProvider,
 ) adminPriceBooksResponse {
 	versions := make([]adminPriceBookVersion, 0, len(books))
 	for _, book := range books {
@@ -398,11 +406,42 @@ func buildAdminPriceBooksResponse(
 		})
 	}
 
+	allowlist := hostedModelAllowlist(providers)
+
+	prefixes := make([]pricebook.PrefixRate, 0)
+	families := make([]pricebook.FamilyRate, 0)
+	for _, row := range rows {
+		if row.UsageKind != models.UsageKindModel {
+			continue
+		}
+		rate := pricebook.Rate{
+			Input:      row.InputCentsPerMillion,
+			Output:     row.OutputCentsPerMillion,
+			CacheRead:  row.CacheReadCentsPerMillion,
+			CacheWrite: row.CacheWriteCentsPerMillion,
+			Reasoning:  row.ReasoningCentsPerMillion,
+		}
+		switch row.MatchMode {
+		case models.UsagePriceBookMatchPrefix:
+			prefixes = append(prefixes, pricebook.PrefixRate{Prefix: row.MatchKey, Rate: rate})
+		case models.UsagePriceBookMatchFamily:
+			families = append(families, pricebook.FamilyRate{Token: row.MatchKey, Rate: rate})
+		}
+	}
+	selectedKeys := make(map[string]bool)
+	for _, model := range allowlist {
+		match, ok := pricebook.MatchModel(model, prefixes, families)
+		if ok {
+			selectedKeys[match.Key+"\x00"+match.Mode] = true
+		}
+	}
+
 	modelRates := make([]adminPriceBookModelRate, 0)
 	vmRates := make([]adminPriceBookVMRate, 0)
 	for _, row := range rows {
 		switch strings.TrimSpace(row.UsageKind) {
 		case models.UsageKindModel:
+			key := row.MatchKey + "\x00" + row.MatchMode
 			modelRates = append(modelRates, adminPriceBookModelRate{
 				MatchKey:                  row.MatchKey,
 				MatchMode:                 row.MatchMode,
@@ -411,6 +450,7 @@ func buildAdminPriceBooksResponse(
 				CacheReadCentsPerMillion:  row.CacheReadCentsPerMillion,
 				CacheWriteCentsPerMillion: row.CacheWriteCentsPerMillion,
 				ReasoningCentsPerMillion:  row.ReasoningCentsPerMillion,
+				Selected:                  selectedKeys[key],
 			})
 		case models.UsageKindCompute:
 			vmRates = append(vmRates, adminPriceBookVMRate{
@@ -430,4 +470,19 @@ func buildAdminPriceBooksResponse(
 		Models:         modelRates,
 		VMs:            vmRates,
 	}
+}
+
+func hostedModelAllowlist(providers []models.HostedLLMProvider) []string {
+	allowlist := make([]string, 0)
+	for _, provider := range providers {
+		if !provider.OffersHostedModels() {
+			continue
+		}
+		for _, model := range provider.AllowedModels {
+			if strings.TrimSpace(model) != "" {
+				allowlist = append(allowlist, model)
+			}
+		}
+	}
+	return allowlist
 }

@@ -2,15 +2,14 @@ import type {
   OrganizationsDescribeOrganizationBillingResponse,
   OrganizationsDescribeOrganizationWorkspaceUsageResponse,
 } from "@/api-client";
-import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { ReactNode } from "react";
 
-import { HostedCreditEmptyBanner, HostedCreditHeaderKicker } from "../HostedCreditEmptyBanner";
+import { HostedCreditHeaderKicker } from "../HostedCreditHeaderKicker";
 import { factorySettingsSectionPath } from "./factoryPagePaths";
-import { hostedCreditBannerKind, isHostedCreditHeaderKickerKind } from "./hostedCreditEmpty";
+import { hostedCreditBannerKind } from "./hostedCreditEmpty";
 
 function hostedCreditChromeState(
   spendData: OrganizationsDescribeOrganizationWorkspaceUsageResponse | undefined,
@@ -29,54 +28,31 @@ function hostedCreditChromeState(
     remainingCreditCents: parseWorkOrderMetric(spendData?.remainingCreditCents),
     welcomeCreditExpiresAt: billingData?.trialEndsAt ?? spendData?.welcomeCreditExpiresAt,
     billingEnabled: spendData?.billingEnabled === true || billingData?.billingEnabled === true,
-    subscriptionCheckoutEnabled: billingData?.subscriptionCheckoutEnabled,
   };
 }
 
-export function useHostedCreditChrome(
-  organizationId: string,
-  factoryKey: string,
-): { headerKicker?: ReactNode; banner?: ReactNode } {
-  const { canAct } = usePermissions();
+export function useHostedCreditChrome(organizationId: string, factoryKey: string): { headerKicker?: ReactNode } {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
-  const { kind, remainingCreditCents, welcomeCreditExpiresAt, billingEnabled, subscriptionCheckoutEnabled } =
-    hostedCreditChromeState(spend.data, billing.data);
+  const { kind, remainingCreditCents, welcomeCreditExpiresAt, billingEnabled } = hostedCreditChromeState(
+    spend.data,
+    billing.data,
+  );
   if (!kind) {
     return {};
   }
 
   const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing");
-  const canManageBilling = canAct("org", "update");
-
-  if (isHostedCreditHeaderKickerKind(kind)) {
-    return {
-      headerKicker: (
-        <HostedCreditHeaderKicker
-          kind={kind}
-          spendingHref={spendingHref}
-          welcomeCreditExpiresAt={welcomeCreditExpiresAt}
-          remainingCreditCents={remainingCreditCents}
-        />
-      ),
-    };
-  }
 
   return {
-    banner: (
-      <HostedCreditEmptyBanner
+    headerKicker: (
+      <HostedCreditHeaderKicker
         kind={kind}
-        billingEnabled={billingEnabled}
-        canManageBilling={canManageBilling}
-        remainingCreditCents={remainingCreditCents}
-        welcomeCreditExpiresAt={welcomeCreditExpiresAt}
-        subscriptionCheckoutEnabled={subscriptionCheckoutEnabled}
         spendingHref={spendingHref}
+        welcomeCreditExpiresAt={welcomeCreditExpiresAt}
+        remainingCreditCents={remainingCreditCents}
+        canAddCredit={billingEnabled}
       />
     ),
   };
-}
-
-export function useHostedCreditEmptyBanner(organizationId: string, factoryKey: string) {
-  return useHostedCreditChrome(organizationId, factoryKey).banner;
 }

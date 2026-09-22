@@ -1,14 +1,9 @@
-import {
-  useFactoryPullRequests,
-  useFactoryWorkOrders,
-  useWorkOrder,
-  useWorkOrderArtifacts,
-} from "@/hooks/useFactoryData";
+import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import { useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -16,6 +11,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
+import { firstWorkOrderPullRequests } from "../../lib/workOrderPullRequest";
 import { useWorkOrderPRFeedbackLog } from "../useWorkOrderPRFeedbackRunHref";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
@@ -52,15 +48,12 @@ function useSplitRunWorkOrderExtras(
   organizationId: string,
   factoryId: string,
   order: ReturnType<typeof useSplitRunPageSelection>["order"],
+  liveOrder: FactoriesWorkOrder | undefined,
 ) {
   const orderId = order?.id ?? "";
-  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const orderChecks = firstWorkOrderChecks(liveOrder, order);
   const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(
-    organizationId,
-    factoryId,
-    orderId ? { workOrderIds: [orderId] } : undefined,
-  );
+  const pullRequests = firstWorkOrderPullRequests(liveOrder, order);
   const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
   const { runsByWorkOrder, analyzingOrderIds } = useFactoryBacklogAnalysis(organizationId, factoryId);
@@ -84,6 +77,7 @@ export function useFactoryAppSplitRunPage() {
     organizationId,
     factoryId,
     order,
+    liveWorkOrder.data,
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(
@@ -167,4 +161,15 @@ export function useFactoryAppSplitRunPage() {
     subtitle: resolveFactoryAppCanvasSubtitle({ factoryName: factory?.name }),
     files: liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined,
   };
+}
+
+function firstWorkOrderChecks(
+  ...orders: Array<{ checks?: FactoriesWorkOrderCheck[] } | null | undefined>
+): FactoriesWorkOrderCheck[] {
+  for (const order of orders) {
+    if (order?.checks) {
+      return order.checks;
+    }
+  }
+  return [];
 }

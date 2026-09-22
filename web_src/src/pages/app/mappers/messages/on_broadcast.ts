@@ -39,17 +39,15 @@ export const onBroadcastTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnBroadcastEventData | undefined;
     const values: Record<string, string> = {};
+    const appLabel = namedOrId(eventData?.app);
+    const sourceNodeLabel = namedOrId(eventData?.node);
 
-    if (eventData?.app?.name) {
-      values.App = eventData.app.name;
-    } else if (eventData?.app?.id) {
-      values.App = eventData.app.id;
+    if (appLabel) {
+      values.App = appLabel;
     }
 
-    if (eventData?.node?.name) {
-      values["Source node"] = eventData.node.name;
-    } else if (eventData?.node?.id) {
-      values["Source node"] = eventData.node.id;
+    if (sourceNodeLabel) {
+      values["Source node"] = sourceNodeLabel;
     }
 
     if (context.event?.createdAt) {
@@ -88,6 +86,16 @@ export const onBroadcastTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function namedOrId(entity?: { name?: string; id?: string }): string | undefined {
+  if (entity?.name) {
+    return entity.name;
+  }
+  if (entity?.id) {
+    return entity.id;
+  }
+  return undefined;
+}
 
 function broadcastTitle(eventData: OnBroadcastEventData | undefined): string {
   const appName = eventData?.app?.name?.trim();

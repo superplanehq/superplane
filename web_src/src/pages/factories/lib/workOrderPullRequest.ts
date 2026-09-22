@@ -2,6 +2,23 @@ import type { CanvasesCanvasRunRef, FactoriesFactoryPullRequest, FactoriesFactor
 
 export type FactoryPullRequestState = "open" | "draft" | "closed" | "merged";
 
+export function pullRequestsFromWorkOrders(
+  orders: Array<{ pullRequests?: FactoriesFactoryPullRequest[] } | undefined>,
+): FactoriesFactoryPullRequest[] {
+  return orders.flatMap((order) => order?.pullRequests ?? []);
+}
+
+export function firstWorkOrderPullRequests(
+  ...orders: Array<{ pullRequests?: FactoriesFactoryPullRequest[] } | null | undefined>
+): FactoriesFactoryPullRequest[] {
+  for (const order of orders) {
+    if (order?.pullRequests) {
+      return order.pullRequests;
+    }
+  }
+  return [];
+}
+
 export function groupPullRequestsByWorkOrderId(
   pullRequests: FactoriesFactoryPullRequest[],
 ): Map<string, FactoriesFactoryPullRequest[]> {

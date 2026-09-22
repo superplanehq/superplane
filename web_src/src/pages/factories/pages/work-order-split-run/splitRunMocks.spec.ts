@@ -1187,7 +1187,7 @@ describe("line board work-order examples", () => {
   });
 
   // A freshly created draft is known to be analyzing before its run appears in
-  // the polled list. The optimistic flag keeps the popup in step with the board.
+  // the live run list. The optimistic flag keeps the popup in step with the board.
   it("shows the analyzing state from the pending flag before a run appears", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,

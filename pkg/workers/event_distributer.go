@@ -54,6 +54,7 @@ func (e *EventDistributer) Start() error {
 		Handler    func(delivery tackle.Delivery) error
 	}{
 		{messages.EventsExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
+		{messages.CanvasExchange, messages.RunPendingRoutingKey, e.createHandler(eventdistributer.HandlePendingCanvasRun)},
 		{messages.CanvasExchange, messages.CanvasRunRoutingKey, e.createHandler(eventdistributer.HandleCanvasRun)},
 		{messages.CanvasExchange, messages.CanvasQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
 		{messages.CanvasExchange, messages.CanvasQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},

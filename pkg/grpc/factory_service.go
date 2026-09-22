@@ -154,11 +154,6 @@ func (s *FactoryService) DeleteFactoryPRFeedbackHandler(ctx context.Context, req
 	return actions.DeleteFactoryPRFeedbackHandler(ctx, organizationID, req)
 }
 
-func (s *FactoryService) ListFactoryPullRequests(ctx context.Context, req *pb.ListFactoryPullRequestsRequest) (*pb.ListFactoryPullRequestsResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListFactoryPullRequests(ctx, organizationID, req)
-}
-
 func (s *FactoryService) DescribeFactoryPullRequest(ctx context.Context, req *pb.DescribeFactoryPullRequestRequest) (*pb.DescribeFactoryPullRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryPullRequest(ctx, organizationID, req)
@@ -166,7 +161,7 @@ func (s *FactoryService) DescribeFactoryPullRequest(ctx context.Context, req *pb
 
 func (s *FactoryService) CreateFactoryPullRequest(ctx context.Context, req *pb.CreateFactoryPullRequestRequest) (*pb.CreateFactoryPullRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreateFactoryPullRequest(ctx, organizationID, req)
+	return actions.CreateFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryPullRequest(ctx context.Context, req *pb.UpdateFactoryPullRequestRequest) (*pb.UpdateFactoryPullRequestResponse, error) {
@@ -273,11 +268,6 @@ func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.De
 func (s *FactoryService) SyncFactoryVelocity(ctx context.Context, req *pb.SyncFactoryVelocityRequest) (*pb.SyncFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SyncFactoryVelocity(ctx, organizationID, req)
-}
-
-func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListWorkOrderChecks(ctx, organizationID, req)
 }
 
 func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.DescribeFactoryUsageRequest) (*pb.DescribeFactoryUsageResponse, error) {

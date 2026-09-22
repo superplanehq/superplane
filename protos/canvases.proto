@@ -501,12 +501,11 @@ message CanvasSummary {
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
   UserRef created_by = 6;
-  string folder_id = 7;
-  repeated Node nodes = 8;
-  repeated Components.Edge edges = 9;
-  bool starred = 10;
-  google.protobuf.Timestamp starred_at = 11;
-  string factory_id = 12;
+  repeated Node nodes = 7;
+  repeated Components.Edge edges = 8;
+  bool starred = 9;
+  google.protobuf.Timestamp starred_at = 10;
+  string factory_id = 11;
 }
 
 message CanvasPreference {
@@ -524,10 +523,9 @@ message Canvas {
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
-    string folder_id = 8;
-    string live_version_id = 9;
-    repeated string dismissed_agent_suggestion_ids = 10;
-    string factory_id = 11;
+    string live_version_id = 8;
+    repeated string dismissed_agent_suggestion_ids = 9;
+    string factory_id = 10;
   }
 
   message Spec {

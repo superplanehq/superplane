@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -34,6 +35,8 @@ type FactoryContext struct {
 	// mutation with a `reason` string (currently the event type that was
 	// recorded). Wired by the node executor via WithWorkOrderUpdated.
 	onWorkOrderUpdated func(factoryID, orderID, reason string)
+
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID)
 
 	// Optional notification fan-out callback: invoked with a fully built
 	// notification payload for mutations that should email work order
@@ -69,6 +72,13 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 
 func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
 	c.onWorkOrderUpdated = callback
+	return c
+}
+
+func (c *FactoryContext) WithGitHubPullRequestRecorded(
+	callback func(organizationID, factoryID, pullRequestID uuid.UUID),
+) *FactoryContext {
+	c.onGitHubPullRequestRecorded = callback
 	return c
 }
 
@@ -151,6 +161,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateJiraWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
@@ -190,6 +208,35 @@ func (c *FactoryContext) skipDuplicateSentryWorkOrder(factoryModel *models.Facto
 	}
 	if hasOrder {
 		log.Infof("skipping Sentry issue %s: work order already exists", issueID)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := jira.IssueRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := jira.LockIssueWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := jira.IssueHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
 	}
 	return hasOrder, nil
 }
@@ -584,6 +631,16 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
 }
 
+func (c *FactoryContext) notifyGitHubPullRequestRecorded(pullRequest *models.FactoryPullRequest) {
+	if c.onGitHubPullRequestRecorded == nil || pullRequest == nil {
+		return
+	}
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+		return
+	}
+	c.onGitHubPullRequestRecorded(pullRequest.OrganizationID, pullRequest.FactoryID, pullRequest.ID)
+}
+
 func (c *FactoryContext) notifyWorkOrderNotification(message messages.FactoryWorkOrderNotificationMessage) {
 	if c.onWorkOrderNotification == nil {
 		return
@@ -775,6 +832,7 @@ func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderPullRequestAdded)
+	c.notifyGitHubPullRequestRecorded(pullRequest)
 	return pullRequestToCore(pullRequest), nil
 }
 

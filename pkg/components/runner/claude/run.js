@@ -69,10 +69,10 @@ function loadAnalysisProtocolModule() {
   return {};
 }
 
-function loadAnalysisProtocol() {
+function loadAnalysisProtocol(env = process.env) {
   const mod = loadAnalysisProtocolModule();
   return typeof mod.analysisProtocol === "function"
-    ? mod.analysisProtocol()
+    ? mod.analysisProtocol(env)
     : "";
 }
 
@@ -100,13 +100,32 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // MCP tools. Edit/Write are intentionally excluded so the agent cannot make
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
-const ANALYSIS_ALLOWED_TOOLS = [
+const ANALYSIS_BASE_ALLOWED_TOOLS = [
   "mcp__superplane__propose_spec",
-  "mcp__superplane__propose_clarity",
-  "mcp__superplane__propose_confidence",
   "mcp__superplane__survey",
   "mcp__superplane__create_task",
 ];
+
+function analysisAllowedTools(env = process.env) {
+  const tools = [...ANALYSIS_BASE_ALLOWED_TOOLS];
+  const protocol = loadAnalysisProtocolModule();
+  const clarityEnabled =
+    typeof protocol.planningClarityEnabled === "function"
+      ? protocol.planningClarityEnabled(env)
+      : true;
+  const confidenceEnabled =
+    typeof protocol.planningConfidenceEnabled === "function"
+      ? protocol.planningConfidenceEnabled(env)
+      : true;
+  if (clarityEnabled) {
+    tools.splice(1, 0, "mcp__superplane__propose_clarity");
+  }
+  if (confidenceEnabled) {
+    const insertAt = tools.indexOf("mcp__superplane__propose_clarity") + 1;
+    tools.splice(insertAt > 0 ? insertAt : 1, 0, "mcp__superplane__propose_confidence");
+  }
+  return tools;
+}
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",
   "mcp__superplane__upload_artifact",
@@ -122,7 +141,7 @@ function planningAnalysisEnabled(env = process.env) {
 }
 
 function planningSystemPrompt(env = process.env) {
-  return planningAnalysisEnabled(env) ? ` ${loadAnalysisProtocol()}` : "";
+  return planningAnalysisEnabled(env) ? ` ${loadAnalysisProtocol(env)}` : "";
 }
 
 function allowedClaudeTools(env = process.env) {
@@ -134,7 +153,7 @@ function allowedClaudeTools(env = process.env) {
       PLANNING_READONLY_TOOLS,
       "mcp__superplane",
       ...workspaceAllow,
-      ...ANALYSIS_ALLOWED_TOOLS,
+      ...analysisAllowedTools(env),
     ].join(",");
   }
   if (artifactMCPEnabled(env)) {

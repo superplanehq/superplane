@@ -141,9 +141,11 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
 			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
 			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
+			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackAcknowledgeReviewNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
 			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
 			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
+			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackAcknowledgeReviewReplyNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
@@ -151,20 +153,26 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			assert.NotEqual(t, "finish", node.ID)
 		}
 
-		acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
-		assert.Equal(t, "github.addReaction", acknowledge.Component)
-		assert.Equal(t, "{{ root().data.repository.full_name }}", acknowledge.Configuration["repository"])
-		assert.Equal(t, "{{ root().data.comment.id }}", acknowledge.Configuration["commentId"])
-		assert.Equal(t, "eyes", acknowledge.Configuration["content"])
-		assert.Equal(t, "issueComment", acknowledge.Configuration["target"])
-		assert.Equal(t, yaml.Position{X: 360, Y: -40}, acknowledge.Position)
+		assertPRFeedbackAcknowledgeNode(t, canvas, prFeedbackAcknowledgeCommentNodeID,
+			prFeedbackCommentAcknowledgeCommentIDExpression(), "issueComment",
+			prFeedbackAcknowledgePosition(prFeedbackCommentFlowY))
+		assertPRFeedbackAcknowledgeNode(t, canvas, prFeedbackAcknowledgeReviewNodeID,
+			prFeedbackReviewAcknowledgeCommentIDExpression(), "reviewComment",
+			prFeedbackAcknowledgePosition(prFeedbackReviewFlowY))
+		assertPRFeedbackAcknowledgeNode(t, canvas, prFeedbackAcknowledgeReviewReplyNodeID,
+			prFeedbackCommentAcknowledgeCommentIDExpression(), "reviewComment",
+			prFeedbackAcknowledgePosition(prFeedbackReplyFlowY))
 		var reactionIDs []string
 		for _, node := range canvas.Spec.Nodes {
 			if node.Component == "github.addReaction" {
 				reactionIDs = append(reactionIDs, node.ID)
 			}
 		}
-		assert.Equal(t, []string{prFeedbackAcknowledgeCommentNodeID}, reactionIDs)
+		assert.Equal(t, []string{
+			prFeedbackAcknowledgeCommentNodeID,
+			prFeedbackAcknowledgeReviewNodeID,
+			prFeedbackAcknowledgeReviewReplyNodeID,
+		}, reactionIDs)
 
 		reply := findSpecNode(t, canvas, prFeedbackReplyTriggerNodeID)
 		assert.Equal(t, false, reply.Configuration["includeReviewSubmissions"])
@@ -431,6 +439,25 @@ func assertPRFeedbackPerPullRequestConcurrency(t *testing.T, canvas *yaml.Canvas
 		assert.Equalf(t, prFeedbackConcurrencyKey, node.Concurrency.Key, "node %s", node.ID)
 		assert.Nilf(t, node.Concurrency.Max, "node %s sets a concurrency max", node.ID)
 	}
+}
+
+func assertPRFeedbackAcknowledgeNode(
+	t *testing.T,
+	canvas *yaml.Canvas,
+	nodeID string,
+	commentID string,
+	target string,
+	position yaml.Position,
+) {
+	t.Helper()
+
+	node := findSpecNode(t, canvas, nodeID)
+	assert.Equal(t, "github.addReaction", node.Component)
+	assert.Equal(t, "{{ root().data.repository.full_name }}", node.Configuration["repository"])
+	assert.Equal(t, commentID, node.Configuration["commentId"])
+	assert.Equal(t, "eyes", node.Configuration["content"])
+	assert.Equal(t, target, node.Configuration["target"])
+	assert.Equal(t, position, node.Position)
 }
 
 func yamlEdgeChannels(canvas *yaml.Canvas) []string {

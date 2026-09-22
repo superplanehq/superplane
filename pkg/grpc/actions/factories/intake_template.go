@@ -28,35 +28,12 @@ const (
 	intakeThresholdNodeID        = "threshold"
 	intakeReportConfidenceNodeID = "report-confidence"
 
-	// The analysis node name is part of the generated backlog graph's contract:
-	// the report-check fields read the score by this name.
-	intakeAnalysisNodeName = "Analyze intake"
-	intakeCreateNodeName   = "Create Task"
+	intakeCreateNodeName = "Create Task"
 
 	intakeFilterComponent           = "if"
 	intakeAuthorPermissionComponent = "github.getRepositoryPermission"
 	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
-	intakeReportConfidenceComponent = "reportWorkOrderCheck"
-
-	intakeConfidenceCheckKey  = "confidence"
-	intakeConfidenceCheckName = "Confidence score"
-	intakeConfidenceScoreMax  = 5
-	intakeConfidenceFormat    = "fraction"
-	intakeConfidenceDirection = "higherIsBetter"
-
-	// Band edges of the confidence meter, which reads High from 4, Medium at
-	// 3, and Low below 3. The check has no neutral threshold, so Medium maps
-	// to caution and Low maps to critical.
-	intakeConfidenceCautionAt  = 3
-	intakeConfidenceCriticalAt = 2
-
-	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
-	intakeIntentOutputFile   = "/tmp/intent.md"
-
-	intakeIntentArtifactNodeID   = "attach-intent"
-	intakeIntentArtifactNodeName = "Add intent"
-	intakeIntentArtifactTitle    = "intent.md"
 
 	intakeAddRunErrorNodeID    = "add-run-error"
 	intakeAddRunErrorNodeName  = "Record Analysis Failure"
@@ -100,7 +77,6 @@ type intakeSpec struct {
 	triggerComponent     string
 	triggerName          string
 	triggerConfiguration map[string]any
-	analysisSubject      string
 	createTitle          string
 	createDescription    string
 }
@@ -112,7 +88,6 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerComponent:     "github.onIssue",
 		triggerName:          "On Issue",
 		triggerConfiguration: map[string]any{"actions": intakeTriggerActionsFor(defaultIntakeSettings())},
-		analysisSubject:      "GitHub issue",
 		createTitle:          "{{ root().data.issue.title }}",
 		createDescription:    "{{ root().data.issue.body }}",
 	},
@@ -121,8 +96,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a Sentry exception is reported.",
 		triggerComponent:     "sentry.onIssue",
 		triggerName:          "On Issue Event",
-		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
-		analysisSubject:      "Sentry exception",
+		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		createTitle:          "{{ root().data.data.issue.title }}",
 		createDescription:    "{{ root().data.description }}",
 	},
@@ -135,7 +109,6 @@ var intakeSpecsBySource = map[string]intakeSpec{
 			"events":    []any{"incident.triggered"},
 			"urgencies": []any{"high", "low"},
 		},
-		analysisSubject:   "PagerDuty incident",
 		createTitle:       "{{ root().data.incident.title }}",
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
@@ -145,7 +118,6 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerComponent:     "productive.onTask",
 		triggerName:          "On Task",
 		triggerConfiguration: map[string]any{"actions": []any{"created"}},
-		analysisSubject:      "Productive.io task",
 		createTitle:          "{{ root().data.data.attributes.title }}",
 		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
@@ -157,8 +129,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerConfiguration: map[string]any{
 			"events": intakeTriggerEventsFor(defaultJiraIntakeSettings()),
 		},
-		analysisSubject: "Jira issue",
-		createTitle:     `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`,
+		createTitle: `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`,
 		// The raw description field holds an Atlassian Document Format
 		// object, so the work order reads the plain text copy the trigger
 		// reports next to it.
@@ -185,7 +156,7 @@ func intakeDefaultDescription(source string) string {
 
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
 // source and create a work order. GitHub intakes keep a filter node so label
-// and assignment settings have somewhere to live. Confidence scoring happens
+// and assignment settings have somewhere to live. Planning happens
 // on the factory Backlog canvas after the work order exists.
 func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	spec, ok := intakeSpecsBySource[request.Source]
@@ -268,6 +239,49 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 func intakeConcurrency() *yaml.ConcurrencySpec {
 	max := intakeConcurrencyMax
 	return &yaml.ConcurrencySpec{Max: &max}
+}
+
+func ensureIntakeFilterNode(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+) ([]models.Node, []models.Edge, intakeGraph, error) {
+	if graph.FilterNodeID != "" {
+		return nodes, edges, graph, nil
+	}
+	if graph.TriggerNodeID == "" || graph.CreateNodeID == "" {
+		return nil, nil, graph, fmt.Errorf("intake automation has no filter to update")
+	}
+
+	nodes = upsertIntakeNode(nodes, models.Node{
+		ID:   intakeFilterNodeID,
+		Name: "Matches filters?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": "true",
+		},
+		Position:    models.Position{X: 160, Y: 260},
+		Concurrency: intakeModelConcurrency(),
+	})
+	graph.FilterNodeID = intakeFilterNodeID
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.TriggerNodeID && edge.TargetID == graph.CreateNodeID
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: graph.TriggerNodeID,
+		TargetID: intakeFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, graph, nil
 }
 
 func configureIntakeAuthorAccess(
@@ -409,32 +423,10 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return defaultJiraIntakeSettings()
 	}
-	return defaultIntakeSettings()
-}
-
-// intakeAnalysisConfiguration sets the machine, checkout, and steps. BYOK
-// agents also receive credentials and a model.
-func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent, githubName string) map[string]any {
-	configuration := intakeRunnerConfiguration(agent, githubName)
-	configuration["steps"] = []any{
-		map[string]any{
-			"name":    "Clone repository",
-			"type":    runner.AgentStepBash,
-			"command": intakeAnalysisCloneCommand(),
-		},
-		map[string]any{
-			"name":             "Analyze and score",
-			"type":             "prompt",
-			"workingDirectory": "repo",
-			"prompt":           intakeAnalysisPrompt(spec.analysisSubject),
-		},
-		map[string]any{
-			"name":    "Use analysis as output",
-			"type":    runner.AgentStepBash,
-			"command": intakeAnalysisOutputCommand(),
-		},
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		return defaultSentryIntakeSettings()
 	}
-	return configuration
+	return defaultIntakeSettings()
 }
 
 func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[string]any {
@@ -510,142 +502,6 @@ func intakeAnalysisCloneCommand() string {
 		"rm -rf repo",
 		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
 	}, "\n")
-}
-
-func intakeAnalysisPrompt(subject string) string {
-	return strings.Join([]string{
-		fmt.Sprintf("Analyze this %s against the repository checked out in the working directory.", subject),
-		"Read the ticket and the code. Score how well an agent on this factory line can complete the work.",
-		"Do not score from the title and description alone.",
-		"",
-		fmt.Sprintf("Write one JSON object to %s.", intakeAnalysisOutputFile),
-		fmt.Sprintf("The file must parse with jq. Run `jq empty %s` and keep editing until it succeeds.", intakeAnalysisOutputFile),
-		"Keys:",
-		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
-		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
-		`- "reasons": exactly three short sentences that explain the score.`,
-		"Write three reasons: what the item names, what already exists in this repository, and whether an agent can do the work.",
-		"",
-		fmt.Sprintf("Also write %s. Write it like you are explaining the work to a teammate, not like a spec.", intakeIntentOutputFile),
-		"Keep it under 40 lines. Use short sentences and plain words.",
-		"Do not write implementation details, file lists, APIs, or a detailed spec.",
-		"Do not use words like proposed outcome, stakeholders, systems, or proto-spec.",
-		"Do not start with a title such as Intent:.",
-		"Use a mermaid fence only when a simple diagram clarifies the idea.",
-		"Do not add an Open questions section.",
-		"Map your 0-100 score to a 0-5 confidence with round(score / 20). Pick one intent format from that 0-5 value.",
-		"",
-		"If confidence is 4 or 5, use these markdown headings:",
-		"## How I understand this",
-		"## What's going on",
-		"## What done looks like",
-		"## What to watch",
-		"Write How I understand this in first person. Answer: How do you understand what needs to be done here?",
-		"What's going on: what is missing or broken, in everyday words.",
-		"What done looks like: what a person will notice when the work is finished.",
-		"What to watch: hard limits only, such as keep the change small.",
-		"",
-		"If confidence is 2 or 3, use the same headings, then add:",
-		"## Honest take",
-		"Say what is uncertain and why. Do not pretend the work is clear.",
-		"",
-		"If confidence is 0 or 1, do not write What done looks like or What to watch.",
-		"Use these markdown headings:",
-		"## How I understand this",
-		"## Why I would not start this",
-		"## What would make this clear",
-		"How I understand this: say that you do not know what should be done, and why.",
-		"Why I would not start this: tell the reader not to start implementation until they refine the task.",
-		"What would make this clear: the top 3 changes that would make the task clear enough to start. Use a numbered list.",
-		"",
-		"Task:",
-		"{{ root().data.workOrder }}",
-	}, "\n")
-}
-
-// intakeAnalysisOutputCommand promotes the files the agent wrote to the node's
-// result, so the rest of the graph reads fields instead of parsing text. The
-// prompt asks for an exact shape, but this step accepts what an agent really
-// produces: a quoted number, a missing summary, or a different number of
-// reasons. Only the score and intent body are required.
-func intakeAnalysisOutputCommand() string {
-	return fmt.Sprintf(`if [ ! -s %s ]; then
-  echo "The analysis wrote no intent.md" >&2
-  exit 1
-fi
-if ! jq -ce --rawfile intent %s '{
-  score: (.score | tonumber | floor),
-  summary: ((.summary // "") | tostring),
-  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring],
-  intent: ($intent | tostring)
-}' %s > "$SUPERPLANE_RESULT_FILE"; then
-  echo "The analysis at %s has no readable score" >&2
-  exit 1
-fi`, intakeIntentOutputFile, intakeIntentOutputFile, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
-}
-
-func intakeIntentBodyExpression() string {
-	return fmt.Sprintf(`{{ $[%q].data.result.intent }}`, intakeAnalysisNodeName)
-}
-
-func intakeIntentArtifactConfiguration() map[string]any {
-	return map[string]any{
-		"orderId":      intakeWorkOrderIDFromRootExpression(),
-		"artifactType": "markdown",
-		"title":        intakeIntentArtifactTitle,
-		"body":         intakeIntentBodyExpression(),
-	}
-}
-
-func intakeAnalysisScorePath() string {
-	return fmt.Sprintf(`$[%q].data.result.score`, intakeAnalysisNodeName)
-}
-
-func intakeWorkOrderIDFromRootExpression() string {
-	return `{{ root().data.workOrder.id }}`
-}
-
-func intakeConfidenceSummaryExpression() string {
-	return fmt.Sprintf(`{{ $[%q].data.result.summary }}`, intakeAnalysisNodeName)
-}
-
-func intakeConfidenceWriteupExpression(subject string) string {
-	intro := fmt.Sprintf(
-		"The automation read this %s. It scored how suitable the work is for an agent on this factory line.",
-		subject,
-	)
-	return fmt.Sprintf(
-		`{{ %q + "\n\n### Why this score\n- " + join($[%q].data.result.reasons, "\n- ") }}`,
-		intro,
-		intakeAnalysisNodeName,
-	)
-}
-
-// intakeConfidenceScoreExpression maps the analysis percentage to the 0–5
-// scale of the work-order confidence meter. The meter rounds the score it
-// receives, so the expression rounds too and both agree on the bar count.
-func intakeConfidenceScoreExpression() string {
-	pctPerPoint := 100 / intakeConfidenceScoreMax
-	return fmt.Sprintf(
-		`{{ int(round(int(%s) / %d.0)) }}`,
-		intakeAnalysisScorePath(), pctPerPoint,
-	)
-}
-
-func intakeConfidenceReportConfiguration(subject string) map[string]any {
-	return map[string]any{
-		"orderId":    intakeWorkOrderIDFromRootExpression(),
-		"checkKey":   intakeConfidenceCheckKey,
-		"name":       intakeConfidenceCheckName,
-		"score":      intakeConfidenceScoreExpression(),
-		"maxScore":   strconv.Itoa(intakeConfidenceScoreMax),
-		"format":     intakeConfidenceFormat,
-		"direction":  intakeConfidenceDirection,
-		"cautionAt":  float64(intakeConfidenceCautionAt),
-		"criticalAt": float64(intakeConfidenceCriticalAt),
-		"summary":    intakeConfidenceSummaryExpression(),
-		"analysis":   intakeConfidenceWriteupExpression(subject),
-	}
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

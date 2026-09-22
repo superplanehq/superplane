@@ -59,9 +59,11 @@ import {
   DiscussionPRFeedbackSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
+  PlanningSetupPage,
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
@@ -113,13 +115,15 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
 );
 
 const withAuthPermissionAndFactoriesFeature = (Component: React.ComponentType, resource: string, action: string) => (
-  <AuthGuard>
-    <RequirePermission resource={resource} action={action}>
-      <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
-        <Component />
-      </RequireExperimentalFeature>
-    </RequirePermission>
-  </AuthGuard>
+  <WorkspaceLoadingProvider>
+    <AuthGuard>
+      <RequirePermission resource={resource} action={action}>
+        <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+          <Component />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    </AuthGuard>
+  </WorkspaceLoadingProvider>
 );
 
 function organizationScopedRouteTree() {
@@ -161,6 +165,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+              <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />

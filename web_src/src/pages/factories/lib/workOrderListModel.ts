@@ -1,11 +1,12 @@
 import type {
   FactoriesFactory,
   FactoriesLineRef,
-  FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { workOrderListSource } from "./workOrderCardSource";
+import { workOrderMatchesUser } from "./workOrderListPagination";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatDurationSeconds, formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
 import {
@@ -19,7 +20,7 @@ import {
 } from "./workOrderProgress";
 
 /**
- * Presentation model built on top of a `FactoriesWorkOrder`. It centralizes
+ * Presentation model built on top of a listed work order. It centralizes
  * every derived value the Tasks layouts need — identifiers, status,
  * latest line and step, usage, assignee summary, and search text — so
  * board/list/table stay display-only and can share the same reducers.
@@ -29,7 +30,7 @@ import {
  * everything else the reference application shows.
  */
 export interface WorkOrderListEntry {
-  order: FactoriesWorkOrder;
+  order: FactoriesWorkOrderSummary;
   id: string;
   displayKey: string;
   /** Numeric part of `displayKey`, used to order by ID. */
@@ -61,7 +62,7 @@ export interface WorkOrderListEntry {
 }
 
 export function buildWorkOrderListEntry(
-  order: FactoriesWorkOrder,
+  order: FactoriesWorkOrderSummary,
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry {
   const dispatches = order.lineDispatches ?? [];
@@ -129,7 +130,7 @@ function trimOrNull(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function isDispatchableState(state: FactoriesWorkOrder["state"]): boolean {
+function isDispatchableState(state: FactoriesWorkOrderSummary["state"]): boolean {
   return state === "STATE_DRAFT" || state === "STATE_OPEN";
 }
 
@@ -194,7 +195,7 @@ function collectLines(dispatches: FactoriesWorkOrderLineDispatch[]): { ids: stri
  * the executions so older payloads still show usage.
  */
 function sumUsage(
-  order: FactoriesWorkOrder,
+  order: FactoriesWorkOrderSummary,
   executions: FactoriesWorkOrderExecution[],
 ): { totalTokens: number; totalCostCents: number; durationSeconds: number } {
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
@@ -213,7 +214,7 @@ function sumUsage(
   );
 }
 
-function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; assigneeNames: string[] } {
+function collectAssignees(order: FactoriesWorkOrderSummary): { assigneeIds: string[]; assigneeNames: string[] } {
   const owner = order.assignees?.[0];
   if (!owner?.id) {
     return { assigneeIds: [], assigneeNames: [] };
@@ -226,7 +227,7 @@ function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; a
 }
 
 export function buildWorkOrderListEntries(
-  orders: FactoriesWorkOrder[],
+  orders: FactoriesWorkOrderSummary[],
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry[] {
   return orders.map((order) => buildWorkOrderListEntry(order, factory));
@@ -350,7 +351,7 @@ export function applyWorkOrderScope(
   if (!currentUserId) {
     return [];
   }
-  return entries.filter((entry) => entry.assigneeIds.includes(currentUserId));
+  return entries.filter((entry) => workOrderMatchesUser(entry.order, currentUserId));
 }
 
 export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: WorkOrderFilters): WorkOrderListEntry[] {
@@ -365,11 +366,13 @@ export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: Wo
     result = result.filter((entry) => filters.sourceIds.includes(entry.sourceId));
   }
   if (filters.assigneeIds.length > 0) {
+    const people = filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+    const wantsUnassigned = filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE);
     result = result.filter((entry) => {
-      if (entry.assigneeIds.some((id) => filters.assigneeIds.includes(id))) {
+      if (wantsUnassigned && entry.assigneeIds.length === 0) {
         return true;
       }
-      return filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE) && entry.assigneeIds.length === 0;
+      return people.some((id) => workOrderMatchesUser(entry.order, id));
     });
   }
   return result;

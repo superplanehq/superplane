@@ -1,5 +1,7 @@
 import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
+import type { LineIntakeSourceId } from "./lineIntakeModel";
+
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
 export type IntakeSettingsTab = "general" | "agent" | "automation";
@@ -31,6 +33,14 @@ export interface IntakeSourceSettings {
   jiraMoveOnComplete: boolean;
   /** Jira status name to move the issue to. Empty means the Done column. */
   jiraCompletionColumn: string;
+  /** Create a task when a Sentry issue is created. */
+  sentryNewIssues: boolean;
+  /** Create a task when a Sentry issue becomes unresolved. */
+  sentryRegressedIssues: boolean;
+  /** Create a task when a Sentry issue is assigned. */
+  sentryAssignedIssues: boolean;
+  /** Issue levels that still create a task. Empty means every level. */
+  sentryLevels: string[];
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -46,6 +56,21 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   authorsWithAccess: false,
   jiraMoveOnComplete: true,
   jiraCompletionColumn: "",
+  sentryNewIssues: true,
+  sentryRegressedIssues: true,
+  sentryAssignedIssues: false,
+  sentryLevels: [],
+};
+
+export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
+
+export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Sentry exceptions",
+  sentryNewIssues: true,
+  sentryRegressedIssues: true,
+  sentryAssignedIssues: false,
+  sentryLevels: [],
 };
 
 export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
@@ -85,16 +110,25 @@ export const INTAKE_SETTINGS_COPY = {
   resume: "Resume intake",
   pausing: "Pausing",
   resuming: "Resuming",
-  pauseHelper: "SuperPlane stops new Sentry items. Tasks in Backlog stay.",
+  pauseHelper: "SuperPlane stops new items. Tasks in Backlog stay.",
   delete: "Delete intake",
   deleteTitle: "Delete this intake?",
   deleteDescription:
-    "SuperPlane stops new Sentry items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
+    "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
   deleteCancel: "Keep intake",
   deleteConfirm: "Delete intake",
   pauseError: "SuperPlane could not change the intake. Try again.",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
+
+export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
+  return (
+    sourceId === "github-issues" ||
+    sourceId === "sentry-exceptions" ||
+    sourceId === "jira-issues" ||
+    sourceId === "productive-tasks"
+  );
+}
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
@@ -109,15 +143,22 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
 }
 export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
+  const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
   if (!draft.filterByLabel) {
-    return { ...draft, confidencePct, labels: [], labelFilterMode: "include" };
+    return { ...draft, confidencePct, labels: [], labelFilterMode: "include", sentryLevels };
   }
-  return { ...draft, confidencePct };
+  return { ...draft, confidencePct, sentryLevels };
 }
 
 type IntakeToggles = Pick<
   IntakeSourceSettings,
-  "newIssues" | "reopenedIssues" | "superplaneLabelAdded" | "authorsWithAccess"
+  | "newIssues"
+  | "reopenedIssues"
+  | "superplaneLabelAdded"
+  | "authorsWithAccess"
+  | "sentryNewIssues"
+  | "sentryRegressedIssues"
+  | "sentryAssignedIssues"
 >;
 
 /** A response that omits a toggle predates it, so fall back to the default. */
@@ -127,6 +168,9 @@ function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefin
     reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
     superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
     authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    sentryNewIssues: settings?.sentryNewIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues,
+    sentryRegressedIssues: settings?.sentryRegressedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues,
+    sentryAssignedIssues: settings?.sentryAssignedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues,
   };
 }
 
@@ -145,6 +189,7 @@ export function intakeSettingsFromApi(
     ...intakeTogglesFromApi(settings),
     jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
+    sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
   };
 }
 
@@ -166,6 +211,10 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     superplaneLabelAdded: settings.superplaneLabelAdded,
     jiraMoveOnComplete: settings.jiraMoveOnComplete,
     jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
+    sentryNewIssues: settings.sentryNewIssues,
+    sentryRegressedIssues: settings.sentryRegressedIssues,
+    sentryAssignedIssues: settings.sentryAssignedIssues,
+    sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
   };
 }
 

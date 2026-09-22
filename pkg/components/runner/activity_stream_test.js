@@ -19,7 +19,7 @@ function analysisEnvironment() {
   };
 }
 
-test("emits ordered records with stable activity metadata", () => {
+test("emits ordered records with namespaced tool events and stable metadata", () => {
   const records = [];
   let now = 1000;
   const stream = createActivityStream({
@@ -51,12 +51,12 @@ test("emits ordered records with stable activity metadata", () => {
       "content_start",
       "line",
       "content_end",
-      "tool_start",
-      "tool_start",
+      "activity_tool_start",
+      "activity_tool_start",
       "line",
-      "tool_end",
+      "activity_tool_end",
       "line",
-      "tool_end",
+      "activity_tool_end",
       "activity_end",
     ],
   );

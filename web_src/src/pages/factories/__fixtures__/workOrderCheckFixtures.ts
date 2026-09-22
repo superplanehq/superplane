@@ -21,8 +21,8 @@ import {
 
 /**
  * Mock checks for Storybook — scores that dedicated automations attach to a
- * task (risk review, coverage, confidence). Shaped like the
- * `ListWorkOrderChecks` API response entries. Timestamps are relative to
+ * task (risk review, coverage, confidence). Shaped like the checks on a
+ * work order. Timestamps are relative to
  * now so the cards always read as recent.
  */
 
@@ -230,9 +230,8 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   },
 ];
 
-/** Fallback map for fixtures that do not override `checksByOrderId` —
- * the open order carries the full set, the running order a partial one,
- * and every other order (closed, draft, failed) has none. */
+/** Fallback map for fixtures that do not override `checksByOrderId`.
+ * The list and describe handlers copy these onto the work order. */
 const LEVEL_FOR_CHECK: Record<ReturnType<typeof confidenceCheckLevel>, FactoriesWorkOrderCheck["level"]> = {
   positive: "LEVEL_POSITIVE",
   neutral: "LEVEL_NEUTRAL",

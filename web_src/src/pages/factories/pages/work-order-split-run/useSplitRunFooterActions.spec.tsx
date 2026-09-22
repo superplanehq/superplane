@@ -157,12 +157,14 @@ describe("useSplitRunFooterActions", () => {
 
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders"],
+      exact: true,
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders", "wo-1"],
+      exact: true,
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+      queryKey: ["factories", "org-1", "factory-1", "work-orders-page"],
     });
   });
 

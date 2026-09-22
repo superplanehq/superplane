@@ -35,10 +35,11 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 		return
 	}
 
-	repository, numbers, sha := githubMergeabilityWebhookRef(eventType, body)
-	if repository == "" {
+	payload, ok := parseGitHubMergeabilityWebhookPayload(eventType, body)
+	if !ok {
 		return
 	}
+	repository := strings.TrimSpace(payload.Repository.FullName)
 	configured := factoryMergeabilityWebhookRepository(webhook.Configuration.Data())
 	if configured != "" && !strings.EqualFold(configured, repository) {
 		return
@@ -51,6 +52,12 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 		return
 	}
 
+	if isGitHubPullRequestClosedEvent(eventType, payload) {
+		closeFactoryWorkOrdersFromGitHubPullRequestClosed(db, integration, payload)
+		return
+	}
+
+	_, numbers, sha := githubMergeabilityWebhookRefFromPayload(payload)
 	pullRequests, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(
 		db,
 		integration.OrganizationID,
@@ -79,8 +86,72 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
-		refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		if err := refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
+			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
+		}
 	}
+}
+
+var publishFactoryWorkOrderUpdated = messages.PublishFactoryWorkOrderUpdated
+
+func ScheduleFactoryPullRequestMergeabilityRefresh(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) {
+	if organizationID == uuid.Nil || factoryID == uuid.Nil || pullRequestID == uuid.Nil {
+		return
+	}
+	ctx = context.WithoutCancel(ctx)
+	go retryFactoryPullRequestMergeabilityRefresh(ctx, deps, organizationID, factoryID, pullRequestID)
+}
+
+func retryFactoryPullRequestMergeabilityRefresh(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) {
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		err = refreshFactoryPullRequestMergeabilityByID(ctx, deps, organizationID, factoryID, pullRequestID)
+		if err == nil {
+			return
+		}
+		log.WithError(err).Warnf(
+			"factory mergeability: refresh attempt %d failed for pull request %s",
+			attempt,
+			pullRequestID,
+		)
+		if attempt < 3 {
+			time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+		}
+	}
+}
+
+func refreshFactoryPullRequestMergeabilityByID(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) error {
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, organizationID, factoryID)
+	if err != nil {
+		return fmt.Errorf("factory %s not found: %w", factoryID, err)
+	}
+	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequestID})
+	if err != nil {
+		return fmt.Errorf("pull request %s not found: %w", pullRequestID, err)
+	}
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+		return nil
+	}
+	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
+		log.WithError(err).Warnf(
+			"factory mergeability: failed to ensure webhook for %s",
+			pullRequest.Repository,
+		)
+	}
+	return refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 }
 
 func refreshFactoryPullRequestMergeability(
@@ -89,45 +160,48 @@ func refreshFactoryPullRequestMergeability(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
-) {
-	before := models.FactoryPullRequestMergeabilitySnapshot{
-		Mergeable:      pullRequest.Mergeable,
-		BlockedReason:  pullRequest.MergeBlockedReason,
-		BlockedMessage: pullRequest.MergeBlockedMessage,
-		HeadSHA:        pullRequest.MergeableHeadSHA,
-		AllowedMethods: pullRequest.MergeableAllowedMethods,
+) error {
+	before := storedFactoryPullRequestMergeability(pullRequest)
+	if _, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
+		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
 	}
-	result, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-	if err != nil {
-		log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
-		return
+	if storedFactoryPullRequestMergeability(pullRequest) == before {
+		return nil
 	}
-	after := models.FactoryPullRequestMergeabilitySnapshot{
-		Mergeable:      result.CanMerge,
-		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
-		BlockedMessage: result.Message,
-		HeadSHA:        result.HeadSHA,
-		AllowedMethods: mergeMethodNames(result.AllowedMethods),
-	}
-	if before == after {
-		return
-	}
-	if err := messages.PublishFactoryWorkOrderUpdated(
+	if err := publishFactoryWorkOrderUpdated(
 		factory.ID.String(),
 		pullRequest.WorkOrderID.String(),
 		factoryevents.EventTypeOrderPullRequestUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
 	}
+	return nil
+}
+
+func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest) models.FactoryPullRequestMergeabilitySnapshot {
+	if pullRequest == nil {
+		return models.FactoryPullRequestMergeabilitySnapshot{}
+	}
+	return models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      pullRequest.Mergeable,
+		BlockedReason:  pullRequest.MergeBlockedReason,
+		BlockedMessage: pullRequest.MergeBlockedMessage,
+		HeadSHA:        pullRequest.MergeableHeadSHA,
+		AllowedMethods: pullRequest.MergeableAllowedMethods,
+	}
 }
 
 type githubMergeabilityWebhookPayload struct {
+	Action     string `json:"action"`
 	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
 	PullRequest *struct {
-		Number int64 `json:"number"`
-		Head   struct {
+		Number   int64  `json:"number"`
+		Merged   bool   `json:"merged"`
+		MergedAt string `json:"merged_at"`
+		ClosedAt string `json:"closed_at"`
+		Head     struct {
 			SHA string `json:"sha"`
 		} `json:"head"`
 	} `json:"pull_request"`
@@ -164,13 +238,31 @@ func ensureFactoryMergeabilityWebhook(
 	deps IntakeDependencies,
 	factory *models.Factory,
 ) error {
+	if factory == nil {
+		return nil
+	}
+	return ensureFactoryMergeabilityWebhookForRepository(
+		ctx,
+		tx,
+		deps,
+		factory,
+		factory.OnboardingConfigValue().AppRepository,
+	)
+}
+
+func ensureFactoryMergeabilityWebhookForRepository(
+	ctx context.Context,
+	tx *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	repository string,
+) error {
 	if deps.Encryptor == nil || factory == nil {
 		return nil
 	}
 
-	config := factory.OnboardingConfigValue()
-	repository := strings.TrimSpace(config.AppRepository)
-	integrationID := strings.TrimSpace(config.VCSIntegrationID)
+	repository = strings.TrimSpace(repository)
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
 	if repository == "" || integrationID == "" {
 		return nil
 	}
@@ -322,17 +414,38 @@ func VerifyGitHubFactoryMergeabilitySignature(
 	return http.StatusOK, nil
 }
 
-func githubMergeabilityWebhookRef(eventType string, body []byte) (repository string, numbers []int64, sha string) {
+func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeabilityWebhookPayload) bool {
+	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
+		strings.EqualFold(strings.TrimSpace(payload.Action), "closed") &&
+		payload.PullRequest != nil
+}
+
+func parseGitHubMergeabilityWebhookPayload(eventType string, body []byte) (githubMergeabilityWebhookPayload, bool) {
 	switch strings.ToLower(strings.TrimSpace(eventType)) {
 	case "pull_request", "check_run", "check_suite", "status":
 	default:
-		return "", nil, ""
+		return githubMergeabilityWebhookPayload{}, false
 	}
 
 	var payload githubMergeabilityWebhookPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
+		return githubMergeabilityWebhookPayload{}, false
+	}
+	if strings.TrimSpace(payload.Repository.FullName) == "" {
+		return githubMergeabilityWebhookPayload{}, false
+	}
+	return payload, true
+}
+
+func githubMergeabilityWebhookRef(eventType string, body []byte) (repository string, numbers []int64, sha string) {
+	payload, ok := parseGitHubMergeabilityWebhookPayload(eventType, body)
+	if !ok {
 		return "", nil, ""
 	}
+	return githubMergeabilityWebhookRefFromPayload(payload)
+}
+
+func githubMergeabilityWebhookRefFromPayload(payload githubMergeabilityWebhookPayload) (repository string, numbers []int64, sha string) {
 	repository = strings.TrimSpace(payload.Repository.FullName)
 	if repository == "" {
 		return "", nil, ""

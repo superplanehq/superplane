@@ -96,30 +96,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         return null;
       },
     },
-    {
-      pattern: re("/api/v1/canvas-folders"),
-      resolve: (_m, _url, method) => {
-        if (method === "POST") {
-          return {
-            json: {
-              folder: {
-                metadata: { id: "storybook-new-folder" },
-                spec: { title: "New Folder", backgroundColor: "blue", canvases: [] },
-              },
-            },
-          };
-        }
-        return { json: { folders: fixture.folders } };
-      },
-    },
-    {
-      pattern: re("/api/v1/canvas-folders/[^/]+/position"),
-      resolve: () => ({ json: {} }),
-    },
-    {
-      pattern: re("/api/v1/canvas-folders/[^/]+"),
-      resolve: () => ({ json: {} }),
-    },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
@@ -190,11 +166,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "organization_byok",
               label: "Organization BYOK",
               description: "Show the organization LLM Models settings page",
-            },
-            {
-              id: "factory_create_with_agent",
-              label: "Task Refinement",
-              description: "Refine draft work orders with an agent",
             },
             {
               id: "workspace_agent_resources",

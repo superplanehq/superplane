@@ -256,22 +256,6 @@ CREATE TABLE public.app_messages (
 
 
 --
--- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.canvas_folders (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    title character varying(128) NOT NULL,
-    background_color character varying(32) DEFAULT 'blue'::character varying NOT NULL,
-    sort_order bigint NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue'::character varying, 'green'::character varying, 'purple'::character varying, 'slate'::character varying, 'orange'::character varying])::text[])))
-);
-
-
---
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -379,6 +363,10 @@ CREATE TABLE public.factories (
     onboarding_completed_at timestamp with time zone,
     onboarding_config jsonb DEFAULT '{}'::jsonb NOT NULL,
     hosted_spend_budget_cents bigint,
+    planning_enabled boolean DEFAULT true NOT NULL,
+    planning_clarity boolean DEFAULT false NOT NULL,
+    planning_confidence boolean DEFAULT true NOT NULL,
+    planning_setup_completed boolean DEFAULT false NOT NULL,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -1475,7 +1463,6 @@ CREATE TABLE public.workflows (
     created_by uuid,
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
-    folder_id uuid,
     description text DEFAULT ''::text NOT NULL,
     dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     factory_id uuid,
@@ -1664,22 +1651,6 @@ ALTER TABLE ONLY public.app_installations
 
 ALTER TABLE ONLY public.app_messages
     ADD CONSTRAINT app_messages_pkey PRIMARY KEY (id);
-
-
---
--- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_folders
-    ADD CONSTRAINT canvas_folders_organization_id_title_key UNIQUE (organization_id, title);
-
-
---
--- Name: canvas_folders canvas_folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_folders
-    ADD CONSTRAINT canvas_folders_pkey PRIMARY KEY (id);
 
 
 --
@@ -2522,13 +2493,6 @@ CREATE INDEX idx_app_messages_created_at ON public.app_messages USING btree (cre
 
 
 --
--- Name: idx_canvas_folders_organization_id_title; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_canvas_folders_organization_id_title ON public.canvas_folders USING btree (organization_id, title);
-
-
---
 -- Name: idx_canvas_memories_canvas_namespace; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3313,13 +3277,6 @@ CREATE INDEX idx_workflows_factory_id ON public.workflows USING btree (factory_i
 
 
 --
--- Name: idx_workflows_folder_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id);
-
-
---
 -- Name: idx_workflows_live_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3540,14 +3497,6 @@ ALTER TABLE ONLY public.app_messages
 
 ALTER TABLE ONLY public.app_messages
     ADD CONSTRAINT app_messages_canvas_id_node_id_fkey FOREIGN KEY (canvas_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
-
-
---
--- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_folders
-    ADD CONSTRAINT canvas_folders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -4519,14 +4468,6 @@ ALTER TABLE ONLY public.workflows
 
 
 --
--- Name: workflows workflows_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflows
-    ADD CONSTRAINT workflows_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.canvas_folders(id) ON DELETE SET NULL;
-
-
---
 -- Name: workflows workflows_live_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4566,7 +4507,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260921182417	f
+20260922193722	f
 \.
 
 
@@ -4611,4 +4552,3 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
-

@@ -61,7 +61,7 @@ func RefreshBacklog(
 		return nil, factoryErrorToStatus(err, "failed to refresh backlog")
 	}
 
-	orders, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{
+	orders, err := listFactoryWorkOrders(factory, db, models.ListFactoryWorkOrdersFilters{
 		States: []string{models.FactoryWorkOrderStateDraft},
 	})
 	if err != nil {
@@ -246,10 +246,31 @@ func archiveDraftWorkOrderIfCurrent(
 		orgID,
 		factory,
 		archivedOrder,
-		archivedBy,
+		&archivedBy,
 		models.FactoryWorkOrderStateDraft,
 		models.FactoryWorkOrderResultRejected,
 		false,
 	)
 	return true, false
+}
+
+func listFactoryWorkOrders(
+	factory *models.Factory,
+	db *gorm.DB,
+	filters models.ListFactoryWorkOrdersFilters,
+) ([]models.FactoryWorkOrder, error) {
+	filters.Limit = maxWorkOrderListLimit
+	var orders []models.FactoryWorkOrder
+	for {
+		page, err := factory.ListWorkOrders(db, filters)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, page...)
+		if len(page) < maxWorkOrderListLimit {
+			return orders, nil
+		}
+		lastID := page[len(page)-1].ID
+		filters.BeforeID = &lastID
+	}
 }

@@ -20,6 +20,8 @@ const (
 	PlanningSessionTokenPurpose      = "planning_session"
 	EnvSuperplanePlanningID          = "SUPERPLANE_PLANNING_SESSION_ID"
 	EnvSuperplanePlanningSessionKind = "SUPERPLANE_PLANNING_SESSION_KIND"
+	EnvSuperplanePlanningClarity     = "SUPERPLANE_PLANNING_CLARITY"
+	EnvSuperplanePlanningConfidence  = "SUPERPLANE_PLANNING_CONFIDENCE"
 	EnvSuperplaneAnalysisSpecFile    = "SUPERPLANE_ANALYSIS_SPEC_FILE"
 	EnvSuperplaneAnalysisScoreFile   = "SUPERPLANE_ANALYSIS_SCORE_FILE"
 	EnvSuperplaneBaseURL             = "SUPERPLANE_BASE_URL"
@@ -146,12 +148,27 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	if ctx.Logger != nil {
 		ctx.Logger.WithField("planning_session_id", session.ID).Info("attached planning session token")
 	}
+	// Fail closed. The server rejects score tools the factory has off, so a
+	// lookup failure must not advertise tools the agent cannot use.
+	planning := models.FactoryPlanning{}
+	factoryModel, err := models.FindFactory(database.DB(context.Background()), session.OrganizationID, session.FactoryID)
+	if err == nil {
+		planning = factoryModel.Planning()
+	} else if ctx.Logger != nil {
+		ctx.Logger.WithError(err).Warn("planning session env: factory lookup failed, score tools disabled")
+	}
 	environment = append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningID,
 		Value: session.ID.String(),
 	}, BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningSessionKind,
 		Value: session.Kind,
+	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplanePlanningClarity,
+		Value: planningScoreEnvValue(planning.Clarity),
+	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplanePlanningConfidence,
+		Value: planningScoreEnvValue(planning.Confidence),
 	}, BrokerEnvironmentVariable{
 		Name:  EnvSuperplaneAnalysisSpecFile,
 		Value: "/tmp/intent.md",
@@ -160,6 +177,13 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		Value: "/tmp/intake-analysis.json",
 	})
 	return environment
+}
+
+func planningScoreEnvValue(enabled bool) string {
+	if enabled {
+		return "true"
+	}
+	return "false"
 }
 
 func planningSessionEnvVars(baseURL, token string) []BrokerEnvironmentVariable {

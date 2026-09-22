@@ -37,6 +37,9 @@ describe("intakeConnectionModel", () => {
     expect(intakeHealthBanner("HEALTH_MISSING_INTEGRATION")).toBe("This intake has no live connection.");
     expect(intakeHealthBanner("HEALTH_INTEGRATION_NOT_READY")).toBe("This connection cannot receive items.");
     expect(intakeHealthBanner("HEALTH_WEBHOOK_NOT_READY")).toBe("SuperPlane is still registering the Jira webhook.");
+    expect(intakeHealthBanner("HEALTH_WEBHOOK_FAILED")).toBe(
+      "SuperPlane could not register the Jira webhook. Save the intake again to retry.",
+    );
     expect(intakeHealthBanner("HEALTH_GRAPH_BROKEN")).toBe(
       "This automation cannot create tasks. Open the Automation tab to repair the steps.",
     );

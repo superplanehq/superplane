@@ -18,8 +18,13 @@ import type {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef } from "react";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
+import { useCanvasWebsocket } from "./useCanvasWebsocket";
+import { applyWorkOrderToListCaches } from "./workOrderListCache";
+
+const INTAKE_RUN_REFRESH_BATCH_MS = 250;
 
 const factoryIntakeQueryKeys = {
   list: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "intakes"] as const,
@@ -31,6 +36,10 @@ const factoryIntakeQueryKeys = {
 
 export function factoryIntakesKey(organizationId: string, factoryId: string) {
   return factoryIntakeQueryKeys.list(organizationId, factoryId);
+}
+
+export function factoryIntakeRunsKey(organizationId: string, factoryId: string, intakeId: string) {
+  return factoryIntakeQueryKeys.runs(organizationId, factoryId, intakeId);
 }
 
 export async function fetchFactoryIntakes(
@@ -61,7 +70,7 @@ export function useFactoryIntakeRuns(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: factoryIntakeQueryKeys.runs(organizationId, factoryId, intakeId ?? ""),
+    queryKey: factoryIntakeRunsKey(organizationId, factoryId, intakeId ?? ""),
     queryFn: async (): Promise<FactoriesFactoryIntakeRun[]> => {
       const response = await factoriesListFactoryIntakeRuns(
         withOrganizationHeader({
@@ -72,9 +81,50 @@ export function useFactoryIntakeRuns(
       return response.data?.runs ?? [];
     },
     enabled: Boolean(organizationId && factoryId && intakeId) && enabled,
-    // Items leave the analysis on their own. The open list has to follow them,
-    // because a new intake starts with a batch that drains within minutes.
-    refetchInterval: 10_000,
+  });
+}
+
+/** Refresh the derived intake-run view after its canvas changes. */
+export function useFactoryIntakeRunsWebsocket({
+  organizationId,
+  factoryId,
+  intakeId,
+  canvasId,
+}: {
+  organizationId: string;
+  factoryId: string;
+  intakeId: string | undefined;
+  canvasId: string | undefined;
+}): void {
+  const queryClient = useQueryClient();
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scheduleRefresh = useCallback(() => {
+    clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      if (!intakeId) {
+        return;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: factoryIntakeRunsKey(organizationId, factoryId, intakeId),
+      });
+    }, INTAKE_RUN_REFRESH_BATCH_MS);
+  }, [factoryId, intakeId, organizationId, queryClient]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+
+  useCanvasWebsocket({
+    canvasId: canvasId ?? "",
+    organizationId,
+    processRuntimeEvents: true,
+    enabled: Boolean(organizationId && factoryId && intakeId && canvasId),
+    onRunEvent: scheduleRefresh,
+    onExecutionEvent: scheduleRefresh,
+    onConnectionOpen: scheduleRefresh,
   });
 }
 
@@ -117,6 +167,9 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       // A new intake seeds the newest items of its source, so the Backlog
       // already holds tasks the cached list does not know about.
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }
@@ -137,6 +190,9 @@ export function useDeleteFactoryIntake(organizationId: string, factoryId: string
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }
@@ -240,11 +296,11 @@ export function useImportFactoryIntakeItem(organizationId: string, factoryId: st
       return response.data.order;
     },
     onSuccess: (order) => {
-      queryClient.setQueryData<FactoriesWorkOrder[]>(
-        factoryQueryKeys.workOrders(organizationId, factoryId),
-        (current) => upsertImportedWorkOrder(current, order),
-      );
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, order.id ?? "", order);
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
       if (order.id) {
         queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, order.id), order);
         void queryClient.invalidateQueries({
@@ -253,22 +309,6 @@ export function useImportFactoryIntakeItem(organizationId: string, factoryId: st
       }
     },
   });
-}
-
-function upsertImportedWorkOrder(
-  current: FactoriesWorkOrder[] | undefined,
-  order: FactoriesWorkOrder,
-): FactoriesWorkOrder[] {
-  if (!order.id) {
-    return current ?? [];
-  }
-  if (!current) {
-    return [order];
-  }
-  if (current.some((existing) => existing.id === order.id)) {
-    return current.map((existing) => (existing.id === order.id ? order : existing));
-  }
-  return [order, ...current];
 }
 
 export type RefreshBacklogResult = {
@@ -297,6 +337,9 @@ export function useRefreshBacklog(organizationId: string, factoryId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }

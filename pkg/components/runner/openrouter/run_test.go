@@ -196,6 +196,83 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	assert.Equal(t, "throughput", routing["sort"])
 }
 
+func TestEnsureOpenCodeModelCatalogRefreshesOnce(t *testing.T) {
+	taskDir := t.TempDir()
+	result := jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", true, true)
+
+	assert.Equal(t, "refreshed", result.Source)
+	assert.Equal(t, 1, result.Calls)
+	assert.Equal(t, []string{"models", "openrouter", "--refresh", "--pure"}, result.Args)
+	assert.False(t, result.FetchDisabled)
+
+	result = jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", true, true)
+	assert.Equal(t, "cache", result.Source)
+	assert.Equal(t, 0, result.Calls)
+}
+
+func TestEnsureOpenCodeModelCatalogRejectsUnknownModelWithoutFreshCatalog(t *testing.T) {
+	result := jsEnsureOpenCodeModelCatalog(t, t.TempDir(), "x-ai/grok-4.6", false, false)
+
+	assert.Contains(t, result.Error, "could not refresh metadata for x-ai/grok-4.6")
+	assert.Empty(t, result.Source)
+}
+
+func TestEnsureOpenCodeModelCatalogUsesBundledMetadataWhenRefreshFails(t *testing.T) {
+	taskDir := t.TempDir()
+	result := jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", false, true)
+
+	assert.Equal(t, "bundled", result.Source)
+	assert.Equal(t, 2, result.Calls)
+	assert.Equal(t, []string{"models", "openrouter", "--pure", "--verbose"}, result.Args)
+	assert.NotEqual(t, taskDir, result.WorkingDirectory)
+	assert.False(t, result.ConfigProvided)
+}
+
+func TestEnsureOpenCodeModelCatalogContinuesWhenRefreshUnavailable(t *testing.T) {
+	cases := []struct {
+		name          string
+		refreshStatus int
+		refreshError  string
+	}{
+		{name: "timeout", refreshError: "ETIMEDOUT"},
+		{name: "spawn error", refreshError: "ENOENT"},
+		{name: "nonzero status", refreshStatus: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			model := "x-ai/grok-4.6"
+			result := jsEnsureOpenCodeModelCatalogWithRefresh(
+				t,
+				taskDir,
+				model,
+				false,
+				false,
+				tc.refreshStatus,
+				tc.refreshError,
+			)
+
+			assert.Equal(t, "unavailable", result.Source)
+			assert.Empty(t, result.Error)
+			assert.Equal(t, 2, result.Calls)
+
+			_, err := os.Stat(filepath.Join(taskDir, "xdg", "cache", "opencode", "models.json"))
+			assert.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
+func TestRunPromptLogsUnavailableCatalogFallback(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:         "x-ai/grok-4.6",
+		catalogSource: "unavailable",
+		spawns:        []spawnScript{successSpawn("ok")},
+	})
+
+	assert.Equal(t, 0, result.exitCode)
+	requireStdoutLine(t, result.output, "Model catalog refresh unavailable. Continuing with OpenCode configuration for x-ai/grok-4.6.")
+}
+
 func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
 	output := runOpenCodeFormatter(t, []string{
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
@@ -275,9 +352,9 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 	assert.Equal(t, "reasoning", records[1]["channel"])
 	reasoningEnd := findActivityRecord(t, records, "content_end")
 	assert.Equal(t, float64(12500), reasoningEnd["duration_ms"])
-	toolStart := findActivityRecord(t, records, "tool_start")
-	assert.Equal(t, "tool_start", toolStart["type"])
-	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "tool_start"))
+	toolStart := findActivityRecord(t, records, "activity_tool_start")
+	assert.Equal(t, "activity_tool_start", toolStart["type"])
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "activity_tool_start"))
 	assert.Equal(t, "printf first\nprintf second", toolStart["input"])
 	var outputText string
 	for _, record := range records {
@@ -286,7 +363,7 @@ func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "first", outputText)
-	assert.Equal(t, "passed", findActivityRecord(t, records, "tool_end")["status"])
+	assert.Equal(t, "passed", findActivityRecord(t, records, "activity_tool_end")["status"])
 }
 
 func TestFormatOpenCodeJsonLinesCompletesAssistantContentBeforeNextTool(t *testing.T) {
@@ -296,7 +373,7 @@ func TestFormatOpenCodeJsonLinesCompletesAssistantContentBeforeNextTool(t *testi
 	})
 
 	records := activityRecords(t, output)
-	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "tool_start"))
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "activity_tool_start"))
 }
 
 func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
@@ -309,7 +386,7 @@ func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
 	records := activityRecords(t, output)
 	var starts []map[string]any
 	for _, record := range records {
-		if record["type"] == "tool_start" {
+		if record["type"] == "activity_tool_start" {
 			starts = append(starts, record)
 		}
 	}
@@ -912,7 +989,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil)
+	}}, nil, nil, nil, "")
 	assert.Equal(t, 0, first.exitCode)
 	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
 	require.NoError(t, err)
@@ -925,7 +1002,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil)
+	}}, nil, nil, nil, "")
 	assert.Equal(t, 0, second.exitCode)
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
@@ -1066,11 +1143,12 @@ type spawnScript struct {
 }
 
 type promptHarness struct {
-	model        string
-	spawns       []spawnScript
-	env          map[string]string
-	nowValues    []int64
-	sessionUsage []map[string]any
+	model         string
+	spawns        []spawnScript
+	env           map[string]string
+	nowValues     []int64
+	sessionUsage  []map[string]any
+	catalogSource string
 }
 
 type openRouterPromptResult struct {
@@ -1090,7 +1168,7 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	writeTaskHelpers(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("do the work"), 0o644))
-	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage)
+	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage, harness.catalogSource)
 }
 
 func rateLimitSpawn(message string) spawnScript {
@@ -1111,7 +1189,7 @@ func successSpawn(text string) spawnScript {
 	}
 }
 
-func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any) openRouterPromptResult {
+func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource string) openRouterPromptResult {
 	t.Helper()
 	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
@@ -1125,6 +1203,9 @@ func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnS
 	require.NoError(t, err)
 	sessionJSON, err := json.Marshal(sessionUsage)
 	require.NoError(t, err)
+	if catalogSource == "" {
+		catalogSource = "cache"
+	}
 	harnessFile := filepath.Join(dir, "harness.js")
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
@@ -1133,6 +1214,7 @@ const { runPrompt } = require(%q);
 const spawns = %s;
 const nowValues = %s;
 const sessionReads = %s;
+const catalogSource = %q;
 const calls = [];
 const sleeps = [];
 const agentMessages = [];
@@ -1167,6 +1249,9 @@ function mockChild(spec) {
   return child;
 }
 const helpers = {
+  ensureOpenCodeModelCatalog() {
+    return catalogSource;
+  },
   spawnOpenCode(args) {
     const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
     index += 1;
@@ -1210,7 +1295,7 @@ runPrompt(%q, %q, helpers)
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, spawnsJSON, nowJSON, sessionJSON, dir, filepath.Join(dir, promptName), model)), 0o644))
+`, script, spawnsJSON, nowJSON, sessionJSON, catalogSource, dir, filepath.Join(dir, promptName), model)), 0o644))
 
 	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)
@@ -1354,6 +1439,97 @@ func jsBuildConfigWithPrompt(t *testing.T, taskDir string, env map[string]string
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(out, &config))
 	return config
+}
+
+type modelCatalogResult struct {
+	Source           string   `json:"source"`
+	Calls            int      `json:"calls"`
+	Args             []string `json:"args"`
+	FetchDisabled    bool     `json:"fetchDisabled"`
+	WorkingDirectory string   `json:"workingDirectory"`
+	ConfigProvided   bool     `json:"configProvided"`
+	Error            string   `json:"error"`
+}
+
+func jsEnsureOpenCodeModelCatalog(t *testing.T, taskDir, model string, createCatalog, listModel bool) modelCatalogResult {
+	t.Helper()
+	return jsEnsureOpenCodeModelCatalogWithRefresh(t, taskDir, model, createCatalog, listModel, 0, "")
+}
+
+func jsEnsureOpenCodeModelCatalogWithRefresh(
+	t *testing.T,
+	taskDir, model string,
+	createCatalog, listModel bool,
+	refreshStatus int,
+	refreshError string,
+) modelCatalogResult {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `
+const fs = require("fs");
+const path = require("path");
+const { ensureOpenCodeModelCatalog, openCodeModelCatalogPath } = require(process.argv[1]);
+const taskDir = process.argv[2];
+const model = process.argv[3];
+const createCatalog = process.argv[4] === "true";
+const listModel = process.argv[5] === "true";
+const refreshStatus = Number(process.argv[6]);
+const refreshError = process.argv[7] || "";
+const calls = [];
+let args = [];
+let fetchDisabled = true;
+let workingDirectory = "";
+let configProvided = true;
+function refresh(command, refreshArgs, options) {
+  calls.push(command);
+  args = refreshArgs;
+  fetchDisabled = Object.prototype.hasOwnProperty.call(options.env, "OPENCODE_DISABLE_MODELS_FETCH");
+  workingDirectory = options.cwd;
+  configProvided = Object.prototype.hasOwnProperty.call(options.env, "OPENCODE_CONFIG");
+  if (refreshArgs.includes("--refresh")) {
+    if (refreshError) {
+      const error = new Error("spawnSync " + command + " " + refreshError);
+      error.code = refreshError;
+      return { error, status: null, stdout: "", stderr: "" };
+    }
+    if (refreshStatus !== 0) {
+      return { status: refreshStatus, stdout: "", stderr: "" };
+    }
+    if (createCatalog) {
+      const catalog = openCodeModelCatalogPath(taskDir);
+      fs.mkdirSync(path.dirname(catalog), { recursive: true });
+      fs.writeFileSync(catalog, JSON.stringify({
+        openrouter: { models: { [model]: { attachment: true } } },
+      }) + "\n");
+    }
+    return { status: 0, stdout: "", stderr: "" };
+  }
+  const stdout = listModel
+    ? "openrouter/" + model + "\n" + JSON.stringify({
+        id: model,
+        capabilities: { attachment: true, input: { image: true } },
+      }, null, 2) + "\n"
+    : "";
+  return { status: 0, stdout, stderr: "" };
+}
+try {
+  const source = ensureOpenCodeModelCatalog(
+    taskDir,
+    model,
+    { OPENCODE_DISABLE_MODELS_FETCH: "1" },
+    refresh,
+  );
+  process.stdout.write(JSON.stringify({ source, calls: calls.length, args, fetchDisabled, workingDirectory, configProvided }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({ error: error.message, calls: calls.length, args, fetchDisabled, workingDirectory, configProvided }));
+}
+`, script, taskDir, model, fmt.Sprint(createCatalog), fmt.Sprint(listModel), fmt.Sprint(refreshStatus), refreshError)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var result modelCatalogResult
+	require.NoError(t, json.Unmarshal(out, &result))
+	return result
 }
 
 func runOpenCodeFormatter(t *testing.T, lines []string) string {

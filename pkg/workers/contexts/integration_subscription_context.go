@@ -89,12 +89,19 @@ func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error 
 }
 
 func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error {
-	skip, err := c.skipPausedIntakeFeed()
+	skip, err := SkipPausedIntakeFeed(c.tx, c.node.WorkflowID)
 	if err != nil {
 		return err
 	}
 	if skip {
 		return nil
+	}
+
+	if _, err := models.FindLiveCanvasVersionInTransaction(c.tx, c.node.WorkflowID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
 	}
 
 	nodeRef := c.subscription.NodeRef.Data()
@@ -123,17 +130,6 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: c.findExecutionByKV,
 	})
-}
-
-func (c *IntegrationSubscriptionContext) skipPausedIntakeFeed() (bool, error) {
-	intake, err := models.FindFactoryIntakeByCanvasID(c.tx, c.node.WorkflowID)
-	if err != nil {
-		if errors.Is(err, models.ErrFactoryIntakeNotFound) {
-			return false, nil
-		}
-		return false, err
-	}
-	return intake.Paused(), nil
 }
 
 func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value string) (*core.ExecutionContext, error) {

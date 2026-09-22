@@ -156,7 +156,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	createGitHubPR := func(t *testing.T, factory *models.Factory, order *models.FactoryWorkOrder) *pb.FactoryPullRequest {
 		t.Helper()
-		resp, err := CreateFactoryPullRequest(ctx, orgID, &pb.CreateFactoryPullRequestRequest{
+		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
 			FactoryId:   factory.ID.String(),
 			WorkOrderId: order.ID.String(),
 			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
@@ -359,7 +359,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 	t.Run("refuses a Bitbucket pull request", func(t *testing.T) {
 		factory := newFactory(t)
 		order := createOrder(t, factory)
-		created, err := CreateFactoryPullRequest(ctx, orgID, &pb.CreateFactoryPullRequestRequest{
+		created, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
 			FactoryId:   factory.ID.String(),
 			WorkOrderId: order.ID.String(),
 			Provider:    pb.FactoryPullRequest_PROVIDER_BITBUCKET,
@@ -391,6 +391,30 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Equal(t, mergeBlockedMissingIntegration, message)
+	})
+
+	t.Run("closes the work order as completed", func(t *testing.T) {
+		factory := newFactory(t)
+		order := createOrder(t, factory)
+		_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateOpen,
+			Actor:   &r.User,
+		})
+		require.NoError(t, err)
+		pr := createGitHubPR(t, factory, order)
+		api := readyAPI()
+		useGitHub(t, api)
+
+		_, err = merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+		require.NoError(t, err)
+
+		reloaded, err := factory.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+		notes, err := reloaded.StatusNotes()
+		require.NoError(t, err)
+		assert.Empty(t, notes)
 	})
 
 	t.Run("persists the merged state after success", func(t *testing.T) {
@@ -442,7 +466,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		t.Helper()
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
-		resp, err := CreateFactoryPullRequest(ctx, orgID, &pb.CreateFactoryPullRequestRequest{
+		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
 			FactoryId:   factory.ID.String(),
 			WorkOrderId: order.ID.String(),
 			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
@@ -480,7 +504,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		factory := newFactory(t)
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
-		resp, err := CreateFactoryPullRequest(ctx, orgID, &pb.CreateFactoryPullRequestRequest{
+		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
 			FactoryId:   factory.ID.String(),
 			WorkOrderId: order.ID.String(),
 			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
@@ -506,7 +530,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		factory := newFactory(t)
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
-		resp, err := CreateFactoryPullRequest(ctx, orgID, &pb.CreateFactoryPullRequestRequest{
+		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
 			FactoryId:   factory.ID.String(),
 			WorkOrderId: order.ID.String(),
 			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
