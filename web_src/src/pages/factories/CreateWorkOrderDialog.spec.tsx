@@ -13,10 +13,11 @@ import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
-const { createMutate, dispatchMutate, meUser } = vi.hoisted(() => ({
+const { createMutate, dispatchMutate, meUser, showErrorToast } = vi.hoisted(() => ({
   createMutate: vi.fn(),
   dispatchMutate: vi.fn(),
   meUser: { current: null as { id: string; name: string } | null },
+  showErrorToast: vi.fn(),
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
@@ -28,15 +29,66 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: meUser.current }),
 }));
 
+vi.mock("@/lib/toast", () => ({
+  showErrorToast,
+}));
+
 vi.mock("./WorkOrderDescriptionEditor", () => ({
-  WorkOrderDescriptionEditor: ({ value, onChange }: { value?: string; onChange?: (next: string) => void }) => (
+  WorkOrderDescriptionEditor: ({
+    value,
+    onChange,
+    onFocus,
+  }: {
+    value?: string;
+    onChange?: (next: string) => void;
+    onFocus?: () => void;
+  }) => (
     <textarea
       data-testid="work-order-description-input"
       value={value}
       onChange={(event) => onChange?.(event.target.value)}
+      onFocus={() => onFocus?.()}
     />
   ),
 }));
+
+type ResultEvent = {
+  resultIndex: number;
+  results: Array<{ isFinal: boolean; 0: { transcript: string } }>;
+};
+
+class FakeSpeechRecognition {
+  static instances: FakeSpeechRecognition[] = [];
+
+  continuous = false;
+  interimResults = false;
+  lang = "";
+  onresult: ((event: ResultEvent) => void) | null = null;
+  onerror: ((event: { error: string }) => void) | null = null;
+  onend: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+  abort = vi.fn();
+
+  constructor() {
+    FakeSpeechRecognition.instances.push(this);
+  }
+}
+
+function latestRecognition(): FakeSpeechRecognition {
+  const recognition = FakeSpeechRecognition.instances.at(-1);
+  if (!recognition) {
+    throw new Error("Speech recognition was not created");
+  }
+  return recognition;
+}
+
+function emitTranscript(transcript: string, isFinal: boolean) {
+  latestRecognition().onresult?.({
+    resultIndex: 0,
+    results: [Object.assign([{ transcript }], { isFinal, 0: { transcript } })],
+  });
+}
 
 function renderDialog(
   factory = factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: true, confidence: true }),
@@ -61,7 +113,9 @@ describe("CreateWorkOrderDialog", () => {
   beforeEach(() => {
     createMutate.mockReset();
     dispatchMutate.mockReset();
+    showErrorToast.mockReset();
     meUser.current = null;
+    FakeSpeechRecognition.instances = [];
   });
 
   afterEach(async () => {
@@ -71,6 +125,7 @@ describe("CreateWorkOrderDialog", () => {
     // environment teardown and throws an unhandled "dispatchEvent" TypeError
     // that fails the whole test shard even though every test passed.
     cleanup();
+    vi.unstubAllGlobals();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -146,5 +201,141 @@ describe("CreateWorkOrderDialog", () => {
       assigneeIds: [],
     });
     expect(dispatchMutate).not.toHaveBeenCalled();
+  });
+
+  it("hides the dictate button when speech recognition is missing", () => {
+    renderDialog();
+
+    expect(screen.queryByTestId("dictate-button")).not.toBeInTheDocument();
+  });
+
+  it("shows the dictate button and does not listen until click", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.dictate);
+    expect(FakeSpeechRecognition.instances).toHaveLength(0);
+
+    await user.click(screen.getByTestId("dictate-button"));
+
+    expect(latestRecognition().start).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.stopDictation);
+    expect(screen.getByTestId("dictate-button")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the interim phrase without appending it", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitTranscript("Fix refunds", false);
+    });
+
+    expect(screen.getByTestId("dictate-interim")).toHaveTextContent("Fix refunds");
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("");
+    expect(screen.getByTestId("work-order-description-input")).toHaveValue("");
+  });
+
+  it("appends a final phrase to the title when the title was last focused", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("work-order-title-input"));
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitTranscript("Fix refunds", true);
+    });
+
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("Fix refunds");
+    expect(screen.getByTestId("work-order-description-input")).toHaveValue("");
+  });
+
+  it("appends a final phrase to the description when the title is not focused", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("work-order-description-input"));
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitTranscript("Retry fails", true);
+    });
+
+    expect(screen.getByTestId("work-order-description-input")).toHaveValue("Retry fails");
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("");
+  });
+
+  it("inserts a space before a final phrase when the field already has text", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(screen.getByTestId("work-order-title-input"), "Fix");
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitTranscript("refunds", true);
+    });
+
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("Fix refunds");
+  });
+
+  it("truncates a dictated title to 256 characters", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("work-order-title-input"));
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitTranscript("A".repeat(300), true);
+    });
+
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("A".repeat(256));
+  });
+
+  it("stops dictation when the dialog closes", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("dictate-button"));
+    const recognition = latestRecognition();
+    await user.click(screen.getByTestId("work-order-create-close-button"));
+
+    expect(recognition.abort).toHaveBeenCalled();
+  });
+
+  it("stops dictation before create", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
+    renderDialog();
+
+    await user.type(screen.getByTestId("work-order-title-input"), "Ship the refunds line");
+    await user.click(screen.getByTestId("dictate-button"));
+    const recognition = latestRecognition();
+    await user.click(screen.getByTestId("work-order-create-button"));
+
+    expect(recognition.abort).toHaveBeenCalled();
+    expect(createMutate).toHaveBeenCalled();
+  });
+
+  it("shows a permission error toast and returns to idle", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      latestRecognition().onerror?.({ error: "not-allowed" });
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith(CREATE_WORK_ORDER_REQUEST_COPY.microphoneDenied);
+    expect(screen.getByTestId("dictate-button")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.dictate);
   });
 });
