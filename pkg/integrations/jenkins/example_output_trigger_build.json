@@ -1,0 +1,8 @@
+{
+  "data": {
+    "jobName": "my-job",
+    "queueUrl": "https://jenkins.example.com/queue/item/42/"
+  },
+  "timestamp": "2026-08-08T12:34:56.000Z",
+  "type": "jenkins.build.triggered"
+}
