@@ -23,10 +23,12 @@ describe("useUpdateNotificationSettings", () => {
   it("updates browser preferences in every organization me cache", async () => {
     const queryClient = new QueryClient();
     const organizationId = "org-1";
+    const lastLocation = { path: "/org-1/workspaces/SP" };
     queryClient.setQueryData(meKeys.me(organizationId, true), {
       id: "user-1",
       browserNotificationPreferences: { enabled: false, showWhileViewing: true },
     });
+    queryClient.setQueryData(["me", organizationId, "last-location"], lastLocation);
     queryClient.setQueryData(meKeys.me(organizationId, false), {
       id: "user-1",
       browserNotificationPreferences: { enabled: false, showWhileViewing: true },
@@ -62,5 +64,12 @@ describe("useUpdateNotificationSettings", () => {
     expect(queryClient.getQueryData(meKeys.me(organizationId, false))).toMatchObject({
       browserNotificationPreferences: { enabled: true, showWhileViewing: false },
     });
+    expect(queryClient.getQueryData(["me", organizationId, "notification-settings"])).toEqual({
+      browser: {
+        scope: "WORKSPACE_SCOPE_ALL",
+        showWhileViewing: false,
+      },
+    });
+    expect(queryClient.getQueryData(["me", organizationId, "last-location"])).toEqual(lastLocation);
   });
 });

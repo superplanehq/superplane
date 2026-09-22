@@ -22,6 +22,7 @@ export const useMe = (includePermissions: boolean = true, organizationIdOverride
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: "always",
     enabled: !!organizationId,
   });
 };

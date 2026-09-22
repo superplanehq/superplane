@@ -41,7 +41,7 @@ export function useUpdateNotificationSettings(organizationId: string) {
     onSuccess: (settings) => {
       queryClient.setQueryData(notificationSettingsKey(organizationId), settings);
       const form = accountNotificationsFromSettings(settings);
-      queryClient.setQueriesData<SuperplaneMeUser | null>({ queryKey: meKeys.organization(organizationId) }, (user) => {
+      const updateUserPreferences = (user: SuperplaneMeUser | null | undefined) => {
         if (!user) return user;
         return {
           ...user,
@@ -50,7 +50,9 @@ export function useUpdateNotificationSettings(organizationId: string) {
             showWhileViewing: form.browserShowWhileViewing,
           },
         };
-      });
+      };
+      queryClient.setQueryData(meKeys.me(organizationId, true), updateUserPreferences);
+      queryClient.setQueryData(meKeys.me(organizationId, false), updateUserPreferences);
     },
   });
 }
