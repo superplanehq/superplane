@@ -36,6 +36,7 @@ type SplitRunPopupTabsProps = {
   sidebarNote?: ReactNode;
   analysis?: IntentAnalysisChat;
   sourceOnly?: boolean;
+  sessionLookupError?: string;
   header: (views: ReactNode) => ReactNode;
 };
 
@@ -117,6 +118,7 @@ export function SplitRunPopupTabs({
   sidebarNote,
   analysis,
   sourceOnly = false,
+  sessionLookupError,
   header,
 }: SplitRunPopupTabsProps) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
@@ -143,11 +145,15 @@ export function SplitRunPopupTabs({
     />
   );
   const showAutomations = refinePopupShowsAutomations({ footerKind: fixture.footer.kind, sourceOnly });
+  const lookupErrorNote = sessionLookupErrorNote(sessionLookupError);
   if (!showAutomations) {
     return (
       <>
         {header(null)}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{description}</div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {lookupErrorNote}
+          {description}
+        </div>
       </>
     );
   }
@@ -169,6 +175,7 @@ export function SplitRunPopupTabs({
         />,
       )}
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+        {lookupErrorNote}
         {description}
       </TabsContent>
       <TabsContent
@@ -192,6 +199,17 @@ export function SplitRunPopupTabs({
         />
       </TabsContent>
     </Tabs>
+  );
+}
+
+function sessionLookupErrorNote(error?: string) {
+  if (!error) {
+    return null;
+  }
+  return (
+    <p className="shrink-0 px-8 pt-4 text-[13px] text-destructive" role="alert">
+      The refinement session did not load. Refresh the page to try again.
+    </p>
   );
 }
 

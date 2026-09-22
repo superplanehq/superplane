@@ -188,6 +188,7 @@ function AnalysisWorkOrderPopup({
           sidebarNote={showSidebarNote ? review : undefined}
           analysis={stripAnalysis}
           sourceOnly={sourceOnly}
+          sessionLookupError={analysis.queryError?.message}
           header={analysisPopupHeader({
             edits,
             fixture,

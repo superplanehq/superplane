@@ -17,6 +17,7 @@ const lookupState = vi.hoisted(() => ({
   factoryPending: false,
   planning: { enabled: true, clarity: true, confidence: true },
   sessionLoading: false,
+  queryError: null as Error | null,
   artifactsLoading: false,
   artifactsError: null as Error | null,
 }));
@@ -36,7 +37,7 @@ vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
     session: null,
     isLoading: lookupState.sessionLoading,
-    queryError: null,
+    queryError: lookupState.queryError,
     view: { machineStatus: "waiting", messages: [], executionId: "", canvasId: "" },
     canSend: false,
     onSubmitSurvey: () => undefined,
@@ -81,6 +82,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     lookupState.factoryPending = false;
     lookupState.planning = { enabled: true, clarity: true, confidence: true };
     lookupState.sessionLoading = false;
+    lookupState.queryError = null;
     lookupState.artifactsLoading = false;
     lookupState.artifactsError = null;
   });
@@ -154,5 +156,16 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
+  it("shows a recovery alert when the refinement session lookup fails", () => {
+    lookupState.queryError = new Error("session unavailable");
+
+    renderPopup();
+
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The refinement session did not load. Refresh the page to try again.",
+    );
   });
 });
