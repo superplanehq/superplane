@@ -1,4 +1,4 @@
-export type WorkOrderPopupMode = "loading" | "classic" | "analysis";
+export type WorkOrderPopupMode = "loading" | "analysis";
 
 function pinsAnalysisWithoutFlag(hasLookupIdentity: boolean, hasPlanningSession: boolean) {
   return !hasLookupIdentity || hasPlanningSession;
@@ -57,5 +57,5 @@ export function workOrderPopupMode({
   if (refinementUsesAnalysis({ hasAnalysisResult, analysisActive, isDraft, artifactsFailed })) {
     return "analysis";
   }
-  return draftLookupPending(sessionLoading, artifactsLoading) ? "loading" : "classic";
+  return draftLookupPending(sessionLoading, artifactsLoading) ? "loading" : "analysis";
 }
