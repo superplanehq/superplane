@@ -952,24 +952,62 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.False(t, response.GetIntake().GetPaused())
 	})
 
-	t.Run("update rejects pause for a GitHub intake", func(t *testing.T) {
+	t.Run("update sets and clears paused for a GitHub intake", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		assert.False(t, intake.GetPaused())
 
 		paused := true
-		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Paused:    &paused,
 		})
-		require.Error(t, err)
-		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-		assert.False(t, intake.GetPaused())
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetPaused())
 
 		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
 		require.NoError(t, err)
 		require.Len(t, listed.GetIntakes(), 1)
-		assert.False(t, listed.GetIntakes()[0].GetPaused())
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+
+		paused = false
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetPaused())
+	})
+
+	t.Run("update sets and clears paused for a Productive.io intake", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
+		assert.False(t, intake.GetPaused())
+
+		paused := true
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetPaused())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+
+		paused = false
+		response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Paused:    &paused,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.GetIntake().GetPaused())
 	})
 
 	t.Run("update rebinds a Sentry intake to a ready integration", func(t *testing.T) {

@@ -232,11 +232,18 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			wantMessage: "lookup timeout",
 		},
 		{
-			name:          "client disconnect is 499",
-			err:           fmt.Errorf("lookup: %w", context.Canceled),
+			name:          "driver-style wrapped cancellation on canceled request is 499",
+			err:           fmt.Errorf("timeout: context already done: %w", context.Canceled),
 			session:       session,
 			cancelRequest: true,
-			status:        499,
+			status:        statusClientClosedRequest,
+		},
+		{
+			name:          "plain canceled error on canceled request is 499",
+			err:           context.Canceled,
+			session:       session,
+			cancelRequest: true,
+			status:        statusClientClosedRequest,
 		},
 		{
 			name:        "canceled error with live request stays 500",
@@ -267,19 +274,11 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			wantMessage: context.DeadlineExceeded.Error(),
 		},
 		{
-			name:          "deadline exceeded after client disconnect stays 500",
+			name:          "deadline exceeded after client disconnect is 499",
 			err:           fmt.Errorf("lookup: %w", context.DeadlineExceeded),
 			session:       session,
 			cancelRequest: true,
-			status:        http.StatusInternalServerError,
-			body:          "Lookup failed\n",
-			wantCapture:   true,
-			wantTags: map[string]string{
-				"route":               "/api/v1/runner/planning-sessions/clarity",
-				"planning_session_id": sessionID.String(),
-				"draft_work_order_id": draftID.String(),
-			},
-			wantMessage: context.DeadlineExceeded.Error(),
+			status:        statusClientClosedRequest,
 		},
 	}
 
@@ -347,6 +346,28 @@ func TestWritePlanningWaitError(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		writePlanningWaitError(rec, req, session, lookupCanceled)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("driver timeout on canceled request returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		ctx, cancel := context.WithCancel(req.Context())
+		cancel()
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, fmt.Errorf("timeout: context already done: %w", context.Canceled))
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var body map[string]any

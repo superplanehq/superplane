@@ -14,6 +14,12 @@ export interface IntentDocument {
   plan: string;
 }
 
+export const EMPTY_INTENT_DOCUMENT: IntentDocument = {
+  title: "",
+  summary: "",
+  plan: "",
+};
+
 export function parseIntentDocument(markdown: string): IntentDocument {
   const trimmed = markdown.trim();
   if (!trimmed) {

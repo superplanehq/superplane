@@ -18,13 +18,13 @@ import {
   BUSINESS_ORGANIZATION_BILLING,
   LAPSED_ORGANIZATION_BILLING,
   LAPSED_TOPUP_USAGE_REPORT,
-  STORYBOOK_TRIAL_ENDS_AT,
+  ACTIVE_TRIAL_ENDS_AT,
 } from "../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(STORYBOOK_TRIAL_ENDS_AT));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(ACTIVE_TRIAL_ENDS_AT));
 
 describe("WorkOrdersPage hosted credit banner", () => {
   beforeAll(() => {

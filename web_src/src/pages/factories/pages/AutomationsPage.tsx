@@ -10,13 +10,13 @@ import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
 import { useAutomationsPageModel } from "./useAutomationsPageModel";
-import { useFactoryPullRequests } from "@/hooks/useFactoryData";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { usePRFeedbackWorkOrderAttention } from "./useWorkOrderPRFeedbackRunHref";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(model.organizationId, model.factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(model.workOrders);
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,

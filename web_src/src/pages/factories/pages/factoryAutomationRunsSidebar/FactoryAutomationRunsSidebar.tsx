@@ -3,7 +3,7 @@ import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoL
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Input } from "@/components/ui/input";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
-import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { AlertCircle, Loader2, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 
 import { findWorkOrderForAutomationRun } from "../../lib/factoryAutomationStatus";
+import { pullRequestsFromWorkOrders } from "../../lib/workOrderPullRequest";
 import { useOptionalFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import type { WorkOrderCardContext } from "../../workOrders/WorkOrderCard";
 import { usePRFeedbackWorkOrderAttention } from "../useWorkOrderPRFeedbackRunHref";
@@ -56,7 +57,7 @@ export function FactoryAutomationRunsSidebar({
   const runsQuery = useInfiniteCanvasRuns(canvasId, {}, Boolean(canvasId));
   const runs = useMemo(() => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []) ?? [], [runsQuery.data]);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
+  const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const attention = usePRFeedbackWorkOrderAttention(pullRequests);
   const [searchQuery, setSearchQuery] = useState("");

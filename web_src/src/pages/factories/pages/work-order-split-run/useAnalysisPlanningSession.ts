@@ -27,6 +27,9 @@ export const ANALYSIS_PLANNING_COPY = {
   composerPlaceholder: "Tell the agent more about this task",
   send: "Send",
   sendShortcut: "Enter",
+  dictate: "Dictate",
+  stopDictation: "Stop dictation",
+  microphoneDenied: "Microphone access was denied. Allow access and try again.",
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
   failedLoad: "The analysis session did not load. Try again.",
@@ -91,6 +94,9 @@ async function refreshAnalysisWorkOrder(
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
