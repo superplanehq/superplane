@@ -49,27 +49,7 @@ export const getImageScanFindingsMapper: ComponentBaseMapper = {
       return {};
     }
 
-    const counts = result.imageScanFindings?.findingSeverityCounts || {};
-
-    return {
-      Repository: stringOrDash(result.repositoryName),
-      "Image Digest": stringOrDash(result.imageId?.imageDigest),
-      "Image Tag": stringOrDash(result.imageId?.imageTag),
-      "Scan Status": stringOrDash(result.imageScanStatus?.status),
-      "Status Description": stringOrDash(result.imageScanStatus?.description),
-      "Scan Completed At": result.imageScanFindings?.imageScanCompletedAt
-        ? formatTimestampInUserTimezone(result.imageScanFindings.imageScanCompletedAt)
-        : "-",
-      "Vulnerability Source Updated At": result.imageScanFindings?.vulnerabilitySourceUpdatedAt
-        ? formatTimestampInUserTimezone(result.imageScanFindings.vulnerabilitySourceUpdatedAt)
-        : "-",
-      "Findings Count": numberOrZero(result.imageScanFindings?.findings?.length).toString(),
-      Critical: numberOrZero(counts.CRITICAL).toString(),
-      High: numberOrZero(counts.HIGH).toString(),
-      Medium: numberOrZero(counts.MEDIUM).toString(),
-      Low: numberOrZero(counts.LOW).toString(),
-      Undefined: numberOrZero(counts.UNDEFINED).toString(),
-    };
+    return scanFindingsDetails(result);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -79,6 +59,30 @@ export const getImageScanFindingsMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function scanFindingsDetails(result: EcrImageScanFindingsResponse): Record<string, string> {
+  const counts = result.imageScanFindings?.findingSeverityCounts || {};
+
+  return {
+    Repository: stringOrDash(result.repositoryName),
+    "Image Digest": stringOrDash(result.imageId?.imageDigest),
+    "Image Tag": stringOrDash(result.imageId?.imageTag),
+    "Scan Status": stringOrDash(result.imageScanStatus?.status),
+    "Status Description": stringOrDash(result.imageScanStatus?.description),
+    "Scan Completed At": result.imageScanFindings?.imageScanCompletedAt
+      ? formatTimestampInUserTimezone(result.imageScanFindings.imageScanCompletedAt)
+      : "-",
+    "Vulnerability Source Updated At": result.imageScanFindings?.vulnerabilitySourceUpdatedAt
+      ? formatTimestampInUserTimezone(result.imageScanFindings.vulnerabilitySourceUpdatedAt)
+      : "-",
+    "Findings Count": numberOrZero(result.imageScanFindings?.findings?.length).toString(),
+    Critical: numberOrZero(counts.CRITICAL).toString(),
+    High: numberOrZero(counts.HIGH).toString(),
+    Medium: numberOrZero(counts.MEDIUM).toString(),
+    Low: numberOrZero(counts.LOW).toString(),
+    Undefined: numberOrZero(counts.UNDEFINED).toString(),
+  };
+}
 
 function getScanMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

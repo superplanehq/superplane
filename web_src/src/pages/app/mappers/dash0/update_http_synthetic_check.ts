@@ -94,6 +94,12 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "arrow-right", label: configuration.request.method.toUpperCase() });
   }
 
+  appendScheduleMetadata(metadata, configuration);
+
+  return metadata;
+}
+
+function appendScheduleMetadata(metadata: MetadataItem[], configuration?: UpdateHttpSyntheticCheckConfiguration): void {
   if (configuration?.schedule?.locations && configuration.schedule.locations.length > 0) {
     const locationNames = configuration.schedule.locations.map((loc) => LOCATION_LABELS[loc] || loc).join(", ");
     metadata.push({ icon: "map-pin", label: locationNames });
@@ -102,8 +108,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.schedule?.interval) {
     metadata.push({ icon: "clock", label: `Every ${configuration.schedule.interval}` });
   }
-
-  return metadata;
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {

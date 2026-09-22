@@ -63,6 +63,12 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "git-branch", label: config.steeringPolicy });
   }
 
+  appendLoadBalancerStateMetadata(metadata, config);
+
+  return metadata;
+}
+
+function appendLoadBalancerStateMetadata(metadata: MetadataItem[], config?: UpdateLoadBalancerConfiguration): void {
   if (config?.defaultPools != null && config.defaultPools.length > 0) {
     const count = config.defaultPools.length;
     metadata.push({ icon: "layers", label: `${count} pool${count === 1 ? "" : "s"}` });
@@ -74,6 +80,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
       label: config.enabled ? "Enabled" : "Disabled",
     });
   }
-
-  return metadata;
 }

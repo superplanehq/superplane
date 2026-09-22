@@ -16,6 +16,26 @@ interface OnIssueCommentEventData {
   comment?: Comment;
 }
 
+function buildOnIssueCommentMetadataItems(metadata?: BaseNodeMetadata, configuration?: OnIssueCommentConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.repository?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.repository.name,
+    });
+  }
+
+  if (configuration?.contentFilter) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Filter: ${configuration.contentFilter}`,
+    });
+  }
+
+  return metadataItems;
+}
+
 /**
  * Renderer for the "github.onIssueComment" trigger
  */
@@ -45,28 +65,13 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueCommentConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.contentFilter) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Filter: ${configuration.contentFilter}`,
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildOnIssueCommentMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {

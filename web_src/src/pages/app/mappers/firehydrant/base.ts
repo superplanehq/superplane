@@ -48,19 +48,27 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
   return outputs.default[0].data as Incident;
 }
 
-export function getDetailsForIncident(incident: Incident | undefined): Record<string, string> {
-  const details: Record<string, string> = {};
+function incidentDashDefaultFields(incident: Incident | undefined): Record<string, string> {
+  return {
+    ID: incident?.id || "-",
+    Name: incident?.name || "-",
+    Summary: incident?.summary || "-",
+    Severity: incident?.severity || "-",
+    Priority: incident?.priority || "-",
+  };
+}
 
-  details.ID = incident?.id || "-";
-  details.Name = incident?.name || "-";
+export function getDetailsForIncident(incident: Incident | undefined): Record<string, string> {
+  const { ID, Name, Summary, Severity, Priority } = incidentDashDefaultFields(incident);
+  const details: Record<string, string> = { ID, Name };
 
   if (incident?.number != null) {
     details.Number = String(incident.number);
   }
 
-  details.Summary = incident?.summary || "-";
-  details.Severity = incident?.severity || "-";
-  details.Priority = incident?.priority || "-";
+  details.Summary = Summary;
+  details.Severity = Severity;
+  details.Priority = Priority;
 
   if (incident?.current_milestone) {
     details.Milestone = incident.current_milestone;
