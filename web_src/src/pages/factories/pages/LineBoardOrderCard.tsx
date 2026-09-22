@@ -1,6 +1,4 @@
 import type { FactoriesWorkOrderCheckScore, FactoriesWorkOrderSummary } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { useMemo, type ComponentProps } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -11,8 +9,7 @@ import {
 } from "../lib/confidenceScore";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { draftCardAgentIsWorking, type PlanningSessionMachineInput } from "./planningSessionView";
-import { useWorkOrderPlanningActivity } from "./useWorkOrderPlanningSurvey";
+import { draftCardAgentIsWorking, planningSessionHasPendingSurvey } from "./planningSessionView";
 
 export function LineBoardOrderCard({
   order,
@@ -51,38 +48,31 @@ export function LineBoardWorkOrderCard({
   isAnalyzing?: boolean;
 }) {
   const { factory } = useFactoriesLayout();
-  const refinementEnabled = useExperimentalFeature(workOrderCardContext.organizationId).has(
-    FEATURE_FACTORY_CREATE_WITH_AGENT,
-  );
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
-  const isDraft = entry.displayStatus === "draft";
-  const watchSession = refinementEnabled && isDraft && showConfidence;
-  const session = useWorkOrderPlanningActivity(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryId ?? "",
-    order.id ?? "",
-    watchSession,
-    isAnalyzing,
-  );
-  const scores = cardScores(showConfidence, order.checkScores, session.session, isAnalyzing);
+  const session = order.planningSession;
+  const scores = cardScores(showConfidence, order.checkScores, session, isAnalyzing);
 
   return (
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
       {...scores}
-      hasAgentQuestion={session.hasAgentQuestion}
+      hasAgentQuestion={showConfidence && planningSessionHasPendingSurvey(session)}
       onOpen={onOpen}
     />
   );
 }
 
-/** Scores from checks, and the strip rule for the thinking state. Nothing when the column hides scores. */
+/**
+ * Scores come from the list. The thinking state follows the planning session
+ * summary on that list. A local backlog run still counts until the first score.
+ * The opened card loads the full session.
+ */
 function cardScores(
   showConfidence: boolean,
   checks: FactoriesWorkOrderCheckScore[] | undefined,
-  session: PlanningSessionMachineInput | null,
+  session: FactoriesWorkOrderSummary["planningSession"],
   backlogAnalyzing: boolean,
 ): Pick<ComponentProps<typeof WorkOrderCard>, "clarityScore" | "confidenceScore" | "isAnalyzing"> {
   if (!showConfidence) {

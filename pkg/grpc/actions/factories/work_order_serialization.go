@@ -58,6 +58,9 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	if err := attachDescribedWorkOrderChecks(db, []*pb.WorkOrder{serialized}); err != nil {
 		return nil, err
 	}
+	if err := attachDescribedPlanningSession(db, serialized); err != nil {
+		return nil, err
+	}
 	return serialized, nil
 }
 
@@ -111,6 +114,9 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 	if err := attachListedWorkOrderCheckScores(db, result); err != nil {
 		return nil, err
 	}
+	if err := attachListedPlanningSessionStatus(db, result); err != nil {
+		return nil, err
+	}
 
 	return result, nil
 }
@@ -131,6 +137,72 @@ func attachListedWorkOrderCheckScores(db *gorm.DB, orders []*pb.WorkOrderSummary
 		order.CheckScores = serializeCheckScores(checks)
 		return nil
 	})
+}
+
+func attachDescribedPlanningSession(db *gorm.DB, order *pb.WorkOrder) error {
+	if order == nil || order.GetId() == "" {
+		return nil
+	}
+	id, err := uuid.Parse(order.GetId())
+	if err != nil {
+		return err
+	}
+	summaries, err := planningSessionSummariesByWorkOrder(db, []uuid.UUID{id})
+	if err != nil {
+		return err
+	}
+	order.PlanningSession = summaries[id]
+	return nil
+}
+
+func attachListedPlanningSessionStatus(db *gorm.DB, orders []*pb.WorkOrderSummary) error {
+	ids := make([]uuid.UUID, 0, len(orders))
+	for _, order := range orders {
+		if order == nil || order.GetId() == "" {
+			continue
+		}
+		id, err := uuid.Parse(order.GetId())
+		if err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+
+	summaries, err := planningSessionSummariesByWorkOrder(db, ids)
+	if err != nil {
+		return err
+	}
+	for _, order := range orders {
+		if order == nil || order.GetId() == "" {
+			continue
+		}
+		id, err := uuid.Parse(order.GetId())
+		if err != nil {
+			return err
+		}
+		order.PlanningSession = summaries[id]
+	}
+	return nil
+}
+
+func planningSessionSummariesByWorkOrder(db *gorm.DB, ids []uuid.UUID) (map[uuid.UUID]*pb.PlanningSessionSummary, error) {
+	sessionsByOrder, err := models.ListAnalysisPlanningSessionsForWorkOrders(db, ids)
+	if err != nil {
+		return nil, err
+	}
+	sessions := make([]*models.FactoryPlanningSession, 0, len(sessionsByOrder))
+	for _, session := range sessionsByOrder {
+		sessions = append(sessions, session)
+	}
+	executionIDs, err := planningSessionExecutionIDs(db, sessions)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make(map[uuid.UUID]*pb.PlanningSessionSummary, len(sessionsByOrder))
+	for orderID, session := range sessionsByOrder {
+		summaries[orderID] = serializePlanningSessionSummary(session, executionIDs[session.ID])
+	}
+	return summaries, nil
 }
 
 type identifiedWorkOrder interface {
