@@ -12,9 +12,10 @@ export type PlanningDraftSettings = {
   confidence: boolean;
 };
 
+/** Mirrors DefaultFactoryPlanning on the server: Clarity is opt-in. */
 export const DEFAULT_PLANNING_SETTINGS: PlanningDraftSettings = {
   enabled: true,
-  clarity: true,
+  clarity: false,
   confidence: true,
 };
 
@@ -28,9 +29,9 @@ export function planningSettingsTabs(hasAgent: boolean): PlanningSettingsTab[] {
 
 export function planningSettingsFromFactory(factory?: FactoriesFactory | null): PlanningDraftSettings {
   return {
-    enabled: factory?.planning?.enabled ?? true,
-    clarity: factory?.planning?.clarity ?? true,
-    confidence: factory?.planning?.confidence ?? true,
+    enabled: factory?.planning?.enabled ?? DEFAULT_PLANNING_SETTINGS.enabled,
+    clarity: factory?.planning?.clarity ?? DEFAULT_PLANNING_SETTINGS.clarity,
+    confidence: factory?.planning?.confidence ?? DEFAULT_PLANNING_SETTINGS.confidence,
   };
 }
 

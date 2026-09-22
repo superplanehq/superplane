@@ -54,7 +54,9 @@ type Factory struct {
 }
 
 // FactoryPlanning is the workspace toggle for draft chat plus the two
-// optional scores. Defaults are all on.
+// optional checks. New workspaces start with Planning and the Confidence
+// estimate on. The Clarity check is opt-in because it makes the agent ask
+// more questions before a task is ready.
 type FactoryPlanning struct {
 	Enabled        bool
 	Clarity        bool
@@ -63,7 +65,7 @@ type FactoryPlanning struct {
 }
 
 func DefaultFactoryPlanning() FactoryPlanning {
-	return FactoryPlanning{Enabled: true, Clarity: true, Confidence: true, SetupCompleted: false}
+	return FactoryPlanning{Enabled: true, Clarity: false, Confidence: true, SetupCompleted: false}
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept

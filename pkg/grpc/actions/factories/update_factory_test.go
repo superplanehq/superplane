@@ -103,7 +103,7 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.Nil(t, cleared.Factory.HostedSpendBudgetCents)
 	})
 
-	t.Run("defaults Planning on with both scores", func(t *testing.T) {
+	t.Run("defaults Planning on with Confidence and without Clarity", func(t *testing.T) {
 		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
@@ -113,7 +113,7 @@ func Test__UpdateFactory(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Planning)
 		assert.True(t, response.Factory.Planning.Enabled)
-		assert.True(t, response.Factory.Planning.Clarity)
+		assert.False(t, response.Factory.Planning.Clarity)
 		assert.True(t, response.Factory.Planning.Confidence)
 	})
 

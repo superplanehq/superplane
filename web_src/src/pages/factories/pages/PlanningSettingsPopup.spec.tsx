@@ -51,12 +51,13 @@ describe("PlanningSettingsPopup", () => {
     const { onSave } = renderPopup();
 
     expect(screen.getByTestId("planning-settings-health")).toHaveTextContent("Ready");
+    expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).not.toBeChecked();
     await user.click(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch"));
     await user.click(screen.getByTestId("planning-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith({
       enabled: true,
-      clarity: false,
+      clarity: true,
       confidence: true,
     });
   });

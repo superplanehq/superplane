@@ -13,7 +13,8 @@ import {
 } from "./planningSettingsModel";
 
 describe("planningSettingsFromFactory", () => {
-  it("defaults Planning on with both scores", () => {
+  it("defaults Planning on with Confidence and without Clarity", () => {
+    expect(DEFAULT_PLANNING_SETTINGS).toEqual({ enabled: true, clarity: false, confidence: true });
     expect(planningSettingsFromFactory(undefined)).toEqual(DEFAULT_PLANNING_SETTINGS);
     expect(planningSettingsFromFactory({ id: "factory-1" })).toEqual(DEFAULT_PLANNING_SETTINGS);
   });
