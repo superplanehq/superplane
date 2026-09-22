@@ -778,6 +778,49 @@ func TestRunnerPlanningWaitContextCancelReturnsPending(t *testing.T) {
 	assert.Equal(t, "pending", body["status"])
 }
 
+func TestBeginPlanningWaitAndNotify_SkipsLockWhenAlreadyPending(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.Equal(t, models.PlanningWaitPending, session.WaitState)
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	assert.Empty(t, published)
+	assert.Equal(t, models.PlanningWaitPending, session.WaitState)
+}
+
+func TestRunnerPlanningWaitIdleTicksDoNotReloadMessages(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "seed transcript", uuid.Nil))
+	_, err := session.ConsumeWait(db)
+	require.NoError(t, err)
+	require.NoError(t, session.BeginWait(db))
+
+	messageQueries := countPlanningMessageQueries(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=2", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "pending", body["status"])
+	assert.Equal(t, int64(0), messageQueries.Load(), "idle wait ticks must not reload session messages")
+}
+
 func TestRunnerPlanningWaitLoadCanceledReturnsPending(t *testing.T) {
 	r := support.Setup(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)
@@ -1270,4 +1313,32 @@ func requirePlanningWaitPending(t *testing.T, db *gorm.DB, session *models.Facto
 		require.True(t, time.Now().Before(deadline), "planning wait did not become pending")
 		time.Sleep(20 * time.Millisecond)
 	}
+}
+
+func countPlanningMessageQueries(t *testing.T, db *gorm.DB) *atomic.Int64 {
+	t.Helper()
+	count := &atomic.Int64{}
+	name := "count-planning-messages:" + t.Name()
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(name, func(tx *gorm.DB) {
+		if planningMessageQuery(tx) {
+			count.Add(1)
+		}
+	}))
+	t.Cleanup(func() {
+		db.Callback().Query().Remove(name)
+	})
+	return count
+}
+
+func planningMessageQuery(tx *gorm.DB) bool {
+	if tx == nil || tx.Statement == nil {
+		return false
+	}
+	if strings.Contains(tx.Statement.Table, "factory_planning_session_messages") {
+		return true
+	}
+	if tx.Statement.Schema != nil && strings.Contains(tx.Statement.Schema.Table, "factory_planning_session_messages") {
+		return true
+	}
+	return strings.Contains(tx.Statement.SQL.String(), "factory_planning_session_messages")
 }

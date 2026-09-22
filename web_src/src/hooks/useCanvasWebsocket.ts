@@ -74,6 +74,12 @@ interface QueuedMessage {
   timestamp: number;
 }
 
+const WEBSOCKET_OPEN = 1;
+
+export type CanvasWebsocketConnection = {
+  isConnected: boolean;
+};
+
 type UseCanvasWebsocketOptions = {
   canvasId: string;
   organizationId: string;
@@ -98,7 +104,7 @@ export function useCanvasWebsocket({
   processRuntimeEvents = true,
   enabled = true,
   onCanvasStagingEvent,
-}: UseCanvasWebsocketOptions): void {
+}: UseCanvasWebsocketOptions): CanvasWebsocketConnection {
   const updateNodeEvent = useNodeExecutionStore((state) => state.updateNodeEvent);
   const updateNodeExecution = useNodeExecutionStore((state) => state.updateNodeExecution);
   const addNodeQueueItem = useNodeExecutionStore((state) => state.addNodeQueueItem);
@@ -450,7 +456,7 @@ export function useCanvasWebsocket({
     };
   }, []);
 
-  useWebSocket(
+  const { readyState } = useWebSocket(
     `${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`,
     {
       shouldReconnect: () => true,
@@ -465,6 +471,8 @@ export function useCanvasWebsocket({
     },
     enabled,
   );
+
+  return { isConnected: Boolean(enabled && readyState === WEBSOCKET_OPEN) };
 }
 
 export function useCanvasRuntimeWebsocket(canvasId: string, organizationId: string, enabled = true): void {

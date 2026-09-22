@@ -37,7 +37,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-	"go.opentelemetry.io/otel/attribute"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -150,24 +149,7 @@ func getOtelMetricRoute(ctx context.Context) string {
 }
 
 func resolveCriticalHTTPRoute(r *http.Request) string {
-	route := getOtelMetricRoute(r.Context())
-	if route != "" {
-		return route
-	}
-
-	if r.Pattern != "" {
-		return r.Pattern
-	}
-
-	currentRoute := mux.CurrentRoute(r)
-	if currentRoute != nil {
-		routeTemplate, err := currentRoute.GetPathTemplate()
-		if err == nil {
-			return routeTemplate
-		}
-	}
-
-	return ""
+	return resolveHTTPMetricRoute(r)
 }
 
 func NewServer(
@@ -637,35 +619,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r.Use(middleware.CriticalHTTPTraceMiddleware(resolveCriticalHTTPRoute))
 	r.Use(otelmux.Middleware(
 		"superplane-public-api",
-		otelmux.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
-			/*
-			 * Prefer the route resolved by grpc-gateway. Fall back to Gorilla mux for
-			 * non-gateway routes that are matched directly by the outer router.
-			 */
-			route := getOtelMetricRoute(r.Context())
-
-			if route == "" {
-				route = r.Pattern
-			}
-
-			if route == "" {
-				currentRoute := mux.CurrentRoute(r)
-				if currentRoute != nil {
-					routeTemplate, err := currentRoute.GetPathTemplate()
-					if err == nil {
-						route = routeTemplate
-					}
-				}
-			}
-
-			if route == "" {
-				return nil
-			}
-
-			return []attribute.KeyValue{
-				attribute.String("http.route", route),
-			}
-		}),
+		otelmux.WithMetricAttributesFn(otelHTTPMetricAttributesForRequest),
 		otelmux.WithTracerProvider(nooptrace.NewTracerProvider()),
 	))
 	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
@@ -892,8 +846,8 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+	if err := messages.PublishCanvasEventCreatedMessages(newEvents); err != nil {
+		log.WithError(err).Error("error publishing canvas events after integration request")
 	}
 }
 
@@ -1772,11 +1726,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var firstResponse *core.WebhookResponseBody
+	started := time.Now()
 
 	for _, node := range nodes {
 		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents, recordExecution)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
+			writeWebhookError(w, webhookID, code, err)
 			return
 		}
 
@@ -1785,8 +1740,10 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+	if err := messages.PublishCanvasEventCreatedMessages(newEvents); err != nil {
+		log.WithError(err).WithField("webhook_id", webhookID).Error("error publishing canvas events for webhook")
+		http.Error(w, "error handling webhook", http.StatusServiceUnavailable)
+		return
 	}
 
 	for executionID, workflowID := range touchedExecutions {
@@ -1815,6 +1772,31 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+
+	log.WithFields(log.Fields{
+		"webhook_id":    webhookID,
+		"node_count":    len(nodes),
+		"payload_bytes": len(body),
+		"event_count":   len(newEvents),
+		"duration_ms":   time.Since(started).Milliseconds(),
+	}).Info("handled webhook")
+}
+
+func writeWebhookError(w http.ResponseWriter, webhookID uuid.UUID, code int, err error) {
+	if code == 0 {
+		code = http.StatusInternalServerError
+	}
+	if code < 500 {
+		http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
+		return
+	}
+
+	log.WithError(err).WithField("webhook_id", webhookID).Error("error handling webhook")
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		http.Error(w, "error handling webhook", http.StatusServiceUnavailable)
+		return
+	}
+	http.Error(w, "error handling webhook", code)
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {

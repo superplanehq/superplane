@@ -147,7 +147,10 @@ func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *htt
 }
 
 func (s *Server) loadPlanningSessionForRunner(r *http.Request, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
-	db := database.DB(r.Context())
+	return loadPlanningSessionForRunner(database.DB(r.Context()), scope)
+}
+
+func loadPlanningSessionForRunner(db *gorm.DB, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
 	session, err := models.FindPlanningSession(db, scope.OrganizationID, scope.FactoryID, scope.SessionID)
 	if err != nil {
 		return nil, err
@@ -169,6 +172,20 @@ func (s *Server) loadAnalysisPlanningSessionForRunner(r *http.Request, scope *ru
 	return session, nil
 }
 
+func loadAnalysisPlanningSessionWaitView(db *gorm.DB, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
+	session, err := models.FindPlanningSessionWaitView(db, scope.OrganizationID, scope.FactoryID, scope.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session.CanvasRunID == nil || *session.CanvasRunID != scope.CanvasRunID {
+		return nil, models.ErrFactoryPlanningSessionNotFound
+	}
+	if !session.IsAnalysisSession() {
+		return nil, models.ErrFactoryPlanningSessionInvalid
+	}
+	return session, nil
+}
+
 func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
@@ -178,13 +195,14 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 	deadline := time.Now().Add(time.Duration(hold) * time.Second)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	db := database.DB(r.Context())
 
 	for {
 		if r.Context().Err() != nil {
 			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		}
-		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+		session, err := loadAnalysisPlanningSessionWaitView(db, scope)
 		if err != nil {
 			writePlanningWaitError(w, r, session, err)
 			return
@@ -194,36 +212,41 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			return
 		}
 		if session.WaitState == models.PlanningWaitResolved {
-			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
-			if err != nil {
-				writePlanningWaitError(w, r, session, err)
+			fullSession, loadErr := loadPlanningSessionForRunner(db, scope)
+			if loadErr != nil {
+				writePlanningWaitError(w, r, session, loadErr)
+				return
+			}
+			result, consumed, consumeErr := consumeResolvedWait(fullSession, db)
+			if consumeErr != nil {
+				writePlanningWaitError(w, r, fullSession, consumeErr)
 				return
 			}
 			if consumed {
 				if r.Context().Err() != nil {
-					restorePlanningWait(session, result)
+					restorePlanningWait(fullSession, result)
 					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 					return
 				}
-				text, err := mintPlanningWaitText(r.Context(), session, result)
-				if err != nil {
-					restorePlanningWait(session, result)
-					writePlanningWaitError(w, r, session, err)
+				text, mintErr := mintPlanningWaitText(r.Context(), fullSession, result)
+				if mintErr != nil {
+					restorePlanningWait(fullSession, result)
+					writePlanningWaitError(w, r, fullSession, mintErr)
 					return
 				}
-				body, bodyErr := planningWaitMessageBody(r.Context(), session, result, text)
+				body, bodyErr := planningWaitMessageBody(r.Context(), fullSession, result, text)
 				if bodyErr != nil {
-					restorePlanningWait(session, result)
-					writePlanningWaitError(w, r, session, bodyErr)
+					restorePlanningWait(fullSession, result)
+					writePlanningWaitError(w, r, fullSession, bodyErr)
 					return
 				}
 				if err := writeJSON(w, http.StatusOK, body); err != nil {
-					restorePlanningWait(session, result)
+					restorePlanningWait(fullSession, result)
 				}
 				return
 			}
 		}
-		if err := beginPlanningWaitAndNotify(database.DB(r.Context()), session); err != nil {
+		if err := beginPlanningWaitAndNotify(db, session); err != nil {
 			writePlanningWaitError(w, r, session, err)
 			return
 		}
@@ -429,11 +452,13 @@ func parseOptionalActivityID(w http.ResponseWriter, raw string) (uuid.UUID, bool
 }
 
 func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSession) error {
-	alreadyWaiting := session.WaitState == models.PlanningWaitPending || session.WaitState == models.PlanningWaitResolved
+	if session.WaitState == models.PlanningWaitPending || session.WaitState == models.PlanningWaitResolved {
+		return nil
+	}
 	if err := session.BeginWait(db); err != nil {
 		return err
 	}
-	if alreadyWaiting || session.WaitState != models.PlanningWaitPending {
+	if session.WaitState != models.PlanningWaitPending {
 		return nil
 	}
 	messages.PublishPlanningBoardStatus(session)
