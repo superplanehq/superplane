@@ -221,4 +221,51 @@ describe("useFactoryWebsocket", () => {
       queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
     });
   });
+
+  it("does not warn when describe rejects with a gateway HTML page", async () => {
+    const html = `<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<title>superplane.com | 502: Bad gateway</title>
+</html>`;
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error(html));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { invalidateSpy } = renderFactoryWebsocket();
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+      exact: true,
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"),
+      exact: true,
+    });
+  });
+
+  it("warns with a short message when describe rejects with a real error", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error("Task not found"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderFactoryWebsocket();
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith("factory ws: failed to refresh work order", "Task not found");
+    expect(warnSpy.mock.calls.some((args) => args.some((arg) => typeof arg === "string" && arg.includes("<")))).toBe(
+      false,
+    );
+  });
 });
