@@ -1347,3 +1347,24 @@ func createReadyJiraIntakeIntegration(t *testing.T, organizationID uuid.UUID, pr
 func protoBool(value bool) *bool {
 	return &value
 }
+
+// backlogTemplateVersionFrom reads the template version stamped on the
+// Backlog trigger node.
+func backlogTemplateVersionFrom(nodes []models.Node) int {
+	for _, node := range nodes {
+		metadata, ok := node.Metadata[factoryTemplateMetadataKey].(map[string]any)
+		if !ok || metadata["id"] != models.FactoryAppTemplateBacklogID {
+			continue
+		}
+		switch version := metadata["version"].(type) {
+		case int:
+			return version
+		case float64:
+			return int(version)
+		case json.Number:
+			value, _ := version.Int64()
+			return int(value)
+		}
+	}
+	return 0
+}
