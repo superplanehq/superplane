@@ -162,7 +162,12 @@ function getDetailsForAnnotatedIncident(
     details["Service"] = incident.service.summary;
   }
 
-  // Assignees
+  assignAnnotatedIncidentContext(details, incident);
+
+  return details;
+}
+
+function assignAnnotatedIncidentContext(details: Record<string, string>, incident?: AnnotatedIncident) {
   if (incident?.assignees && incident.assignees.length > 0) {
     const assigneeNames = incident.assignees.map((a) => a.summary).filter(Boolean);
     if (assigneeNames.length > 0) {
@@ -170,15 +175,11 @@ function getDetailsForAnnotatedIncident(
     }
   }
 
-  // Escalation policy
   if (incident?.escalation_policy?.summary) {
     details["Escalation Policy"] = incident.escalation_policy.summary;
   }
 
-  // Created at
   if (incident?.created_at) {
     details["Incident Created"] = new Date(incident.created_at).toLocaleString();
   }
-
-  return details;
 }
