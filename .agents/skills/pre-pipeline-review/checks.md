@@ -32,7 +32,7 @@ targets across rows. Skip a row when nothing in that column changed.
 - **Fast security**: `make check.fast.security` is a static scan of tool
   configs, known dropper markers, and package install hooks. Run it before
   jobs that load Vite, Vitest, Storybook, or ESLint. It does not load
-  `eslint.config.js`. Semaphore runs the same scans in the Security block.
+  `eslint.config.js`. Semaphore runs the same scans in the Checks job.
 - **ESLint**: `make check.lint.ui` fails when the budget grows. Fix violations;
   do not update the baseline unless the user explicitly requests it.
 - **DB structure**: `make check.db.structure` is CI-only for this skill unless
