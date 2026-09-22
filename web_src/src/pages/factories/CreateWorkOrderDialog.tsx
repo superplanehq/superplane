@@ -9,10 +9,13 @@ import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
+import { DictateButton } from "./DictateButton";
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
+import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
 import { factoryPlanningEnabled } from "./pages/planningSettingsModel";
 
 interface CreateWorkOrderDialogProps {
@@ -78,6 +81,14 @@ function CreateWorkOrderDialogSession({
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
   const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
   const [isExpanded, setIsExpanded] = useState(false);
+  const dictation = useWorkOrderFieldDictation({
+    title: composer.title,
+    description: composer.description,
+    maxTitleLength: composer.maxTitleLength,
+    maxDescriptionLength: composer.maxDescriptionLength,
+    onTitleChange: composer.updateTitle,
+    onDescriptionChange: composer.updateDescription,
+  });
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -86,6 +97,7 @@ function CreateWorkOrderDialogSession({
   };
 
   const handleClose = () => {
+    dictation.stop();
     if (composer.isCreating) {
       return;
     }
@@ -121,6 +133,7 @@ function CreateWorkOrderDialogSession({
             data-testid="work-order-title-input"
             value={composer.title}
             onChange={(event) => composer.updateTitle(event.target.value)}
+            onFocus={dictation.rememberTitle}
             placeholder="Task title"
             maxLength={composer.maxTitleLength}
             autoFocus
@@ -137,6 +150,7 @@ function CreateWorkOrderDialogSession({
               maxLength={composer.maxDescriptionLength}
               disabled={composer.isCreating || fileUpload.isUploading}
               onChange={composer.updateDescription}
+              onFocus={dictation.rememberDescription}
               onUploadFiles={fileUpload.uploadFiles}
               isUploading={fileUpload.isUploading}
             />
@@ -146,7 +160,13 @@ function CreateWorkOrderDialogSession({
         <CreateWorkOrderDialogFooter
           canCreate={composer.canCreate}
           isCreating={composer.isCreating}
-          onCreate={() => void composer.handleCreate()}
+          dictate={
+            <DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={composer.isCreating} />
+          }
+          onCreate={() => {
+            dictation.stop();
+            void composer.handleCreate();
+          }}
         />
       </DialogContent>
     </Dialog>
@@ -204,14 +224,17 @@ function CreateWorkOrderDialogHeader({
 function CreateWorkOrderDialogFooter({
   canCreate,
   isCreating,
+  dictate,
   onCreate,
 }: {
   canCreate: boolean;
   isCreating: boolean;
+  dictate: ReactNode;
   onCreate: () => void;
 }) {
   return (
     <div className="relative z-10 flex items-center justify-end gap-3 border-t border-border px-4 py-3">
+      {dictate}
       <LoadingButton
         type="button"
         disabled={!canCreate}

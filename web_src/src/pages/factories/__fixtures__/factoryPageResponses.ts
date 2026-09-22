@@ -22,7 +22,12 @@ import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import type { PlanningSessionPayload } from "../pages/planningSessionView";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
-import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import {
+  DEFAULT_FACTORY_USAGE,
+  EMPTY_USAGE_REPORT,
+  ACTIVE_TRIAL_ENDS_AT,
+  type StorybookUsageReport,
+} from "./usageReportFixtures";
 import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
@@ -31,7 +36,6 @@ import {
   GITHUB_ISSUES_INTAKE_APP_ID,
   EMPTY_FACTORY_ID,
   FACTORIES_ORGANIZATION_ID,
-  IN_FOURTEEN_DAYS,
   LAST_WEEK,
   PRIMARY_FACTORY_ID,
   REFUND_LINE_HOTFIX_ID,
@@ -425,7 +429,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationBilling: {
     plan: "trial",
     planSource: "system",
-    trialEndsAt: IN_FOURTEEN_DAYS,
+    trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",
