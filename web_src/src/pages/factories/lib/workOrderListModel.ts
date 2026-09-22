@@ -6,6 +6,7 @@ import type {
   FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { workOrderListSource } from "./workOrderCardSource";
+import { workOrderMatchesUser } from "./workOrderListPagination";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatDurationSeconds, formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
 import {
@@ -350,7 +351,7 @@ export function applyWorkOrderScope(
   if (!currentUserId) {
     return [];
   }
-  return entries.filter((entry) => entry.assigneeIds.includes(currentUserId));
+  return entries.filter((entry) => workOrderMatchesUser(entry.order, currentUserId));
 }
 
 export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: WorkOrderFilters): WorkOrderListEntry[] {
@@ -365,11 +366,13 @@ export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: Wo
     result = result.filter((entry) => filters.sourceIds.includes(entry.sourceId));
   }
   if (filters.assigneeIds.length > 0) {
+    const people = filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+    const wantsUnassigned = filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE);
     result = result.filter((entry) => {
-      if (entry.assigneeIds.some((id) => filters.assigneeIds.includes(id))) {
+      if (wantsUnassigned && entry.assigneeIds.length === 0) {
         return true;
       }
-      return filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE) && entry.assigneeIds.length === 0;
+      return people.some((id) => workOrderMatchesUser(entry.order, id));
     });
   }
   return result;

@@ -13,6 +13,7 @@ import {
   GITHUB_INTAKE,
   GITHUB_INTAKE_CANVAS,
   JIRA_INTAKE,
+  PRODUCTIVE_INTAKE,
   renderHost,
   SENTRY_INTAKE,
 } from "./IntakeSettingsHost.spec.fixtures";
@@ -395,6 +396,36 @@ describe("IntakeSettingsHost", () => {
     expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("intake-source-settings-resume"));
     expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-jira", paused: false });
+  });
+
+  it("pauses, resumes, and deletes a Productive.io intake from settings", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({
+      intake: PRODUCTIVE_INTAKE,
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-productive", paused: true });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(deleteIntake).toHaveBeenCalledWith("intake-productive");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes a paused Productive.io intake from settings", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: { ...PRODUCTIVE_INTAKE, paused: true },
+    });
+
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-resume"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-productive", paused: false });
   });
 
   it("shows a pause error in settings when pause fails", async () => {

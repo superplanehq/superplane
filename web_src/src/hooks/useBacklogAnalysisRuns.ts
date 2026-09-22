@@ -16,7 +16,8 @@ import { getWorkOrderDisplayStatus } from "@/pages/factories/lib/workOrderProgre
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-import { useFactoryAutomations, useFactoryWorkOrders } from "./useFactoryData";
+import { useFactoryAutomations, useFactoryWorkOrdersPage } from "./useFactoryData";
+import { BOARD_BACKLOG_PAGE_SIZE, BOARD_BACKLOG_STATES } from "@/pages/factories/lib/workOrderListPagination";
 import { useFactoryIntakes } from "./useFactoryIntakeData";
 
 const BACKLOG_ANALYSIS_RUNS_LIMIT = 50;
@@ -71,7 +72,12 @@ export function useBacklogAnalysisRuns(organizationId: string, canvasId: string 
 export function useFactoryBacklogAnalysis(organizationId: string, factoryId: string) {
   const { data: apps = [] } = useFactoryAutomations(organizationId, factoryId);
   const { data: intakes = [] } = useFactoryIntakes(organizationId, factoryId);
-  const { data: orders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { orders = [] } = useFactoryWorkOrdersPage(
+    organizationId,
+    factoryId,
+    BOARD_BACKLOG_STATES,
+    BOARD_BACKLOG_PAGE_SIZE,
+  );
   const analyzerCanvasId = useMemo(
     () =>
       findBacklogAnalyzerCanvasId(

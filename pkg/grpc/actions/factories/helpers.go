@@ -83,6 +83,12 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		Unassigned: req.Unassigned,
 	}
 
+	if req.GetBeforeId() != "" {
+		if beforeID, err := uuid.Parse(req.GetBeforeId()); err == nil {
+			filters.BeforeID = &beforeID
+		}
+	}
+
 	for _, state := range req.States {
 		if mapped, ok := workOrderStateFromProto(state); ok {
 			filters.States = append(filters.States, mapped)
@@ -95,17 +101,9 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		}
 	}
 
-	for _, assigneeID := range req.AssigneeIds {
-		userID, err := uuid.Parse(assigneeID)
-		if err != nil {
-			continue
-		}
-		filters.AssigneeIDs = append(filters.AssigneeIDs, userID)
-	}
-
-	if req.Mine != nil {
-		if userID, err := uuid.Parse(*req.Mine); err == nil {
-			filters.Mine = &userID
+	if req.UserId != nil {
+		if userID, err := uuid.Parse(*req.UserId); err == nil {
+			filters.UserID = &userID
 		}
 	}
 

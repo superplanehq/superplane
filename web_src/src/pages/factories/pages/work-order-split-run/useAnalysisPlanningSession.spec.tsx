@@ -149,7 +149,7 @@ describe("useAnalysisPlanningSession", () => {
       { wrapper: wrapperWithClient(queryClient) },
     );
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
     invalidateQueries.mockClear();
 
     await act(async () => {
@@ -189,7 +189,7 @@ describe("useAnalysisPlanningSession", () => {
       { wrapper: wrapperWithClient(queryClient) },
     );
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
     invalidateQueries.mockClear();
 
     act(() => result.current.onComposerChange("Use this image."));
@@ -197,7 +197,7 @@ describe("useAnalysisPlanningSession", () => {
       await result.current.onSend();
     });
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
   });
 
   it("lets the user send after analysis stops so a new run can continue the chat", async () => {

@@ -1,11 +1,13 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderCheckScore, FactoriesWorkOrderSummary } from "@/api-client";
+import type { FactoriesWorkOrder } from "@/api-client";
 import { factoriesDescribeWorkOrder } from "@/api-client";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
+import { factoryWorkOrdersPagePrefix } from "@/pages/factories/lib/workOrderListPagination";
 import { canvasKeys } from "./useCanvasData";
 import { factoryQueryKeys } from "./useFactoryData";
+import { applyWorkOrderToListCaches, cachedWorkOrderIdsFromLists } from "./workOrderListCache";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/factories/`;
 
@@ -78,6 +80,9 @@ function invalidateOrdersList(queryClient: WorkOrderQueryClient, organizationId:
     queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
     exact: true,
   });
+  void queryClient.invalidateQueries({
+    queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
+  });
 }
 
 function invalidatePullRequests(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
@@ -109,64 +114,6 @@ function invalidateCachedCanvasRuns(
   }
 }
 
-function checkScoresFromChecks(order: FactoriesWorkOrder): FactoriesWorkOrderCheckScore[] {
-  return (order.checks ?? []).map((check) => ({
-    key: check.key,
-    name: check.name,
-    score: check.score,
-    maxScore: check.maxScore,
-  }));
-}
-
-const SUMMARY_FIELDS = [
-  "id",
-  "title",
-  "description",
-  "state",
-  "result",
-  "createdAt",
-  "updatedAt",
-  "assignees",
-  "createdBy",
-  "totalTokens",
-  "totalCostCents",
-  "number",
-  "key",
-  "lineDispatches",
-  "statusNotes",
-  "origin",
-  "totalDurationSeconds",
-] as const satisfies ReadonlyArray<keyof FactoriesWorkOrder & keyof FactoriesWorkOrderSummary>;
-
-function summaryFromDescribedOrder(order: FactoriesWorkOrder): FactoriesWorkOrderSummary {
-  const summary: FactoriesWorkOrderSummary = { checkScores: checkScoresFromChecks(order) };
-  for (const field of SUMMARY_FIELDS) {
-    if (order[field] !== undefined) {
-      summary[field] = order[field] as never;
-    }
-  }
-  return summary;
-}
-
-function patchedWorkOrder(order: FactoriesWorkOrderSummary, described: FactoriesWorkOrder): FactoriesWorkOrderSummary {
-  return { ...order, ...summaryFromDescribedOrder(described), planningSession: described.planningSession };
-}
-
-function patchCachedWorkOrder(
-  orders: FactoriesWorkOrderSummary[] | undefined,
-  orderId: string,
-  described: FactoriesWorkOrder,
-): FactoriesWorkOrderSummary[] | undefined {
-  if (!orders) {
-    return orders;
-  }
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index < 0) {
-    return [patchedWorkOrder({ id: described.id ?? orderId }, described), ...orders];
-  }
-  return orders.map((order) => (order.id === orderId ? patchedWorkOrder(order, described) : order));
-}
-
 async function describeWorkOrder(
   organizationId: string,
   factoryId: string,
@@ -185,9 +132,7 @@ async function describeWorkOrder(
 }
 
 function cachedWorkOrderIds(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string): string[] {
-  const orders =
-    queryClient.getQueryData<FactoriesWorkOrderSummary[]>(factoryQueryKeys.workOrders(organizationId, factoryId)) ?? [];
-  return orders.flatMap((order) => (order.id ? [order.id] : []));
+  return cachedWorkOrderIdsFromLists(queryClient, organizationId, factoryId);
 }
 
 function invalidateTaskActivity(
@@ -222,10 +167,7 @@ async function refreshUpdatedWorkOrder(
     return;
   }
   queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId), order);
-  queryClient.setQueryData<FactoriesWorkOrderSummary[]>(
-    factoryQueryKeys.workOrders(organizationId, factoryId),
-    (orders) => patchCachedWorkOrder(orders, orderId, order),
-  );
+  applyWorkOrderToListCaches(queryClient, organizationId, factoryId, orderId, order);
 }
 
 function invalidateFactoryWorkOrdersOnReconnect(
