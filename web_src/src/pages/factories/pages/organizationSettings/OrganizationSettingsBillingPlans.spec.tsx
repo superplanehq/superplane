@@ -14,11 +14,12 @@ import {
   ENDING_ORGANIZATION_BILLING,
   PURCHASED_CREDIT_USAGE_REPORT,
   RESTORED_TRIAL_ORGANIZATION_BILLING,
+  STORYBOOK_TRIAL_ENDS_AT,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY } from "../../lib/billingCreditBuckets";
 import { billingSubscriptionEndsCopy } from "../../lib/billingPlans";
 
-const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
+const WELCOME_EXPIRY_LABEL = new Date(STORYBOOK_TRIAL_ENDS_AT).toLocaleDateString();
 const BUSINESS_PERIOD_END = "2026-10-09T12:00:00.000Z";
 let canUpdateOrg = true;
 

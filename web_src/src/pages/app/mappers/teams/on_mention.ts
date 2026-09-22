@@ -1,6 +1,6 @@
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
-import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { EventInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerProps } from "@/ui/trigger";
 import teamsIcon from "@/assets/icons/integrations/teams.svg";
@@ -90,25 +90,29 @@ export const onMentionTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as MentionEventData | undefined;
-      const title = eventData?.text?.trim() ? eventData.text : "Bot mention";
-      const subtitle = buildSubtitle(
-        eventData?.from?.name ? `Mention by ${eventData.from.name}` : "Mention",
-        lastEvent.createdAt,
-      );
-
-      props.lastEventData = {
-        title,
-        subtitle,
-        receivedAt: new Date(lastEvent.createdAt),
-        state: "triggered",
-        eventId: lastEvent.id,
-      };
+      props.lastEventData = lastMentionEventData(lastEvent);
     }
 
     return props;
   },
 };
+
+function lastMentionEventData(lastEvent: NonNullable<EventInfo>): TriggerProps["lastEventData"] {
+  const eventData = lastEvent.data as MentionEventData | undefined;
+  const title = eventData?.text?.trim() ? eventData.text : "Bot mention";
+  const subtitle = buildSubtitle(
+    eventData?.from?.name ? `Mention by ${eventData.from.name}` : "Mention",
+    lastEvent.createdAt,
+  );
+
+  return {
+    title,
+    subtitle,
+    receivedAt: new Date(lastEvent.createdAt),
+    state: "triggered",
+    eventId: lastEvent.id,
+  };
+}
 
 function stringOrDash(value?: unknown): string {
   if (value === undefined || value === null || value === "") {
