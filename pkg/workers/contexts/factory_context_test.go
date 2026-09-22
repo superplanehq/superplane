@@ -197,7 +197,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 
 	countOrders := func(factoryModel *models.Factory) int {
 		t.Helper()
-		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{})
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 100})
 		require.NoError(t, err)
 		return len(orders)
 	}
@@ -397,7 +397,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 
 	countOrders := func(factoryModel *models.Factory) int {
 		t.Helper()
-		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{})
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 100})
 		require.NoError(t, err)
 		return len(orders)
 	}

@@ -107,6 +107,13 @@ describe("buildAssigneeFilterOptions", () => {
       { value: "u2", label: "Zoe" },
     ]);
   });
+
+  it("keeps organization members when the loaded page has no owners", () => {
+    expect(buildAssigneeFilterOptions([], [{ id: "u3", name: "Sam" }])).toEqual([
+      { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
+      { value: "u3", label: "Sam" },
+    ]);
+  });
 });
 
 describe("buildWorkOrderFilterChips", () => {
