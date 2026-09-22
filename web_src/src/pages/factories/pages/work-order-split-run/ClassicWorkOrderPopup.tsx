@@ -2,7 +2,9 @@ import { useMemo, useState } from "react";
 
 import { useFactory } from "@/hooks/useFactoryData";
 
-import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
+import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
@@ -25,7 +27,15 @@ type ClassicWorkOrderPopupProps = WorkOrderSplitRunPopupProps & {
   sessionLookupError: Error | null;
 };
 
-export function ClassicWorkOrderPopup({
+export function ClassicWorkOrderPopup(props: ClassicWorkOrderPopupProps) {
+  return (
+    <LiveHeaderSpendProvider>
+      <ClassicWorkOrderPopupBody {...props} />
+    </LiveHeaderSpendProvider>
+  );
+}
+
+function ClassicWorkOrderPopupBody({
   organizationId,
   factoryId,
   factoryKey,
@@ -133,7 +143,7 @@ export function ClassicWorkOrderPopup({
             }
             accessory={views}
           >
-            <OwnerTimeCostRow
+            <LiveOwnerTimeCostRow
               fixture={{ ...classicFixture, owner: edits.owner }}
               assigneeIds={edits.assigneeIds}
               usageByModel={classicFixture.usageByModel}
