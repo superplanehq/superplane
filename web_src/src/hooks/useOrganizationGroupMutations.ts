@@ -7,7 +7,7 @@ import {
   groupsUpdateGroup,
 } from "../api-client/sdk.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
-import { organizationKeys } from "./useOrganizationData";
+import { organizationKeys } from "./organizationKeys";
 
 export const useCreateGroup = (organizationId: string) => {
   const queryClient = useQueryClient();

@@ -62,7 +62,7 @@ export const sendLogEventMapper: ComponentBaseMapper = {
       details["Severity"] = String(severityText);
     }
 
-    addLogBodyAndAttributes(details, responseData);
+    addLogBody(details, responseData);
 
     if (eventName) {
       details["Event Name"] = String(eventName);
@@ -75,6 +75,8 @@ export const sendLogEventMapper: ComponentBaseMapper = {
     if (dataset) {
       details["Dataset"] = String(dataset);
     }
+
+    addLogAttributes(details, responseData);
 
     return details;
   },
@@ -91,12 +93,14 @@ function hasDefaultPayload(
   return !!outputs?.default && outputs.default.length > 0;
 }
 
-function addLogBodyAndAttributes(details: Record<string, string>, responseData: Record<string, unknown> | undefined) {
+function addLogBody(details: Record<string, string>, responseData: Record<string, unknown> | undefined) {
   if (responseData?.body) {
     const bodyText = String(responseData.body);
     details["Body"] = bodyText.length > 100 ? bodyText.substring(0, 100) + "..." : bodyText;
   }
+}
 
+function addLogAttributes(details: Record<string, string>, responseData: Record<string, unknown> | undefined) {
   if (responseData?.attributes && typeof responseData.attributes === "object") {
     const attrs = responseData.attributes as Record<string, unknown>;
     const attrCount = Object.keys(attrs).length;

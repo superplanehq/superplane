@@ -40,7 +40,7 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
     details.Number = incidentNumber;
   }
 
-  assignIncidentRelatedResources(details, incident, agent);
+  assignIncidentRelatedResources(details, incident);
 
   const lastStatusChangeAt = record.last_status_change_at;
   if (lastStatusChangeAt) {
@@ -51,6 +51,8 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
   if (resolvedAt) {
     details["Resolved At"] = new Date(resolvedAt).toLocaleString();
   }
+
+  assignIncidentAgent(details, agent);
 
   return details;
 }
@@ -63,11 +65,7 @@ function formatIncidentTime(value: string | undefined): string {
   return value ? new Date(value).toLocaleString() : "-";
 }
 
-function assignIncidentRelatedResources(
-  details: Record<string, string>,
-  incident: Incident | undefined,
-  agent?: ResourceRef,
-) {
+function assignIncidentRelatedResources(details: Record<string, string>, incident: Incident | undefined) {
   if (incident?.service) {
     details.Service = incident.service.summary || "-";
     details["Service URL"] = incident.service.html_url || "-";
@@ -81,7 +79,9 @@ function assignIncidentRelatedResources(
   if (incident?.assignments) {
     details["Assignments"] = incident.assignments.map((i) => i.assignee.summary).join(", ");
   }
+}
 
+function assignIncidentAgent(details: Record<string, string>, agent?: ResourceRef) {
   if (agent) {
     details["Agent"] = agent.summary || "-";
     details["Agent URL"] = agent.html_url || "-";

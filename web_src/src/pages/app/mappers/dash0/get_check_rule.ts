@@ -66,12 +66,14 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
       details["Expression"] = expr.length > 100 ? expr.substring(0, 100) + "..." : expr;
     }
 
-    addCheckRuleThresholdsAndLabels(details, responseData);
+    addCheckRuleThresholds(details, responseData);
 
     if (interval) details["Interval"] = String(interval);
     if (forDuration) details["For"] = String(forDuration);
     if (keepFiringFor) details["Keep Firing For"] = String(keepFiringFor);
     if (enabled != null) details["Enabled"] = enabled ? "Yes" : "No";
+
+    addCheckRuleLabels(details, responseData);
 
     return details;
   },
@@ -88,14 +90,16 @@ function hasDefaultPayload(
   return !!outputs?.default && outputs.default.length > 0;
 }
 
-function addCheckRuleThresholdsAndLabels(details: Record<string, string>, responseData: CheckRulePayload) {
+function addCheckRuleThresholds(details: Record<string, string>, responseData: CheckRulePayload) {
   if (responseData.thresholds) {
     const parts: string[] = [];
     if (responseData.thresholds.degraded != null) parts.push(`Degraded: ${responseData.thresholds.degraded}`);
     if (responseData.thresholds.critical != null) parts.push(`Critical: ${responseData.thresholds.critical}`);
     if (parts.length > 0) details["Thresholds"] = parts.join(", ");
   }
+}
 
+function addCheckRuleLabels(details: Record<string, string>, responseData: CheckRulePayload) {
   if (responseData.labels && Object.keys(responseData.labels).length > 0) {
     const labels = Object.entries(responseData.labels)
       .map(([k, v]) => `${k}=${v}`)
