@@ -50,7 +50,7 @@ export function PlanningSessionSurveyForm({
                 <Button
                   key={option}
                   type="button"
-                  variant="ghost"
+                  variant={selected ? "default" : "ghost"}
                   size="sm"
                   aria-pressed={selected}
                   className={cn(
@@ -60,7 +60,7 @@ export function PlanningSessionSurveyForm({
                       : "border-border bg-background text-foreground hover:bg-muted",
                   )}
                   onClick={() => {
-                    setAnswers((current) => replaceAtIndex(current, currentIndex, option));
+                    setAnswers((current) => replaceAtIndex(current, currentIndex, selected ? null : option));
                   }}
                 >
                   <span
