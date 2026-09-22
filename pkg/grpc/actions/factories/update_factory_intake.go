@@ -275,17 +275,16 @@ func applyIntakeSettingsToGraph(
 		graph.TriggerNodeID == "" {
 		return nil, nil, invalidArgument("intake automation has no trigger to update")
 	}
+	expression := intakeFilterExpressionFor(source, updated)
 	if graph.FilterNodeID == "" &&
 		intakeSourceHasFilterNode(source) &&
-		intakeSettingsChangeFilters(current, updated) {
+		(intakeSettingsChangeFilters(current, updated) || expression != "true") {
 		var err error
 		nodes, edges, graph, err = ensureIntakeFilterNode(nodes, edges, graph)
 		if err != nil {
 			return nil, nil, invalidArgument(err.Error())
 		}
 	}
-
-	expression := intakeFilterExpressionFor(source, updated)
 	for i := range nodes {
 		switch nodes[i].ID {
 		case graph.TriggerNodeID:

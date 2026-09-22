@@ -1149,6 +1149,9 @@ message FactoryIntake {
     // Issue levels that still create a task. Empty means every level.
     // Sentry exception intakes only.
     repeated string sentry_levels = 14;
+    // When true, skip Productive.io key tasks (milestones). Productive task
+    // intakes only.
+    optional bool exclude_key_tasks = 15;
   }
 
   string id = 1;

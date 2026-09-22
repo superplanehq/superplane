@@ -76,6 +76,8 @@ type intakeSettings struct {
 	SentryAssignedIssues bool
 	// Issue levels that still create a task. Empty means every level.
 	SentryLevels []string
+	// Skip Productive.io key tasks (milestones). Productive task intakes only.
+	ExcludeKeyTasks bool
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -90,6 +92,7 @@ func defaultIntakeSettings() intakeSettings {
 		ReopenedIssues:       true,
 		SuperplaneLabelAdded: true,
 		JiraMoveOnComplete:   true,
+		ExcludeKeyTasks:      true,
 		// AuthorsWithAccess is off by default: false.
 	}
 }
@@ -111,10 +114,17 @@ func defaultSentryIntakeSettings() intakeSettings {
 	return settings
 }
 
+func defaultProductiveIntakeSettings() intakeSettings {
+	settings := defaultIntakeSettings()
+	settings.ExcludeKeyTasks = true
+	return settings
+}
+
 func intakeSourceHasFilterNode(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceJiraIssues ||
-		source == models.FactoryIntakeSourceSentryExceptions
+		source == models.FactoryIntakeSourceSentryExceptions ||
+		source == models.FactoryIntakeSourceProductiveTasks
 }
 
 func (s intakeSettings) normalized() intakeSettings {
@@ -168,6 +178,8 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeJiraFilterExpression(settings)
 	case models.FactoryIntakeSourceSentryExceptions:
 		return intakeSentryFilterExpression(settings)
+	case models.FactoryIntakeSourceProductiveTasks:
+		return intakeProductiveFilterExpression(settings)
 	default:
 		return "true"
 	}
@@ -242,6 +254,15 @@ func intakeSentryFilterExpression(settings intakeSettings) string {
 	return fmt.Sprintf(`(root().data.data.issue?.level ?? "") in %s`, levels)
 }
 
+const intakeProductiveExcludeKeyTasksCondition = "root().data.data.attributes.type_id != 3"
+
+func intakeProductiveFilterExpression(settings intakeSettings) string {
+	if settings.ExcludeKeyTasks {
+		return intakeProductiveExcludeKeyTasksCondition
+	}
+	return "true"
+}
+
 func intakeTriggerActionsFor(settings intakeSettings) []any {
 	actions := []any{}
 	if settings.NewIssues {
@@ -312,7 +333,10 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 	if !slices.Equal(current.Labels, updated.Labels) {
 		return true
 	}
-	return !slices.Equal(current.SentryLevels, updated.SentryLevels)
+	if !slices.Equal(current.SentryLevels, updated.SentryLevels) {
+		return true
+	}
+	return current.ExcludeKeyTasks != updated.ExcludeKeyTasks
 }
 
 // The second alternative is the expression built before the label filter was
@@ -340,6 +364,8 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultJiraIntakeSettings()
 	case models.FactoryIntakeSourceSentryExceptions:
 		settings = defaultSentryIntakeSettings()
+	case models.FactoryIntakeSourceProductiveTasks:
+		settings = defaultProductiveIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
 
@@ -382,6 +408,11 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			}
 		}
 
+		return settings.normalized()
+	}
+
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		settings.ExcludeKeyTasks = strings.Contains(expression, intakeProductiveExcludeKeyTasksCondition)
 		return settings.normalized()
 	}
 
@@ -452,6 +483,9 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.SentryAssignedIssues = proto.Bool(settings.SentryAssignedIssues)
 		serialized.SentryLevels = settings.SentryLevels
 	}
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		serialized.ExcludeKeyTasks = proto.Bool(settings.ExcludeKeyTasks)
+	}
 	return serialized
 }
 
@@ -496,6 +530,9 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.SentryAssignedIssues = requested.GetSentryAssignedIssues()
 	}
 	updated.SentryLevels = requested.GetSentryLevels()
+	if requested.ExcludeKeyTasks != nil {
+		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
+	}
 
 	return updated.normalized()
 }

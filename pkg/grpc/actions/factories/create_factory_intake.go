@@ -103,8 +103,13 @@ func CreateFactoryIntake(
 	}
 
 	settings := defaultIntakeSettings()
-	if source == models.FactoryIntakeSourceJiraIssues {
+	switch source {
+	case models.FactoryIntakeSourceJiraIssues:
 		settings = defaultJiraIntakeSettings()
+	case models.FactoryIntakeSourceSentryExceptions:
+		settings = defaultSentryIntakeSettings()
+	case models.FactoryIntakeSourceProductiveTasks:
+		settings = defaultProductiveIntakeSettings()
 	}
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
