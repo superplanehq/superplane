@@ -7,3 +7,4 @@ export const WORKSPACE_LOADING_COPY = {
 } as const;
 
 export const WORKSPACE_LOADING_TEST_ID = "workspace-loading";
+export const WORKSPACE_LOADING_EXIT_MS = 300;

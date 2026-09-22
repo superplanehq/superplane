@@ -20,9 +20,17 @@ describe("WorkspaceLoadingScreen", () => {
     const status = screen.getByRole("status", { name: WORKSPACE_LOADING_COPY.board });
     expect(status).toHaveAttribute("data-testid", WORKSPACE_LOADING_TEST_ID);
     expect(status).toHaveAttribute("aria-busy", "true");
-    expect(status.querySelectorAll("svg path")).toHaveLength(3);
+    expect(status.querySelectorAll("svg path")).toHaveLength(4);
     expect(status.querySelector(".workspace-loading-pen")).not.toBeNull();
     expect(screen.getByText(WORKSPACE_LOADING_COPY.board)).toBeInTheDocument();
+  });
+
+  it("fades the overlay out when exiting", () => {
+    render(<WorkspaceLoadingScreen message={WORKSPACE_LOADING_COPY.board} exiting />);
+
+    const status = screen.getByTestId(WORKSPACE_LOADING_TEST_ID);
+    expect(status).toHaveClass("workspace-loading-overlay--exit");
+    expect(status).toHaveAttribute("aria-busy", "false");
   });
 });
 
@@ -69,7 +77,7 @@ describe("WorkspaceLoadingProvider", () => {
     expect(screen.getAllByTestId(WORKSPACE_LOADING_TEST_ID)).toHaveLength(1);
   });
 
-  it("hides the screen when nothing is pending", () => {
+  it("fades the screen out when nothing is pending", () => {
     const { rerender } = render(
       <WorkspaceLoadingProvider>
         <PendingReporter message={WORKSPACE_LOADING_COPY.board} pending />
@@ -82,7 +90,7 @@ describe("WorkspaceLoadingProvider", () => {
       </WorkspaceLoadingProvider>,
     );
 
-    expect(screen.queryByTestId(WORKSPACE_LOADING_TEST_ID)).not.toBeInTheDocument();
+    expect(screen.getByTestId(WORKSPACE_LOADING_TEST_ID)).toHaveClass("workspace-loading-overlay--exit");
     expect(screen.getByText("Ready child")).toBeInTheDocument();
   });
 });

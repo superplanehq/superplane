@@ -6,8 +6,9 @@ import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 
 const WORKSPACE_LOADING_STROKES = [
   { name: "left", d: "M14.4975 0 L3.123 16.447" },
+  { name: "mid-left", d: "M14.4975 0 L9.91 19.43" },
+  { name: "mid-right", d: "M14.4975 0 L19.09 19.43" },
   { name: "right", d: "M14.4975 0 L25.877 16.455" },
-  { name: "stem", d: "M14.4975 0 L14.5 20.3" },
 ] as const;
 
 function WorkspaceLoadingMark() {
@@ -32,14 +33,17 @@ function WorkspaceLoadingMark() {
   );
 }
 
-export function WorkspaceLoadingScreen({ message }: { message: string }) {
+export function WorkspaceLoadingScreen({ message, exiting = false }: { message: string; exiting?: boolean }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex min-h-screen flex-col items-center justify-center gap-5 bg-background text-foreground"
+      className={cn(
+        "fixed inset-0 z-50 flex min-h-screen flex-col items-center justify-center gap-5 bg-background text-foreground",
+        exiting && "workspace-loading-overlay--exit",
+      )}
       role="status"
       aria-label={message}
       aria-live="polite"
-      aria-busy="true"
+      aria-busy={!exiting}
       data-testid={WORKSPACE_LOADING_TEST_ID}
     >
       <WorkspaceLoadingMark />
