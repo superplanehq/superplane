@@ -9,14 +9,11 @@ import { useState } from "react";
 import { FactorySetupPanel } from "./FactorySetupPanel";
 import { getFactoryDefinition } from "./factories";
 import { homePageSubtitleClassName, homePageTitleClassName } from "./homePageStyles";
-import type { CanvasFolderData } from "./types";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallFactory } from "./useInstallFactory";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 interface FreshOrgLandingProps {
-  folder?: CanvasFolderData;
-  folderContextPending?: boolean;
   title?: string;
 }
 
@@ -24,19 +21,15 @@ interface FreshOrgLandingProps {
  * New-app landing. When factories are disabled, offers the template-based
  * "Setup Factory" onboarding. When enabled, only a blank app.
  */
-export function FreshOrgLanding({
-  folder,
-  folderContextPending = false,
-  title = "Create a new app",
-}: FreshOrgLandingProps) {
+export function FreshOrgLanding({ title = "Create a new app" }: FreshOrgLandingProps) {
   const organizationId = useOrganizationId() ?? undefined;
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const showLegacyFactoryOnboarding = !hasExperimentalFeature(FEATURE_FACTORIES);
   const factory = getFactoryDefinition();
-  const { createApp, isSaving } = useCreateApp({ folder });
-  const { installFactory, isInstalling } = useInstallFactory({ folder });
+  const { createApp, isSaving } = useCreateApp();
+  const { installFactory, isInstalling } = useInstallFactory();
   const [showFactorySetup, setShowFactorySetup] = useState(false);
-  const busy = folderContextPending || isSaving || isInstalling;
+  const busy = isSaving || isInstalling;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-14 lg:py-20">
