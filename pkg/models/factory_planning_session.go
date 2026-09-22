@@ -149,6 +149,10 @@ func (s *FactoryPlanningSession) CurrentSurvey() PlanningSessionSurvey {
 	return s.Survey.Data()
 }
 
+func (s *FactoryPlanningSession) HasPendingQuestion() bool {
+	return s != nil && s.WaitState == PlanningWaitPending && len(s.CurrentSurvey().Questions) > 0
+}
+
 // ListAnalysisPlanningSessionsForWorkOrders loads the analysis session for
 // each work order. Work orders without a session are absent from the map.
 // Messages and activities stay unloaded.

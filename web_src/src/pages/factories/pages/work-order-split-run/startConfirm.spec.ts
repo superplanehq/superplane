@@ -45,11 +45,22 @@ describe("startConfirm", () => {
     expect(needsStartConfirm({ confidence: 5 })).toBe(false);
   });
 
+  it("warns while the agent still works, even when scores are high", () => {
+    expect(startConfirmTone({ clarity: 4, confidence: 5, agentWorking: true })).toBe("working");
+    expect(startConfirmBody({ clarity: 4, confidence: 5, agentWorking: true })).toBe(START_CONFIRM_COPY.working);
+    expect(needsStartConfirm({ clarity: 4, confidence: 5, agentWorking: true })).toBe(true);
+  });
+
   it("honors Do not ask again from localStorage", () => {
     persistSkipStartConfirm();
     expect(window.localStorage.getItem(START_CONFIRM_STORAGE_KEY)).toBe("1");
     expect(needsStartConfirm({})).toBe(false);
     expect(needsStartConfirm({ clarity: 1 })).toBe(false);
     expect(needsStartConfirm({ clarity: 3, confidence: 3 })).toBe(false);
+  });
+
+  it("does not let Do not ask again skip the still-working confirm", () => {
+    persistSkipStartConfirm();
+    expect(needsStartConfirm({ clarity: 4, confidence: 5, agentWorking: true })).toBe(true);
   });
 });

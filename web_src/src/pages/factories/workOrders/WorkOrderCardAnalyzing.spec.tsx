@@ -160,8 +160,17 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.getByTestId("work-order-card-wo-1").className).toContain("hover:bg-slate-100");
   });
 
-  it("shows Agent question when the analysis waits for an answer", () => {
+  it("keeps thinking states when a question is stored while the agent still works", () => {
     renderCard({ isAnalyzing: true, hasAgentQuestion: true, confidenceScore: 4 });
+
+    expect(liveThinkingCopy("work-order-card-analyzing-wo-1")).toBe("Analyzing");
+    expect(screen.queryByTestId("work-order-card-agent-question-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("shows Agent question when the analysis waits for an answer", () => {
+    renderCard({ hasAgentQuestion: true, confidenceScore: 4 });
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toHaveTextContent("Agent question");
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();

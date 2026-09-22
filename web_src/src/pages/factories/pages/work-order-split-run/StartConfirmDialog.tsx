@@ -20,16 +20,18 @@ const ACTION_CLASS = "rounded-md";
 export function StartConfirmDialog({
   open,
   scores,
+  agentWorking = false,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean;
   scores: StartConfirmScores;
+  agentWorking?: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (skipNext: boolean) => void;
 }) {
   const [skipNext, setSkipNext] = useState(false);
-  const body = startConfirmBody(scores) ?? START_CONFIRM_COPY.missing;
+  const body = startConfirmBody({ ...scores, agentWorking }) ?? START_CONFIRM_COPY.missing;
 
   useEffect(() => {
     if (open) {

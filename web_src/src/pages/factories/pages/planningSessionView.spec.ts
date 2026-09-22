@@ -237,32 +237,52 @@ describe("createWithAgentViewFromSession", () => {
     expect(draftCardAgentIsWorking(null, false)).toBe(false);
   });
 
-  it("exposes a pending survey and keeps it out of the chat messages", () => {
-    const view = createWithAgentViewFromSession(
+  it("exposes a pending survey only after SuperPlane waits", () => {
+    const survey = {
+      id: "pending-survey",
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+    };
+    const running = createWithAgentViewFromSession(
       {
         repository: "acme/payments",
         canvasId: "canvas-1",
         executionId: "exec-1",
         messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
-        survey: {
-          id: "pending-survey",
-          questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
-        },
+        survey,
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+    const waiting = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        waitState: "pending",
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+        survey,
       },
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
     );
 
-    expect(view.survey).toEqual({
+    expect(running.survey).toBeUndefined();
+    expect(running.machineStatus).toBe("running");
+    expect(
+      planningSessionHasPendingSurvey({
+        survey,
+      }),
+    ).toBe(false);
+    expect(
+      planningSessionHasPendingSurvey({
+        waitState: "pending",
+        survey,
+      }),
+    ).toBe(true);
+    expect(planningSessionHasPendingSurvey({ waitState: "pending", survey: { questions: [] } })).toBe(false);
+    expect(waiting.survey).toEqual({
       id: "pending-survey",
       questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
     });
-    expect(
-      planningSessionHasPendingSurvey({
-        survey: { id: "pending-survey", questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] },
-      }),
-    ).toBe(true);
-    expect(planningSessionHasPendingSurvey({ survey: { questions: [] } })).toBe(false);
-    expect(view.messages).toEqual([
+    expect(waiting.messages).toEqual([
       { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
     ]);
   });
