@@ -1,7 +1,11 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "bun:test";
+import { act, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "bun:test";
 
-import { WORKSPACE_LOADING_COPY, WORKSPACE_LOADING_TEST_ID } from "@/lib/workspaceLoadingCopy";
+import {
+  WORKSPACE_LOADING_COPY,
+  WORKSPACE_LOADING_EXIT_MS,
+  WORKSPACE_LOADING_TEST_ID,
+} from "@/lib/workspaceLoadingCopy";
 
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 
@@ -78,19 +82,35 @@ describe("WorkspaceLoadingProvider", () => {
   });
 
   it("fades the screen out when nothing is pending", () => {
-    const { rerender } = render(
-      <WorkspaceLoadingProvider>
-        <PendingReporter message={WORKSPACE_LOADING_COPY.board} pending />
-      </WorkspaceLoadingProvider>,
-    );
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <WorkspaceLoadingProvider>
+          <PendingReporter message={WORKSPACE_LOADING_COPY.board} pending />
+        </WorkspaceLoadingProvider>,
+      );
 
-    rerender(
-      <WorkspaceLoadingProvider>
-        <PendingReporter message={WORKSPACE_LOADING_COPY.board} pending={false} />
-      </WorkspaceLoadingProvider>,
-    );
+      rerender(
+        <WorkspaceLoadingProvider>
+          <PendingReporter message={WORKSPACE_LOADING_COPY.board} pending={false} />
+        </WorkspaceLoadingProvider>,
+      );
 
-    expect(screen.getByTestId(WORKSPACE_LOADING_TEST_ID)).toHaveClass("workspace-loading-overlay--exit");
-    expect(screen.getByText("Ready child")).toBeInTheDocument();
+      const status = screen.getByTestId(WORKSPACE_LOADING_TEST_ID);
+      expect(status).toHaveClass("workspace-loading-overlay--exit");
+      expect(screen.getByText("Ready child")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(WORKSPACE_LOADING_EXIT_MS - 1);
+      });
+      expect(screen.getByTestId(WORKSPACE_LOADING_TEST_ID)).toBe(status);
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.queryByTestId(WORKSPACE_LOADING_TEST_ID)?.isConnected ?? false).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
