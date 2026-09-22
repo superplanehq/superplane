@@ -7,6 +7,7 @@ import { factoryQueryKeys } from "@/hooks/useFactoryData";
 
 import {
   answerPlanningSessionSurvey,
+  endPlanningSession,
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
@@ -22,6 +23,7 @@ vi.mock("../planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: vi.fn(),
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
+  endPlanningSession: vi.fn(),
 }));
 
 function planningTalk(message: CreateWithAgentMessage) {
@@ -47,6 +49,7 @@ describe("useAnalysisPlanningSession", () => {
     vi.mocked(findPlanningSessionByWorkOrder).mockReset();
     vi.mocked(sendPlanningSessionMessage).mockReset();
     vi.mocked(answerPlanningSessionSurvey).mockReset();
+    vi.mocked(endPlanningSession).mockReset();
   });
 
   it("keeps chat closed when the draft has no analysis session", async () => {
@@ -369,6 +372,89 @@ describe("useAnalysisPlanningSession", () => {
       "session-1",
       "See this.\n\n![bug.png](sp-file://file-1)",
     );
+  });
+
+  it("stops the current analysis turn without closing the chat", async () => {
+    const running = {
+      id: "session-1",
+      state: "running",
+      messages: [{ id: "user-1", role: "user", text: "Add a screenshot." }],
+    };
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue(running);
+    vi.mocked(endPlanningSession).mockResolvedValue({ ...running, state: "ended" });
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.showChat).toBe(true));
+    act(() => result.current.onComposerChange("Keep this note."));
+    await act(async () => {
+      await result.current.onStop();
+    });
+
+    expect(endPlanningSession).toHaveBeenCalledWith("org-1", "factory-1", "session-1");
+    expect(result.current.showChat).toBe(true);
+    expect(result.current.composer).toBe("Keep this note.");
+    expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
+  });
+
+  it("lets the user send after stop so a new run can continue the chat", async () => {
+    const running = {
+      id: "session-1",
+      state: "running",
+      messages: [{ role: "user", text: "Add a screenshot." }],
+    };
+    const ended = { ...running, state: "ended" };
+    const continued = {
+      ...ended,
+      state: "running",
+      messages: [...running.messages, { role: "user", text: "Use the existing form." }],
+    };
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue(running);
+    vi.mocked(endPlanningSession).mockResolvedValue(ended);
+    vi.mocked(sendPlanningSessionMessage).mockResolvedValue(continued);
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.showChat).toBe(true));
+    await act(async () => {
+      await result.current.onStop();
+    });
+    expect(result.current.showChat).toBe(true);
+    expect(result.current.canSend).toBe(true);
+
+    act(() => result.current.onComposerChange("Use the existing form."));
+    await act(async () => {
+      await result.current.onSend();
+    });
+
+    expect(sendPlanningSessionMessage).toHaveBeenCalledWith(
+      "org-1",
+      "factory-1",
+      "session-1",
+      "Use the existing form.",
+    );
+    expect(result.current.showChat).toBe(true);
+    expect(result.current.view.messages.map(planningTalk)).toEqual(continued.messages);
   });
 
   it("does not send while an upload is in progress", async () => {

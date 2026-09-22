@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Loader2, Square } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
@@ -41,6 +41,8 @@ export type IntentAnalysisChat = {
   isUploading?: boolean;
   onComposerChange: (value: string) => void;
   onSend: (text?: string) => void | Promise<boolean>;
+  onStop?: () => void | Promise<void>;
+  stopping?: boolean;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   onSubmitSurvey: (text: string) => void;
   planPaneOpen?: boolean;
@@ -169,6 +171,7 @@ function AnalysisRequestChat({
         chipsWorking={chipsWorking}
         chatSolo={chatSolo}
         chatColumnClass={chatColumnClass}
+        showStop={state.active}
       />
     </div>
   );
@@ -181,6 +184,7 @@ function AnalysisComposer({
   chipsWorking,
   chatSolo,
   chatColumnClass,
+  showStop,
 }: {
   analysis: IntentAnalysisChat;
   images: ReturnType<typeof useAnalysisComposerImages>;
@@ -188,6 +192,7 @@ function AnalysisComposer({
   chipsWorking: boolean;
   chatSolo: boolean;
   chatColumnClass: string;
+  showStop: boolean;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
   const send = async () => {
@@ -264,22 +269,12 @@ function AnalysisComposer({
                   <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
                 ) : null}
               </div>
-              <div className="flex items-center gap-1.5">
-                <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
-                  {ANALYSIS_PLANNING_COPY.sendShortcut}
-                </Kbd>
-                <InputGroupButton
-                  type="submit"
-                  variant="default"
-                  size="icon-sm"
-                  className="rounded-full"
-                  disabled={!canSubmit}
-                  aria-label={ANALYSIS_PLANNING_COPY.send}
-                  data-testid="split-run-intent-composer-send"
-                >
-                  <ArrowUp className="size-4" aria-hidden />
-                </InputGroupButton>
-              </div>
+              <AnalysisComposerActions
+                canSubmit={canSubmit}
+                showStop={showStop}
+                onStop={analysis.onStop}
+                stopping={analysis.stopping}
+              />
             </InputGroupAddon>
           </InputGroup>
         </div>
@@ -290,6 +285,60 @@ function AnalysisComposer({
         ) : null}
       </form>
     </div>
+  );
+}
+
+function AnalysisComposerActions({
+  canSubmit,
+  showStop,
+  onStop,
+  stopping,
+}: {
+  canSubmit: boolean;
+  showStop: boolean;
+  onStop?: () => void | Promise<void>;
+  stopping?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
+        {ANALYSIS_PLANNING_COPY.sendShortcut}
+      </Kbd>
+      {showStop && onStop ? <AnalysisStopButton onStop={onStop} stopping={stopping} /> : null}
+      <InputGroupButton
+        type="submit"
+        variant="default"
+        size="icon-sm"
+        className="rounded-full"
+        disabled={!canSubmit}
+        aria-label={ANALYSIS_PLANNING_COPY.send}
+        data-testid="split-run-intent-composer-send"
+      >
+        <ArrowUp className="size-4" aria-hidden />
+      </InputGroupButton>
+    </div>
+  );
+}
+
+function AnalysisStopButton({ onStop, stopping }: { onStop: () => void | Promise<void>; stopping?: boolean }) {
+  return (
+    <InputGroupButton
+      type="button"
+      variant="outline"
+      size="icon-sm"
+      className="rounded-full"
+      onClick={() => void onStop()}
+      disabled={stopping}
+      aria-label={stopping ? "Stopping" : "Stop"}
+      title={stopping ? "Stopping" : "Stop"}
+      data-testid="split-run-intent-composer-stop"
+    >
+      {stopping ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+      ) : (
+        <Square className="size-3 fill-current" aria-hidden />
+      )}
+    </InputGroupButton>
   );
 }
 

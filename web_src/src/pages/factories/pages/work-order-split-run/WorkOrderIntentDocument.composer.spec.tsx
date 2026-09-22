@@ -300,6 +300,58 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(screen.getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "analyzing");
   });
 
+  it.each(["starting", "running"] as const)("shows Stop while the analysis agent is %s", (machineStatus) => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument {...INTENT_DOC} artifacts={[]} analysis={analysisChat({ view: { machineStatus } })} />,
+    );
+
+    expect(screen.getByTestId("split-run-intent-composer-stop")).toHaveAccessibleName("Stop");
+    expect(screen.getByTestId("split-run-intent-chat")).toBeInTheDocument();
+  });
+
+  it("hides Stop while the analysis agent is waiting", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW })}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-intent-composer-stop")).not.toBeInTheDocument();
+  });
+
+  it("calls onStop from the Stop control and keeps the chat open", async () => {
+    const user = userEvent.setup();
+    const onStop = vi.fn();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        analysis={analysisChat({ view: { machineStatus: "running" }, onStop })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Stop" }));
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("split-run-intent-chat")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer")).toBeInTheDocument();
+  });
+
+  it("names the control Stopping while the stop request is in flight", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        analysis={analysisChat({ view: { machineStatus: "running" }, stopping: true })}
+      />,
+    );
+
+    const stop = screen.getByTestId("split-run-intent-composer-stop");
+    expect(stop).toHaveAccessibleName("Stopping");
+    expect(stop).toBeDisabled();
+  });
+
   it("attaches, pastes, caps, and sends composer images", async () => {
     const user = userEvent.setup();
     let nextId = 0;
