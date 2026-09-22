@@ -34,10 +34,35 @@ describe("matchFactoryPageFixture", () => {
   });
 
   it("serves tasks and includes both open and closed entries", async () => {
-    const orders = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/orders`);
+    const orders = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100`);
     const body = (await orders.json()) as { orders: Array<{ id?: string; state?: string }> };
     const ids = body.orders.map((entry) => entry.id);
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
+  });
+
+  it("filters work orders by user", async () => {
+    const unassigned = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100&unassigned=true`,
+    );
+    const unassignedBody = (await unassigned.json()) as { orders: Array<{ assignees?: Array<{ id?: string }> }> };
+    expect(unassignedBody.orders.length).toBeGreaterThan(0);
+    expect(unassignedBody.orders.every((order) => (order.assignees ?? []).length === 0)).toBe(true);
+
+    const byUser = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100&userId=nobody-here`,
+    );
+    const byUserBody = (await byUser.json()) as { orders: Array<{ id?: string }> };
+    expect(byUserBody.orders).toEqual([]);
+  });
+
+  it("pages work orders by state and limit", async () => {
+    const page = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_DRAFT&limit=1`,
+    );
+    const body = (await page.json()) as { orders: Array<{ id?: string; state?: string }>; hasNextPage?: boolean };
+    expect(body.orders).toHaveLength(1);
+    expect(body.orders[0]?.state).toBe("STATE_DRAFT");
+    expect(body.hasNextPage).toBe(true);
   });
 
   it("serves factory usage, usage history, and organization workspace usage reports", async () => {
