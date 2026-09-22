@@ -52,6 +52,14 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 const app: FactoryAutomation = {
   id: "app-refund-planner",
   name: "Refund Planner",
