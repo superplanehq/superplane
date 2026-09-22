@@ -95,11 +95,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
  * Approval-specific state logic function
  */
 export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
+  if (isApprovalExecutionError(execution)) {
     return "error";
   }
 
@@ -139,6 +135,22 @@ export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): 
   // Default fallback
   return "error";
 };
+
+function isApprovalExecutionError(execution: ExecutionInfo): boolean {
+  if (!execution.resultMessage) {
+    return false;
+  }
+
+  if (execution.resultReason === "RESULT_REASON_ERROR") {
+    return true;
+  }
+
+  if (execution.result !== "RESULT_FAILED") {
+    return false;
+  }
+
+  return execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED";
+}
 
 /**
  * Approval-specific state registry

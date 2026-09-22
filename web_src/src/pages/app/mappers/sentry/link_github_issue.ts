@@ -100,11 +100,7 @@ function buildMetadata(node: NodeInfo) {
     metadata.push({ icon: "bug", label: issueLabel });
   }
 
-  const externalIssueLabel =
-    nodeMetadata?.externalIssueLabel ||
-    (configuration?.repo && configuration?.externalIssue
-      ? `${configuration.repo}#${configuration.externalIssue}`
-      : configuration?.externalIssue);
+  const externalIssueLabel = nodeMetadata?.externalIssueLabel || formatExternalIssueLabel(configuration);
   if (externalIssueLabel) {
     metadata.push({ icon: "link", label: externalIssueLabel });
   }
@@ -115,4 +111,12 @@ function buildMetadata(node: NodeInfo) {
   }
 
   return metadata.slice(0, 3);
+}
+
+function formatExternalIssueLabel(configuration: LinkGitHubIssueConfiguration | undefined): string | undefined {
+  if (configuration?.repo && configuration?.externalIssue) {
+    return `${configuration.repo}#${configuration.externalIssue}`;
+  }
+
+  return configuration?.externalIssue;
 }

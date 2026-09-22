@@ -319,19 +319,7 @@ function getGraphQLEventSections(
     const state = stateFunction(execution);
 
     if (state === "running") {
-      if (execution.createdAt) {
-        const startTime = new Date(execution.createdAt);
-        const now = new Date();
-        const durationMs = now.getTime() - startTime.getTime();
-
-        if (durationMs < 60000) {
-          return `Running for: ${Math.floor(durationMs / 1000)}s`;
-        } else {
-          const minutes = Math.floor(durationMs / 60000);
-          return `Running for: ${minutes}m`;
-        }
-      }
-      return "Running...";
+      return runningDurationSubtitle(execution.createdAt);
     }
 
     if (state === "success" || state === "failed") {
@@ -371,4 +359,21 @@ function getGraphQLEventSections(
   };
 
   return [eventSection];
+}
+
+function runningDurationSubtitle(createdAt?: string): string {
+  if (!createdAt) {
+    return "Running...";
+  }
+
+  const startTime = new Date(createdAt);
+  const now = new Date();
+  const durationMs = now.getTime() - startTime.getTime();
+
+  if (durationMs < 60000) {
+    return `Running for: ${Math.floor(durationMs / 1000)}s`;
+  }
+
+  const minutes = Math.floor(durationMs / 60000);
+  return `Running for: ${minutes}m`;
 }
