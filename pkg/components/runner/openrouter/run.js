@@ -534,14 +534,48 @@ function ensureOpenCodeModelCatalog(
     return "bundled";
   }
 
-  const reason = refreshResult.error
-    ? `: ${refreshResult.error.message}`
-    : refreshResult.status !== 0
-      ? `: refresh exited with status ${refreshResult.status}`
-      : ": the refreshed catalog does not list the model";
+  if (catalogRefreshFailed(refreshResult)) {
+    seedOpenCodeModelCatalog(catalogPath, model);
+    return "seeded";
+  }
+
   throw new Error(
-    `OpenCode could not refresh metadata for ${catalogModelId(model)}${reason}`,
+    `OpenCode could not refresh metadata for ${catalogModelId(model)}: the refreshed catalog does not list the model`,
   );
+}
+
+function catalogRefreshFailed(result) {
+  if (!result) {
+    return true;
+  }
+  if (result.error) {
+    return true;
+  }
+  return result.status !== 0;
+}
+
+function seedOpenCodeModelCatalog(catalogPath, model) {
+  const catalogId = catalogModelId(model);
+  fs.mkdirSync(path.dirname(catalogPath), { recursive: true });
+  let catalog = {};
+  try {
+    const existing = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+    if (existing && typeof existing === "object") {
+      catalog = existing;
+    }
+  } catch (_error) {
+    catalog = {};
+  }
+  if (!catalog.openrouter || typeof catalog.openrouter !== "object") {
+    catalog.openrouter = {};
+  }
+  if (!catalog.openrouter.models || typeof catalog.openrouter.models !== "object") {
+    catalog.openrouter.models = {};
+  }
+  if (!catalog.openrouter.models[catalogId]) {
+    catalog.openrouter.models[catalogId] = {};
+  }
+  fs.writeFileSync(catalogPath, `${JSON.stringify(catalog)}\n`);
 }
 
 function ensureXdgDirs(taskDir) {
@@ -626,6 +660,11 @@ async function runPrompt(promptFile, model, helpers = {}) {
   if (catalogSource === "bundled") {
     printLiveLogLine(
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
+    );
+  }
+  if (catalogSource === "seeded") {
+    printLiveLogLine(
+      `Model catalog refresh unavailable. Using a local catalog entry for ${currentModel}.`,
     );
   }
   writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
