@@ -58,7 +58,7 @@ export function workspaceLoadingOverlay(
     return { message: activeMessage, exiting: false };
   }
   if (reduceMotion) {
-    return {};
+    return { exiting: false };
   }
   const message = leavingMessage ?? lastActiveMessage;
   return { message, exiting: Boolean(message) };

@@ -41,6 +41,8 @@ describe("workspaceLoadingOverlay", () => {
   });
 
   it("hides the overlay when reduced motion is on", () => {
-    expect(workspaceLoadingOverlay(undefined, "Loading the board", "Loading the board", true)).toEqual({});
+    expect(workspaceLoadingOverlay(undefined, "Loading the board", "Loading the board", true)).toEqual({
+      exiting: false,
+    });
   });
 });
