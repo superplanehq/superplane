@@ -50,6 +50,26 @@ rm -f "$tmp/web_src/note.txt"
 printf '%s\n' '{"scripts":{"postinstall":"node pwn.js"}}' >"$tmp/web_src/package.json"
 expect_fail "postinstall hook" bash ./scripts/check_install_hooks.sh "$tmp"
 
+python3 - <<'PY'
+from pathlib import Path
+
+commands = []
+for line in Path(".semaphore/semaphore.yml").read_text().splitlines():
+    stripped = line.strip()
+    if stripped.startswith("- "):
+        commands.append(stripped[2:])
+
+hook = next((i for i, cmd in enumerate(commands) if "check_install_hooks.sh" in cmd), None)
+setup = next((i for i, cmd in enumerate(commands) if cmd.startswith("make dev.setup")), None)
+if hook is None:
+    raise SystemExit("check_install_hooks.sh missing from semaphore.yml")
+if setup is None:
+    raise SystemExit("make dev.setup missing from semaphore.yml")
+if hook > setup:
+    raise SystemExit("install-hook scan must appear before make dev.setup")
+print("PASS semaphore install-hook order")
+PY
+
 if [ "$failed" -ne 0 ]; then
 	exit 1
 fi
