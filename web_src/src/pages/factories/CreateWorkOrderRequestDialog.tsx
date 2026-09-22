@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { DictateButton } from "./DictateButton";
+import { PendingWorkOrderFileChips } from "./PendingWorkOrderFileChips";
 import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
 import { MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 import { useCreateWorkOrderRequestForm } from "./useCreateWorkOrderRequestForm";
@@ -200,6 +202,7 @@ function RequestDialogForm({
         canAttach={showAttach && form.canAttach}
         canCreate={form.canCreate}
         isCreating={isCreating}
+        pendingFiles={form.pendingFiles}
         showAttach={showAttach}
         dictate={<DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={form.busy} />}
         onAttach={(files) => void form.handleAttach(files)}
@@ -283,6 +286,7 @@ function RequestDialogFooter({
   canAttach,
   canCreate,
   isCreating,
+  pendingFiles,
   showAttach,
   dictate,
   onAttach,
@@ -292,6 +296,7 @@ function RequestDialogFooter({
   canAttach: boolean;
   canCreate: boolean;
   isCreating: boolean;
+  pendingFiles: UploadedWorkOrderFile[];
   showAttach: boolean;
   dictate: ReactNode;
   onAttach: (files: FileList | File[]) => void;
@@ -303,10 +308,19 @@ function RequestDialogFooter({
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
       <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
         <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {showAttach ? <CreateWorkOrderRequestAttachButton disabled={!canAttach} onAttach={onAttach} /> : null}
+          {showAttach ? (
+            <CreateWorkOrderRequestAttachButton
+              accept={WORK_ORDER_FILE_ACCEPT}
+              disabled={!canAttach}
+              onAttach={onAttach}
+            />
+          ) : null}
           {dictate}
           {attachedImages.length > 0 ? (
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
+          ) : null}
+          {pendingFiles.length > 0 ? (
+            <PendingWorkOrderFileChips files={pendingFiles} onRemove={onRemoveAttachment} />
           ) : null}
         </div>
         <div className="ms-auto flex items-center gap-1.5">
