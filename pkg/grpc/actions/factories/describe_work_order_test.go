@@ -112,3 +112,20 @@ func Test__DescribeWorkOrder_IncludesUsageBreakdown(t *testing.T) {
 	require.NotEmpty(t, resp.Order.GetLineDispatches()[0].GetStepExecutions())
 	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, resp.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetModels())
 }
+
+func Test__DescribeWorkOrder_IncludesPlanningSessionSummary(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	session := openAnalysisSession(t, r, database.DB(ctx))
+	require.NotNil(t, session.DraftWorkOrderID)
+
+	resp, err := DescribeWorkOrder(ctx, r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: session.FactoryID.String(),
+		OrderId:   session.DraftWorkOrderID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Order.GetPlanningSession())
+	assert.Equal(t, session.ID.String(), resp.Order.GetPlanningSession().GetId())
+	assert.Equal(t, session.State, resp.Order.GetPlanningSession().GetState())
+	assert.Empty(t, resp.Order.GetPlanningSession().GetSurvey().GetQuestions())
+}

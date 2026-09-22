@@ -81,6 +81,7 @@ func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndP
 	if err := session.End(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to end planning session")
 	}
+	messages.PublishPlanningBoardStatus(session)
 	cancelPlanningSessionRun(ctx, db, session)
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
@@ -133,6 +134,7 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 	if assigned {
 		publishDraftAssigneesUpdated(session)
 	}
+	messages.PublishPlanningBoardStatus(session)
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
@@ -373,6 +375,25 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	return out, nil
 }
 
+func serializePlanningSessionSummary(session *models.FactoryPlanningSession, executionID string) *pb.PlanningSessionSummary {
+	if session == nil {
+		return nil
+	}
+	out := &pb.PlanningSessionSummary{
+		Id:          session.ID.String(),
+		State:       session.State,
+		WaitState:   session.WaitState,
+		ExecutionId: executionID,
+	}
+	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
+		out.Survey = &pb.PlanningSessionSurvey{
+			Id:        session.SurveyID.String(),
+			Questions: planningSessionSurveyQuestions(survey),
+		}
+	}
+	return out
+}
+
 func serializePlanningSessionMessage(message models.PlanningSessionMessage) *pb.PlanningSessionMessage {
 	out := &pb.PlanningSessionMessage{
 		Id:        message.ID.String(),
@@ -461,19 +482,51 @@ func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.P
 }
 
 func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSession) (string, error) {
-	if session.CanvasID == nil || session.CanvasRunID == nil {
+	if session == nil {
 		return "", nil
 	}
-	executions, err := models.ListExecutionsForRunsInTransaction(tx, *session.CanvasID, []uuid.UUID{*session.CanvasRunID})
+	ids, err := planningSessionExecutionIDs(tx, []*models.FactoryPlanningSession{session})
 	if err != nil {
 		return "", err
 	}
-	for i := len(executions) - 1; i >= 0; i-- {
-		if isPlanningSessionAgentNode(executions[i].NodeID) {
-			return executions[i].ID.String(), nil
+	return ids[session.ID], nil
+}
+
+func planningSessionExecutionIDs(tx *gorm.DB, sessions []*models.FactoryPlanningSession) (map[uuid.UUID]string, error) {
+	executionBySession := make(map[uuid.UUID]string)
+	runIDsByCanvas := make(map[uuid.UUID][]uuid.UUID)
+	for _, session := range sessions {
+		if session == nil || session.CanvasID == nil || session.CanvasRunID == nil {
+			continue
+		}
+		runIDsByCanvas[*session.CanvasID] = append(runIDsByCanvas[*session.CanvasID], *session.CanvasRunID)
+	}
+
+	executionByRun := make(map[uuid.UUID]string)
+	for canvasID, runIDs := range runIDsByCanvas {
+		executions, err := models.ListExecutionsForRunsInTransaction(tx, canvasID, runIDs)
+		if err != nil {
+			return nil, err
+		}
+		for i := range executions {
+			execution := executions[i]
+			if isPlanningSessionAgentNode(execution.NodeID) {
+				executionByRun[execution.RunID] = execution.ID.String()
+			}
 		}
 	}
-	return "", nil
+
+	for _, session := range sessions {
+		if session == nil || session.CanvasRunID == nil {
+			continue
+		}
+		executionID, ok := executionByRun[*session.CanvasRunID]
+		if !ok {
+			continue
+		}
+		executionBySession[session.ID] = executionID
+	}
+	return executionBySession, nil
 }
 
 func isPlanningSessionAgentNode(nodeID string) bool {

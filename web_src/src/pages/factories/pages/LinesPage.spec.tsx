@@ -252,22 +252,6 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
-vi.mock("./useWorkOrderPlanningSurvey", () => ({
-  useWorkOrderPlanningSurvey: () => false,
-  useWorkOrderPlanningActivity: () => ({
-    hasAgentQuestion: false,
-    isWaiting: false,
-    isWorking: false,
-    session: null,
-  }),
-  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
-    "planning-session-by-work-order",
-    organizationId,
-    factoryId,
-    workOrderId,
-  ],
-}));
-
 async function resetLinesBoardMocks() {
   window.localStorage.clear();
   updateFactoryLineMutateAsync.mockReset();
