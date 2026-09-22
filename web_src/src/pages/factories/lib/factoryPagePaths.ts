@@ -200,6 +200,34 @@ export function prFeedbackHandlerIdFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
 }
 
+export const PLANNING_SEARCH_PARAM = "planning";
+/** Opens Planning settings on a tab: general, agent, or automation. */
+export const PLANNING_SETTINGS_SEARCH_PARAM = "planningSettings";
+
+export function factoryPlanningPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  settingsTab?: string,
+) {
+  const params = new URLSearchParams();
+  params.set(PLANNING_SEARCH_PARAM, "1");
+  if (settingsTab) {
+    params.set(PLANNING_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function isPlanningSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PLANNING_SEARCH_PARAM) === "1";
+}
+
+export function planningSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PLANNING_SETTINGS_SEARCH_PARAM);
+}
+
 /** Opens the per-column Automations drawer. Value is a column key. */
 export const COLUMN_AUTOMATIONS_SEARCH_PARAM = "automations";
 
@@ -333,6 +361,11 @@ export function factoryPRFeedbackSetupPath(
 
 export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks"): PRFeedbackSetupKind {
   return sourceId === "checks" ? "checks" : "comments";
+}
+
+/** Dedicated setup page for the post-onboarding Backlog Refinement wizard. */
+export function factoryPlanningSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
 }
 
 /** Dedicated setup page for Sentry exception intake. */

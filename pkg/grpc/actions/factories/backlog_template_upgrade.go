@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,10 +21,11 @@ type BacklogTemplateUpgradeResult struct {
 	Skipped  int
 }
 
-// UpgradeDefaultBacklogTemplates upgrades generated version 1 Backlog graphs
-// to the current template, and refreshes a Refine Task prompt that still
-// matches an earlier default. A behavioral change to the graph makes it
-// user-owned and leaves it on the runtime compatibility path; an edited prompt
+// UpgradeDefaultBacklogTemplates upgrades generated version 1 and 2 Backlog
+// graphs to the current template, and refreshes a Refine Task prompt that
+// still matches an earlier default. Version 1 and 2 graphs still have the
+// Analyze / intent.md path. SuperPlane replaces that path. A graph that no
+// longer matches those node sets is user-owned. An edited Refine Task prompt
 // stays as the user wrote it.
 func UpgradeDefaultBacklogTemplates(
 	ctx context.Context,
@@ -34,14 +33,6 @@ func UpgradeDefaultBacklogTemplates(
 	organizationID uuid.UUID,
 ) (BacklogTemplateUpgradeResult, error) {
 	db := database.DB(ctx)
-	organization, err := models.FindOrganizationByIDInTransaction(db, organizationID.String())
-	if err != nil {
-		return BacklogTemplateUpgradeResult{}, err
-	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCreateWithAgent) {
-		return BacklogTemplateUpgradeResult{}, nil
-	}
-
 	factoryModels, err := models.ListFactories(db, organizationID)
 	if err != nil {
 		return BacklogTemplateUpgradeResult{}, err
@@ -192,12 +183,7 @@ func isDefaultLegacyBacklog(nodes []models.Node, edges []models.Edge) bool {
 	if !models.IsBacklogFactoryApp(nodes, edges) || backlogTemplateVersionFrom(nodes) >= backlogTemplateVersion {
 		return false
 	}
-	expected := buildLegacyBacklogCanvas(backlogCanvasRequest{
-		Agent:      intakeAgentFromCanvasNodes(nodes),
-		GitHubName: backlogGitHubIntegrationName(nodes),
-	})
-	return reflect.DeepEqual(backlogBehaviorNodes(nodes), backlogBehaviorNodes(expected.Nodes())) &&
-		reflect.DeepEqual(sortedBacklogEdges(edges), sortedBacklogEdges(expected.Edges()))
+	return models.IsLegacyAnalyzeBacklog(nodes)
 }
 
 func backlogTemplateVersionFrom(nodes []models.Node) int {
@@ -248,7 +234,7 @@ func sortedBacklogEdges(edges []models.Edge) []models.Edge {
 
 func backlogGitHubIntegrationName(nodes []models.Node) string {
 	for _, node := range nodes {
-		if node.ID != intakeAnalysisNodeID {
+		if node.ID != intakeAnalysisNodeID && node.ID != backlogRefinementNodeID {
 			continue
 		}
 		environment, _ := node.Configuration["environmentFrom"].([]any)

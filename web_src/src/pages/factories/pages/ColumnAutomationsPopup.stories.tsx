@@ -36,7 +36,7 @@ const ANALYSIS: ColumnAutomation = {
   kind: "analysis",
   name: "Task analysis",
   trigger: "On task in Backlog",
-  action: "Score the task",
+  action: "Plan the task",
   iconSrc: "",
   iconAlt: "",
   health: "healthy",
