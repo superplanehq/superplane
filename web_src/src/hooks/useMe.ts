@@ -4,8 +4,10 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 export const meKeys = {
+  all: ["me"] as const,
+  organization: (organizationId: string) => [...meKeys.all, organizationId] as const,
   me: (organizationId: string, includePermissions: boolean = true) =>
-    ["me", organizationId, includePermissions] as const,
+    [...meKeys.organization(organizationId), includePermissions] as const,
 };
 
 export const useMe = (includePermissions: boolean = true, organizationIdOverride?: string | null) => {
@@ -20,6 +22,7 @@ export const useMe = (includePermissions: boolean = true, organizationIdOverride
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: "always",
     enabled: !!organizationId,
   });
 };

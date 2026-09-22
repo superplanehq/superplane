@@ -59,6 +59,8 @@ type CanvasLifecycleEventName = "canvas_updated" | "canvas_deleted";
 
 type CanvasStagingEventName = "staging_updated";
 
+type CanvasRunEventName = "run_pending" | "run_started" | "run_cancelling" | "run_finished";
+
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
   | CanvasesCanvasEvent
@@ -80,6 +82,8 @@ type UseCanvasWebsocketOptions = {
   onNodeEvent?: (nodeId: string, event: string) => void;
   onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void;
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void;
+  onRunEvent?: (run: CanvasesCanvasRun, eventName: CanvasRunEventName) => void;
+  onConnectionOpen?: () => void;
   onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void;
   shouldApplyCanvasUpdate?: () => boolean;
   processRuntimeEvents?: boolean;
@@ -93,6 +97,8 @@ export function useCanvasWebsocket({
   onNodeEvent,
   onWorkflowEvent,
   onExecutionEvent,
+  onRunEvent,
+  onConnectionOpen,
   onCanvasLifecycleEvent,
   shouldApplyCanvasUpdate,
   processRuntimeEvents = true,
@@ -310,6 +316,7 @@ export function useCanvasWebsocket({
           }
 
           patchRunInCache(run);
+          onRunEvent?.(run, data.event as CanvasRunEventName);
           break;
         }
         case "canvas_updated":
@@ -353,6 +360,7 @@ export function useCanvasWebsocket({
       onNodeEvent,
       onWorkflowEvent,
       onExecutionEvent,
+      onRunEvent,
       onCanvasStagingEvent,
       processRuntimeEvents,
       handleCanvasLifecycleEvent,
@@ -448,7 +456,8 @@ export function useCanvasWebsocket({
     // Refresh memory in case mutations happened while we were disconnected; we
     // no longer poll, so the websocket is the only push channel.
     invalidateMemoryEntries();
-  }, [invalidateRuns, invalidateMemoryEntries]);
+    onConnectionOpen?.();
+  }, [invalidateRuns, invalidateMemoryEntries, onConnectionOpen]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -470,7 +479,7 @@ export function useCanvasWebsocket({
       onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
-      share: false,
+      share: true,
       onMessage: onMessage,
     },
     enabled,

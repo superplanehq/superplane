@@ -24,6 +24,8 @@ export type CommandPaletteModel = {
   canvasListProps: CanvasCommandListProps;
   canvasNodeSearchActions: PaletteAction[];
   canManageInviteLink: boolean;
+  canReadAPIKeys: boolean;
+  canReadIntegrations: boolean;
   currentCanvasName: string;
   open: boolean;
   organizationName: string;
@@ -45,7 +47,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const [page, setPage] = useState<CommandPage>("root");
   const [search, setSearch] = useState("");
   const shortcutModifier = useShortcutModifierLabel();
-  const data = useCommandPaletteData(route.organizationId, route.canvasId);
+  const data = useCommandPaletteData(route.organizationId, route.canvasId, open);
   const closePalette = useClosePalette(setOpen, setPage, setSearch);
   const canvasNodeSearchProvider = useCanvasNodeSearchProvider();
   const navigation = usePaletteNavigation(closePalette, navigate);
@@ -94,7 +96,9 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
 type PaletteData = {
   canCreateCanvas: boolean;
   canManageInviteLink: boolean;
+  canReadAPIKeys: boolean;
   canReadCanvas: boolean;
+  canReadIntegrations: boolean;
   canUpdateCanvas: boolean;
   canvases: CanvasesCanvasSummary[];
   canvasesLoading: boolean;
@@ -106,24 +110,35 @@ type PaletteData = {
   usageEnabled: boolean;
 };
 
-function useCommandPaletteData(organizationId: string | null, canvasId: string | null): PaletteData {
+function useCommandPaletteData(
+  organizationId: string | null,
+  canvasId: string | null,
+  paletteOpen: boolean,
+): PaletteData {
   const queryOrganizationId = organizationId ?? "";
   const hasOrganization = organizationId !== null;
-  const { data: organization } = useOrganization(queryOrganizationId);
-  const { data: usageStatus, error: usageError } = useOrganizationUsage(queryOrganizationId, hasOrganization);
-  const { data: canvases = [], isLoading: canvasesLoading } = useCanvases(queryOrganizationId);
   const permissionState = usePalettePermissions(organizationId);
-  const createCanvasMutation = useCreateCanvas(queryOrganizationId);
-  const currentCanvas = canvases.find((canvas) => canvas.id === canvasId);
   const canCreateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "create");
   const canManageInviteLink = canUsePermission(hasOrganization, permissionState.canAct, "members", "create");
+  const canReadAPIKeys = canUsePermission(hasOrganization, permissionState.canAct, "api_keys", "read");
   const canReadCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "read");
+  const canReadIntegrations = canUsePermission(hasOrganization, permissionState.canAct, "integrations", "read");
   const canUpdateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "update");
+  const queriesEnabled = paletteOpen && hasOrganization;
+  const { data: organization } = useOrganization(queryOrganizationId, queriesEnabled);
+  const { data: usageStatus, error: usageError } = useOrganizationUsage(queryOrganizationId, queriesEnabled);
+  const { data: canvases = [], isLoading: canvasesLoading } = useCanvases(queryOrganizationId, {
+    enabled: paletteOpen && canReadCanvas,
+  });
+  const createCanvasMutation = useCreateCanvas(queryOrganizationId);
+  const currentCanvas = canvases.find((canvas) => canvas.id === canvasId);
 
   return {
     canCreateCanvas,
     canManageInviteLink,
+    canReadAPIKeys,
     canReadCanvas,
+    canReadIntegrations,
     canUpdateCanvas,
     canvases,
     canvasesLoading,
@@ -255,6 +270,8 @@ function buildModel({
       query: search,
     }),
     canManageInviteLink: data.canManageInviteLink,
+    canReadAPIKeys: data.canReadAPIKeys,
+    canReadIntegrations: data.canReadIntegrations,
     currentCanvasName: data.currentCanvasName,
     open,
     organizationName: data.organizationName,
