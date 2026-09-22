@@ -119,6 +119,15 @@ function policyDetails(
   const result = getPolicyOutput(context);
   if (!result) return details;
 
+  assignPolicyResultFields(details, result, { includeId, includeFirstCondition });
+  return details;
+}
+
+function assignPolicyResultFields(
+  details: Record<string, string>,
+  result: AlertingPolicyOutputData,
+  { includeId, includeFirstCondition }: { includeId: boolean; includeFirstCondition: boolean },
+) {
   if (result.displayName) details["Display Name"] = result.displayName;
   if (includeId && result.id) details["Policy ID"] = result.id;
   if (result.enabled !== undefined) details["Enabled"] = result.enabled ? "Yes" : "No";
@@ -128,7 +137,6 @@ function policyDetails(
     details["First Condition"] = `${comparisonLabels[result.comparison] || result.comparison} ${result.thresholdValue}`;
   }
   if (result.duration) details["Duration"] = result.duration;
-  return details;
 }
 
 export const createAlertingPolicyMapper: ComponentBaseMapper = {
