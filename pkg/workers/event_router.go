@@ -215,6 +215,9 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 				event.WorkflowID,
 			)
 		}
+		if event.NodeID == models.FactoryAppBacklogTriggerID {
+			publishPlanningBoardStatusForRun(logger, runID)
+		}
 	}
 
 	//

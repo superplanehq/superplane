@@ -72,6 +72,10 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
+  planningSessions: (organizationId: string, factoryId: string) =>
+    ["planning-session-by-work-order", organizationId, factoryId] as const,
+  planningSession: (organizationId: string, factoryId: string, workOrderId: string) =>
+    [...factoryQueryKeys.planningSessions(organizationId, factoryId), workOrderId] as const,
   pullRequestMergeability: (organizationId: string, factoryId: string, pullRequestId: string) =>
     ["factories", organizationId, factoryId, "pull-requests", pullRequestId, "mergeability"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
@@ -461,8 +465,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       // The Backlog run for this order is created asynchronously after this
-      // RPC returns, so show "Analyzing" optimistically and start polling
-      // for the real run right away instead of waiting for a page reload.
+      // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
       markBacklogAnalysisPending(order.id);
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {

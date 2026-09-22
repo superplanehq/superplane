@@ -363,6 +363,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
+	messages.PublishPlanningBoardStatus(session)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 

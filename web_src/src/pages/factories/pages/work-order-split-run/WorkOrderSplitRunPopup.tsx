@@ -54,7 +54,6 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     factoryId,
     workOrderId: orderId,
     enabled: canLookupSession,
-    pollForSession: refinementEnabled && isAnalyzing,
     canUpdate,
     isUploading: fileUpload.isUploading,
     uploadFiles: fileUpload.uploadFiles,

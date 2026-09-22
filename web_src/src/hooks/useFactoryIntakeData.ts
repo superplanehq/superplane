@@ -18,9 +18,13 @@ import type {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef } from "react";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
+import { useCanvasWebsocket } from "./useCanvasWebsocket";
 import { applyWorkOrderToListCaches } from "./workOrderListCache";
+
+const INTAKE_RUN_REFRESH_BATCH_MS = 250;
 
 const factoryIntakeQueryKeys = {
   list: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "intakes"] as const,
@@ -32,6 +36,10 @@ const factoryIntakeQueryKeys = {
 
 export function factoryIntakesKey(organizationId: string, factoryId: string) {
   return factoryIntakeQueryKeys.list(organizationId, factoryId);
+}
+
+export function factoryIntakeRunsKey(organizationId: string, factoryId: string, intakeId: string) {
+  return factoryIntakeQueryKeys.runs(organizationId, factoryId, intakeId);
 }
 
 export async function fetchFactoryIntakes(
@@ -62,7 +70,7 @@ export function useFactoryIntakeRuns(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: factoryIntakeQueryKeys.runs(organizationId, factoryId, intakeId ?? ""),
+    queryKey: factoryIntakeRunsKey(organizationId, factoryId, intakeId ?? ""),
     queryFn: async (): Promise<FactoriesFactoryIntakeRun[]> => {
       const response = await factoriesListFactoryIntakeRuns(
         withOrganizationHeader({
@@ -73,9 +81,50 @@ export function useFactoryIntakeRuns(
       return response.data?.runs ?? [];
     },
     enabled: Boolean(organizationId && factoryId && intakeId) && enabled,
-    // Items leave the analysis on their own. The open list has to follow them,
-    // because a new intake starts with a batch that drains within minutes.
-    refetchInterval: 10_000,
+  });
+}
+
+/** Refresh the derived intake-run view after its canvas changes. */
+export function useFactoryIntakeRunsWebsocket({
+  organizationId,
+  factoryId,
+  intakeId,
+  canvasId,
+}: {
+  organizationId: string;
+  factoryId: string;
+  intakeId: string | undefined;
+  canvasId: string | undefined;
+}): void {
+  const queryClient = useQueryClient();
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scheduleRefresh = useCallback(() => {
+    clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      if (!intakeId) {
+        return;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: factoryIntakeRunsKey(organizationId, factoryId, intakeId),
+      });
+    }, INTAKE_RUN_REFRESH_BATCH_MS);
+  }, [factoryId, intakeId, organizationId, queryClient]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+
+  useCanvasWebsocket({
+    canvasId: canvasId ?? "",
+    organizationId,
+    processRuntimeEvents: true,
+    enabled: Boolean(organizationId && factoryId && intakeId && canvasId),
+    onRunEvent: scheduleRefresh,
+    onExecutionEvent: scheduleRefresh,
+    onConnectionOpen: scheduleRefresh,
   });
 }
 
