@@ -1,5 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -11,6 +11,7 @@ import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../workOrders/WorkOrdersEmptyStates";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 /**
@@ -37,7 +38,7 @@ export function WorkOrdersPage() {
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(workOrders);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");

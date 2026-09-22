@@ -1,7 +1,6 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import {
   useFactory,
-  useFactoryPullRequests,
   useFactoryWorkOrders,
   useWorkOrder,
   useWorkOrderArtifacts,
@@ -71,7 +70,6 @@ export function WorkOrderDetailPanel({
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
-  const pullRequestsQuery = useFactoryPullRequests(organizationId, factoryId, { workOrderIds: [orderId] });
   const checks = useMemo(() => presentWorkOrderChecks(order?.checks ?? []), [order?.checks]);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
@@ -108,7 +106,6 @@ export function WorkOrderDetailPanel({
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
-      pullRequestsQuery={pullRequestsQuery}
       checks={checks}
       isChecksLoading={false}
       checksError={null}
@@ -173,7 +170,6 @@ interface LoadedWorkOrderDetailProps {
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
-  pullRequestsQuery: ReturnType<typeof useFactoryPullRequests>;
   checks: WorkOrderCheckPresentation[];
   isChecksLoading: boolean;
   checksError: Error | null;
@@ -192,7 +188,6 @@ function LoadedWorkOrderDetail({
   events,
   eventsQuery,
   artifactsQuery,
-  pullRequestsQuery,
   checks,
   isChecksLoading,
   checksError,
@@ -221,9 +216,9 @@ function LoadedWorkOrderDetail({
       artifacts={artifactsQuery.data ?? []}
       isArtifactsLoading={artifactsQuery.isLoading}
       artifactsError={artifactsQuery.error ?? null}
-      pullRequests={pullRequestsQuery.data ?? []}
-      isPullRequestsLoading={pullRequestsQuery.isLoading}
-      pullRequestsError={pullRequestsQuery.error ?? null}
+      pullRequests={order.pullRequests ?? []}
+      isPullRequestsLoading={false}
+      pullRequestsError={null}
       checks={checks}
       isChecksLoading={isChecksLoading}
       checksError={checksError}
