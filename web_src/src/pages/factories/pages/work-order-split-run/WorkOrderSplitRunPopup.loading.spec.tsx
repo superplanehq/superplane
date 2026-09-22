@@ -56,10 +56,6 @@ vi.mock("./useSplitRunPopupData", () => ({
   }),
 }));
 
-vi.mock("./ClassicWorkOrderPopup", () => ({
-  ClassicWorkOrderPopup: () => <div data-testid="classic-work-order-popup" />,
-}));
-
 function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -104,23 +100,22 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a loading popup instead of the classic popup while the refinement session loads", () => {
+  it("shows a loading popup while the refinement session loads", () => {
     lookupState.sessionLoading = true;
 
     renderPopup();
 
     expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
   });
 
-  it("shows a loading popup instead of the classic popup while draft artifacts load", () => {
+  it("shows a loading popup while draft artifacts load", () => {
     lookupState.artifactsLoading = true;
 
     renderPopup();
 
     expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 
   it("keeps a started task on the analysis popup while artifacts load", () => {
@@ -130,7 +125,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup(undefined, fixture);
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
@@ -142,7 +136,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup(undefined, fixture);
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 
@@ -151,7 +144,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup();
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 
@@ -160,7 +152,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup();
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
