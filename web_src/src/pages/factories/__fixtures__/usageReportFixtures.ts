@@ -1,3 +1,9 @@
+import { IN_FOURTEEN_DAYS, IN_SEVENTEEN_DAYS, THIRTY_DAYS_AGO } from "./factoryPageIds";
+
+export const ACTIVE_TRIAL_ENDS_AT = IN_FOURTEEN_DAYS;
+export const ACTIVE_BILLING_PERIOD_ENDS_AT = IN_SEVENTEEN_DAYS;
+export const EXPIRED_TRIAL_ENDED_AT = THIRTY_DAYS_AGO;
+
 /** Storybook payload for factory Usage and org workspace usage reports. */
 export interface StorybookUsageReport {
   totalTokens: string;
@@ -41,7 +47,7 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "0",
   remainingCreditWarning: false,
-  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+  welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
 export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
@@ -79,7 +85,7 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "876",
   remainingCreditWarning: false,
-  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+  welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
 /** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
@@ -105,7 +111,7 @@ export const LOW_TRIAL_USAGE_REPORT: StorybookUsageReport = {
 
 export const EXPIRED_WELCOME_USAGE_REPORT: StorybookUsageReport = {
   ...SPENT_CREDIT_USAGE_REPORT,
-  welcomeCreditExpiresAt: "2026-08-15T12:00:00.000Z",
+  welcomeCreditExpiresAt: EXPIRED_TRIAL_ENDED_AT,
 };
 
 export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
@@ -113,7 +119,7 @@ export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   remainingCreditCents: "14124",
   grantTotalCents: "15000",
   purchasedCreditCents: "5000",
-  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
+  welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
 /** Purchased hosted credit remains, but the balance is at or below $20. */
@@ -143,12 +149,12 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   plan: "business",
   planSource: "polar",
   polarSubscriptionStatus: "active",
-  trialEndsAt: "2026-09-22T12:00:00.000Z",
+  trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
   remainingCreditCents: "14124",
   includedRemainingCents: "5000",
   purchasedRemainingCents: "5000",
   welcomeRemainingCents: "4124",
-  currentPeriodEnd: "2026-10-09T12:00:00.000Z",
+  currentPeriodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
   billingEnabled: true,
   subscriptionCheckoutEnabled: true,
   creditPurchaseAllowed: true,
@@ -169,7 +175,7 @@ export const ADMIN_ORGANIZATION_BILLING = {
 export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
   planSource: "system",
-  trialEndsAt: "2026-08-15T12:00:00.000Z",
+  trialEndsAt: EXPIRED_TRIAL_ENDED_AT,
   remainingCreditCents: "0",
   includedRemainingCents: "0",
   purchasedRemainingCents: "0",
@@ -188,7 +194,7 @@ export const LAPSED_ORGANIZATION_BILLING = {
   includedRemainingCents: "0",
   purchasedRemainingCents: "5000",
   welcomeRemainingCents: "0",
-  currentPeriodEnd: "2026-10-09T12:00:00.000Z",
+  currentPeriodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
   billingEnabled: true,
   subscriptionCheckoutEnabled: true,
   creditPurchaseAllowed: false,
@@ -199,7 +205,7 @@ export const RESTORED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
   planSource: "polar",
   polarSubscriptionStatus: "canceled",
-  trialEndsAt: "2026-09-22T12:00:00.000Z",
+  trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
   remainingCreditCents: "5000",
   includedRemainingCents: "0",
   purchasedRemainingCents: "0",
