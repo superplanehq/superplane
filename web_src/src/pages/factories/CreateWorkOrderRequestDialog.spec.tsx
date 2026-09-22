@@ -70,7 +70,9 @@ describe("CreateWorkOrderRequestDialog", () => {
     expect(screen.getByTestId("create-work-order-request-attach")).toHaveAccessibleName(
       CREATE_WORK_ORDER_REQUEST_COPY.attach,
     );
-    expect(screen.getByTestId("create-work-order-request-image-input").getAttribute("accept")).toContain("image/png");
+    expect(screen.getByTestId("create-work-order-request-image-input").getAttribute("accept")).toBe(
+      "image/png,image/jpeg,image/gif,image/webp",
+    );
     expect(screen.getByTestId("create-work-order-request-create")).toBeDisabled();
   });
 
