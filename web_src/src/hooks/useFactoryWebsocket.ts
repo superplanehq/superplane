@@ -148,6 +148,10 @@ function summaryFromDescribedOrder(order: FactoriesWorkOrder): FactoriesWorkOrde
   return summary;
 }
 
+function patchedWorkOrder(order: FactoriesWorkOrderSummary, described: FactoriesWorkOrder): FactoriesWorkOrderSummary {
+  return { ...order, ...summaryFromDescribedOrder(described), planningSession: described.planningSession };
+}
+
 function patchCachedWorkOrder(
   orders: FactoriesWorkOrderSummary[] | undefined,
   orderId: string,
@@ -156,12 +160,11 @@ function patchCachedWorkOrder(
   if (!orders) {
     return orders;
   }
-  return orders.map((order) => {
-    if (order.id !== orderId) {
-      return order;
-    }
-    return { ...order, ...summaryFromDescribedOrder(described), planningSession: described.planningSession };
-  });
+  const index = orders.findIndex((order) => order.id === orderId);
+  if (index < 0) {
+    return [...orders, patchedWorkOrder({ id: described.id ?? orderId }, described)];
+  }
+  return orders.map((order) => (order.id === orderId ? patchedWorkOrder(order, described) : order));
 }
 
 async function describeWorkOrder(
@@ -181,13 +184,43 @@ async function describeWorkOrder(
   return response.data.order;
 }
 
+function cachedWorkOrderIds(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string): string[] {
+  const orders =
+    queryClient.getQueryData<FactoriesWorkOrderSummary[]>(factoryQueryKeys.workOrders(organizationId, factoryId)) ?? [];
+  return orders.flatMap((order) => (order.id ? [order.id] : []));
+}
+
+function invalidateTaskActivity(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderIds: string[],
+) {
+  invalidatePullRequests(queryClient, organizationId, factoryId);
+  invalidateBacklogAnalysisRuns(queryClient, organizationId);
+  for (const orderId of orderIds) {
+    invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
+    void queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderEvents(organizationId, factoryId, orderId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+    });
+  }
+}
+
 async function refreshUpdatedWorkOrder(
   queryClient: WorkOrderQueryClient,
   organizationId: string,
   factoryId: string,
   orderId: string,
+  isCurrent: () => boolean,
 ) {
+  invalidateTaskActivity(queryClient, organizationId, factoryId, [orderId]);
   const order = await describeWorkOrder(organizationId, factoryId, orderId);
+  if (!isCurrent()) {
+    return;
+  }
   queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId), order);
   queryClient.setQueryData<FactoriesWorkOrderSummary[]>(
     factoryQueryKeys.workOrders(organizationId, factoryId),
@@ -201,6 +234,12 @@ function invalidateFactoryWorkOrdersOnReconnect(
   factoryId: string,
 ) {
   invalidateOrdersList(queryClient, organizationId, factoryId);
+  invalidateTaskActivity(
+    queryClient,
+    organizationId,
+    factoryId,
+    cachedWorkOrderIds(queryClient, organizationId, factoryId),
+  );
 }
 
 export function invalidateFactoryWorkOrderQueries(
@@ -233,6 +272,7 @@ export function invalidateFactoryWorkOrderQueries(
 export function useFactoryWebsocket(organizationId: string, factoryId: string, enabled = true): void {
   const queryClient = useQueryClient();
   const hasConnectedOnce = useRef(false);
+  const refreshVersion = useRef(new Map<string, number>());
 
   const onMessage = useCallback(
     (event: MessageEvent<unknown>) => {
@@ -247,7 +287,15 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       if (!orderId || (data.payload?.factoryId && data.payload.factoryId !== factoryId)) {
         return;
       }
-      void refreshUpdatedWorkOrder(queryClient, organizationId, factoryId, orderId).catch((error) => {
+      const version = (refreshVersion.current.get(orderId) ?? 0) + 1;
+      refreshVersion.current.set(orderId, version);
+      void refreshUpdatedWorkOrder(
+        queryClient,
+        organizationId,
+        factoryId,
+        orderId,
+        () => refreshVersion.current.get(orderId) === version,
+      ).catch((error) => {
         console.warn("factory ws: failed to refresh work order", error);
       });
     },

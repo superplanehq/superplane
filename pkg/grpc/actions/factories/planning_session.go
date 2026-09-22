@@ -134,6 +134,7 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 	if assigned {
 		publishDraftAssigneesUpdated(session)
 	}
+	messages.PublishPlanningBoardStatus(session)
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")

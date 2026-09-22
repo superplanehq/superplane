@@ -112,10 +112,24 @@ describe("useFactoryWebsocket", () => {
       },
     });
     expect(orders?.[1]).toEqual({ id: "order-2", title: "Other" });
-    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrderEvents("org-1", "factory-1", "order-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["backlog-analysis-runs", "org-1"],
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
+    });
   });
 
-  it("leaves a task that is not in the loaded list", async () => {
+  it("adds a task that is not in the loaded list", async () => {
     vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue({
       data: { order: { id: "order-1", title: "New", checks: [] } },
     } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
@@ -129,7 +143,42 @@ describe("useFactoryWebsocket", () => {
 
     expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual([
       { id: "order-2", title: "Other" },
+      expect.objectContaining({ id: "order-1", title: "New" }),
     ]);
+  });
+
+  it("ignores an older describe that finishes after a newer one", async () => {
+    let releaseOlder: (value: Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>) => void = () => {};
+    const older = new Promise<Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>>((resolve) => {
+      releaseOlder = resolve;
+    });
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+    describeWorkOrder.mockImplementationOnce(() => older);
+    describeWorkOrder.mockResolvedValueOnce({
+      data: { order: { id: "order-1", title: "Newer", checks: [] } },
+    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+    const { queryClient } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [{ id: "order-1", title: "Old" }]);
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    releaseOlder({
+      data: { order: { id: "order-1", title: "Older", checks: [] } },
+    } as Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>);
+    await act(async () => {
+      await older;
+    });
+
+    expect(
+      queryClient.getQueryData<Array<{ title?: string }>>(factoryQueryKeys.workOrders("org-1", "factory-1"))?.[0]
+        ?.title,
+    ).toBe("Newer");
   });
 
   it("ignores events for a different factory", async () => {
@@ -157,10 +206,18 @@ describe("useFactoryWebsocket", () => {
     act(() => {
       onOpen();
     });
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
       exact: true,
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["backlog-analysis-runs", "org-1"],
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
     });
   });
 });
