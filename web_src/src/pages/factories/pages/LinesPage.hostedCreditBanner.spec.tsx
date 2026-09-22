@@ -6,7 +6,6 @@ import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
-  IN_FOURTEEN_DAYS,
   PRIMARY_FACTORY_KEY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
@@ -17,10 +16,11 @@ import {
   LOW_CREDIT_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
+  ACTIVE_TRIAL_ENDS_AT,
 } from "../__fixtures__/usageReportFixtures";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(IN_FOURTEEN_DAYS));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(ACTIVE_TRIAL_ENDS_AT));
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {

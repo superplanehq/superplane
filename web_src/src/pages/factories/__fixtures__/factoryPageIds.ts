@@ -30,6 +30,7 @@ export const HOUR_AGO = relativeIso(HOUR_MS);
 export const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
 export const YESTERDAY = relativeIso(DAY_MS);
 export const LAST_WEEK = relativeIso(7 * DAY_MS);
+export const THIRTY_DAYS_AGO = relativeIso(30 * DAY_MS);
 
 export function daysFromNow(days: number) {
   return new Date(NOW_MS + days * DAY_MS).toISOString();
