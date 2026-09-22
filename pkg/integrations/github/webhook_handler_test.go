@@ -1,13 +1,20 @@
 package github
 
 import (
+	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -176,6 +183,66 @@ func Test__GitHubWebhookHandler__Cleanup(t *testing.T) {
 	})
 }
 
+func Test__GitHub__HandleWebhook(t *testing.T) {
+	t.Run("returns not found when new setup flow is missing app webhook secret", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		integration := mocks.IntegrationContextForNewSetupFlow()
+		delete(integration.CurrentSecrets, common.SecretAppWebhookSecret)
+
+		(&GitHub{}).handleWebhook(githubWebhookRequestContext(recorder, integration, []byte("{}")))
+
+		assert.Equal(t, http.StatusNotFound, recorder.Code)
+		assert.NotContains(t, recorder.Body.String(), common.SecretAppWebhookSecret)
+	})
+
+	t.Run("keeps invalid signature status when new setup flow has app webhook secret", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		integration := mocks.IntegrationContextForNewSetupFlow()
+		require.NoError(t, integration.SetSecret(common.SecretAppWebhookSecret, []byte("webhook-secret")))
+
+		(&GitHub{}).handleWebhook(githubWebhookRequestContext(recorder, integration, []byte("{}")))
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("keeps legacy missing webhook secret behavior", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		integration := mocks.IntegrationContextForLegacySetupFlow(githubPrivateKeyPEM(t))
+
+		(&GitHub{}).handleWebhook(githubWebhookRequestContext(recorder, integration, []byte("{}")))
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	})
+
+	t.Run("keeps unexpected new setup secret retrieval failures as internal errors", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		integration := &failingSecretIntegrationContext{
+			IntegrationContext: mocks.IntegrationContextForNewSetupFlow(),
+			err:                errors.New("storage unavailable"),
+		}
+
+		(&GitHub{}).handleWebhook(githubWebhookRequestContext(recorder, integration, []byte("{}")))
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	})
+
+	t.Run("keeps malformed payload behavior", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		secret := "webhook-secret"
+		body := []byte("not-json")
+		integration := mocks.IntegrationContextForNewSetupFlow()
+		require.NoError(t, integration.SetSecret(common.SecretAppWebhookSecret, []byte(secret)))
+
+		ctx := githubWebhookRequestContext(recorder, integration, body)
+		ctx.Request.Header.Set("X-GitHub-Event", "installation")
+		ctx.Request.Header.Set("X-Hub-Signature-256", githubSignature(secret, body))
+
+		(&GitHub{}).handleWebhook(ctx)
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+}
+
 func githubPrivateKeyPEM(t *testing.T) []byte {
 	t.Helper()
 
@@ -186,4 +253,56 @@ func githubPrivateKeyPEM(t *testing.T) []byte {
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	})
+}
+
+func githubWebhookRequestContext(
+	recorder *httptest.ResponseRecorder,
+	integration core.IntegrationContext,
+	body []byte,
+) core.HTTPRequestContext {
+	return core.HTTPRequestContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Request:     httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/webhook", bytes.NewReader(body)),
+		Response:    recorder,
+		Integration: integration,
+	}
+}
+
+func githubSignature(secret string, body []byte) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+type failingSecretIntegrationContext struct {
+	*contexts.IntegrationContext
+	err error
+}
+
+func (c *failingSecretIntegrationContext) Secrets() core.IntegrationSecretStorage {
+	return failingSecretStorage{err: c.err}
+}
+
+type failingSecretStorage struct {
+	err error
+}
+
+func (s failingSecretStorage) Get(string) (string, error) {
+	return "", s.err
+}
+
+func (s failingSecretStorage) Delete(string) error {
+	return s.err
+}
+
+func (s failingSecretStorage) Create(core.IntegrationSecretDefinition) error {
+	return s.err
+}
+
+func (s failingSecretStorage) CreateMany([]core.IntegrationSecretDefinition) error {
+	return s.err
+}
+
+func (s failingSecretStorage) Update(string, string) error {
+	return s.err
 }
