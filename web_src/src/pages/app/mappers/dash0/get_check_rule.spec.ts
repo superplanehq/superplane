@@ -25,7 +25,7 @@ function makeDetailsContext(data: Record<string, unknown>): ExecutionDetailsCont
       default: [
         {
           type: "dash0.checkRule",
-          timestamp: "2026-09-22T12:00:00.000Z",
+          timestamp: new Date().toISOString(),
           data,
         },
       ],

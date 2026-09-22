@@ -3,6 +3,7 @@ import { getDetailsForIncident } from "./base";
 
 describe("getDetailsForIncident", () => {
   it("keeps agent fields after status-change timestamps", () => {
+    const now = new Date();
     const details = getDetailsForIncident(
       {
         id: "inc-1",
@@ -11,14 +12,14 @@ describe("getDetailsForIncident", () => {
         urgency: "high",
         status: "triggered",
         html_url: "https://pagerduty.example/inc-1",
-        created_at: "2026-09-22T12:00:00.000Z",
-        updated_at: "2026-09-22T12:01:00.000Z",
+        created_at: now.toISOString(),
+        updated_at: new Date(now.getTime() + 60_000).toISOString(),
         incident_number: "42",
         service: { summary: "API", html_url: "https://pagerduty.example/svc" },
         escalation_policy: { summary: "On-call", html_url: "https://pagerduty.example/ep" },
         assignments: [{ assignee: { summary: "Ada" } }],
-        last_status_change_at: "2026-09-22T12:02:00.000Z",
-        resolved_at: "2026-09-22T12:03:00.000Z",
+        last_status_change_at: new Date(now.getTime() + 120_000).toISOString(),
+        resolved_at: new Date(now.getTime() + 180_000).toISOString(),
       },
       { summary: "Webhook", html_url: "https://pagerduty.example/agent" },
     );
