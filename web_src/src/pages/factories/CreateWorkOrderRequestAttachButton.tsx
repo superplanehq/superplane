@@ -1,8 +1,8 @@
 import { Paperclip } from "lucide-react";
 import { useRef } from "react";
 
-import { ALLOWED_IMAGE_TYPES } from "@/components/AgentSidebar/useImageAttachments";
 import { Button } from "@/components/ui/button";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 
@@ -24,7 +24,7 @@ export function CreateWorkOrderRequestAttachButton({
         type="file"
         hidden
         multiple
-        accept={ALLOWED_IMAGE_TYPES.join(",")}
+        accept={WORK_ORDER_FILE_ACCEPT}
         data-testid="create-work-order-request-image-input"
         onChange={(event) => {
           const files = event.target.files;
