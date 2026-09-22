@@ -17,6 +17,7 @@ const lookupState = vi.hoisted(() => ({
   factoryPending: false,
   planning: { enabled: true, clarity: true, confidence: true },
   sessionLoading: false,
+  queryError: null as Error | null,
   artifactsLoading: false,
   artifactsError: null as Error | null,
 }));
@@ -36,7 +37,7 @@ vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
     session: null,
     isLoading: lookupState.sessionLoading,
-    queryError: null,
+    queryError: lookupState.queryError,
     view: { machineStatus: "waiting", messages: [], executionId: "", canvasId: "" },
     canSend: false,
     onSubmitSurvey: () => undefined,
@@ -54,10 +55,6 @@ vi.mock("./useSplitRunPopupData", () => ({
     pullRequestsLoading: false,
     pullRequestsError: null,
   }),
-}));
-
-vi.mock("./ClassicWorkOrderPopup", () => ({
-  ClassicWorkOrderPopup: () => <div data-testid="classic-work-order-popup" />,
 }));
 
 function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)) {
@@ -85,6 +82,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     lookupState.factoryPending = false;
     lookupState.planning = { enabled: true, clarity: true, confidence: true };
     lookupState.sessionLoading = false;
+    lookupState.queryError = null;
     lookupState.artifactsLoading = false;
     lookupState.artifactsError = null;
   });
@@ -104,23 +102,22 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a loading popup instead of the classic popup while the refinement session loads", () => {
+  it("shows a loading popup while the refinement session loads", () => {
     lookupState.sessionLoading = true;
 
     renderPopup();
 
     expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
   });
 
-  it("shows a loading popup instead of the classic popup while draft artifacts load", () => {
+  it("shows a loading popup while draft artifacts load", () => {
     lookupState.artifactsLoading = true;
 
     renderPopup();
 
     expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 
   it("keeps a started task on the analysis popup while artifacts load", () => {
@@ -130,7 +127,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup(undefined, fixture);
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
@@ -142,7 +138,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup(undefined, fixture);
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 
@@ -151,7 +146,6 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup();
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
   });
 
@@ -160,8 +154,18 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     renderPopup();
 
-    expect(screen.queryByTestId("classic-work-order-popup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+  });
+
+  it("shows a recovery alert when the refinement session lookup fails", () => {
+    lookupState.queryError = new Error("session unavailable");
+
+    renderPopup();
+
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The refinement session did not load. Refresh the page to try again.",
+    );
   });
 });

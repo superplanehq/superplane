@@ -7,7 +7,6 @@ import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
-import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
@@ -80,10 +79,7 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} fixed={fixed} onClose={onClose} />;
   }
-  if (mode === "analysis") {
-    return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
-  }
-  return <ClassicWorkOrderPopup {...props} popupData={popupData} sessionLookupError={analysis.queryError} />;
+  return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
 }
 
 function LoadingWorkOrderPopup({ title, fixed, onClose }: { title: string; fixed: boolean; onClose?: () => void }) {
@@ -192,6 +188,7 @@ function AnalysisWorkOrderPopup({
           sidebarNote={showSidebarNote ? review : undefined}
           analysis={stripAnalysis}
           sourceOnly={sourceOnly}
+          sessionLookupError={analysis.queryError?.message}
           header={analysisPopupHeader({
             edits,
             fixture,
@@ -207,7 +204,7 @@ function AnalysisWorkOrderPopup({
             reviewActions,
           })}
         />
-        {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
+        {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
@@ -407,6 +404,13 @@ function analysisReviewCompact(
 
 function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
   return !sourceOnly && !showSidebarNote && tab === "description";
+}
+
+function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
+  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
+    return review;
+  }
+  return null;
 }
 
 /** The split-run dialog width applies only to the Planning layout in a fixed popup. */
