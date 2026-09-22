@@ -6,6 +6,7 @@ import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
+  IN_FOURTEEN_DAYS,
   PRIMARY_FACTORY_KEY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
@@ -19,7 +20,7 @@ import {
 } from "../__fixtures__/usageReportFixtures";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(IN_FOURTEEN_DAYS));
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {

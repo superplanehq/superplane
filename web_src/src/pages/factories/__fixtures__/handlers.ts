@@ -6,6 +6,7 @@ import { factoryPlanningSessionRoutes } from "./factoryPlanningSessionHandlers";
 import { factoryPRFeedbackRoutes } from "./factoryPRFeedbackHandlers";
 import {
   defaultFactoriesFixture,
+  IN_FOURTEEN_DAYS,
   ORGANIZATION_USERS,
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
@@ -1072,7 +1073,7 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
         json: fixture.organizationBilling ?? {
           plan: "trial",
           planSource: "system",
-          trialEndsAt: "2026-09-22T12:00:00.000Z",
+          trialEndsAt: IN_FOURTEEN_DAYS,
           billingEnabled: true,
           subscriptionCheckoutEnabled: true,
           creditPurchaseAllowed: false,
@@ -1122,7 +1123,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
       json: fixture.organizationBilling ?? {
         plan: "trial",
         planSource: "system",
-        trialEndsAt: "2026-09-22T12:00:00.000Z",
+        trialEndsAt: IN_FOURTEEN_DAYS,
         billingEnabled: true,
         subscriptionCheckoutEnabled: true,
         creditPurchaseAllowed: false,
