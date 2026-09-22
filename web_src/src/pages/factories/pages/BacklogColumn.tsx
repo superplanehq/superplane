@@ -1,10 +1,10 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
+import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
-import { useRef } from "react";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -28,6 +28,7 @@ export type BacklogColumnProps = {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  lineId?: string;
   orders: FactoriesWorkOrder[];
   title: string;
   size: number | null;
@@ -74,6 +75,7 @@ export function BacklogColumn({
   organizationId,
   factoryId,
   factoryKey,
+  lineId,
   orders,
   title,
   size,
@@ -167,6 +169,7 @@ export function BacklogColumn({
           atCapacity={atCapacity}
           createPopover={createPopover}
           paging={paging}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "backlog") : undefined}
         />
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
@@ -255,11 +258,13 @@ function BacklogColumnOrderList({
   atCapacity,
   createPopover,
   paging,
+  scrollPersistenceKey,
 }: Pick<BacklogColumnProps, "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging"> & {
   atCapacity: boolean;
   createPopover: BacklogCreatePopoverProps;
+  scrollPersistenceKey?: string;
 }) {
-  const scrollRef = useRef<HTMLUListElement>(null);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging?.hasMore,
     isLoading: paging?.isLoading,
@@ -271,7 +276,10 @@ function BacklogColumnOrderList({
       ref={scrollRef}
       className={workOrderKanbanLaneScrollClassName}
       data-testid="lines-backlog-column-scroll"
-      onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+      onScroll={(event) => {
+        handleScroll(event);
+        loadMoreIfNeeded(event.currentTarget);
+      }}
     >
       {orders.map((order) => (
         <li key={order.id}>

@@ -22,6 +22,7 @@ import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { useMe } from "@/hooks/useMe";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
@@ -1402,6 +1403,7 @@ function PhaseBoard({
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
+          lineId={lineId}
           orders={backlogOrders}
           title={backlogTitle}
           size={backlogSize}
@@ -1469,6 +1471,7 @@ function PhaseBoard({
         <VerifyColumn
           orders={verifyOrders}
           title={verifyTitle}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "verify") : undefined}
           listeners={verifyListeners}
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
@@ -1490,6 +1493,7 @@ function PhaseBoard({
         <DoneColumn
           orders={doneOrders}
           title={doneTitle}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "done") : undefined}
           colorId={columnColors.done ?? null}
           colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("done", colorId)}
@@ -1525,6 +1529,7 @@ function VerifyColumn({
   onAutomationRowAction,
   onAddAutomation,
   paging,
+  scrollPersistenceKey,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1542,9 +1547,10 @@ function VerifyColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
+  scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const scrollRef = useRef<HTMLUListElement>(null);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1609,7 +1615,10 @@ function VerifyColumn({
         ref={scrollRef}
         className={workOrderKanbanLaneScrollClassName}
         data-testid="lines-verify-column-scroll"
-        onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+        onScroll={(event) => {
+          handleScroll(event);
+          loadMoreIfNeeded(event.currentTarget);
+        }}
       >
         {orders.map((order) => (
           <li key={order.id}>
@@ -1640,6 +1649,7 @@ function DoneColumn({
   onAutomationRowAction,
   onAddAutomation,
   paging,
+  scrollPersistenceKey,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1655,9 +1665,10 @@ function DoneColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
+  scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const scrollRef = useRef<HTMLUListElement>(null);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1709,7 +1720,10 @@ function DoneColumn({
         ref={scrollRef}
         className={workOrderKanbanLaneScrollClassName}
         data-testid="lines-done-column-scroll"
-        onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+        onScroll={(event) => {
+          handleScroll(event);
+          loadMoreIfNeeded(event.currentTarget);
+        }}
       >
         {orders.map((order) => (
           <li key={order.id}>
@@ -1775,7 +1789,9 @@ function PhaseColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   paging: BoardColumnPaging;
 }) {
-  const scrollRef = useRef<HTMLUListElement>(null);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(
+    lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, `step-${column.stepIndex}`) : undefined,
+  );
   const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
@@ -1837,7 +1853,10 @@ function PhaseColumn({
         <ul
           ref={scrollRef}
           className={workOrderKanbanLaneScrollClassName}
-          onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+          onScroll={(event) => {
+            handleScroll(event);
+            loadMoreIfNeeded(event.currentTarget);
+          }}
           data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
         >
           {visibleRuns.map((run) => (
