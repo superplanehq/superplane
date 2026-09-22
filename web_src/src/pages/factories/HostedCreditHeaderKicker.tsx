@@ -16,7 +16,7 @@ interface HostedCreditHeaderKickerProps {
   welcomeCreditExpiresAt?: string;
   remainingCreditCents?: number;
   kind?: HostedCreditHeaderKickerKind;
-  /** Whether the signed-in organization can buy credit. Hides the action for low and empty credit. */
+  /** Whether the signed-in organization can buy credit. Hides the action and link for low and empty credit. */
   canAddCredit?: boolean;
 }
 
@@ -33,18 +33,13 @@ export function HostedCreditHeaderKicker({
   const actionLabel = hostedCreditHeaderKickerActionLabel(kind);
   const details = kickerDetails(kind, welcomeCreditExpiresAt, remainingCreditCents);
   const showAction = kind !== "low" && kind !== "empty" ? true : canAddCredit;
-
-  return (
-    <Link
-      to={spendingHref}
-      aria-label={actionLabel}
-      data-testid="hosted-credit-header-kicker"
-      data-kind={kind}
-      className={cn(
-        "inline-flex h-8 shrink-0 items-center gap-2 rounded-full py-1 pl-2.5 pr-1.5 text-[12px]",
-        palette.shell,
-      )}
-    >
+  const className = cn(
+    "inline-flex h-8 shrink-0 items-center gap-2 rounded-full py-1 pl-2.5 pr-1.5 text-[12px]",
+    palette.shell,
+    showAction && palette.hover,
+  );
+  const content = (
+    <>
       <span className={cn("whitespace-nowrap font-medium", palette.text)}>{label}</span>
       {details.map((detail) => (
         <span key={detail.key} className="inline-flex items-center gap-2">
@@ -69,12 +64,33 @@ export function HostedCreditHeaderKicker({
           {actionLabel}
         </span>
       ) : null}
+    </>
+  );
+
+  if (!showAction) {
+    return (
+      <span data-testid="hosted-credit-header-kicker" data-kind={kind} className={className}>
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      to={spendingHref}
+      aria-label={actionLabel}
+      data-testid="hosted-credit-header-kicker"
+      data-kind={kind}
+      className={className}
+    >
+      {content}
     </Link>
   );
 }
 
 type KickPalette = {
   shell: string;
+  hover: string;
   text: string;
   amount: string;
   dot: string;
@@ -82,7 +98,8 @@ type KickPalette = {
 };
 
 const TRIAL_KICKER_PALETTE: KickPalette = {
-  shell: "bg-violet-100 hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900",
+  shell: "bg-violet-100 dark:bg-violet-950",
+  hover: "hover:bg-violet-200/80 dark:hover:bg-violet-900",
   text: "text-violet-800 dark:text-violet-200",
   amount: "text-violet-950 dark:text-violet-50",
   dot: "text-violet-400 dark:text-violet-600",
@@ -90,7 +107,8 @@ const TRIAL_KICKER_PALETTE: KickPalette = {
 };
 
 const LAPSED_KICKER_PALETTE: KickPalette = {
-  shell: "bg-amber-100 hover:bg-amber-200/80 dark:bg-amber-950 dark:hover:bg-amber-900",
+  shell: "bg-amber-100 dark:bg-amber-950",
+  hover: "hover:bg-amber-200/80 dark:hover:bg-amber-900",
   text: "text-amber-900 dark:text-amber-200",
   amount: "text-amber-950 dark:text-amber-50",
   dot: "text-amber-400 dark:text-amber-600",

@@ -135,21 +135,25 @@ describe("HostedCreditHeaderKicker", () => {
     expect(kicker.className).toContain("bg-amber-100");
   });
 
-  it("hides the action pill for low and empty credit when credit cannot be added", () => {
-    render(
-      <MemoryRouter>
-        <HostedCreditHeaderKicker
-          kind="low"
-          remainingCreditCents={1500}
-          spendingHref={billingHref}
-          canAddCredit={false}
-        />
-      </MemoryRouter>,
-    );
+  it.each(["low", "empty"] as const)(
+    "renders the %s chip without a billing link when credit cannot be added",
+    (kind) => {
+      render(
+        <MemoryRouter>
+          <HostedCreditHeaderKicker
+            kind={kind}
+            remainingCreditCents={kind === "low" ? 1500 : 0}
+            spendingHref={billingHref}
+            canAddCredit={false}
+          />
+        </MemoryRouter>,
+      );
 
-    const kicker = screen.getByTestId("hosted-credit-header-kicker");
-    expect(kicker).toHaveTextContent("Credit low");
-    expect(kicker).not.toHaveTextContent("Add credits");
-    expect(screen.getByRole("link")).toHaveAttribute("href", billingHref);
-  });
+      const kicker = screen.getByTestId("hosted-credit-header-kicker");
+      expect(kicker.tagName).toBe("SPAN");
+      expect(kicker).toHaveTextContent(kind === "low" ? "Credit low" : "No credit");
+      expect(kicker).not.toHaveTextContent("Add credits");
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    },
+  );
 });

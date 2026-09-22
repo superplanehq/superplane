@@ -64,7 +64,7 @@ export const EmptyCredit: Story = {
   args: { kind: "empty" },
 };
 
-/** Billing is off. Low and empty chips render without the action pill. */
+/** Billing is off. Low and empty chips render without the action pill or billing link. */
 export const LowCreditNoAction: Story = {
   name: "Low credit, no action",
   args: { kind: "low", remainingCreditCents: 1500, canAddCredit: false },
