@@ -473,6 +473,16 @@ func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
 	return !s.hasActiveAnalysisRun(tx)
 }
 
+func (s *FactoryPlanningSession) NeedsAnalysisInterrupt(tx *gorm.DB) bool {
+	if !s.IsAnalysisSession() {
+		return false
+	}
+	if s.WaitState == PlanningWaitPending {
+		return false
+	}
+	return s.hasActiveAnalysisRun(tx)
+}
+
 func (s *FactoryPlanningSession) hasActiveAnalysisRun(tx *gorm.DB) bool {
 	if s.CanvasID == nil || s.CanvasRunID == nil {
 		return false

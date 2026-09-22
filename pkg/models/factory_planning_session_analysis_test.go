@@ -118,6 +118,38 @@ func TestFactoryPlanningSession_NeedsAnalysisRestart(t *testing.T) {
 	assert.True(t, session.NeedsAnalysisRestart(db))
 }
 
+func TestFactoryPlanningSession_NeedsAnalysisInterrupt(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-interrupt")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	assert.True(t, session.NeedsAnalysisInterrupt(db))
+
+	require.NoError(t, session.BeginWait(db))
+	assert.False(t, session.NeedsAnalysisInterrupt(db))
+
+	now := time.Now()
+	require.NoError(t, db.Model(run).Updates(map[string]any{
+		"state":       CanvasRunStateFinished,
+		"result":      CanvasRunResultCancelled,
+		"finished_at": &now,
+		"updated_at":  &now,
+	}).Error)
+	require.NoError(t, session.End(db))
+	assert.False(t, session.NeedsAnalysisInterrupt(db))
+}
+
 func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 	for _, test := range []struct {
 		name              string

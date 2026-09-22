@@ -100,12 +100,20 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 	}
 	db := database.DB(ctx)
 	assigned := false
+	var interruptCanvasID, interruptRunID uuid.UUID
+	interrupted := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		draft, err := lockAnalysisSessionAndDraft(tx, session)
 		if err != nil {
 			return err
 		}
 		restartAnalysis := session.NeedsAnalysisRestart(tx)
+		if session.NeedsAnalysisInterrupt(tx) {
+			interruptCanvasID = *session.CanvasID
+			interruptRunID = *session.CanvasRunID
+			interrupted = true
+			restartAnalysis = true
+		}
 		if restartAnalysis {
 			if err := session.Reopen(tx); err != nil {
 				return err
@@ -130,6 +138,9 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		return restartAnalysisCanvasRun(tx, factoryModel, session)
 	}); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
+	}
+	if interrupted {
+		cancelPlanningSessionRunByID(ctx, db, session.OrganizationID, interruptCanvasID, interruptRunID)
 	}
 	if assigned {
 		publishDraftAssigneesUpdated(session)
