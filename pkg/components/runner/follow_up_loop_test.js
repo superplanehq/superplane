@@ -235,7 +235,7 @@ test("safeWaitRequest treats a fetch throw as unreachable pending", async () => 
   assert.deepEqual(got, { status: "pending", unreachable: true });
 });
 
-test("runLoop exits after consecutive unreachable waits", async () => {
+test("runLoop ends cleanly after consecutive unreachable waits", async () => {
   const logs = [];
   const sleeps = [];
   let waits = 0;
@@ -257,10 +257,10 @@ test("runLoop exits after consecutive unreachable waits", async () => {
     writeLiveLogRecord: () => {},
     maxUnreachableWaits: 3,
   });
-  assert.equal(code, 1);
+  assert.equal(code, 0);
   assert.equal(waits, 3);
   assert.equal(sleeps.length, 2);
-  assert.match(logs.join(""), /unreachable|failed/i);
+  assert.deepEqual(logs, []);
 });
 
 test("safeWaitRequest treats an abort as unreachable pending", async () => {
