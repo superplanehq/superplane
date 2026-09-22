@@ -33,7 +33,8 @@ export function catalogAppearance(appearance: CatalogAppearance) {
       plugReady: "text-green-600",
       plugError: "text-destructive",
       plugOther: "text-amber-600",
-      statusLabel: "w-16 text-[12px] font-medium text-muted-foreground",
+      statusLabel: "text-[12px] font-medium text-muted-foreground",
+      statusLabelWrap: "w-16 shrink-0",
       footerRequest: "mt-6 text-center text-[13px] text-muted-foreground",
     };
   }
@@ -62,7 +63,8 @@ export function catalogAppearance(appearance: CatalogAppearance) {
     plugReady: "text-green-500",
     plugError: "text-red-500",
     plugOther: "text-amber-600",
-    statusLabel: "inline-flex w-16 items-center justify-start rounded text-xs font-medium",
+    statusLabel: "inline-flex w-fit items-center rounded px-1.5 py-0.5 text-xs font-medium",
+    statusLabelWrap: "min-w-16 shrink-0",
     footerRequest: "mt-6 text-center text-sm text-gray-500 dark:text-gray-400",
   };
 }
