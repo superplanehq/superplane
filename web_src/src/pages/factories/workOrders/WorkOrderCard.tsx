@@ -21,6 +21,8 @@ import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 
 const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
@@ -130,6 +132,8 @@ export function WorkOrderCard({
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const source = workOrderCardSource(entry.order);
+  const pullRequestMerge = useExperimentalFeature(organizationId);
+  const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
       addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
@@ -138,6 +142,7 @@ export function WorkOrderCard({
       fixesPaused: fixesPausedOrderIds.has(entry.id),
     }),
     cardPullRequest,
+    showPullRequestMerge,
   );
 
   return (
@@ -168,6 +173,7 @@ export function WorkOrderCard({
           checksPassedLabel={checksPassedLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
+          showPullRequestMerge={showPullRequestMerge}
         />
         <WorkOrderCardMetaRow
           entry={entry}
@@ -231,6 +237,7 @@ function WorkOrderCardStatusRow({
   checksPassedLabel,
   cardPullRequest,
   hasAgentQuestion,
+  showPullRequestMerge,
 }: {
   entryId: string;
   reasons: WorkOrderAttentionReason[];
@@ -238,6 +245,7 @@ function WorkOrderCardStatusRow({
   checksPassedLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
+  showPullRequestMerge?: boolean;
 }) {
   if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
@@ -249,7 +257,9 @@ function WorkOrderCardStatusRow({
       {cardPullRequest ? (
         <>
           <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
-          {workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest) ? <WorkOrderMergeableChip /> : null}
+          {showPullRequestMerge && workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest) ? (
+            <WorkOrderMergeableChip />
+          ) : null}
         </>
       ) : null}
       {reasons.map((reason) => (

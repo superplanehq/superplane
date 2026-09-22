@@ -72,6 +72,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
 	})
 
+	t.Run("known id returns pull request merge feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryPullRequestMerge)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryPullRequestMerge, f.ID)
+		assert.Equal(t, "Pull Request Merge", f.Label)
+		assert.Equal(t, "Show the Mergeable chip on task cards and the Merge button on pull request review", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -94,6 +103,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceAgentResources))
+	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
