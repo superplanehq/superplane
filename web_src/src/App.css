@@ -1375,11 +1375,43 @@
     stroke-dashoffset: 1;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  16.67% {
+  12.5% {
     stroke-dashoffset: 0;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  33.33%,
+  25%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-mid-left {
+  0%,
+  25% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  37.5% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  50%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-mid-right {
+  0%,
+  50% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  62.5% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  75%,
   100% {
     stroke-dashoffset: -1;
   }
@@ -1387,27 +1419,11 @@
 
 @keyframes workspace-loading-stroke-right {
   0%,
-  33.33% {
+  75% {
     stroke-dashoffset: 1;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  50% {
-    stroke-dashoffset: 0;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  66.67%,
-  100% {
-    stroke-dashoffset: -1;
-  }
-}
-
-@keyframes workspace-loading-stroke-stem {
-  0%,
-  66.67% {
-    stroke-dashoffset: 1;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  83.33% {
+  87.5% {
     stroke-dashoffset: 0;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -1418,25 +1434,31 @@
 
 @keyframes workspace-loading-pen {
   0%,
-  33.33%,
-  66.67% {
+  25%,
+  50%,
+  75% {
     left: 50%;
     top: 8%;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  16.67% {
+  12.5% {
     left: 15.5%;
     top: 73.8%;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  50% {
-    left: 84.5%;
-    top: 73.8%;
+  37.5% {
+    left: 36.1%;
+    top: 85.7%;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  83.33% {
-    left: 50%;
-    top: 89.2%;
+  62.5% {
+    left: 63.9%;
+    top: 85.7%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  87.5% {
+    left: 84.5%;
+    top: 73.8%;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
   100% {
@@ -1445,7 +1467,14 @@
   }
 }
 
+@keyframes workspace-loading-overlay-exit {
+  to {
+    opacity: 0;
+  }
+}
+
 .workspace-loading-mark {
+  --workspace-loading-cycle: 1.5s;
   position: relative;
   width: 5.5rem;
   aspect-ratio: 33 / 25;
@@ -1464,15 +1493,19 @@
 }
 
 .workspace-loading-trace--left {
-  animation: workspace-loading-stroke-left 1.8s infinite;
+  animation: workspace-loading-stroke-left var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-trace--mid-left {
+  animation: workspace-loading-stroke-mid-left var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-trace--mid-right {
+  animation: workspace-loading-stroke-mid-right var(--workspace-loading-cycle) infinite;
 }
 
 .workspace-loading-trace--right {
-  animation: workspace-loading-stroke-right 1.8s infinite;
-}
-
-.workspace-loading-trace--stem {
-  animation: workspace-loading-stroke-stem 1.8s infinite;
+  animation: workspace-loading-stroke-right var(--workspace-loading-cycle) infinite;
 }
 
 .workspace-loading-pen {
@@ -1482,7 +1515,12 @@
   border-radius: 999px;
   background: currentColor;
   translate: -50% -50%;
-  animation: workspace-loading-pen 1.8s infinite;
+  animation: workspace-loading-pen var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-overlay--exit {
+  pointer-events: none;
+  animation: workspace-loading-overlay-exit 0.3s ease-out forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1495,9 +1533,11 @@
   .workspace-next-steps-reveal,
   .workspace-loading-trace,
   .workspace-loading-trace--left,
+  .workspace-loading-trace--mid-left,
+  .workspace-loading-trace--mid-right,
   .workspace-loading-trace--right,
-  .workspace-loading-trace--stem,
   .workspace-loading-pen,
+  .workspace-loading-overlay--exit,
   .sp-text-reveal,
   .sp-stream-text,
   .sp-tool-enter,
