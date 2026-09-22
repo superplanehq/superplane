@@ -13,7 +13,6 @@ import {
   useFactoryAutomations,
   useFactoryBoardWorkOrders,
   type FactoryWorkOrdersPageOptions,
-  useFactoryPullRequests,
   useUpdateFactoryLine,
   useWorkOrder,
   useWorkOrderArtifacts,
@@ -114,6 +113,7 @@ import {
   UNASSIGNED_FILTER_VALUE,
   WORK_ORDER_SCOPES,
 } from "../lib/workOrderListModel";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
@@ -288,7 +288,7 @@ export function LinesPage() {
     open: openPage,
     done: donePage,
   } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, me?.id));
-  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
+  const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
   const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
@@ -1096,9 +1096,7 @@ function LineBoardSplitRunPopup({
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
-  const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
-    workOrderIds: [peekOrderId],
-  });
+  const peekPullRequests = describedOrder?.pullRequests ?? peekOrder.pullRequests ?? [];
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
   const popupOrder = describedOrder ?? peekOrder;

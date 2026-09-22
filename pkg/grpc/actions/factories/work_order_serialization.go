@@ -8,34 +8,83 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
 func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
 	db := database.DB(ctx)
-	if err := loadWorkOrderAssigneeUsers(db, order); err != nil {
-		return nil, err
-	}
+	workOrderIDs := []uuid.UUID{order.ID}
+	numbers := map[uuid.UUID]int64{order.ID: order.Number}
 
-	dispatchesByOrderID, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{order.ID})
-	if err != nil {
-		return nil, err
-	}
+	g, gctx := errgroup.WithContext(ctx)
 
-	creatorAutomations, err := models.ResolveFactoryWorkOrderCreatorAutomations(db, []models.FactoryWorkOrder{*order})
-	if err != nil {
-		return nil, err
-	}
+	g.Go(func() error {
+		return loadWorkOrderAssigneeUsers(db.WithContext(gctx), order)
+	})
 
-	usageByOrder, err := models.SumUsageForWorkOrders(db, []uuid.UUID{order.ID})
-	if err != nil {
+	var dispatchesByOrderID map[uuid.UUID][]models.FactoryWorkOrderLineDispatchRecord
+	var modelsByExecution map[uuid.UUID][]string
+	g.Go(func() error {
+		var err error
+		dispatchesByOrderID, err = models.ListWorkOrderLineDispatchesByWorkOrderIDs(db.WithContext(gctx), workOrderIDs)
+		if err != nil {
+			return err
+		}
+		modelsByExecution = loadModelsForDispatches(db.WithContext(gctx), dispatchesByOrderID)
+		return nil
+	})
+
+	var creatorAutomations map[uuid.UUID]*factoryevents.AutomationRef
+	g.Go(func() error {
+		var err error
+		creatorAutomations, err = models.ResolveFactoryWorkOrderCreatorAutomations(db.WithContext(gctx), []models.FactoryWorkOrder{*order})
+		return err
+	})
+
+	var usageByOrder map[uuid.UUID]models.UsageTotals
+	g.Go(func() error {
+		var err error
+		usageByOrder, err = models.SumUsageForWorkOrders(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
+
+	var byModel map[uuid.UUID][]models.UsageByModel
+	var byMachineType map[uuid.UUID][]models.UsageByMachineType
+	g.Go(func() error {
+		byModel, byMachineType = loadWorkOrderUsageBreakdowns(db.WithContext(gctx), workOrderIDs)
+		return nil
+	})
+
+	var pullRequestsByOrder map[uuid.UUID][]*pb.FactoryPullRequest
+	g.Go(func() error {
+		var err error
+		pullRequestsByOrder, err = loadSerializedPullRequestsByWorkOrderIDs(gctx, db.WithContext(gctx), workOrderIDs, numbers)
+		return err
+	})
+
+	var checksByOrder map[uuid.UUID][]models.FactoryWorkOrderCheck
+	g.Go(func() error {
+		var err error
+		checksByOrder, err = models.ListChecksForWorkOrders(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
+
+	var planningByOrder map[uuid.UUID]*pb.PlanningSessionSummary
+	g.Go(func() error {
+		var err error
+		planningByOrder, err = planningSessionSummariesByWorkOrder(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	byModel, byMachineType := loadWorkOrderUsageBreakdowns(db, []uuid.UUID{order.ID})
 
 	serialized, err := serializeWorkOrder(
 		factory,
@@ -46,21 +95,22 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 			Totals:            usageByOrder[order.ID],
 			ByModel:           byModel[order.ID],
 			ByMachineType:     byMachineType[order.ID],
-			ModelsByExecution: loadModelsForDispatches(db, dispatchesByOrderID),
+			ModelsByExecution: modelsByExecution,
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
+	serialized.PullRequests = pullRequestsByOrder[order.ID]
 	if err := attachWorkOrderFiles(ctx, db, serialized, order.ID); err != nil {
 		return nil, err
 	}
-	if err := attachDescribedWorkOrderChecks(db, []*pb.WorkOrder{serialized}); err != nil {
+	checks, err := serializeChecks(checksByOrder[order.ID])
+	if err != nil {
 		return nil, err
 	}
-	if err := attachDescribedPlanningSession(db, serialized); err != nil {
-		return nil, err
-	}
+	serialized.Checks = checks
+	serialized.PlanningSession = planningByOrder[order.ID]
 	return serialized, nil
 }
 
@@ -71,28 +121,63 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 
 	workOrderIDs := make([]uuid.UUID, len(orders))
 	orderRefs := make([]*models.FactoryWorkOrder, len(orders))
+	numbers := make(map[uuid.UUID]int64, len(orders))
 	for i := range orders {
 		workOrderIDs[i] = orders[i].ID
 		orderRefs[i] = &orders[i]
+		numbers[orders[i].ID] = orders[i].Number
 	}
 
 	db := database.DB(ctx)
-	if err := loadWorkOrderAssigneeUsers(db, orderRefs...); err != nil {
-		return nil, err
-	}
+	g, gctx := errgroup.WithContext(ctx)
 
-	dispatchesByOrderID, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, workOrderIDs)
-	if err != nil {
-		return nil, err
-	}
+	g.Go(func() error {
+		return loadWorkOrderAssigneeUsers(db.WithContext(gctx), orderRefs...)
+	})
 
-	creatorAutomations, err := models.ResolveFactoryWorkOrderCreatorAutomations(db, orders)
-	if err != nil {
-		return nil, err
-	}
+	var dispatchesByOrderID map[uuid.UUID][]models.FactoryWorkOrderLineDispatchRecord
+	g.Go(func() error {
+		var err error
+		dispatchesByOrderID, err = models.ListWorkOrderLineDispatchesByWorkOrderIDs(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
 
-	usageByOrder, err := models.SumUsageForWorkOrders(db, workOrderIDs)
-	if err != nil {
+	var creatorAutomations map[uuid.UUID]*factoryevents.AutomationRef
+	g.Go(func() error {
+		var err error
+		creatorAutomations, err = models.ResolveFactoryWorkOrderCreatorAutomations(db.WithContext(gctx), orders)
+		return err
+	})
+
+	var usageByOrder map[uuid.UUID]models.UsageTotals
+	g.Go(func() error {
+		var err error
+		usageByOrder, err = models.SumUsageForWorkOrders(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
+
+	var pullRequestsByOrder map[uuid.UUID][]*pb.FactoryPullRequest
+	g.Go(func() error {
+		var err error
+		pullRequestsByOrder, err = loadSerializedPullRequestsByWorkOrderIDs(gctx, db.WithContext(gctx), workOrderIDs, numbers)
+		return err
+	})
+
+	var checksByOrder map[uuid.UUID][]models.FactoryWorkOrderCheck
+	g.Go(func() error {
+		var err error
+		checksByOrder, err = models.ListChecksForWorkOrders(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
+
+	var planningByOrder map[uuid.UUID]*pb.PlanningSessionSummary
+	g.Go(func() error {
+		var err error
+		planningByOrder, err = planningSessionSummariesByWorkOrder(db.WithContext(gctx), workOrderIDs)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
@@ -108,81 +193,13 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		if err != nil {
 			return nil, err
 		}
+		serialized.PullRequests = pullRequestsByOrder[orders[i].ID]
+		serialized.CheckScores = serializeCheckScores(checksByOrder[orders[i].ID])
+		serialized.PlanningSession = planningByOrder[orders[i].ID]
 		result[i] = serialized
 	}
 
-	if err := attachListedWorkOrderCheckScores(db, result); err != nil {
-		return nil, err
-	}
-	if err := attachListedPlanningSessionStatus(db, result); err != nil {
-		return nil, err
-	}
-
 	return result, nil
-}
-
-func attachDescribedWorkOrderChecks(db *gorm.DB, orders []*pb.WorkOrder) error {
-	return applyWorkOrderChecks(db, orders, func(order *pb.WorkOrder, checks []models.FactoryWorkOrderCheck) error {
-		serialized, err := serializeChecks(checks)
-		if err != nil {
-			return err
-		}
-		order.Checks = serialized
-		return nil
-	})
-}
-
-func attachListedWorkOrderCheckScores(db *gorm.DB, orders []*pb.WorkOrderSummary) error {
-	return applyWorkOrderChecks(db, orders, func(order *pb.WorkOrderSummary, checks []models.FactoryWorkOrderCheck) error {
-		order.CheckScores = serializeCheckScores(checks)
-		return nil
-	})
-}
-
-func attachDescribedPlanningSession(db *gorm.DB, order *pb.WorkOrder) error {
-	if order == nil || order.GetId() == "" {
-		return nil
-	}
-	id, err := uuid.Parse(order.GetId())
-	if err != nil {
-		return err
-	}
-	summaries, err := planningSessionSummariesByWorkOrder(db, []uuid.UUID{id})
-	if err != nil {
-		return err
-	}
-	order.PlanningSession = summaries[id]
-	return nil
-}
-
-func attachListedPlanningSessionStatus(db *gorm.DB, orders []*pb.WorkOrderSummary) error {
-	ids := make([]uuid.UUID, 0, len(orders))
-	for _, order := range orders {
-		if order == nil || order.GetId() == "" {
-			continue
-		}
-		id, err := uuid.Parse(order.GetId())
-		if err != nil {
-			return err
-		}
-		ids = append(ids, id)
-	}
-
-	summaries, err := planningSessionSummariesByWorkOrder(db, ids)
-	if err != nil {
-		return err
-	}
-	for _, order := range orders {
-		if order == nil || order.GetId() == "" {
-			continue
-		}
-		id, err := uuid.Parse(order.GetId())
-		if err != nil {
-			return err
-		}
-		order.PlanningSession = summaries[id]
-	}
-	return nil
 }
 
 func planningSessionSummariesByWorkOrder(db *gorm.DB, ids []uuid.UUID) (map[uuid.UUID]*pb.PlanningSessionSummary, error) {
@@ -203,47 +220,6 @@ func planningSessionSummariesByWorkOrder(db *gorm.DB, ids []uuid.UUID) (map[uuid
 		summaries[orderID] = serializePlanningSessionSummary(session, executionIDs[session.ID])
 	}
 	return summaries, nil
-}
-
-type identifiedWorkOrder interface {
-	GetId() string
-}
-
-func applyWorkOrderChecks[T identifiedWorkOrder](
-	db *gorm.DB,
-	orders []T,
-	apply func(T, []models.FactoryWorkOrderCheck) error,
-) error {
-	ids := make([]uuid.UUID, 0, len(orders))
-	for _, order := range orders {
-		if any(order) == nil || order.GetId() == "" {
-			continue
-		}
-		id, err := uuid.Parse(order.GetId())
-		if err != nil {
-			return err
-		}
-		ids = append(ids, id)
-	}
-
-	grouped, err := models.ListChecksForWorkOrders(db, ids)
-	if err != nil {
-		return err
-	}
-
-	for _, order := range orders {
-		if any(order) == nil || order.GetId() == "" {
-			continue
-		}
-		id, err := uuid.Parse(order.GetId())
-		if err != nil {
-			return err
-		}
-		if err := apply(order, grouped[id]); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // loadWorkOrderAssigneeUsers reloads assignees with User so the API can

@@ -85,12 +85,6 @@ function invalidateOrdersList(queryClient: WorkOrderQueryClient, organizationId:
   });
 }
 
-function invalidatePullRequests(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
-  void queryClient.invalidateQueries({
-    queryKey: ["factories", organizationId, factoryId, "pull-requests"],
-  });
-}
-
 function invalidateBacklogAnalysisRuns(queryClient: WorkOrderQueryClient, organizationId: string) {
   // A draft created through the API has no optimistic "analyzing" flag.
   // This refetch picks up the Backlog run once the factory creates it.
@@ -141,7 +135,6 @@ function invalidateTaskActivity(
   factoryId: string,
   orderIds: string[],
 ) {
-  invalidatePullRequests(queryClient, organizationId, factoryId);
   invalidateBacklogAnalysisRuns(queryClient, organizationId);
   for (const orderId of orderIds) {
     invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
@@ -191,7 +184,6 @@ export function invalidateFactoryWorkOrderQueries(
   orderId?: string,
 ): void {
   invalidateOrdersList(queryClient, organizationId, factoryId);
-  invalidatePullRequests(queryClient, organizationId, factoryId);
   invalidateBacklogAnalysisRuns(queryClient, organizationId);
   invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
 
