@@ -19,7 +19,7 @@ describe("WorkOrderPullRequestsList", () => {
         pullRequests={[
           {
             id: "pr-1",
-            number: 12,
+            number: "12",
             title: "Fix mermaid contrast",
             url: "https://github.com/acme/app/pull/12",
             state: "STATE_OPEN",
