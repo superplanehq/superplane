@@ -122,7 +122,7 @@ export const INTAKE_SETTINGS_COPY = {
 } as const;
 
 export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
-  return sourceId === "sentry-exceptions" || sourceId === "jira-issues";
+  return sourceId === "github-issues" || sourceId === "sentry-exceptions" || sourceId === "jira-issues";
 }
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {

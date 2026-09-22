@@ -4,7 +4,6 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { client } from "@/api-client/client.gen";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { IN_FOURTEEN_DAYS } from "../__fixtures__/factoryPageIds";
 import {
   defaultFactoriesFixture,
   FACTORIES_ORGANIZATION_ID,
@@ -19,12 +18,13 @@ import {
   BUSINESS_ORGANIZATION_BILLING,
   LAPSED_ORGANIZATION_BILLING,
   LAPSED_TOPUP_USAGE_REPORT,
+  ACTIVE_TRIAL_ENDS_AT,
 } from "../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(IN_FOURTEEN_DAYS));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(ACTIVE_TRIAL_ENDS_AT));
 
 describe("WorkOrdersPage hosted credit banner", () => {
   beforeAll(() => {
