@@ -48,6 +48,7 @@ export function useCanvasAgentChat(
       const response = await agentsGetCanvasAgentChat(
         withOrganizationHeader({ organizationId, path: { canvasId: canvasId ?? "" } }),
       );
+      if (response.error) throw response.error;
       return fromApiChat(response.data?.chat);
     },
   });
