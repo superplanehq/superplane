@@ -1,6 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
-import { useMe } from "@/hooks/useMe";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -16,8 +15,7 @@ import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 /** Storybook-only Tasks page with a Missions rail. */
 export function MissionsWorkOrdersPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: me } = useMe(false);
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const state = useWorkOrderListState(factoryId);
 
   const {
@@ -69,7 +67,7 @@ export function MissionsWorkOrdersPage() {
       workOrders={workOrders}
       pullRequests={pullRequests}
       state={state}
-      currentUserId={me?.id}
+      currentUserId={currentUserId}
       canCreate={canCreate}
       onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}

@@ -271,8 +271,12 @@ export const widgetKeys = {
 
 export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
 
+type UseCanvasesOptions = {
+  enabled?: boolean;
+};
+
 // Hooks for fetching canvases
-export const useCanvases = (organizationId: string) => {
+export const useCanvases = (organizationId: string, options: UseCanvasesOptions = {}) => {
   return useQuery({
     queryKey: canvasKeys.list(organizationId),
     queryFn: async () => {
@@ -283,7 +287,7 @@ export const useCanvases = (organizationId: string) => {
       );
       return response.data?.canvases || [];
     },
-    enabled: !!organizationId,
+    enabled: !!organizationId && (options.enabled ?? true),
   });
 };
 
