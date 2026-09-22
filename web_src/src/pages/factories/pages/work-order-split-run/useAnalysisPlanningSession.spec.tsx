@@ -22,6 +22,7 @@ vi.mock("../planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: vi.fn(),
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
+  endPlanningSession: vi.fn(),
 }));
 
 function planningTalk(message: CreateWithAgentMessage) {
