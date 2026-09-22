@@ -29,7 +29,6 @@ interface WorkOrdersHeaderProps {
   canCreate: boolean;
   permissionsLoading: boolean;
   hostedCreditHeaderKicker?: ReactNode;
-  hostedCreditEmptyBanner?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
 }
 
@@ -49,7 +48,6 @@ export function WorkOrdersHeader({
   canCreate,
   permissionsLoading,
   hostedCreditHeaderKicker,
-  hostedCreditEmptyBanner,
   brokenIntegrationsBanner,
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
@@ -104,9 +102,8 @@ export function WorkOrdersHeader({
         </>
       }
       belowRow={
-        hostedCreditEmptyBanner || brokenIntegrationsBanner || state.filterCount > 0 ? (
+        brokenIntegrationsBanner || state.filterCount > 0 ? (
           <>
-            {hostedCreditEmptyBanner}
             {brokenIntegrationsBanner}
             {state.filterCount > 0 ? (
               <FilterChips

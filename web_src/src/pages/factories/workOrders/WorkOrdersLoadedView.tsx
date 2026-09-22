@@ -47,7 +47,6 @@ interface WorkOrdersLoadedViewProps {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
   hostedCreditHeaderKicker?: ReactNode;
-  hostedCreditEmptyBanner?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
 }
 
@@ -149,7 +148,6 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
-          hostedCreditEmptyBanner={props.hostedCreditEmptyBanner}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
         />
       </div>
