@@ -42,19 +42,26 @@ func IsBacklogFactoryApp(nodes []Node, _ []Edge) bool {
 	if FactoryAppTemplateID(nodes) == FactoryAppTemplateBacklogID {
 		return true
 	}
+	return IsLegacyAnalyzeBacklog(nodes) || matchesBacklogIdentity(nodes, backlogVersionThreeNodeIDs)
+}
 
-	legacyNodeIDs := map[string]bool{
+// IsLegacyAnalyzeBacklog reports a generated version 1 or 2 Backlog graph.
+// Those graphs still have the Analyze / intent.md nodes. SuperPlane upgrades
+// them and no longer starts that path.
+func IsLegacyAnalyzeBacklog(nodes []Node) bool {
+	return matchesBacklogIdentity(nodes, backlogVersionOneNodeIDs) ||
+		matchesBacklogIdentity(nodes, backlogVersionTwoNodeIDs)
+}
+
+var (
+	backlogVersionOneNodeIDs = map[string]bool{
 		FactoryAppBacklogTriggerID: true,
 		"analyze":                  true,
 		"report-confidence":        true,
 		"attach-intent":            true,
 		"add-run-error":            true,
 	}
-	if matchesBacklogIdentity(nodes, legacyNodeIDs) {
-		return true
-	}
-
-	versionTwoNodeIDs := map[string]bool{
+	backlogVersionTwoNodeIDs = map[string]bool{
 		FactoryAppBacklogTriggerID: true,
 		"task-refinement-enabled":  true,
 		"analyze":                  true,
@@ -63,8 +70,13 @@ func IsBacklogFactoryApp(nodes []Node, _ []Edge) bool {
 		"attach-intent":            true,
 		"add-run-error":            true,
 	}
-	return matchesBacklogIdentity(nodes, versionTwoNodeIDs)
-}
+	backlogVersionThreeNodeIDs = map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"task-refinement-enabled":  true,
+		"refine-task":              true,
+		"add-run-error":            true,
+	}
+)
 
 // StampFactoryAppTemplate records template identity in the live version and
 // its normalized trigger node. Canvas changesets keep component metadata

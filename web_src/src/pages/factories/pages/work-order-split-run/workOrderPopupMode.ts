@@ -52,7 +52,7 @@ export function workOrderPopupMode({
     return "loading";
   }
   if (!refinementEnabled) {
-    return "classic";
+    return "analysis";
   }
   if (refinementUsesAnalysis({ hasAnalysisResult, analysisActive, isDraft, artifactsFailed })) {
     return "analysis";

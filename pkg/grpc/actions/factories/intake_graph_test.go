@@ -239,13 +239,10 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		assert.Equal(t, backlogDefaultName, canvas.Metadata.Name)
 		assert.Equal(t, []yaml.Edge{
 			{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: backlogRefinementFilterNodeID},
-			{Channel: "false", SourceID: backlogRefinementFilterNodeID, TargetID: intakeAnalysisNodeID},
 			{Channel: "true", SourceID: backlogRefinementFilterNodeID, TargetID: backlogRefinementNodeID},
-			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
-			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: "attach-intent"},
-			{Channel: "failed", SourceID: intakeAnalysisNodeID, TargetID: intakeAddRunErrorNodeID},
 			{Channel: "failed", SourceID: backlogRefinementNodeID, TargetID: intakeAddRunErrorNodeID},
 		}, canvas.Spec.Edges)
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeAnalysisNodeID))
 
 		trigger := findSpecNode(t, canvas, backlogTriggerNodeID)
 		assert.Equal(t, factory.OnWorkOrderTriggerName, trigger.Component)
@@ -270,19 +267,6 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		assert.NotContains(t, prompt["prompt"], runner.PlanningSessionProtocolMarkdown())
 		assert.Contains(t, prompt["prompt"], "{{ root().data.workOrder }}")
 
-		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
-		assert.Equal(t, intakeReportConfidenceComponent, report.Component)
-		assert.Equal(t, "{{ root().data.workOrder.id }}", report.Configuration["orderId"])
-		assert.Equal(t, "confidence", report.Configuration["checkKey"])
-		assert.Equal(t, "Confidence score", report.Configuration["name"])
-
-		intent := findSpecNode(t, canvas, "attach-intent")
-		assert.Equal(t, factory.AddWorkOrderArtifactComponentName, intent.Component)
-		assert.Equal(t, "{{ root().data.workOrder.id }}", intent.Configuration["orderId"])
-		assert.Equal(t, "markdown", intent.Configuration["artifactType"])
-		assert.Equal(t, "intent.md", intent.Configuration["title"])
-		assert.Equal(t, `{{ $["Analyze intake"].data.result.intent }}`, intent.Configuration["body"])
-
 		runError := findSpecNode(t, canvas, intakeAddRunErrorNodeID)
 		assert.Equal(t, intakeAddRunErrorComponent, runError.Component)
 		assert.Equal(t, intakeAddRunErrorMessage, runError.Configuration["message"])
@@ -299,24 +283,20 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 			},
 		})
 
-		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
 		refinement := findSpecNode(t, canvas, backlogRefinementNodeID)
-		assert.Equal(t, "runnerCodex", analysis.Component)
-		assert.Equal(t, analysis.Component, refinement.Component)
+		assert.Equal(t, "runnerCodex", refinement.Component)
 		assert.Equal(t, map[string]any{
 			"source":      runner.CredentialsSourceIntegration,
 			"integration": map[string]any{"name": "acme-openai"},
-		}, analysis.Configuration["credentials"])
-		assert.Equal(t, "gpt-5", analysis.Configuration["model"])
-		assert.Equal(t, analysis.Configuration["credentials"], refinement.Configuration["credentials"])
-		assert.Equal(t, analysis.Configuration["model"], refinement.Configuration["model"])
-		assert.Equal(t, runner.MachineTypeE1LargeAMD64, analysis.Configuration["machineType"])
+		}, refinement.Configuration["credentials"])
+		assert.Equal(t, "gpt-5", refinement.Configuration["model"])
+		assert.Equal(t, runner.MachineTypeE1LargeAMD64, refinement.Configuration["machineType"])
 		assert.Equal(t, []any{
 			map[string]any{
 				"source":      "integration",
 				"integration": map[string]any{"name": "github"},
 			},
-		}, analysis.Configuration["environmentFrom"])
+		}, refinement.Configuration["environmentFrom"])
 		assert.Equal(t, []any{
 			map[string]any{
 				"name":        "REPO_URL",
@@ -328,80 +308,16 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 				"value":       "{{ root().data.workOrder.default_branch }}",
 				"valueSource": "literal",
 			},
-		}, analysis.Configuration["environment"])
+		}, refinement.Configuration["environment"])
 
-		steps, ok := analysis.Configuration["steps"].([]any)
+		steps, ok := refinement.Configuration["steps"].([]any)
 		require.True(t, ok)
-		require.Len(t, steps, 3)
-		clone, ok := steps[0].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "Clone repository", clone["name"])
-		assert.Contains(t, clone["command"], "rm -rf repo")
-		assert.Contains(t, clone["command"], `git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`)
+		require.Len(t, steps, 2)
 		prompt, ok := steps[1].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "repo", prompt["workingDirectory"])
-		assert.Contains(t, prompt["prompt"], "/tmp/intent.md")
-		assert.Contains(t, prompt["prompt"], "Do not write implementation details")
-		assert.Contains(t, prompt["prompt"], "## How I understand this")
-		assert.Contains(t, prompt["prompt"], "How do you understand what needs to be done here?")
-		assert.Contains(t, prompt["prompt"], "## What's going on")
-		assert.Contains(t, prompt["prompt"], "## What done looks like")
-		assert.Contains(t, prompt["prompt"], "## What to watch")
-		assert.Contains(t, prompt["prompt"], "## Honest take")
-		assert.Contains(t, prompt["prompt"], "## Why I would not start this")
-		assert.Contains(t, prompt["prompt"], "## What would make this clear")
-		assert.Contains(t, prompt["prompt"], "If confidence is 4 or 5")
-		assert.Contains(t, prompt["prompt"], "If confidence is 2 or 3")
-		assert.Contains(t, prompt["prompt"], "If confidence is 0 or 1")
-		assert.Contains(t, prompt["prompt"], "Do not add an Open questions section.")
-		assert.NotContains(t, prompt["prompt"], "Proposed outcome")
-	})
-}
-
-func Test__IsDefaultLegacyBacklog(t *testing.T) {
-	t.Run("accepts the generated version 1 behavior with moved nodes", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		nodes := legacy.Nodes()
-		nodes[0].Position = models.Position{X: 900, Y: 700}
-
-		assert.True(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
-	})
-
-	t.Run("rejects a customized prompt", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		nodes := legacy.Nodes()
-		analysis := findModelNode(t, nodes, intakeAnalysisNodeID)
-		steps := analysis.Configuration["steps"].([]any)
-		steps[1].(map[string]any)["prompt"] = "Use the team's custom scoring rules."
-
-		assert.False(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
-	})
-
-	t.Run("rejects a customized component", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		nodes := legacy.Nodes()
-		for i := range nodes {
-			if nodes[i].ID == intakeReportConfidenceNodeID {
-				nodes[i].Ref.Component.Name = "customReporter"
-			}
-		}
-
-		assert.False(t, isDefaultLegacyBacklog(nodes, legacy.Edges()))
-	})
-
-	t.Run("rejects customized edges", func(t *testing.T) {
-		legacy := buildLegacyBacklogCanvas(backlogCanvasRequest{})
-		edges := legacy.Edges()
-		edges[0].TargetID = intakeReportConfidenceNodeID
-
-		assert.False(t, isDefaultLegacyBacklog(legacy.Nodes(), edges))
-	})
-
-	t.Run("rejects version 2", func(t *testing.T) {
-		current := buildBacklogCanvas(backlogCanvasRequest{})
-
-		assert.False(t, isDefaultLegacyBacklog(current.Nodes(), current.Edges()))
+		assert.Equal(t, "Refine Task", prompt["name"])
+		assert.Contains(t, prompt["prompt"], runner.PlanningSessionUserPromptMarkdown())
+		assert.Contains(t, prompt["prompt"], "{{ root().data.workOrder }}")
 	})
 }
 

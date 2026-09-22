@@ -18,6 +18,45 @@ const {
   parseFrames,
 } = require("./planning_session_mcp");
 
+test("analysis protocol omits a disabled score tool", () => {
+  const clarityOnly = analysisProtocol({ SUPERPLANE_PLANNING_CONFIDENCE: "false" });
+  assert.match(clarityOnly, /propose_clarity/);
+  assert.doesNotMatch(clarityOnly, /propose_confidence/);
+  assert.match(clarityOnly, /Publish a Clarity score every turn/);
+
+  const confidenceOnly = analysisProtocol({ SUPERPLANE_PLANNING_CLARITY: "false" });
+  assert.match(confidenceOnly, /propose_confidence/);
+  assert.doesNotMatch(confidenceOnly, /propose_clarity/);
+  assert.match(confidenceOnly, /Publish a Confidence score every turn/);
+
+  const neither = analysisProtocol({
+    SUPERPLANE_PLANNING_CLARITY: "false",
+    SUPERPLANE_PLANNING_CONFIDENCE: "false",
+  });
+  assert.doesNotMatch(neither, /propose_clarity/);
+  assert.doesNotMatch(neither, /propose_confidence/);
+  assert.match(neither, /Do not publish Clarity or Confidence scores/);
+});
+
+test("planningTools omits disabled score tools", () => {
+  const { planningTools } = require("./planning_session_mcp");
+  assert.deepEqual(
+    planningTools({ SUPERPLANE_PLANNING_CLARITY: "false" }).map((tool) => tool.name),
+    ["propose_spec", "propose_confidence", "survey", "create_task"],
+  );
+  assert.deepEqual(
+    planningTools({ SUPERPLANE_PLANNING_CONFIDENCE: "false" }).map((tool) => tool.name),
+    ["propose_spec", "propose_clarity", "survey", "create_task"],
+  );
+  assert.deepEqual(
+    planningTools({
+      SUPERPLANE_PLANNING_CLARITY: "false",
+      SUPERPLANE_PLANNING_CONFIDENCE: "false",
+    }).map((tool) => tool.name),
+    ["propose_spec", "survey", "create_task"],
+  );
+});
+
 test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
   assert.match(pack, /propose_spec/);

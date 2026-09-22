@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/components/factory"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -16,8 +15,10 @@ import (
 )
 
 // EmitWorkOrderCreated fans a new work order out to every On Work Order
-// trigger in the factory. Failures are logged: the work order already exists,
-// and a missed score can be retried by creating the item again.
+// trigger in the factory. When Planning is off, the Backlog canvas is
+// skipped so no planning or analysis run starts. Failures are logged:
+// the work order already exists, and a missed score can be retried by
+// creating the item again.
 func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
 	if factoryModel == nil || order == nil {
 		return
@@ -66,7 +67,11 @@ func emitWorkOrderCreated(
 		return err
 	}
 
-	payload := workOrderCreatedPayloadWithRefinement(tx, order, refinementEnabledOverride)
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	payload := workOrderCreatedPayloadWithRefinement(tx, order, &refinementEnabled)
 	emitted := []models.CanvasEvent{}
 
 	for i := range live {
@@ -75,6 +80,9 @@ func emitWorkOrderCreated(
 		}
 		spec, ok := specs[live[i].ID]
 		if !ok {
+			continue
+		}
+		if !refinementEnabled && models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
 			continue
 		}
 		nodeID := onWorkOrderNodeID(spec)
@@ -165,12 +173,12 @@ func workOrderCreatedPayloadWithRefinement(
 }
 
 func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) bool {
-	organization, err := models.FindOrganizationByIDInTransaction(tx, order.OrganizationID.String())
+	factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
 	if err != nil {
-		log.WithError(err).Warnf("failed to snapshot task refinement feature for work order %s", order.ID)
+		log.WithError(err).Warnf("failed to snapshot Planning settings for work order %s", order.ID)
 		return false
 	}
-	return organization.HasExperimentalFeature(features.FeatureFactoryCreateWithAgent)
+	return factoryModel.PlanningEnabled
 }
 
 func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
