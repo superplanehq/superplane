@@ -24,8 +24,8 @@ import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spe
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
 import {
   DEFAULT_FACTORY_USAGE,
-  DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
   EMPTY_USAGE_REPORT,
+  ACTIVE_TRIAL_ENDS_AT,
   type StorybookUsageReport,
 } from "./usageReportFixtures";
 import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
@@ -429,7 +429,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationBilling: {
     plan: "trial",
     planSource: "system",
-    trialEndsAt: DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
+    trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",

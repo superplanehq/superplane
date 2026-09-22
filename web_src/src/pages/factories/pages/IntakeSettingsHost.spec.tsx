@@ -10,6 +10,7 @@ import { unmockedSrc } from "@/test/unmockedModule";
 
 import {
   connectedJiraIntake,
+  GITHUB_INTAKE,
   GITHUB_INTAKE_CANVAS,
   JIRA_INTAKE,
   renderHost,
@@ -226,8 +227,8 @@ describe("IntakeSettingsHost", () => {
         .map((tab) => tab.textContent),
     ).toEqual(["General", "Automation"]);
     expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    expect(within(dialog).queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
+    expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -319,6 +320,33 @@ describe("IntakeSettingsHost", () => {
         jiraCompletionColumn: "QA",
       }),
     });
+  });
+
+  it("pauses, resumes, and deletes a GitHub intake from settings", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({ onClose });
+
+    await user.click(screen.getByTestId("intake-source-settings-pause"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-github", paused: true });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(deleteIntake).toHaveBeenCalledWith("intake-github");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes a paused GitHub intake from settings", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: { ...GITHUB_INTAKE, paused: true },
+    });
+
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-resume"));
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-github", paused: false });
   });
 
   it("pauses and deletes a Sentry intake from settings", async () => {
