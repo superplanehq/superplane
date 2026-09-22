@@ -95,6 +95,91 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 	})
 }
 
+func TestHandleSentryAppWebhook_listenerCannotStartRun(t *testing.T) {
+	t.Setenv(config.EnvSentryAppSlug, "superplane")
+	t.Setenv(config.EnvSentryAppClientID, "cid")
+	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
+
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-client-secret")
+	server, err := NewServer(
+		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
+		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+	)
+	require.NoError(t, err)
+
+	integration, err := models.CreateIntegration(
+		uuid.New(), r.Organization.ID, "sentry", support.RandomName("sentry"), map[string]any{},
+	)
+	require.NoError(t, err)
+	integration.Metadata = datatypes.NewJSONType(map[string]any{
+		"hostedApp":        true,
+		"installationUUID": "install-1",
+	})
+	require.NoError(t, database.Conn().Save(integration).Error)
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
+
+	t.Run("a listener whose canvas has no live version is acknowledged", func(t *testing.T) {
+		canvas := createSentryIssueListener(t, r, integration)
+
+		// The schema keeps live_version_id NOT NULL, so a canvas without a
+		// live version cannot be stored. Point the canvas at the live version
+		// of another canvas instead: the live version lookup for this canvas
+		// then finds nothing, the same not-found error a nil live version
+		// produces.
+		other, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		require.NotNil(t, other.LiveVersionID)
+		require.NoError(t, database.Conn().
+			Model(&models.Canvas{}).
+			Where("id = ?", canvas.ID).
+			Update("live_version_id", *other.LiveVersionID).
+			Error)
+
+		rec := httptest.NewRecorder()
+		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("a listener whose canvas is gone is acknowledged", func(t *testing.T) {
+		canvas := createSentryIssueListener(t, r, integration)
+		require.NoError(t, database.Conn().Delete(&models.Canvas{}, canvas.ID).Error)
+
+		rec := httptest.NewRecorder()
+		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func createSentryIssueListener(t *testing.T, r *support.ResourceRegistry, integration *models.Integration) *models.Canvas {
+	t.Helper()
+
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "listener",
+				Name:          "listener",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "sentry.onIssue"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+
+	_, err := models.CreateIntegrationSubscription(&nodes[0], integration, map[string]any{
+		"resources": []string{"issue"},
+	})
+	require.NoError(t, err)
+
+	return canvas
+}
+
 func Test__sentryDeliveryFinished(t *testing.T) {
 	assert.True(t, sentryDeliveryFinished(http.StatusOK))
 	assert.True(t, sentryDeliveryFinished(http.StatusForbidden))
