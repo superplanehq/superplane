@@ -836,13 +836,71 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   return { json: { order } };
 }
 
+function listWorkOrdersFixture(
+  fixture: FactoriesFixture,
+  orders: FactoriesWorkOrder[],
+  url: URL,
+): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
+  const states = url.searchParams.getAll("states");
+  const userId = url.searchParams.get("userId");
+  const unassigned = url.searchParams.get("unassigned") === "true";
+  const limit = Number(url.searchParams.get("limit") ?? "0");
+  const beforeId = url.searchParams.get("beforeId");
+  let filtered =
+    states.length > 0 ? orders.filter((order) => order.state && states.includes(order.state)) : [...orders];
+  if (userId || unassigned) {
+    filtered = filtered.filter((order) => {
+      const owners = (order.assignees ?? []).flatMap((assignee) => (assignee.id ? [assignee.id] : []));
+      const isUnassigned = owners.length === 0;
+      if (userId && unassigned) {
+        return isUnassigned || order.createdBy?.user?.id === userId || owners.includes(userId);
+      }
+      if (unassigned) {
+        return isUnassigned;
+      }
+      return order.createdBy?.user?.id === userId || owners.includes(userId ?? "");
+    });
+  }
+
+  if (limit <= 0) {
+    return { orders: [], hasNextPage: false };
+  }
+
+  filtered = filtered.toSorted((left, right) => {
+    const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
+    const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
+    if (leftTime !== rightTime) {
+      return rightTime - leftTime;
+    }
+    return (right.id ?? "").localeCompare(left.id ?? "");
+  });
+  if (beforeId) {
+    const cursor = filtered.find((order) => order.id === beforeId);
+    if (!cursor) {
+      return { orders: [], hasNextPage: false };
+    }
+    const cursorTime = Date.parse(cursor.updatedAt ?? cursor.createdAt ?? "") || 0;
+    filtered = filtered.filter((order) => {
+      const time = Date.parse(order.updatedAt ?? order.createdAt ?? "") || 0;
+      if (time !== cursorTime) {
+        return time < cursorTime;
+      }
+      return (order.id ?? "") < beforeId;
+    });
+  }
+  return {
+    orders: filtered.slice(0, limit).map((order) => orderWithListChecks(fixture, order)),
+    hasNextPage: filtered.length > limit,
+  };
+}
+
 function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
       pattern: re("/api/v1/factories/([^/]+)/orders"),
-      resolve: (match, method, body) => {
+      resolve: (match, method, body, url) => {
         const orders = ensureFactoryWorkOrders(fixture, match[1]);
-        if (method !== "POST") return { json: { orders: orders.map((order) => orderWithListChecks(fixture, order)) } };
+        if (method !== "POST") return { json: listWorkOrdersFixture(fixture, orders, url) };
         const created = createWorkOrderFromRequest((body ?? {}) as RequestBody, orders.length);
         orders.unshift(created);
         return { json: { order: created } };

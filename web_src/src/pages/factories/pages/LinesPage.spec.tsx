@@ -60,7 +60,6 @@ import {
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "../__fixtures__/workOrderCheckFixtures";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
-import { LINE_PHASE_RUNS_PAGE_SIZE } from "../lib/linePhaseRuns";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
@@ -109,7 +108,15 @@ function renderLinesBoard(
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
+const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
+const useFactoryBoardWorkOrders = vi.fn(() => ({
+  workOrders: useFactoryWorkOrders().data ?? [],
+  isLoading: Boolean(useFactoryWorkOrders().isLoading),
+  backlog: idleBoardPage(),
+  open: idleBoardPage(),
+  done: idleBoardPage(),
+}));
 const useWorkOrder = vi.fn(() => ({ data: undefined as FactoriesWorkOrder | undefined }));
 const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
@@ -169,6 +176,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
   useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
+  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
@@ -275,6 +283,13 @@ async function resetLinesBoardMocks() {
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useFactoryBoardWorkOrders.mockImplementation(() => ({
+    workOrders: useFactoryWorkOrders().data ?? [],
+    isLoading: Boolean(useFactoryWorkOrders().isLoading),
+    backlog: idleBoardPage(),
+    open: idleBoardPage(),
+    done: idleBoardPage(),
+  }));
   useWorkOrder.mockReturnValue({ data: undefined });
   useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryAutomations.mockReturnValue({ data: [] });
@@ -1765,17 +1780,25 @@ describe("LinesPage Implement phase window", () => {
     const orders = Array.from({ length: 8 }, (_, index) =>
       dispatchDraftToImplement(kickoffDraft(index), new Date(Date.now() + index * 1000).toISOString()),
     );
+    const fetchNextOpen = vi.fn();
     useFactoryWorkOrders.mockReturnValue({ data: orders });
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      backlog: idleBoardPage(),
+      open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
+      done: idleBoardPage(),
+    });
     renderLinesBoard();
 
-    expect(implementPhaseCards()).toHaveLength(LINE_PHASE_RUNS_PAGE_SIZE);
+    expect(implementPhaseCards()).toHaveLength(8);
 
     const scroller = screen.getByTestId("lines-phase-column-scroll-0");
     scroller.scrollTop = 1760;
     fireEvent.scroll(scroller);
 
     await waitFor(() => {
-      expect(implementPhaseCards()).toHaveLength(LINE_PHASE_RUNS_PAGE_SIZE * 2);
+      expect(fetchNextOpen).toHaveBeenCalled();
     });
   });
 });
