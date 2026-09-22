@@ -37,6 +37,7 @@ type SplitRunPopupTabsProps = {
   resultFooter?: ReactNode;
   sidebarNote?: ReactNode;
   analysis?: IntentAnalysisChat;
+  sourceOnly?: boolean;
   sessionLookupError?: string;
   header: (views: ReactNode) => ReactNode;
 };
@@ -55,6 +56,7 @@ function SplitRunPopupOverview({
   resultFooter,
   sidebarNote,
   analysis,
+  sourceOnly,
   sessionLookupError,
 }: Pick<
   SplitRunPopupTabsProps,
@@ -70,6 +72,7 @@ function SplitRunPopupOverview({
   | "resultFooter"
   | "sidebarNote"
   | "analysis"
+  | "sourceOnly"
   | "sessionLookupError"
 > & { files?: FilesFile[] }) {
   if (mode === "classic") {
@@ -110,6 +113,7 @@ function SplitRunPopupOverview({
       checks={fixture.checks}
       isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
       organizationId={organizationId}
+      factoryId={factoryId}
       factoryKey={factoryKey}
       orderId={orderId}
       orderNumber={orderNumber}
@@ -118,7 +122,11 @@ function SplitRunPopupOverview({
       resultFooter={resultFooter}
       analysis={analysis}
       source={fixture.source}
-      showContextSidebar={fixture.footer.kind !== "draft"}
+      showContextSidebar={sourceOnly || fixture.footer.kind !== "draft"}
+      sourceOnly={sourceOnly}
+      canEditDescription={sourceOnly ? edits.canEditDescription : undefined}
+      descriptionBusy={sourceOnly ? edits.descriptionBusy : undefined}
+      onDescriptionSave={sourceOnly ? edits.saveDescription : undefined}
       sidebarNote={sidebarNote}
     />
   );
@@ -142,6 +150,7 @@ export function SplitRunPopupTabs({
   resultFooter,
   sidebarNote,
   analysis,
+  sourceOnly = false,
   sessionLookupError,
   header,
 }: SplitRunPopupTabsProps) {
@@ -166,10 +175,11 @@ export function SplitRunPopupTabs({
       resultFooter={resultFooter}
       sidebarNote={sidebarNote}
       analysis={analysis}
+      sourceOnly={sourceOnly}
       sessionLookupError={sessionLookupError}
     />
   );
-  const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind });
+  const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind, sourceOnly });
   if (!showAutomations) {
     return (
       <>

@@ -61,10 +61,10 @@ function loadAnalysisProtocolModule() {
   return {};
 }
 
-function loadAnalysisProtocol() {
+function loadAnalysisProtocol(env = process.env) {
   const mod = loadAnalysisProtocolModule();
   return typeof mod.analysisProtocol === "function"
-    ? mod.analysisProtocol()
+    ? mod.analysisProtocol(env)
     : "";
 }
 
@@ -107,7 +107,7 @@ function artifactEnabled(env = process.env) {
 }
 
 function planningSystemPrompt(env = process.env) {
-  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
@@ -134,7 +134,7 @@ function codexExecArgs(
     args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
-      `developer_instructions=${tomlString(loadAnalysisProtocol())}`,
+      `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");

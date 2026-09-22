@@ -829,6 +829,8 @@ message UpdateFactoryRequest {
   optional int64 hosted_spend_budget_cents = 5;
   // When true, remove the hosted spend cap. Takes precedence over hosted_spend_budget_cents.
   bool clear_hosted_spend_budget = 6;
+  // Full replacement of Planning settings. Absent means do not change.
+  optional FactoryPlanning planning = 7;
 }
 
 message UpdateFactoryResponse {
@@ -933,6 +935,16 @@ message Factory {
   FactoryOnboarding onboarding = 6;
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
+  FactoryPlanning planning = 8;
+}
+
+// Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
+message FactoryPlanning {
+  bool enabled = 1;
+  bool clarity = 2;
+  bool confidence = 3;
+  // True after the post-onboarding Planning wizard or a Planning settings save.
+  bool setup_completed = 4;
 }
 
 message FactoryLine {

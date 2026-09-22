@@ -68,10 +68,10 @@ function loadAnalysisProtocolModule() {
   return {};
 }
 
-function loadAnalysisProtocol() {
+function loadAnalysisProtocol(env = process.env) {
   const mod = loadAnalysisProtocolModule();
   return typeof mod.analysisProtocol === "function"
-    ? mod.analysisProtocol()
+    ? mod.analysisProtocol(env)
     : "";
 }
 
@@ -168,7 +168,7 @@ function artifactEnabled(env = process.env) {
 }
 
 function planningSystemPrompt(env = process.env) {
-  return planningAnalysisEnabled(env) ? loadAnalysisProtocol() : "";
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
 function catalogModelId(model) {
