@@ -163,11 +163,11 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
   });
 
-  it("offers pause for GitHub, Sentry, and Jira intakes", () => {
+  it("offers pause for GitHub, Sentry, Jira, and Productive.io intakes", () => {
     expect(intakeSupportsPause("github-issues")).toBe(true);
     expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
     expect(intakeSupportsPause("jira-issues")).toBe(true);
-    expect(intakeSupportsPause("productive-tasks")).toBe(false);
+    expect(intakeSupportsPause("productive-tasks")).toBe(true);
     expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
   });
 });
