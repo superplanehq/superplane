@@ -3,6 +3,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
 import { cn } from "@/lib/utils";
+import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
+import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 
 interface PermissionTooltipProps {
   allowed: boolean;
@@ -32,15 +34,23 @@ interface RequirePermissionProps {
   children: React.ReactNode;
 }
 
+function PermissionLoading() {
+  const overlayHandles = useWorkspaceLoading(WORKSPACE_LOADING_COPY.access, true);
+  if (overlayHandles) {
+    return null;
+  }
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-gray-500">Checking permissions...</p>
+    </div>
+  );
+}
+
 export function RequirePermission({ resource, action, children }: RequirePermissionProps) {
   const { canAct, isLoading } = usePermissions();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Checking permissions...</p>
-      </div>
-    );
+    return <PermissionLoading />;
   }
 
   if (!canAct(resource, action)) {
@@ -59,11 +69,7 @@ export function RequireAnyPermission({ checks, children }: RequireAnyPermissionP
   const { canAct, isLoading } = usePermissions();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Checking permissions...</p>
-      </div>
-    );
+    return <PermissionLoading />;
   }
 
   if (!checks.some((check) => canAct(check.resource, check.action))) {

@@ -1370,6 +1370,121 @@
   }
 }
 
+@keyframes workspace-loading-stroke-left {
+  0% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  16.67% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  33.33%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-right {
+  0%,
+  33.33% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  50% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  66.67%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-stem {
+  0%,
+  66.67% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  83.33% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-pen {
+  0%,
+  33.33%,
+  66.67% {
+    left: 50%;
+    top: 8%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  16.67% {
+    left: 15.5%;
+    top: 73.8%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  50% {
+    left: 84.5%;
+    top: 73.8%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  83.33% {
+    left: 50%;
+    top: 89.2%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  100% {
+    left: 50%;
+    top: 8%;
+  }
+}
+
+.workspace-loading-mark {
+  position: relative;
+  width: 5.5rem;
+  aspect-ratio: 33 / 25;
+}
+
+.workspace-loading-trace-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.workspace-loading-trace {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+}
+
+.workspace-loading-trace--left {
+  animation: workspace-loading-stroke-left 1.8s infinite;
+}
+
+.workspace-loading-trace--right {
+  animation: workspace-loading-stroke-right 1.8s infinite;
+}
+
+.workspace-loading-trace--stem {
+  animation: workspace-loading-stroke-stem 1.8s infinite;
+}
+
+.workspace-loading-pen {
+  position: absolute;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+  translate: -50% -50%;
+  animation: workspace-loading-pen 1.8s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .workspace-next-steps-progress,
   .workspace-next-steps-title,
@@ -1378,6 +1493,11 @@
   }
 
   .workspace-next-steps-reveal,
+  .workspace-loading-trace,
+  .workspace-loading-trace--left,
+  .workspace-loading-trace--right,
+  .workspace-loading-trace--stem,
+  .workspace-loading-pen,
   .sp-text-reveal,
   .sp-stream-text,
   .sp-tool-enter,
@@ -1408,5 +1528,14 @@
 
   .sp-confidence-why[data-state="open"] {
     animation: none;
+  }
+
+  .workspace-loading-trace {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .workspace-loading-pen {
+    display: none;
   }
 }

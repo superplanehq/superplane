@@ -25,8 +25,10 @@ import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
@@ -159,6 +161,7 @@ import {
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
+import { WorkspaceLoadingScreen } from "../layout/WorkspaceLoadingScreen";
 import {
   factoryKanbanPageClassName,
   factorySectionHeaderClassName,
@@ -397,7 +400,13 @@ export function LinesPage() {
   }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
 
   const canonicalNumber = canonicalWorkOrderNumber(permalink.order);
-  if (routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber)) {
+  const redirectCanonical = Boolean(
+    routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber),
+  );
+  const holdBoard = workOrdersLoading && !redirectCanonical && Boolean(selectedLine);
+  const overlayHoldsBoard = useWorkspaceLoading(WORKSPACE_LOADING_COPY.board, holdBoard);
+
+  if (redirectCanonical && canonicalNumber) {
     return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
   }
 
@@ -421,6 +430,10 @@ export function LinesPage() {
         replace
       />
     );
+  }
+
+  if (holdBoard) {
+    return overlayHoldsBoard ? null : <WorkspaceLoadingScreen message={WORKSPACE_LOADING_COPY.board} />;
   }
 
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
