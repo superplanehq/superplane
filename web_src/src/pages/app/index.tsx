@@ -1944,16 +1944,12 @@ export function AppPage({
     saveSessionRef: canvasSaveSessionRef,
     readOnly: isReadOnly,
   });
-  const applyInitialFactoryLayout = useCallback(
-    () => commitTopologyMutation((workflow) => workflow),
-    [commitTopologyMutation],
-  );
   const { ready: factoryConfigureLayoutReady, holdCanvas } = useFactoryConfigureInitialLayout({
     factoryAutoLayout,
     isEditing,
     editBootstrapReady: isEditBootstrapReady,
     activeCanvasVersionId,
-    applyLayout: applyInitialFactoryLayout,
+    applyLayout: () => commitTopologyMutation((workflow) => workflow),
   });
 
   const getNodeEditData = useCallback(
@@ -3452,6 +3448,8 @@ export function AppPage({
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
     applyLocalWorkflowUpdate,
+    factoryAutoLayout,
+    components,
   });
 
   const buildYamlExportPayload = useCallback(
