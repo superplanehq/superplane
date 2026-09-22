@@ -59,15 +59,17 @@ export function PlanningSetupDialog(props: PlanningSetupDialogProps) {
 function SetupHeader({ step, onBack }: { step: PlanningSetupStep; onBack: () => void }) {
   return (
     <header className="text-left">
-      <button
+      <Button
         type="button"
-        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+        variant="ghost"
+        size="sm"
+        className="mb-6 -ml-2 h-auto gap-1.5 px-2 py-1 text-[13px] font-normal text-muted-foreground hover:text-foreground"
         onClick={onBack}
         data-testid="planning-setup-back"
       >
         <ArrowLeft className="size-4 shrink-0" aria-hidden />
         <span>{step === "refine" ? PLANNING_SETTINGS_COPY.wizardBackToBoard : PLANNING_SETTINGS_COPY.wizardBack}</span>
-      </button>
+      </Button>
       <h1 className={factoryPageTitleClassName}>{setupStepTitle(step)}</h1>
     </header>
   );

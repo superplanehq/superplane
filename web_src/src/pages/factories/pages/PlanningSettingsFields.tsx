@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/ui/switch";
 
 import { PLANNING_SETTINGS_COPY, type PlanningDraftSettings } from "./planningSettingsModel";
 

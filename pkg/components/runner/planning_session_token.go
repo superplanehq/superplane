@@ -148,9 +148,14 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	if ctx.Logger != nil {
 		ctx.Logger.WithField("planning_session_id", session.ID).Info("attached planning session token")
 	}
-	planning := models.DefaultFactoryPlanning()
-	if factoryModel, err := models.FindFactory(database.DB(context.Background()), session.OrganizationID, session.FactoryID); err == nil {
+	// Fail closed. The server rejects score tools the factory has off, so a
+	// lookup failure must not advertise tools the agent cannot use.
+	planning := models.FactoryPlanning{}
+	factoryModel, err := models.FindFactory(database.DB(context.Background()), session.OrganizationID, session.FactoryID)
+	if err == nil {
 		planning = factoryModel.Planning()
+	} else if ctx.Logger != nil {
+		ctx.Logger.WithError(err).Warn("planning session env: factory lookup failed, score tools disabled")
 	}
 	environment = append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningID,

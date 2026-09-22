@@ -83,6 +83,29 @@ describe("PlanningSettingsPopup", () => {
     });
   });
 
+  it("keeps an unsaved draft when the host passes an equal settings object", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const popup = (settings: PlanningDraftSettings) => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <PlanningSettingsPopup settings={settings} onSave={onSave} onClose={vi.fn()} fixed={false} />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(popup({ ...DEFAULT_PLANNING_SETTINGS }));
+
+    await user.click(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch"));
+    rerender(popup({ ...DEFAULT_PLANNING_SETTINGS }));
+
+    expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).toBeChecked();
+  });
+
   it("shows General, Agent, and Automation tabs when an agent exists", () => {
     renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { agent: true });
 

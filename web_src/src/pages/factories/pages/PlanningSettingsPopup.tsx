@@ -69,9 +69,12 @@ export function PlanningSettingsPopup({
     }
   }, [tab, hasAgent]);
 
+  // Reset the draft only when the stored values change. Hosts often build a
+  // new settings object on every render, and that alone must not erase
+  // toggles the user changed before Save.
   useEffect(() => {
-    setDraft(settings);
-  }, [settings]);
+    setDraft({ enabled: settings.enabled, clarity: settings.clarity, confidence: settings.confidence });
+  }, [settings.enabled, settings.clarity, settings.confidence]);
 
   const update = useCallback(<K extends keyof PlanningDraftSettings>(key: K, value: PlanningDraftSettings[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
