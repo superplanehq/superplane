@@ -290,10 +290,7 @@ export function LinesPage() {
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
-  const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
-    organizationId,
-    factoryKey,
-  );
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
@@ -570,7 +567,6 @@ export function LinesPage() {
                 />
               ) : undefined
             }
-            hostedCreditEmptyBanner={hostedCreditEmptyBanner}
             intakes={factoryIntakes}
             automationView={canChooseAutomationView ? columnAutomationView : undefined}
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
@@ -664,7 +660,6 @@ function LineDetailHeader({
   canUpdate,
   hostedCreditHeaderKicker,
   nextStepsRestore,
-  hostedCreditEmptyBanner,
   intakes,
   automationView,
   onAutomationViewChange,
@@ -680,7 +675,6 @@ function LineDetailHeader({
   canUpdate: boolean;
   hostedCreditHeaderKicker?: ReactNode;
   nextStepsRestore?: ReactNode;
-  hostedCreditEmptyBanner?: ReactNode;
   intakes: FactoriesFactoryIntake[];
   automationView?: ColumnAutomationView;
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
@@ -754,13 +748,8 @@ function LineDetailHeader({
         </>
       }
       belowRow={
-        hostedCreditEmptyBanner || state.filterCount > 0 ? (
-          <>
-            {hostedCreditEmptyBanner}
-            {state.filterCount > 0 ? (
-              <FilterChips state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
-            ) : null}
-          </>
+        state.filterCount > 0 ? (
+          <FilterChips state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
         ) : undefined
       }
     />
