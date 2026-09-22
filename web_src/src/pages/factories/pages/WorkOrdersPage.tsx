@@ -42,10 +42,7 @@ export function WorkOrdersPage() {
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
-  const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
-    organizationId,
-    factoryKey,
-  );
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
   const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
 
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
@@ -88,7 +85,6 @@ export function WorkOrdersPage() {
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
       hostedCreditHeaderKicker={hostedCreditHeaderKicker}
-      hostedCreditEmptyBanner={hostedCreditEmptyBanner}
       brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />
