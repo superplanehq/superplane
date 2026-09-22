@@ -145,6 +145,29 @@ describe("useInfiniteCanvasRuns", () => {
       );
     });
   });
+
+  it("does not poll for run updates", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns.mockResolvedValueOnce({
+      data: {
+        runs: [],
+        totalCount: 0,
+        hasNextPage: false,
+      },
+    });
+
+    renderHook(() => useInfiniteCanvasRuns("canvas-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(canvasesListRuns).toHaveBeenCalledTimes(1);
+    });
+
+    const query = queryClient.getQueryCache().find({ queryKey: canvasKeys.infiniteRuns("canvas-1") });
+    const options = query?.options as { refetchInterval?: unknown } | undefined;
+    expect(options?.refetchInterval).toBeUndefined();
+  });
 });
 
 describe("useDescribeRun", () => {

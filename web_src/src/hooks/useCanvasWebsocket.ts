@@ -138,6 +138,7 @@ export function useCanvasWebsocket({
   );
 
   const hasConnectedOnce = useRef(false);
+  const missedMessagesBeforeOpen = useRef(false);
 
   const patchRunInCache = useCallback(
     (run: CanvasesCanvasRun) => {
@@ -289,6 +290,7 @@ export function useCanvasWebsocket({
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
+        case "run_pending":
         case "run_started":
         case "run_cancelling":
         case "run_finished": {
@@ -429,8 +431,12 @@ export function useCanvasWebsocket({
   );
 
   const handleWebSocketOpen = useCallback(() => {
-    if (!hasConnectedOnce.current) {
-      hasConnectedOnce.current = true;
+    const isFirstSuccessfulConnection = !hasConnectedOnce.current;
+    hasConnectedOnce.current = true;
+
+    const shouldResyncRuns = missedMessagesBeforeOpen.current || !isFirstSuccessfulConnection;
+    missedMessagesBeforeOpen.current = false;
+    if (!shouldResyncRuns) {
       return;
     }
 
@@ -439,6 +445,10 @@ export function useCanvasWebsocket({
     // no longer poll, so the websocket is the only push channel.
     invalidateMemoryEntries();
   }, [invalidateRuns, invalidateMemoryEntries]);
+
+  const handleWebSocketDisconnect = useCallback(() => {
+    missedMessagesBeforeOpen.current = true;
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -458,8 +468,8 @@ export function useCanvasWebsocket({
       heartbeat: false,
       reconnectInterval: 3000,
       onOpen: handleWebSocketOpen,
-      onError: () => {},
-      onClose: () => {},
+      onError: handleWebSocketDisconnect,
+      onClose: handleWebSocketDisconnect,
       share: false,
       onMessage: onMessage,
     },
