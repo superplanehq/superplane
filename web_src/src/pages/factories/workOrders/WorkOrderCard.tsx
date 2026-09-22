@@ -344,8 +344,8 @@ function WorkOrderCardMetaRow({
 }
 
 function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
-  const showAgentQuestion = hasAgentQuestion && isDraft;
-  const agentWorking = isAnalyzing && !showAgentQuestion;
+  const agentWorking = isAnalyzing;
+  const showAgentQuestion = hasAgentQuestion && isDraft && !agentWorking;
   return { showAgentQuestion, agentWorking };
 }
 

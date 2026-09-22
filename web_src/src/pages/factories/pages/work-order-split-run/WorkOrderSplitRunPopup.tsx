@@ -27,6 +27,7 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
+import { refineAgentIsWorking } from "./startConfirm";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -157,6 +158,10 @@ function AnalysisWorkOrderPopup({
     compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     factory,
+    agentWorking: refineAgentIsWorking({
+      hasSession: Boolean(analysis.session),
+      machineStatus: analysis.view.machineStatus,
+    }),
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
@@ -289,6 +294,7 @@ function analysisReviewArgs(args: {
   compact: boolean;
   modelSelect?: ReactNode;
   factory?: FactoriesFactory;
+  agentWorking?: boolean;
 }) {
   return {
     fixture: args.viewFixture,
@@ -307,6 +313,7 @@ function analysisReviewArgs(args: {
     compact: args.compact,
     modelSelect: args.modelSelect,
     confirmUnclearStart: factoryPlanningEnabled(args.factory),
+    agentWorking: args.agentWorking,
   };
 }
 
@@ -328,6 +335,7 @@ function analysisPopupReview(args: {
   actionsOnly?: boolean;
   modelSelect?: ReactNode;
   confirmUnclearStart?: boolean;
+  agentWorking?: boolean;
 }) {
   return (
     <SplitRunReview
@@ -349,6 +357,7 @@ function analysisPopupReview(args: {
       compact={args.compact}
       actionsOnly={args.actionsOnly}
       confirmUnclearStart={args.confirmUnclearStart}
+      agentWorking={args.agentWorking}
       modelSelect={args.modelSelect}
     />
   );
