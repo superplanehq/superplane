@@ -141,29 +141,17 @@ export function buildCloudBuildSummaryDetails({
     if (formatted) details[label] = formatted;
   }
 
-  if (build?.status) {
-    details["Status"] = build.status;
-  }
-
-  if (build?.id) {
-    details["Build ID"] = build.id;
-  }
-
-  const branch = build?.substitutions?.["BRANCH_NAME"];
-  if (branch) {
-    details["Branch"] = branch;
-  }
-
-  const repo = build?.substitutions?.["REPO_FULL_NAME"];
-  if (repo) {
-    details["Repository"] = repo;
-  }
-
-  if (build?.logUrl) {
-    details["Log URL"] = build.logUrl;
-  }
+  addCloudBuildSummaryFields(details, build);
 
   return details;
+}
+
+function addCloudBuildSummaryFields(details: Record<string, string>, build?: CloudBuildData): void {
+  addDetail(details, "Status", build?.status);
+  addDetail(details, "Build ID", build?.id);
+  addDetail(details, "Branch", build?.substitutions?.["BRANCH_NAME"]);
+  addDetail(details, "Repository", build?.substitutions?.["REPO_FULL_NAME"]);
+  addDetail(details, "Log URL", build?.logUrl);
 }
 
 export function buildCloudBuildDetails({

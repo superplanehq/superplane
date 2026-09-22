@@ -57,17 +57,7 @@ export const executeCommandMapper: ComponentBaseMapper = {
       "Executed At": timestamp,
     };
     if (command) {
-      details["Task ARN"] = stringOrDash(command.taskArn);
-      details["Container"] = stringOrDash(command.containerName);
-      details["Interactive"] = stringOrDash(command.interactive);
-      if (command.session?.streamUrl) {
-        details["Stream URL"] = command.session.streamUrl;
-      }
-      const region = command.clusterArn?.split(":")[2] ?? "";
-      const cluster = command.clusterArn?.split("/").pop() ?? "";
-      if (region && cluster && command.taskArn) {
-        details["ECS Console"] = ecsConsoleUrl(region, cluster, undefined, command.taskArn);
-      }
+      appendExecuteCommandDetails(details, command);
     }
     return details;
   },
@@ -76,6 +66,20 @@ export const executeCommandMapper: ComponentBaseMapper = {
     return ecsSubtitle(context);
   },
 };
+
+function appendExecuteCommandDetails(details: Record<string, string>, command: ExecuteCommandResult): void {
+  details["Task ARN"] = stringOrDash(command.taskArn);
+  details["Container"] = stringOrDash(command.containerName);
+  details["Interactive"] = stringOrDash(command.interactive);
+  if (command.session?.streamUrl) {
+    details["Stream URL"] = command.session.streamUrl;
+  }
+  const region = command.clusterArn?.split(":")[2] ?? "";
+  const cluster = command.clusterArn?.split("/").pop() ?? "";
+  if (region && cluster && command.taskArn) {
+    details["ECS Console"] = ecsConsoleUrl(region, cluster, undefined, command.taskArn);
+  }
+}
 
 function executeCommandMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as ExecuteCommandConfiguration | undefined;

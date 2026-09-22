@@ -52,20 +52,7 @@ export const getImageMapper: ComponentBaseMapper = {
       return {};
     }
 
-    return {
-      "Image ID": stringOrDash(output.image?.imageId),
-      Name: stringOrDash(output.image?.name),
-      Description: stringOrDash(output.image?.description),
-      State: stringOrDash(output.image?.state),
-      "Creation Date": stringOrDash(output.image?.creationDate),
-      "Owner ID": stringOrDash(output.image?.ownerId),
-      Architecture: stringOrDash(output.image?.architecture),
-      "Image Type": stringOrDash(output.image?.imageType),
-      "Root Device Type": stringOrDash(output.image?.rootDeviceType),
-      "Root Device Name": stringOrDash(output.image?.rootDeviceName),
-      "Virtualization Type": stringOrDash(output.image?.virtualizationType),
-      Hypervisor: stringOrDash(output.image?.hypervisor),
-    };
+    return imageDetails(output.image);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -76,6 +63,23 @@ export const getImageMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function imageDetails(image?: Ec2Image): Record<string, string> {
+  return {
+    "Image ID": stringOrDash(image?.imageId),
+    Name: stringOrDash(image?.name),
+    Description: stringOrDash(image?.description),
+    State: stringOrDash(image?.state),
+    "Creation Date": stringOrDash(image?.creationDate),
+    "Owner ID": stringOrDash(image?.ownerId),
+    Architecture: stringOrDash(image?.architecture),
+    "Image Type": stringOrDash(image?.imageType),
+    "Root Device Type": stringOrDash(image?.rootDeviceType),
+    "Root Device Name": stringOrDash(image?.rootDeviceName),
+    "Virtualization Type": stringOrDash(image?.virtualizationType),
+    Hypervisor: stringOrDash(image?.hypervisor),
+  };
+}
 
 function getImageMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
