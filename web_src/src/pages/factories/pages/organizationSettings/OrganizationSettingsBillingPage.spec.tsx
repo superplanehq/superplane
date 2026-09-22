@@ -15,12 +15,13 @@ import {
   LAPSED_ORGANIZATION_BILLING,
   RESTORED_TRIAL_ORGANIZATION_BILLING,
   LAPSED_TOPUP_USAGE_REPORT,
+  OPEN_TRIAL_ENDS_AT,
   PURCHASED_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
 
-const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
+const WELCOME_EXPIRY_LABEL = new Date(OPEN_TRIAL_ENDS_AT).toLocaleDateString();
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({
