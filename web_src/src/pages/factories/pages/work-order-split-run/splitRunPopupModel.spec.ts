@@ -234,6 +234,16 @@ describe("splitRunPopupModel", () => {
     expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
   });
 
+  it("does not compose a description fallback while artifacts are still loading", () => {
+    expect(
+      splitRunIntentDocument({
+        artifacts: [],
+        description: "The mermaid charts are sometimes unreadable in the dark mode",
+        skipDescriptionFallback: true,
+      }),
+    ).toEqual({ title: "", summary: "", plan: "" });
+  });
+
   it("prefers spec.md over intent.md", () => {
     const artifacts = [
       {
