@@ -36,50 +36,44 @@ export const sendLogEventMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
+    if (!hasDefaultPayload(outputs)) {
       return { Status: "No response data" };
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, unknown> | undefined;
-
+    const responseData = payload.data as Record<string, unknown> | undefined;
     const details: Record<string, string> = {};
+    const sentAt = payload.timestamp;
+    const sent = responseData?.sent;
+    const severityText = responseData?.severityText;
+    const eventName = responseData?.eventName;
+    const serviceName = responseData?.serviceName;
+    const dataset = responseData?.dataset;
 
-    if (payload?.timestamp) {
-      details["Sent At"] = new Date(payload.timestamp).toLocaleString();
+    if (sentAt) {
+      details["Sent At"] = new Date(sentAt).toLocaleString();
     }
 
-    if (responseData?.sent) {
+    if (sent) {
       details["Status"] = "Successfully sent";
     }
 
-    if (responseData?.severityText) {
-      details["Severity"] = String(responseData.severityText);
+    if (severityText) {
+      details["Severity"] = String(severityText);
     }
 
-    if (responseData?.body) {
-      const bodyText = String(responseData.body);
-      details["Body"] = bodyText.length > 100 ? bodyText.substring(0, 100) + "..." : bodyText;
+    addLogBodyAndAttributes(details, responseData);
+
+    if (eventName) {
+      details["Event Name"] = String(eventName);
     }
 
-    if (responseData?.eventName) {
-      details["Event Name"] = String(responseData.eventName);
+    if (serviceName) {
+      details["Service Name"] = String(serviceName);
     }
 
-    if (responseData?.serviceName) {
-      details["Service Name"] = String(responseData.serviceName);
-    }
-
-    if (responseData?.dataset) {
-      details["Dataset"] = String(responseData.dataset);
-    }
-
-    if (responseData?.attributes && typeof responseData.attributes === "object") {
-      const attrs = responseData.attributes as Record<string, unknown>;
-      const attrCount = Object.keys(attrs).length;
-      if (attrCount > 0) {
-        details["Attributes"] = `${attrCount} attribute${attrCount > 1 ? "s" : ""}`;
-      }
+    if (dataset) {
+      details["Dataset"] = String(dataset);
     }
 
     return details;
@@ -90,6 +84,27 @@ export const sendLogEventMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function hasDefaultPayload(
+  outputs: { default?: OutputPayload[] } | undefined,
+): outputs is { default: OutputPayload[] } {
+  return !!outputs?.default && outputs.default.length > 0;
+}
+
+function addLogBodyAndAttributes(details: Record<string, string>, responseData: Record<string, unknown> | undefined) {
+  if (responseData?.body) {
+    const bodyText = String(responseData.body);
+    details["Body"] = bodyText.length > 100 ? bodyText.substring(0, 100) + "..." : bodyText;
+  }
+
+  if (responseData?.attributes && typeof responseData.attributes === "object") {
+    const attrs = responseData.attributes as Record<string, unknown>;
+    const attrCount = Object.keys(attrs).length;
+    if (attrCount > 0) {
+      details["Attributes"] = `${attrCount} attribute${attrCount > 1 ? "s" : ""}`;
+    }
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
