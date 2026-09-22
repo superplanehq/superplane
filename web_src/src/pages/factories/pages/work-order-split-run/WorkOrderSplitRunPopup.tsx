@@ -6,8 +6,10 @@ import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
-import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
+import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
+import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
@@ -171,40 +173,42 @@ function AnalysisWorkOrderPopup({
       className={analysisPopupClassName(fullPage, sourceOnly)}
       onDismiss={onClose}
     >
-      <SplitRunPopupTabs
-        fixture={viewFixture}
-        edits={edits}
-        popupData={popupData}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        lineId={lineId}
-        tab={tab}
-        onTabChange={setTab}
-        canUpdate={canUpdate}
-        footerActions={footerActions}
-        resultFooter={descriptionReview}
-        sidebarNote={showSidebarNote ? review : undefined}
-        analysis={stripAnalysis}
-        sourceOnly={sourceOnly}
-        header={analysisPopupHeader({
-          edits,
-          fixture,
-          organizationId,
-          factoryKey,
-          orderNumber,
-          lineId,
-          onClose,
-          fullPage,
-          toggleFullPage,
-          mutations,
-          footerBusy: footerActions.busy,
-          reviewActions,
-        })}
-      />
-      {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
+      <LiveHeaderSpendProvider>
+        <SplitRunPopupTabs
+          fixture={viewFixture}
+          edits={edits}
+          popupData={popupData}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          orderId={orderId}
+          orderNumber={orderNumber}
+          lineId={lineId}
+          tab={tab}
+          onTabChange={setTab}
+          canUpdate={canUpdate}
+          footerActions={footerActions}
+          resultFooter={descriptionReview}
+          sidebarNote={showSidebarNote ? review : undefined}
+          analysis={stripAnalysis}
+          sourceOnly={sourceOnly}
+          header={analysisPopupHeader({
+            edits,
+            fixture,
+            organizationId,
+            factoryKey,
+            orderNumber,
+            lineId,
+            onClose,
+            fullPage,
+            toggleFullPage,
+            mutations,
+            footerBusy: footerActions.busy,
+            reviewActions,
+          })}
+        />
+        {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
+      </LiveHeaderSpendProvider>
     </PopupShell>
   );
 }
@@ -262,7 +266,7 @@ function analysisPopupHeader(args: {
       }
       accessory={views}
     >
-      <OwnerTimeCostRow
+      <LiveOwnerTimeCostRow
         fixture={{ ...args.fixture, owner: args.edits.owner }}
         assigneeIds={args.edits.assigneeIds}
         usageByModel={args.fixture.usageByModel}

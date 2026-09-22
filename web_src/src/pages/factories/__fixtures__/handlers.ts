@@ -1,4 +1,8 @@
-import { BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import {
+  BUSINESS_ORGANIZATION_BILLING,
+  DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
+  EMPTY_USAGE_REPORT,
+} from "./usageReportFixtures";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
@@ -1072,7 +1076,7 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
         json: fixture.organizationBilling ?? {
           plan: "trial",
           planSource: "system",
-          trialEndsAt: "2026-09-22T12:00:00.000Z",
+          trialEndsAt: DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
           billingEnabled: true,
           subscriptionCheckoutEnabled: true,
           creditPurchaseAllowed: false,
@@ -1122,7 +1126,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
       json: fixture.organizationBilling ?? {
         plan: "trial",
         planSource: "system",
-        trialEndsAt: "2026-09-22T12:00:00.000Z",
+        trialEndsAt: DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
         billingEnabled: true,
         subscriptionCheckoutEnabled: true,
         creditPurchaseAllowed: false,

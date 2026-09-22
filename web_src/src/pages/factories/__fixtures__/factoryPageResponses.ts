@@ -22,7 +22,12 @@ import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import type { PlanningSessionPayload } from "../pages/planningSessionView";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
-import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import {
+  DEFAULT_FACTORY_USAGE,
+  DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
+  EMPTY_USAGE_REPORT,
+  type StorybookUsageReport,
+} from "./usageReportFixtures";
 import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
@@ -424,7 +429,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationBilling: {
     plan: "trial",
     planSource: "system",
-    trialEndsAt: "2026-09-22T12:00:00.000Z",
+    trialEndsAt: DEFAULT_WELCOME_CREDIT_EXPIRES_AT,
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",
