@@ -1,11 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- provider and hooks share one context module */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import {
-  EMPTY_LIVE_HEADER_SPEND,
-  sumLiveHeaderSpend,
-  type LiveHeaderSpend,
-} from "../work-order-popup-redesign/overlayHeaderSpend";
+import { EMPTY_LIVE_HEADER_SPEND, sumLiveHeaderSpend, type LiveHeaderSpend } from "@/lib/overlayHeaderSpend";
 
 type LiveHeaderSpendContextValue = {
   report: (phaseId: string, spend: LiveHeaderSpend) => void;

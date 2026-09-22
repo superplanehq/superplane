@@ -1,7 +1,5 @@
 import { formatCompactTokenLabel } from "@/lib/formatTokenCount";
 
-import { formatUsdCents } from "../../lib/workOrderUsage";
-
 export type LiveHeaderSpend = {
   tokens: number;
   cents: number;
@@ -32,6 +30,10 @@ export function overlayHeaderSpend(
     costUsd: liveCents > savedCents ? formatUsdCents(liveCents) : savedCostUsd,
     tokensLabel: liveTokens > savedTokens ? formatCompactTokenLabel(liveTokens) : savedTokensLabel,
   };
+}
+
+function formatUsdCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function parseCostUsdToCents(costUsd: string): number {

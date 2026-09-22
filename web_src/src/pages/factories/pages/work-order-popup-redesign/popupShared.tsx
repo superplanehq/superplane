@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { overlayHeaderSpend, type LiveHeaderSpend } from "@/lib/overlayHeaderSpend";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
@@ -19,7 +20,6 @@ import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderAssigneesPopover } from "../../WorkOrderAssigneesPopover";
 import { WorkOrderStatusNote } from "../../WorkOrderStatusNote";
 import { RunOverlayBoardBackdrop, RunOverlayFrame } from "../work-order-run-overlay/runOverlayShared";
-import { overlayHeaderSpend, type LiveHeaderSpend } from "./overlayHeaderSpend";
 import type { PopupFixture, PopupLogEntry, PopupLogState } from "./workOrderPopupMocks";
 
 export { RunOverlayBoardBackdrop };
