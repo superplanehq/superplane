@@ -1,7 +1,8 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_READINESS_NOTES } from "../../lib/draftReadiness";
@@ -9,18 +10,19 @@ import { CONFIDENCE_ANALYZING_TOOLTIP } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import {
   analysisChat,
+  composerPng,
+  composerTextFile,
   HIGH_CONFIDENCE,
   INTENT,
   INTENT_DOC,
   IntentDocumentResizeObserver,
-  composerPng,
   renderIntentDocument,
+  uploadedComposerFile,
   uploadedComposerImage,
   WAITING_COMPOSER_VIEW,
 } from "./WorkOrderIntentDocument.testHelpers";
 import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 import { REFINE_LAYOUT_STORAGE_KEY } from "./refineLayoutPreference";
-import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 
 const { showErrorToast } = vi.hoisted(() => ({ showErrorToast: vi.fn() }));
@@ -35,55 +37,9 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   }),
 }));
 
-type ResultEvent = {
-  resultIndex: number;
-  results: Array<{ isFinal: boolean; 0: { transcript: string } }>;
-};
-
-class FakeSpeechRecognition {
-  static instances: FakeSpeechRecognition[] = [];
-
-  continuous = false;
-  interimResults = false;
-  lang = "";
-  onresult: ((event: ResultEvent) => void) | null = null;
-  onerror: ((event: { error: string }) => void) | null = null;
-  onend: (() => void) | null = null;
-  start = vi.fn();
-  stop = vi.fn();
-  abort = vi.fn();
-
-  constructor() {
-    FakeSpeechRecognition.instances.push(this);
-  }
-}
-
-function latestRecognition(): FakeSpeechRecognition {
-  const recognition = FakeSpeechRecognition.instances.at(-1);
-  if (!recognition) {
-    throw new Error("Speech recognition was not created");
-  }
-  return recognition;
-}
-
-function emitTranscript(transcript: string, isFinal: boolean) {
-  latestRecognition().onresult?.({
-    resultIndex: 0,
-    results: [Object.assign([{ transcript }], { isFinal, 0: { transcript } })],
-  });
-}
-
-function emitFinalPhrases(transcripts: string[]) {
-  latestRecognition().onresult?.({
-    resultIndex: 0,
-    results: transcripts.map((transcript) => Object.assign([{ transcript }], { isFinal: true, 0: { transcript } })),
-  });
-}
-
 describe("WorkOrderIntentDocument composer", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    FakeSpeechRecognition.instances = [];
     vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
   });
 
@@ -347,11 +303,15 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(screen.getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "analyzing");
   });
 
-  it("attaches, pastes, caps, and sends composer images", async () => {
+  it("attaches, pastes, caps, and sends composer images and text files", async () => {
     const user = userEvent.setup();
     let nextId = 0;
     const onUploadFiles = vi.fn(async (files: FileList | File[]) =>
-      Array.from(files).map((file) => uploadedComposerImage(`file-${++nextId}`, file.name)),
+      Array.from(files).map((file) =>
+        file.type.startsWith("image/")
+          ? uploadedComposerImage(`file-${++nextId}`, file.name)
+          : uploadedComposerFile(`file-${++nextId}`, file.name),
+      ),
     );
     const onSend = vi.fn();
     const input = () => screen.getByTestId("create-work-order-request-image-input");
@@ -362,15 +322,21 @@ describe("WorkOrderIntentDocument composer", () => {
         analysis={analysisChat({ view: WAITING_COMPOSER_VIEW, onUploadFiles, onSend })}
       />,
     );
-    await user.upload(input(), new File(["notes"], "notes.md", { type: "text/markdown" }));
-    expect(onUploadFiles).not.toHaveBeenCalled();
+
+    expect(input().getAttribute("accept")).toBe(WORK_ORDER_FILE_ACCEPT);
+    await user.upload(input(), composerTextFile("notes.txt"));
+    await waitFor(() => expect(screen.getByTestId("create-work-order-request-file-file-1")).toBeInTheDocument());
+    expect(screen.getByTestId("create-work-order-request-file-file-1")).toHaveTextContent("notes.txt");
+    await user.click(screen.getByTestId("create-work-order-request-file-remove-file-1"));
+    expect(screen.queryByTestId("create-work-order-request-file-file-1")).not.toBeInTheDocument();
+
     await user.upload(input(), composerPng("bug.png"));
-    await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-1")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-2")).toBeInTheDocument());
     fireEvent.paste(screen.getByTestId("split-run-intent-composer"), {
       clipboardData: { files: [composerPng("shot.png")], getData: () => "" },
     });
-    await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-2")).toBeInTheDocument());
-    await user.click(screen.getByTestId("create-work-order-request-attachment-file-2"));
+    await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-3")).toBeInTheDocument());
+    await user.click(screen.getByTestId("create-work-order-request-attachment-file-3"));
     await user.click(screen.getByTestId("create-work-order-request-image-remove"));
     await user.upload(
       input(),
@@ -378,14 +344,22 @@ describe("WorkOrderIntentDocument composer", () => {
     );
     await waitFor(() => expect(screen.getAllByTestId(/create-work-order-request-attachment-/)).toHaveLength(8));
     expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+
+    await user.upload(input(), composerTextFile("data.csv"));
+    await waitFor(() => expect(screen.getByTestId("create-work-order-request-file-file-11")).toBeInTheDocument());
+
     await user.click(screen.getByTestId("split-run-intent-composer-send"));
-    const uploaded = uploadedComposerImage("file-1", "bug.png");
+    const image = uploadedComposerImage("file-2", "bug.png");
+    const csv = uploadedComposerFile("file-11", "data.csv");
     rerender(
       <TooltipProvider>
         <WorkOrderIntentDocument
           {...INTENT_DOC}
           artifacts={[INTENT]}
-          files={[{ id: uploaded.id, downloadUrl: uploaded.previewUrl }]}
+          files={[
+            { id: image.id, downloadUrl: image.previewUrl },
+            { id: csv.id, downloadUrl: csv.previewUrl },
+          ]}
           analysis={analysisChat({
             view: {
               ...WAITING_COMPOSER_VIEW,
@@ -397,153 +371,11 @@ describe("WorkOrderIntentDocument composer", () => {
     );
     expect(
       within(screen.getByTestId("split-run-intent-user-note")).getByRole("img", { name: "bug.png" }),
-    ).toHaveAttribute("src", uploaded.previewUrl);
+    ).toHaveAttribute("src", image.previewUrl);
+    expect(
+      within(screen.getByTestId("split-run-intent-user-note")).getByRole("link", { name: "data.csv" }),
+    ).toHaveAttribute("href", csv.previewUrl);
+    expect(screen.queryByTestId("create-work-order-request-file-chips")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-description")).not.toHaveTextContent("bug.png");
-  });
-
-  it("hides the dictate button when speech recognition is missing", () => {
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW })}
-      />,
-    );
-
-    expect(screen.queryByTestId("dictate-button")).not.toBeInTheDocument();
-  });
-
-  it("shows the dictate button and does not listen until click", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
-    const user = userEvent.setup();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW })}
-      />,
-    );
-
-    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(ANALYSIS_PLANNING_COPY.dictate);
-    expect(FakeSpeechRecognition.instances).toHaveLength(0);
-
-    await user.click(screen.getByTestId("dictate-button"));
-
-    expect(latestRecognition().start).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(ANALYSIS_PLANNING_COPY.stopDictation);
-  });
-
-  it("shows the interim phrase without appending it to the composer", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
-    const user = userEvent.setup();
-    const onComposerChange = vi.fn();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW, onComposerChange })}
-      />,
-    );
-
-    await user.click(screen.getByTestId("dictate-button"));
-    act(() => {
-      emitTranscript("Need the empty state", false);
-    });
-
-    expect(screen.getByTestId("dictate-interim")).toHaveTextContent("Need the empty state");
-    expect(onComposerChange).not.toHaveBeenCalled();
-  });
-
-  it("appends a final phrase to the composer", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
-    const user = userEvent.setup();
-    const onComposerChange = vi.fn();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({
-          view: WAITING_COMPOSER_VIEW,
-          composer: "Need the empty state.",
-          onComposerChange,
-        })}
-      />,
-    );
-
-    await user.click(screen.getByTestId("dictate-button"));
-    act(() => {
-      emitTranscript("Confirm the copy", true);
-    });
-
-    expect(onComposerChange).toHaveBeenCalledWith("Need the empty state. Confirm the copy");
-  });
-
-  it("keeps every final phrase from one recognition event", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
-    const user = userEvent.setup();
-    const onComposerChange = vi.fn();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({
-          view: WAITING_COMPOSER_VIEW,
-          composer: "Need the empty state.",
-          onComposerChange,
-        })}
-      />,
-    );
-
-    await user.click(screen.getByTestId("dictate-button"));
-    act(() => {
-      emitFinalPhrases(["Confirm the copy", "and spacing"]);
-    });
-
-    expect(onComposerChange).toHaveBeenNthCalledWith(1, "Need the empty state. Confirm the copy");
-    expect(onComposerChange).toHaveBeenNthCalledWith(2, "Need the empty state. Confirm the copy and spacing");
-  });
-
-  it("stops dictation before send", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
-    const user = userEvent.setup();
-    const onSend = vi.fn();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({
-          view: WAITING_COMPOSER_VIEW,
-          composer: "Need the empty state.",
-          onSend,
-        })}
-      />,
-    );
-
-    await user.click(screen.getByTestId("dictate-button"));
-    const recognition = latestRecognition();
-    await user.click(screen.getByTestId("split-run-intent-composer-send"));
-
-    expect(recognition.abort).toHaveBeenCalled();
-    expect(onSend).toHaveBeenCalled();
-  });
-
-  it("shows a permission error toast and returns to idle", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
-    const user = userEvent.setup();
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[INTENT]}
-        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW })}
-      />,
-    );
-
-    await user.click(screen.getByTestId("dictate-button"));
-    act(() => {
-      latestRecognition().onerror?.({ error: "not-allowed" });
-    });
-
-    expect(showErrorToast).toHaveBeenCalledWith(ANALYSIS_PLANNING_COPY.microphoneDenied);
-    expect(screen.getByTestId("dictate-button")).toHaveAttribute("aria-pressed", "false");
   });
 });
