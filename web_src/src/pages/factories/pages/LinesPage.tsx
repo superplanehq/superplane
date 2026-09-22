@@ -126,7 +126,6 @@ import {
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -341,8 +340,6 @@ export function LinesPage() {
     canConfigure: canUpdate,
     takenPRFeedbackSources,
     prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
-    planningSetupReady: Boolean(factory),
-    planningSetupCompleted: factoryPlanningSetupCompleted(factory),
   });
   const nextStepBanner = workspaceNextStepBanner(nextSteps);
   const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
@@ -602,9 +599,6 @@ export function LinesPage() {
             collapsed={nextStepsCollapsed}
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
-                openPlanningSetup: () => {
-                  navigate(factoryPlanningSetupPath(organizationId, factoryKey, selectedLine.id));
-                },
                 openPRFeedbackSetup: (sourceId) => {
                   const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, sourceId);
                   if (href) {
@@ -671,6 +665,7 @@ export function LinesPage() {
             onOpenWorkOrder={openWorkOrder}
             onClosePeek={closePeek}
             planningEnabled={factory?.planning?.enabled !== false}
+            planningSetupCompleted={factoryPlanningSetupCompleted(factory)}
           />
         </div>
       </div>
@@ -819,6 +814,7 @@ function LineDetail({
   onOpenWorkOrder,
   onClosePeek,
   planningEnabled,
+  planningSetupCompleted,
 }: {
   organizationId: string;
   factoryId: string;
@@ -847,6 +843,7 @@ function LineDetail({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClosePeek: () => void;
   planningEnabled: boolean;
+  planningSetupCompleted: boolean;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -896,7 +893,12 @@ function LineDetail({
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
-      const href = columnAutomationOpenPath(automation, { organizationId, factoryKey, lineId: line.id });
+      const href = columnAutomationOpenPath(automation, {
+        organizationId,
+        factoryKey,
+        lineId: line.id,
+        planningSetupCompleted,
+      });
       if (href) {
         navigate(href);
       }

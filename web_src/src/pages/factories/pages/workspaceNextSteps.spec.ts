@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "bun:test";
 
-import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
 import {
   isWorkspaceNextStepDeferred,
   isWorkspaceNextStepsQueryReady,
@@ -15,33 +14,12 @@ const ready = {
   onboardingComplete: true,
   canConfigure: true,
   prFeedbackHandlersReady: true,
-  planningSetupReady: true,
-  planningSetupCompleted: false,
   takenPRFeedbackSources: [] as const,
 };
 
-const afterPlanning = {
-  ...ready,
-  planningSetupCompleted: true,
-};
-
 describe("workspaceNextSteps", () => {
-  it("lists Planning first, then comments and status-check tasks", () => {
+  it("lists comments and status-check tasks as not done when no handler exists", () => {
     expect(workspaceNextSteps(ready)).toEqual([
-      expect.objectContaining({ id: "planning-setup", done: false, canDefer: false }),
-      expect.objectContaining({ id: "pr-comments-handler", done: false }),
-      expect.objectContaining({ id: "pr-checks-handler", done: false }),
-    ]);
-  });
-
-  it("marks Planning done only after setupCompleted", () => {
-    expect(
-      workspaceNextSteps({
-        ...ready,
-        planningSetupCompleted: true,
-      }),
-    ).toEqual([
-      expect.objectContaining({ id: "planning-setup", done: true }),
       expect.objectContaining({ id: "pr-comments-handler", done: false }),
       expect.objectContaining({ id: "pr-checks-handler", done: false }),
     ]);
@@ -50,20 +28,19 @@ describe("workspaceNextSteps", () => {
   it("marks comments done and keeps status checks open", () => {
     expect(
       workspaceNextSteps({
-        ...afterPlanning,
+        ...ready,
         takenPRFeedbackSources: ["discussion"],
       }),
     ).toEqual([
-      expect.objectContaining({ id: "planning-setup", done: true }),
       expect.objectContaining({ id: "pr-comments-handler", done: true }),
       expect.objectContaining({ id: "pr-checks-handler", done: false }),
     ]);
   });
 
-  it("hides the list when every next step is done", () => {
+  it("hides the list when both handlers are configured", () => {
     expect(
       workspaceNextSteps({
-        ...afterPlanning,
+        ...ready,
         takenPRFeedbackSources: ["discussion", "checks"],
       }),
     ).toEqual([]);
@@ -74,11 +51,9 @@ describe("workspaceNextSteps", () => {
     expect(workspaceNextSteps({ ...ready, canConfigure: false })).toEqual([]);
   });
 
-  it("hides the list until handler status and factory Planning are ready", () => {
+  it("hides the list until handler status is ready", () => {
     expect(workspaceNextSteps({ ...ready, prFeedbackHandlersReady: false })).toEqual([]);
-    expect(workspaceNextSteps({ ...ready, planningSetupReady: false })).toEqual([]);
-    expect(workspaceNextSteps({ ...ready, prFeedbackHandlersReady: true, planningSetupReady: true })).toEqual([
-      expect.objectContaining({ id: "planning-setup", done: false }),
+    expect(workspaceNextSteps({ ...ready, prFeedbackHandlersReady: true })).toEqual([
       expect.objectContaining({ id: "pr-comments-handler", done: false }),
       expect.objectContaining({ id: "pr-checks-handler", done: false }),
     ]);
@@ -103,23 +78,11 @@ describe("isWorkspaceNextStepsQueryReady", () => {
 });
 
 describe("workspaceNextStepBanner", () => {
-  it("personalizes the banner for Planning when setup is not confirmed", () => {
+  it("personalizes the banner for comments when nothing is configured", () => {
     const banner = workspaceNextStepBanner(workspaceNextSteps(ready));
-    expect(banner?.activeStep.id).toBe("planning-setup");
-    expect(banner?.doneCount).toBe(2);
-    expect(banner?.totalCount).toBe(5);
-    expect(banner?.title).toBe(PLANNING_SETTINGS_COPY.wizardPageTitle);
-    expect(banner?.badgeLabel).toBe(PLANNING_SETTINGS_COPY.wizardBadgeLabel);
-    expect(banner?.description).toBe(PLANNING_SETTINGS_COPY.wizardBannerDescription);
-    expect(banner?.ctaLabel).toBe("Configure");
-    expect(banner?.canDefer).toBe(false);
-  });
-
-  it("personalizes the banner for comments after Planning is confirmed", () => {
-    const banner = workspaceNextStepBanner(workspaceNextSteps(afterPlanning));
     expect(banner?.activeStep.id).toBe("pr-comments-handler");
-    expect(banner?.doneCount).toBe(3);
-    expect(banner?.totalCount).toBe(5);
+    expect(banner?.doneCount).toBe(2);
+    expect(banner?.totalCount).toBe(4);
     expect(banner?.title).toBe("How should pull request comments be handled?");
     expect(banner?.description).toBe(
       "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
@@ -131,13 +94,13 @@ describe("workspaceNextStepBanner", () => {
   it("personalizes the banner for status checks after comments are configured", () => {
     const banner = workspaceNextStepBanner(
       workspaceNextSteps({
-        ...afterPlanning,
+        ...ready,
         takenPRFeedbackSources: ["discussion"],
       }),
     );
     expect(banner?.activeStep.id).toBe("pr-checks-handler");
-    expect(banner?.doneCount).toBe(4);
-    expect(banner?.totalCount).toBe(5);
+    expect(banner?.doneCount).toBe(3);
+    expect(banner?.totalCount).toBe(4);
     expect(banner?.title).toBe("How should failing status checks be handled?");
     expect(banner?.badgeLabel).toBe("Configure status checks");
     expect(banner?.description).toContain("automatically fix failing pull request status checks");
@@ -145,11 +108,11 @@ describe("workspaceNextStepBanner", () => {
     expect(banner?.canDefer).toBe(true);
   });
 
-  it("hides the banner after every next step is done", () => {
+  it("hides the banner after both handlers are configured", () => {
     expect(
       workspaceNextStepBanner(
         workspaceNextSteps({
-          ...afterPlanning,
+          ...ready,
           takenPRFeedbackSources: ["discussion", "checks"],
         }),
       ),
@@ -159,22 +122,20 @@ describe("workspaceNextStepBanner", () => {
 
 describe("workspaceNextStepsProgressCopy", () => {
   it("names how many tasks are complete", () => {
-    expect(workspaceNextStepsProgressCopy(2, 5)).toBe("2/5");
+    expect(workspaceNextStepsProgressCopy(2, 4)).toBe("2/4");
   });
 });
 
 describe("isWorkspaceNextStepDeferred", () => {
   it("defers only the optional status-checks banner", () => {
-    const planning = workspaceNextStepBanner(workspaceNextSteps(ready));
-    const comments = workspaceNextStepBanner(workspaceNextSteps(afterPlanning));
+    const comments = workspaceNextStepBanner(workspaceNextSteps(ready));
     const checks = workspaceNextStepBanner(
       workspaceNextSteps({
-        ...afterPlanning,
+        ...ready,
         takenPRFeedbackSources: ["discussion"],
       }),
     );
 
-    expect(isWorkspaceNextStepDeferred(planning, "pr-checks-handler")).toBe(false);
     expect(isWorkspaceNextStepDeferred(comments, "pr-checks-handler")).toBe(false);
     expect(isWorkspaceNextStepDeferred(checks, "pr-checks-handler")).toBe(true);
     expect(isWorkspaceNextStepDeferred(checks, "pr-comments-handler")).toBe(false);
@@ -191,22 +152,9 @@ describe("shouldForgetDeferredWorkspaceNextStep", () => {
 });
 
 describe("runWorkspaceNextStepAction", () => {
-  it("opens the Planning setup page", () => {
-    const openPlanningSetup = vi.fn();
-    const openPRFeedbackSetup = vi.fn();
-    runWorkspaceNextStepAction({ type: "open-planning-setup" }, { openPlanningSetup, openPRFeedbackSetup });
-    expect(openPlanningSetup).toHaveBeenCalledOnce();
-    expect(openPRFeedbackSetup).not.toHaveBeenCalled();
-  });
-
   it("opens the matching PR feedback setup page", () => {
-    const openPlanningSetup = vi.fn();
     const openPRFeedbackSetup = vi.fn();
-    runWorkspaceNextStepAction(
-      { type: "open-pr-feedback-setup", sourceId: "discussion" },
-      { openPlanningSetup, openPRFeedbackSetup },
-    );
+    runWorkspaceNextStepAction({ type: "open-pr-feedback-setup", sourceId: "discussion" }, { openPRFeedbackSetup });
     expect(openPRFeedbackSetup).toHaveBeenCalledWith("discussion");
-    expect(openPlanningSetup).not.toHaveBeenCalled();
   });
 });

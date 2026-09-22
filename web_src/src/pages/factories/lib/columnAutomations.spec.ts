@@ -20,6 +20,7 @@ import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
   factoryPlanningPath,
+  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
@@ -379,27 +380,36 @@ describe("columnAutomationOpenPath", () => {
     ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-implementer"));
   });
 
+  const analysisAutomation = {
+    id: "analysis-app-refund-backlog",
+    kind: "analysis",
+    name: "Task analysis",
+    trigger: "On task in Backlog",
+    action: "Plan the task",
+    iconSrc: "",
+    iconAlt: "",
+    health: "healthy",
+    runningCount: 0,
+    catalogId: "analysis",
+    canvasId: "app-refund-backlog",
+  } as const;
+
   it("opens Planning settings for Task analysis", () => {
-    const href = columnAutomationOpenPath(
-      {
-        id: "analysis-app-refund-backlog",
-        kind: "analysis",
-        name: "Task analysis",
-        trigger: "On task in Backlog",
-        action: "Plan the task",
-        iconSrc: "",
-        iconAlt: "",
-        health: "healthy",
-        runningCount: 0,
-        catalogId: "analysis",
-        canvasId: "app-refund-backlog",
-      },
-      nav,
-    );
+    const href = columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: true });
 
     expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
+  });
+
+  it("opens the Planning setup wizard for Task analysis until setup is confirmed", () => {
+    expect(columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: false })).toBe(
+      factoryPlanningSetupPath("org-1", "RF", "line-plan"),
+    );
+  });
+
+  it("opens Planning settings for Task analysis when the setup state is unknown", () => {
+    expect(columnAutomationOpenPath(analysisAutomation, nav)).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
   });
 
   it("opens the intake settings popup on the first tab", () => {
