@@ -43,11 +43,6 @@ func serializePreparedCanvas(
 		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 	}
 
-	canvasFolderID := ""
-	if canvas.CanvasFolderID != nil {
-		canvasFolderID = canvas.CanvasFolderID.String()
-	}
-
 	liveVersionID := ""
 	if canvas.LiveVersionID != nil {
 		liveVersionID = canvas.LiveVersionID.String()
@@ -67,7 +62,6 @@ func serializePreparedCanvas(
 			CreatedAt:                   timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:                   timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:                   createdBy,
-			FolderId:                    canvasFolderID,
 			LiveVersionId:               liveVersionID,
 			FactoryId:                   factoryID,
 			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),

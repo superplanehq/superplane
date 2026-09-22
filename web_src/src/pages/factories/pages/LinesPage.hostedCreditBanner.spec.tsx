@@ -16,10 +16,11 @@ import {
   LOW_CREDIT_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
+  STORYBOOK_TRIAL_ENDS_AT,
 } from "../__fixtures__/usageReportFixtures";
 import { welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(STORYBOOK_TRIAL_ENDS_AT));
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {
