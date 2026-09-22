@@ -7,6 +7,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SplitRunFooterKind } from "./splitRunFooter";
 
+function splitRunOwnerFields(owner: OrgUserDisplay) {
+  return {
+    ownerId: owner.id,
+    ownerName: owner.name,
+    ownerInitials: owner.initials,
+    ownerAvatarUrl: owner.avatarUrl,
+  };
+}
+
 export function canEditSplitRunContent(kind: SplitRunFooterKind, canUpdate = true): boolean {
   return canUpdate && kind !== "done";
 }
@@ -56,10 +65,7 @@ export function useSplitRunWorkOrderEdits(args: {
     setDescription(args.description);
   }, [args.description]);
 
-  const ownerId = args.owner.id;
-  const ownerName = args.owner.name;
-  const ownerInitials = args.owner.initials;
-  const ownerAvatarUrl = args.owner.avatarUrl;
+  const { ownerId, ownerName, ownerInitials, ownerAvatarUrl } = splitRunOwnerFields(args.owner);
   const assigneeKey = args.assigneeIds.join("\0");
 
   useEffect(() => {
