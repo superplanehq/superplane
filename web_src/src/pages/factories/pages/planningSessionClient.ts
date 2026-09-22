@@ -63,6 +63,12 @@ export function sendPlanningSessionMessage(organizationId: string, factoryId: st
   );
 }
 
+export function endPlanningSession(organizationId: string, factoryId: string, sessionId: string) {
+  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/end`, {
+    method: "POST",
+  });
+}
+
 export function answerPlanningSessionSurvey(
   organizationId: string,
   factoryId: string,
