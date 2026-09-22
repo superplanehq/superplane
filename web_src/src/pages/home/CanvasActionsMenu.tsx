@@ -7,12 +7,10 @@ import { useDeleteCanvas } from "@/hooks/useCanvasData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
-import { CanvasFolderSubmenu } from "./CanvasFolderSubmenu";
-import type { CanvasCardData, CanvasFolderData } from "./types";
+import type { CanvasCardData } from "./types";
 
 interface CanvasActionsMenuProps {
   canvas: CanvasCardData;
-  canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
@@ -22,7 +20,6 @@ interface CanvasActionsMenuProps {
 
 export function CanvasActionsMenu({
   canvas,
-  canvasFolders,
   organizationId,
   onEdit,
   canUpdateCanvases,
@@ -105,13 +102,6 @@ export function CanvasActionsMenu({
                   Rename
                 </DropdownMenuItem>
               </PermissionTooltip>
-
-              <CanvasFolderSubmenu
-                canvas={canvas}
-                canvasFolders={canvasFolders}
-                organizationId={organizationId}
-                canUpdateCanvases={canUpdateCanvases}
-              />
 
               <PermissionTooltip allowed={canDeleteCanvases} message="You don't have permission to delete canvases.">
                 <DropdownMenuItem onClick={openDialog} disabled={!canDeleteCanvases}>

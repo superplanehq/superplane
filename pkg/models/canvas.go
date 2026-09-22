@@ -33,7 +33,6 @@ type Canvas struct {
 	OrganizationID uuid.UUID
 	FactoryID      *uuid.UUID
 	LiveVersionID  *uuid.UUID
-	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
 	Name           string
 	Description    string
 	// ColumnKey is the line-board column this factory event automation is
@@ -407,7 +406,6 @@ func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
 			"workflows.id",
 			"workflows.organization_id",
 			"workflows.live_version_id",
-			"workflows.folder_id",
 			"workflows.name",
 			"workflows.description",
 			"workflows.created_by",
@@ -437,7 +435,6 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.id",
 			"workflows.organization_id",
 			"workflows.live_version_id",
-			"workflows.folder_id",
 			"workflows.name",
 			"workflows.description",
 			"workflows.created_by",
