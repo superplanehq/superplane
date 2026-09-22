@@ -16,34 +16,35 @@ func TestFactory_ListWorkOrders_UserID(t *testing.T) {
 	org, callerID, factoryModel := setupFactoryWithUser(t, "user-filter")
 	otherUser := createOrgUser(t, org.ID, "user-filter-other")
 	unassignedTrue := true
+	db := database.Conn()
 
-	assigneeOnly, err := factoryModel.CreateWorkOrder(database.Conn(), "Assignee only", "", &otherUser.ID, []uuid.UUID{callerID}, nil)
+	assigneeOnly, err := factoryModel.CreateWorkOrder(db, "Assignee only", "", &otherUser.ID, []uuid.UUID{callerID}, nil)
 	require.NoError(t, err)
 
-	creatorOnly, err := factoryModel.CreateWorkOrder(database.Conn(), "Creator only", "", &callerID, nil, nil)
+	creatorOnly, err := factoryModel.CreateWorkOrder(db, "Creator only", "", &callerID, nil, nil)
 	require.NoError(t, err)
 
-	both, err := factoryModel.CreateWorkOrder(database.Conn(), "Creator and assignee", "", &callerID, []uuid.UUID{callerID}, nil)
+	both, err := factoryModel.CreateWorkOrder(db, "Creator and assignee", "", &callerID, []uuid.UUID{callerID}, nil)
 	require.NoError(t, err)
 
-	_, err = factoryModel.CreateWorkOrder(database.Conn(), "Other user only", "", &otherUser.ID, []uuid.UUID{otherUser.ID}, nil)
+	_, err = factoryModel.CreateWorkOrder(db, "Other user only", "", &otherUser.ID, []uuid.UUID{otherUser.ID}, nil)
 	require.NoError(t, err)
 
-	otherUnassigned, err := factoryModel.CreateWorkOrder(database.Conn(), "Other unassigned", "", &otherUser.ID, nil, nil)
+	otherUnassigned, err := factoryModel.CreateWorkOrder(db, "Other unassigned", "", &otherUser.ID, nil, nil)
 	require.NoError(t, err)
 
-	orders, err := factoryModel.ListWorkOrders(database.Conn(), ListFactoryWorkOrdersFilters{UserID: &callerID, Limit: 10})
+	orders, err := factoryModel.ListWorkOrders(db, ListFactoryWorkOrdersFilters{UserID: &callerID, Limit: 10})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []uuid.UUID{assigneeOnly.ID, creatorOnly.ID, both.ID}, workOrderIDs(orders))
 
-	nobody, err := factoryModel.ListWorkOrders(database.Conn(), ListFactoryWorkOrdersFilters{
+	nobody, err := factoryModel.ListWorkOrders(db, ListFactoryWorkOrdersFilters{
 		Unassigned: &unassignedTrue,
 		Limit:      10,
 	})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []uuid.UUID{creatorOnly.ID, otherUnassigned.ID}, workOrderIDs(nobody))
 
-	userOrNobody, err := factoryModel.ListWorkOrders(database.Conn(), ListFactoryWorkOrdersFilters{
+	userOrNobody, err := factoryModel.ListWorkOrders(db, ListFactoryWorkOrdersFilters{
 		UserID:     &callerID,
 		Unassigned: &unassignedTrue,
 		Limit:      10,
@@ -96,10 +97,11 @@ func TestFactory_ListWorkOrders_UsesDefaultLimit(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	_, callerID, factoryModel := setupFactoryWithUser(t, "default-limit")
-	created, err := factoryModel.CreateWorkOrder(database.Conn(), "Default page", "", &callerID, nil, nil)
+	db := database.Conn()
+	created, err := factoryModel.CreateWorkOrder(db, "Default page", "", &callerID, nil, nil)
 	require.NoError(t, err)
 
-	orders, err := factoryModel.ListWorkOrders(database.Conn(), ListFactoryWorkOrdersFilters{})
+	orders, err := factoryModel.ListWorkOrders(db, ListFactoryWorkOrdersFilters{})
 	require.NoError(t, err)
 	require.Len(t, orders, 1)
 	assert.Equal(t, created.ID, orders[0].ID)

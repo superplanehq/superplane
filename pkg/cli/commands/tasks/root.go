@@ -18,6 +18,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		taskListStates     []string
 		taskListResults    []string
 		taskListUnassigned bool
+		taskListAll        bool
 	)
 
 	taskListCmd := &cobra.Command{
@@ -37,11 +38,16 @@ completed, rejected, failed).
 By default, only open tasks are shown. Pass --state all to see
 draft, open, and closed tasks.
 
+The list shows the first 100 matching tasks.
+Use --user, --state, --result, or --unassigned to narrow the list.
+Pass --all to show every matching task.
+
 Examples:
   superplane tasks list --workspace super --state open
   superplane tasks list --user alice@example.com --result failed
   superplane tasks list --unassigned
-  superplane tasks list --state all`,
+  superplane tasks list --state all
+  superplane tasks list --all`,
 		Args: cobra.NoArgs,
 	}
 	taskListCmd.Flags().StringVar(&taskListWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
@@ -49,12 +55,14 @@ Examples:
 	taskListCmd.Flags().StringSliceVar(&taskListStates, "state", nil, "filter by task state (repeatable, e.g. open or STATE_OPEN); defaults to open when omitted; pass 'all' to include every state")
 	taskListCmd.Flags().StringSliceVar(&taskListResults, "result", nil, "filter by task result (repeatable, e.g. completed or RESULT_COMPLETED)")
 	taskListCmd.Flags().BoolVar(&taskListUnassigned, "unassigned", false, "only show tasks with no assignees")
+	taskListCmd.Flags().BoolVar(&taskListAll, "all", false, "show every matching task")
 	core.Bind(taskListCmd, &taskListCommand{
 		workspace:  &taskListWorkspace,
 		user:       &taskListUser,
 		states:     &taskListStates,
 		results:    &taskListResults,
 		unassigned: &taskListUnassigned,
+		all:        &taskListAll,
 	}, options)
 
 	var (

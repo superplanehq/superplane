@@ -18,6 +18,7 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	require.NotNil(t, listCmd.Flags().Lookup("state"))
 	require.NotNil(t, listCmd.Flags().Lookup("result"))
 	require.NotNil(t, listCmd.Flags().Lookup("unassigned"))
+	require.NotNil(t, listCmd.Flags().Lookup("all"))
 
 	describeCmd, _, err := root.Find([]string{"describe"})
 	require.NoError(t, err)
