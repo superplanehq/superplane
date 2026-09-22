@@ -2,12 +2,16 @@ package public
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -200,6 +204,9 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		if session.WaitState == models.PlanningWaitResolved {
 			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
 			if err != nil {
+				if result.Kind != "" {
+					restorePlanningWait(session, result)
+				}
 				writePlanningWaitError(w, r, session, err)
 				return
 			}
@@ -521,7 +528,7 @@ func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (m
 		return models.PlanningWaitResult{}, false, nil
 	}
 	if err != nil {
-		return models.PlanningWaitResult{}, false, err
+		return result, false, err
 	}
 	return result, true, nil
 }
@@ -553,8 +560,31 @@ func isPlanningRequestCanceled(r *http.Request, err error) bool {
 	return errors.Is(r.Context().Err(), context.Canceled)
 }
 
+func isTransientPlanningWaitDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, sql.ErrConnDone) {
+		return true
+	}
+	if !isDroppedConnectionError(err) {
+		return false
+	}
+	return strings.Contains(err.Error(), "pgproto3")
+}
+
+func isDroppedConnectionError(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) && (errors.Is(opErr.Err, syscall.ECONNRESET) || errors.Is(opErr.Err, syscall.EPIPE)) {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "connection reset by peer") ||
+		strings.Contains(message, "broken pipe")
+}
+
 func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	if isPlanningRequestCanceled(r, err) {
+	if isPlanningRequestCanceled(r, err) || isTransientPlanningWaitDBError(err) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 		return
 	}
