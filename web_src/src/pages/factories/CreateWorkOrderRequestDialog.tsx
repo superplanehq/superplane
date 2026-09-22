@@ -1,5 +1,5 @@
 import { ArrowUp, Loader2, Maximize2, Minimize2, XIcon } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -14,9 +14,11 @@ import { cn } from "@/lib/utils";
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
+import { DictateButton } from "./DictateButton";
 import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
 import { MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 import { useCreateWorkOrderRequestForm } from "./useCreateWorkOrderRequestForm";
+import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 
 export interface CreateWorkOrderRequestDraft {
@@ -53,16 +55,29 @@ export function CreateWorkOrderRequestDialog({
 }: CreateWorkOrderRequestDialogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const stopDictationRef = useRef<() => void>(() => {});
   const form = useCreateWorkOrderRequestForm({
     open,
     description,
     isCreating,
     isUploading,
     onDescriptionChange,
-    onCreate,
+    onCreate: (draft) => {
+      stopDictationRef.current();
+      onCreate(draft);
+    },
     onUploadFiles,
     initialAttachedFiles,
   });
+  const dictation = useWorkOrderFieldDictation({
+    title: form.titleValue,
+    description,
+    maxTitleLength: MAX_DERIVED_WORK_ORDER_TITLE_LENGTH,
+    maxDescriptionLength: maxLength,
+    onTitleChange: form.handleTitleChange,
+    onDescriptionChange,
+  });
+  stopDictationRef.current = dictation.stop;
   const attachedImages = mergeCreateWorkOrderRequestImages(
     createWorkOrderRequestImages(description, fileUrls),
     form.attachedFiles,
@@ -72,6 +87,9 @@ export function CreateWorkOrderRequestDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          dictation.stop();
+        }
         if (!nextOpen && !isCreating && !isUploading) {
           onClose();
         }
@@ -97,55 +115,97 @@ export function CreateWorkOrderRequestDialog({
         <DialogTitle className="sr-only">{CREATE_WORK_ORDER_REQUEST_COPY.title}</DialogTitle>
         <DialogDescription className="sr-only">{CREATE_WORK_ORDER_REQUEST_COPY.description}</DialogDescription>
         <RequestDialogChrome isExpanded={isExpanded} onToggleExpanded={() => setIsExpanded((current) => !current)} />
-        <form
-          className="flex min-h-0 flex-1 flex-col overflow-visible"
-          onSubmit={(event: FormEvent) => {
-            event.preventDefault();
-            form.submitDraft();
-          }}
-        >
-          <RequestDialogTitleField
-            busy={form.busy}
-            derivedTitle={form.derivedTitle}
-            titleDirty={form.titleDirty}
-            titleValue={form.titleValue}
-            onTitleChange={form.handleTitleChange}
-          />
-          <Label htmlFor="work-order-description-input" className="sr-only">
-            {CREATE_WORK_ORDER_REQUEST_COPY.placeholder}
-          </Label>
-          <div
-            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]"
-            data-testid="create-work-order-request-body"
-          >
-            <div className="px-4 pt-2 pb-1">
-              <WorkOrderDescriptionEditor
-                value={description}
-                maxLength={maxLength}
-                disabled={form.busy}
-                autoFocus
-                placeholder={CREATE_WORK_ORDER_REQUEST_COPY.placeholder}
-                className="min-h-[6.5rem] max-w-full text-[14px] leading-6 [&_.ProseMirror]:max-w-full [&_.work-order-file-image]:my-2 [&_.work-order-file-image]:max-h-40 [&_.work-order-file-image]:w-auto [&_.work-order-file-image]:max-w-full [&_.work-order-file-image]:object-contain"
-                fileUrls={fileUrls}
-                onUploadFiles={form.uploadAcceptedFiles}
-                isUploading={isUploading}
-                canRemoveImages
-                onChange={onDescriptionChange}
-              />
-            </div>
-          </div>
-          <RequestDialogFooter
-            attachedImages={attachedImages}
-            canAttach={Boolean(onUploadFiles) && form.canAttach}
-            canCreate={form.canCreate}
-            isCreating={isCreating}
-            showAttach={Boolean(onUploadFiles)}
-            onAttach={(files) => void form.handleAttach(files)}
-            onRemoveAttachment={form.handleRemoveAttachment}
-          />
-        </form>
+        <RequestDialogForm
+          attachedImages={attachedImages}
+          description={description}
+          dictation={dictation}
+          fileUrls={fileUrls}
+          form={form}
+          isCreating={isCreating}
+          isUploading={isUploading}
+          maxLength={maxLength}
+          showAttach={Boolean(onUploadFiles)}
+          onDescriptionChange={onDescriptionChange}
+        />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RequestDialogForm({
+  attachedImages,
+  description,
+  dictation,
+  fileUrls,
+  form,
+  isCreating,
+  isUploading,
+  maxLength,
+  showAttach,
+  onDescriptionChange,
+}: {
+  attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
+  description: string;
+  dictation: ReturnType<typeof useWorkOrderFieldDictation>;
+  fileUrls?: Record<string, string>;
+  form: ReturnType<typeof useCreateWorkOrderRequestForm>;
+  isCreating: boolean;
+  isUploading: boolean;
+  maxLength: number;
+  showAttach: boolean;
+  onDescriptionChange: (next: string) => void;
+}) {
+  return (
+    <form
+      className="flex min-h-0 flex-1 flex-col overflow-visible"
+      onSubmit={(event: FormEvent) => {
+        event.preventDefault();
+        form.submitDraft();
+      }}
+    >
+      <RequestDialogTitleField
+        busy={form.busy}
+        derivedTitle={form.derivedTitle}
+        titleDirty={form.titleDirty}
+        titleValue={form.titleValue}
+        onTitleChange={form.handleTitleChange}
+        onTitleFocus={dictation.rememberTitle}
+      />
+      <Label htmlFor="work-order-description-input" className="sr-only">
+        {CREATE_WORK_ORDER_REQUEST_COPY.placeholder}
+      </Label>
+      <div
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]"
+        data-testid="create-work-order-request-body"
+      >
+        <div className="px-4 pt-2 pb-1">
+          <WorkOrderDescriptionEditor
+            value={description}
+            maxLength={maxLength}
+            disabled={form.busy}
+            autoFocus
+            placeholder={CREATE_WORK_ORDER_REQUEST_COPY.placeholder}
+            className="min-h-[6.5rem] max-w-full text-[14px] leading-6 [&_.ProseMirror]:max-w-full [&_.work-order-file-image]:my-2 [&_.work-order-file-image]:max-h-40 [&_.work-order-file-image]:w-auto [&_.work-order-file-image]:max-w-full [&_.work-order-file-image]:object-contain"
+            fileUrls={fileUrls}
+            onUploadFiles={form.uploadAcceptedFiles}
+            isUploading={isUploading}
+            canRemoveImages
+            onChange={onDescriptionChange}
+            onFocus={dictation.rememberDescription}
+          />
+        </div>
+      </div>
+      <RequestDialogFooter
+        attachedImages={attachedImages}
+        canAttach={showAttach && form.canAttach}
+        canCreate={form.canCreate}
+        isCreating={isCreating}
+        showAttach={showAttach}
+        dictate={<DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={form.busy} />}
+        onAttach={(files) => void form.handleAttach(files)}
+        onRemoveAttachment={form.handleRemoveAttachment}
+      />
+    </form>
   );
 }
 
@@ -180,12 +240,14 @@ function RequestDialogTitleField({
   titleDirty,
   titleValue,
   onTitleChange,
+  onTitleFocus,
 }: {
   busy: boolean;
   derivedTitle: string;
   titleDirty: boolean;
   titleValue: string;
   onTitleChange: (next: string) => void;
+  onTitleFocus: () => void;
 }) {
   return (
     <div className="shrink-0 px-4 pt-4 pr-20">
@@ -200,6 +262,7 @@ function RequestDialogTitleField({
         disabled={busy}
         rows={1}
         placeholder={derivedTitle || CREATE_WORK_ORDER_REQUEST_COPY.titlePlaceholder}
+        onFocus={onTitleFocus}
         onChange={(event) => onTitleChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.metaKey && !event.ctrlKey) {
@@ -221,6 +284,7 @@ function RequestDialogFooter({
   canCreate,
   isCreating,
   showAttach,
+  dictate,
   onAttach,
   onRemoveAttachment,
 }: {
@@ -229,6 +293,7 @@ function RequestDialogFooter({
   canCreate: boolean;
   isCreating: boolean;
   showAttach: boolean;
+  dictate: ReactNode;
   onAttach: (files: FileList | File[]) => void;
   onRemoveAttachment: (id: string) => void;
 }) {
@@ -238,7 +303,8 @@ function RequestDialogFooter({
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
       <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
         <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {showAttach ? <CreateWorkOrderRequestAttachButton disabled={!canAttach} onAttach={onAttach} /> : <span />}
+          {showAttach ? <CreateWorkOrderRequestAttachButton disabled={!canAttach} onAttach={onAttach} /> : null}
+          {dictate}
           {attachedImages.length > 0 ? (
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
           ) : null}
