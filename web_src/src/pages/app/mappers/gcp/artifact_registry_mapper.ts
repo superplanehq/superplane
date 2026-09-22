@@ -43,15 +43,7 @@ export const getArtifactMapper: ComponentBaseMapper = {
       details["Image"] = dockerUri;
     }
 
-    if (data?.createTime) {
-      const formatted = formatDateTime(data.createTime);
-      if (formatted) details["Image Created At"] = formatted;
-    }
-
-    if (data?.updateTime) {
-      const formatted = formatDateTime(data.updateTime);
-      if (formatted) details["Image Updated At"] = formatted;
-    }
+    Object.assign(details, artifactTimestampDetails(data));
 
     const sizeBytes = metadata?.imageSizeBytes;
     if (sizeBytes) {
@@ -120,6 +112,20 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
+
+function artifactTimestampDetails(data: ArtifactVersionData | undefined): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (data?.createTime) {
+    const formatted = formatDateTime(data.createTime);
+    if (formatted) details["Image Created At"] = formatted;
+  }
+
+  if (data?.updateTime) {
+    const formatted = formatDateTime(data.updateTime);
+    if (formatted) details["Image Updated At"] = formatted;
+  }
+  return details;
+}
 
 function formatDateTime(value?: string): string | undefined {
   if (!value) return undefined;
