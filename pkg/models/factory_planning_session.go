@@ -149,6 +149,33 @@ func (s *FactoryPlanningSession) CurrentSurvey() PlanningSessionSurvey {
 	return s.Survey.Data()
 }
 
+// ListAnalysisPlanningSessionsForWorkOrders loads the analysis session for
+// each work order. Work orders without a session are absent from the map.
+// Messages and activities stay unloaded.
+func ListAnalysisPlanningSessionsForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]*FactoryPlanningSession, error) {
+	sessionsByOrder := make(map[uuid.UUID]*FactoryPlanningSession)
+	if len(workOrderIDs) == 0 {
+		return sessionsByOrder, nil
+	}
+
+	var sessions []FactoryPlanningSession
+	err := tx.
+		Where("draft_work_order_id IN ?", workOrderIDs).
+		Where("kind = ?", PlanningSessionKindWorkOrderAnalysis).
+		Find(&sessions).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range sessions {
+		session := &sessions[i]
+		if session.DraftWorkOrderID == nil {
+			continue
+		}
+		sessionsByOrder[*session.DraftWorkOrderID] = session
+	}
+	return sessionsByOrder, nil
+}
+
 func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionParams) (*FactoryPlanningSession, error) {
 	repository := strings.TrimSpace(params.Repository)
 	if repository == "" || params.CreatedByUserID == uuid.Nil || params.CanvasID == uuid.Nil || strings.TrimSpace(params.Entrypoint) == "" {
