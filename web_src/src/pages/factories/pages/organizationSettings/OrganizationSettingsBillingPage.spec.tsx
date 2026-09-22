@@ -6,7 +6,6 @@ import { client } from "@/api-client/client.gen";
 
 import { DEFAULT_CREDIT_GRANTS, MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { IN_FOURTEEN_DAYS, IN_SEVENTEEN_DAYS } from "../../__fixtures__/factoryPageIds";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
   BUSINESS_ORGANIZATION_BILLING,
@@ -18,10 +17,11 @@ import {
   LAPSED_TOPUP_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+  ACTIVE_TRIAL_ENDS_AT,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
 
-const WELCOME_EXPIRY_LABEL = new Date(IN_FOURTEEN_DAYS).toLocaleDateString();
+const WELCOME_EXPIRY_LABEL = new Date(ACTIVE_TRIAL_ENDS_AT).toLocaleDateString();
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -321,7 +321,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent("Included usage");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent(
-      `Resets ${new Date(IN_SEVENTEEN_DAYS).toLocaleDateString()}`,
+      `Resets ${new Date("2026-10-09T12:00:00.000Z").toLocaleDateString()}`,
     );
     expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$41.24 remaining");
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");

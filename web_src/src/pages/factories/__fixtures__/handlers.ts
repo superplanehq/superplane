@@ -1,5 +1,4 @@
-import { BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
-import { IN_FOURTEEN_DAYS } from "./factoryPageIds";
+import { ACTIVE_TRIAL_ENDS_AT, BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
@@ -1073,7 +1072,7 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
         json: fixture.organizationBilling ?? {
           plan: "trial",
           planSource: "system",
-          trialEndsAt: IN_FOURTEEN_DAYS,
+          trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
           billingEnabled: true,
           subscriptionCheckoutEnabled: true,
           creditPurchaseAllowed: false,
@@ -1123,7 +1122,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
       json: fixture.organizationBilling ?? {
         plan: "trial",
         planSource: "system",
-        trialEndsAt: IN_FOURTEEN_DAYS,
+        trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
         billingEnabled: true,
         subscriptionCheckoutEnabled: true,
         creditPurchaseAllowed: false,

@@ -6,7 +6,6 @@ import { client } from "@/api-client/client.gen";
 
 import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { IN_FOURTEEN_DAYS, IN_SEVENTEEN_DAYS } from "../../__fixtures__/factoryPageIds";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
   ADMIN_ORGANIZATION_BILLING,
@@ -15,12 +14,14 @@ import {
   ENDING_ORGANIZATION_BILLING,
   PURCHASED_CREDIT_USAGE_REPORT,
   RESTORED_TRIAL_ORGANIZATION_BILLING,
+  ACTIVE_TRIAL_ENDS_AT,
+  ACTIVE_BILLING_PERIOD_ENDS_AT,
 } from "../../__fixtures__/usageReportFixtures";
 import { BILLING_SPEND_ORDER_COPY } from "../../lib/billingCreditBuckets";
 import { billingSubscriptionEndsCopy } from "../../lib/billingPlans";
 
-const WELCOME_EXPIRY_LABEL = new Date(IN_FOURTEEN_DAYS).toLocaleDateString();
-const BUSINESS_PERIOD_END = IN_SEVENTEEN_DAYS;
+const WELCOME_EXPIRY_LABEL = new Date(ACTIVE_TRIAL_ENDS_AT).toLocaleDateString();
+const BUSINESS_PERIOD_END = ACTIVE_BILLING_PERIOD_ENDS_AT;
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({

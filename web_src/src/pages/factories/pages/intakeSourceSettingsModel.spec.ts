@@ -149,10 +149,10 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.sentryLevels).toEqual([]);
   });
 
-  it("offers pause for Sentry and Jira intakes only", () => {
+  it("offers pause for GitHub, Sentry, and Jira intakes", () => {
+    expect(intakeSupportsPause("github-issues")).toBe(true);
     expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
     expect(intakeSupportsPause("jira-issues")).toBe(true);
-    expect(intakeSupportsPause("github-issues")).toBe(false);
     expect(intakeSupportsPause("productive-tasks")).toBe(false);
     expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
   });
