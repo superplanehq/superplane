@@ -66,6 +66,22 @@ function getSSHExitCode(execution: ExecutionInfo): number | undefined {
   return undefined;
 }
 
+function sshFinishedPassedState(execution: ExecutionInfo): EventState {
+  const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
+  if (outputs?.failed?.length) {
+    return "failed";
+  }
+
+  const code = getSSHExitCode(execution);
+  if (code === 0) {
+    return "success";
+  }
+  if (typeof code === "number") {
+    return "failed";
+  }
+  return "success";
+}
+
 const sshStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
@@ -86,19 +102,7 @@ const sshStateFunction = (execution: ExecutionInfo): EventState => {
   }
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
-    if (outputs?.failed?.length) {
-      return "failed";
-    }
-
-    const code = getSSHExitCode(execution);
-    if (code === 0) {
-      return "success";
-    }
-    if (typeof code === "number") {
-      return "failed";
-    }
-    return "success";
+    return sshFinishedPassedState(execution);
   }
 
   return "failed";

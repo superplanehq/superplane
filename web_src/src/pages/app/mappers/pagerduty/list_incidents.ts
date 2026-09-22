@@ -216,6 +216,28 @@ export const LIST_INCIDENTS_STATE_MAP: EventStateMap = {
   },
 };
 
+function listIncidentsPassedState(execution: ExecutionInfo): EventState {
+  const activeChannel = getActiveChannel(execution);
+
+  if (activeChannel === CHANNEL_HIGH) {
+    return "high";
+  }
+  if (activeChannel === CHANNEL_LOW) {
+    return "low";
+  }
+  if (activeChannel === CHANNEL_CLEAR) {
+    return "clear";
+  }
+
+  const incidents = getIncidents(execution);
+  if (incidents.length > 0) {
+    const hasHigh = incidents.some((i) => i.urgency === "high");
+    return hasHigh ? "high" : "low";
+  }
+
+  return "clear";
+}
+
 export const listIncidentsStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
@@ -240,26 +262,7 @@ export const listIncidentsStateFunction: StateFunction = (execution: ExecutionIn
 
   // Only analyze incident urgency for finished, successful executions
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const activeChannel = getActiveChannel(execution);
-
-    if (activeChannel === CHANNEL_HIGH) {
-      return "high";
-    }
-    if (activeChannel === CHANNEL_LOW) {
-      return "low";
-    }
-    if (activeChannel === CHANNEL_CLEAR) {
-      return "clear";
-    }
-
-    // Fallback: analyze incidents from data
-    const incidents = getIncidents(execution);
-    if (incidents.length > 0) {
-      const hasHigh = incidents.some((i) => i.urgency === "high");
-      return hasHigh ? "high" : "low";
-    }
-
-    return "clear";
+    return listIncidentsPassedState(execution);
   }
 
   return "failed";
