@@ -21,7 +21,6 @@ import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useMe } from "@/hooks/useMe";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
@@ -261,7 +260,7 @@ function prFeedbackSetupHref(
 
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
@@ -279,7 +278,6 @@ export function LinesPage() {
   const planningSettingsTab = planningSettingsTabFromSearch(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
-  const { data: me } = useMe(false);
   const listState = useWorkOrderListState(factoryId);
   const {
     workOrders,
@@ -287,7 +285,7 @@ export function LinesPage() {
     backlog: backlogPage,
     open: openPage,
     done: donePage,
-  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, me?.id));
+  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, currentUserId));
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
@@ -331,8 +329,8 @@ export function LinesPage() {
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
   const visibleWorkOrders = useMemo(
-    () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
-    [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
+    () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId),
+    [currentUserId, factory, listState.filters, listState.scope, listState.search, workOrders],
   );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
