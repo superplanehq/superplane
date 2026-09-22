@@ -16,10 +16,18 @@ var publishWorkOrderNotification = func(message FactoryWorkOrderNotificationMess
 	return message.Publish()
 }
 
+var publishPlanningBoardUpdate = PublishFactoryWorkOrderUpdated
+
 func SetWorkOrderNotificationPublisherForTest(fn func(FactoryWorkOrderNotificationMessage) error) func() {
 	previous := publishWorkOrderNotification
 	publishWorkOrderNotification = fn
 	return func() { publishWorkOrderNotification = previous }
+}
+
+func SetPlanningBoardPublisherForTest(fn func(factoryID, orderID, reason string) error) func() {
+	previous := publishPlanningBoardUpdate
+	publishPlanningBoardUpdate = fn
+	return func() { publishPlanningBoardUpdate = previous }
 }
 
 // PublishPlanningBoardStatus tells open lines boards to reload the work
@@ -29,10 +37,10 @@ func PublishPlanningBoardStatus(session *models.FactoryPlanningSession) {
 		return
 	}
 	reason := factory.EventTypeOrderUpdated
-	if len(session.CurrentSurvey().Questions) > 0 {
+	if session.HasPendingQuestion() {
 		reason = factory.EventTypeOrderAgentQuestion
 	}
-	if err := PublishFactoryWorkOrderUpdated(session.FactoryID.String(), session.DraftWorkOrderID.String(), reason); err != nil {
+	if err := publishPlanningBoardUpdate(session.FactoryID.String(), session.DraftWorkOrderID.String(), reason); err != nil {
 		log.WithError(err).Warnf("Failed to publish planning board status for session %s", session.ID)
 	}
 }

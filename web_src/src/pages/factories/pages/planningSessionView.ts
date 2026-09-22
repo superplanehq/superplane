@@ -161,7 +161,7 @@ export function createWithAgentViewFromSession(
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
     messages: planningSessionMessagesFromPayload(session),
-    survey: planningSessionSurveyFromPayload(session.survey),
+    survey: visiblePlanningSessionSurvey(session),
     composer: extras.composer,
     created: createdOrdersFromSession(session),
     right: planningSessionRightPane(session, extras.right),
@@ -213,6 +213,15 @@ function planningSessionRightPane(
   return { kind: "empty" };
 }
 
+function visiblePlanningSessionSurvey(
+  session: Pick<PlanningSessionPayload, "survey" | "state" | "waitState"> | null | undefined,
+): CreateWithAgentView["survey"] {
+  if (!planningSessionIsWaiting(session)) {
+    return undefined;
+  }
+  return planningSessionSurveyFromPayload(session?.survey);
+}
+
 function planningSessionSurveyFromPayload(
   survey: PlanningSessionSurveyPayload | null | undefined,
 ): CreateWithAgentView["survey"] {
@@ -231,9 +240,9 @@ function planningSessionSurveyFromPayload(
 }
 
 export function planningSessionHasPendingSurvey(
-  session: Pick<PlanningSessionPayload, "survey"> | null | undefined,
+  session: Pick<PlanningSessionPayload, "survey" | "state" | "waitState"> | null | undefined,
 ): boolean {
-  return Boolean(planningSessionSurveyFromPayload(session?.survey));
+  return Boolean(visiblePlanningSessionSurvey(session));
 }
 
 /** True when the session is held for the next user message. */
