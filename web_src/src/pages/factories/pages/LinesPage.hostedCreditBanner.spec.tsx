@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { client } from "@/api-client/client.gen";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
+import { IN_FOURTEEN_DAYS } from "../__fixtures__/factoryPageIds";
 import {
   defaultFactoriesFixture,
   PRIMARY_FACTORY_KEY,
@@ -19,7 +20,7 @@ import {
 } from "../__fixtures__/usageReportFixtures";
 import { HOSTED_CREDIT_RUNS_STOP_HINT, welcomeCreditHeaderLabel } from "../lib/hostedCreditEmpty";
 
-const defaultTrialLabel = welcomeCreditHeaderLabel(new Date("2026-09-22T12:00:00.000Z"));
+const defaultTrialLabel = welcomeCreditHeaderLabel(new Date(IN_FOURTEEN_DAYS));
 
 describe("LinesPage hosted credit banner", () => {
   beforeAll(() => {
