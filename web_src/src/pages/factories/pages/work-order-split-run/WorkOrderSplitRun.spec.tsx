@@ -129,17 +129,23 @@ function fixtureWithReviewPullRequest(state: "STATE_OPEN" | "STATE_MERGED"): Spl
 }
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const ui = (next: ComponentProps<typeof WorkOrderSplitRunPopup>) => (
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
-            <WorkOrderSplitRunPopup {...props} />
+            <WorkOrderSplitRunPopup {...next} />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(ui(props));
+  return {
+    ...view,
+    rerenderPopup: (next: ComponentProps<typeof WorkOrderSplitRunPopup> = props) => view.rerender(ui(next)),
+  };
 }
 
 function renderSplitRun() {
@@ -507,17 +513,21 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("updates header spend from live log telemetry while a step runs", async () => {
     const user = userEvent.setup();
-    const live = liveUsageTelemetry(2100, 0.45);
-    useLiveLogStreamMock.mockReturnValue({
-      ...idleLiveLogStream(vi.fn()),
-      telemetry: live,
-      usageSeries: [{ name: "Prompt", telemetry: live }],
-    });
-
-    renderPopup({
+    const setLiveSpend = (tokens: number, usd: number) => {
+      const live = liveUsageTelemetry(tokens, usd);
+      useLiveLogStreamMock.mockReturnValue({
+        ...idleLiveLogStream(vi.fn()),
+        telemetry: live,
+        usageSeries: [{ name: "Prompt", telemetry: live }],
+      });
+    };
+    const popupProps = {
       organizationId: FACTORIES_ORGANIZATION_ID,
       fixture: runningImplementWithZeroSavedSpend(),
-    });
+    };
+
+    setLiveSpend(2100, 0.45);
+    const view = renderPopup(popupProps);
 
     await waitFor(() => {
       expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
@@ -526,8 +536,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Task" }));
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
     expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
-    expect(screen.queryByTestId("split-run-log-scroll")).not.toBeInTheDocument();
+
+    setLiveSpend(3200, 0.67);
+    view.rerenderPopup();
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.67 · 3.2k tokens");
+    });
   });
 
   it("does not show a model on a draft that has not started", () => {
