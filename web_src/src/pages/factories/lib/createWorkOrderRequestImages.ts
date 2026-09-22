@@ -99,9 +99,11 @@ export function mergeCreateWorkOrderRequestImages(
 }
 
 export function appendUploadedWorkOrderImages(description: string, files: UploadedWorkOrderFile[]): string {
-  const blocks = files
-    .filter((file) => file.isImage)
-    .map((file) => `![${markdownImageLabel(file.filename)}](${file.ref})`);
+  const blocks = files.map((file) =>
+    file.isImage
+      ? `![${markdownFileLabel(file.filename)}](${file.ref})`
+      : `[${markdownFileLabel(file.filename)}](${file.ref})`,
+  );
   return [description.trimEnd(), ...blocks].filter((part) => part.length > 0).join("\n\n");
 }
 
@@ -114,6 +116,6 @@ export function removeCreateWorkOrderRequestMarkdownImage(markdown: string, id: 
   return next.replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function markdownImageLabel(filename: string): string {
-  return filename.replace(/[[\]()]/g, "").trim() || "image";
+function markdownFileLabel(filename: string): string {
+  return filename.replace(/[[\]()]/g, "").trim() || "file";
 }

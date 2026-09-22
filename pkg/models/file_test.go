@@ -22,6 +22,42 @@ func TestArtifactFilePolicyAllowsEvidenceAndUsesLargerLimit(t *testing.T) {
 	assert.Equal(t, int64(MaxFileBytes), File{Purpose: FilePurposeAttachment}.MaxBytes())
 }
 
+func TestAllowedFileContentTypesIncludeTextDataFiles(t *testing.T) {
+	allowed := []string{
+		"application/json",
+		"text/csv",
+		"application/yaml",
+		"text/yaml",
+		"application/x-yaml",
+		"APPLICATION/JSON",
+		"text/yaml; charset=utf-8",
+	}
+	for _, contentType := range allowed {
+		assert.True(t, IsAllowedFileContentType(contentType), contentType)
+	}
+
+	rejected := []string{"video/mp4", "application/zip", "text/html", "application/octet-stream"}
+	for _, contentType := range rejected {
+		assert.False(t, IsAllowedFileContentType(contentType), contentType)
+	}
+}
+
+func TestCreatePendingFileNormalizesYamlContentType(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "file-yaml")
+
+	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "config.yaml",
+		ContentType:    "text/yaml",
+		CreatedByID:    userID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "application/yaml", file.ContentType)
+}
+
 func TestCreatePendingFileRejectsDisallowedContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-type")
