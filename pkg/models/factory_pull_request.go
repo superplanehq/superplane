@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -570,17 +572,6 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		runIDs = append(runIDs, link.RunID)
 	}
 
-	var runs []CanvasRun
-	err = tx.Where("id IN ?", runIDs).Find(&runs).Error
-	if err != nil {
-		return nil, err
-	}
-
-	runByID := make(map[uuid.UUID]CanvasRun, len(runs))
-	for _, run := range runs {
-		runByID[run.ID] = run
-	}
-
 	revisionIDs := make([]uuid.UUID, 0)
 	seenRevisions := map[uuid.UUID]bool{}
 	for _, link := range links {
@@ -590,15 +581,42 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		seenRevisions[*link.RevisionID] = true
 		revisionIDs = append(revisionIDs, *link.RevisionID)
 	}
+
+	ctx := tx.Statement.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	g, gctx := errgroup.WithContext(ctx)
+
+	var runs []CanvasRun
+	g.Go(func() error {
+		if len(runIDs) == 0 {
+			return nil
+		}
+		return tx.WithContext(gctx).Where("id IN ?", runIDs).Find(&runs).Error
+	})
+
 	revisionByID := map[uuid.UUID]FactoryPullRequestRevision{}
-	if len(revisionIDs) > 0 {
+	g.Go(func() error {
+		if len(revisionIDs) == 0 {
+			return nil
+		}
 		var revisions []FactoryPullRequestRevision
-		if err := tx.Where("id IN ?", revisionIDs).Find(&revisions).Error; err != nil {
-			return nil, err
+		if err := tx.WithContext(gctx).Where("id IN ?", revisionIDs).Find(&revisions).Error; err != nil {
+			return err
 		}
 		for _, revision := range revisions {
 			revisionByID[revision.ID] = revision
 		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	runByID := make(map[uuid.UUID]CanvasRun, len(runs))
+	for _, run := range runs {
+		runByID[run.ID] = run
 	}
 
 	seenRunByPullRequest := map[uuid.UUID]map[uuid.UUID]bool{}

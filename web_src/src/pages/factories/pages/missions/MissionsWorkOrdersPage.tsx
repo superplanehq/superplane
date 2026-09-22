@@ -1,5 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { WorkOrdersLoadedView } from "../../workOrders/WorkOrdersLoadedView";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { useBrokenIntegrationsBanner } from "../../lib/useBrokenIntegrationsBanner";
 import { useHostedCreditChrome } from "../../lib/useHostedCreditEmptyBanner";
+import { pullRequestsFromWorkOrders } from "../../lib/workOrderPullRequest";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 
 /** Storybook-only Tasks page with a Missions rail. */
@@ -28,7 +29,7 @@ export function MissionsWorkOrdersPage() {
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(workOrders);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");

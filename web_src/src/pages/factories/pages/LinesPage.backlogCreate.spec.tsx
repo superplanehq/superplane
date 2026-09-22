@@ -101,7 +101,6 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
-  useFactoryPullRequests: () => ({ data: [] }),
   useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
