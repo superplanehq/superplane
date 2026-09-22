@@ -47,6 +47,28 @@ describe("WorkspaceLoadingProvider", () => {
     expect(screen.getAllByTestId(WORKSPACE_LOADING_TEST_ID)).toHaveLength(1);
   });
 
+  it("keeps the same screen when one pending reporter replaces another", () => {
+    const { rerender } = render(
+      <WorkspaceLoadingProvider>
+        <PendingReporter key="account" message={WORKSPACE_LOADING_COPY.account} pending />
+      </WorkspaceLoadingProvider>,
+    );
+
+    const status = screen.getByTestId(WORKSPACE_LOADING_TEST_ID);
+    expect(status).toHaveTextContent(WORKSPACE_LOADING_COPY.account);
+
+    rerender(
+      <WorkspaceLoadingProvider>
+        <PendingReporter key="access" message={WORKSPACE_LOADING_COPY.access} pending />
+      </WorkspaceLoadingProvider>,
+    );
+
+    const nextStatus = screen.getByTestId(WORKSPACE_LOADING_TEST_ID);
+    expect(nextStatus).toBe(status);
+    expect(nextStatus).toHaveTextContent(WORKSPACE_LOADING_COPY.access);
+    expect(screen.getAllByTestId(WORKSPACE_LOADING_TEST_ID)).toHaveLength(1);
+  });
+
   it("hides the screen when nothing is pending", () => {
     const { rerender } = render(
       <WorkspaceLoadingProvider>

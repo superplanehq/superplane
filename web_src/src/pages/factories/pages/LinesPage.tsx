@@ -408,7 +408,7 @@ export function LinesPage() {
   const holdBoard = workOrdersLoading && !redirectCanonical && Boolean(selectedLine);
   const overlayHoldsBoard = useWorkspaceLoading(WORKSPACE_LOADING_COPY.board, holdBoard);
 
-  if (redirectCanonical) {
+  if (redirectCanonical && canonicalNumber) {
     return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
   }
 
