@@ -1,14 +1,17 @@
-import type { FormEvent, ReactNode } from "react";
+import { useRef, type FormEvent, type ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
+import { useSpeechDictation, type UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { appendSpokenPhrase } from "@/lib/appendSpokenPhrase";
 import { cn } from "@/lib/utils";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
+import { DictateButton } from "../../DictateButton";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -190,10 +193,20 @@ function AnalysisComposer({
   chatColumnClass: string;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
+  const composerRef = useRef(analysis.composer);
+  composerRef.current = analysis.composer;
+  const dictation = useSpeechDictation({
+    onFinalPhrase: (phrase) => {
+      const next = appendSpokenPhrase(composerRef.current, phrase);
+      composerRef.current = next;
+      analysis.onComposerChange(next);
+    },
+  });
   const send = async () => {
     if (!canSubmit) {
       return;
     }
+    dictation.stop();
     const pending = images.takePending();
     const result = await analysis.onSend(appendUploadedWorkOrderImages(analysis.composer, pending));
     if (result === false) {
@@ -253,17 +266,7 @@ function AnalysisComposer({
               rows={2}
             />
             <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
-              <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
-                {analysis.onUploadFiles ? (
-                  <CreateWorkOrderRequestAttachButton
-                    disabled={!images.canAttach}
-                    onAttach={(files) => void images.attach(files)}
-                  />
-                ) : null}
-                {images.previewImages.length > 0 ? (
-                  <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
-                ) : null}
-              </div>
+              <AnalysisComposerAddons analysis={analysis} images={images} dictation={dictation} />
               <div className="flex items-center gap-1.5">
                 <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
                   {ANALYSIS_PLANNING_COPY.sendShortcut}
@@ -289,6 +292,31 @@ function AnalysisComposer({
           </p>
         ) : null}
       </form>
+    </div>
+  );
+}
+
+function AnalysisComposerAddons({
+  analysis,
+  images,
+  dictation,
+}: {
+  analysis: IntentAnalysisChat;
+  images: ReturnType<typeof useAnalysisComposerImages>;
+  dictation: UseSpeechDictationResult;
+}) {
+  return (
+    <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
+      {analysis.onUploadFiles ? (
+        <CreateWorkOrderRequestAttachButton
+          disabled={!images.canAttach}
+          onAttach={(files) => void images.attach(files)}
+        />
+      ) : null}
+      <DictateButton dictation={dictation} copy={ANALYSIS_PLANNING_COPY} disabled={!analysis.canSend} />
+      {images.previewImages.length > 0 ? (
+        <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
+      ) : null}
     </div>
   );
 }
