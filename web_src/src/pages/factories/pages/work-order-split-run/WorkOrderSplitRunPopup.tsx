@@ -406,12 +406,7 @@ function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, t
   return !sourceOnly && !showSidebarNote && tab === "description";
 }
 
-function analysisShellReview(
-  sourceOnly: boolean,
-  showSidebarNote: boolean,
-  tab: string,
-  review: ReactNode,
-) {
+function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
   if (sourceOnly || (!showSidebarNote && tab !== "description")) {
     return review;
   }
