@@ -2,13 +2,17 @@ package public
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -129,4 +133,152 @@ func Test__isHostedSentryAppBrowserCallback(t *testing.T) {
 	assert.True(t, isHostedSentryAppBrowserCallback(install, hosted))
 	assert.False(t, isHostedSentryAppBrowserCallback(setup, legacy))
 	assert.False(t, isHostedSentryAppBrowserCallback(webhook, hosted))
+}
+
+func Test__applySentryWebhookErrorTags_setsTagsOnEvent(t *testing.T) {
+	transport := &captureTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:              "https://examplePublicKey@o0.ingest.sentry.io/0",
+		Transport:        transport,
+		AttachStacktrace: false,
+	})
+	require.NoError(t, err)
+	defer client.Flush(0)
+
+	hub := sentry.NewHub(client, sentry.NewScope())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", nil)
+	req.Header.Set("Sentry-Hook-Resource", "issue")
+
+	hub.WithScope(func(scope *sentry.Scope) {
+		applySentryWebhookErrorTags(scope, req, []string{
+			"installation_uuid", "inst-abc",
+			"integration_id", "int-123",
+			"inner_status", "500",
+		})
+		hub.CaptureException(errors.New("test error"))
+	})
+	hub.Flush(0)
+
+	require.NotNil(t, transport.lastEvent)
+	assert.Equal(t, "inst-abc", transport.lastEvent.Tags["installation_uuid"])
+	assert.Equal(t, "int-123", transport.lastEvent.Tags["integration_id"])
+	assert.Equal(t, "500", transport.lastEvent.Tags["inner_status"])
+	assert.Equal(t, "issue", transport.lastEvent.Tags["hook_resource"])
+}
+
+func Test__applySentryWebhookErrorTags_noRequestAddsOnlyManualTags(t *testing.T) {
+	transport := &captureTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:              "https://examplePublicKey@o0.ingest.sentry.io/0",
+		Transport:        transport,
+		AttachStacktrace: false,
+	})
+	require.NoError(t, err)
+	defer client.Flush(0)
+
+	hub := sentry.NewHub(client, sentry.NewScope())
+
+	hub.WithScope(func(scope *sentry.Scope) {
+		applySentryWebhookErrorTags(scope, nil, []string{"installation_uuid", "inst-abc"})
+		hub.CaptureException(errors.New("test error"))
+	})
+	hub.Flush(0)
+
+	require.NotNil(t, transport.lastEvent)
+	assert.Equal(t, "inst-abc", transport.lastEvent.Tags["installation_uuid"])
+	_, hasHookResource := transport.lastEvent.Tags["hook_resource"]
+	assert.False(t, hasHookResource)
+}
+
+func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
+	t.Setenv(config.EnvSentryAppSlug, "superplane")
+	t.Setenv(config.EnvSentryAppClientID, "cid")
+	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
+
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-client-secret")
+	server, err := NewServer(
+		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
+		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+	)
+	require.NoError(t, err)
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
+	req := sentryWebhookRequest(body, "issue")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	server.HandleSentryAppWebhook(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
+	r := support.Setup(t)
+
+	integration, err := models.CreateIntegration(
+		uuid.New(), r.Organization.ID, "sentry", support.RandomName("sentry"), map[string]any{},
+	)
+	require.NoError(t, err)
+	integration.Metadata = datatypes.NewJSONType(map[string]any{
+		"hostedApp":        true,
+		"installationUUID": "install-1",
+	})
+	require.NoError(t, database.Conn().Save(integration).Error)
+
+	t.Run("dropped delivery tags carry the integration and status", func(t *testing.T) {
+		transport := &captureTransport{}
+		client, err := sentry.NewClient(sentry.ClientOptions{
+			Dsn:              "https://examplePublicKey@o0.ingest.sentry.io/0",
+			Transport:        transport,
+			AttachStacktrace: false,
+		})
+		require.NoError(t, err)
+		defer client.Flush(0)
+
+		hub := sentry.NewHub(client, sentry.NewScope())
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", nil)
+		req.Header.Set("Sentry-Hook-Resource", "issue")
+
+		hub.WithScope(func(scope *sentry.Scope) {
+			applySentryWebhookErrorTags(scope, req, []string{
+				"integration_id", integration.ID.String(),
+				"inner_status", "502",
+			})
+			hub.CaptureException(errors.New(
+				"delivery failed for integration " + integration.ID.String() + ": inner_status=502",
+			))
+		})
+		hub.Flush(0)
+
+		require.NotNil(t, transport.lastEvent)
+		assert.Equal(t, integration.ID.String(), transport.lastEvent.Tags["integration_id"])
+		assert.Equal(t, "502", transport.lastEvent.Tags["inner_status"])
+		assert.Equal(t, "issue", transport.lastEvent.Tags["hook_resource"])
+	})
+}
+
+func Test__joinStatuses(t *testing.T) {
+	assert.Equal(t, "", joinStatuses(nil))
+	assert.Equal(t, "500", joinStatuses([]int{500}))
+	assert.Equal(t, "502,503", joinStatuses([]int{502, 503}))
+}
+
+type captureTransport struct {
+	lastEvent *sentry.Event
+}
+
+func (t *captureTransport) Configure(options sentry.ClientOptions) {}
+
+func (t *captureTransport) SendEvent(event *sentry.Event) {
+	t.lastEvent = event
+}
+
+func (t *captureTransport) Flush(timeout time.Duration) bool {
+	return true
 }
