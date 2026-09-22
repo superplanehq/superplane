@@ -14,7 +14,7 @@ import (
 
 type taskListCommand struct {
 	workspace  *string
-	assignees  *[]string
+	user       *string
 	states     *[]string
 	results    *[]string
 	unassigned *bool
@@ -26,15 +26,15 @@ func (c *taskListCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	request := ctx.API.FactoryAPI.FactoriesListWorkOrders(ctx.Context, workspaceID)
+	request := ctx.API.FactoryAPI.FactoriesListWorkOrders(ctx.Context, workspaceID).Limit(100)
 
-	if c.assignees != nil && len(*c.assignees) > 0 {
-		assigneeIDs, err := resolveAssigneeIDs(ctx, *c.assignees)
+	if c.user != nil && strings.TrimSpace(*c.user) != "" {
+		userIDs, err := resolveAssigneeIDs(ctx, []string{*c.user})
 		if err != nil {
 			return err
 		}
-		if len(assigneeIDs) > 0 {
-			request = request.AssigneeIds(assigneeIDs)
+		if len(userIDs) > 0 {
+			request = request.UserId(userIDs[0])
 		}
 	}
 
