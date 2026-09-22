@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -12,12 +12,7 @@ import {
   type ConfidenceBand,
 } from "../lib/confidenceScore";
 import { SCORE_KINDS, scoreSummaryText, type ScoreKind, type ScoreSummaryValue } from "../lib/scoreSummary";
-import {
-  CONFIDENCE_ANALYZING_LABEL,
-  CONFIDENCE_ANALYZING_TOOLTIP,
-  ConfidenceAnalyzingIndicator,
-  ConfidenceMeter,
-} from "./ConfidenceMeter";
+import { CONFIDENCE_ANALYZING_LABEL, CONFIDENCE_ANALYZING_TOOLTIP, ConfidenceMeter } from "./ConfidenceMeter";
 
 const ITEM_CLASS = "inline-flex h-7 items-center gap-1.5 px-1.5 text-[12px] leading-none";
 
@@ -98,19 +93,18 @@ export function ScoreEvidence({
   const score = value?.score;
   const summary = scoreSummaryText(kind, value);
 
+  // The verdict above already animates while the agent works. The score
+  // slots stay quiet and show the same dash as a missing score.
   if (isAnalyzing) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={ITEM_CLASS} aria-label={`${label.short}. ${CONFIDENCE_ANALYZING_LABEL}`} role="status">
-            <ScoreEvidenceLabel>{label.short}</ScoreEvidenceLabel>
-            <ConfidenceAnalyzingIndicator
-              testId={testId ? `${testId}-analyzing` : undefined}
-              showTooltip={false}
-              decorative
-              className="shrink-0"
-            />
-          </span>
+          <ScoreEvidencePlaceholder
+            label={label.short}
+            ariaLabel={`${label.short}. ${CONFIDENCE_ANALYZING_LABEL}`}
+            role="status"
+            testId={testId ? `${testId}-analyzing` : undefined}
+          />
         </TooltipTrigger>
         <TooltipContent>{CONFIDENCE_ANALYZING_TOOLTIP}</TooltipContent>
       </Tooltip>
@@ -118,12 +112,7 @@ export function ScoreEvidence({
   }
 
   if (score == null || !summary) {
-    return (
-      <span className={ITEM_CLASS} aria-label={`${label.short}. No score yet`} data-testid={testId}>
-        <ScoreEvidenceLabel>{label.short}</ScoreEvidenceLabel>
-        <span className="tabular-nums text-muted-foreground">–</span>
-      </span>
-    );
+    return <ScoreEvidencePlaceholder label={label.short} ariaLabel={`${label.short}. No score yet`} testId={testId} />;
   }
 
   return (
@@ -148,6 +137,25 @@ export function ScoreEvidence({
 
 function ScoreEvidenceLabel({ children }: { children: ReactNode }) {
   return <span className="text-muted-foreground">{children}</span>;
+}
+
+/** Spreads the rest so a TooltipTrigger can attach its ref and handlers. */
+function ScoreEvidencePlaceholder({
+  label,
+  ariaLabel,
+  testId,
+  ...rest
+}: {
+  label: string;
+  ariaLabel: string;
+  testId?: string;
+} & ComponentPropsWithRef<"span">) {
+  return (
+    <span {...rest} className={ITEM_CLASS} aria-label={ariaLabel} data-testid={testId}>
+      <ScoreEvidenceLabel>{label}</ScoreEvidenceLabel>
+      <span className="tabular-nums text-muted-foreground">–</span>
+    </span>
+  );
 }
 
 /** Hover peeks, click pins. A pinned card stays until the next click. */
