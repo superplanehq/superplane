@@ -11,11 +11,15 @@ import { SplitRunReview } from "./SplitRunReview";
 import { START_CONFIRM_COPY, START_CONFIRM_STORAGE_KEY } from "./startConfirm";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
-function renderConfirmReview(onStart: () => void, footer = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer) {
+function renderConfirmReview(
+  onStart: () => void,
+  footer = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+  agentWorking = false,
+) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <TooltipProvider>
-        <SplitRunReview footer={footer} onStart={onStart} confirmUnclearStart />
+        <SplitRunReview footer={footer} onStart={onStart} confirmUnclearStart agentWorking={agentWorking} />
       </TooltipProvider>
     </QueryClientProvider>,
   );
@@ -94,6 +98,69 @@ describe("SplitRunReview start confirm", () => {
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
+  });
+
+  it("warns while the agent still works, even when scores are high", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(
+      onStart,
+      {
+        ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+        clarityScore: 4,
+        confidenceScore: 5,
+      },
+      true,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.getByText(START_CONFIRM_COPY.working)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: START_CONFIRM_COPY.cancel }));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
+  });
+
+  it("starts after confirm while the agent still works", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(
+      onStart,
+      {
+        ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+        clarityScore: 4,
+        confidenceScore: 5,
+      },
+      true,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(screen.getByRole("button", { name: START_CONFIRM_COPY.confirm }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let Do not ask again skip the still-working confirm", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    const readyFooter = {
+      ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+      clarityScore: 4,
+      confidenceScore: 5,
+    };
+    const { unmount } = renderConfirmReview(onStart, readyFooter, true);
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(screen.getByTestId("split-run-start-dont-ask"));
+    await user.click(screen.getByRole("button", { name: START_CONFIRM_COPY.confirm }));
+    expect(window.localStorage.getItem(START_CONFIRM_STORAGE_KEY)).toBe("1");
+    expect(onStart).toHaveBeenCalledTimes(1);
+    unmount();
+
+    renderConfirmReview(onStart, readyFooter, true);
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(START_CONFIRM_COPY.working)).toBeInTheDocument();
   });
 
   it("starts immediately on an intake draft with a high Confidence", async () => {

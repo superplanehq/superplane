@@ -39,12 +39,14 @@ func TestListAnalysisPlanningSessionsForWorkOrders(t *testing.T) {
 	assert.Equal(t, PlanningSessionStateRunning, working.State)
 	assert.Equal(t, PlanningWaitIdle, working.WaitState)
 	assert.Empty(t, working.CurrentSurvey().Questions)
+	assert.False(t, working.HasPendingQuestion())
 
 	asked := sessions[questionOrder.ID]
 	require.NotNil(t, asked)
 	assert.Equal(t, PlanningWaitPending, asked.WaitState)
 	require.Len(t, asked.CurrentSurvey().Questions, 1)
 	assert.Equal(t, "Which API?", asked.CurrentSurvey().Questions[0].Prompt)
+	assert.True(t, asked.HasPendingQuestion())
 
 	_, listed := sessions[plainOrder.ID]
 	assert.False(t, listed)
