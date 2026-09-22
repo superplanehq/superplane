@@ -2,11 +2,13 @@ import type { FormEvent, ReactNode } from "react";
 import { ArrowUp, FileText, X } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
@@ -253,20 +255,7 @@ function AnalysisComposer({
               rows={2}
             />
             <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
-              <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
-                {analysis.onUploadFiles ? (
-                  <CreateWorkOrderRequestAttachButton
-                    disabled={!images.canAttach}
-                    onAttach={(files) => void images.attach(files)}
-                  />
-                ) : null}
-                {images.previewImages.length > 0 ? (
-                  <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
-                ) : null}
-                {images.pendingFiles.length > 0 ? (
-                  <PendingWorkOrderFileChips files={images.pendingFiles} onRemove={images.remove} />
-                ) : null}
-              </div>
+              <AnalysisComposerAttachments images={images} onUploadFiles={analysis.onUploadFiles} />
               <div className="flex items-center gap-1.5">
                 <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
                   {ANALYSIS_PLANNING_COPY.sendShortcut}
@@ -296,6 +285,32 @@ function AnalysisComposer({
   );
 }
 
+function AnalysisComposerAttachments({
+  images,
+  onUploadFiles,
+}: {
+  images: ReturnType<typeof useAnalysisComposerImages>;
+  onUploadFiles?: IntentAnalysisChat["onUploadFiles"];
+}) {
+  return (
+    <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
+      {onUploadFiles ? (
+        <CreateWorkOrderRequestAttachButton
+          accept={WORK_ORDER_FILE_ACCEPT}
+          disabled={!images.canAttach}
+          onAttach={(files) => void images.attach(files)}
+        />
+      ) : null}
+      {images.previewImages.length > 0 ? (
+        <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
+      ) : null}
+      {images.pendingFiles.length > 0 ? (
+        <PendingWorkOrderFileChips files={images.pendingFiles} onRemove={images.remove} />
+      ) : null}
+    </div>
+  );
+}
+
 function PendingWorkOrderFileChips({
   files,
   onRemove,
@@ -315,15 +330,17 @@ function PendingWorkOrderFileChips({
           <span className="truncate" title={file.filename}>
             {file.filename}
           </span>
-          <button
+          <Button
             type="button"
-            className="shrink-0 text-muted-foreground hover:text-foreground"
+            variant="ghost"
+            size="icon-xs"
+            className="size-4 shrink-0 text-muted-foreground hover:text-foreground"
             aria-label={`Remove ${file.filename}`}
             data-testid={`create-work-order-request-file-remove-${file.id}`}
             onClick={() => onRemove(file.id)}
           >
             <X className="size-3" aria-hidden />
-          </button>
+          </Button>
         </span>
       ))}
     </div>

@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_READINESS_NOTES } from "../../lib/draftReadiness";
@@ -322,6 +323,7 @@ describe("WorkOrderIntentDocument composer", () => {
       />,
     );
 
+    expect(input().getAttribute("accept")).toBe(WORK_ORDER_FILE_ACCEPT);
     await user.upload(input(), composerTextFile("notes.txt"));
     await waitFor(() => expect(screen.getByTestId("create-work-order-request-file-file-1")).toBeInTheDocument());
     expect(screen.getByTestId("create-work-order-request-file-file-1")).toHaveTextContent("notes.txt");
