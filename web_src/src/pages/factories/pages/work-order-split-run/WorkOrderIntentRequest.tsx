@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from "react";
+import { useRef, type FormEvent, type ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
@@ -193,9 +193,13 @@ function AnalysisComposer({
   chatColumnClass: string;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
+  const composerRef = useRef(analysis.composer);
+  composerRef.current = analysis.composer;
   const dictation = useSpeechDictation({
     onFinalPhrase: (phrase) => {
-      analysis.onComposerChange(appendSpokenPhrase(analysis.composer, phrase));
+      const next = appendSpokenPhrase(composerRef.current, phrase);
+      composerRef.current = next;
+      analysis.onComposerChange(next);
     },
   });
   const send = async () => {

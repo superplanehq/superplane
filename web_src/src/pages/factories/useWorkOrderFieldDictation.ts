@@ -24,13 +24,21 @@ export function useWorkOrderFieldDictation({
   rememberDescription: () => void;
 } {
   const lastFieldRef = useRef<WorkOrderDictationField>("description");
+  const titleRef = useRef(title);
+  const descriptionRef = useRef(description);
+  titleRef.current = title;
+  descriptionRef.current = description;
   const dictation = useSpeechDictation({
     onFinalPhrase: (phrase) => {
       if (lastFieldRef.current === "title") {
-        onTitleChange(appendSpokenPhrase(title, phrase, maxTitleLength));
+        const next = appendSpokenPhrase(titleRef.current, phrase, maxTitleLength);
+        titleRef.current = next;
+        onTitleChange(next);
         return;
       }
-      onDescriptionChange(appendSpokenPhrase(description, phrase, maxDescriptionLength));
+      const next = appendSpokenPhrase(descriptionRef.current, phrase, maxDescriptionLength);
+      descriptionRef.current = next;
+      onDescriptionChange(next);
     },
   });
 

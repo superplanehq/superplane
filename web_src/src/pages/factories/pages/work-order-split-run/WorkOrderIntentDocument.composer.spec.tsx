@@ -73,6 +73,13 @@ function emitTranscript(transcript: string, isFinal: boolean) {
   });
 }
 
+function emitFinalPhrases(transcripts: string[]) {
+  latestRecognition().onresult?.({
+    resultIndex: 0,
+    results: transcripts.map((transcript) => Object.assign([{ transcript }], { isFinal: true, 0: { transcript } })),
+  });
+}
+
 describe("WorkOrderIntentDocument composer", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -469,6 +476,31 @@ describe("WorkOrderIntentDocument composer", () => {
     });
 
     expect(onComposerChange).toHaveBeenCalledWith("Need the empty state. Confirm the copy");
+  });
+
+  it("keeps every final phrase from one recognition event", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    const onComposerChange = vi.fn();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          view: WAITING_COMPOSER_VIEW,
+          composer: "Need the empty state.",
+          onComposerChange,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitFinalPhrases(["Confirm the copy", "and spacing"]);
+    });
+
+    expect(onComposerChange).toHaveBeenNthCalledWith(1, "Need the empty state. Confirm the copy");
+    expect(onComposerChange).toHaveBeenNthCalledWith(2, "Need the empty state. Confirm the copy and spacing");
   });
 
   it("stops dictation before send", async () => {

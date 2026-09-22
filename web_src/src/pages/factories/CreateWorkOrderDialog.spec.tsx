@@ -90,6 +90,13 @@ function emitTranscript(transcript: string, isFinal: boolean) {
   });
 }
 
+function emitFinalPhrases(transcripts: string[]) {
+  latestRecognition().onresult?.({
+    resultIndex: 0,
+    results: transcripts.map((transcript) => Object.assign([{ transcript }], { isFinal: true, 0: { transcript } })),
+  });
+}
+
 function renderDialog(
   factory = factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: true, confidence: true }),
 ) {
@@ -281,6 +288,20 @@ describe("CreateWorkOrderDialog", () => {
     });
 
     expect(screen.getByTestId("work-order-title-input")).toHaveValue("Fix refunds");
+  });
+
+  it("keeps every final phrase from one recognition event", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("work-order-title-input"));
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitFinalPhrases(["Fix refunds", "on retry"]);
+    });
+
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("Fix refunds on retry");
   });
 
   it("truncates a dictated title to 256 characters", async () => {

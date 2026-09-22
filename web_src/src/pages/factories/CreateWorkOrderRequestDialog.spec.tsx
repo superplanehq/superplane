@@ -77,6 +77,13 @@ function emitTranscript(transcript: string, isFinal: boolean) {
   });
 }
 
+function emitFinalPhrases(transcripts: string[]) {
+  latestRecognition().onresult?.({
+    resultIndex: 0,
+    results: transcripts.map((transcript) => Object.assign([{ transcript }], { isFinal: true, 0: { transcript } })),
+  });
+}
+
 function renderRequestDialog(overrides: Partial<Parameters<typeof CreateWorkOrderRequestDialog>[0]> = {}) {
   return render(
     <CreateWorkOrderRequestDialog
@@ -378,6 +385,21 @@ describe("CreateWorkOrderRequestDialog", () => {
     });
 
     expect(onDescriptionChange).toHaveBeenCalledWith("Refunds fail on retry");
+  });
+
+  it("keeps every final phrase from one recognition event", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
+    const user = userEvent.setup();
+    const onDescriptionChange = vi.fn();
+    renderRequestDialog({ description: "Refunds fail.", onDescriptionChange });
+
+    await user.click(screen.getByTestId("dictate-button"));
+    act(() => {
+      emitFinalPhrases(["Retry the job", "Check logs"]);
+    });
+
+    expect(onDescriptionChange).toHaveBeenNthCalledWith(1, "Refunds fail. Retry the job");
+    expect(onDescriptionChange).toHaveBeenNthCalledWith(2, "Refunds fail. Retry the job Check logs");
   });
 
   it("appends a final phrase to the title when the title was last focused", async () => {
