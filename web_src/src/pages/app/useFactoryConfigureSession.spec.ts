@@ -148,6 +148,40 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
     layoutSpy.mockRestore();
   });
 
+  it("does not apply a layout result after the draft is edited", async () => {
+    const applyLocalWorkflowUpdate = vi.fn();
+    let releaseLayout: (workflow: CanvasesCanvas) => void = () => {};
+    const layoutSpy = vi.spyOn(DefaultLayoutEngine, "apply").mockImplementation(
+      () =>
+        new Promise<CanvasesCanvas>((resolve) => {
+          releaseLayout = resolve;
+        }),
+    );
+    const options = baseOptions({ applyLocalWorkflowUpdate, factoryAutoLayout: true, components: [] });
+    renderHook(() => useFactoryConfigureSession(options));
+
+    const pending = options.factoryConfigureActionsRef.current?.applyDraftSpec({
+      nodes: [{ id: "new-node" }],
+      edges: [],
+    });
+    options.draftCanvasSpecsRef.current.set("version-live", {
+      nodes: [{ id: "user-edit" }],
+      edges: [],
+    });
+    releaseLayout({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "laid-out" }], edges: [] },
+    });
+    await pending;
+
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledTimes(1);
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledWith({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "new-node" }], edges: [] },
+    });
+    layoutSpy.mockRestore();
+  });
+
   it("does nothing without a current workflow snapshot", async () => {
     const applyLocalWorkflowUpdate = vi.fn();
     const options = baseOptions({

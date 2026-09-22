@@ -9,6 +9,7 @@ import {
   type FactoryConfigureSaveOptions,
 } from "./factoryConfigureActions";
 import { useFactoryConfigureEnter } from "./useFactoryConfigureEnter";
+import { getWorkflowSpecSignature } from "./lib/draft-canvas-sync";
 import { applyFactoryCanvasLayout } from "./useTopologyMutationCommit";
 
 export type FactoryConfigureActions = {
@@ -188,6 +189,13 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
             }
             const nextWorkflow = await applyFactoryCanvasLayout(merged, componentsRef.current || []);
             if (!sessionMatches()) {
+              return;
+            }
+            const latestDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionIdRef.current);
+            if (
+              latestDraftSpec != null &&
+              getWorkflowSpecSignature(latestDraftSpec) !== getWorkflowSpecSignature(merged.spec)
+            ) {
               return;
             }
             applyLocalWorkflowUpdate(nextWorkflow);
