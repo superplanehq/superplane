@@ -38,6 +38,7 @@ export type IntentAnalysisChat = {
   composer: string;
   composerError?: string;
   canSend: boolean;
+  canStop?: boolean;
   isUploading?: boolean;
   onComposerChange: (value: string) => void;
   onSend: (text?: string) => void | Promise<boolean>;
@@ -274,6 +275,7 @@ function AnalysisComposer({
                 showStop={showStop}
                 onStop={analysis.onStop}
                 stopping={analysis.stopping}
+                canStop={analysis.canStop}
               />
             </InputGroupAddon>
           </InputGroup>
@@ -293,18 +295,20 @@ function AnalysisComposerActions({
   showStop,
   onStop,
   stopping,
+  canStop,
 }: {
   canSubmit: boolean;
   showStop: boolean;
   onStop?: () => void | Promise<void>;
   stopping?: boolean;
+  canStop?: boolean;
 }) {
   return (
     <div className="flex items-center gap-1.5">
       <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
         {ANALYSIS_PLANNING_COPY.sendShortcut}
       </Kbd>
-      {showStop && onStop ? <AnalysisStopButton onStop={onStop} stopping={stopping} /> : null}
+      {showStop && onStop ? <AnalysisStopButton onStop={onStop} stopping={stopping} canStop={canStop} /> : null}
       <InputGroupButton
         type="submit"
         variant="default"
@@ -320,7 +324,15 @@ function AnalysisComposerActions({
   );
 }
 
-function AnalysisStopButton({ onStop, stopping }: { onStop: () => void | Promise<void>; stopping?: boolean }) {
+function AnalysisStopButton({
+  onStop,
+  stopping,
+  canStop,
+}: {
+  onStop: () => void | Promise<void>;
+  stopping?: boolean;
+  canStop?: boolean;
+}) {
   return (
     <InputGroupButton
       type="button"
@@ -328,7 +340,7 @@ function AnalysisStopButton({ onStop, stopping }: { onStop: () => void | Promise
       size="icon-sm"
       className="rounded-full"
       onClick={() => void onStop()}
-      disabled={stopping}
+      disabled={stopping || canStop === false}
       aria-label={stopping ? "Stopping" : "Stop"}
       title={stopping ? "Stopping" : "Stop"}
       data-testid="split-run-intent-composer-stop"

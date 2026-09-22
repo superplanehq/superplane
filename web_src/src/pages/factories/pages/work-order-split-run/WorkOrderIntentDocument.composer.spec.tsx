@@ -321,6 +321,32 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(screen.queryByTestId("split-run-intent-composer-stop")).not.toBeInTheDocument();
   });
 
+  it("hides Stop when the analysis chat has no stop action", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        analysis={analysisChat({ view: { machineStatus: "running" }, onStop: undefined })}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-intent-composer-stop")).not.toBeInTheDocument();
+  });
+
+  it("disables Stop while a send is in flight", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        analysis={analysisChat({ view: { machineStatus: "running" }, canStop: false })}
+      />,
+    );
+
+    const stop = screen.getByTestId("split-run-intent-composer-stop");
+    expect(stop).toHaveAccessibleName("Stop");
+    expect(stop).toBeDisabled();
+  });
+
   it("calls onStop from the Stop control and keeps the chat open", async () => {
     const user = userEvent.setup();
     const onStop = vi.fn();

@@ -143,17 +143,30 @@ function analysisView(session: PlanningSessionPayload | null, composer: string, 
   });
 }
 
-function analysisSendState(
-  session: PlanningSessionPayload | null,
-  machineStatus: string,
-  canUpdate: boolean,
-  sendPending: boolean,
-  isUploading = false,
-) {
+function analysisLiveFlags(session: PlanningSessionPayload | null, machineStatus: string) {
   const stopped = machineStatus === "failed" || machineStatus === "passed";
-  const isLive = Boolean(session?.id && session.state !== "ended" && !stopped);
-  const canRestart = Boolean(session?.id && (session.state === "ended" || stopped));
-  return { isLive, canSend: canUpdate && !sendPending && !isUploading && (isLive || canRestart) };
+  return {
+    isLive: Boolean(session?.id && session.state !== "ended" && !stopped),
+    canRestart: Boolean(session?.id && (session.state === "ended" || stopped)),
+  };
+}
+
+function analysisSendState(args: {
+  session: PlanningSessionPayload | null;
+  machineStatus: string;
+  canUpdate: boolean;
+  sendPending: boolean;
+  isUploading?: boolean;
+  stopPending?: boolean;
+}) {
+  const { session, machineStatus, canUpdate, sendPending, isUploading = false, stopPending = false } = args;
+  const { isLive, canRestart } = analysisLiveFlags(session, machineStatus);
+  const idle = canUpdate && !sendPending && !stopPending;
+  return {
+    isLive,
+    canSend: idle && !isUploading && (isLive || canRestart),
+    canStop: idle && isLive,
+  };
 }
 
 function usePlanningSessionMutations(args: {
@@ -202,18 +215,32 @@ function usePlanningSessionMutations(args: {
   return { sendMessage, answerSurvey, stopSession };
 }
 
+function analysisPlanningArgs(args: AnalysisPlanningSessionArgs) {
+  return {
+    organizationId: args.organizationId ?? "",
+    factoryId: args.factoryId ?? "",
+    workOrderId: args.workOrderId ?? "",
+    enabled: args.enabled,
+    pollForSession: args.pollForSession ?? false,
+    canUpdate: args.canUpdate,
+    analysisDelivered: args.analysisDelivered ?? false,
+    isUploading: args.isUploading ?? false,
+    uploadFiles: args.uploadFiles,
+  };
+}
+
 export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
   const {
-    organizationId = "",
-    factoryId = "",
-    workOrderId = "",
+    organizationId,
+    factoryId,
+    workOrderId,
     enabled,
-    pollForSession = false,
+    pollForSession,
     canUpdate,
-    analysisDelivered = false,
-    isUploading = false,
+    analysisDelivered,
+    isUploading,
     uploadFiles,
-  } = args;
+  } = analysisPlanningArgs(args);
   const queryClient = useQueryClient();
   const [composer, setComposer] = useState("");
   const [composerError, setComposerError] = useState("");
@@ -249,13 +276,84 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     analysisView(session, composer, analysisDelivered),
     analysisDelivered,
   );
-  const { isLive, canSend } = analysisSendState(
+  const sendPending = sendMessage.isPending || answerSurvey.isPending;
+  const { isLive, canSend, canStop } = analysisSendState({
     session,
-    view.machineStatus,
+    machineStatus: view.machineStatus,
     canUpdate,
-    sendMessage.isPending || answerSurvey.isPending,
+    sendPending,
     isUploading,
-  );
+    stopPending: stopSession.isPending,
+  });
+  const actions = useAnalysisComposerActions({
+    composer,
+    canSend,
+    canStop,
+    canUpdate,
+    sessionId: session?.id ?? "",
+    sendMessage,
+    answerSurvey,
+    stopSession,
+    setComposerError,
+    queryClient,
+    organizationId,
+    factoryId,
+    workOrderId,
+    uploadFiles,
+  });
+
+  return {
+    organizationId,
+    session,
+    sessionId: session?.id ?? "",
+    queryError: query.error,
+    isLoading: query.isLoading,
+    view,
+    composer,
+    composerError,
+    canSend,
+    canStop,
+    isUploading,
+    isLive,
+    showChat: Boolean(session?.id),
+    onComposerChange: setComposer,
+    stopping: stopSession.isPending,
+    ...actions,
+  };
+}
+
+function useAnalysisComposerActions(args: {
+  composer: string;
+  canSend: boolean;
+  canStop: boolean;
+  canUpdate: boolean;
+  sessionId: string;
+  sendMessage: ReturnType<typeof usePlanningSessionMutations>["sendMessage"];
+  answerSurvey: ReturnType<typeof usePlanningSessionMutations>["answerSurvey"];
+  stopSession: ReturnType<typeof usePlanningSessionMutations>["stopSession"];
+  setComposerError: (value: string) => void;
+  queryClient: QueryClient;
+  organizationId: string;
+  factoryId: string;
+  workOrderId: string;
+  uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
+}) {
+  const {
+    composer,
+    canSend,
+    canStop,
+    canUpdate,
+    sessionId,
+    sendMessage,
+    answerSurvey,
+    stopSession,
+    setComposerError,
+    queryClient,
+    organizationId,
+    factoryId,
+    workOrderId,
+    uploadFiles,
+  } = args;
   const submit = (text: string, send: (body: string) => void) => {
     const trimmed = text.trim();
     if (!trimmed || !canSend) {
@@ -279,7 +377,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     }
   };
   const onStop = async () => {
-    if (!session?.id || stopSession.isPending) {
+    if (!canStop || !sessionId) {
       return;
     }
     setComposerError("");
@@ -301,24 +399,9 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     }
     return uploaded;
   };
-
   return {
-    organizationId,
-    session,
-    sessionId: session?.id ?? "",
-    queryError: query.error,
-    isLoading: query.isLoading,
-    view,
-    composer,
-    composerError,
-    canSend,
-    isUploading,
-    isLive,
-    showChat: Boolean(session?.id),
-    onComposerChange: setComposer,
     onSend,
-    onStop,
-    stopping: stopSession.isPending,
+    onStop: canUpdate ? onStop : undefined,
     onUploadFiles: uploadFiles ? onUploadFiles : undefined,
     onSubmitSurvey: (text: string) => {
       submit(text, answerSurvey.mutate);
