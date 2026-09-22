@@ -535,8 +535,7 @@ function ensureOpenCodeModelCatalog(
   }
 
   if (catalogRefreshFailed(refreshResult)) {
-    seedOpenCodeModelCatalog(catalogPath, model);
-    return "seeded";
+    return "unavailable";
   }
 
   throw new Error(
@@ -552,30 +551,6 @@ function catalogRefreshFailed(result) {
     return true;
   }
   return result.status !== 0;
-}
-
-function seedOpenCodeModelCatalog(catalogPath, model) {
-  const catalogId = catalogModelId(model);
-  fs.mkdirSync(path.dirname(catalogPath), { recursive: true });
-  let catalog = {};
-  try {
-    const existing = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
-    if (existing && typeof existing === "object") {
-      catalog = existing;
-    }
-  } catch (_error) {
-    catalog = {};
-  }
-  if (!catalog.openrouter || typeof catalog.openrouter !== "object") {
-    catalog.openrouter = {};
-  }
-  if (!catalog.openrouter.models || typeof catalog.openrouter.models !== "object") {
-    catalog.openrouter.models = {};
-  }
-  if (!catalog.openrouter.models[catalogId]) {
-    catalog.openrouter.models[catalogId] = {};
-  }
-  fs.writeFileSync(catalogPath, `${JSON.stringify(catalog)}\n`);
 }
 
 function ensureXdgDirs(taskDir) {
@@ -662,9 +637,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
     );
   }
-  if (catalogSource === "seeded") {
+  if (catalogSource === "unavailable") {
     printLiveLogLine(
-      `Model catalog refresh unavailable. Using a local catalog entry for ${currentModel}.`,
+      `Model catalog refresh unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
     );
   }
   writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);

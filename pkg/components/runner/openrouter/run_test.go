@@ -228,7 +228,7 @@ func TestEnsureOpenCodeModelCatalogUsesBundledMetadataWhenRefreshFails(t *testin
 	assert.False(t, result.ConfigProvided)
 }
 
-func TestEnsureOpenCodeModelCatalogSeedsWhenRefreshUnavailable(t *testing.T) {
+func TestEnsureOpenCodeModelCatalogContinuesWhenRefreshUnavailable(t *testing.T) {
 	cases := []struct {
 		name          string
 		refreshStatus int
@@ -252,30 +252,25 @@ func TestEnsureOpenCodeModelCatalogSeedsWhenRefreshUnavailable(t *testing.T) {
 				tc.refreshError,
 			)
 
-			assert.Equal(t, "seeded", result.Source)
+			assert.Equal(t, "unavailable", result.Source)
 			assert.Empty(t, result.Error)
 			assert.Equal(t, 2, result.Calls)
 
-			body, err := os.ReadFile(filepath.Join(taskDir, "xdg", "cache", "opencode", "models.json"))
-			require.NoError(t, err)
-			var catalog map[string]any
-			require.NoError(t, json.Unmarshal(body, &catalog))
-			openrouter, _ := catalog["openrouter"].(map[string]any)
-			models, _ := openrouter["models"].(map[string]any)
-			require.Contains(t, models, model)
+			_, err := os.Stat(filepath.Join(taskDir, "xdg", "cache", "opencode", "models.json"))
+			assert.ErrorIs(t, err, os.ErrNotExist)
 		})
 	}
 }
 
-func TestRunPromptLogsSeededCatalogFallback(t *testing.T) {
+func TestRunPromptLogsUnavailableCatalogFallback(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model:         "x-ai/grok-4.6",
-		catalogSource: "seeded",
+		catalogSource: "unavailable",
 		spawns:        []spawnScript{successSpawn("ok")},
 	})
 
 	assert.Equal(t, 0, result.exitCode)
-	requireStdoutLine(t, result.output, "Model catalog refresh unavailable. Using a local catalog entry for x-ai/grok-4.6.")
+	requireStdoutLine(t, result.output, "Model catalog refresh unavailable. Continuing with OpenCode configuration for x-ai/grok-4.6.")
 }
 
 func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
