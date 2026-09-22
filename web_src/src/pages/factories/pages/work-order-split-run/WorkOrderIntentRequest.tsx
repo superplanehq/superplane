@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, FileText, X } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
@@ -263,6 +263,9 @@ function AnalysisComposer({
                 {images.previewImages.length > 0 ? (
                   <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
                 ) : null}
+                {images.pendingFiles.length > 0 ? (
+                  <PendingWorkOrderFileChips files={images.pendingFiles} onRemove={images.remove} />
+                ) : null}
               </div>
               <div className="flex items-center gap-1.5">
                 <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
@@ -289,6 +292,40 @@ function AnalysisComposer({
           </p>
         ) : null}
       </form>
+    </div>
+  );
+}
+
+function PendingWorkOrderFileChips({
+  files,
+  onRemove,
+}: {
+  files: UploadedWorkOrderFile[];
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-end gap-1.5" data-testid="create-work-order-request-file-chips">
+      {files.map((file) => (
+        <span
+          key={file.id}
+          className="flex max-w-44 items-center gap-1 rounded-md border bg-card px-1.5 py-1 text-[12px] text-foreground"
+          data-testid={`create-work-order-request-file-${file.id}`}
+        >
+          <FileText className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="truncate" title={file.filename}>
+            {file.filename}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Remove ${file.filename}`}
+            data-testid={`create-work-order-request-file-remove-${file.id}`}
+            onClick={() => onRemove(file.id)}
+          >
+            <X className="size-3" aria-hidden />
+          </button>
+        </span>
+      ))}
     </div>
   );
 }
