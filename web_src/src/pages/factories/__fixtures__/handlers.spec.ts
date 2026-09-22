@@ -310,16 +310,19 @@ describe("matchFactoryPageFixture", () => {
     });
   });
 
-  it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
+  it("returns pull requests on listed work orders", async () => {
     const response = await fetchFactoryPageFixture(
-      `/api/v1/factories/${PRIMARY_FACTORY_ID}/prs`,
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100`,
       undefined,
       structuredClone(lineMetricsFactoriesFixture),
     );
     const body = (await response.json()) as {
-      pullRequests: Array<{ workOrderId?: string; number?: string; state?: string }>;
+      orders: Array<{
+        id?: string;
+        pullRequests?: Array<{ number?: string; state?: string }>;
+      }>;
     };
-    const byOrder = Object.fromEntries(body.pullRequests.map((pullRequest) => [pullRequest.workOrderId, pullRequest]));
+    const byOrder = Object.fromEntries(body.orders.map((order) => [order.id, order.pullRequests?.[0]]));
 
     expect(byOrder["wo-review-pay-842"]).toMatchObject({ number: "842", state: "STATE_DRAFT" });
     expect(byOrder["wo-review-pay-844"]).toMatchObject({ number: "844", state: "STATE_DRAFT" });

@@ -32,6 +32,7 @@ const SUMMARY_FIELDS = [
   "statusNotes",
   "origin",
   "totalDurationSeconds",
+  "pullRequests",
 ] as const;
 
 function checkScoresFromChecks(order: FactoriesWorkOrder): FactoriesWorkOrderSummary["checkScores"] {

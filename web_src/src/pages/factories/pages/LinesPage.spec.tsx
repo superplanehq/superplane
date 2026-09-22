@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
-  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
@@ -118,7 +117,6 @@ const useFactoryBoardWorkOrders = vi.fn(() => ({
   done: idleBoardPage(),
 }));
 const useWorkOrder = vi.fn(() => ({ data: undefined as FactoriesWorkOrder | undefined }));
-const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
@@ -188,7 +186,6 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrder: () => useWorkOrder(),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
-  useFactoryPullRequests: () => useFactoryPullRequests(),
   useCreateFactoryAutomation: () => ({ mutateAsync: createFactoryAutomationMutateAsync, isPending: false }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: deleteFactoryAutomationMutateAsync, isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -291,7 +288,6 @@ async function resetLinesBoardMocks() {
     done: idleBoardPage(),
   }));
   useWorkOrder.mockReturnValue({ data: undefined });
-  useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryAutomations.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
   createFactoryIntakeMutateAsync.mockReset();
@@ -1259,16 +1255,20 @@ describe("LinesPage board pull request", () => {
   });
 
   it("shows an attached pull request on the task card", () => {
-    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
-    useFactoryPullRequests.mockReturnValue({
+    useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          id: "pr-106",
-          workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-          number: "106",
-          url: "https://github.com/acme/payments/pull/106",
-          title: "Fix refund dispatcher timeout loop",
-          state: "STATE_CLOSED",
+          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          pullRequests: [
+            {
+              id: "pr-106",
+              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
+              number: "106",
+              url: "https://github.com/acme/payments/pull/106",
+              title: "Fix refund dispatcher timeout loop",
+              state: "STATE_CLOSED",
+            },
+          ],
         },
       ],
     });

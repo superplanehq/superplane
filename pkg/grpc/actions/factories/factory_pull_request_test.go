@@ -47,7 +47,7 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		return resp.GetPullRequest()
 	}
 
-	t.Run("lists all factory pull requests sorted by work order number", func(t *testing.T) {
+	t.Run("returns pull requests on listed work orders", func(t *testing.T) {
 		factory := newFactory(t)
 		first := createOrder(t, factory, "First")
 		second := createOrder(t, factory, "Second")
@@ -64,81 +64,17 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 			Title:       "On later order",
 		})
 
-		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+		resp, err := ListWorkOrders(ctx, orgID, &pb.ListWorkOrdersRequest{
 			FactoryId: factory.ID.String(),
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.GetPullRequests(), 2)
-		assert.Equal(t, later.GetId(), resp.GetPullRequests()[0].GetId())
-		assert.Equal(t, first.Number, resp.GetPullRequests()[0].GetWorkOrderNumber())
-		assert.Equal(t, earlierOnSecond.GetId(), resp.GetPullRequests()[1].GetId())
-		assert.Equal(t, second.Number, resp.GetPullRequests()[1].GetWorkOrderNumber())
-	})
-
-	t.Run("filters by work order number", func(t *testing.T) {
-		factory := newFactory(t)
-		order := createOrder(t, factory, "Tracked")
-		other := createOrder(t, factory, "Other")
-		wanted := createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
-			WorkOrderId: order.ID.String(),
-			Url:         "https://github.com/acme/app/pull/12",
-		})
-		_ = createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
-			WorkOrderId: other.ID.String(),
-			Url:         "https://github.com/acme/app/pull/13",
-		})
-
-		orderNumber := order.Number
-		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
-			FactoryId: factory.ID.String(),
-			Order:     &orderNumber,
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.GetPullRequests(), 1)
-		assert.Equal(t, wanted.GetId(), resp.GetPullRequests()[0].GetId())
-	})
-
-	t.Run("filters by work order ids", func(t *testing.T) {
-		factory := newFactory(t)
-		first := createOrder(t, factory, "First")
-		second := createOrder(t, factory, "Second")
-		ignored := createOrder(t, factory, "Ignored")
-		_ = createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
-			WorkOrderId: first.ID.String(),
-			Url:         "https://github.com/acme/app/pull/21",
-		})
-		_ = createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
-			WorkOrderId: second.ID.String(),
-			Url:         "https://github.com/acme/app/pull/22",
-		})
-		_ = createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
-			WorkOrderId: ignored.ID.String(),
-			Url:         "https://github.com/acme/app/pull/23",
-		})
-
-		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
-			FactoryId:    factory.ID.String(),
-			WorkOrderIds: []string{second.ID.String(), first.ID.String()},
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.GetPullRequests(), 2)
-		assert.Equal(t, first.Number, resp.GetPullRequests()[0].GetWorkOrderNumber())
-		assert.Equal(t, second.Number, resp.GetPullRequests()[1].GetWorkOrderNumber())
-	})
-
-	t.Run("rejects conflicting filters", func(t *testing.T) {
-		factory := newFactory(t)
-		order := createOrder(t, factory, "Tracked")
-		orderNumber := order.Number
-		_, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
-			FactoryId:    factory.ID.String(),
-			Order:        &orderNumber,
-			WorkOrderIds: []string{order.ID.String()},
-		})
-		require.Error(t, err)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
+		byID := workOrdersByID(resp.GetOrders())
+		require.Len(t, byID[first.ID.String()].GetPullRequests(), 1)
+		assert.Equal(t, later.GetId(), byID[first.ID.String()].GetPullRequests()[0].GetId())
+		assert.Equal(t, first.Number, byID[first.ID.String()].GetPullRequests()[0].GetWorkOrderNumber())
+		require.Len(t, byID[second.ID.String()].GetPullRequests(), 1)
+		assert.Equal(t, earlierOnSecond.GetId(), byID[second.ID.String()].GetPullRequests()[0].GetId())
+		assert.Equal(t, second.Number, byID[second.ID.String()].GetPullRequests()[0].GetWorkOrderNumber())
 	})
 
 	t.Run("describes a pull request with linked runs", func(t *testing.T) {
@@ -215,16 +151,17 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 			TotalTokens:     1_000_000,
 		}))
 
-		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+		resp, err := DescribeWorkOrder(ctx, orgID, &pb.DescribeWorkOrderRequest{
 			FactoryId: factory.ID.String(),
+			OrderId:   order.ID.String(),
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.GetPullRequests(), 1)
-		require.Len(t, resp.GetPullRequests()[0].GetActivities(), 1)
-		activity := resp.GetPullRequests()[0].GetActivities()[0]
+		require.Len(t, resp.GetOrder().GetPullRequests(), 1)
+		require.Len(t, resp.GetOrder().GetPullRequests()[0].GetActivities(), 1)
+		activity := resp.GetOrder().GetPullRequests()[0].GetActivities()[0]
 		assert.Equal(t, int64(1_000_000), activity.GetTotalTokens())
 		assert.Greater(t, activity.GetCostCents(), int64(0))
-		assert.Equal(t, int64(1_000_000), resp.GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
+		assert.Equal(t, int64(1_000_000), resp.GetOrder().GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
 	})
 
 	t.Run("degrades to zero usage when usage rollup is unavailable", func(t *testing.T) {
@@ -270,14 +207,15 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 			CreatedAt:        now,
 		}).Error)
 
-		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+		resp, err := DescribeWorkOrder(ctx, orgID, &pb.DescribeWorkOrderRequest{
 			FactoryId: factory.ID.String(),
+			OrderId:   order.ID.String(),
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.GetPullRequests(), 1)
-		require.Len(t, resp.GetPullRequests()[0].GetRuns(), 1)
-		assert.EqualValues(t, 1_000_000, resp.GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
-		assert.Positive(t, resp.GetPullRequests()[0].GetRuns()[0].GetCostCents())
+		require.Len(t, resp.GetOrder().GetPullRequests(), 1)
+		require.Len(t, resp.GetOrder().GetPullRequests()[0].GetRuns(), 1)
+		assert.EqualValues(t, 1_000_000, resp.GetOrder().GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
+		assert.Positive(t, resp.GetOrder().GetPullRequests()[0].GetRuns()[0].GetCostCents())
 
 		// Simulate the usage rollup table being unavailable mid-migration
 		// (for example, during a table rename). The PR listing must still
@@ -291,14 +229,17 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 			).Error)
 		}()
 
-		degraded, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
-			FactoryId: factory.ID.String(),
-		})
+		degraded, err := loadSerializedPullRequestsByWorkOrderIDs(
+			ctx,
+			db,
+			[]uuid.UUID{order.ID},
+			map[uuid.UUID]int64{order.ID: order.Number},
+		)
 		require.NoError(t, err)
-		require.Len(t, degraded.GetPullRequests(), 1)
-		require.Len(t, degraded.GetPullRequests()[0].GetRuns(), 1)
-		assert.EqualValues(t, 0, degraded.GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
-		assert.EqualValues(t, 0, degraded.GetPullRequests()[0].GetRuns()[0].GetCostCents())
+		require.Len(t, degraded[order.ID], 1)
+		require.Len(t, degraded[order.ID][0].GetRuns(), 1)
+		assert.EqualValues(t, 0, degraded[order.ID][0].GetRuns()[0].GetTotalTokens())
+		assert.EqualValues(t, 0, degraded[order.ID][0].GetRuns()[0].GetCostCents())
 	})
 
 	t.Run("updates a tracked pull request", func(t *testing.T) {
@@ -341,12 +282,22 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 
-		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+		resp, err := ListWorkOrders(ctx, orgID, &pb.ListWorkOrdersRequest{
 			FactoryId: other.ID.String(),
 		})
 		require.NoError(t, err)
-		assert.Empty(t, resp.GetPullRequests())
+		for _, listed := range resp.GetOrders() {
+			assert.Empty(t, listed.GetPullRequests())
+		}
 	})
+}
+
+func workOrdersByID(orders []*pb.WorkOrderSummary) map[string]*pb.WorkOrderSummary {
+	result := make(map[string]*pb.WorkOrderSummary, len(orders))
+	for _, order := range orders {
+		result[order.GetId()] = order
+	}
+	return result
 }
 
 func parseUUID(t *testing.T, raw string) uuid.UUID {

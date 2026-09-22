@@ -20,12 +20,10 @@ import {
   factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
-  factoriesListFactoryPullRequests,
 } from "@/api-client";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
-  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderSummary,
@@ -61,22 +59,6 @@ import {
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-export type FactoryPullRequestFilters = {
-  order?: number | string;
-  workOrderIds?: string[];
-};
-
-type NormalizedFactoryPullRequestFilters = {
-  order?: string;
-  workOrderIds: string[];
-};
-
-function normalizeFactoryPullRequestFilters(filters?: FactoryPullRequestFilters): NormalizedFactoryPullRequestFilters {
-  const workOrderIds = [...new Set(filters?.workOrderIds ?? [])].filter(Boolean).sort();
-  const order = filters?.order == null || String(filters.order) === "" ? undefined : String(filters.order);
-  return { order, workOrderIds };
-}
-
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
   detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
@@ -90,8 +72,6 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
-  pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
-    ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   pullRequestMergeability: (organizationId: string, factoryId: string, pullRequestId: string) =>
     ["factories", organizationId, factoryId, "pull-requests", pullRequestId, "mergeability"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
@@ -322,32 +302,6 @@ function invalidateWorkOrderLists(
 ) {
   void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId) });
-}
-
-export function factoryPullRequestsKey(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
-  return factoryQueryKeys.pullRequests(organizationId, factoryId, normalizeFactoryPullRequestFilters(filters));
-}
-
-export function useFactoryPullRequests(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
-  const normalized = normalizeFactoryPullRequestFilters(filters);
-  return useQuery({
-    queryKey: factoryQueryKeys.pullRequests(organizationId, factoryId, normalized),
-    queryFn: async (): Promise<FactoriesFactoryPullRequest[]> => {
-      const response = await factoriesListFactoryPullRequests(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-          query: {
-            order: normalized.order,
-            workOrderIds: normalized.workOrderIds.length > 0 ? normalized.workOrderIds : undefined,
-          },
-        }),
-      );
-      return response.data?.pullRequests ?? [];
-    },
-    enabled: Boolean(organizationId && factoryId),
-    staleTime: 0,
-  });
 }
 
 export function useWorkOrder(organizationId: string, factoryId: string, orderId: string) {

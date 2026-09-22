@@ -154,7 +154,7 @@ func MergeFactoryPullRequest(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", pullRequest.WorkOrderID)
 	}
 
-	serialized, err := serializeFactoryPullRequests(db, []models.FactoryPullRequest{*pullRequest})
+	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
