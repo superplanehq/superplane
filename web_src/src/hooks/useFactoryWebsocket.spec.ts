@@ -253,7 +253,7 @@ describe("useFactoryWebsocket", () => {
   it("warns with a short message when describe rejects with a real error", async () => {
     vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error("Task not found"));
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    renderFactoryWebsocket();
+    const { invalidateSpy } = renderFactoryWebsocket();
 
     await emit({
       event: "work_order_updated",
@@ -267,5 +267,47 @@ describe("useFactoryWebsocket", () => {
     expect(warnSpy.mock.calls.some((args) => args.some((arg) => typeof arg === "string" && arg.includes("<")))).toBe(
       false,
     );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+      exact: true,
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"),
+      exact: true,
+    });
+  });
+
+  it("does not invalidate when an older describe fails after a newer one succeeds", async () => {
+    let rejectOlder: (error: Error) => void = () => {};
+    const older = new Promise<DescribeWorkOrderResult>((_, reject) => {
+      rejectOlder = reject;
+    });
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+    describeWorkOrder.mockImplementationOnce(() => older as ReturnType<typeof apiClient.factoriesDescribeWorkOrder>);
+    describeWorkOrder.mockResolvedValueOnce(describeResponse({ id: "order-1", title: "Newer", checks: [] }));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [{ id: "order-1", title: "Old" }]);
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    invalidateSpy.mockClear();
+    rejectOlder(new Error("Task not found"));
+    await act(async () => {
+      await older.catch(() => {});
+    });
+
+    expect(
+      queryClient.getQueryData<Array<{ title?: string }>>(factoryQueryKeys.workOrders("org-1", "factory-1"))?.[0]
+        ?.title,
+    ).toBe("Newer");
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

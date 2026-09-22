@@ -297,12 +297,14 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
         orderId,
         () => refreshVersion.current.get(orderId) === version,
       ).catch((error) => {
-        const message = getApiErrorMessage(error, "");
-        if (!message) {
-          invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
+        if (refreshVersion.current.get(orderId) !== version) {
           return;
         }
-        console.warn("factory ws: failed to refresh work order", message);
+        const message = getApiErrorMessage(error, "");
+        if (message) {
+          console.warn("factory ws: failed to refresh work order", message);
+        }
+        invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
       });
     },
     [queryClient, organizationId, factoryId],
