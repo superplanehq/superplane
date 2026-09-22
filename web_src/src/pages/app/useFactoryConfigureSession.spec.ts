@@ -78,7 +78,8 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
       components: [],
       direction: "vertical",
     });
-    expect(applyLocalWorkflowUpdate).toHaveBeenCalledWith(laidOut);
+    expect(applyLocalWorkflowUpdate).toHaveBeenNthCalledWith(1, merged);
+    expect(applyLocalWorkflowUpdate).toHaveBeenNthCalledWith(2, laidOut);
     layoutSpy.mockRestore();
   });
 
@@ -105,7 +106,11 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
     });
     await pending;
 
-    expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledTimes(1);
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledWith({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "new-node" }], edges: [] },
+    });
     layoutSpy.mockRestore();
   });
 
@@ -135,7 +140,11 @@ describe("useFactoryConfigureSession applyDraftSpec", () => {
     });
     await pending;
 
-    expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledTimes(1);
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledWith({
+      metadata: { id: "canvas-1", name: "Implement" },
+      spec: { nodes: [{ id: "new-node" }], edges: [] },
+    });
     layoutSpy.mockRestore();
   });
 

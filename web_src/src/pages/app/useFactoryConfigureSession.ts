@@ -177,15 +177,17 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
             const requestedVisitId = configureVisitIdRef.current;
             const requestedVersionId = activeCanvasVersionIdRef.current;
             const requestedEditSessionActive = editSessionActiveRef.current;
+            const sessionMatches = () =>
+              configureVisitIdRef.current === requestedVisitId &&
+              activeCanvasVersionIdRef.current === requestedVersionId &&
+              editSessionActiveRef.current === requestedEditSessionActive;
             const merged = { ...current, spec };
-            const nextWorkflow = factoryAutoLayoutRef.current
-              ? await applyFactoryCanvasLayout(merged, componentsRef.current || [])
-              : merged;
-            if (
-              configureVisitIdRef.current !== requestedVisitId ||
-              activeCanvasVersionIdRef.current !== requestedVersionId ||
-              editSessionActiveRef.current !== requestedEditSessionActive
-            ) {
+            applyLocalWorkflowUpdate(merged);
+            if (!factoryAutoLayoutRef.current) {
+              return;
+            }
+            const nextWorkflow = await applyFactoryCanvasLayout(merged, componentsRef.current || []);
+            if (!sessionMatches()) {
               return;
             }
             applyLocalWorkflowUpdate(nextWorkflow);
