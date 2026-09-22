@@ -332,6 +332,7 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
+	messages.PublishPlanningBoardStatus(session)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
@@ -435,6 +436,7 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 	if alreadyWaiting || session.WaitState != models.PlanningWaitPending {
 		return nil
 	}
+	messages.PublishPlanningBoardStatus(session)
 	if !hasOutstandingPlanningQuestion(session) {
 		return nil
 	}

@@ -452,6 +452,8 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	// The finished run's own work order is refreshed by the run-state
 	// fan-out above; admitted orders are other work orders whose queued →
 	// started transition the UI would otherwise miss until their run starts.
+	publishPlanningBoardStatusForFinishedRun(w.logger, runID)
+
 	for _, update := range factoryOrderUpdates {
 		if err := messages.PublishFactoryWorkOrderUpdated(
 			update.factoryID.String(),
@@ -544,6 +546,21 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 type factoryLinePendingRun struct {
 	workflowID uuid.UUID
 	runID      uuid.UUID
+}
+
+// publishPlanningBoardStatusForFinishedRun reloads the lines board after an
+// analysis session ends with its canvas run. The list flags say whether the
+// agent is still working.
+func publishPlanningBoardStatusForFinishedRun(logger *log.Entry, runID uuid.UUID) {
+	session, err := models.FindPlanningSessionByRun(database.Conn(), runID)
+	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return
+	}
+	if err != nil {
+		logger.WithError(err).Warnf("failed to load planning session for finished run %s", runID)
+		return
+	}
+	messages.PublishPlanningBoardStatus(session)
 }
 
 // factoryWorkOrderUpdate identifies a work order whose factory websocket
