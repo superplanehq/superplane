@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -218,7 +219,27 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 }
 
 func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
+	t.Setenv(config.EnvSentryAppSlug, "superplane")
+	t.Setenv(config.EnvSentryAppClientID, "cid")
+	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
+
 	r := support.Setup(t)
+	original := r.Registry.Integrations["sentry"]
+	require.NotNil(t, original)
+	r.Registry.Integrations["sentry"] = sentryWebhookStatusStub{
+		Integration: original,
+		status:      http.StatusBadGateway,
+	}
+	t.Cleanup(func() {
+		r.Registry.Integrations["sentry"] = original
+	})
+
+	signer := jwt.NewSigner("test-client-secret")
+	server, err := NewServer(
+		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
+		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+	)
+	require.NoError(t, err)
 
 	integration, err := models.CreateIntegration(
 		uuid.New(), r.Organization.ID, "sentry", support.RandomName("sentry"), map[string]any{},
@@ -230,37 +251,45 @@ func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
 	})
 	require.NoError(t, database.Conn().Save(integration).Error)
 
-	t.Run("dropped delivery tags carry the integration and status", func(t *testing.T) {
-		transport := &captureTransport{}
-		client, err := sentry.NewClient(sentry.ClientOptions{
-			Dsn:              "https://examplePublicKey@o0.ingest.sentry.io/0",
-			Transport:        transport,
-			AttachStacktrace: false,
-		})
-		require.NoError(t, err)
-		defer client.Flush(0)
+	transport := bindTestSentryHub(t)
+	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
+	rec := httptest.NewRecorder()
 
-		hub := sentry.NewHub(client, sentry.NewScope())
+	server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
 
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", nil)
-		req.Header.Set("Sentry-Hook-Resource", "issue")
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 
-		hub.WithScope(func(scope *sentry.Scope) {
-			applySentryWebhookErrorTags(scope, req, []string{
-				"integration_id", integration.ID.String(),
-				"inner_status", "502",
-			})
-			hub.CaptureException(errors.New(
-				"delivery failed for integration " + integration.ID.String() + ": inner_status=502",
-			))
-		})
-		hub.Flush(0)
+	events := transport.Events()
+	delivery := requireEventWithTag(t, events, "inner_status", "502")
+	assert.Equal(t, integration.ID.String(), delivery.Tags["integration_id"])
+	assert.Equal(t, "issue", delivery.Tags["hook_resource"])
+	assert.Contains(t, capturedExceptionText(delivery), "delivery failed for integration "+integration.ID.String())
 
-		require.NotNil(t, transport.lastEvent)
-		assert.Equal(t, integration.ID.String(), transport.lastEvent.Tags["integration_id"])
-		assert.Equal(t, "502", transport.lastEvent.Tags["inner_status"])
-		assert.Equal(t, "issue", transport.lastEvent.Tags["hook_resource"])
-	})
+	aggregate := requireEventWithTag(t, events, "inner_statuses", "502")
+	assert.Equal(t, "install-1", aggregate.Tags["installation_uuid"])
+	assert.Equal(t, integration.ID.String(), aggregate.Tags["integration_ids"])
+	assert.Equal(t, "issue", aggregate.Tags["hook_resource"])
+	assert.Contains(t, capturedExceptionText(aggregate), "dropped webhook delivery for installation install-1")
+}
+
+type sentryWebhookStatusStub struct {
+	core.Integration
+	status int
+}
+
+func (s sentryWebhookStatusStub) HandleRequest(ctx core.HTTPRequestContext) {
+	ctx.Response.WriteHeader(s.status)
+}
+
+func requireEventWithTag(t *testing.T, events []*sentry.Event, key, value string) *sentry.Event {
+	t.Helper()
+	for _, event := range events {
+		if event != nil && event.Tags[key] == value {
+			return event
+		}
+	}
+	require.Fail(t, "expected a captured event with tag", "%s=%s events=%d", key, value, len(events))
+	return nil
 }
 
 func Test__joinStatuses(t *testing.T) {
