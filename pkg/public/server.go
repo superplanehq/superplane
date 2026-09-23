@@ -1769,7 +1769,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents, recordExecution)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, r.URL.Query(), node, onNewEvents, recordExecution)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
@@ -1812,15 +1812,15 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
-		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
+		return s.executeTriggerNode(ctx, body, headers, query, node, onNewEvents)
 	}
 
-	return s.executeActionNode(ctx, body, headers, node, onNewEvents, recordExecution)
+	return s.executeActionNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
 	if err != nil {
@@ -1851,6 +1851,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
+		Query:         query,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
@@ -1863,7 +1864,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -1886,6 +1887,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 	return action.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
+		Query:         query,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
