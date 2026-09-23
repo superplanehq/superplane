@@ -131,18 +131,15 @@ export const INTAKE_SETTINGS_COPY = {
   automationEmpty: "This intake has no automation yet.",
   automationError: "SuperPlane could not load the automation.",
   retryAutomation: "Try again",
-  intakeSection: "Create task when:",
   filtersLabel: "Filters",
   newIssues: "A new issue is opened",
   reopenedIssues: "A closed issue is re-opened",
-  filterByLabel: "Issue has one of these labels",
   labelInput: "Issue label",
   labelPlaceholder: "Type a label name",
   labelNew: "Add label",
   labelAdd: "Add",
   labelCancel: "Cancel",
   labelsLoading: "Loading labels from the repository",
-  labelsEmpty: "No labels found in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
   authorsWithAccess: "Author is a repository collaborator",
   eventsThatCreateTasks: "Events that create tasks",
@@ -208,7 +205,8 @@ export function intakeSettingsSections(sourceId: LineIntakeSourceId, hasConnecti
 
   switch (sourceId) {
     case "github-issues":
-      sections.push({ id: "triggers", label: "Triggers" });
+      sections.push({ id: "triggers", label: INTAKE_SETTINGS_COPY.eventsThatCreateTasks });
+      sections.push({ id: "labels", label: "Labels" });
       sections.push({ id: "filters", label: INTAKE_SETTINGS_COPY.filtersLabel });
       break;
     case "jira-issues":

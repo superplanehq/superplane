@@ -44,7 +44,7 @@ describe("SentryIntakeFilterFields", () => {
     expect(screen.queryByRole("switch", { name: "An issue is assigned" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Fatal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Error" })).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "A new issue is opened" })).toBeInTheDocument();
   });
 
   it("shows Sentry event fields with no level checkboxes for a Sentry intake", () => {
@@ -65,7 +65,7 @@ describe("SentryIntakeFilterFields", () => {
     expect(screen.queryByRole("checkbox", { name: "Warning" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Info" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Debug" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "A new issue is opened" })).not.toBeInTheDocument();
   });
 
   it("puts Sentry event triggers on the save payload", async () => {

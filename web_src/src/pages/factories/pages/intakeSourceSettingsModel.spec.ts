@@ -247,6 +247,7 @@ describe("intakeSourceSettingsModel", () => {
   it("lists settings sections per intake source", () => {
     expect(intakeSettingsSections("github-issues", false).map((section) => section.id)).toEqual([
       "triggers",
+      "labels",
       "filters",
       "danger",
     ]);
@@ -268,7 +269,8 @@ describe("intakeSourceSettingsModel", () => {
       "danger",
     ]);
     expect(intakeSettingsSections("github-issues", false).map((section) => section.label)).toEqual([
-      "Triggers",
+      "Events that create tasks",
+      "Labels",
       "Filters",
       "Pause or delete",
     ]);
