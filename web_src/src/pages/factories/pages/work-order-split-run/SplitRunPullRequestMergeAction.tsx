@@ -14,6 +14,8 @@ import { useFactoryPullRequestMergeability, useMergeFactoryPullRequest } from "@
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 
 import {
   defaultMergeMethod,
@@ -44,6 +46,7 @@ export function SplitRunPullRequestMergeAction({
   canAct: boolean;
   compact?: boolean;
 }) {
+  const { has } = useExperimentalFeature(organizationId);
   if (!isGitHubPullRequest(pullRequest) || !pullRequest?.id) {
     return null;
   }
@@ -53,6 +56,10 @@ export function SplitRunPullRequestMergeAction({
         {PULL_REQUEST_REVIEW_COPY.merged}
       </p>
     );
+  }
+
+  if (!has(FEATURE_FACTORY_PULL_REQUEST_MERGE)) {
+    return null;
   }
 
   return (

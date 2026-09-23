@@ -154,11 +154,6 @@ func (s *FactoryService) DeleteFactoryPRFeedbackHandler(ctx context.Context, req
 	return actions.DeleteFactoryPRFeedbackHandler(ctx, organizationID, req)
 }
 
-func (s *FactoryService) ListFactoryPullRequests(ctx context.Context, req *pb.ListFactoryPullRequestsRequest) (*pb.ListFactoryPullRequestsResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListFactoryPullRequests(ctx, organizationID, req)
-}
-
 func (s *FactoryService) DescribeFactoryPullRequest(ctx context.Context, req *pb.DescribeFactoryPullRequestRequest) (*pb.DescribeFactoryPullRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryPullRequest(ctx, organizationID, req)
@@ -358,4 +353,9 @@ func (s *FactoryService) StartFactoryAgentResourceOAuth(ctx context.Context, req
 func (s *FactoryService) DisconnectFactoryAgentResourceOAuth(ctx context.Context, req *pb.DisconnectFactoryAgentResourceOAuthRequest) (*pb.DisconnectFactoryAgentResourceOAuthResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DisconnectFactoryAgentResourceOAuth(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryAgentResourceTools(ctx context.Context, req *pb.ListFactoryAgentResourceToolsRequest) (*pb.ListFactoryAgentResourceToolsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryAgentResourceTools(ctx, s.intakeDeps, organizationID, req)
 }

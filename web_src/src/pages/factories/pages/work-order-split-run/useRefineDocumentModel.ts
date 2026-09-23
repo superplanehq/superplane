@@ -55,6 +55,7 @@ export function useRefineDocumentModel({
   resultFooter,
   analysis,
   contextSidebar,
+  skipDescriptionFallback = false,
 }: {
   title: string;
   description: string;
@@ -65,6 +66,7 @@ export function useRefineDocumentModel({
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
   contextSidebar?: ReactNode;
+  skipDescriptionFallback?: boolean;
 }) {
   const refineOpen = Boolean(analysis) && !contextSidebar;
   const [planOpenedHere, setPlanOpenedHere] = useState(false);
@@ -82,7 +84,7 @@ export function useRefineDocumentModel({
   return {
     refineOpen,
     split,
-    document: splitRunIntentDocument({ artifacts, description }),
+    document: splitRunIntentDocument({ artifacts, description, skipDescriptionFallback }),
     sessionTitle: title.trim() || SESSION_TITLE_FALLBACK,
     ...panes,
     showClosedDecision: refineOpen && resultFooter != null,

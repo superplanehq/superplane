@@ -124,9 +124,9 @@ describe("useFactoryWebsocket", () => {
       queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+      queryKey: factoryQueryKeys.planningSession("org-1", "factory-1", "order-1"),
     });
-    expect(invalidateSpy).toHaveBeenCalledWith({
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: ["backlog-analysis-runs", "org-1"],
     });
     expect(invalidateSpy).not.toHaveBeenCalledWith({
@@ -208,17 +208,17 @@ describe("useFactoryWebsocket", () => {
       onOpen();
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+      queryKey: ["factories", "org-1", "factory-1", "work-orders"],
       exact: true,
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+      queryKey: ["factories", "org-1", "factory-1", "work-orders-page"],
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ["backlog-analysis-runs", "org-1"],
+      queryKey: factoryQueryKeys.planningSessions("org-1", "factory-1"),
     });
     expect(invalidateSpy).not.toHaveBeenCalledWith({
-      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
+      queryKey: ["factories", "org-1", "factory-1"],
     });
   });
 });

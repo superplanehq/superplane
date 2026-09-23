@@ -4,9 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 
-const { useWebSocketMock, useAccountMock, useNotificationSettingsMock } = vi.hoisted(() => ({
+const { permissionsState, useWebSocketMock, useNotificationSettingsMock } = vi.hoisted(() => ({
+  permissionsState: {
+    currentUserId: "user-1" as string | undefined,
+    browserNotificationPreferences: {
+      enabled: true,
+      showWhileViewing: true,
+    },
+  },
   useWebSocketMock: vi.fn(),
-  useAccountMock: vi.fn(),
   useNotificationSettingsMock: vi.fn(),
 }));
 
@@ -14,8 +20,8 @@ vi.mock("@/lib/reactUseWebsocket", () => ({
   useWebSocket: useWebSocketMock,
 }));
 
-vi.mock("@/contexts/useAccount", () => ({
-  useAccount: useAccountMock,
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => permissionsState,
 }));
 
 vi.mock("@/hooks/useNotificationSettings", () => ({
@@ -94,7 +100,11 @@ describe("useUserNotificationsWebsocket", () => {
       configurable: true,
       value: FakeNotification,
     });
-    useAccountMock.mockReturnValue({ account: { id: "user-1", email: "ada@example.com" } });
+    permissionsState.currentUserId = "user-1";
+    permissionsState.browserNotificationPreferences = {
+      enabled: true,
+      showWhileViewing: true,
+    };
     useNotificationSettingsMock.mockReturnValue({ data: browserOnSettings, isPending: false });
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
   });
@@ -105,6 +115,7 @@ describe("useUserNotificationsWebsocket", () => {
     expect(url).toContain("/ws/users/notifications");
     expect(url).toContain("organization_id=org-1");
     expect(enabled).toBe(true);
+    expect(useNotificationSettingsMock).not.toHaveBeenCalled();
     expect(window.Notification.requestPermission).not.toHaveBeenCalled();
   });
 
@@ -117,13 +128,7 @@ describe("useUserNotificationsWebsocket", () => {
   });
 
   it("does not connect when the browser channel is off", () => {
-    useNotificationSettingsMock.mockReturnValue({
-      data: {
-        workspaces: { scope: "WORKSPACE_SCOPE_ALL" },
-        browser: { scope: "WORKSPACE_SCOPE_NONE" },
-      },
-      isPending: false,
-    });
+    permissionsState.browserNotificationPreferences.enabled = false;
     renderNotificationsHook();
     const [, , enabled] = lastCall();
     expect(enabled).toBe(false);
@@ -163,13 +168,7 @@ describe("useUserNotificationsWebsocket", () => {
   });
 
   it("skips an alert on the visible source board when that setting is off", () => {
-    useNotificationSettingsMock.mockReturnValue({
-      data: {
-        ...browserOnSettings,
-        browser: { ...browserOnSettings.browser, showWhileViewing: false },
-      },
-      isPending: false,
-    });
+    permissionsState.browserNotificationPreferences.showWhileViewing = false;
     renderNotificationsHook("/org-1/workspaces/sp/lines/line-1");
     emit({
       event: "user_notification",

@@ -53,6 +53,11 @@ const FeatureFactoryCustomAutomations = "factory_custom_automations"
 // page until MCP servers are ready for general use.
 const FeatureWorkspaceAgentResources = "workspace_agent_resources"
 
+// FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
+// the Merge button on pull request review until the feature is generally
+// available.
+const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
+
 func released() *bool {
 	v := true
 	return &v
@@ -69,6 +74,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 }
 
 func All() []Feature {

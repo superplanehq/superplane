@@ -59,6 +59,7 @@ export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactor
 export function visibleWorkOrderCardAttentionReasons(
   reasons: WorkOrderAttentionReason[],
   cardPullRequest: WorkOrderCardPullRequest | null,
+  showPullRequestMerge?: boolean,
 ): WorkOrderAttentionReason[] {
   if (!cardPullRequest) {
     return reasons;
@@ -71,7 +72,11 @@ export function visibleWorkOrderCardAttentionReasons(
     if (reason === "approval") {
       return false;
     }
-    if (reason === "checksPassed" && workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest)) {
+    if (
+      reason === "checksPassed" &&
+      showPullRequestMerge &&
+      workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest)
+    ) {
       return false;
     }
     return true;

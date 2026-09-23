@@ -17,10 +17,8 @@ import {
 } from "../planningSessionView";
 import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
 
-const POLL_MS = 1500;
-
 export function workOrderPlanningSessionQueryKey(organizationId: string, factoryId: string, workOrderId: string) {
-  return ["planning-session-by-work-order", organizationId, factoryId, workOrderId] as const;
+  return factoryQueryKeys.planningSession(organizationId, factoryId, workOrderId);
 }
 
 export const ANALYSIS_PLANNING_COPY = {
@@ -40,31 +38,20 @@ type AnalysisPlanningSessionArgs = {
   factoryId?: string;
   workOrderId?: string;
   enabled: boolean;
-  pollForSession?: boolean;
   canUpdate: boolean;
   analysisDelivered?: boolean;
   isUploading?: boolean;
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 };
 
-export function analysisSessionPollInterval(
-  pollForSession: boolean,
-  session: PlanningSessionPayload | null | undefined,
-) {
-  if (session && session.state !== "ended") {
-    return POLL_MS;
-  }
-  return pollForSession && !session ? POLL_MS : false;
-}
-
 function usePlanningSessionLookup(
-  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled" | "pollForSession">> & {
+  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled">> & {
     organizationId: string;
     factoryId: string;
     workOrderId: string;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled, pollForSession } = args;
+  const { organizationId, factoryId, workOrderId, enabled } = args;
   return useQuery<PlanningSessionPayload | null>({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -74,8 +61,7 @@ function usePlanningSessionLookup(
         previous as PlanningSessionPayload | null | undefined,
         next as PlanningSessionPayload | null,
       ),
-    refetchInterval: (current) =>
-      analysisSessionPollInterval(pollForSession, current.state.data as PlanningSessionPayload | null | undefined),
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -94,6 +80,9 @@ async function refreshAnalysisWorkOrder(
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
@@ -163,7 +152,6 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId = "",
     workOrderId = "",
     enabled,
-    pollForSession = false,
     canUpdate,
     analysisDelivered = false,
     isUploading = false,
@@ -178,7 +166,6 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
-    pollForSession,
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({

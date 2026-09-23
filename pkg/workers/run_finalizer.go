@@ -452,7 +452,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	// The finished run's own work order is refreshed by the run-state
 	// fan-out above; admitted orders are other work orders whose queued →
 	// started transition the UI would otherwise miss until their run starts.
-	publishPlanningBoardStatusForFinishedRun(w.logger, runID)
+	publishPlanningBoardStatusForRun(w.logger, runID)
 
 	for _, update := range factoryOrderUpdates {
 		if err := messages.PublishFactoryWorkOrderUpdated(
@@ -548,10 +548,10 @@ type factoryLinePendingRun struct {
 	runID      uuid.UUID
 }
 
-// publishPlanningBoardStatusForFinishedRun reloads the lines board after an
-// analysis session ends with its canvas run. The list flags say whether the
-// agent is still working.
-func publishPlanningBoardStatusForFinishedRun(logger *log.Entry, runID uuid.UUID) {
+// publishPlanningBoardStatusForRun reloads the lines board after an analysis
+// session changes with its canvas run. The list flags say whether the agent is
+// still working.
+func publishPlanningBoardStatusForRun(logger *log.Entry, runID uuid.UUID) {
 	session, err := models.FindPlanningSessionByRun(database.Conn(), runID)
 	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
 		return

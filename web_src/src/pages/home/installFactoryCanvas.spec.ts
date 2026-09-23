@@ -35,7 +35,6 @@ async function install(args: {
     definition: getFactoryDefinition("line-implementation"),
     workspaceFactoryId: args.workspaceFactoryId,
     createCanvas: args.createCanvas,
-    updateCanvasFolderMembership: vi.fn(),
   });
 }
 

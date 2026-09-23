@@ -15,7 +15,11 @@ export const apiKeyKeys = {
   detail: (orgId: string, id: string) => [...apiKeyKeys.all, "detail", orgId, id] as const,
 };
 
-export const useAPIKeys = (organizationId: string) => {
+type UseAPIKeysOptions = {
+  enabled?: boolean;
+};
+
+export const useAPIKeys = (organizationId: string, options: UseAPIKeysOptions = {}) => {
   return useQuery({
     queryKey: apiKeyKeys.list(organizationId),
     queryFn: async () => {
@@ -24,7 +28,7 @@ export const useAPIKeys = (organizationId: string) => {
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
-    enabled: !!organizationId,
+    enabled: !!organizationId && (options.enabled ?? true),
   });
 };
 

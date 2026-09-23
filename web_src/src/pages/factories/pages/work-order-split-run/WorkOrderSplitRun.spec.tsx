@@ -44,6 +44,14 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 
 const useLiveLogStreamMock = vi.fn();
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
@@ -1474,6 +1482,7 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("shows the Ingest log when a GitHub automation created the draft", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     const user = userEvent.setup();
     renderPopup({
       factoryId: PRIMARY_FACTORY_ID,

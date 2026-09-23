@@ -298,8 +298,15 @@ describe("scope + filter + search + ordering", () => {
     );
   });
 
-  it("scope=my only keeps orders assigned to the current user", () => {
-    expect(applyWorkOrderScope(entries, "my", "me").map((e) => e.id)).toEqual(["mine-1"]);
+  it("scope=my keeps orders assigned to the current user or created by them", () => {
+    const createdByMe = order({
+      id: "created-1",
+      assignees: [],
+      createdBy: { user: { id: "me", name: "You" } },
+      updatedAt: "2024-06-04T00:00:00Z",
+    });
+    const withCreated = buildWorkOrderListEntries([meAssigned, createdByMe, others], factory);
+    expect(applyWorkOrderScope(withCreated, "my", "me").map((e) => e.id)).toEqual(["mine-1", "created-1"]);
   });
 
   it("scope=active keeps drafts, waiting, and failed orders and drops running work", () => {

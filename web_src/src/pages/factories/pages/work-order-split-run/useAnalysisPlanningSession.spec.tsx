@@ -12,7 +12,6 @@ import {
 } from "../planningSessionClient";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import {
-  analysisSessionPollInterval,
   analysisWorkOrderRefreshKey,
   useAnalysisPlanningSession,
   workOrderPlanningSessionQueryKey,
@@ -51,6 +50,7 @@ describe("useAnalysisPlanningSession", () => {
 
   it("keeps chat closed when the draft has no analysis session", async () => {
     vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue(null);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     const { result } = renderHook(
       () =>
@@ -61,7 +61,7 @@ describe("useAnalysisPlanningSession", () => {
           enabled: true,
           canUpdate: true,
         }),
-      { wrapper },
+      { wrapper: wrapperWithClient(queryClient) },
     );
 
     await waitFor(() => {
@@ -71,6 +71,10 @@ describe("useAnalysisPlanningSession", () => {
     expect(result.current.canSend).toBe(false);
     expect(result.current.queryError).toBeNull();
     expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(1);
+    const query = queryClient.getQueryCache().find({
+      queryKey: workOrderPlanningSessionQueryKey("org-1", "factory-1", "order-1"),
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
   });
 
   it("surfaces failures that are not a missing session", async () => {
@@ -149,7 +153,7 @@ describe("useAnalysisPlanningSession", () => {
       { wrapper: wrapperWithClient(queryClient) },
     );
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
     invalidateQueries.mockClear();
 
     await act(async () => {
@@ -189,7 +193,7 @@ describe("useAnalysisPlanningSession", () => {
       { wrapper: wrapperWithClient(queryClient) },
     );
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
     invalidateQueries.mockClear();
 
     act(() => result.current.onComposerChange("Use this image."));
@@ -197,7 +201,7 @@ describe("useAnalysisPlanningSession", () => {
       await result.current.onSend();
     });
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
   });
 
   it("lets the user send after analysis stops so a new run can continue the chat", async () => {
@@ -435,21 +439,5 @@ describe("analysisWorkOrderRefreshKey", () => {
     const session = { id: "session-1", state: "running" };
 
     expect(analysisWorkOrderRefreshKey({ ...session, ...changes })).not.toBe(analysisWorkOrderRefreshKey(session));
-  });
-});
-
-describe("analysisSessionPollInterval", () => {
-  it("polls while waiting for an enabled analysis session", () => {
-    expect(analysisSessionPollInterval(true, null)).toBe(1500);
-  });
-
-  it("does not poll an absent session after the disabled-mode lookup", () => {
-    expect(analysisSessionPollInterval(false, null)).toBe(false);
-  });
-
-  it("polls a live pinned session and stops after it ends", () => {
-    const session = { id: "session-1", state: "running" };
-    expect(analysisSessionPollInterval(false, session)).toBe(1500);
-    expect(analysisSessionPollInterval(false, { ...session, state: "ended" })).toBe(false);
   });
 });
