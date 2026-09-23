@@ -148,6 +148,8 @@ spec:
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
+            - name: BLOB_STORAGE_REGION
+              value: {{ .Values.blobStorage.region | quote }}
             - name: BLOB_STORAGE_LOCAL_PATH
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE

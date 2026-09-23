@@ -119,7 +119,7 @@ func FileIDFromSignedURL(raw string) (uuid.UUID, bool) {
 	if id, ok := fileIDFromHMACSignedURL(parsed); ok {
 		return id, true
 	}
-	return fileIDFromGCSSignedURL(parsed)
+	return fileIDFromObjectSignedURL(parsed)
 }
 
 func fileIDFromHMACSignedURL(parsed *url.URL) (uuid.UUID, bool) {
@@ -135,9 +135,22 @@ func fileIDFromHMACSignedURL(parsed *url.URL) (uuid.UUID, bool) {
 	return id, true
 }
 
-func fileIDFromGCSSignedURL(parsed *url.URL) (uuid.UUID, bool) {
-	host := strings.ToLower(parsed.Hostname())
-	if host != "storage.googleapis.com" && !strings.HasSuffix(host, ".storage.googleapis.com") {
+func isObjectStorageHost(host string) bool {
+	host = strings.ToLower(host)
+	if host == "storage.googleapis.com" || strings.HasSuffix(host, ".storage.googleapis.com") {
+		return true
+	}
+	if host == "s3.amazonaws.com" || strings.HasSuffix(host, ".s3.amazonaws.com") {
+		return true
+	}
+	if !strings.HasSuffix(host, ".amazonaws.com") {
+		return false
+	}
+	return strings.HasPrefix(host, "s3.") || strings.Contains(host, ".s3.") || strings.Contains(host, ".s3-")
+}
+
+func fileIDFromObjectSignedURL(parsed *url.URL) (uuid.UUID, bool) {
+	if !isObjectStorageHost(parsed.Hostname()) {
 		return uuid.Nil, false
 	}
 	base := path.Base(strings.Trim(parsed.Path, "/"))

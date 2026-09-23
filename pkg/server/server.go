@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
+	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -765,6 +766,9 @@ func newBlobProvider() (blob.Provider, error) {
 	case blob.ProviderGCS:
 		log.Println("Creating GCS blob storage provider")
 		return gcs.NewProvider()
+	case blob.ProviderS3:
+		log.Println("Creating S3 blob storage provider")
+		return s3blob.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
 		return filesystem.NewProvider()
