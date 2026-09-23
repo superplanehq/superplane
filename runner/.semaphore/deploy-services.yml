@@ -1,0 +1,84 @@
+version: v1.0
+name: Deploy services
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+global_job_config:
+  secrets:
+    - name: aws-prod
+  env_vars:
+    - name: AWS_DEFAULT_REGION
+      value: us-east-1
+
+blocks:
+  - name: Deploy task-broker
+    dependencies: []
+    task:
+      jobs:
+        - name: ECS deploy task-broker
+          commands:
+            - export IMAGE_TAG="$(echo "$SEMAPHORE_GIT_SHA" | cut -c1-12)"
+            - export IMAGE="ghcr.io/superplanehq/runner/task-broker:${IMAGE_TAG}"
+            - >-
+              TASK_DEF=$(aws ecs describe-task-definition --task-definition default-task-broker --query 'taskDefinition' --output json)
+            - >-
+              NEW_TASK_DEF=$(echo "$TASK_DEF" | jq --arg IMAGE "$IMAGE"
+              'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+              | .containerDefinitions[0].image = $IMAGE')
+            - >-
+              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            - aws ecs update-service --cluster default --service task-broker-v2 --task-definition "$NEW_TASK_DEF_ARN"
+            - |
+              DONE=0
+              for i in $(seq 1 20); do
+                STATUS=$(aws ecs describe-services --cluster default --services task-broker-v2 --query 'services[0].deployments[0].rolloutState' --output text)
+                echo "task-broker rollout: $STATUS (attempt $i)"
+                if [ "$STATUS" = "COMPLETED" ]; then
+                  DONE=1
+                  break
+                fi
+                sleep 30
+              done
+              if [ "$DONE" = "0" ]; then
+                echo "ERROR: Timed out waiting for task-broker rollout"
+                false
+              fi
+              echo "task-broker deployed successfully"
+
+  - name: Deploy fleet-manager
+    dependencies:
+      - Deploy task-broker
+    task:
+      jobs:
+        - name: ECS deploy fleet-manager
+          commands:
+            - export IMAGE_TAG="$(echo "$SEMAPHORE_GIT_SHA" | cut -c1-12)"
+            - export IMAGE="ghcr.io/superplanehq/runner/fleet-manager:${IMAGE_TAG}"
+            - >-
+              TASK_DEF=$(aws ecs describe-task-definition --task-definition default-fleet-manager --query 'taskDefinition' --output json)
+            - >-
+              NEW_TASK_DEF=$(echo "$TASK_DEF" | jq --arg IMAGE "$IMAGE"
+              'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+              | .containerDefinitions[0].image = $IMAGE')
+            - >-
+              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            - aws ecs update-service --cluster default --service fleet-manager --task-definition "$NEW_TASK_DEF_ARN"
+            - |
+              DONE=0
+              for i in $(seq 1 20); do
+                STATUS=$(aws ecs describe-services --cluster default --services fleet-manager --query 'services[0].deployments[0].rolloutState' --output text)
+                echo "fleet-manager rollout: $STATUS (attempt $i)"
+                if [ "$STATUS" = "COMPLETED" ]; then
+                  DONE=1
+                  break
+                fi
+                sleep 30
+              done
+              if [ "$DONE" = "0" ]; then
+                echo "ERROR: Timed out waiting for fleet-manager rollout"
+                false
+              fi
+              echo "fleet-manager deployed successfully"

@@ -1,0 +1,42 @@
+# Semaphore 2.0 — https://docs.semaphore.io
+version: v1.0
+name: runner
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+promotions:
+  - name: Publish Docker images to GHCR
+    pipeline_file: docker-publish.yml
+    auto_promote:
+      when: "result = 'passed' and branch = 'main'"
+  - name: Publish runner binaries to S3
+    pipeline_file: runner-binary-s3.yml
+    auto_promote:
+      when: "result = 'passed' and branch = 'main'"
+  - name: Build runner AMIs
+    pipeline_file: build-amis.yml
+
+blocks:
+  - name: Build and test
+    task:
+      jobs:
+        - name: fmt, vet, build, tests
+          commands:
+            - checkout
+            - sem-version go 1.25
+            # Module cache — same pattern as Semaphore Go guide
+            - cache restore
+            - go mod download
+            - cache store
+            - |
+              FILES=$(gofmt -l fleet-manager runner shared task-broker test)
+              if [ -n "$FILES" ]; then echo "gofmt needed on:"; echo "$FILES"; exit 1; fi
+            - go vet ./...
+            - mkdir -p bin
+            - make build
+            - sem-service start postgres 16
+            - export TEST_DATABASE_URL='postgresql://postgres:@0.0.0.0:5432/postgres?sslmode=disable'
+            - go test ./... -count=1 -p 1
