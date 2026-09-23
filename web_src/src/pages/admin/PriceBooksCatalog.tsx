@@ -57,8 +57,6 @@ type PriceBooksCatalogProps = {
   onTabChange: (tab: PriceBooksTab) => void;
   onProviderChange: (provider: PriceBookProvider) => void;
   onVersionChange: (version: string) => void;
-  onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-  onVMChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
   onRemoveVM: (index: number) => void;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
@@ -113,7 +111,6 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             syncing={props.syncing}
             actionsDisabled={actionsDisabled}
             onProviderChange={props.onProviderChange}
-            onModelChange={props.onModelChange}
             onSave={props.onSave}
             onSync={props.onSync}
           />
@@ -124,7 +121,6 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             vms={props.vms}
             saving={props.saving}
             actionsDisabled={actionsDisabled}
-            onVMChange={props.onVMChange}
             onRemoveVM={props.onRemoveVM}
             onAddVM={props.onAddVM}
             onSave={props.onSave}
@@ -216,7 +212,6 @@ function VMsPanel({
   vms,
   saving,
   actionsDisabled,
-  onVMChange,
   onRemoveVM,
   onAddVM,
   onSave,
@@ -225,7 +220,6 @@ function VMsPanel({
   vms: PriceBookVMRate[];
   saving: boolean;
   actionsDisabled: boolean;
-  onVMChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
   onRemoveVM: (index: number) => void;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
@@ -245,7 +239,7 @@ function VMsPanel({
           </Button>
         </div>
       )}
-      <VMsTable rates={vms} editable={isCurrent && !actionsDisabled} onChange={onVMChange} onRemove={onRemoveVM} />
+      <VMsTable rates={vms} canRemove={isCurrent && !actionsDisabled} onRemove={onRemoveVM} />
       {isCurrent && <AddVMRateForm disabled={actionsDisabled} onAdd={onAddVM} />}
     </>
   );

@@ -25,8 +25,7 @@ afterEach(() => {
 });
 
 describe("PriceBooks machine rates", () => {
-  it("renames and removes VM rates on the current catalog", async () => {
-    const renamedVm = "e1-xlarge-amd64";
+  it("removes a machine rate and saves the remaining row", async () => {
     const catalog = {
       ...currentCatalog,
       vms: [
@@ -39,7 +38,7 @@ describe("PriceBooks machine rates", () => {
         const body = JSON.parse(String(init.body)) as {
           vms: { match_key: string; micros_per_second: number }[];
         };
-        expect(body.vms).toEqual([{ match_key: renamedVm, match_mode: "exact", micros_per_second: 70 }]);
+        expect(body.vms).toEqual([{ match_key: "e1-large-amd64", match_mode: "exact", micros_per_second: 70 }]);
         return jsonResponse(savedCatalog);
       }
       return jsonResponse(catalog);
@@ -51,15 +50,12 @@ describe("PriceBooks machine rates", () => {
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Machines" }));
-    const machineType = screen.getByDisplayValue("e1-large-amd64");
-    await user.clear(machineType);
-    await user.type(machineType, " E1-XLARGE-AMD64 ");
-    await user.tab();
-    expect(machineType).toHaveValue(renamedVm);
+    expect(screen.getByText("e1-large-amd64")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("e1-large-amd64")).not.toBeInTheDocument();
 
     const removeButtons = screen.getAllByRole("button", { name: "Remove" });
     await user.click(removeButtons[1]);
-    expect(screen.queryByDisplayValue("e1-small-amd64")).not.toBeInTheDocument();
+    expect(screen.queryByText("e1-small-amd64")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("admin-price-book-save-vms"));
     await waitFor(() => {
@@ -95,24 +91,19 @@ describe("PriceBooks machine rates", () => {
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Machines" }));
-    const machineType = screen.getByDisplayValue("e1-large-amd64");
+    const machineType = screen.getByLabelText("Machine type", { selector: "#price-book-add-vm-key" });
 
-    await user.clear(machineType);
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Add machine rate" }));
     expect(showErrorToast).toHaveBeenCalledWith("Enter a machine type.");
-    expect(machineType).toHaveValue("e1-large-amd64");
 
-    await user.clear(machineType);
     await user.type(machineType, "   ");
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Add machine rate" }));
     expect(showErrorToast).toHaveBeenCalledWith("Enter a machine type.");
-    expect(machineType).toHaveValue("e1-large-amd64");
 
     await user.clear(machineType);
     await user.type(machineType, "e1-small-amd64");
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Add machine rate" }));
     expect(showErrorToast).toHaveBeenCalledWith("That machine rate already exists.");
-    expect(machineType).toHaveValue("e1-large-amd64");
 
     await user.click(screen.getByTestId("admin-price-book-save-vms"));
     await waitFor(() => {
@@ -167,7 +158,7 @@ describe("PriceBooks machine rates", () => {
 
     await user.click(screen.getByRole("tab", { name: "Machines" }));
     expect(screen.getByText("e1-large-amd64")).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("e1-large-amd64")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Machine type" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });
 });
@@ -251,55 +242,47 @@ describe("PriceBooks unused models", () => {
     expect(screen.getByText("No unused model rates for this provider.")).toBeInTheDocument();
   });
 
-  it("edits a rate in the unused models group", async () => {
+  it("sorts model and machine rates from the column header", async () => {
     const catalog = {
       ...currentCatalog,
       models: [
-        {
-          ...currentCatalog.models[0],
-          selected: true,
-        },
-        {
-          provider: "openrouter",
-          match_key: "other-model",
-          match_mode: "exact",
-          input_cents_per_million: 100,
-          output_cents_per_million: 500,
-          cache_read_cents_per_million: 10,
-          cache_write_cents_per_million: 50,
-          reasoning_cents_per_million: 0,
-          selected: false,
-        },
+        { ...currentCatalog.models[0], match_key: "beta-model", input_cents_per_million: 100, selected: true },
+        { ...currentCatalog.models[0], match_key: "alpha-model", input_cents_per_million: 500, selected: true },
+      ],
+      vms: [
+        { match_key: "e1-small-amd64", match_mode: "exact", micros_per_second: 40 },
+        { match_key: "e1-large-amd64", match_mode: "exact", micros_per_second: 70 },
       ],
     };
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
-        const body = JSON.parse(String(init.body)) as {
-          models: { input_cents_per_million: number }[];
-        };
-        expect(body.models[1].input_cents_per_million).toBe(200);
-        return jsonResponse(savedCatalog);
-      }
-      return jsonResponse(catalog);
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(catalog)),
+    );
 
     const user = userEvent.setup();
     renderPage();
+    expect(await screen.findByText("alpha-model")).toBeInTheDocument();
 
-    await user.click(await screen.findByTestId("admin-price-book-unused-toggle"));
-    expect(await screen.findByText("other-model")).toBeInTheDocument();
-    const inputs = screen.getAllByDisplayValue("1.00");
-    const otherInput = inputs.find((input) => input.closest("tr")?.textContent?.includes("other-model"));
-    expect(otherInput).toBeTruthy();
-    await user.clear(otherInput!);
-    await user.type(otherInput!, "2");
-    await user.tab();
+    const bodyRows = () => screen.getAllByRole("row").slice(1);
+    expect(bodyRows()[0]).toHaveTextContent("alpha-model");
+    expect(screen.getByRole("columnheader", { name: "Model" })).toHaveAttribute("aria-sort", "ascending");
 
-    await user.click(screen.getByTestId("admin-price-book-save"));
-    await waitFor(() => {
-      expect(showSuccessToast).toHaveBeenCalled();
-    });
+    await user.click(screen.getByRole("button", { name: "Input" }));
+    expect(screen.getByRole("columnheader", { name: "Input" })).toHaveAttribute("aria-sort", "ascending");
+    expect(bodyRows()[0]).toHaveTextContent("beta-model");
+
+    await user.click(screen.getByRole("button", { name: "Input" }));
+    expect(screen.getByRole("columnheader", { name: "Input" })).toHaveAttribute("aria-sort", "descending");
+    expect(bodyRows()[0]).toHaveTextContent("alpha-model");
+
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
+    expect(bodyRows()[0]).toHaveTextContent("e1-large-amd64");
+
+    await user.click(screen.getByRole("button", { name: "Micros per second" }));
+    expect(bodyRows()[0]).toHaveTextContent("e1-small-amd64");
+
+    await user.click(screen.getByRole("button", { name: "Micros per second" }));
+    expect(bodyRows()[0]).toHaveTextContent("e1-large-amd64");
   });
 
   it("disables update on Anthropic and OpenAI tabs", async () => {
@@ -315,6 +298,6 @@ describe("PriceBooks unused models", () => {
 
     await user.click(screen.getByRole("tab", { name: "Anthropic" }));
     expect(screen.getByTestId("admin-price-book-sync-disabled")).toBeDisabled();
-    expect(screen.getByText("The Anthropic API does not publish prices. Edit rates here.")).toBeInTheDocument();
+    expect(screen.getByText("The Anthropic API does not publish prices.")).toBeInTheDocument();
   });
 });

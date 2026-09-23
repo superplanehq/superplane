@@ -194,44 +194,10 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
       void activateCurrentVersion(targetVersion, catalog, setActivating, onDone),
     handleDelete: (targetVersion: string, onDone: () => void) =>
       void deleteCurrentVersion(targetVersion, catalog, setDeleting, onDone),
-    handleModelChange: (index: number, patch: Partial<PriceBookModelRate>) => {
-      catalog.setModels((current) =>
-        current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...patch } : rate)),
-      );
-    },
-    handleVMChange: (index: number, patch: Partial<PriceBookVMRate>) => patchVMRate(catalog, index, patch),
     handleRemoveVM: (index: number) => {
       catalog.setVMs((current) => current.filter((_, rateIndex) => rateIndex !== index));
     },
   };
-}
-
-function patchVMRate(catalog: PriceBookEditCatalog, index: number, patch: Partial<PriceBookVMRate>): boolean {
-  const current = catalog.vms[index];
-  if (!current) {
-    return false;
-  }
-
-  if (patch.match_key !== undefined) {
-    const matchKey = normalizeVMMatchKey(patch.match_key);
-    if (matchKey === undefined) {
-      return false;
-    }
-
-    const matchMode = patch.match_mode ?? current.match_mode;
-    const duplicate = catalog.vms.some(
-      (rate, rateIndex) => rateIndex !== index && rate.match_key === matchKey && rate.match_mode === matchMode,
-    );
-    if (duplicate) {
-      showErrorToast("That machine rate already exists.");
-      return false;
-    }
-
-    patch = { ...patch, match_key: matchKey };
-  }
-
-  catalog.setVMs((rates) => rates.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...patch } : rate)));
-  return true;
 }
 
 function normalizeVMMatchKey(matchKey: string): string | undefined {

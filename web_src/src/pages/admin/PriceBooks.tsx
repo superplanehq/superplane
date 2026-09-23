@@ -64,8 +64,6 @@ export function PriceBooks() {
           setDeleteOpen(false);
           void catalog.loadPriceBooks(version);
         }}
-        onModelChange={edits.handleModelChange}
-        onVMChange={edits.handleVMChange}
         onRemoveVM={edits.handleRemoveVM}
         onAddVM={edits.handleAddVM}
         onSave={edits.handleSave}

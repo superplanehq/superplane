@@ -42,7 +42,7 @@ describe("PriceBooks catalog", () => {
 
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
     expect(screen.getByTestId("admin-price-book-version")).toHaveTextContent("2026-09-09.1 (current)");
-    expect(screen.getByDisplayValue("3.00")).toBeInTheDocument();
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
     expect(screen.getByTestId("admin-price-book-sync")).toBeInTheDocument();
   });
 
@@ -92,7 +92,7 @@ describe("PriceBooks catalog", () => {
     expect(screen.queryByTestId("admin-price-book-sync")).not.toBeInTheDocument();
   });
 
-  it("saves edited rates and adds a VM row", async () => {
+  it("saves an added machine rate", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
         const body = JSON.parse(String(init.body)) as {
@@ -101,7 +101,7 @@ describe("PriceBooks catalog", () => {
           vms: { match_key: string }[];
         };
         expect(body.base_version).toBe("2026-09-09.1");
-        expect(body.models[0].input_cents_per_million).toBe(400);
+        expect(body.models[0].input_cents_per_million).toBe(300);
         expect(body.vms.some((rate) => rate.match_key === "e1-test-amd64")).toBe(true);
         return jsonResponse(savedCatalog);
       }
@@ -112,11 +112,7 @@ describe("PriceBooks catalog", () => {
     const user = userEvent.setup();
     renderPage();
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
-
-    const input = screen.getByDisplayValue("3.00");
-    await user.clear(input);
-    await user.type(input, "4");
-    await user.tab();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Machines" }));
     await user.type(screen.getByLabelText("Machine type", { selector: "#price-book-add-vm-key" }), "e1-test-amd64");
@@ -179,7 +175,7 @@ describe("PriceBooks catalog", () => {
     expect(screen.getByTestId("admin-price-book-version")).toHaveTextContent("2026-08-31.1 (current)");
     expect(screen.getByTestId("admin-price-book-sync")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-price-book-activate")).not.toBeInTheDocument();
-    expect(screen.getByDisplayValue("3.00")).toBeInTheDocument();
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
   });
 
   it("disables save while a version change is loading", async () => {

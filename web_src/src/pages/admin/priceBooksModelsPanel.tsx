@@ -5,7 +5,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { hostedProviderLabel } from "@/lib/hostedCredit";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import AdminPagination from "./AdminPagination";
 import { EmptyRatesMessage, ModelsTable } from "./priceBooksTables";
 import type { PriceBookModelRate } from "./priceBooksApi";
 
@@ -26,7 +25,6 @@ export function ModelsPanel({
   syncing,
   actionsDisabled,
   onProviderChange,
-  onModelChange,
   onSave,
   onSync,
 }: {
@@ -37,7 +35,6 @@ export function ModelsPanel({
   syncing: boolean;
   actionsDisabled: boolean;
   onProviderChange: (provider: PriceBookProvider) => void;
-  onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
   onSave: () => void;
   onSync: (provider: PriceBookProvider) => void;
 }) {
@@ -90,7 +87,7 @@ export function ModelsPanel({
           <div>
             <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Selected models</Text>
             {selectedRows.length > 0 ? (
-              <ModelsTable rows={selectedRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
+              <ModelsTable rows={selectedRows} />
             ) : (
               <EmptyRatesMessage
                 message="No models are selected in Hosted LLM settings."
@@ -105,12 +102,7 @@ export function ModelsPanel({
               />
             )}
           </div>
-          <UnusedModelsSection
-            key={provider}
-            rows={unusedRows}
-            editable={isCurrent && !actionsDisabled}
-            onChange={onModelChange}
-          />
+          <UnusedModelsSection key={provider} rows={unusedRows} />
         </>
       )}
     </>
@@ -136,8 +128,8 @@ function ProviderUpdateControl({
         </Button>
         <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {provider === "anthropic"
-            ? "The Anthropic API does not publish prices. Edit rates here."
-            : "The OpenAI API does not publish prices. Edit rates here."}
+            ? "The Anthropic API does not publish prices."
+            : "The OpenAI API does not publish prices."}
         </Text>
       </div>
     );
@@ -162,18 +154,8 @@ function ProviderUpdateControl({
   );
 }
 
-function UnusedModelsSection({
-  rows,
-  editable,
-  onChange,
-}: {
-  rows: { rate: PriceBookModelRate; index: number }[];
-  editable: boolean;
-  onChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-}) {
+function UnusedModelsSection({ rows }: { rows: { rate: PriceBookModelRate; index: number }[] }) {
   const [open, setOpen] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const pageRows = rows.slice(offset, offset + UNUSED_PAGE_SIZE);
 
   return (
     <div>
@@ -189,8 +171,7 @@ function UnusedModelsSection({
       {open &&
         (rows.length > 0 ? (
           <>
-            <ModelsTable rows={pageRows} editable={editable} onChange={onChange} />
-            <AdminPagination offset={offset} total={rows.length} pageSize={UNUSED_PAGE_SIZE} onPageChange={setOffset} />
+            <ModelsTable rows={rows} pageSize={UNUSED_PAGE_SIZE} />
           </>
         ) : (
           <EmptyRatesMessage message="No unused model rates for this provider." />
