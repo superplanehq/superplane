@@ -1,14 +1,12 @@
 This specification defines the recommended starting capacity for an on-premise SuperPlane installation.
-The installation has two layers: the control plane and the Runner execution environment.
 
+The installation has two layers: the control plane and the Runner execution environment.
 
 - [Control plane](#control-plane)
   - [Components](#components)
   - [Hardware](#hardware)
-    - [Production Kubernetes installation](#production-kubernetes-installation)
-    - [Single-host installation](#single-host-installation)
   - [Software](#software)
-  - [Storage and Backup](#storage-and-backup)
+  - [Storage](#storage)
   - [Network](#network)
   - [Security](#security)
 - [Runners](#runners)
@@ -33,19 +31,20 @@ The control plane provides the SuperPlane user interface, APIs, workflow coordin
 
 ### Hardware
 
-#### Production Kubernetes installation
+**Production Kubernetes installation**
 
 | Resource | Recommended |
 | --- | --- |
 | Kubernetes worker nodes | 3 nodes |
-| Capacity per node | 2 vCPU, 8 GiB RAM |
+| Capacity per node | 2 vCPU, 8 GiB RAM |-
 
-This capacity covers SuperPlane services.
-PostgreSQL and RabbitMQ can run in the cluster or as managed services, such as Amazon RDS for PostgreSQL and Amazon MQ for RabbitMQ.
-For production deployments, we recommend using a managed service.
-Blob storage uses an external object storage service.
+Additional information:
+- This capacity covers SuperPlane services.
+- PostgreSQL and RabbitMQ can run in the cluster or as managed services, such as Amazon RDS for PostgreSQL and Amazon MQ for RabbitMQ.
+- For production deployments, we recommend using a managed service.
+- Blob storage uses an external object storage service.
 
-#### Single-host installation
+**Single-host installation**
 
 Use a single host only for evaluation or small, non-critical installations.
 
@@ -55,8 +54,7 @@ Use a single host only for evaluation or small, non-critical installations.
 | Memory | 4 GiB | 8 GiB |
 | Storage | 40 GiB SSD | 100 GiB SSD |
 
-The single host runs SuperPlane, PostgreSQL, RabbitMQ, and the HTTPS proxy.
-It does not provide high availability.
+The single host runs SuperPlane, PostgreSQL, RabbitMQ, and the HTTPS proxy. It does not provide high availability.
 
 ### Software
 
@@ -69,17 +67,11 @@ It does not provide high availability.
 | HTTPS | Ingress controller, load balancer, or Caddy |
 | CPU architecture | `amd64` |
 
-Use a Kubernetes version that the selected distribution currently supports.
-Pin SuperPlane container images to exact release tags or digests.
+### Storage
 
-### Storage and Backup
-
-Blob storage contains uploaded and generated files.
-SuperPlane uses S3-compatible object storage, such as GCS.
-Configure one bucket for all API and worker replicas.
-
-Back up the SuperPlane PostgreSQL database. Enable point-in-time recovery.
-Keep at least 30 days of backups and test a restore every quarter.
+- Blob storage contains uploaded and generated files.
+- SuperPlane uses S3-compatible object storage, such as GCS.
+- One bucket for all API and worker replicas.
 
 ### Network
 
@@ -92,8 +84,9 @@ Keep at least 30 days of backups and test a restore every quarter.
 | 15672/TCP | Administration only | RabbitMQ administration |
 | 4317/4318 TCP | Private or outbound | OpenTelemetry |
 
-External integrations require outbound HTTPS access.
-Inbound integrations require a stable HTTPS webhook address.
+Additional notes:
+- External integrations require outbound HTTPS access.
+- Inbound integrations require a stable HTTPS webhook address.
 
 ### Security
 
@@ -106,17 +99,16 @@ Inbound integrations require a stable HTTPS webhook address.
 
 ## Runners
 
-Runners execute shell, Docker, and coding agent tasks for SuperPlane workflows.
-One Runner process executes one active task.
+- Runners execute shell, Docker, and coding agent tasks for SuperPlane workflows.
+- One Runner process executes one active task.
 
 ### Components
 
 - A task broker that receives and tracks tasks.
 - PostgreSQL for the task-broker queue.
 - One or more Runner hosts.
-
-The task broker can run in the control-plane Kubernetes cluster.
-Runner hosts must run in a separate execution environment.
+- The task broker can run in the control-plane Kubernetes cluster.
+- Runner hosts must run in a separate execution environment.
 
 ### Software
 
@@ -126,10 +118,9 @@ Runner hosts must run in a separate execution environment.
 | Container support | Docker Engine |
 | CPU architecture | `amd64` or `arm64` |
 
-Pin Runner container images and binaries to exact releases.
 Runner images must include the tools required by each task.
+
 Typical tools include Git, GitHub CLI, Node.js 22, Python 3, Docker, Claude Code, OpenCode, and Codex.
-Back up the task-broker PostgreSQL database. Enable point-in-time recovery.
 
 ### Network
 
@@ -139,6 +130,7 @@ Back up the task-broker PostgreSQL database. Enable point-in-time recovery.
 | 9090/TCP | Private only | Runner health checks |
 
 Runner hosts require access to the task broker.
+
 The task broker requires access to the SuperPlane webhook endpoint.
 
 Runner tasks can require outbound access to:
