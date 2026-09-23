@@ -148,8 +148,9 @@ func signedWebhookEvent(ctx core.WebhookRequestContext) (string, int, error) {
 }
 
 // webhookSecretEntries reads the signature tokens stored at registration.
-// New records are "event=token" lines. Older records are one raw token per
-// line, in created-then-updated order.
+// New records are "event=token" lines. Older records with two lines are
+// created then updated. One older line is a token both webhooks shared,
+// so it does not name the event.
 func webhookSecretEntries(secret []byte) []webhookSecretEntry {
 	lines := []string{}
 	for _, part := range strings.Split(string(secret), "\n") {
@@ -184,6 +185,15 @@ func webhookSecretEntries(secret []byte) []webhookSecretEntry {
 }
 
 func legacyWebhookSecretEntries(tokens []string) []webhookSecretEntry {
+	// The previous registration stored one copy of a token that both
+	// webhooks shared. That copy does not say which event arrived.
+	if len(tokens) < 2 {
+		if len(tokens) == 0 {
+			return nil
+		}
+		return []webhookSecretEntry{{token: tokens[0]}}
+	}
+
 	entries := make([]webhookSecretEntry, 0, len(tokens))
 	for i, token := range tokens {
 		if i >= len(remoteWebhookEvents) {

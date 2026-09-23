@@ -41,9 +41,7 @@ func taskWebhookBody(id, projectID, title string) []byte {
 			"id":   id,
 			"type": "tasks",
 			"attributes": map[string]any{
-				"title":      title,
-				"created_at": "2026-09-23T13:37:41.207+02:00",
-				"updated_at": "2026-09-23T13:37:41.242+02:00",
+				"title": title,
 			},
 			"relationships": map[string]any{
 				"project": map[string]any{
@@ -286,6 +284,23 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		meta, ok := envelope["meta"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, TaskUpdatedEvent, meta["event"])
+	})
+
+	t.Run("one legacy token does not classify an update as created", func(t *testing.T) {
+		body := taskWebhookBody("91", "1", "Fix payment retries")
+		events := &contexts.EventContext{}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders("", signWebhookBody("shared-token", "1710000000", body)),
+			Configuration: createdTaskConfiguration(),
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "shared-token"},
+			Events:        events,
+		})
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		require.ErrorContains(t, err, "missing")
+		assert.Zero(t, events.Count())
 	})
 
 	t.Run("shared signature token uses the event query", func(t *testing.T) {
