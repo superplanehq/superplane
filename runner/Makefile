@@ -2,18 +2,22 @@ DOCKER_SERVICES := fleet-manager task-broker runner
 
 # Local dev defaults (override on the command line)
 LOCAL_TMP ?= /tmp
-LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable
+LOCAL_BROKER_DATABASE_URL ?= postgres://postgres:the-cake-is-a-lie@127.0.0.1:5432/broker?sslmode=disable
 
 # Run integration tests that require Postgres.
 # Uses a separate Compose project and host port so it does not share or
-# stop the local broker-db.
+# stop the dev Postgres.
 .PHONY: test-integration
 test-integration:
 	@set -eu; \
-	cleanup() { BROKER_DB_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml --profile local-runner down -v; }; \
+	cleanup() { POSTGRES_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml down -v; }; \
 	trap cleanup EXIT; \
-	BROKER_DB_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml --profile local-runner up -d --wait broker-db; \
-	TEST_DATABASE_URL=postgres://broker:broker@127.0.0.1:5433/broker?sslmode=disable go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
+	POSTGRES_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml up -d --wait db; \
+	POSTGRES_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml exec -T db \
+	  psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
+	  || POSTGRES_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml exec -T db \
+	  psql -U postgres -c "CREATE DATABASE broker"; \
+	TEST_DATABASE_URL=postgres://postgres:the-cake-is-a-lie@127.0.0.1:5433/broker?sslmode=disable go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
 
 LOCAL_BROKER_LISTEN ?= :8081
 LOCAL_BROKER_URL ?= http://127.0.0.1:8081
