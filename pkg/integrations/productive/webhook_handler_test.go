@@ -76,8 +76,8 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 		}
 		assert.Contains(t, strings.Join(bodies, "\n"), `"event_id":1`)
 		assert.Contains(t, strings.Join(bodies, "\n"), `"event_id":24`)
-		assert.Contains(t, strings.Join(bodies, "\n"), "event=task.created")
-		assert.Contains(t, strings.Join(bodies, "\n"), "event=task.updated")
+		assert.Contains(t, strings.Join(bodies, "\n"), "/task.created?event=task.created")
+		assert.Contains(t, strings.Join(bodies, "\n"), "/task.updated?event=task.updated")
 	})
 
 	t.Run("webhooks_limit_exceeded is surfaced as a plan limitation", func(t *testing.T) {
@@ -190,4 +190,9 @@ func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 
 		require.Error(t, err)
 	})
+}
+
+func TestEventTargetURL(t *testing.T) {
+	assert.Equal(t, "https://sp.test/hook/task.created?event=task.created", eventTargetURL("https://sp.test/hook", TaskCreatedEvent))
+	assert.Equal(t, "https://sp.test/hook/task.updated?event=task.updated", eventTargetURL("https://sp.test/hook/", TaskUpdatedEvent))
 }
