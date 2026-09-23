@@ -131,6 +131,9 @@ func TestSeedDevHostedOpenRouter(t *testing.T) {
 	})
 
 	t.Run("replaces an OpenRouter default that left the allowlist", func(t *testing.T) {
+		withOldModel := cfg
+		withOldModel.Models = []string{"openai/gpt-4.1", "deepseek/deepseek-v4-flash"}
+		require.NoError(t, llm.SeedDevHostedOpenRouter(t.Context(), db, r.Encryptor, withOldModel))
 		require.NoError(t, setInstallationDefaultHostedModel(db, models.UsageProviderOpenRouter, "openai/gpt-4.1"))
 
 		require.NoError(t, llm.SeedDevHostedOpenRouter(t.Context(), db, r.Encryptor, cfg))

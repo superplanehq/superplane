@@ -63,7 +63,7 @@ export function IntakeSettingsTableOfContents({
     }
 
     function recompute() {
-      if (scrollingToRef.current) {
+      if (!root || scrollingToRef.current) {
         return;
       }
 

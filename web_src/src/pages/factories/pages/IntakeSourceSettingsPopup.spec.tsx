@@ -1,32 +1,14 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
-import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { unmockedSrc } from "@/test/unmockedModule";
-import { TooltipProvider } from "@/ui/tooltip";
 
-import { INTAKE_CONNECTION_COPY } from "./intakeConnectionModel";
-import { IntakeSourceSettingsPopup, type IntakeSettingsConnection } from "./IntakeSourceSettingsPopup";
-import {
-  DEFAULT_GITHUB_INTAKE_SETTINGS,
-  DEFAULT_SENTRY_INTAKE_SETTINGS,
-  INTAKE_SETTINGS_COPY,
-  intakeDangerZoneHelper,
-  intakeDeleteHelper,
-  intakePauseHelper,
-  intakeSettingsTitle,
-  type IntakeSettingsTab,
-} from "./intakeSourceSettingsModel";
+import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsTitle } from "./intakeSourceSettingsModel";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
-import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
-import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import type { LineIntakeSourceId } from "./lineIntakeModel";
 import { lineIntakeSourceById } from "./lineIntakeModel";
+import { intakeConnection, renderPopup } from "./intakeSourceSettingsPopupTestSupport";
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
@@ -82,141 +64,6 @@ useInfiniteCanvasRuns.mockReturnValue({
   fetchNextPage: vi.fn(),
   refetch: vi.fn(),
 });
-
-const githubAutomationGraph = githubIntakeGraph();
-
-/** Same pipeline the canvas editor uses, so the popup renders editor nodes. */
-function githubIntakeGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData({
-    workflow: {
-      metadata: { id: "app-github-issues-intake", name: "GitHub issues", factoryId: "factory-1" },
-      spec: {
-        nodes: [
-          { id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-          {
-            id: "filter",
-            name: "Matches filters?",
-            type: "TYPE_ACTION",
-            component: "if",
-            configuration: { expression: "true" },
-          },
-          { id: "create", name: "Create Task", type: "TYPE_ACTION", component: "createWorkOrder" },
-        ],
-        edges: [
-          { channel: "default", sourceId: "trigger", targetId: "filter" },
-          { channel: "true", sourceId: "filter", targetId: "create" },
-        ],
-      },
-    },
-    triggers: [{ name: "github.onIssue", label: "On Issue" }],
-    components: [
-      { name: "if", label: "If" },
-      { name: "createWorkOrder", label: "Create Task" },
-    ],
-    nodeEventsMap: {},
-    nodeExecutionsMap: {},
-    nodeQueueItemsMap: {},
-    workflowId: "app-github-issues-intake",
-    queryClient: new QueryClient(),
-    user: null,
-    canvasMode: "live",
-  });
-
-  return {
-    nodes,
-    edges,
-    factoryId: "factory-1",
-    specNodes: [{ id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" }],
-  };
-}
-
-function renderPopup(
-  props: {
-    onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
-    onClose?: () => void;
-    editAutomationHref?: string;
-    canvasId?: string;
-    runHrefFor?: (runId: string) => string;
-    agent?: PlanningReviewAgentSlot;
-    initialTab?: IntakeSettingsTab;
-    labelOptions?: string[];
-    labelOptionsLoading?: boolean;
-    sourceId?: LineIntakeSourceId;
-    connection?: IntakeSettingsConnection;
-    settings?: typeof DEFAULT_GITHUB_INTAKE_SETTINGS;
-    organizationId?: string;
-    integrationId?: string;
-    resourceId?: string;
-    paused?: boolean;
-    pauseError?: string;
-    deleteError?: string;
-    onPause?: () => void | Promise<void>;
-    onResume?: () => void | Promise<void>;
-    onDelete?: () => void | Promise<void>;
-    saveError?: string;
-  } = {},
-) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
-        <ThemeProvider>
-          <TooltipProvider>
-            <IntakeSourceSettingsPopup
-              settings={
-                props.settings ??
-                (props.sourceId === "sentry-exceptions"
-                  ? DEFAULT_SENTRY_INTAKE_SETTINGS
-                  : props.sourceId === "jira-issues"
-                    ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
-                    : DEFAULT_GITHUB_INTAKE_SETTINGS)
-              }
-              sourceId={props.sourceId}
-              connection={props.connection}
-              organizationId={props.organizationId}
-              integrationId={props.integrationId}
-              resourceId={props.resourceId}
-              labelOptions={props.labelOptions ?? ["bug", "enhancement"]}
-              labelOptionsLoading={props.labelOptionsLoading}
-              automationGraph={githubAutomationGraph}
-              onSave={props.onSave ?? vi.fn()}
-              saveError={props.saveError}
-              paused={props.paused}
-              pauseError={props.pauseError}
-              deleteError={props.deleteError}
-              onPause={props.onPause}
-              onResume={props.onResume}
-              onDelete={props.onDelete}
-              editAutomationHref={props.editAutomationHref}
-              canvasId={props.canvasId}
-              runHrefFor={props.runHrefFor}
-              agent={props.agent}
-              onClose={props.onClose ?? vi.fn()}
-              initialTab={props.initialTab}
-              fixed={false}
-            />
-          </TooltipProvider>
-        </ThemeProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
-function intakeConnection(overrides: Partial<IntakeSettingsConnection> = {}): IntakeSettingsConnection {
-  return {
-    binding: { integrationId: "", resourceId: "" },
-    integrationsBasePath: "/org-1/workspaces/rf/settings/organization/integrations",
-    integrations: [
-      {
-        metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
-        status: { state: "ready" },
-      },
-    ],
-    projects: [],
-    onBindingChange: vi.fn(),
-    onConnect: vi.fn(),
-    ...overrides,
-  };
-}
 
 afterEach(() => {
   localStorage.clear();
@@ -332,8 +179,7 @@ describe("IntakeSourceSettingsPopup", () => {
     },
   );
 
-  it("shows the GitHub issues configuration fields", async () => {
-    const user = userEvent.setup();
+  it("shows the GitHub issues configuration fields", () => {
     renderPopup();
 
     const dialog = screen.getByTestId("intake-source-settings");
@@ -526,179 +372,12 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the Connection section for a GitHub intake", () => {
-    renderPopup();
-
-    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-  });
-
-  it("shows Connection fields for a Jira intake that needs a live connection", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "jira-issues",
-      organizationId: "org-1",
-      connection: intakeConnection({ health: "HEALTH_MISSING_INTEGRATION" }),
-    });
-
-    expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: INTAKE_CONNECTION_COPY.section })).toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent(INTAKE_CONNECTION_COPY.missing);
-    expect(screen.getByText(INTAKE_CONNECTION_COPY.integration)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Atlassian/ })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/settings/organization/integrations/jira-1",
-    );
-  });
-
-  it("hides Connect when a Jira intake already has an account", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "jira-issues",
-      organizationId: "org-1",
-      connection: intakeConnection({
-        binding: { integrationId: "jira-1", resourceId: "ENG" },
-        projects: [{ id: "ENG", name: "Engineering" }],
-      }),
-    });
-
-    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Atlassian/ })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/settings/organization/integrations/jira-1",
-    );
-  });
-
-  it("shows Connect Jira when the intake has no account", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "jira-issues",
-      connection: intakeConnection({ integrations: [] }),
-    });
-
-    expect(screen.getByTestId("intake-connection-connect")).toHaveTextContent("Connect Jira");
-  });
-
-  it("hides Connect when a Sentry intake already has an account", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "sentry-exceptions",
-      organizationId: "org-1",
-      connection: intakeConnection({
-        binding: { integrationId: "sentry-1", resourceId: "proj-1" },
-        integrations: [
-          {
-            metadata: { id: "sentry-1", name: "Sentry org", integrationName: "sentry" },
-            status: { state: "ready" },
-          },
-        ],
-        projects: [{ id: "proj-1", name: "Frontend" }],
-      }),
-    });
-
-    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Sentry org/ })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/settings/organization/integrations/sentry-1",
-    );
-  });
-
-  it("keeps Save disabled until the Jira project is chosen", () => {
-    renderPopup({
-      sourceId: "jira-issues",
-      connection: intakeConnection({
-        health: "HEALTH_MISSING_INTEGRATION",
-        binding: { integrationId: "jira-1", resourceId: "" },
-        projects: [{ id: "ENG", name: "Engineering" }],
-        saveDisabled: true,
-      }),
-    });
-
-    expect(
-      within(screen.getByTestId("intake-settings-topbar")).getByTestId("intake-source-settings-save"),
-    ).toBeDisabled();
-  });
-
   it("shows a save error beside the top bar Save button", () => {
     renderPopup({ saveError: INTAKE_SETTINGS_COPY.saveError });
 
     const topbar = screen.getByTestId("intake-settings-topbar");
     expect(within(topbar).getByRole("alert")).toHaveTextContent(INTAKE_SETTINGS_COPY.saveError);
     expect(within(topbar).getByTestId("intake-source-settings-save")).toBeInTheDocument();
-  });
-
-  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "pauses, resumes, and deletes a %s intake after confirmation",
-    async (sourceId) => {
-      const onPause = vi.fn();
-      const onResume = vi.fn();
-      const onDelete = vi.fn();
-      const user = userEvent.setup();
-      renderPopup({ sourceId, onPause, onResume, onDelete });
-
-      expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
-      expect(screen.getByText(intakeDangerZoneHelper(sourceId))).toBeInTheDocument();
-      expect(screen.getByText(intakePauseHelper(sourceId))).toBeInTheDocument();
-      expect(screen.getByText(intakeDeleteHelper(sourceId))).toBeInTheDocument();
-      expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
-
-      await user.click(screen.getByTestId("intake-source-settings-pause"));
-      expect(onPause).toHaveBeenCalledTimes(1);
-
-      await user.click(screen.getByTestId("intake-source-settings-delete"));
-      expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-      expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(intakeDeleteHelper(sourceId));
-      expect(onDelete).not.toHaveBeenCalled();
-      await user.click(screen.getByTestId("intake-delete-cancel"));
-      expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
-      expect(onDelete).not.toHaveBeenCalled();
-
-      await user.click(screen.getByTestId("intake-source-settings-delete"));
-      await user.click(screen.getByTestId("intake-delete-confirm"));
-      expect(onDelete).toHaveBeenCalledTimes(1);
-    },
-  );
-
-  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "offers resume for a paused %s intake",
-    async (sourceId) => {
-      const onResume = vi.fn();
-      const user = userEvent.setup();
-      renderPopup({ sourceId, paused: true, onResume });
-
-      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-      await user.click(screen.getByTestId("intake-source-settings-resume"));
-      expect(onResume).toHaveBeenCalledTimes(1);
-    },
-  );
-
-  it("keeps a failed pause from rejecting and shows the error", async () => {
-    const onPause = vi.fn().mockRejectedValue(new Error("pause failed"));
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "sentry-exceptions",
-      onPause,
-      pauseError: INTAKE_SETTINGS_COPY.pauseError,
-    });
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-
-    expect(onPause).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("alert")).toHaveTextContent(INTAKE_SETTINGS_COPY.pauseError);
-  });
-
-  it("shows a delete error in the confirmation dialog", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "sentry-exceptions",
-      onDelete: vi.fn().mockRejectedValue(new Error("delete failed")),
-      deleteError: INTAKE_SETTINGS_COPY.deleteError,
-    });
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-
-    const dialog = screen.getByTestId("intake-delete-dialog");
-    expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteError);
-    expect(within(screen.getByTestId("intake-source-settings")).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows Jira intake triggers and completion settings on the Settings page", async () => {
