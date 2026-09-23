@@ -224,11 +224,9 @@ describe("IntakeSettingsHost", () => {
     );
     expect(within(dialog).queryByTestId("intake-connection")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
-    expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
-    expect(
-      within(dialog).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
-    ).toBeChecked();
+    expect(within(dialog).getByRole("switch", { name: "A new issue is opened" })).toBeChecked();
+    expect(within(dialog).getByRole("switch", { name: "A closed issue is re-opened" })).toBeChecked();
+    expect(within(dialog).getByRole("switch", { name: 'The "superplane" label is added to the issue' })).toBeChecked();
     const nav = within(dialog).getByRole("navigation", { name: "Intake settings" });
     expect(
       within(nav)
