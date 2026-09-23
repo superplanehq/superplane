@@ -118,8 +118,9 @@ Full steps, webhook URLs, and factory CLIs on the Compose worker:
 **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`**).
 **`make register-superplane-fleets`** also registers SuperPlane machine types.
 **`make fleet-manager`** is only for the EC2 provisioner.
-**`make local-dev-help`** lists this. Host **`make task-broker`** still
-listens on **:8081**. Enqueue with **`Authorization: Bearer dev-local-token`**
+**`make local-dev-help`** lists this. **`make task-broker`** runs on the
+Compose network and listens on **127.0.0.1:8081**. Start Postgres first with
+root **`make dev.up`**. Enqueue with **`Authorization: Bearer dev-local-token`**
 and **`"fleet_id":"local"`**.
 
 ## Run task-broker
@@ -150,15 +151,15 @@ and **`"fleet_id":"local"`**.
 | `POST`   | `/tasks`                            | Body: `BrokerCreateTaskRequest` — task fields (`command` xor `commands`, `webhook_url`, execution mode…) plus required **`fleet_id`**                                                                                                           |
 
 ```bash
-export DATABASE_URL='postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable'
+export DATABASE_URL='postgres://postgres:the-cake-is-a-lie@db:5432/broker?sslmode=disable'
 export LISTEN_ADDR=:8081
 export AUTH_TOKEN=your-secret
 ./bin/task-broker
 ```
 
-Local dev expects Postgres on `127.0.0.1:5432` with database `broker` (see `LOCAL_BROKER_DATABASE_URL` in the `Makefile`). GORM auto-migrates schema on startup.
+Local dev uses database `broker` on the SuperPlane Postgres host `db`. Compose does not publish that port. `make task-broker` runs the process on that network and publishes the listen port on `127.0.0.1:8081`. GORM auto-migrates schema on startup.
 
-**Tests** that touch the broker store require `TEST_DATABASE_URL` (same format as `DATABASE_URL`). CI starts Postgres via `sem-service`; locally run e.g. `docker run -d --name broker-pg -e POSTGRES_USER=broker -e POSTGRES_PASSWORD=broker -e POSTGRES_DB=broker -p 5432:5432 postgres:16-alpine` and export `TEST_DATABASE_URL=postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable`. Use `go test ./... -p 1` when sharing one test database.
+**Tests** that touch the broker store require `TEST_DATABASE_URL` (same format as `DATABASE_URL`). CI starts Postgres via `sem-service`. Locally, `make test-integration` starts an isolated Postgres on the Compose network. Use `go test ./... -p 1` when sharing one test database.
 
 **Inspect upstream task status** (uses `AUTH_TOKEN` and broker base from **`scripts/deploy/task-broker.env`** unless you export overrides): `./scripts/check-broker-task.sh <broker_task_id>`
 

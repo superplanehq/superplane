@@ -139,8 +139,7 @@ dev.up:
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
 ifeq ($(strip $(CI)),)
 	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) build task-broker runner
-	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build broker-db
-	@echo "Runner images built. broker-db is ready."
+	@echo "Runner images built."
 endif
 	@echo "Development containers are ready."
 
@@ -154,6 +153,7 @@ dev.setup:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 ifeq ($(strip $(CI)),)
+	$(MAKE) db.create DB_NAME=broker
 	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build task-broker
 	$(COMPOSE_RUNNER) run --rm -T --no-deps task-broker-init
 	@echo "Task broker ready at http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
