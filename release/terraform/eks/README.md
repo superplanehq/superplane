@@ -67,7 +67,8 @@ terraform destroy
 ```
 
 Terraform keeps a final RDS snapshot when it deletes the instance.
-The snapshot name has a random suffix, so the next destroy can use a new name.
+The snapshot name has a random suffix.
+The suffix changes when an argument that replaces the instance changes.
 
 ## Notes
 

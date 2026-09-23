@@ -93,9 +93,19 @@ resource "aws_security_group" "rds" {
 # RDS PostgreSQL Instance
 # -----------------------------------------------------------------------------
 
-# A new id is created with each instance, so a later destroy does not reuse a snapshot name.
+# These are the arguments that replace the instance. A new suffix is stored
+# with the replacement, so the next delete does not reuse a snapshot name.
+# The instance cannot be a keeper. That reference cycles with final_snapshot_identifier.
 resource "random_id" "rds_final_snapshot" {
   byte_length = 4
+
+  keepers = {
+    identifier        = var.db_instance_identifier
+    db_name           = var.db_name
+    username          = var.db_username
+    allocated_storage = tostring(var.db_allocated_storage)
+    subnet_group      = aws_db_subnet_group.superplane.name
+  }
 }
 
 resource "aws_db_instance" "superplane" {
