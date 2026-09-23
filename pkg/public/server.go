@@ -1706,7 +1706,9 @@ func (s *Server) Close() {
 // webhookDeliveryQuery returns the query the trigger should read.
 // The event can be a path segment or a query value. A proxy can drop
 // the query and still forward the path. Use the path when the query
-// does not name the event.
+// does not name the event. Read the last path segment even when Gorilla
+// mux vars are missing, because some proxies forward the path without
+// matching the extra route.
 func webhookDeliveryQuery(r *http.Request) url.Values {
 	query := r.URL.Query()
 	if strings.TrimSpace(query.Get("event")) != "" {
@@ -1714,16 +1716,19 @@ func webhookDeliveryQuery(r *http.Request) url.Values {
 	}
 
 	event := strings.TrimSpace(mux.Vars(r)["event"])
+	if event == "" {
+		event = eventNameFromPath(r.URL.Path)
+	}
 	if event == "" && r.RequestURI != "" {
 		parsed, err := url.ParseRequestURI(r.RequestURI)
 		if err == nil {
-			event = strings.TrimSpace(parsed.Query().Get("event"))
-			if event != "" {
-				query = parsed.Query()
+			if value := strings.TrimSpace(parsed.Query().Get("event")); value != "" {
+				return parsed.Query()
 			}
+			event = eventNameFromPath(parsed.Path)
 		}
 	}
-	if event == "" || strings.TrimSpace(query.Get("event")) != "" {
+	if event == "" {
 		return query
 	}
 
@@ -1733,6 +1738,29 @@ func webhookDeliveryQuery(r *http.Request) url.Values {
 	}
 	cloned.Set("event", event)
 	return cloned
+}
+
+// eventNameFromPath returns the segment after a webhook UUID.
+// `/webhooks/{id}/task.created` yields `task.created`. A path that
+// ends on the webhook id has no event.
+func eventNameFromPath(rawPath string) string {
+	parts := strings.Split(strings.Trim(rawPath, "/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	last := strings.TrimSpace(parts[len(parts)-1])
+	webhookID := strings.TrimSpace(parts[len(parts)-2])
+	if last == "" {
+		return ""
+	}
+	if _, err := uuid.Parse(webhookID); err != nil {
+		return ""
+	}
+	if _, err := uuid.Parse(last); err == nil {
+		return ""
+	}
+	return last
 }
 
 func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
