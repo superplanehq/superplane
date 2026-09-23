@@ -186,12 +186,13 @@ func webhookSecretEntries(secret []byte) []webhookSecretEntry {
 
 func legacyWebhookSecretEntries(tokens []string) []webhookSecretEntry {
 	// The previous registration stored one copy of a token that both
-	// webhooks shared. That copy does not say which event arrived.
-	if len(tokens) < 2 {
-		if len(tokens) == 0 {
-			return nil
+	// webhooks shared. Attach it to both events so a match does not
+	// name one of them. The URL query or the header names the event.
+	if len(tokens) == 1 {
+		return []webhookSecretEntry{
+			{event: TaskCreatedEvent, token: tokens[0]},
+			{event: TaskUpdatedEvent, token: tokens[0]},
 		}
-		return []webhookSecretEntry{{token: tokens[0]}}
 	}
 
 	entries := make([]webhookSecretEntry, 0, len(tokens))

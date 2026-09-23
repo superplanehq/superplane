@@ -286,6 +286,30 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		assert.Equal(t, TaskUpdatedEvent, meta["event"])
 	})
 
+	t.Run("one legacy token with an updated query emits an update", func(t *testing.T) {
+		body := taskWebhookBody("91", "1", "Fix payment retries")
+		events := &contexts.EventContext{}
+		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders("", signWebhookBody("shared-token", "1710000000", body)),
+			Query:         map[string][]string{"event": {TaskUpdatedEvent}},
+			Configuration: configuration,
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "shared-token"},
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		envelope, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		meta, ok := envelope["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, TaskUpdatedEvent, meta["event"])
+	})
+
 	t.Run("one legacy token does not classify an update as created", func(t *testing.T) {
 		body := taskWebhookBody("91", "1", "Fix payment retries")
 		events := &contexts.EventContext{}
