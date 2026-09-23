@@ -37,13 +37,15 @@ type Rate struct {
 }
 
 type PrefixRate struct {
-	Prefix string
-	Rate   Rate
+	Provider string
+	Prefix   string
+	Rate     Rate
 }
 
 type FamilyRate struct {
-	Token string
-	Rate  Rate
+	Provider string
+	Token    string
+	Rate     Rate
 }
 
 // ExactRate prices one provider catalog model id.
@@ -68,13 +70,15 @@ type exactKey struct {
 }
 
 type entry struct {
-	prefix string
-	rate   Rate
+	provider string
+	prefix   string
+	rate     Rate
 }
 
 type familyEntry struct {
-	token string
-	rate  Rate
+	provider string
+	token    string
+	rate     Rate
 }
 
 var (
@@ -90,51 +94,78 @@ var current = defaultBook()
 var Version = current.version
 
 func defaultPrefixRates() []entry {
-	return []entry{
-		{prefix: "claude-opus", rate: rateClaudeOpus},
-		{prefix: "claude-sonnet", rate: rateClaudeSonnet},
-		{prefix: "claude-haiku", rate: rateClaudeHaiku},
-		{prefix: "gpt-4o-mini", rate: openAIRate(15, 60)},
-		{prefix: "gpt-4o", rate: openAIRate(250, 1000)},
-		{prefix: "gpt-5-mini", rate: openAIRate(25, 200)},
-		{prefix: "gpt-5", rate: openAIRate(125, 1000)},
-		{prefix: "o3-mini", rate: openAIRate(110, 440)},
-		{prefix: "o3", rate: openAIRate(2000, 8000)},
-		{prefix: "o4-mini", rate: openAIRate(110, 440)},
-		{prefix: "gemini-2.5-pro", rate: openAIRate(125, 1000)},
-		{prefix: "gemini-2.5-flash", rate: openAIRate(15, 60)},
-		{prefix: "gemini-2.0-flash", rate: openAIRate(10, 40)},
-		{prefix: "gemini-1.5-pro", rate: openAIRate(125, 500)},
-		{prefix: "gemini-1.5-flash", rate: openAIRate(8, 30)},
-		{prefix: "gemini-flash", rate: openAIRate(15, 60)},
-		{prefix: "gemini-pro", rate: openAIRate(125, 1000)},
-		{prefix: "gemini", rate: openAIRate(15, 60)},
-		{prefix: "grok-3-mini", rate: openAIRate(30, 50)},
-		{prefix: "grok-3", rate: openAIRate(300, 1500)},
-		{prefix: "grok-2", rate: openAIRate(200, 1000)},
-		{prefix: "grok", rate: openAIRate(300, 1500)},
-		{prefix: "deepseek-reasoner", rate: openAIRate(55, 219)},
-		{prefix: "deepseek-r1", rate: openAIRate(55, 219)},
-		{prefix: "deepseek-chat", rate: openAIRate(27, 110)},
-		{prefix: "deepseek-v3", rate: openAIRate(27, 110)},
-		{prefix: "deepseek", rate: openAIRate(27, 110)},
-		{prefix: "qwen-max", rate: openAIRate(160, 640)},
-		{prefix: "qwen-plus", rate: openAIRate(40, 120)},
-		{prefix: "qwen-turbo", rate: openAIRate(5, 20)},
-		{prefix: "qwen3", rate: openAIRate(30, 90)},
-		{prefix: "qwen", rate: openAIRate(40, 120)},
-		{prefix: "kimi-k2", rate: openAIRate(60, 250)},
-		{prefix: "moonshot", rate: openAIRate(120, 120)},
-		{prefix: "kimi", rate: openAIRate(60, 250)},
-	}
+	anthropicOpenRouter := []string{"anthropic", "openrouter"}
+	openaiOpenRouter := []string{"openai", "openrouter"}
+	openrouterOnly := []string{"openrouter"}
+	var rates []entry
+	rates = append(rates, prefixRatesFor(anthropicOpenRouter, "claude-opus", rateClaudeOpus)...)
+	rates = append(rates, prefixRatesFor(anthropicOpenRouter, "claude-sonnet", rateClaudeSonnet)...)
+	rates = append(rates, prefixRatesFor(anthropicOpenRouter, "claude-haiku", rateClaudeHaiku)...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "gpt-4o-mini", openAIRate(15, 60))...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "gpt-4o", openAIRate(250, 1000))...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "gpt-5-mini", openAIRate(25, 200))...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "gpt-5", openAIRate(125, 1000))...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "o3-mini", openAIRate(110, 440))...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "o3", openAIRate(2000, 8000))...)
+	rates = append(rates, prefixRatesFor(openaiOpenRouter, "o4-mini", openAIRate(110, 440))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-2.5-pro", openAIRate(125, 1000))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-2.5-flash", openAIRate(15, 60))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-2.0-flash", openAIRate(10, 40))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-1.5-pro", openAIRate(125, 500))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-1.5-flash", openAIRate(8, 30))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-flash", openAIRate(15, 60))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini-pro", openAIRate(125, 1000))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "gemini", openAIRate(15, 60))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "grok-3-mini", openAIRate(30, 50))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "grok-3", openAIRate(300, 1500))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "grok-2", openAIRate(200, 1000))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "grok", openAIRate(300, 1500))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "deepseek-reasoner", openAIRate(55, 219))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "deepseek-r1", openAIRate(55, 219))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "deepseek-chat", openAIRate(27, 110))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "deepseek-v3", openAIRate(27, 110))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "deepseek", openAIRate(27, 110))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "qwen-max", openAIRate(160, 640))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "qwen-plus", openAIRate(40, 120))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "qwen-turbo", openAIRate(5, 20))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "qwen3", openAIRate(30, 90))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "qwen", openAIRate(40, 120))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "kimi-k2", openAIRate(60, 250))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "moonshot", openAIRate(120, 120))...)
+	rates = append(rates, prefixRatesFor(openrouterOnly, "kimi", openAIRate(60, 250))...)
+	return rates
 }
 
 func defaultFamilyRates() []familyEntry {
-	return []familyEntry{
+	return familyRatesFor([]string{"anthropic", "openrouter"}, []struct {
+		token string
+		rate  Rate
+	}{
 		{token: "opus", rate: rateClaudeOpus},
 		{token: "sonnet", rate: rateClaudeSonnet},
 		{token: "haiku", rate: rateClaudeHaiku},
+	}...)
+}
+
+func prefixRatesFor(providers []string, prefix string, rate Rate) []entry {
+	rates := make([]entry, 0, len(providers))
+	for _, provider := range providers {
+		rates = append(rates, entry{provider: provider, prefix: prefix, rate: rate})
 	}
+	return rates
+}
+
+func familyRatesFor(providers []string, families ...struct {
+	token string
+	rate  Rate
+}) []familyEntry {
+	rates := make([]familyEntry, 0, len(providers)*len(families))
+	for _, provider := range providers {
+		for _, family := range families {
+			rates = append(rates, familyEntry{provider: provider, token: family.token, rate: family.rate})
+		}
+	}
+	return rates
 }
 
 func defaultComputeRates() map[string]int64 {
@@ -184,18 +215,20 @@ func Replace(book Book) {
 		next.exact[exactKey{provider: provider, model: model}] = item.Rate
 	}
 	for _, item := range book.PrefixRates {
+		provider := strings.ToLower(strings.TrimSpace(item.Provider))
 		prefix := strings.ToLower(strings.TrimSpace(item.Prefix))
-		if prefix == "" {
+		if provider == "" || prefix == "" {
 			continue
 		}
-		next.rates = append(next.rates, entry{prefix: prefix, rate: item.Rate})
+		next.rates = append(next.rates, entry{provider: provider, prefix: prefix, rate: item.Rate})
 	}
 	for _, item := range book.FamilyRates {
+		provider := strings.ToLower(strings.TrimSpace(item.Provider))
 		token := strings.ToLower(strings.TrimSpace(item.Token))
-		if token == "" {
+		if provider == "" || token == "" {
 			continue
 		}
-		next.familyRates = append(next.familyRates, familyEntry{token: token, rate: item.Rate})
+		next.familyRates = append(next.familyRates, familyEntry{provider: provider, token: token, rate: item.Rate})
 	}
 	for key, rate := range book.ComputeRates {
 		normalized := strings.ToLower(strings.TrimSpace(key))
@@ -303,41 +336,20 @@ func lookup(provider, model string) (Rate, bool) {
 		return rate, true
 	}
 	normalized := normalizeModelID(model)
-	if rate, ok := lookupPrefix(normalized); ok {
+	if rate, ok := lookupPrefix(provider, normalized); ok {
 		return rate, true
 	}
-	if rate, ok := lookupFamilyToken(normalized); ok {
+	if rate, ok := lookupFamilyToken(provider, normalized); ok {
 		return rate, true
 	}
-	return lookupCompiledIn(normalized)
+	return lookupCompiledIn(provider, normalized)
 }
 
-func lookupCompiledIn(normalized string) (Rate, bool) {
-	bestPrefix := ""
-	var best Rate
-	found := false
-	for _, item := range defaultPrefixRates() {
-		if !strings.HasPrefix(normalized, item.prefix) {
-			continue
-		}
-		if !found || len(item.prefix) > len(bestPrefix) {
-			bestPrefix = item.prefix
-			best = item.rate
-			found = true
-		}
+func lookupCompiledIn(provider, normalized string) (Rate, bool) {
+	if rate, ok := matchPrefixRate(defaultPrefixRates(), provider, normalized); ok {
+		return rate, true
 	}
-	if found {
-		return best, true
-	}
-	parts := strings.Split(normalized, "-")
-	for _, family := range defaultFamilyRates() {
-		for _, part := range parts {
-			if part == family.token {
-				return family.rate, true
-			}
-		}
-	}
-	return Rate{}, false
+	return matchFamilyRate(defaultFamilyRates(), provider, normalized)
 }
 
 func lookupExact(provider, model string) (Rate, bool) {
@@ -363,14 +375,28 @@ func normalizeModelID(model string) string {
 	return normalized
 }
 
-func lookupPrefix(normalized string) (Rate, bool) {
+func lookupPrefix(provider, normalized string) (Rate, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
+	return matchPrefixRate(current.rates, provider, normalized)
+}
+
+func lookupFamilyToken(provider, normalized string) (Rate, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
+	return matchFamilyRate(current.familyRates, provider, normalized)
+}
+
+func matchPrefixRate(rates []entry, provider, normalized string) (Rate, bool) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		return Rate{}, false
+	}
 	bestPrefix := ""
 	var best Rate
 	found := false
-	for _, item := range current.rates {
-		if !strings.HasPrefix(normalized, item.prefix) {
+	for _, item := range rates {
+		if item.provider != provider || !strings.HasPrefix(normalized, item.prefix) {
 			continue
 		}
 		if !found || len(item.prefix) > len(bestPrefix) {
@@ -379,14 +405,22 @@ func lookupPrefix(normalized string) (Rate, bool) {
 			found = true
 		}
 	}
-	return best, found
+	if found {
+		return best, true
+	}
+	return Rate{}, false
 }
 
-func lookupFamilyToken(normalized string) (Rate, bool) {
-	mu.RLock()
-	defer mu.RUnlock()
+func matchFamilyRate(rates []familyEntry, provider, normalized string) (Rate, bool) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		return Rate{}, false
+	}
 	parts := strings.Split(normalized, "-")
-	for _, family := range current.familyRates {
+	for _, family := range rates {
+		if family.provider != provider {
+			continue
+		}
 		for _, part := range parts {
 			if part == family.token {
 				return family.rate, true

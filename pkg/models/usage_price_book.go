@@ -311,13 +311,15 @@ func LoadCurrentPriceBook(tx *gorm.DB) error {
 				})
 			case UsagePriceBookMatchPrefix:
 				loaded.PrefixRates = append(loaded.PrefixRates, pricebook.PrefixRate{
-					Prefix: row.MatchKey,
-					Rate:   rate,
+					Provider: row.Provider,
+					Prefix:   row.MatchKey,
+					Rate:     rate,
 				})
 			case UsagePriceBookMatchFamily:
 				loaded.FamilyRates = append(loaded.FamilyRates, pricebook.FamilyRate{
-					Token: row.MatchKey,
-					Rate:  rate,
+					Provider: row.Provider,
+					Token:    row.MatchKey,
+					Rate:     rate,
 				})
 			}
 		case UsageKindCompute:
