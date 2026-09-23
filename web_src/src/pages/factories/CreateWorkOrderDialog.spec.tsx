@@ -264,7 +264,7 @@ describe("CreateWorkOrderDialog", () => {
     );
   });
 
-  it("shows the interim phrase without appending it", async () => {
+  it("writes the live phrase into the description and keeps the toolbar still", async () => {
     vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
     const user = userEvent.setup();
     renderDialog();
@@ -274,8 +274,8 @@ describe("CreateWorkOrderDialog", () => {
       emitTranscript("Fix refunds", false);
     });
 
-    expect(screen.getByTestId("dictate-interim")).toHaveTextContent("Fix refunds");
-    expect(screen.getByTestId("work-order-title-input")).toHaveValue("");
+    expect(screen.queryByTestId("dictate-interim")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("Fix refunds");
     expect(screen.getByTestId("work-order-description-input")).toHaveValue("");
   });
 

@@ -151,7 +151,7 @@ describe("WorkOrderIntentDocument composer dictation", () => {
     );
   });
 
-  it("shows the interim phrase without appending it to the composer", async () => {
+  it("writes the live phrase into the composer and keeps the toolbar still", async () => {
     vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
     const user = userEvent.setup();
     const onComposerChange = vi.fn();
@@ -168,8 +168,8 @@ describe("WorkOrderIntentDocument composer dictation", () => {
       emitTranscript("Need the empty state", false);
     });
 
-    expect(screen.getByTestId("dictate-interim")).toHaveTextContent("Need the empty state");
-    expect(onComposerChange).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("dictate-interim")).not.toBeInTheDocument();
+    expect(onComposerChange).toHaveBeenCalledWith("Need the empty state");
   });
 
   it("appends a final phrase to the composer", async () => {

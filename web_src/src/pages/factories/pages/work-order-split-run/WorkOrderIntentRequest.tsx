@@ -5,9 +5,9 @@ import type { FilesFile } from "@/api-client";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
-import { useSpeechDictation, type UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
+import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
+import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
-import { appendSpokenPhrase } from "@/lib/appendSpokenPhrase";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
@@ -179,6 +179,23 @@ function AnalysisRequestChat({
   );
 }
 
+function useAnalysisComposerDictation(composer: string, onComposerChange: (next: string) => void) {
+  const composerRef = useRef(composer);
+  composerRef.current = composer;
+  const fieldRef = useRef<SpokenPhraseField>({
+    getValue: () => composerRef.current,
+    setValue: onComposerChange,
+  });
+  fieldRef.current = {
+    getValue: () => composerRef.current,
+    setValue: (next) => {
+      composerRef.current = next;
+      onComposerChange(next);
+    },
+  };
+  return { composerRef, dictation: useSpokenPhraseDictation(fieldRef) };
+}
+
 function AnalysisComposer({
   analysis,
   images,
@@ -195,15 +212,7 @@ function AnalysisComposer({
   chatColumnClass: string;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
-  const composerRef = useRef(analysis.composer);
-  composerRef.current = analysis.composer;
-  const dictation = useSpeechDictation({
-    onFinalPhrase: (phrase) => {
-      const next = appendSpokenPhrase(composerRef.current, phrase);
-      composerRef.current = next;
-      analysis.onComposerChange(next);
-    },
-  });
+  const { composerRef, dictation } = useAnalysisComposerDictation(analysis.composer, analysis.onComposerChange);
   const send = async () => {
     if (!canSubmit) {
       return;
@@ -256,7 +265,10 @@ function AnalysisComposer({
               value={analysis.composer}
               placeholder={placeholder}
               disabled={!analysis.canSend}
-              onChange={(event) => analysis.onComposerChange(event.target.value)}
+              onChange={(event) => {
+                composerRef.current = event.target.value;
+                analysis.onComposerChange(event.target.value);
+              }}
               onPaste={images.handlePaste}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
