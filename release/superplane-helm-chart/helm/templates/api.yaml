@@ -40,6 +40,9 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-api
     spec:
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -69,6 +72,14 @@ spec:
                 name: {{ include "secrets.sentry.name" . }}
             - secretRef:
                 name: {{ include "secrets.dash0Web.name" . }}
+            {{- if .Values.posthog.enabled }}
+            - secretRef:
+                name: {{ include "secrets.posthog.name" . }}
+            {{- end }}
+            {{- if .Values.polar.enabled }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
           env:
             - name: START_PUBLIC_API
               value: "yes"
