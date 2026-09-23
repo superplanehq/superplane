@@ -88,15 +88,15 @@ services:
       # Browser / links. For tunnels: match your public UI URL if you load the app through it.
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
-      # Default reaches this app from the runner-repo task-broker container (`make dev` there).
+      # Default reaches this app from the local task-broker container on the Compose network.
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL in .env (no trailing slash).
-      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://host.docker.internal:8000}
-      # Task broker /v1 (Runner component). Defaults match runner `make dev` (host port 8091).
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://app:8000}
+      # Task broker /v1 (Runner component). Defaults use Compose service DNS.
       # Base URL has no trailing slash. Set TASK_BROKER_BASE_URL in .env for a remote broker.
       # Empty TASK_BROKER_FLEET_ID keeps node machine types. Unset FLEET_ID uses fleet
       # `local` only when BASE_URL is the local Docker host.
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://host.docker.internal:8091}
-      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://task-broker:8081}
+      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-http://localhost:8091}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
       # Bearer; must match broker AUTH_TOKEN (runner compose default: dev-local-token).
       TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-local-token}
