@@ -1,20 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { usdInputToCents } from "./priceBookFormat";
 import type { PriceBookModelRate, PriceBookVMRate } from "./priceBooksApi";
 
 export function AddModelRateForm({
+  provider,
   onAdd,
   disabled = false,
 }: {
+  provider: string;
   onAdd: (rate: PriceBookModelRate) => boolean;
   disabled?: boolean;
 }) {
   const [matchKey, setMatchKey] = useState("");
-  const [matchMode, setMatchMode] = useState("prefix");
   const [input, setInput] = useState("0.00");
   const [output, setOutput] = useState("0.00");
 
@@ -27,8 +27,9 @@ export function AddModelRateForm({
           return;
         }
         const added = onAdd({
+          provider,
           match_key: matchKey.trim(),
-          match_mode: matchMode,
+          match_mode: "exact",
           input_cents_per_million: usdInputToCents(input),
           output_cents_per_million: usdInputToCents(output),
           cache_read_cents_per_million: 0,
@@ -43,7 +44,7 @@ export function AddModelRateForm({
       }}
     >
       <div className="min-w-40 flex-1">
-        <Label htmlFor="price-book-add-model-key">Match key</Label>
+        <Label htmlFor="price-book-add-model-key">Model</Label>
         <Input
           id="price-book-add-model-key"
           className="mt-1 font-mono text-xs"
@@ -51,18 +52,6 @@ export function AddModelRateForm({
           disabled={disabled}
           onChange={(event) => setMatchKey(event.target.value)}
         />
-      </div>
-      <div className="w-40">
-        <Label htmlFor="price-book-add-model-mode">Mode</Label>
-        <Select value={matchMode} onValueChange={setMatchMode} disabled={disabled}>
-          <SelectTrigger id="price-book-add-model-mode" className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="prefix">Prefix</SelectItem>
-            <SelectItem value="family">Family</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
       <div className="w-28">
         <Label htmlFor="price-book-add-model-input">Input</Label>
@@ -151,7 +140,7 @@ export function AddVMRateForm({
         />
       </div>
       <Button type="submit" variant="outline" size="sm" disabled={disabled}>
-        Add VM rate
+        Add machine rate
       </Button>
     </form>
   );
