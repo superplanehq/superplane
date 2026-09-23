@@ -55,14 +55,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
 	})
 
-	t.Run("known id returns task refinement feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryCreateWithAgent)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryCreateWithAgent, f.ID)
-		assert.Equal(t, "Task Refinement", f.Label)
-		assert.Equal(t, "Refine draft work orders with an agent", f.Description)
-	})
-
 	t.Run("known id returns custom automations feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryCustomAutomations)
 		assert.True(t, ok)
@@ -78,6 +70,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureWorkspaceAgentResources, f.ID)
 		assert.Equal(t, "Agent Resources", f.Label)
 		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
+	})
+
+	t.Run("known id returns pull request merge feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryPullRequestMerge)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryPullRequestMerge, f.ID)
+		assert.Equal(t, "Pull Request Merge", f.Label)
+		assert.Equal(t, "Show the Mergeable chip on task cards and the Merge button on pull request review", f.Description)
+		assert.Nil(t, f.Released)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -100,9 +101,9 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
-	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceAgentResources))
+	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))

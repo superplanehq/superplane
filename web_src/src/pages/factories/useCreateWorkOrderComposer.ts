@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
-import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useEffect, useRef, useState } from "react";
@@ -30,7 +30,7 @@ export function useCreateWorkOrderComposer({
   onCreated,
 }: UseCreateWorkOrderComposerArgs) {
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
-  const { data: me } = useMe(false, organizationId);
+  const { currentUserId } = usePermissions();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -47,12 +47,12 @@ export function useCreateWorkOrderComposer({
   };
 
   useEffect(() => {
-    if (hasSeededOwner.current || !me?.id) {
+    if (hasSeededOwner.current || !currentUserId) {
       return;
     }
     hasSeededOwner.current = true;
-    setAssigneeIdsInternal([me.id]);
-  }, [me?.id]);
+    setAssigneeIdsInternal([currentUserId]);
+  }, [currentUserId]);
 
   const goToOrder = (order: FactoriesWorkOrder | null) => {
     if (order?.number !== undefined && order.number !== "") {

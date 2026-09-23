@@ -613,3 +613,406 @@ func Test__IntegrationSubscriptionContext_PausedIntakeIgnoresLiveMessages(t *tes
 	assert.Len(t, newEvents, 2)
 	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 2)
 }
+
+func Test__IntegrationSubscriptionContext_DeletedCanvasSkipsMessage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerName := "dummy.deleted-canvas-trigger"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{
+			impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{
+				Name: triggerName,
+				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
+					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "trigger-1",
+				Name:          "trigger-1",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NotNil(t, canvas)
+	require.Len(t, nodes, 1)
+
+	node := nodes[0]
+	node.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&node).Error)
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, onNewEvents)
+	_, err = ctx.Subscribe(map[string]any{"enabled": true})
+	require.NoError(t, err)
+
+	subscriptions, err := ctx.ListSubscriptions()
+	require.NoError(t, err)
+	require.Len(t, subscriptions, 1)
+
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "before-delete"}))
+	assert.Len(t, newEvents, 1)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 1)
+
+	require.NoError(t, database.Conn().Delete(&models.Canvas{}, canvas.ID).Error)
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "after-delete"}))
+	assert.Len(t, newEvents, 1)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 1)
+}
+
+func Test__IntegrationSubscriptionContext_NoLiveVersionSkipsMessage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerName := "dummy.no-live-version-trigger"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{
+			impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{
+				Name: triggerName,
+				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
+					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "trigger-1",
+				Name:          "trigger-1",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NotNil(t, canvas)
+	require.Len(t, nodes, 1)
+
+	node := nodes[0]
+	node.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&node).Error)
+
+	other, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	require.NotNil(t, other.LiveVersionID)
+	require.NoError(t, database.Conn().
+		Model(&models.Canvas{}).
+		Where("id = ?", canvas.ID).
+		Update("live_version_id", *other.LiveVersionID).
+		Error)
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, onNewEvents)
+	_, err = ctx.Subscribe(map[string]any{"enabled": true})
+	require.NoError(t, err)
+
+	subscriptions, err := ctx.ListSubscriptions()
+	require.NoError(t, err)
+	require.Len(t, subscriptions, 1)
+
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "world"}))
+	assert.Len(t, newEvents, 0)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 0)
+}
+
+func Test__IntegrationSubscriptionContext_LiveListenersStillReceiveOnMixedConnection(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerName := "dummy.mixed-trigger"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{
+			impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{
+				Name: triggerName,
+				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
+					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	liveCanvas, liveNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "live-trigger",
+				Name:          "live-trigger",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NotNil(t, liveCanvas)
+	require.Len(t, liveNodes, 1)
+
+	deletedCanvas, deletedCanvasNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "deleted-trigger",
+				Name:          "deleted-trigger",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NotNil(t, deletedCanvas)
+	require.Len(t, deletedCanvasNodes, 1)
+
+	liveNode := liveNodes[0]
+	liveNode.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&liveNode).Error)
+
+	deletedNode := deletedCanvasNodes[0]
+	deletedNode.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&deletedNode).Error)
+
+	liveSub, err := models.CreateIntegrationSubscription(&liveNode, integration, map[string]any{"enabled": true})
+	require.NoError(t, err)
+	require.NotNil(t, liveSub)
+
+	deletedSub, err := models.CreateIntegrationSubscription(&deletedNode, integration, map[string]any{"enabled": true})
+	require.NoError(t, err)
+	require.NotNil(t, deletedSub)
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	ctx := NewIntegrationContext(database.Conn(), &liveNode, integration, r.Encryptor, r.Registry, onNewEvents)
+	subscriptions, err := ctx.ListSubscriptions()
+	require.NoError(t, err)
+	require.Len(t, subscriptions, 2)
+
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "before-delete"}))
+	require.NoError(t, subscriptions[1].SendMessage(map[string]any{"hello": "before-delete"}))
+	assert.Len(t, newEvents, 2)
+	support.VerifyCanvasNodeEventsCount(t, liveCanvas.ID, liveNode.NodeID, 1)
+	support.VerifyCanvasNodeEventsCount(t, deletedCanvas.ID, deletedNode.NodeID, 1)
+
+	require.NoError(t, database.Conn().Delete(&models.Canvas{}, deletedCanvas.ID).Error)
+
+	newEvents = []models.CanvasEvent{}
+	require.NoError(t, subscriptions[0].SendMessage(map[string]any{"hello": "after-delete-live"}))
+	require.NoError(t, subscriptions[1].SendMessage(map[string]any{"hello": "after-delete-deleted"}))
+	assert.Len(t, newEvents, 1)
+	support.VerifyCanvasNodeEventsCount(t, liveCanvas.ID, liveNode.NodeID, 2)
+	support.VerifyCanvasNodeEventsCount(t, deletedCanvas.ID, deletedNode.NodeID, 1)
+}
+
+func Test_applyMetadataDelta(t *testing.T) {
+	t.Run("writes only the changed key onto concurrent metadata", func(t *testing.T) {
+		latest := map[string]any{"user": "newer-user", "accessTokenExpiresAt": "later"}
+		original := map[string]any{"user": "original-user", "accessTokenExpiresAt": "earlier"}
+		current := map[string]any{"user": "original-user", "accessTokenExpiresAt": "earlier", "webhookId": 34}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.False(t, conflict)
+		assert.Equal(t, "newer-user", latest["user"])
+		assert.Equal(t, "later", latest["accessTokenExpiresAt"])
+		assert.Equal(t, float64(34), latest["webhookId"])
+	})
+
+	t.Run("clears a key when the stored value still matches the snapshot", func(t *testing.T) {
+		latest := map[string]any{"user": "newer-user", "webhookId": float64(34)}
+		original := map[string]any{"user": "original-user", "webhookId": float64(34)}
+		current := map[string]any{"user": "original-user"}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.False(t, conflict)
+		assert.Equal(t, "newer-user", latest["user"])
+		assert.NotContains(t, latest, "webhookId")
+	})
+
+	t.Run("does not revert a key another writer already changed", func(t *testing.T) {
+		latest := map[string]any{"user": "newer-user", "webhookId": float64(99)}
+		original := map[string]any{"webhookId": float64(34)}
+		current := map[string]any{}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.False(t, conflict)
+		assert.Equal(t, "newer-user", latest["user"])
+		assert.Equal(t, float64(99), latest["webhookId"])
+	})
+
+	t.Run("reports conflict when a write is skipped", func(t *testing.T) {
+		latest := map[string]any{"webhookId": float64(99)}
+		original := map[string]any{}
+		current := map[string]any{"webhookId": float64(34)}
+
+		conflict := applyMetadataDelta(latest, original, current)
+
+		assert.True(t, conflict)
+		assert.Equal(t, float64(99), latest["webhookId"])
+	})
+}
+
+func Test__IntegrationContext_PersistMetadata_PreservesConcurrentUpdates(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{
+			"user":                 "original-user",
+			"accessTokenExpiresAt": "earlier",
+		}),
+	).Error)
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(integration).Error)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{
+			"user":                 "newer-user",
+			"accessTokenExpiresAt": "later",
+		}),
+	).Error)
+
+	ctx.SetMetadata(map[string]any{
+		"user":                 "original-user",
+		"accessTokenExpiresAt": "earlier",
+		"webhookId":            34,
+	})
+	require.NoError(t, ctx.PersistMetadata())
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(&stored).Error)
+	assert.Equal(t, "newer-user", stored.Metadata.Data()["user"])
+	assert.Equal(t, "later", stored.Metadata.Data()["accessTokenExpiresAt"])
+	assert.Equal(t, float64(34), stored.Metadata.Data()["webhookId"])
+}
+
+func Test__IntegrationContext_PersistMetadata_DoesNotClearAReplacedWebhookID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{"webhookId": 34}),
+	).Error)
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(integration).Error)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{"user": "newer-user", "webhookId": 99}),
+	).Error)
+
+	ctx.SetMetadata(map[string]any{})
+	require.NoError(t, ctx.PersistMetadata())
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(&stored).Error)
+	assert.Equal(t, "newer-user", stored.Metadata.Data()["user"])
+	assert.Equal(t, float64(99), stored.Metadata.Data()["webhookId"])
+}
+
+func Test__IntegrationContext_PersistMetadata_ReturnsErrorWhenWebhookIDWriteConflicts(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	require.NoError(t, database.Conn().Model(integration).Update(
+		"metadata",
+		datatypes.NewJSONType(map[string]any{"webhookId": 99}),
+	).Error)
+
+	ctx.SetMetadata(map[string]any{"webhookId": 34})
+	require.ErrorIs(t, ctx.PersistMetadata(), errIntegrationMetadataConflict)
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integration.ID).First(&stored).Error)
+	assert.Equal(t, float64(99), stored.Metadata.Data()["webhookId"])
+}

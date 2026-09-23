@@ -72,7 +72,7 @@ describe("mergeCreateWorkOrderRequestImages", () => {
 });
 
 describe("appendUploadedWorkOrderImages", () => {
-  it("appends image markdown and strips label delimiters", () => {
+  it("appends images and file links as markdown and strips label delimiters", () => {
     expect(
       appendUploadedWorkOrderImages("Refunds fail on retry.", [
         {
@@ -92,7 +92,11 @@ describe("appendUploadedWorkOrderImages", () => {
           isImage: false,
         },
       ]),
-    ).toBe("Refunds fail on retry.\n\n![checkout1.png](sp-file://file-1)");
+    ).toBe("Refunds fail on retry.\n\n![checkout1.png](sp-file://file-1)\n\n[notes.md](sp-file://file-2)");
+  });
+
+  it("appends nothing when no files are attached", () => {
+    expect(appendUploadedWorkOrderImages("Refunds fail on retry.", [])).toBe("Refunds fail on retry.");
   });
 });
 

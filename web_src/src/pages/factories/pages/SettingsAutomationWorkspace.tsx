@@ -3,6 +3,7 @@ import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsS
 import { Link } from "@/components/Link/link";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { Pencil } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -68,7 +69,10 @@ export function SettingsAutomationWorkspace({
   editTestId = DEFAULT_EDIT_TEST_ID,
 }: SettingsAutomationWorkspaceProps) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const runsQuery = useInfiniteCanvasRuns(canvasId ?? "", {}, Boolean(canvasId));
+  const resolvedCanvasId = canvasId ?? "";
+  const organizationId = graph.organizationId ?? "";
+  useCanvasRuntimeWebsocket(resolvedCanvasId, organizationId, Boolean(resolvedCanvasId && organizationId));
+  const runsQuery = useInfiniteCanvasRuns(resolvedCanvasId, {}, Boolean(resolvedCanvasId));
   const selectedRunFromList = useMemo(
     () => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).find((run) => run.id === selectedRunId) ?? null,
     [runsQuery.data, selectedRunId],

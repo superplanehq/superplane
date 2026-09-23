@@ -33,4 +33,26 @@ describe("WorkOrderArtifactsList", () => {
     fireEvent.click(note);
     expect(screen.getByRole("dialog").parentElement).toBe(document.body);
   });
+
+  it("shows a loading skeleton instead of a loading sentence", () => {
+    render(<WorkOrderArtifactsList isLoading artifacts={[]} />);
+
+    expect(screen.getByRole("status", { name: "Loading artifacts" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading artifacts…")).not.toBeInTheDocument();
+  });
+
+  it("fades the artifact list in after a loading stretch", () => {
+    const { rerender } = render(<WorkOrderArtifactsList isLoading artifacts={[]} />);
+    rerender(
+      <WorkOrderArtifactsList
+        isLoading={false}
+        artifacts={[
+          { id: "link", type: "TYPE_LINK", data: { title: "Design doc", url: "https://example.com/design" } },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("status", { name: "Loading artifacts" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list")).toHaveAttribute("data-reveal");
+  });
 });

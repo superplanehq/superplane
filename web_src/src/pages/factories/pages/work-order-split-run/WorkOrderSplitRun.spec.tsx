@@ -1,15 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-const enabledExperimentalFeatures = new Set<string>();
+const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
 const mergeability = {
   current: {
     canMerge: true,
@@ -25,17 +26,34 @@ const mergeability = {
 };
 const mergeMutate = vi.fn();
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
-    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
-    isLoading: false,
-  }),
-}));
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
+  return {
+    ...actual,
+    useFactory: () => ({
+      data: { id: "factory-1", planning: factoryPlanning.current },
+      isPending: false,
+    }),
+  };
+});
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
   useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+}));
+
+const useLiveLogStreamMock = vi.fn();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
+  useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
 
 import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
@@ -61,6 +79,7 @@ import {
 import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
+import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
@@ -118,21 +137,94 @@ function fixtureWithReviewPullRequest(state: "STATE_OPEN" | "STATE_MERGED"): Spl
 }
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const ui = (next: ComponentProps<typeof WorkOrderSplitRunPopup>) => (
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
-            <WorkOrderSplitRunPopup {...props} />
+            <WorkOrderSplitRunPopup {...next} />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(ui(props));
+  return {
+    ...view,
+    rerenderPopup: (next: ComponentProps<typeof WorkOrderSplitRunPopup> = props) => view.rerender(ui(next)),
+  };
 }
 
 function renderSplitRun() {
   return renderPopup({ fixture: SPLIT_RUN_RUNNING });
+}
+
+function liveUsageTelemetry(inputTokens: number, totalCostUsd: number) {
+  return {
+    num_turns: 1,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      reasoning_tokens: 0,
+      total_cost_usd: totalCostUsd,
+    },
+    tool_counts: { bash: 1 },
+    turns: [
+      {
+        turn: 1,
+        usage: {
+          input_tokens: inputTokens,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          reasoning_tokens: 0,
+        },
+        tools: [{ kind: "bash", text: "git status" }],
+      },
+    ],
+  };
+}
+
+function runningImplementWithZeroSavedSpend(): SplitRunFixture {
+  const fixture = splitRunFixtureForWorkOrder({
+    ...RUNNING_WORK_ORDER,
+    totalTokens: "0",
+    totalCostCents: "0",
+    usageByModel: [],
+    usageByMachineType: [],
+  });
+  return {
+    ...fixture,
+    costUsd: "$0.00",
+    tokensLabel: "0 tokens",
+    usageByModel: [],
+    usageByMachineType: [],
+    phases: fixture.phases.map((phase) =>
+      phase.id.startsWith("implement")
+        ? {
+            ...phase,
+            canvasKey: null,
+            costCents: "0",
+            totalTokens: "0",
+            appId: "canvas-1",
+            stream: [
+              {
+                id: "impl-agent",
+                nodeId: "impl-agent",
+                at: "12:00",
+                componentName: "Agent",
+                component: "runnerClaudeCode",
+                executionId: "exec-1",
+                status: "running" as const,
+              },
+            ],
+          }
+        : phase,
+    ),
+  };
 }
 
 async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
@@ -142,7 +234,8 @@ async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
 describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    enabledExperimentalFeatures.clear();
+    factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
+    useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
     mergeMutate.mockReset();
     mergeability.current = {
       canMerge: true,
@@ -424,6 +517,41 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(card).toHaveTextContent("2.7k tokens · $0.45");
     expect(card).toHaveTextContent("Machine time");
     expect(card).toHaveTextContent("1 min 30 s · $0.28");
+  });
+
+  it("updates header spend from live log telemetry while a step runs", async () => {
+    const user = userEvent.setup();
+    const setLiveSpend = (tokens: number, usd: number) => {
+      const live = liveUsageTelemetry(tokens, usd);
+      useLiveLogStreamMock.mockReturnValue({
+        ...idleLiveLogStream(vi.fn()),
+        telemetry: live,
+        usageSeries: [{ name: "Prompt", telemetry: live }],
+      });
+    };
+    const popupProps = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      fixture: runningImplementWithZeroSavedSpend(),
+    };
+
+    setLiveSpend(2100, 0.45);
+    const view = renderPopup(popupProps);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
+    });
+    expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("$0.00 · 0 tokens");
+    expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Task" }));
+    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
+
+    setLiveSpend(3200, 0.67);
+    view.rerenderPopup();
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.67 · 3.2k tokens");
+    });
   });
 
   it("does not show a model on a draft that has not started", () => {
@@ -1127,6 +1255,32 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
+  it("shows source, artifacts, and the classic Start footer on a Planning-off draft", () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
+    const request = screen.getByTestId("split-run-intent-request");
+    const result = screen.getByTestId("split-run-intent-result");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
+    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(result).getByTestId("split-run-description")).toHaveTextContent("emoji reactions");
+    expect(within(result).queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
+    expect(within(result).queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
+    expect(within(result).queryByTestId("split-run-review")).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveTextContent("This task is ready to start");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+  });
+
   it("tells a draft is under analysis and keeps Archive in the header", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
@@ -1177,7 +1331,6 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("keeps source and spec after reopen when the started card has a score", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CREATE_WITH_AGENT);
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
@@ -1329,6 +1482,7 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("shows the Ingest log when a GitHub automation created the draft", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     const user = userEvent.setup();
     renderPopup({
       factoryId: PRIMARY_FACTORY_ID,

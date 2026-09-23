@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -31,6 +32,14 @@ func MergeFactoryPullRequest(
 	factory, pullRequest, err := loadFactoryPullRequestForMerge(db, orgID, req.GetFactoryId(), req.GetPrId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+
+	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+	if !organization.HasExperimentalFeature(features.FeatureFactoryPullRequestMerge) {
+		return nil, factoryErrorToStatus(errFactoryPullRequestMergeDisabled, "failed to merge factory pull request")
 	}
 
 	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
@@ -154,7 +163,7 @@ func MergeFactoryPullRequest(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", pullRequest.WorkOrderID)
 	}
 
-	serialized, err := serializeFactoryPullRequests(db, []models.FactoryPullRequest{*pullRequest})
+	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}

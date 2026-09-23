@@ -1,17 +1,17 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { createMutate, meResult } = vi.hoisted(() => ({
+const { createMutate, permissionsState } = vi.hoisted(() => ({
   createMutate: vi.fn(),
-  meResult: { current: { data: null as { id: string; name: string } | null } },
+  permissionsState: { currentUserId: undefined as string | undefined },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
 }));
 
-vi.mock("@/hooks/useMe", () => ({
-  useMe: () => meResult.current,
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => permissionsState,
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -28,7 +28,7 @@ describe("useCreateWorkOrderComposer", () => {
     createMutate.mockReset();
     onClose.mockReset();
     onCreated.mockReset();
-    meResult.current = { data: null };
+    permissionsState.currentUserId = undefined;
   });
 
   it("marks Create as loading while the task is created", async () => {
@@ -65,7 +65,7 @@ describe("useCreateWorkOrderComposer", () => {
   });
 
   it("seeds assigneeIds with the current user once me resolves", () => {
-    meResult.current = { data: { id: "user-me", name: "Me" } };
+    permissionsState.currentUserId = "user-me";
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -106,14 +106,14 @@ describe("useCreateWorkOrderComposer", () => {
       result.current.setAssigneeIds(["user-manual"]);
     });
 
-    meResult.current = { data: { id: "user-me", name: "Me" } };
+    permissionsState.currentUserId = "user-me";
     rerender();
 
     expect(result.current.assigneeIds).toEqual(["user-manual"]);
   });
 
   it("does not clobber a manual change made after me resolves", () => {
-    meResult.current = { data: { id: "user-me", name: "Me" } };
+    permissionsState.currentUserId = "user-me";
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({

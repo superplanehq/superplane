@@ -11,6 +11,10 @@ import { AutomationCard } from "./automationsPageParts";
 import { duplicateAutomationName } from "./automationCardActions";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 
+const { useCanvasRuntimeWebsocket } = vi.hoisted(() => ({
+  useCanvasRuntimeWebsocket: vi.fn(),
+}));
+
 vi.mock("@/hooks/useCanvasData", () => ({
   useInfiniteCanvasRuns: () => ({
     data: {
@@ -40,6 +44,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCanvasWebsocket", () => ({
+  useCanvasRuntimeWebsocket,
+}));
+
 vi.mock("./LineVelocityPanel", () => ({
   LineVelocityPanel: () => <div data-testid="line-velocity-panel">Velocity</div>,
 }));
@@ -48,6 +56,14 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   useOrgUserLookup: () => ({
     resolveUser: (id: string | undefined, name?: string) =>
       id ? { id, name: name ?? "Unknown member", initials: "U" } : null,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
     isLoading: false,
   }),
 }));
@@ -195,6 +211,8 @@ describe("AutomationDetail tabs", () => {
 
   it("shows Runs and Velocity tabs, with run rows as soft cards", () => {
     renderDetail();
+
+    expect(useCanvasRuntimeWebsocket).toHaveBeenCalledWith("app-refund-planner", "org-1", true);
 
     expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("data-state", "active");
     expect(screen.getByRole("tab", { name: "Velocity" })).toBeInTheDocument();

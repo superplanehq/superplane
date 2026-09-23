@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -94,6 +95,13 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 	if skip {
 		return nil
+	}
+
+	if _, err := models.FindLiveCanvasVersionInTransaction(c.tx, c.node.WorkflowID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
 	}
 
 	nodeRef := c.subscription.NodeRef.Data()

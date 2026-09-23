@@ -59,6 +59,15 @@ export const SENTRY_INTAKE: ConfiguredLineIntakeSource = {
   source: lineIntakeSourceById("sentry-exceptions")!,
 };
 
+export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
+  intakeId: "intake-productive",
+  appId: "app-productive-intake",
+  healthy: true,
+  paused: false,
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Productive.io tasks" },
+  source: lineIntakeSourceById("productive-tasks")!,
+};
+
 export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSource> = {}): ConfiguredLineIntakeSource {
   return {
     ...JIRA_INTAKE,

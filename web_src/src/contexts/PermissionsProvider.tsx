@@ -15,6 +15,13 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
   const { data: me, isLoading: meLoading } = useMe(true, organizationId);
 
   const permissions = useMemo(() => me?.permissions ?? [], [me?.permissions]);
+  const browserNotificationPreferences = useMemo(
+    () => ({
+      enabled: me?.browserNotificationPreferences?.enabled ?? false,
+      showWhileViewing: me?.browserNotificationPreferences?.showWhileViewing ?? true,
+    }),
+    [me?.browserNotificationPreferences?.enabled, me?.browserNotificationPreferences?.showWhileViewing],
+  );
 
   const permissionSet = useMemo(() => {
     return new Set(
@@ -40,6 +47,16 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
   const isLoading = !organizationId || meLoading;
 
   return (
-    <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
+    <PermissionsContext.Provider
+      value={{
+        permissions,
+        isLoading,
+        canAct,
+        currentUserId: me?.id,
+        browserNotificationPreferences,
+      }}
+    >
+      {children}
+    </PermissionsContext.Provider>
   );
 }

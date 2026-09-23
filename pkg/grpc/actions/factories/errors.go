@@ -178,6 +178,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Custom automations are not enabled for this organization.")
 	case errors.Is(err, errFactoryAutomationReserved):
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
+	case errors.Is(err, errFactoryPullRequestMergeDisabled):
+		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -192,6 +194,7 @@ var errCustomAutomationsDisabled = errors.New("custom automations are not enable
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
+var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

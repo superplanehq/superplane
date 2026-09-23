@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvas } from "@/api-client";
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
@@ -11,13 +10,6 @@ import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const hookState = vi.hoisted(() => ({
   canvas: { current: undefined as CanvasesCanvas | undefined },
-  feature: {
-    current: {
-      has: (_featureId: string): boolean => false,
-      enabledExperimentalFeatures: [] as string[],
-      isLoading: false,
-    },
-  },
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
@@ -25,10 +17,6 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: hookState.canvas.current, isPending: false }),
   useCommitCanvasStaging: () => ({ mutateAsync: vi.fn() }),
   useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn() }),
-}));
-
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => hookState.feature.current,
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -109,40 +97,15 @@ function createWrapper() {
 describe("useColumnCanvasAgentEditor", () => {
   beforeEach(() => {
     hookState.canvas.current = backlogCanvas;
-    hookState.feature.current = {
-      has: (_featureId: string): boolean => false,
-      enabledExperimentalFeatures: [],
-      isLoading: false,
-    };
   });
 
-  it("selects the refinement agent when Task Refinement is enabled", () => {
-    hookState.feature.current.has = (featureId: string) => featureId === FEATURE_FACTORY_CREATE_WITH_AGENT;
-
+  it("selects the Refine Task agent on the Backlog canvas", () => {
     const { result } = renderHook(() => useColumnCanvasAgentEditor("organization-1", "backlog"), {
       wrapper: createWrapper(),
     });
 
     expect(result.current.agentNode?.id).toBe("refine-task");
     expect(result.current.draft?.title).toBe("Refine Task");
-  });
-
-  it("selects the first agent when Task Refinement is disabled", () => {
-    const { result } = renderHook(() => useColumnCanvasAgentEditor("organization-1", "backlog"), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.agentNode?.id).toBe("analyze");
-  });
-
-  it("stays loading while Task Refinement access resolves", () => {
-    hookState.feature.current.isLoading = true;
-
-    const { result } = renderHook(() => useColumnCanvasAgentEditor("organization-1", "backlog"), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.isLoading).toBe(true);
   });
 
   it("shows the visual evidence setting only for line implementation", () => {

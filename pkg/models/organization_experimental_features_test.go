@@ -20,9 +20,8 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories}, []string(reloaded.EnabledExperimentalFeatures))
 		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureFactories))
-		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureFactoryCreateWithAgent))
 	})
 
 	t.Run("Enable adds the feature and is idempotent", func(t *testing.T) {
@@ -33,13 +32,13 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent, "exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories, "exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
 
 		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
 
 		reloaded, err = FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent, "exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories, "exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
 	})
 
 	t.Run("Disable removes the feature and is idempotent", func(t *testing.T) {
@@ -51,7 +50,7 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories}, []string(reloaded.EnabledExperimentalFeatures))
 
 		// Disabling again is a no-op.
 		require.NoError(t, DisableExperimentalFeature(org.ID, "exp-feature"))
@@ -128,7 +127,7 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		expected := append([]string{features.FeatureFactories, features.FeatureFactoryCreateWithAgent}, ids...)
+		expected := append([]string{features.FeatureFactories}, ids...)
 		assert.ElementsMatch(t, expected, []string(reloaded.EnabledExperimentalFeatures))
 	})
 }

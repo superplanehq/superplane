@@ -22,6 +22,21 @@ func SetWorkOrderNotificationPublisherForTest(fn func(FactoryWorkOrderNotificati
 	return func() { publishWorkOrderNotification = previous }
 }
 
+// PublishPlanningBoardStatus tells open lines boards to reload the work
+// order list. The list carries the working flag and the question flag.
+func PublishPlanningBoardStatus(session *models.FactoryPlanningSession) {
+	if session == nil || !session.IsAnalysisSession() || session.DraftWorkOrderID == nil || *session.DraftWorkOrderID == uuid.Nil {
+		return
+	}
+	reason := factory.EventTypeOrderUpdated
+	if len(session.CurrentSurvey().Questions) > 0 {
+		reason = factory.EventTypeOrderAgentQuestion
+	}
+	if err := PublishFactoryWorkOrderUpdated(session.FactoryID.String(), session.DraftWorkOrderID.String(), reason); err != nil {
+		log.WithError(err).Warnf("Failed to publish planning board status for session %s", session.ID)
+	}
+}
+
 func PublishPlanningAgentQuestion(session *models.FactoryPlanningSession) {
 	message, ok := planningAgentQuestionMessage(session)
 	if !ok {
