@@ -17,18 +17,8 @@ export TF_IN_AUTOMATION=1
 echo "==> terraform fmt"
 terraform fmt -check -recursive -diff .
 
-found=0
-for dir in */; do
-  if ! compgen -G "${dir}*.tf" >/dev/null; then
-    continue
-  fi
-  found=1
-  echo "==> terraform validate (${dir%/})"
+for dir in gke eks; do
+  echo "==> terraform validate ${dir}"
   terraform -chdir="$dir" init -backend=false -input=false -no-color
   terraform -chdir="$dir" validate -no-color
 done
-
-if [[ "$found" -eq 0 ]]; then
-  echo "No Terraform stacks found under ${terraform_root}." >&2
-  exit 1
-fi
