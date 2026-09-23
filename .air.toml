@@ -8,7 +8,9 @@ bin = "tmp/superplane"
 delay = 500
 # Include js so go:embed sources (e.g. pkg/components/runner/claude/run.js) trigger rebuilds.
 include_ext = ["go", "yaml", "yml", "js"]
-exclude_dir = ["web_src", "tmp", "build", "api/swagger", "node_modules"]
+# Top-level runner/ is a separate Go module. Do not rebuild SuperPlane when it changes.
+# This path is exact, so pkg/components/runner stays watched.
+exclude_dir = ["web_src", "tmp", "build", "api/swagger", "node_modules", "runner"]
 stop_on_error = true
 send_interrupt = true
 kill_delay = "3s"
