@@ -34,6 +34,13 @@ function latestRecognition(): FakeSpeechRecognition {
   return recognition;
 }
 
+function emitTranscript(transcript: string, isFinal: boolean) {
+  latestRecognition().onresult?.({
+    resultIndex: 0,
+    results: [Object.assign([{ transcript }], { isFinal, 0: { transcript } })],
+  });
+}
+
 function emitFinalPhrases(transcripts: string[]) {
   latestRecognition().onresult?.({
     resultIndex: 0,
@@ -98,5 +105,80 @@ describe("useWorkOrderFieldDictation", () => {
     expect(onDescriptionChange).toHaveBeenNthCalledWith(1, "Refunds fail. Retry the job");
     expect(onDescriptionChange).toHaveBeenNthCalledWith(2, "Refunds fail. Retry the job Check logs");
     expect(onTitleChange).not.toHaveBeenCalled();
+  });
+
+  it("writes the live phrase into the description and replaces later live words", () => {
+    const onTitleChange = vi.fn();
+    const onDescriptionChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkOrderFieldDictation({
+        title: "",
+        description: "Refunds fail.",
+        maxTitleLength: 256,
+        maxDescriptionLength: 5000,
+        onTitleChange,
+        onDescriptionChange,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("Retry", false);
+      emitTranscript("Retry the job", false);
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Refunds fail. Retry the job");
+    expect(onDescriptionChange.mock.calls.some((call) => call[0] === "Refunds fail. Retry Retry the job")).toBe(false);
+    expect(onTitleChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps in-progress words when stop is called", () => {
+    const onDescriptionChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkOrderFieldDictation({
+        title: "",
+        description: "",
+        maxTitleLength: 256,
+        maxDescriptionLength: 5000,
+        onTitleChange: vi.fn(),
+        onDescriptionChange,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("Fix refunds", false);
+      result.current.stop();
+    });
+
+    expect(onDescriptionChange).toHaveBeenCalledWith("Fix refunds");
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Fix refunds");
+  });
+
+  it("treats a typed prefix as the snapshot when the live phrase is still a suffix", () => {
+    const onDescriptionChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ description }) =>
+        useWorkOrderFieldDictation({
+          title: "",
+          description,
+          maxTitleLength: 256,
+          maxDescriptionLength: 5000,
+          onTitleChange: vi.fn(),
+          onDescriptionChange,
+        }),
+      { initialProps: { description: "" } },
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("Fix refunds", false);
+    });
+    rerender({ description: "Please Fix refunds" });
+    act(() => {
+      emitTranscript("Fix refunds on retry", false);
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Please Fix refunds on retry");
   });
 });
