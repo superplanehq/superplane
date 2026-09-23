@@ -1,18 +1,18 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-api
+  name: {{ .Release.Name }}-websocket
   namespace: {{ .Release.Namespace }}
 {{- if eq .Values.ingress.className "gce" }}
   annotations:
-    cloud.google.com/backend-config: '{"default": "ingress-api-backend-config"}'
+    cloud.google.com/backend-config: '{"default": "ingress-websocket-backend-config"}'
     cloud.google.com/neg: '{"ingress": true}'
 {{- end }}
 spec:
   type: NodePort
   selector:
     app: superplane
-    service: {{ .Release.Name }}-api
+    service: {{ .Release.Name }}-websocket
   ports:
     - name: http
       port: 8000
@@ -22,30 +22,37 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-api
+  name: {{ .Release.Name }}-websocket
   namespace: {{ .Release.Namespace }}
   labels:
     app: superplane
-    service: {{ .Release.Name }}-api
+    service: {{ .Release.Name }}-websocket
 spec:
-  replicas: {{ .Values.api.replicas }}
+  replicas: {{ .Values.websocket.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  minReadySeconds: 10
   selector:
     matchLabels:
       app: superplane
-      service: {{ .Release.Name }}-api
+      service: {{ .Release.Name }}-websocket
   template:
     metadata:
-      name: {{ .Release.Name }}-api
+      name: {{ .Release.Name }}-websocket
       labels:
         app: superplane
-        service: {{ .Release.Name }}-api
+        service: {{ .Release.Name }}-websocket
     spec:
+      terminationGracePeriodSeconds: 75
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ .Release.Name }}-api
+        - name: {{ .Release.Name }}-websocket
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           envFrom:
@@ -72,11 +79,13 @@ spec:
           env:
             - name: START_PUBLIC_API
               value: "yes"
+            - name: START_GRPC_GATEWAY
+              value: "no"
             - name: START_EVENT_DISTRIBUTER
+              value: "yes"
+            - name: START_WEB_SERVER
               value: "no"
             - name: START_WEBSOCKET_SERVER
-              value: "no"
-            - name: START_WEB_SERVER
               value: "yes"
             - name: START_RBAC_POLICY_RELOAD_CONSUMER
               value: "yes"
@@ -95,7 +104,7 @@ spec:
             - name: APPLICATION_NAME
               value: superplane
             - name: DB_POOL_SIZE
-              value: "{{ .Values.api.dbPoolSize }}"
+              value: "{{ .Values.websocket.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
               value: "{{ .Values.database.statementTimeout }}"
             - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
@@ -132,8 +141,6 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
-            - name: START_FILE_CLEANUP_WORKER
-              value: "yes"
 
           volumeMounts:
             - name: oidc-keys
@@ -148,27 +155,34 @@ spec:
             - name: http
               containerPort: 8000
               protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 30
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
-            periodSeconds: 10
+            periodSeconds: 5
             timeoutSeconds: 2
-            failureThreshold: 5
+            failureThreshold: 6
           securityContext:
             privileged: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
 
-          {{- with .Values.api.resources }}
+          {{- with .Values.websocket.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
