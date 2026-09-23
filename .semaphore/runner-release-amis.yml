@@ -1,3 +1,4 @@
+# Credentials come from the runner-ami deployment target (aws-credentials).
 version: v1.0
 name: Release runner AMIs
 agent:
@@ -5,15 +6,13 @@ agent:
     type: f1-standard-2
     os_image: ubuntu2404
 
-# This pipeline promotes the staged AMI IDs (written by build-amis.yml) into
-# the live fleet-manager SSM config, making them active for new instances.
-# Run this manually (or trigger it) after validating the built AMIs.
+# This pipeline promotes the staged AMI IDs (written by runner-build-amis.yml)
+# into the live fleet-manager SSM config, making them active for new instances.
+# Run this manually after you validate the built AMIs.
 
 blocks:
   - name: Promote AMIs to fleet config
     task:
-      secrets:
-        - name: aws-credentials
       env_vars:
         - name: AWS_DEFAULT_REGION
           value: us-east-1
@@ -21,6 +20,7 @@ blocks:
         - name: update SSM fleet config
           commands:
             - checkout
+            - cd runner
 
             # Read staged AMI IDs
             - |

@@ -1,44 +1,51 @@
 # Local development
 
-This repository owns the local task-broker and runner worker. SuperPlane does
-not start these services.
+The SuperPlane repo root starts the task-broker and runner workers. Use the
+same three commands as the app.
 
 ## Start
 
+From the SuperPlane repo root:
+
 ```bash
-make dev
+make dev.up
+make dev.setup
+make dev.server
 ```
 
-That command starts Postgres, task-broker, SuperPlane fleets (`local` and
-`e1-*`), and 10 runner workers. Override the count with `N=1 make dev`.
+| Command | App | Runner stack |
+| --- | --- | --- |
+| `make dev.up` | Build the app image. Start `db`, `rabbitmq`, and the idle app shell. | Build the task-broker and worker images. Start `broker-db`. |
+| `make dev.setup` | Install npm and Go modules. Generate protos. Create and migrate `superplane_dev`. | Start task-broker so GORM migrates the `broker` database. Register fleets `local` and `e1-*`. |
+| `make dev.server` | Start air and Vite. | Start 10 runner workers. Override the count with `N=1 make dev.server`. |
 
-The broker listens on **http://127.0.0.1:8091**. SuperPlane pgweb already uses
-host port **8081**.
+The broker listens on **http://127.0.0.1:8091**. SuperPlane pgweb uses host
+port **8081**.
 
-Stop the stack with `make dev.down`. After you change
-`runner/Dockerfile.local`, run `make dev` again so Compose rebuilds the
+Stop both stacks with `make dev.down`. After you change
+`runner/Dockerfile.local`, run `make dev.up` again so Compose rebuilds the
 worker image.
+
+If a sibling `../runner` Compose project still holds port `8091` or `5432`,
+stop it first. Do not run two brokers at the same time.
 
 ## Connect SuperPlane
 
-SuperPlane `docker-compose.dev.yml` already defaults to this stack:
+`docker-compose.dev.yml` already defaults to this stack:
 
 ```
-TASK_BROKER_BASE_URL=http://host.docker.internal:8091
+TASK_BROKER_BASE_URL=http://task-broker:8081
 TASK_BROKER_PUBLIC_URL=http://localhost:8091
 TASK_BROKER_AUTH_TOKEN=dev-local-token
-TASK_BROKER_FLEET_ID=local
-WEBHOOKS_BASE_URL=http://host.docker.internal:8000
+WEBHOOKS_BASE_URL=http://app:8000
 ```
 
-Start SuperPlane with `make dev.up` then `make dev.server`. Do not set
-`TASK_BROKER_*` in SuperPlane `.env` unless you want a remote broker.
+Do not set `TASK_BROKER_*` in SuperPlane `.env` unless you want a remote
+broker.
 
 If SuperPlane `.env` sets `WEBHOOKS_BASE_URL` to a tunnel, the broker posts
 there instead. GitHub needs that tunnel. The local worker needs a URL it can
 reach; keep the compose default for local Runner nodes.
-
-Do not run two brokers at the same time.
 
 ## Test a Runner node
 
@@ -59,7 +66,7 @@ Node.js 22, git, GitHub CLI (`gh`), jq, openssl, Docker CLI, Claude Code,
 OpenCode, and Codex. Factory line apps can run on this worker. Do not install
 those CLIs on the host. Host NVM binaries are not on the container PATH.
 
-Check the tools after `make dev`:
+Check the tools after `make dev.server`:
 
 ```bash
 make doctor-local
@@ -70,7 +77,8 @@ GitHub and the applicable agent integration before you dispatch a factory line.
 
 ## Manual start
 
-Use separate terminals:
+Use these targets from this directory when you debug the module without
+Compose:
 
 ```bash
 make task-broker
@@ -79,8 +87,10 @@ make register-superplane-fleets
 make runner
 ```
 
-Host `make task-broker` listens on **:8081**. Compose `make dev` uses **8091**.
-Enqueue with `Authorization: Bearer dev-local-token` and `"fleet_id":"local"`.
+Host `make task-broker` listens on **:8081**. Compose `make dev.server` uses
+**8091**. Enqueue with `Authorization: Bearer dev-local-token` and
+`"fleet_id":"local"`.
 
 Host `make runner` inherits the shell PATH. Tasks run `bash --norc
---noprofile`, so NVM hooks in `.bashrc` do not load. Prefer `make dev`.
+--noprofile`, so NVM hooks in `.bashrc` do not load. Prefer the root
+`make dev.server` path.

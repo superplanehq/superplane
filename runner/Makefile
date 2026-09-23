@@ -37,60 +37,33 @@ test:
 	go test ./...
 
 local-dev-help:
-	@echo "Local dev:"
-	@echo "  make dev"
+	@echo "Local start from the SuperPlane repo root:"
+	@echo "  make dev.up"
+	@echo "  make dev.setup"
+	@echo "  make dev.server"
 	@echo "  make doctor-local"
 	@echo "  make dev.down"
-	@echo "Manual (separate terminals):"
+	@echo "Manual (separate terminals, this directory):"
 	@echo "  make task-broker"
 	@echo "  make register-local-fleet"
 	@echo "  make register-superplane-fleets"
 	@echo "  make runner N=10"
 	@echo "Defaults are LOCAL_* / LOCAL_STACK_* / LOCAL_RUNNER_* / N in the Makefile (override on the command line)."
 
-# One-command local stack: Postgres, task-broker, SuperPlane fleets, N workers.
-# Broker is on host port 8091 (8081 is SuperPlane pgweb). SuperPlane app in Docker
-# should use TASK_BROKER_BASE_URL=http://host.docker.internal:8091
+# Local start lives on the SuperPlane repo root. Use those targets.
 dev:
-	docker compose up -d --wait --build --scale runner=$(N)
-	@echo "Local runner stack is up."
-	@echo "  broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
-	@echo "  AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN)"
-	@echo "  fleet_id=$(LOCAL_FLEET_ID)"
-	@echo "  workers=$(N)"
-	@echo "SuperPlane (.env or compose override):"
-	@echo "  TASK_BROKER_BASE_URL=http://host.docker.internal:$(TASK_BROKER_HOST_PORT)"
-	@echo "  TASK_BROKER_PUBLIC_URL=http://localhost:$(TASK_BROKER_HOST_PORT)"
-	@echo "  TASK_BROKER_AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN)"
-	@echo "  TASK_BROKER_FLEET_ID=$(LOCAL_FLEET_ID)"
+	@echo "Start the local stack from the SuperPlane repo root:" >&2
+	@echo "  make dev.up" >&2
+	@echo "  make dev.setup" >&2
+	@echo "  make dev.server" >&2
+	@exit 1
 
 dev.down:
-	docker compose down
+	$(MAKE) -C .. dev.down
 
 # Confirm factory host-mode CLIs exist on the Compose worker PATH.
 doctor-local:
-	docker compose exec runner sh -c '\
-	  missing=0; \
-	  for cmd in claude codex opencode playwright node git gh jq python3 bash; do \
-	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
-	      echo "$$cmd missing" >&2; \
-	      missing=1; \
-	      continue; \
-	    fi; \
-	    echo "$$cmd=$$(command -v "$$cmd")"; \
-	  done; \
-	  echo "claude=$$(claude --version 2>/dev/null | head -n1)"; \
-	  echo "codex=$$(codex --version 2>/dev/null | head -n1)"; \
-	  echo "opencode=$$(opencode --version 2>/dev/null | head -n1)"; \
-	  echo "playwright=$$(playwright --version 2>/dev/null | head -n1)"; \
-	  playwright cli --help >/dev/null 2>&1 || missing=1; \
-	  echo "node=$$(node --version 2>/dev/null)"; \
-	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
-	  shot=$$(mktemp /tmp/playwright-doctor.XXXXXX.png); \
-	  playwright screenshot about:blank "$$shot" >/dev/null 2>&1 || missing=1; \
-	  test -s "$$shot" || missing=1; \
-	  rm -f "$$shot"; \
-	  test "$$missing" -eq 0'
+	$(MAKE) -C .. doctor-local
 
 # Long-running: run in its own terminal. Requires a JSON config; set FM_CONFIG_FILE.
 # Example:

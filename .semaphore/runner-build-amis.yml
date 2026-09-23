@@ -1,3 +1,4 @@
+# Credentials come from the runner-ami deployment target (aws-prod-ami-builder).
 version: v1.0
 name: Build runner AMIs
 agent:
@@ -7,13 +8,12 @@ agent:
 
 promotions:
   - name: Release runner AMIs
-    pipeline_file: release-amis.yml
+    pipeline_file: runner-release-amis.yml
+    deployment_target: runner-ami
 
 blocks:
   - name: Build AMIs (amd64 + arm64)
     task:
-      secrets:
-        - name: aws-prod-ami-builder
       env_vars:
         - name: AWS_DEFAULT_REGION
           value: us-east-1
@@ -23,6 +23,7 @@ blocks:
         - name: packer build
           commands:
             - checkout
+            - cd runner
 
             # Install Packer
             - |

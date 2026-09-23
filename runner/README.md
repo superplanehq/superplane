@@ -104,11 +104,23 @@ go build -o bin/task-broker ./task-broker/cmd/task-broker
 
 ### Local dev
 
-**One command:** **`make dev`** starts Postgres, task-broker, SuperPlane fleets (`local` plus `e1-*`), and 10 runner workers. Override the count with **`N=1 make dev`**. Broker is on **http://127.0.0.1:8091** (host **8081** is SuperPlane pgweb). **`make dev.down`** stops the stack.
+This module lives in the SuperPlane repo. From the SuperPlane root, run
+**`make dev.up`**, **`make dev.setup`**, and **`make dev.server`**. Those
+commands start Postgres, task-broker, SuperPlane fleets (`local` plus `e1-*`),
+and 10 runner workers. Override the count with **`N=1 make dev.server`**.
+Broker is on **http://127.0.0.1:8091** (host **8081** is SuperPlane pgweb).
+**`make dev.down`** stops the app and the runner stack.
 
-SuperPlane compose defaults already point at this stack. Full steps, webhook URLs, and factory CLIs on the Compose worker: [docs/local-dev.md](./docs/local-dev.md).
+Full steps, webhook URLs, and factory CLIs on the Compose worker:
+[docs/local-dev.md](./docs/local-dev.md).
 
-**Manual (separate terminals):** **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`**). **`make register-superplane-fleets`** also registers SuperPlane machine types. **`make fleet-manager`** is only for the EC2 provisioner. **`make local-dev-help`** lists this. Host **`make task-broker`** still listens on **:8081**. Enqueue with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`**.
+**Manual (separate terminals, this directory):** **`make task-broker`**, then
+**`make register-local-fleet`**, then **`make runner`** (optional **`N=3`**).
+**`make register-superplane-fleets`** also registers SuperPlane machine types.
+**`make fleet-manager`** is only for the EC2 provisioner.
+**`make local-dev-help`** lists this. Host **`make task-broker`** still
+listens on **:8081**. Enqueue with **`Authorization: Bearer dev-local-token`**
+and **`"fleet_id":"local"`**.
 
 ## Run task-broker
 
