@@ -4,6 +4,7 @@ import {
   addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
+  intakeIncludeLabelFields,
   isIntakeSettingsTab,
   intakeSettingsTabs,
   resolveIntakeSettingsTab,
@@ -30,6 +31,31 @@ describe("intakeSourceSettingsModel", () => {
     expect(addIntakeLabel(["bug"], "  needs-triage  ")).toEqual(["bug", "needs-triage"]);
     expect(addIntakeLabel(["bug"], "bug")).toEqual(["bug"]);
     expect(addIntakeLabel(["bug"], "   ")).toEqual(["bug"]);
+  });
+
+  it("saves include-only labels even when the stored mode is exclude", () => {
+    const next = normalizeIntakeSourceSettings({
+      ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+      labels: ["bug"],
+      filterByLabel: true,
+      labelFilterMode: "exclude",
+    });
+
+    expect(next).toMatchObject({
+      labels: ["bug"],
+      filterByLabel: true,
+      labelFilterMode: "include",
+    });
+    expect(intakeIncludeLabelFields(["bug"])).toEqual({
+      labels: ["bug"],
+      filterByLabel: true,
+      labelFilterMode: "include",
+    });
+    expect(intakeIncludeLabelFields([])).toEqual({
+      labels: [],
+      filterByLabel: false,
+      labelFilterMode: "include",
+    });
   });
 
   it("clamps the confidence score", () => {

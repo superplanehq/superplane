@@ -7,6 +7,7 @@ import { IntakeEventRow } from "./IntakeEventRow";
 import {
   addIntakeLabel,
   INTAKE_SETTINGS_COPY,
+  intakeIncludeLabelFields,
   intakeSettingsSectionDomId,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -125,14 +126,7 @@ export function GitHubIntakeFilterFields({
             labels={settings.labels}
             options={labelOptions}
             loading={labelOptionsLoading}
-            onChange={(labels) =>
-              onSettingsChange((current) => ({
-                ...current,
-                labels,
-                filterByLabel: labels.length > 0,
-                labelFilterMode: labels.length > 0 ? current.labelFilterMode : "include",
-              }))
-            }
+            onChange={(labels) => onSettingsChange((current) => ({ ...current, ...intakeIncludeLabelFields(labels) }))}
           />
         </section>
       ) : null}
@@ -242,14 +236,16 @@ function GitHubSelectedLabels({ labels, onRemove }: { labels: string[]; onRemove
         <li key={label}>
           <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-foreground/20 bg-accent/50 px-2 py-1 text-[13px] text-foreground">
             <span className="min-w-0 truncate">{label}</span>
-            <button
+            <Button
               type="button"
-              className="rounded-sm text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              size="icon-xs"
+              className="size-5 text-muted-foreground hover:text-foreground"
               aria-label={`Remove ${label}`}
               onClick={() => onRemove(label)}
             >
               <X className="size-3.5" aria-hidden />
-            </button>
+            </Button>
           </span>
         </li>
       ))}
@@ -343,16 +339,17 @@ function GitHubLabelSuggestions({ suggestions, onPick }: { suggestions: string[]
     >
       {suggestions.map((label) => (
         <li key={label}>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             role="option"
             aria-selected={false}
-            className="flex w-full px-3 py-1.5 text-left text-[13px] text-foreground hover:bg-accent/60"
+            className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-[13px] font-normal"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPick(label)}
           >
             {label}
-          </button>
+          </Button>
         </li>
       ))}
     </ul>

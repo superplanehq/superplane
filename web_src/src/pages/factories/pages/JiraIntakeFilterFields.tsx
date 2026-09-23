@@ -10,6 +10,7 @@ import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
 import {
   addIntakeLabel,
   INTAKE_SETTINGS_COPY,
+  intakeIncludeLabelFields,
   intakeSettingsSectionDomId,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -116,14 +117,7 @@ export function JiraIntakeFilterFields({
           <p className="mt-1 text-[13px] text-muted-foreground">{JIRA_INTAKE_SETTINGS_COPY.labelsHelper}</p>
           <IntakeLabelField
             labels={settings.labels}
-            onChange={(labels) =>
-              onSettingsChange((current) => ({
-                ...current,
-                labels,
-                filterByLabel: labels.length > 0,
-                labelFilterMode: labels.length > 0 ? current.labelFilterMode : "include",
-              }))
-            }
+            onChange={(labels) => onSettingsChange((current) => ({ ...current, ...intakeIncludeLabelFields(labels) }))}
           />
         </section>
       ) : null}
@@ -201,14 +195,16 @@ function IntakeLabelField({ labels, onChange }: { labels: string[]; onChange: (l
                 )}
               >
                 <span className="min-w-0 truncate">{label}</span>
-                <button
+                <Button
                   type="button"
-                  className="rounded-sm text-muted-foreground hover:text-foreground"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-5 text-muted-foreground hover:text-foreground"
                   aria-label={`Remove ${label}`}
                   onClick={() => remove(label)}
                 >
                   <X className="size-3.5" aria-hidden />
-                </button>
+                </Button>
               </span>
             </li>
           ))}

@@ -243,13 +243,22 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
   return [...labels, next];
 }
 
+/** GitHub and Jira label editors are include-only. */
+export function intakeIncludeLabelFields(
+  labels: string[],
+): Pick<IntakeSourceSettings, "labels" | "filterByLabel" | "labelFilterMode"> {
+  return {
+    labels,
+    filterByLabel: labels.length > 0,
+    labelFilterMode: "include",
+  };
+}
+
 export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
   const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
-  if (!draft.filterByLabel) {
-    return { ...draft, confidencePct, labels: [], labelFilterMode: "include", sentryLevels };
-  }
-  return { ...draft, confidencePct, sentryLevels };
+  const labels = draft.filterByLabel ? draft.labels : [];
+  return { ...draft, ...intakeIncludeLabelFields(labels), confidencePct, sentryLevels };
 }
 
 type IntakeToggles = Pick<

@@ -384,6 +384,31 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("saves stored exclude labels as include", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      onSave,
+      settings: {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        labels: ["bug"],
+        filterByLabel: true,
+        labelFilterMode: "exclude",
+      },
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        labels: ["bug"],
+        filterByLabel: true,
+        labelFilterMode: "include",
+      }),
+    );
+  });
+
   it("shows a save error beside the top bar Save button", () => {
     renderPopup({ saveError: INTAKE_SETTINGS_COPY.saveError });
 
