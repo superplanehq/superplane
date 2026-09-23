@@ -1618,7 +1618,7 @@ describe("LinesPage board editing", () => {
     const scopeAll = within(actions).getByTestId("work-orders-scope-all");
     const filter = within(actions).getByTestId("work-orders-filter-trigger");
     const search = within(actions).getByTestId("work-orders-search-trigger");
-    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
+    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Active");
     expect(within(actions).getByTestId("work-orders-scope-my")).toBeInTheDocument();
     expect(scopeAll.className).toMatch(/rounded-full/);
     expect(filter).toHaveAccessibleName("Filter");
@@ -1637,6 +1637,7 @@ describe("LinesPage board editing", () => {
 
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
     expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-labels")).toHaveTextContent("Label");
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
@@ -1669,6 +1670,41 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
+    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
+  });
+
+  it("narrows the board when a Review label filter is selected", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          pullRequests: [
+            {
+              id: "pr-review",
+              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
+              number: "106",
+              url: "https://github.com/acme/payments/pull/106",
+              title: "Fix refund dispatcher timeout loop",
+              state: "STATE_OPEN",
+            },
+          ],
+        },
+        BOARD_IMPLEMENT_NOTIFY_ORDER,
+      ],
+    });
+    renderLinesBoard();
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-labels"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-labels-review"));
+
+    const board = screen.getByTestId("lines-detail-page");
+    expect(within(board).getByText("Label is Review")).toBeInTheDocument();
     expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });

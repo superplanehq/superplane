@@ -66,6 +66,27 @@ describe("WorkOrdersHeader", () => {
     ).toBeTruthy();
   });
 
+  it("lists Label after Status, with Review and Mergeable", async () => {
+    const user = userEvent.setup();
+    render(<HeaderHarness onCreateWorkOrder={vi.fn()} />);
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    const labels = screen.getByTestId("work-orders-filter-labels");
+    expect(labels).toHaveTextContent("Label");
+    expect(
+      screen.getByTestId("work-orders-filter-statuses").compareDocumentPosition(labels) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      labels.compareDocumentPosition(screen.getByTestId("work-orders-filter-lineIds")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.hover(labels);
+    expect(await screen.findByTestId("work-orders-filter-labels-review")).toHaveTextContent("Review");
+    expect(screen.getByTestId("work-orders-filter-labels-mergeable")).toHaveTextContent("Mergeable");
+  });
+
   it("still offers Source when the factory has no intakes", async () => {
     const user = userEvent.setup();
     render(<HeaderHarness onCreateWorkOrder={vi.fn()} />);
@@ -80,6 +101,7 @@ describe("WorkOrdersHeader", () => {
       "sp:work-orders:filters:factory-chip",
       JSON.stringify({
         statuses: [],
+        labels: [],
         lineIds: [],
         sourceIds: ["github-issues", "manual"],
         assigneeIds: [],

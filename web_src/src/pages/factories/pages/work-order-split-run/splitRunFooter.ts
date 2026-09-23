@@ -343,7 +343,7 @@ function draftDecisionActions(): SplitRunFooterAction[] {
 function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: input.kind,
-    sentence: input.kind === "running" ? "This task is running." : "This task needs attention.",
+    sentence: splitRunKindSentence(input.kind),
     note,
     actions: [],
   });
@@ -385,7 +385,7 @@ function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
   if (input.kind === "failed") {
     return withFooterMeta(input, {
       kind: "failed",
-      sentence: "This task needs attention.",
+      sentence: splitRunKindSentence("failed"),
       note: closedNote,
       attentionCard: true,
       actions: closedDecisionActions(input.status ?? "failed"),
@@ -411,7 +411,7 @@ function stoppedNote(note: SplitRunFooterNote | undefined, actor?: OrgUserDispla
 function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: "stopped",
-    sentence: "This task needs attention.",
+    sentence: splitRunKindSentence("stopped"),
     note: stoppedNote(note, input.actor),
     attentionCard: true,
     actions: [REJECT, RERUN],
@@ -426,11 +426,24 @@ function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spli
   const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
   return withFooterMeta(input, {
     kind: input.kind,
-    sentence: "This task needs attention.",
+    sentence: splitRunKindSentence(input.kind),
     note,
     attentionCard: true,
     actions,
   });
+}
+
+function splitRunKindSentence(kind: FooterInput["kind"]): string {
+  if (kind === "running") {
+    return "This task is running.";
+  }
+  if (kind === "failed") {
+    return "This task failed.";
+  }
+  if (kind === "stopped") {
+    return "This task stopped.";
+  }
+  return "This task is waiting.";
 }
 
 export function buildSplitRunFooter(input: FooterInput): SplitRunFooter {

@@ -9,6 +9,8 @@ import {
 import {
   MANUAL_FILTER_VALUE,
   UNASSIGNED_FILTER_VALUE,
+  WORK_ORDER_FILTER_LABELS,
+  WORK_ORDER_FILTER_LABEL_META,
   type WorkOrderFilters,
   type WorkOrderListEntry,
 } from "./workOrderListModel";
@@ -34,6 +36,13 @@ export function buildStatusFilterOptions(): WorkOrderFilterOption[] {
     const meta = getWorkOrderDisplayStatusMeta(status);
     return { value: status, label: meta.filterLabel, dot: meta.dotClassName };
   });
+}
+
+export function buildLabelFilterOptions(): WorkOrderFilterOption[] {
+  return WORK_ORDER_FILTER_LABELS.map((label) => ({
+    value: label,
+    label: WORK_ORDER_FILTER_LABEL_META[label].label,
+  }));
 }
 
 export function buildLineFilterOptions(lines: FactoriesFactoryLine[]): WorkOrderFilterOption[] {
@@ -132,6 +141,11 @@ export function buildWorkOrderFilterChips(
       dimension: "statuses" as const,
       value: status,
       label: `Status is ${getWorkOrderDisplayStatusMeta(status).filterLabel}`,
+    })),
+    ...filters.labels.map((label) => ({
+      dimension: "labels" as const,
+      value: label,
+      label: `Label is ${WORK_ORDER_FILTER_LABEL_META[label].label}`,
     })),
     ...filters.lineIds.map((lineId) => ({
       dimension: "lineIds" as const,
