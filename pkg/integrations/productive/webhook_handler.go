@@ -147,12 +147,17 @@ func (h *ProductiveWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error
 
 // eventTargetURL puts the event on the target URL. Productive.io does not
 // send an event header, and two webhooks can share one signature token.
-// The query value is used only when the signature token does not name
-// one event by itself.
+// The path segment is the event name. The query value is a second copy for
+// a handler that does not read the path.
 func eventTargetURL(webhookURL, eventName string) string {
 	parsed, err := url.Parse(webhookURL)
 	if err != nil {
 		return webhookURL
+	}
+
+	eventName = strings.TrimSpace(eventName)
+	if eventName != "" {
+		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + url.PathEscape(eventName)
 	}
 
 	query := parsed.Query()

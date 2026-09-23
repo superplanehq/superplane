@@ -209,8 +209,9 @@ func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 }
 
 // deliveryEventName reads the event SuperPlane put on the webhook URL, then
-// the custom header. Productive.io does not send the header on a real
-// delivery. The signature token is checked before this name is trusted.
+// the custom header. The URL event is a path segment or a query value.
+// Productive.io does not send the header on a real delivery. The signature
+// token is checked before this name is trusted.
 func deliveryEventName(ctx core.WebhookRequestContext) string {
 	if ctx.Query != nil {
 		if event := strings.TrimSpace(ctx.Query.Get("event")); event != "" {
