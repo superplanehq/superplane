@@ -37,7 +37,7 @@ blocks:
   - name: "Backend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -85,7 +85,7 @@ blocks:
   - name: "Security"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -114,7 +114,7 @@ blocks:
   - name: "Frontend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -157,7 +157,7 @@ blocks:
   - name: "Build Image"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       secrets:
         - name: ghcr-push-token
@@ -173,6 +173,31 @@ blocks:
           commands:
             - bash scripts/build-image
 
+  - name: "Runner Tests"
+    dependencies: []
+    run:
+      when: "change_in('/runner', {default_branch: 'main'})"
+    task:
+      prologue:
+        commands:
+          - sem-version go 1.25
+          - cache restore go-mod-runner-$(checksum runner/go.sum),go-mod-runner
+          - (cd runner && go mod download)
+          - cache store go-mod-runner-$(checksum runner/go.sum),go-mod-runner
+      jobs:
+        - name: fmt, vet, build, tests
+          commands:
+            - cd runner
+            - |
+              FILES=$(gofmt -l fleet-manager runner shared task-broker test)
+              if [ -n "$FILES" ]; then echo "gofmt needed on:"; echo "$FILES"; exit 1; fi
+            - go vet ./...
+            - mkdir -p bin
+            - make build
+            - sem-service start postgres 16
+            - export TEST_DATABASE_URL='postgresql://postgres:@0.0.0.0:5432/postgres?sslmode=disable'
+            - go test ./... -count=1 -p 1
+
 after_pipeline:
   task:
     jobs:
@@ -180,9 +205,28 @@ after_pipeline:
         commands:
           - test-results gen-pipeline-report
 
+# Runner promotions require SuperPlane deployment targets runner-images,
+# runner-s3, and runner-ami. Attach GHCR_TOKEN, aws-prod, runner-s3,
+# aws-prod-ami-builder, and aws-credentials there. Do not use production.
 promotions:
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
     deployment_target: production
     auto_promote:
-      when: "branch = 'main' AND result = 'passed'"
+      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+
+  - name: Publish runner images
+    pipeline_file: runner-docker-publish.yml
+    deployment_target: runner-images
+    auto_promote:
+      when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
+
+  - name: Publish runner binaries to S3
+    pipeline_file: runner-binary-s3.yml
+    deployment_target: runner-s3
+    auto_promote:
+      when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
+
+  - name: Build runner AMIs
+    pipeline_file: runner-build-amis.yml
+    deployment_target: runner-ami
