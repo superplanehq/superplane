@@ -19,39 +19,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 )
 
-type objectAPI interface {
-	PutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.Options)) (*awss3.PutObjectOutput, error)
-	GetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.Options)) (*awss3.GetObjectOutput, error)
-	HeadObject(ctx context.Context, params *awss3.HeadObjectInput, optFns ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error)
-	DeleteObject(ctx context.Context, params *awss3.DeleteObjectInput, optFns ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error)
-}
-
-type presignAPI interface {
-	PresignGetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4Presign, error)
-}
-
-// v4Presign matches the URL field of the AWS presign result without importing
-// the signer package into every caller. The real presign client is adapted below.
-type v4Presign struct {
-	URL string
-}
-
-type awsPresignClient struct {
-	client *awss3.PresignClient
-}
-
-func (c awsPresignClient) PresignGetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4Presign, error) {
-	result, err := c.client.PresignGetObject(ctx, params, optFns...)
-	if err != nil {
-		return nil, err
-	}
-	return &v4Presign{URL: result.URL}, nil
-}
-
 type Store struct {
 	bucket    string
-	objects   objectAPI
-	presigner presignAPI
+	client    *awss3.Client
+	presigner *awss3.PresignClient
 }
 
 func NewProvider() (*Store, error) {
@@ -72,17 +43,11 @@ func NewProvider() (*Store, error) {
 		return nil, fmt.Errorf("load AWS config: %w", err)
 	}
 	client := awss3.NewFromConfig(cfg)
-	return newStore(bucket, client, awsPresignClient{client: awss3.NewPresignClient(client)})
-}
-
-func newStore(bucket string, objects objectAPI, presigner presignAPI) (*Store, error) {
-	if strings.TrimSpace(bucket) == "" {
-		return nil, fmt.Errorf("S3 bucket is required")
-	}
-	if objects == nil || presigner == nil {
-		return nil, fmt.Errorf("S3 client is required")
-	}
-	return &Store{bucket: bucket, objects: objects, presigner: presigner}, nil
+	return &Store{
+		bucket:    bucket,
+		client:    client,
+		presigner: awss3.NewPresignClient(client),
+	}, nil
 }
 
 func (s *Store) Name() string {
@@ -98,14 +63,14 @@ func (s *Store) Put(ctx context.Context, key string, r io.Reader, opts blob.PutO
 	if contentType := strings.TrimSpace(opts.ContentType); contentType != "" {
 		input.ContentType = aws.String(contentType)
 	}
-	if _, err := s.objects.PutObject(ctx, input); err != nil {
+	if _, err := s.client.PutObject(ctx, input); err != nil {
 		return fmt.Errorf("write S3 object: %w", err)
 	}
 	return nil
 }
 
 func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	output, err := s.objects.GetObject(ctx, &awss3.GetObjectInput{
+	output, err := s.client.GetObject(ctx, &awss3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
@@ -119,7 +84,7 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 }
 
 func (s *Store) Head(ctx context.Context, key string) (*blob.ObjectInfo, error) {
-	output, err := s.objects.HeadObject(ctx, &awss3.HeadObjectInput{
+	output, err := s.client.HeadObject(ctx, &awss3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
@@ -140,7 +105,7 @@ func (s *Store) Head(ctx context.Context, key string) (*blob.ObjectInfo, error) 
 }
 
 func (s *Store) Delete(ctx context.Context, key string) error {
-	_, err := s.objects.DeleteObject(ctx, &awss3.DeleteObjectInput{
+	_, err := s.client.DeleteObject(ctx, &awss3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
