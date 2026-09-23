@@ -118,8 +118,9 @@ Full steps, webhook URLs, and factory CLIs on the Compose worker:
 **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`**).
 **`make register-superplane-fleets`** also registers SuperPlane machine types.
 **`make fleet-manager`** is only for the EC2 provisioner.
-**`make local-dev-help`** lists this. Host **`make task-broker`** still
-listens on **:8081**. Enqueue with **`Authorization: Bearer dev-local-token`**
+**`make local-dev-help`** lists this. **`make task-broker`** runs on the
+Compose network and listens on **127.0.0.1:8081**. Start Postgres first with
+root **`make dev.up`**. Enqueue with **`Authorization: Bearer dev-local-token`**
 and **`"fleet_id":"local"`**.
 
 ## Run task-broker
@@ -156,7 +157,7 @@ export AUTH_TOKEN=your-secret
 ./bin/task-broker
 ```
 
-Local dev uses database `broker` on the SuperPlane Postgres host `db`. Compose does not publish that port. GORM auto-migrates schema on startup.
+Local dev uses database `broker` on the SuperPlane Postgres host `db`. Compose does not publish that port. `make task-broker` runs the process on that network and publishes the listen port on `127.0.0.1:8081`. GORM auto-migrates schema on startup.
 
 **Tests** that touch the broker store require `TEST_DATABASE_URL` (same format as `DATABASE_URL`). CI starts Postgres via `sem-service`. Locally, `make test-integration` starts an isolated Postgres on the Compose network. Use `go test ./... -p 1` when sharing one test database.
 

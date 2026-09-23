@@ -86,9 +86,26 @@ fleet-manager: build
 	./bin/fleet-manager
 
 # Long-running: run in its own terminal.
-task-broker: build
-	DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) LISTEN_ADDR=$(LOCAL_BROKER_LISTEN) \
-		AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN) ./bin/task-broker
+# The broker runs on the dev Compose network so it can open Postgres at
+# db:5432. That port stays unpublished. The listen port is published on
+# 127.0.0.1 so register-local-fleet and make runner can connect.
+task-broker:
+	@set -eu; \
+	cid=$$(docker compose --project-directory "$(CURDIR)/.." -f "$(CURDIR)/../docker-compose.dev.yml" ps -q db); \
+	if [ -z "$$cid" ]; then \
+	  echo "Postgres is not running. From the SuperPlane repo root, run: make dev.up" >&2; \
+	  exit 1; \
+	fi; \
+	net=$$(docker inspect -f '{{range $$name, $$conf := .NetworkSettings.Networks}}{{$$name}}{{end}}' "$$cid"); \
+	port=$$(printf '%s' "$(LOCAL_BROKER_LISTEN)" | sed 's/.*://'); \
+	docker run --rm -it --init --network "$$net" \
+	  -p "127.0.0.1:$$port:$$port" \
+	  -v "$(CURDIR):/src" -w /src \
+	  -e DATABASE_URL="$(LOCAL_BROKER_DATABASE_URL)" \
+	  -e LISTEN_ADDR=":$$port" \
+	  -e AUTH_TOKEN="$(LOCAL_STACK_AUTH_TOKEN)" \
+	  golang:1.25 \
+	  go run ./task-broker/cmd/task-broker
 
 # After task-broker is listening; registers LOCAL_FLEET_ID on the broker.
 register-local-fleet:

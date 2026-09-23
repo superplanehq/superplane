@@ -77,8 +77,9 @@ GitHub and the applicable agent integration before you dispatch a factory line.
 
 ## Manual start
 
-Use these targets from this directory when you debug the module without
-Compose:
+Use these targets from this directory when you debug the broker and workers
+without the Compose task-broker service. Postgres must already be running
+(`make dev.up` from the repo root).
 
 ```bash
 make task-broker
@@ -87,9 +88,11 @@ make register-superplane-fleets
 make runner
 ```
 
-Host `make task-broker` listens on **:8081**. Compose `make dev.server` uses
-**8091**. Enqueue with `Authorization: Bearer dev-local-token` and
-`"fleet_id":"local"`.
+`make task-broker` runs on the Compose network so it can open Postgres at
+`db:5432`. That port stays unpublished. The broker listens on
+**127.0.0.1:8081**. Compose `make dev.server` uses **8091**. Do not run both
+brokers at the same time. They share database `broker`. Enqueue with
+`Authorization: Bearer dev-local-token` and `"fleet_id":"local"`.
 
 Host `make runner` inherits the shell PATH. Tasks run `bash --norc
 --noprofile`, so NVM hooks in `.bashrc` do not load. Prefer the root
