@@ -208,6 +208,38 @@ describe("useWorkOrderFieldDictation", () => {
     expect(onTitleChange.mock.calls.some((call) => String(call[0]).startsWith("Refunds fail."))).toBe(false);
   });
 
+  it("replaces live words after focus returns before the phrase is final", () => {
+    const onTitleChange = vi.fn();
+    const onDescriptionChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ description }) =>
+        useWorkOrderFieldDictation({
+          title: "Fix bugs",
+          description,
+          maxTitleLength: 256,
+          maxDescriptionLength: 5000,
+          onTitleChange,
+          onDescriptionChange,
+        }),
+      { initialProps: { description: "Notes" } },
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("hello", false);
+    });
+    rerender({ description: "Notes hello" });
+    act(() => {
+      result.current.rememberTitle();
+      result.current.rememberDescription();
+      emitTranscript("hello", true);
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Notes hello");
+    expect(onDescriptionChange.mock.calls.some((call) => call[0] === "Notes hello hello")).toBe(false);
+    expect(onTitleChange).not.toHaveBeenCalled();
+  });
+
   it("replaces live words after a newline when the field re-renders", () => {
     const onDescriptionChange = vi.fn();
     const { result, rerender } = renderHook(

@@ -30,6 +30,7 @@ export function useWorkOrderFieldDictation({
   descriptionRef.current = description;
 
   const fieldRef = useRef<SpokenPhraseField>({
+    key: lastFieldRef.current,
     getValue: () => descriptionRef.current,
     setValue: onDescriptionChange,
     get maxLength() {
@@ -37,6 +38,7 @@ export function useWorkOrderFieldDictation({
     },
   });
   fieldRef.current = {
+    key: lastFieldRef.current,
     getValue: () => (lastFieldRef.current === "title" ? titleRef.current : descriptionRef.current),
     setValue: (next) => {
       if (lastFieldRef.current === "title") {
@@ -52,7 +54,7 @@ export function useWorkOrderFieldDictation({
     },
   };
 
-  const { resetSnapshot, ...dictation } = useSpokenPhraseDictation(fieldRef);
+  const { activateField, ...dictation } = useSpokenPhraseDictation(fieldRef);
 
   return {
     ...dictation,
@@ -61,14 +63,14 @@ export function useWorkOrderFieldDictation({
         return;
       }
       lastFieldRef.current = "title";
-      resetSnapshot();
+      activateField("title");
     },
     rememberDescription: () => {
       if (lastFieldRef.current === "description") {
         return;
       }
       lastFieldRef.current = "description";
-      resetSnapshot();
+      activateField("description");
     },
   };
 }

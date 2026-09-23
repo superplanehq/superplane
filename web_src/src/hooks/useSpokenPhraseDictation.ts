@@ -5,18 +5,26 @@ import { appendSpokenPhrase, stripTrailingSpokenPhrase } from "@/lib/appendSpoke
 import { useSpeechDictation, type UseSpeechDictationResult } from "./useSpeechDictation";
 
 export type SpokenPhraseField = {
+  key?: string;
   getValue: () => string;
   setValue: (next: string) => void;
   maxLength?: number;
 };
 
+type FieldSnapshot = {
+  committed: string;
+  livePhrase: string;
+};
+
 export type UseSpokenPhraseDictationResult = UseSpeechDictationResult & {
-  resetSnapshot: () => void;
+  activateField: (nextKey: string) => void;
 };
 
 export function useSpokenPhraseDictation(
   fieldRef: MutableRefObject<SpokenPhraseField>,
 ): UseSpokenPhraseDictationResult {
+  const snapshotsRef = useRef(new Map<string, FieldSnapshot>());
+  const fieldKeyRef = useRef(fieldRef.current.key ?? "default");
   const committedRef = useRef(fieldRef.current.getValue());
   const livePhraseRef = useRef("");
   const valueRef = useRef(fieldRef.current.getValue());
@@ -30,6 +38,28 @@ export function useSpokenPhraseDictation(
   };
 
   const resetSnapshot = () => {
+    snapshotsRef.current.clear();
+    livePhraseRef.current = "";
+    committedRef.current = fieldRef.current.getValue();
+    valueRef.current = committedRef.current;
+  };
+
+  const activateField = (nextKey: string) => {
+    if (nextKey === fieldKeyRef.current) {
+      return;
+    }
+    snapshotsRef.current.set(fieldKeyRef.current, {
+      committed: committedRef.current,
+      livePhrase: livePhraseRef.current,
+    });
+    fieldKeyRef.current = nextKey;
+    const saved = snapshotsRef.current.get(nextKey);
+    if (saved) {
+      committedRef.current = saved.committed;
+      livePhraseRef.current = saved.livePhrase;
+      valueRef.current = fieldRef.current.getValue();
+      return;
+    }
     livePhraseRef.current = "";
     committedRef.current = fieldRef.current.getValue();
     valueRef.current = committedRef.current;
@@ -57,7 +87,7 @@ export function useSpokenPhraseDictation(
 
   return {
     ...dictation,
-    resetSnapshot,
+    activateField,
     start: () => {
       resetSnapshot();
       dictation.start();
