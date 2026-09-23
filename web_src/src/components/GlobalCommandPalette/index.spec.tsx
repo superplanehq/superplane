@@ -18,6 +18,7 @@ const {
   inviteLinkQueryState,
   inviteLinkState,
   navigateMock,
+  paletteQueryState,
   permissionsState,
   writeTextMock,
 } = vi.hoisted(() => {
@@ -52,6 +53,14 @@ const {
     inviteLinkQueryState: { enabledValues: [] as boolean[] },
     inviteLinkState: { data: { token: "test-invite-token", enabled: true } },
     navigateMock: vi.fn(),
+    paletteQueryState: {
+      apiKeysCalls: 0,
+      canvasEnabledValues: [] as Array<boolean | undefined>,
+      integrationsCalls: 0,
+      loading: false,
+      organizationEnabledValues: [] as Array<boolean | undefined>,
+      usageEnabledValues: [] as boolean[],
+    },
     permissionsState: { permissions: defaultPermissions },
     writeTextMock: vi.fn(),
   };
@@ -85,21 +94,24 @@ vi.mock("@/api-client", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  useCanvases: () => ({
-    data: [
-      {
-        id: "canvas-1",
-        name: "Deploy API",
-        description: "Production deployment flow",
-      },
-      {
-        id: "canvas-2",
-        name: "Database Backups",
-        description: "Nightly backup flow",
-      },
-    ],
-    isLoading: false,
-  }),
+  useCanvases: (_organizationId: string, options?: { enabled?: boolean }) => {
+    paletteQueryState.canvasEnabledValues.push(options?.enabled);
+    return {
+      data: [
+        {
+          id: "canvas-1",
+          name: "Deploy API",
+          description: "Production deployment flow",
+        },
+        {
+          id: "canvas-2",
+          name: "Database Backups",
+          description: "Nightly backup flow",
+        },
+      ],
+      isLoading: paletteQueryState.loading,
+    };
+  },
   useCreateCanvas: () => ({
     mutateAsync: createCanvasMock,
     isPending: false,
@@ -115,46 +127,60 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/hooks/useOrganizationData", () => ({
-  useOrganization: () => ({
-    data: {
-      metadata: {
-        id: "org-1",
-        name: "Acme",
+  useOrganization: (_organizationId: string, enabled?: boolean) => {
+    paletteQueryState.organizationEnabledValues.push(enabled);
+    return {
+      data: {
+        metadata: {
+          id: "org-1",
+          name: "Acme",
+        },
       },
-    },
-  }),
-  useOrganizationUsage: () => ({
-    data: { enabled: true },
-    error: null,
-  }),
+    };
+  },
+  useOrganizationUsage: (_organizationId: string, enabled: boolean) => {
+    paletteQueryState.usageEnabledValues.push(enabled);
+    return {
+      data: { enabled: true },
+      error: null,
+    };
+  },
   useOrganizationInviteLink: (_organizationId: string, enabled: boolean) => {
     inviteLinkQueryState.enabledValues.push(enabled);
     return {
       data: enabled ? inviteLinkState.data : undefined,
-      isLoading: false,
+      isLoading: paletteQueryState.loading,
     };
   },
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
-  useConnectedIntegrations: () => ({
-    data: [
-      {
-        metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
-        status: { state: "ready" },
-      },
-      {
-        metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
-        status: { state: "ready" },
-      },
-    ],
-  }),
+  useConnectedIntegrations: () => {
+    paletteQueryState.integrationsCalls += 1;
+    return {
+      data: [
+        {
+          metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
+          status: { state: "ready" },
+        },
+        {
+          metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
+          status: { state: "ready" },
+        },
+      ],
+      isLoading: paletteQueryState.loading,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useApiKeys", () => ({
-  useAPIKeys: () => ({
-    data: [{ id: "api-key-1", name: "deploy-bot" }],
-  }),
+  useAPIKeys: () => {
+    paletteQueryState.apiKeysCalls += 1;
+    return {
+      data: [{ id: "api-key-1", name: "deploy-bot" }],
+      isLoading: false,
+    };
+  },
 }));
 
 vi.mock("@/lib/canvasNameGenerator", () => ({
@@ -199,6 +225,12 @@ describe("GlobalCommandPalette", () => {
     createCanvasMock.mockReset();
     createCanvasMock.mockResolvedValue({ data: { canvas: { metadata: { id: "canvas-new" } } } });
     navigateMock.mockReset();
+    paletteQueryState.apiKeysCalls = 0;
+    paletteQueryState.canvasEnabledValues = [];
+    paletteQueryState.integrationsCalls = 0;
+    paletteQueryState.loading = false;
+    paletteQueryState.organizationEnabledValues = [];
+    paletteQueryState.usageEnabledValues = [];
     inviteLinkQueryState.enabledValues = [];
     inviteLinkState.data = { token: "test-invite-token", enabled: true };
     permissionsState.permissions = [...defaultPermissions];
@@ -224,6 +256,44 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByText("Integrations")).toBeInTheDocument();
     expect(screen.getByText("Go to Docs")).toBeInTheDocument();
     expect(screen.getByText("Sign Out")).toBeInTheDocument();
+  });
+
+  it("keeps palette-only queries disabled until the palette opens", async () => {
+    renderPalette();
+
+    expect(paletteQueryState.apiKeysCalls).toBe(0);
+    expect(paletteQueryState.integrationsCalls).toBe(0);
+    expect(inviteLinkQueryState.enabledValues).toEqual([]);
+    expect(paletteQueryState.canvasEnabledValues).not.toContain(true);
+    expect(paletteQueryState.organizationEnabledValues).not.toContain(true);
+    expect(paletteQueryState.usageEnabledValues).not.toContain(true);
+
+    openPalette();
+
+    expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+    expect(paletteQueryState.apiKeysCalls).toBeGreaterThan(0);
+    expect(paletteQueryState.integrationsCalls).toBeGreaterThan(0);
+    expect(inviteLinkQueryState.enabledValues).toContain(true);
+    expect(paletteQueryState.canvasEnabledValues).toContain(true);
+    expect(paletteQueryState.organizationEnabledValues).toContain(true);
+    expect(paletteQueryState.usageEnabledValues).toContain(true);
+  });
+
+  it("shows a loading state while searchable data loads", async () => {
+    const user = userEvent.setup();
+    paletteQueryState.loading = true;
+    renderPalette();
+
+    openPalette();
+    const input = await screen.findByPlaceholderText("Find apps, integrations, and commands...");
+    await user.type(input, "missing");
+
+    expect(await screen.findByText("Loading results…")).toBeInTheDocument();
+
+    paletteQueryState.loading = false;
+    await user.type(input, " result");
+
+    expect(await screen.findByText("No results found.")).toBeInTheDocument();
   });
 
   it("closes with CMD+K while the command input is focused", async () => {

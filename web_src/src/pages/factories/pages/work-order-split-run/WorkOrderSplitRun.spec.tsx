@@ -44,6 +44,14 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 
 const useLiveLogStreamMock = vi.fn();
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
@@ -861,7 +869,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 
-  it("keeps the state bar when logs are complete and the order waits with no note", () => {
+  it("omits the decision footer when logs are complete and the order waits with no note", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
@@ -889,11 +897,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByText("This task needs attention from test test.")).not.toBeInTheDocument();
-    const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("heading", { name: "This task needs a decision" })).toBeInTheDocument();
-    expect(within(note).getByText("Every automation finished. This task is ready to complete.")).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
   it("keeps the running log visible when the task has no note or checks", () => {

@@ -20,12 +20,10 @@ import {
   factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
-  factoriesListFactoryPullRequests,
 } from "@/api-client";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
-  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderSummary,
@@ -53,29 +51,14 @@ import {
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
   normalizeWorkOrdersPageQuery,
+  uniqueWorkOrdersById,
   WORK_ORDER_LIST_PAGE_SIZE,
   workOrdersPageFromResponse,
   type WorkOrdersPageCursor,
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
-export type FactoryPullRequestFilters = {
-  order?: number | string;
-  workOrderIds?: string[];
-};
-
-type NormalizedFactoryPullRequestFilters = {
-  order?: string;
-  workOrderIds: string[];
-};
-
-function normalizeFactoryPullRequestFilters(filters?: FactoryPullRequestFilters): NormalizedFactoryPullRequestFilters {
-  const workOrderIds = [...new Set(filters?.workOrderIds ?? [])].filter(Boolean).sort();
-  const order = filters?.order == null || String(filters.order) === "" ? undefined : String(filters.order);
-  return { order, workOrderIds };
-}
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -90,8 +73,10 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
-  pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
-    ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
+  planningSessions: (organizationId: string, factoryId: string) =>
+    ["planning-session-by-work-order", organizationId, factoryId] as const,
+  planningSession: (organizationId: string, factoryId: string, workOrderId: string) =>
+    [...factoryQueryKeys.planningSessions(organizationId, factoryId), workOrderId] as const,
   pullRequestMergeability: (organizationId: string, factoryId: string, pullRequestId: string) =>
     ["factories", organizationId, factoryId, "pull-requests", pullRequestId, "mergeability"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
@@ -256,11 +241,13 @@ export function useFactoryWorkOrdersPage(
     initialPageParam: undefined as WorkOrdersPageCursor | undefined,
     enabled: Boolean(organizationId && factoryId) && (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 
   return {
     orders: flattenWorkOrdersPages(query.data?.pages),
     isLoading: query.isLoading,
+    isPlaceholderData: query.isPlaceholderData,
     hasNextPage: Boolean(query.hasNextPage),
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
@@ -276,6 +263,7 @@ export type FactoryBoardColumnPage = {
 export type FactoryBoardWorkOrders = {
   workOrders: FactoriesWorkOrderSummary[];
   isLoading: boolean;
+  isPlaceholderData: boolean;
   backlog: FactoryBoardColumnPage;
   open: FactoryBoardColumnPage;
   done: FactoryBoardColumnPage;
@@ -289,6 +277,14 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
       void page.fetchNextPage();
     },
   };
+}
+
+export function mergeFactoryBoardWorkOrders(
+  backlog: FactoriesWorkOrderSummary[],
+  open: FactoriesWorkOrderSummary[],
+  done: FactoriesWorkOrderSummary[],
+): FactoriesWorkOrderSummary[] {
+  return uniqueWorkOrdersById([...backlog, ...open, ...done]);
 }
 
 export function useFactoryBoardWorkOrders(
@@ -307,8 +303,9 @@ export function useFactoryBoardWorkOrders(
   const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, options);
 
   return {
-    workOrders: [...backlog.orders, ...open.orders, ...closed.orders],
+    workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
     isLoading: backlog.isLoading || open.isLoading || closed.isLoading,
+    isPlaceholderData: backlog.isPlaceholderData || open.isPlaceholderData || closed.isPlaceholderData,
     backlog: boardColumnPage(backlog),
     open: boardColumnPage(open),
     done: boardColumnPage(closed),
@@ -322,32 +319,6 @@ function invalidateWorkOrderLists(
 ) {
   void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId) });
-}
-
-export function factoryPullRequestsKey(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
-  return factoryQueryKeys.pullRequests(organizationId, factoryId, normalizeFactoryPullRequestFilters(filters));
-}
-
-export function useFactoryPullRequests(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
-  const normalized = normalizeFactoryPullRequestFilters(filters);
-  return useQuery({
-    queryKey: factoryQueryKeys.pullRequests(organizationId, factoryId, normalized),
-    queryFn: async (): Promise<FactoriesFactoryPullRequest[]> => {
-      const response = await factoriesListFactoryPullRequests(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-          query: {
-            order: normalized.order,
-            workOrderIds: normalized.workOrderIds.length > 0 ? normalized.workOrderIds : undefined,
-          },
-        }),
-      );
-      return response.data?.pullRequests ?? [];
-    },
-    enabled: Boolean(organizationId && factoryId),
-    staleTime: 0,
-  });
 }
 
 export function useWorkOrder(organizationId: string, factoryId: string, orderId: string) {
@@ -507,8 +478,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       // The Backlog run for this order is created asynchronously after this
-      // RPC returns, so show "Analyzing" optimistically and start polling
-      // for the real run right away instead of waiting for a page reload.
+      // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
       markBacklogAnalysisPending(order.id);
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {

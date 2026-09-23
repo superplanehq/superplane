@@ -3,6 +3,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
   composeIntentDocument,
+  EMPTY_INTENT_DOCUMENT,
   INTENT_ARTIFACT_NAME,
   SPEC_ARTIFACT_NAME,
   type IntentDocument,
@@ -199,10 +200,14 @@ export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]):
 export function splitRunIntentDocument(args: {
   artifacts: FactoriesWorkOrderArtifact[];
   description: string;
+  skipDescriptionFallback?: boolean;
 }): IntentDocument {
   const intent = splitRunIntentMarkdown(args.artifacts);
   if (intent) {
     return parseIntentDocument(intent);
+  }
+  if (args.skipDescriptionFallback) {
+    return EMPTY_INTENT_DOCUMENT;
   }
   return composeIntentDocument(args.description, firstArtifactMarkdown(args.artifacts, PLAN_NAMES));
 }

@@ -10,7 +10,6 @@ import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, RotateCcw, XI
 export type DecisionFooterKind =
   | "draft"
   | "running"
-  | "waiting"
   | "statusNote"
   | "failed"
   | "completed"
@@ -37,16 +36,6 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     actions: [
       { id: "archive", label: "Archive", emphasis: "quiet" },
       { id: "start", label: "Start", emphasis: "primary" },
-    ],
-  },
-  waiting: {
-    title: "Add refund reconciliation test",
-    headline: "This task needs a decision",
-    text: "Every automation finished. This task is ready to complete.",
-    tone: "waiting",
-    actions: [
-      { id: "reject", label: "Reject", emphasis: "quiet" },
-      { id: "approve", label: "Approve", emphasis: "primary" },
     ],
   },
   statusNote: {
@@ -146,7 +135,7 @@ export function SplitRunDecisionFooterPreview({ kind }: { kind: DecisionFooterKi
         {kind === "running"
           ? "Implement is running. Stop lives on that automation. The header has no Reject or Approve."
           : kind === "statusNote"
-            ? "A Set Task Status Note supplies the headline, body, and Review PR link. Reject and Approve stay on this strip."
+            ? "A task status note supplies the headline, body, and Review PR link. Reject and Approve stay on this strip."
             : "Automations log. Close actions stay in the footer note, not in the header."}
       </div>
       {model ? <DecisionNote copy={model} /> : null}

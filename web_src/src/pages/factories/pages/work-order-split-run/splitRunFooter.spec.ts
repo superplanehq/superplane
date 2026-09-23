@@ -164,16 +164,11 @@ describe("buildSplitRunFooter", () => {
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
-  it("uses the default waiting note when a waiting order has no run note", () => {
+  it("omits the decision strip when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
       sentence: "This task needs attention.",
-      note: {
-        headline: "This task needs a decision",
-        text: "Every automation finished. This task is ready to complete.",
-      },
-      attentionCard: true,
-      actions: [REJECT, APPROVE],
+      actions: [],
     });
   });
 

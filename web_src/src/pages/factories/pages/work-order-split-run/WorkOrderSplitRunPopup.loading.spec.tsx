@@ -10,6 +10,7 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { APPROVAL_WORK_ORDER, DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -120,7 +121,8 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 
-  it("keeps a started task on the analysis popup while artifacts load", () => {
+  it("keeps a started task on the analysis popup while artifacts load", async () => {
+    const user = userEvent.setup();
     lookupState.artifactsLoading = true;
     const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
     expect(fixture.footer.kind).not.toBe("draft");
@@ -129,6 +131,12 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Task" }));
+
+    expect(screen.queryByRole("heading", { name: INTENT_DOCUMENT_TITLE })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the spec" })).toBeInTheDocument();
   });
 
   it("keeps a started task on the analysis popup when Planning is off", () => {

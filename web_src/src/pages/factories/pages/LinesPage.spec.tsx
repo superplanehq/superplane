@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
-  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
@@ -44,6 +43,7 @@ import {
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
   DEFAULT_FACTORY_PLANNING,
+  DRAFT_WORK_ORDER,
   factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
@@ -114,12 +114,12 @@ const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummar
 const useFactoryBoardWorkOrders = vi.fn(() => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
+  isPlaceholderData: false,
   backlog: idleBoardPage(),
   open: idleBoardPage(),
   done: idleBoardPage(),
 }));
 const useWorkOrder = vi.fn(() => ({ data: undefined as FactoriesWorkOrder | undefined }));
-const useFactoryPullRequests = vi.fn(() => ({ data: [] as FactoriesFactoryPullRequest[] }));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
@@ -189,7 +189,6 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrder: () => useWorkOrder(),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
-  useFactoryPullRequests: () => useFactoryPullRequests(),
   useCreateFactoryAutomation: () => ({ mutateAsync: createFactoryAutomationMutateAsync, isPending: false }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: deleteFactoryAutomationMutateAsync, isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -232,7 +231,7 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -288,12 +287,12 @@ async function resetLinesBoardMocks() {
   useFactoryBoardWorkOrders.mockImplementation(() => ({
     workOrders: useFactoryWorkOrders().data ?? [],
     isLoading: false,
+    isPlaceholderData: false,
     backlog: idleBoardPage(),
     open: idleBoardPage(),
     done: idleBoardPage(),
   }));
   useWorkOrder.mockReturnValue({ data: undefined });
-  useFactoryPullRequests.mockReturnValue({ data: [] });
   useFactoryAutomations.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
   createFactoryIntakeMutateAsync.mockReset();
@@ -329,6 +328,75 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
+  });
+
+  it("holds the empty board while the first task pages load", () => {
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [],
+      isLoading: true,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    renderLinesBoard();
+
+    expect(screen.getByRole("status", { name: "Loading the board" })).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-board")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing here.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the columns and shows task skeletons while filter pages are placeholders", () => {
+    const fetchNextOpen = vi.fn();
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [DRAFT_WORK_ORDER],
+      isLoading: false,
+      isPlaceholderData: true,
+      backlog: idleBoardPage(),
+      open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
+      done: idleBoardPage(),
+    });
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-phase-board")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading the board" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("status", { name: "Loading tasks" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Nothing here.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-wo-draft-refunds")).not.toBeInTheDocument();
+
+    fireEvent.scroll(screen.getByTestId("lines-phase-column-scroll-0"));
+    expect(fetchNextOpen).not.toHaveBeenCalled();
+  });
+
+  it("fades the board cards in after a filter placeholder stretch", () => {
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [DRAFT_WORK_ORDER],
+      isLoading: false,
+      isPlaceholderData: true,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    const view = renderLinesBoard();
+
+    expect(screen.getAllByRole("status", { name: "Loading tasks" }).length).toBeGreaterThan(0);
+
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [DRAFT_WORK_ORDER],
+      isLoading: false,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    expect(screen.queryByRole("status", { name: "Loading tasks" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-column-scroll")).toHaveAttribute("data-reveal");
+    expect(screen.getByTestId("work-order-card-wo-draft-refunds")).toBeInTheDocument();
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
@@ -388,6 +456,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
+    expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => {
@@ -396,6 +465,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+    expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
   });
 
   it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
@@ -403,7 +473,7 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [analyzingOrder] });
     const analyzingOrderId = analyzingOrder.id;
     // The board optimistically knows this draft is analyzing before its Backlog
-    // run appears in the polled list. The popup must match the board card.
+    // run appears through the live subscription. The popup must match the board card.
     markBacklogAnalysisPending(analyzingOrderId);
     try {
       const user = userEvent.setup();
@@ -1261,16 +1331,20 @@ describe("LinesPage board pull request", () => {
   });
 
   it("shows an attached pull request on the task card", () => {
-    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
-    useFactoryPullRequests.mockReturnValue({
+    useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          id: "pr-106",
-          workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-          number: "106",
-          url: "https://github.com/acme/payments/pull/106",
-          title: "Fix refund dispatcher timeout loop",
-          state: "STATE_CLOSED",
+          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          pullRequests: [
+            {
+              id: "pr-106",
+              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
+              number: "106",
+              url: "https://github.com/acme/payments/pull/106",
+              title: "Fix refund dispatcher timeout loop",
+              state: "STATE_CLOSED",
+            },
+          ],
         },
       ],
     });
@@ -1520,6 +1594,20 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByTestId("lines-done-menu-edit")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-create")).not.toBeInTheDocument();
+  });
+
+  it("shows one Backlog card when My is on and the same draft is in every column list", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrders.mockReturnValue({
+      data: [DRAFT_WORK_ORDER, DRAFT_WORK_ORDER, DRAFT_WORK_ORDER],
+    });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-scope-my"));
+
+    const cardId = `work-order-card-${DRAFT_WORK_ORDER.id}`;
+    expect(within(screen.getByTestId("lines-backlog-column")).getAllByTestId(cardId)).toHaveLength(1);
+    expect(screen.getAllByTestId(cardId)).toHaveLength(1);
   });
 
   it("hides the phase path and shows work-order filters", async () => {
@@ -1787,6 +1875,7 @@ describe("LinesPage Implement phase window", () => {
     useFactoryBoardWorkOrders.mockReturnValue({
       workOrders: orders,
       isLoading: false,
+      isPlaceholderData: false,
       backlog: idleBoardPage(),
       open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
       done: idleBoardPage(),

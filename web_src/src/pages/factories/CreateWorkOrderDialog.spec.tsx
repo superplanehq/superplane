@@ -222,6 +222,13 @@ describe("CreateWorkOrderDialog", () => {
     renderDialog();
 
     expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.dictate);
+    expect(screen.getByTestId("dictate-mic-icon")).toBeInTheDocument();
+    expect(screen.queryByTestId("dictate-stop-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dictate-button")).not.toHaveClass(
+      "text-destructive",
+      "bg-destructive/15",
+      "ring-destructive",
+    );
     expect(FakeSpeechRecognition.instances).toHaveLength(0);
 
     await user.click(screen.getByTestId("dictate-button"));
@@ -229,6 +236,32 @@ describe("CreateWorkOrderDialog", () => {
     expect(latestRecognition().start).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.stopDictation);
     expect(screen.getByTestId("dictate-button")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("dictate-stop-icon")).toBeInTheDocument();
+    expect(screen.queryByTestId("dictate-mic-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dictate-button")).toHaveClass(
+      "text-destructive",
+      "bg-destructive/15",
+      "ring-2",
+      "ring-destructive",
+      "animate-pulse",
+      "hover:bg-destructive/15",
+      "hover:text-destructive",
+      "dark:hover:bg-destructive/15",
+      "dark:hover:text-destructive",
+      "motion-reduce:animate-none",
+    );
+
+    await user.click(screen.getByTestId("dictate-button"));
+
+    expect(latestRecognition().abort).toHaveBeenCalled();
+    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.dictate);
+    expect(screen.getByTestId("dictate-mic-icon")).toBeInTheDocument();
+    expect(screen.queryByTestId("dictate-stop-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dictate-button")).not.toHaveClass(
+      "text-destructive",
+      "bg-destructive/15",
+      "ring-destructive",
+    );
   });
 
   it("shows the interim phrase without appending it", async () => {

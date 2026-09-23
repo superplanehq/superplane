@@ -85,20 +85,6 @@ function invalidateOrdersList(queryClient: WorkOrderQueryClient, organizationId:
   });
 }
 
-function invalidatePullRequests(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
-  void queryClient.invalidateQueries({
-    queryKey: ["factories", organizationId, factoryId, "pull-requests"],
-  });
-}
-
-function invalidateBacklogAnalysisRuns(queryClient: WorkOrderQueryClient, organizationId: string) {
-  // A draft created through the API has no optimistic "analyzing" flag.
-  // This refetch picks up the Backlog run once the factory creates it.
-  void queryClient.invalidateQueries({
-    queryKey: ["backlog-analysis-runs", organizationId],
-  });
-}
-
 function invalidateCachedCanvasRuns(
   queryClient: WorkOrderQueryClient,
   organizationId: string,
@@ -141,8 +127,6 @@ function invalidateTaskActivity(
   factoryId: string,
   orderIds: string[],
 ) {
-  invalidatePullRequests(queryClient, organizationId, factoryId);
-  invalidateBacklogAnalysisRuns(queryClient, organizationId);
   for (const orderId of orderIds) {
     invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
     void queryClient.invalidateQueries({
@@ -150,6 +134,9 @@ function invalidateTaskActivity(
     });
     void queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.planningSession(organizationId, factoryId, orderId),
     });
   }
 }
@@ -176,6 +163,9 @@ function invalidateFactoryWorkOrdersOnReconnect(
   factoryId: string,
 ) {
   invalidateOrdersList(queryClient, organizationId, factoryId);
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId),
+  });
   invalidateTaskActivity(
     queryClient,
     organizationId,
@@ -191,8 +181,6 @@ export function invalidateFactoryWorkOrderQueries(
   orderId?: string,
 ): void {
   invalidateOrdersList(queryClient, organizationId, factoryId);
-  invalidatePullRequests(queryClient, organizationId, factoryId);
-  invalidateBacklogAnalysisRuns(queryClient, organizationId);
   invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
 
   if (!orderId) {
@@ -208,6 +196,9 @@ export function invalidateFactoryWorkOrderQueries(
   });
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+  });
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.planningSession(organizationId, factoryId, orderId),
   });
 }
 

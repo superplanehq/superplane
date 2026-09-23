@@ -16,7 +16,7 @@ import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { LineBoardOrderCard } from "./LineBoardOrderCard";
+import { LineBoardColumnCardList, LineBoardOrderCard } from "./LineBoardOrderCard";
 import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
 import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
@@ -61,6 +61,7 @@ export type BacklogColumnProps = {
     isLoading: boolean;
     onLoadMore: () => void;
   };
+  cardsPending?: boolean;
 };
 
 export type BacklogIntakePanel = {
@@ -99,6 +100,7 @@ export function BacklogColumn({
   automationRowCount,
   onAutomationRowAction,
   paging,
+  cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
@@ -169,6 +171,7 @@ export function BacklogColumn({
           atCapacity={atCapacity}
           createPopover={createPopover}
           paging={paging}
+          cardsPending={cardsPending}
           scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "backlog") : undefined}
         />
       </WorkOrderBoardLane>
@@ -258,13 +261,17 @@ function BacklogColumnOrderList({
   atCapacity,
   createPopover,
   paging,
+  cardsPending,
   scrollPersistenceKey,
-}: Pick<BacklogColumnProps, "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging"> & {
+}: Pick<
+  BacklogColumnProps,
+  "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging" | "cardsPending"
+> & {
   atCapacity: boolean;
   createPopover: BacklogCreatePopoverProps;
   scrollPersistenceKey?: string;
 }) {
-  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging?.hasMore,
     isLoading: paging?.isLoading,
@@ -272,13 +279,14 @@ function BacklogColumnOrderList({
   });
 
   return (
-    <ul
+    <LineBoardColumnCardList
       ref={scrollRef}
+      pending={Boolean(cardsPending)}
       className={workOrderKanbanLaneScrollClassName}
-      data-testid="lines-backlog-column-scroll"
-      onScroll={(event) => {
-        handleScroll(event);
-        loadMoreIfNeeded(event.currentTarget);
+      testId="lines-backlog-column-scroll"
+      onScroll={(element) => {
+        handleScroll(element);
+        loadMoreIfNeeded(element);
       }}
     >
       {orders.map((order) => (
@@ -296,7 +304,7 @@ function BacklogColumnOrderList({
           <BacklogCreatePopover variant="ghost" {...createPopover} />
         </li>
       )}
-    </ul>
+    </LineBoardColumnCardList>
   );
 }
 

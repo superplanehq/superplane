@@ -310,19 +310,6 @@ service Factories {
     };
   }
 
-  rpc ListFactoryPullRequests(
-    ListFactoryPullRequestsRequest
-  ) returns (ListFactoryPullRequestsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/prs"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory pull requests";
-      description: "Returns pull requests tracked by a factory";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribeFactoryPullRequest(
     DescribeFactoryPullRequestRequest
   ) returns (DescribeFactoryPullRequestResponse) {
@@ -724,6 +711,17 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Disconnect MCP OAuth";
       description: "Revokes stored tokens when the vendor advertises a revoke endpoint.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryAgentResourceTools(ListFactoryAgentResourceToolsRequest) returns (ListFactoryAgentResourceToolsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List MCP tools";
+      description: "Calls tools/list on a connected MCP server. The result is read-only.";
       tags: "Factory";
     };
   }
@@ -1149,6 +1147,9 @@ message FactoryIntake {
     // Issue levels that still create a task. Empty means every level.
     // Sentry exception intakes only.
     repeated string sentry_levels = 14;
+    // When true, skip Productive.io key tasks (milestones). Productive task
+    // intakes only.
+    optional bool exclude_key_tasks = 15;
   }
 
   string id = 1;
@@ -1426,16 +1427,6 @@ message FactoryPullRequest {
   bool mergeable = 19;
 }
 
-message ListFactoryPullRequestsRequest {
-  string factory_id = 1;
-  optional int64 order = 2;
-  repeated string work_order_ids = 3;
-}
-
-message ListFactoryPullRequestsResponse {
-  repeated FactoryPullRequest pull_requests = 1;
-}
-
 message DescribeFactoryPullRequestRequest {
   string factory_id = 1;
   string pr_id = 2;
@@ -1667,6 +1658,8 @@ message WorkOrder {
   repeated WorkOrderCheck checks = 22;
   // Board fields for the analysis session. The opened card loads the full session.
   PlanningSessionSummary planning_session = 23;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 24;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1694,6 +1687,8 @@ message WorkOrderSummary {
   repeated WorkOrderCheckScore check_scores = 18;
   // Analysis session fields the board needs. The opened card loads the full session.
   PlanningSessionSummary planning_session = 19;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 20;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2531,6 +2526,20 @@ message DisconnectFactoryAgentResourceOAuthRequest {
 
 message DisconnectFactoryAgentResourceOAuthResponse {
   FactoryAgentResource resource = 1;
+}
+
+message FactoryAgentResourceTool {
+  string name = 1;
+  string description = 2;
+}
+
+message ListFactoryAgentResourceToolsRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message ListFactoryAgentResourceToolsResponse {
+  repeated FactoryAgentResourceTool tools = 1;
 }
 
 message UsageByModel {

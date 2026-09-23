@@ -456,8 +456,36 @@ function requestedAgentResourceKind(url: URL): FactoriesFactoryAgentResource["ki
   return url.searchParams.get("kind") === "KIND_SKILL" ? "KIND_SKILL" : "KIND_MCP_SERVER";
 }
 
+const DEFAULT_MCP_TOOLS = [
+  { name: "search", description: "Search the catalog." },
+  { name: "create_issue", description: "Create an issue." },
+];
+
+function toolsForAgentResource(
+  fixture: FactoriesFixture,
+  resourceId: string,
+): Array<{ name: string; description?: string }> {
+  return fixture.agentResourceToolsById?.[resourceId] ?? DEFAULT_MCP_TOOLS;
+}
+
+function factoryAgentResourceToolsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/tools"),
+    resolve: (match, method) => {
+      if (method !== "GET") return { json: {} };
+      const resources = ensureAgentResources(fixture, match[1]);
+      const resource = resources.find((entry) => entry.id === match[2]);
+      if (!resource || resource.kind === "KIND_SKILL") {
+        return { json: { tools: [] } };
+      }
+      return { json: { tools: toolsForAgentResource(fixture, match[2]) } };
+    },
+  };
+}
+
 function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
+    factoryAgentResourceToolsRoute(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:start"),
       resolve: (match, method) => {
@@ -634,33 +662,6 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
-function factoryPullRequestRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
-  return [
-    {
-      pattern: re("/api/v1/factories/([^/]+)/prs"),
-      resolve: (match, method, _body, url) => {
-        if (method !== "GET") return { json: {} };
-        const factoryId = match[1];
-        const orderNumber = (url.searchParams.get("order") ?? "").trim();
-        const workOrderIds = [
-          ...url.searchParams.getAll("workOrderIds"),
-          ...url.searchParams.getAll("work_order_ids"),
-        ].filter(Boolean);
-        const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
-        let pullRequests = orders.flatMap((order) => (order.id ? orderPullRequests(fixture, order.id) : []));
-        if (orderNumber) {
-          const order = orders.find((entry) => entry.number === orderNumber || entry.id === orderNumber);
-          pullRequests = order?.id ? orderPullRequests(fixture, order.id) : [];
-        } else if (workOrderIds.length > 0) {
-          const allowed = new Set(workOrderIds);
-          pullRequests = pullRequests.filter((pr) => pr.workOrderId && allowed.has(pr.workOrderId));
-        }
-        return { json: { pullRequests } };
-      },
-    },
-  ];
-}
-
 function orderPullRequests(fixture: FactoriesFixture, orderId: string): FactoriesFactoryPullRequest[] {
   return fixture.pullRequestsByOrderId?.[orderId] ?? DEFAULT_PULL_REQUESTS_BY_ORDER_ID[orderId] ?? [];
 }
@@ -719,14 +720,26 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
 }
 
 function orderWithChecks(fixture: FactoriesFixture, order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const withPullRequests = orderWithPullRequests(fixture, order);
   if (!order.id) {
-    return order;
+    return withPullRequests;
   }
   const checks = fixture.checksByOrderId?.[order.id] ?? DEFAULT_CHECKS_BY_ORDER_ID[order.id];
   if (!checks) {
+    return withPullRequests;
+  }
+  return { ...withPullRequests, checks };
+}
+
+function orderWithPullRequests(fixture: FactoriesFixture, order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (!order.id) {
     return order;
   }
-  return { ...order, checks };
+  const pullRequests = orderPullRequests(fixture, order.id);
+  if (pullRequests.length === 0) {
+    return order;
+  }
+  return { ...order, pullRequests };
 }
 
 function orderWithListChecks(fixture: FactoriesFixture, order: FactoriesWorkOrder) {
@@ -1262,7 +1275,6 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     factoryRepositoryRoute(fixture),
     ...organizationSecretsRoutes(),
     ...factoryLinesRoutes(fixture),
-    ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationWorkspaceUsageRoute(fixture),
     organizationSpendingReportRoute(fixture),

@@ -33,6 +33,32 @@ describe("patchCachedWorkOrderList", () => {
     expect(next?.[1]).toEqual({ id: "wo-2", title: "Other" });
   });
 
+  it("copies pull requests from the described task", () => {
+    const next = patchCachedWorkOrderList([{ id: "wo-1", title: "Old", pullRequests: [] }], "wo-1", {
+      id: "wo-1",
+      title: "New",
+      checks: [],
+      pullRequests: [
+        {
+          id: "pr-1",
+          workOrderId: "wo-1",
+          number: "12",
+          url: "https://github.com/acme/app/pull/12",
+          state: "STATE_OPEN",
+        },
+      ],
+    });
+    expect(next?.[0]?.pullRequests).toEqual([
+      {
+        id: "pr-1",
+        workOrderId: "wo-1",
+        number: "12",
+        url: "https://github.com/acme/app/pull/12",
+        state: "STATE_OPEN",
+      },
+    ]);
+  });
+
   it("prepends a missing row", () => {
     const next = patchCachedWorkOrderList([{ id: "wo-2", title: "Other" }], "wo-1", {
       id: "wo-1",

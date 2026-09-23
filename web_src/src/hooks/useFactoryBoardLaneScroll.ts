@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, type UIEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 const persistedScrollTops = new Map<string, number>();
 
@@ -12,16 +12,16 @@ export function resetFactoryBoardLaneScrollPositions() {
   persistedScrollTops.clear();
 }
 
-export function useFactoryBoardLaneScroll(scrollPersistenceKey: string | undefined) {
+export function useFactoryBoardLaneScroll(scrollPersistenceKey: string | undefined, ready = true) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const persistenceKeyRef = useRef(scrollPersistenceKey);
 
   const handleScroll = useCallback(
-    (event: UIEvent<HTMLUListElement>) => {
+    (element: HTMLElement) => {
       if (!scrollPersistenceKey) {
         return;
       }
-      persistedScrollTops.set(scrollPersistenceKey, event.currentTarget.scrollTop);
+      persistedScrollTops.set(scrollPersistenceKey, element.scrollTop);
     },
     [scrollPersistenceKey],
   );
@@ -36,7 +36,7 @@ export function useFactoryBoardLaneScroll(scrollPersistenceKey: string | undefin
 
     persistenceKeyRef.current = scrollPersistenceKey;
 
-    if (!element) {
+    if (!element || !ready) {
       return;
     }
 
@@ -46,19 +46,19 @@ export function useFactoryBoardLaneScroll(scrollPersistenceKey: string | undefin
     }
 
     element.scrollTop = persistedScrollTops.get(scrollPersistenceKey) ?? 0;
-  }, [scrollPersistenceKey]);
+  }, [ready, scrollPersistenceKey]);
 
   useEffect(() => {
     const element = scrollRef.current;
 
     return () => {
       const key = persistenceKeyRef.current;
-      if (!element || !key) {
+      if (!element || !key || !ready) {
         return;
       }
       persistedScrollTops.set(key, element.scrollTop);
     };
-  }, [scrollPersistenceKey]);
+  }, [ready, scrollPersistenceKey]);
 
   return { scrollRef, handleScroll };
 }

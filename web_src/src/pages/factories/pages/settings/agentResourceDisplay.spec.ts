@@ -11,6 +11,7 @@ import {
 } from "../../__fixtures__/agentResourceFixtures";
 import {
   connectionAuthLabel,
+  connectionIsEstablished,
   connectionNeedsOAuthAction,
   connectionStatusLabel,
   skillSourceLabel,
@@ -42,6 +43,15 @@ describe("connectionNeedsOAuthAction", () => {
     expect(connectionNeedsOAuthAction(OAUTH_CONNECTED_RESOURCE)).toBe(false);
     expect(connectionNeedsOAuthAction(OAUTH_NOT_CONNECTED_RESOURCE)).toBe(true);
     expect(connectionNeedsOAuthAction(OAUTH_VENDOR_REJECTED_RESOURCE)).toBe(true);
+  });
+});
+
+describe("connectionIsEstablished", () => {
+  it("is true for header auth and a completed sign-in", () => {
+    expect(connectionIsEstablished(HEADER_MCP_RESOURCE)).toBe(true);
+    expect(connectionIsEstablished(OAUTH_CONNECTED_RESOURCE)).toBe(true);
+    expect(connectionIsEstablished(OAUTH_NOT_CONNECTED_RESOURCE)).toBe(false);
+    expect(connectionIsEstablished(OAUTH_VENDOR_REJECTED_RESOURCE)).toBe(false);
   });
 });
 

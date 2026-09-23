@@ -214,6 +214,8 @@ function ColumnAutomationViewBody({
         initialDraft={agent.draft}
         onSave={agent.onSave}
         organizationId={agent.organizationId}
+        factoryId={agent.factoryId}
+        factoryKey={agent.factoryKey}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -236,6 +238,7 @@ function ColumnAutomationViewBody({
 
 export function ColumnAutomationViewHost({
   organizationId,
+  factoryId,
   factoryKey,
   lineId,
   canvasId,
@@ -247,6 +250,7 @@ export function ColumnAutomationViewHost({
   deletePending,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   lineId?: string;
   canvasId: string;
@@ -277,6 +281,8 @@ export function ColumnAutomationViewHost({
               draft: agent.draft ?? undefined,
               isLoading: agent.isLoading || !agent.draft,
               organizationId,
+              factoryId,
+              factoryKey,
               onSave: agent.save,
               showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }

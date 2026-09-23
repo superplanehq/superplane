@@ -13,7 +13,6 @@ import {
   useFactoryAutomations,
   useFactoryBoardWorkOrders,
   type FactoryWorkOrdersPageOptions,
-  useFactoryPullRequests,
   useUpdateFactoryLine,
   useWorkOrder,
   useWorkOrderArtifacts,
@@ -23,13 +22,14 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
-import { useMe } from "@/hooks/useMe";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
@@ -82,7 +82,7 @@ import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
+import { LineBoardColumnCardList, LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -115,6 +115,8 @@ import {
   UNASSIGNED_FILTER_VALUE,
   WORK_ORDER_SCOPES,
 } from "../lib/workOrderListModel";
+import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
@@ -161,6 +163,7 @@ import {
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
+import { WorkspaceLoadingScreen } from "../layout/WorkspaceLoadingScreen";
 import {
   factoryKanbanPageClassName,
   factorySectionHeaderClassName,
@@ -239,13 +242,15 @@ function applyVisibleWorkOrders(
       state.search,
     ).map((entry) => entry.id),
   );
-  return workOrders.filter((order) => {
-    const id = order.id;
-    if (!id) {
-      return false;
-    }
-    return visibleIds.has(id);
-  });
+  return uniqueWorkOrdersById(
+    workOrders.filter((order) => {
+      const id = order.id;
+      if (!id) {
+        return false;
+      }
+      return visibleIds.has(id);
+    }),
+  );
 }
 
 function prFeedbackSetupHref(
@@ -262,7 +267,7 @@ function prFeedbackSetupHref(
 
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
@@ -280,16 +285,16 @@ export function LinesPage() {
   const planningSettingsTab = planningSettingsTabFromSearch(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
-  const { data: me } = useMe(false);
   const listState = useWorkOrderListState(factoryId);
   const {
     workOrders,
     isLoading: workOrdersLoading,
+    isPlaceholderData,
     backlog: backlogPage,
     open: openPage,
     done: donePage,
-  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, me?.id));
-  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
+  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, currentUserId));
+  const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
   const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
@@ -332,8 +337,8 @@ export function LinesPage() {
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
   const visibleWorkOrders = useMemo(
-    () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
-    [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
+    () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId),
+    [currentUserId, factory, listState.filters, listState.scope, listState.search, workOrders],
   );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
@@ -400,7 +405,13 @@ export function LinesPage() {
   }, [nextStepDeferral.deferredStepId, nextStepDeferral.forget, takenPRFeedbackSources]);
 
   const canonicalNumber = canonicalWorkOrderNumber(permalink.order);
-  if (routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber)) {
+  const redirectCanonical = Boolean(
+    routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber),
+  );
+  const holdBoard = workOrdersLoading && !isPlaceholderData && !redirectCanonical && Boolean(selectedLine);
+  const overlayHoldsBoard = useWorkspaceLoading(WORKSPACE_LOADING_COPY.board, holdBoard);
+
+  if (redirectCanonical && canonicalNumber) {
     return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
   }
 
@@ -424,6 +435,10 @@ export function LinesPage() {
         replace
       />
     );
+  }
+
+  if (holdBoard) {
+    return overlayHoldsBoard ? null : <WorkspaceLoadingScreen message={WORKSPACE_LOADING_COPY.board} />;
   }
 
   const settingsIntake = intakeOpen ? configuredIntakes.find((intake) => intake.intakeId === intakeId) : undefined;
@@ -582,6 +597,7 @@ export function LinesPage() {
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
           organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
@@ -669,6 +685,7 @@ export function LinesPage() {
             line={selectedLine}
             apps={factoryApps}
             workOrders={visibleWorkOrders}
+            cardsPending={Boolean(isPlaceholderData)}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
@@ -693,17 +710,17 @@ export function LinesPage() {
             colorView={columnColorView}
             columnPaging={{
               backlog: {
-                hasMore: backlogPage.hasNextPage,
+                hasMore: !isPlaceholderData && backlogPage.hasNextPage,
                 isLoading: backlogPage.isFetchingNextPage,
                 onLoadMore: backlogPage.fetchNextPage,
               },
               open: {
-                hasMore: openPage.hasNextPage,
+                hasMore: !isPlaceholderData && openPage.hasNextPage,
                 isLoading: openPage.isFetchingNextPage,
                 onLoadMore: openPage.fetchNextPage,
               },
               done: {
-                hasMore: donePage.hasNextPage,
+                hasMore: !isPlaceholderData && donePage.hasNextPage,
                 isLoading: donePage.isFetchingNextPage,
                 onLoadMore: donePage.fetchNextPage,
               },
@@ -861,6 +878,7 @@ function LineDetail({
   line,
   apps,
   workOrders,
+  cardsPending,
   canCreateWorkOrder,
   canUpdate,
   onCreateWorkOrder,
@@ -891,6 +909,7 @@ function LineDetail({
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders: FactoriesWorkOrder[];
+  cardsPending: boolean;
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
@@ -1003,6 +1022,7 @@ function LineDetail({
           backlogOrders={backlogOrders}
           verifyOrders={verifyOrders}
           doneOrders={doneOrders}
+          cardsPending={cardsPending}
           columnPaging={columnPaging}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
@@ -1097,9 +1117,7 @@ function LineBoardSplitRunPopup({
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
-  const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
-    workOrderIds: [peekOrderId],
-  });
+  const peekPullRequests = describedOrder?.pullRequests ?? peekOrder.pullRequests ?? [];
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
   const popupOrder = describedOrder ?? peekOrder;
@@ -1250,6 +1268,7 @@ function PhaseBoard({
   backlogOrders,
   verifyOrders,
   doneOrders,
+  cardsPending,
   columnPaging,
   columns,
   canCreateWorkOrder,
@@ -1277,6 +1296,7 @@ function PhaseBoard({
   backlogOrders: FactoriesWorkOrder[];
   verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
+  cardsPending: boolean;
   columnPaging: BoardPaging;
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
@@ -1431,6 +1451,7 @@ function PhaseBoard({
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}
           paging={columnPaging.backlog}
+          cardsPending={cardsPending}
         />
       </div>
       {columns.map((column, index) => {
@@ -1462,6 +1483,7 @@ function PhaseBoard({
               automationRowCount={automationRowCount}
               onAutomationRowAction={onAutomationRowAction}
               paging={columnPaging.open}
+              cardsPending={cardsPending}
             />
           </div>
         );
@@ -1486,6 +1508,7 @@ function PhaseBoard({
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddVerifyAutomation}
           paging={columnPaging.open}
+          cardsPending={cardsPending}
         />
       </div>
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
@@ -1506,6 +1529,7 @@ function PhaseBoard({
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddDoneAutomation}
           paging={columnPaging.done}
+          cardsPending={cardsPending}
         />
       </div>
     </WorkOrderKanbanBoard>
@@ -1529,6 +1553,7 @@ function VerifyColumn({
   onAutomationRowAction,
   onAddAutomation,
   paging,
+  cardsPending,
   scrollPersistenceKey,
 }: {
   orders: FactoriesWorkOrder[];
@@ -1547,10 +1572,11 @@ function VerifyColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
+  cardsPending: boolean;
   scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1568,6 +1594,7 @@ function VerifyColumn({
       tone="neutral"
       surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Verify."
+      keepChildrenWhenEmpty={cardsPending}
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
@@ -1611,13 +1638,14 @@ function VerifyColumn({
       banner={<LaneListenerList listeners={listeners} testId="lines-verify-listeners" />}
       testId="lines-verify-column"
     >
-      <ul
+      <LineBoardColumnCardList
         ref={scrollRef}
+        pending={cardsPending}
         className={workOrderKanbanLaneScrollClassName}
-        data-testid="lines-verify-column-scroll"
-        onScroll={(event) => {
-          handleScroll(event);
-          loadMoreIfNeeded(event.currentTarget);
+        testId="lines-verify-column-scroll"
+        onScroll={(element) => {
+          handleScroll(element);
+          loadMoreIfNeeded(element);
         }}
       >
         {orders.map((order) => (
@@ -1629,7 +1657,7 @@ function VerifyColumn({
             />
           </li>
         ))}
-      </ul>
+      </LineBoardColumnCardList>
     </WorkOrderBoardLane>
   );
 }
@@ -1649,6 +1677,7 @@ function DoneColumn({
   onAutomationRowAction,
   onAddAutomation,
   paging,
+  cardsPending,
   scrollPersistenceKey,
 }: {
   orders: FactoriesWorkOrder[];
@@ -1665,10 +1694,11 @@ function DoneColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
+  cardsPending: boolean;
   scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey);
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1686,6 +1716,7 @@ function DoneColumn({
       tone="done"
       surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Done."
+      keepChildrenWhenEmpty={cardsPending}
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
@@ -1716,13 +1747,14 @@ function DoneColumn({
       })}
       testId="lines-done-column"
     >
-      <ul
+      <LineBoardColumnCardList
         ref={scrollRef}
+        pending={cardsPending}
         className={workOrderKanbanLaneScrollClassName}
-        data-testid="lines-done-column-scroll"
-        onScroll={(event) => {
-          handleScroll(event);
-          loadMoreIfNeeded(event.currentTarget);
+        testId="lines-done-column-scroll"
+        onScroll={(element) => {
+          handleScroll(element);
+          loadMoreIfNeeded(element);
         }}
       >
         {orders.map((order) => (
@@ -1734,7 +1766,7 @@ function DoneColumn({
             />
           </li>
         ))}
-      </ul>
+      </LineBoardColumnCardList>
     </WorkOrderBoardLane>
   );
 }
@@ -1769,6 +1801,7 @@ function PhaseColumn({
   automationRowCount,
   onAutomationRowAction,
   paging,
+  cardsPending,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -1788,9 +1821,11 @@ function PhaseColumn({
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   paging: BoardColumnPaging;
+  cardsPending: boolean;
 }) {
   const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(
     lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, `step-${column.stepIndex}`) : undefined,
+    !cardsPending,
   );
   const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
@@ -1818,6 +1853,7 @@ function PhaseColumn({
         surfaceClassName={lane.surfaceClassName}
         className={lane.className}
         emptyDescription="Nothing here."
+        keepChildrenWhenEmpty={cardsPending}
         canRename={canRename}
         onRename={onRename}
         titleTestId={`lines-column-title-phase-${column.stepIndex}`}
@@ -1850,21 +1886,22 @@ function PhaseColumn({
           </div>
         }
       >
-        <ul
+        <LineBoardColumnCardList
           ref={scrollRef}
+          pending={cardsPending}
           className={workOrderKanbanLaneScrollClassName}
-          onScroll={(event) => {
-            handleScroll(event);
-            loadMoreIfNeeded(event.currentTarget);
+          testId={`lines-phase-column-scroll-${column.stepIndex}`}
+          onScroll={(element) => {
+            handleScroll(element);
+            loadMoreIfNeeded(element);
           }}
-          data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
         >
           {visibleRuns.map((run) => (
             <li key={run.executionId}>
               <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
             </li>
           ))}
-        </ul>
+        </LineBoardColumnCardList>
       </WorkOrderBoardLane>
       <ParallelismSettingsDialog
         open={parallelismOpen}

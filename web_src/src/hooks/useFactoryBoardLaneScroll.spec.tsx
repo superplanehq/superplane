@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { resetFactoryBoardLaneScrollPositions, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 
-function Lane({ persistenceKey }: { persistenceKey: string }) {
-  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(persistenceKey);
+function Lane({ persistenceKey, ready = true }: { persistenceKey: string; ready?: boolean }) {
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(persistenceKey, ready);
   return (
-    <ul data-testid="lane" ref={scrollRef} onScroll={handleScroll}>
+    <ul data-testid="lane" ref={scrollRef} onScroll={(event) => handleScroll(event.currentTarget)}>
       <li>content</li>
     </ul>
   );
@@ -71,6 +71,20 @@ describe("useFactoryBoardLaneScroll", () => {
     expect(screen.getByTestId("lane").scrollTop).toBe(900);
 
     rerenderShared(<Lane persistenceKey="ws:line-a:step-0" />);
+    expect(screen.getByTestId("lane").scrollTop).toBe(1760);
+  });
+
+  it("restores after the lane becomes ready", () => {
+    const { unmount } = render(<Lane persistenceKey="ws:line-a:step-0" />);
+    const first = screen.getByTestId("lane");
+    first.scrollTop = 1760;
+    fireEvent.scroll(first);
+    unmount();
+
+    const { rerender } = render(<Lane persistenceKey="ws:line-a:step-0" ready={false} />);
+    expect(screen.getByTestId("lane").scrollTop).toBe(0);
+
+    rerender(<Lane persistenceKey="ws:line-a:step-0" ready />);
     expect(screen.getByTestId("lane").scrollTop).toBe(1760);
   });
 });

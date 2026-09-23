@@ -30,6 +30,7 @@ import {
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
+import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
   return {
@@ -215,7 +216,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("keeps a waiting state bar when a waiting order has no notes", () => {
+  it("omits the decision strip when a waiting order has no notes", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "Ship idempotent refund retries",
@@ -230,9 +231,39 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
-    expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.note).toBeUndefined();
+    expect(fixture.footer.attentionCard).toBeUndefined();
+    expect(fixture.footer.actions).toEqual([]);
+  });
+
+  it("derives pull request review from a tracked pull request when status notes are missing", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        pullRequests: [
+          {
+            id: "pr-6812",
+            workOrderId: "wo-1",
+            number: "6812",
+            url: "https://github.com/acme/payments/pull/6812",
+            state: "STATE_OPEN",
+          },
+        ],
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(isPullRequestReviewFooter(fixture.footer)).toBe(true);
+    expect(fixture.footer.note?.cta).toEqual({
+      label: "Review PR #6812",
+      href: "https://github.com/acme/payments/pull/6812",
+    });
   });
 
   it("does not treat a missing execution step index as the first step", () => {
@@ -631,8 +662,8 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.note).toBeUndefined();
+    expect(fixture.footer.actions).toEqual([]);
   });
 
   it("marks a failed implement step as failed", () => {
@@ -1187,7 +1218,7 @@ describe("line board work-order examples", () => {
   });
 
   // A freshly created draft is known to be analyzing before its run appears in
-  // the polled list. The optimistic flag keeps the popup in step with the board.
+  // the live run list. The optimistic flag keeps the popup in step with the board.
   it("shows the analyzing state from the pending flag before a run appears", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
@@ -1971,7 +2002,6 @@ describe("line board work-order examples", () => {
       ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
       ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
       ["19:52:39", "Add Pull Request", "Attach PR to Task", "passed"],
-      ["19:52:39", "setWorkOrderStatusNote", "Set Closure Note", "passed"],
     ]);
     expect(prStream.find((line) => line.componentName === "Attach PR to Task")?.pullRequest).toMatchObject({
       number: "6837",

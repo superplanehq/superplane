@@ -8,10 +8,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
 const mergeMutate = vi.fn();
+const experimentalFeatureHas = { current: (_id: string) => true };
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
   useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (id: string) => experimentalFeatureHas.current(id),
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
 }));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
@@ -45,6 +54,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   mergeMutate.mockReset();
+  experimentalFeatureHas.current = () => true;
   mergeability.current = {
     canMerge: true,
     allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_MERGE"],
@@ -244,5 +254,23 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+  });
+
+  it("hides merge when the pull request merge flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-merge-method")).not.toBeInTheDocument();
+  });
+
+  it("shows merged confirmation even when the flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderNote({
+      pullRequests: [{ ...GITHUB_PR, state: "STATE_MERGED" }],
+    });
+
+    expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
   });
 });

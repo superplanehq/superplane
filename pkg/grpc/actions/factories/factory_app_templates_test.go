@@ -59,6 +59,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "For a visual-only change")
 	assert.NotContains(t, result.canvasYAML, "report_visual_evidence_unavailable")
 	assert.NotContains(t, result.canvasYAML, "Visual evidence is unavailable:")
+	assert.NotContains(t, result.canvasYAML, "setWorkOrderStatusNote")
+	assert.NotContains(t, result.canvasYAML, "set-pr-closure-note")
 	assert.NotContains(t, result.canvasYAML, "x-access-token")
 	assert.NotContains(t, result.canvasYAML, `git rev-parse '@{upstream}'`)
 	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")

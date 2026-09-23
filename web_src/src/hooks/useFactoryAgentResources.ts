@@ -5,6 +5,7 @@ import {
   factoriesDeleteFactoryAgentResource,
   factoriesDisconnectFactoryAgentResourceOAuth,
   factoriesListFactoryAgentResources,
+  factoriesListFactoryAgentResourceTools,
   factoriesStartFactoryAgentResourceOAuth,
   factoriesUpdateFactoryAgentResource,
   type FactoriesCreateFactoryAgentResourceBody,
@@ -146,5 +147,27 @@ export function useDisconnectFactoryAgentResourceOAuth(organizationId: string, f
       return response.data.resource;
     },
     onSuccess: () => invalidateAgentResources(queryClient, organizationId, factoryId),
+  });
+}
+
+export function useFactoryAgentResourceTools(
+  organizationId: string,
+  factoryId: string,
+  resourceId: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: [...factoryAgentResourcesKey(organizationId, factoryId), "tools", resourceId],
+    queryFn: async () => {
+      const response = await factoriesListFactoryAgentResourceTools(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, resourceId },
+        }),
+      );
+      return response.data?.tools ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId && resourceId) && enabled,
+    retry: false,
   });
 }
