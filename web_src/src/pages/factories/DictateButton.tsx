@@ -1,4 +1,4 @@
-import { Mic } from "lucide-react";
+import { Mic, Square } from "lucide-react";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,8 @@ export function DictateButton({ dictation, copy, disabled = false }: DictateButt
         size="icon"
         className={cn(
           "size-8 rounded-full text-muted-foreground",
-          dictation.isListening && "animate-pulse ring-2 ring-ring/40 motion-reduce:animate-none",
+          dictation.isListening &&
+            "text-destructive bg-destructive/15 ring-2 ring-destructive animate-pulse hover:bg-destructive/15 hover:text-destructive dark:hover:bg-destructive/15 dark:hover:text-destructive motion-reduce:animate-none",
         )}
         disabled={disabled}
         aria-label={dictation.isListening ? copy.stopDictation : copy.dictate}
@@ -56,7 +57,11 @@ export function DictateButton({ dictation, copy, disabled = false }: DictateButt
           dictation.start();
         }}
       >
-        <Mic className="size-4" aria-hidden />
+        {dictation.isListening ? (
+          <Square className="size-3 fill-current" aria-hidden data-testid="dictate-stop-icon" />
+        ) : (
+          <Mic className="size-4" aria-hidden data-testid="dictate-mic-icon" />
+        )}
       </Button>
     </div>
   );
