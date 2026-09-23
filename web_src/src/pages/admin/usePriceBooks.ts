@@ -188,7 +188,7 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
     activating,
     deleting,
     handleAddVM: (rate: PriceBookVMRate) => appendUniqueVM(catalog.vms, vmKeys, rate, catalog.setVMs),
-    handleSave: () => void saveCurrentRates(catalog, setSaving),
+    handleSave: () => saveCurrentRates(catalog, setSaving),
     handleSync: (provider: string) => void syncCurrentRates(catalog, provider, setSyncing),
     handleActivate: (targetVersion: string, onDone: () => void) =>
       void activateCurrentVersion(targetVersion, catalog, setActivating, onDone),
@@ -227,14 +227,16 @@ function appendUniqueVM(
   return true;
 }
 
-async function saveCurrentRates(catalog: PriceBookEditCatalog, setSaving: (value: boolean) => void) {
+async function saveCurrentRates(catalog: PriceBookEditCatalog, setSaving: (value: boolean) => void): Promise<boolean> {
   setSaving(true);
   catalog.supersedeLoads();
   try {
     catalog.applyCatalog(await savePriceBooks(catalog.data?.version ?? "", catalog.models, catalog.vms));
     showSuccessToast("Saved a new current price book.");
+    return true;
   } catch (error) {
     showErrorToast(error instanceof Error ? error.message : "Failed to save price books");
+    return false;
   } finally {
     setSaving(false);
   }
