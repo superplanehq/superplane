@@ -41,36 +41,39 @@ export const queryRangeMapper: ComponentBaseMapper = {
       return details;
     }
 
-    const queryResult = outputs.default[0].data as PrometheusQueryPayload;
-
-    const configuration = context.node?.configuration as QueryRangeConfiguration | undefined;
-    if (configuration?.query) {
-      details["Query"] = configuration.query;
-    }
-
-    if (configuration?.start) {
-      details["Start"] = configuration.start;
-    }
-
-    if (configuration?.end) {
-      details["End"] = configuration.end;
-    }
-
-    if (configuration?.step) {
-      details["Step"] = configuration.step;
-    }
-
-    if (queryResult?.resultType) {
-      details["Result Type"] = queryResult.resultType;
-    }
-
-    if (queryResult?.result !== undefined) {
-      details["Results"] = String(Array.isArray(queryResult.result) ? queryResult.result.length : 0);
-    }
+    addQueryRangeOutputDetails(
+      details,
+      outputs.default[0].data as PrometheusQueryPayload,
+      context.node?.configuration as QueryRangeConfiguration | undefined,
+    );
 
     return details;
   },
 };
+
+function addQueryRangeOutputDetails(
+  details: Record<string, string>,
+  queryResult: PrometheusQueryPayload,
+  configuration: QueryRangeConfiguration | undefined,
+) {
+  const fields: Array<[string, string | undefined]> = [
+    ["Query", configuration?.query],
+    ["Start", configuration?.start],
+    ["End", configuration?.end],
+    ["Step", configuration?.step],
+    ["Result Type", queryResult?.resultType],
+  ];
+
+  for (const [label, value] of fields) {
+    if (value) {
+      details[label] = value;
+    }
+  }
+
+  if (queryResult?.result !== undefined) {
+    details["Results"] = String(Array.isArray(queryResult.result) ? queryResult.result.length : 0);
+  }
+}
 
 function buildQueryRangeProps(
   nodes: NodeInfo[],
