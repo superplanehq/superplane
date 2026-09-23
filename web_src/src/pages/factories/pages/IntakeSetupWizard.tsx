@@ -5,7 +5,9 @@ import type { ReactNode } from "react";
 import { FirstRunHeading, FirstRunShell } from "./onboarding/first-run/FirstRunShell";
 import type { FirstRunSphereProps } from "./onboarding/first-run/FirstRunSpherePane";
 
-export type IntakeSetupStep = "connection" | "project";
+export type IntakeSetupStep = "connection" | "project" | "completion";
+
+export type IntakeSetupStepItem = { id: IntakeSetupStep; label: string };
 
 export function IntakeSetupWizard({
   testId,
@@ -17,6 +19,8 @@ export function IntakeSetupWizard({
   children,
   footer,
   stepAction,
+  steps,
+  plain = false,
 }: {
   testId: string;
   integrationName: string;
@@ -28,13 +32,23 @@ export function IntakeSetupWizard({
   footer: ReactNode;
   /** Rendered on the right of the current step label, e.g. Connect. */
   stepAction?: ReactNode;
+  /** Overrides the default Connect and Choose project rows. */
+  steps?: IntakeSetupStepItem[];
+  /** Renders the step body outside the stepper card. */
+  plain?: boolean;
 }) {
+  const resolvedSteps = steps ?? defaultIntakeSteps(integrationName);
+  const stepIndex = Math.max(
+    0,
+    resolvedSteps.findIndex((item) => item.id === step),
+  );
+
   return (
     <FirstRunShell
       testId={testId}
       chrome={{
-        stepIndex: step === "connection" ? 0 : 1,
-        stepCount: 2,
+        stepIndex,
+        stepCount: resolvedSteps.length,
         onBack,
       }}
       sphere={intakeSphere(integrationName, step, `${testId}-sphere`)}
@@ -42,38 +56,40 @@ export function IntakeSetupWizard({
       <FirstRunHeading headline={title}>
         <p className="text-[15px] leading-6 text-muted-foreground">{helper}</p>
       </FirstRunHeading>
-      <div className="mt-8 space-y-4">
-        <IntakeSetupStepper
-          testId={`${testId}-stepper`}
-          integrationName={integrationName}
-          current={step}
-          stepAction={stepAction}
-        >
-          {children}
-        </IntakeSetupStepper>
+      <div className={cn("mt-8", plain ? "flex flex-col gap-6" : "space-y-4")}>
+        {plain ? (
+          children
+        ) : (
+          <IntakeSetupStepper testId={`${testId}-stepper`} steps={resolvedSteps} current={step} stepAction={stepAction}>
+            {children}
+          </IntakeSetupStepper>
+        )}
         {footer}
       </div>
     </FirstRunShell>
   );
 }
 
+function defaultIntakeSteps(integrationName: string): IntakeSetupStepItem[] {
+  return [
+    { id: "connection", label: `Connect ${integrationName}` },
+    { id: "project", label: "Choose project" },
+  ];
+}
+
 function IntakeSetupStepper({
   testId,
-  integrationName,
+  steps,
   current,
   children,
   stepAction,
 }: {
   testId: string;
-  integrationName: string;
+  steps: IntakeSetupStepItem[];
   current: IntakeSetupStep;
   children: ReactNode;
   stepAction?: ReactNode;
 }) {
-  const steps: Array<{ id: IntakeSetupStep; label: string }> = [
-    { id: "connection", label: `Connect ${integrationName}` },
-    { id: "project", label: "Choose project" },
-  ];
   const currentIndex = steps.findIndex((step) => step.id === current);
 
   return (
@@ -117,14 +133,23 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
 }
 
 function intakeSphere(integrationName: string, step: IntakeSetupStep, testId: string): FirstRunSphereProps {
-  const connectionStep = step === "connection";
+  if (step === "connection") {
+    return sphereProps(testId, 0.24, `Awaiting ${integrationName} connection`, "Awaiting backlog");
+  }
+  if (step === "completion") {
+    return sphereProps(testId, 0.82, "Awaiting column", `${integrationName} issues`);
+  }
+  return sphereProps(testId, 0.58, "Awaiting project", `${integrationName} issues`);
+}
+
+function sphereProps(testId: string, level: number, caption: string, chipValue: string): FirstRunSphereProps {
   return {
     testId,
-    level: connectionStep ? 0.24 : 0.58,
-    caption: connectionStep ? `Awaiting ${integrationName} connection` : "Awaiting project",
+    level,
+    caption,
     leftChip: {
       label: "Discover",
-      value: connectionStep ? "Awaiting backlog" : `${integrationName} issues`,
+      value: chipValue,
       tone: "ghost",
     },
   };

@@ -16,7 +16,7 @@ import type { JiraCompletionColumnValue } from "./jiraCompletionColumn";
 import { DEFAULT_JIRA_COMPLETION_SETTINGS, jiraCompletionSettingsToApi } from "./intakeSourceSettingsModel";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
-export type JiraSetupStep = "connection" | "project";
+export type JiraSetupStep = "connection" | "project" | "completion";
 
 export function useJiraIntakeSetup(organizationId: string, factoryId: string, selectIntegrationId = "") {
   const [step, setStep] = useState<JiraSetupStep>("connection");
