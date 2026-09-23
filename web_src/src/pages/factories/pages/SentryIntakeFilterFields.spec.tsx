@@ -40,8 +40,8 @@ describe("SentryIntakeFilterFields", () => {
   it("hides Sentry event fields and level checkboxes for a GitHub intake", () => {
     render(<FilterHarness sourceId="github-issues" initial={DEFAULT_GITHUB_INTAKE_SETTINGS} />);
 
-    expect(screen.queryByRole("checkbox", { name: "An issue becomes unresolved" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "An issue is assigned" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "An issue becomes unresolved" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "An issue is assigned" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Fatal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Error" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeInTheDocument();
@@ -50,10 +50,15 @@ describe("SentryIntakeFilterFields", () => {
   it("shows Sentry event fields with no level checkboxes for a Sentry intake", () => {
     render(<FilterHarness sourceId="sentry-exceptions" initial={DEFAULT_SENTRY_INTAKE_SETTINGS} />);
 
-    expect(screen.getByRole("group", { name: "Create task when:" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "An issue becomes unresolved" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "An issue is assigned" })).not.toBeChecked();
+    expect(screen.getByRole("heading", { name: "Events that create tasks" })).toBeInTheDocument();
+    expect(screen.getByText("The events you select here create tasks in the factory.")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Events that create tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "A new issue is created" })).toBeChecked();
+    expect(screen.getByText("Sentry adds an issue.")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "An issue becomes unresolved" })).toBeChecked();
+    expect(screen.getByText("Sentry marks a resolved issue as unresolved.")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "An issue is assigned" })).not.toBeChecked();
+    expect(screen.getByText("A person assigns the issue.")).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Fatal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Error" })).not.toBeInTheDocument();
@@ -68,7 +73,7 @@ describe("SentryIntakeFilterFields", () => {
     const user = userEvent.setup();
     render(<FilterHarness sourceId="sentry-exceptions" initial={DEFAULT_SENTRY_INTAKE_SETTINGS} onSave={onSave} />);
 
-    await user.click(screen.getByRole("checkbox", { name: "An issue is assigned" }));
+    await user.click(screen.getByRole("switch", { name: "An issue is assigned" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave).toHaveBeenCalledWith(
