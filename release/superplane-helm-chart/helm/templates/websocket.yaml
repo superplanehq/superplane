@@ -47,6 +47,9 @@ spec:
         service: {{ .Release.Name }}-websocket
     spec:
       terminationGracePeriodSeconds: 75
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -76,6 +79,14 @@ spec:
                 name: {{ include "secrets.sentry.name" . }}
             - secretRef:
                 name: {{ include "secrets.dash0Web.name" . }}
+            {{- if or .Values.posthog.enabled (ne .Values.posthog.secretName "") }}
+            - secretRef:
+                name: {{ include "secrets.posthog.name" . }}
+            {{- end }}
+            {{- if or .Values.polar.enabled (ne .Values.polar.secretName "") }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
           env:
             - name: START_PUBLIC_API
               value: "yes"
