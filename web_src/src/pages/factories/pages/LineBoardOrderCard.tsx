@@ -2,7 +2,7 @@ import type { FactoriesWorkOrderCheckScore, FactoriesWorkOrderSummary } from "@/
 import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
-import { useMemo, type ComponentProps, type ReactNode } from "react";
+import { useMemo, type ComponentProps, type ReactNode, type Ref } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
@@ -37,17 +37,20 @@ export function LineBoardColumnCardList({
   testId,
   onScroll,
   children,
+  ref,
 }: {
   pending: boolean;
   className: string;
   testId?: string;
   onScroll?: (element: HTMLElement) => void;
   children: ReactNode;
+  ref?: Ref<HTMLUListElement>;
 }) {
   const reveal = useRevealAfterPending(pending);
 
   return (
     <ul
+      ref={ref}
       className={cn(className, reveal && LOADING_REVEAL_CLASSNAME)}
       data-testid={testId}
       data-reveal={reveal ? "" : undefined}

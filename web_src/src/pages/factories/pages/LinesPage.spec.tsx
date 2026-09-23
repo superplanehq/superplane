@@ -10,6 +10,7 @@ import type {
   FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_JIRA_INTAKE,
@@ -279,6 +280,7 @@ vi.mock("@/lib/toast", () => ({
 
 async function resetLinesBoardMocks() {
   window.localStorage.clear();
+  resetFactoryBoardLaneScrollPositions();
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
@@ -1889,5 +1891,120 @@ describe("LinesPage Implement phase window", () => {
     await waitFor(() => {
       expect(fetchNextOpen).toHaveBeenCalled();
     });
+  });
+
+  it("keeps Implement column scroll after a card opens and closes", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const orders = Array.from({ length: 8 }, (_, index) =>
+      dispatchDraftToImplement(kickoffDraft(index), new Date(Date.now() + index * 1000).toISOString()),
+    );
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    useWorkOrder.mockReturnValue({ data: orders[0] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    const scroller = screen.getByTestId("lines-phase-column-scroll-0");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(1760);
+    expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "Open Kickoff task 0" }));
+
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
+    expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
+
+    await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
+    expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
+  });
+
+  it("keeps Implement column scroll after a filter placeholder stretch", () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const orders = Array.from({ length: 8 }, (_, index) =>
+      dispatchDraftToImplement(kickoffDraft(index), new Date(Date.now() + index * 1000).toISOString()),
+    );
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    const view = renderLinesBoard();
+
+    const scroller = screen.getByTestId("lines-phase-column-scroll-0");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(1760);
+
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      isPlaceholderData: true,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    const pending = screen.getByTestId("lines-phase-column-scroll-0");
+    pending.scrollTop = 40;
+    fireEvent.scroll(pending);
+
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
+  });
+
+  it("does not keep backlog scroll when the line changes", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const orders = Array.from({ length: 8 }, (_, index) => kickoffDraft(index));
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    const user = userEvent.setup();
+    render(
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`}
+      />,
+    );
+
+    const scroller = screen.getByTestId("lines-backlog-column-scroll");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(1760);
+
+    await user.click(screen.getByTestId("lines-test-navigate"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`,
+    );
+    expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
+
+    await user.click(screen.getByTestId("lines-test-back"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+    );
+    expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(1760);
   });
 });

@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
+import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
@@ -27,6 +28,7 @@ export type BacklogColumnProps = {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  lineId?: string;
   orders: FactoriesWorkOrder[];
   title: string;
   size: number | null;
@@ -74,6 +76,7 @@ export function BacklogColumn({
   organizationId,
   factoryId,
   factoryKey,
+  lineId,
   orders,
   title,
   size,
@@ -169,6 +172,7 @@ export function BacklogColumn({
           createPopover={createPopover}
           paging={paging}
           cardsPending={cardsPending}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "backlog") : undefined}
         />
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
@@ -258,13 +262,16 @@ function BacklogColumnOrderList({
   createPopover,
   paging,
   cardsPending,
+  scrollPersistenceKey,
 }: Pick<
   BacklogColumnProps,
   "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging" | "cardsPending"
 > & {
   atCapacity: boolean;
   createPopover: BacklogCreatePopoverProps;
+  scrollPersistenceKey?: string;
 }) {
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging?.hasMore,
     isLoading: paging?.isLoading,
@@ -273,10 +280,14 @@ function BacklogColumnOrderList({
 
   return (
     <LineBoardColumnCardList
+      ref={scrollRef}
       pending={Boolean(cardsPending)}
       className={workOrderKanbanLaneScrollClassName}
       testId="lines-backlog-column-scroll"
-      onScroll={loadMoreIfNeeded}
+      onScroll={(element) => {
+        handleScroll(element);
+        loadMoreIfNeeded(element);
+      }}
     >
       {orders.map((order) => (
         <li key={order.id}>
