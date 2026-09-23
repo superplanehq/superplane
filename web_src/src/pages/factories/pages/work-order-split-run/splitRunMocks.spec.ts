@@ -302,7 +302,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.sentence).toBe("This task needs attention.");
+    expect(fixture.footer.sentence).toBe("This task is waiting.");
   });
 
   it("puts risk score and code quality on the verify step", () => {

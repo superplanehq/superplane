@@ -159,7 +159,7 @@ describe("buildSplitRunFooter", () => {
       sourceName: "PR Closure",
       cta: PR_NOTE.cta,
     });
-    expect(footer.sentence).toBe("This task needs attention.");
+    expect(footer.sentence).toBe("This task is waiting.");
     expect(footer.actions).toEqual([REJECT, APPROVE]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
@@ -167,7 +167,7 @@ describe("buildSplitRunFooter", () => {
   it("omits the decision strip when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
-      sentence: "This task needs attention.",
+      sentence: "This task is waiting.",
       actions: [],
     });
   });
@@ -175,7 +175,7 @@ describe("buildSplitRunFooter", () => {
   it("hides the decision strip while a waiting order is still running a follow-up", () => {
     expect(buildSplitRunFooter({ kind: "waiting", decision: false })).toEqual({
       kind: "waiting",
-      sentence: "This task needs attention.",
+      sentence: "This task is waiting.",
       actions: [],
     });
   });
@@ -188,6 +188,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.text).toBe("This automation did not finish. This task still needs a decision.");
     expect(footer.note?.cta).toBeUndefined();
     expect(footer.note?.actor).toBeUndefined();
+    expect(footer.sentence).toBe("This task stopped.");
     expect(footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(footer.actions.map((action) => action.kind)).toEqual(["reject", "rerun"]);
     expect(splitRunCloseNeedsConfirm("stopped")).toBe(false);
@@ -207,7 +208,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Debug");
-    expect(footer.sentence).toBe("This task needs attention.");
+    expect(footer.sentence).toBe("This task failed.");
     expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });

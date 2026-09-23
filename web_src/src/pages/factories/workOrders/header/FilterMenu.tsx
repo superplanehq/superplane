@@ -13,7 +13,12 @@ import {
 } from "@/ui/dropdownMenu";
 import { Check, Funnel } from "lucide-react";
 import type { WorkOrderFilterDimension, WorkOrderListState } from "../../lib/useWorkOrderListState";
-import { buildStatusFilterOptions, type WorkOrderFilterOption } from "../../lib/workOrderFilterOptions";
+import {
+  buildLabelFilterOptions,
+  buildStatusFilterOptions,
+  type WorkOrderFilterOption,
+} from "../../lib/workOrderFilterOptions";
+import { countWorkOrderFilters, visibleWorkOrderFilters } from "../../lib/workOrderListModel";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
@@ -22,11 +27,20 @@ interface FilterMenuProps {
   lineOptions?: WorkOrderFilterOption[];
   sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
+  /** When false, hide Mergeable so the menu matches the card pill. */
+  showPullRequestMerge?: boolean;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
-export function FilterMenu({ state, lineOptions, sourceOptions, assigneeOptions }: FilterMenuProps) {
-  const filterCount = lineOptions ? state.filterCount : state.filterCount - state.filters.lineIds.length;
+export function FilterMenu({
+  state,
+  lineOptions,
+  sourceOptions,
+  assigneeOptions,
+  showPullRequestMerge = false,
+}: FilterMenuProps) {
+  const visibleFilters = visibleWorkOrderFilters(state.filters, showPullRequestMerge);
+  const filterCount = countWorkOrderFilters(visibleFilters) - (lineOptions ? 0 : visibleFilters.lineIds.length);
   return (
     <DropdownMenu open={state.filterMenuOpen} onOpenChange={state.setFilterMenuOpen}>
       <DropdownMenuTrigger asChild>
@@ -55,6 +69,14 @@ export function FilterMenu({ state, lineOptions, sourceOptions, assigneeOptions 
           dimension="statuses"
           state={state}
           options={buildStatusFilterOptions()}
+        />
+
+        <FilterSubMenu
+          label="Label"
+          resetLabel="Any label"
+          dimension="labels"
+          state={state}
+          options={buildLabelFilterOptions(showPullRequestMerge)}
         />
 
         {lineOptions ? (

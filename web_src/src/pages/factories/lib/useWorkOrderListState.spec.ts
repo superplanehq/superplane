@@ -141,10 +141,53 @@ describe("useWorkOrderListState", () => {
     const { result } = renderHook(() => useWorkOrderListState("factory-1"));
     expect(result.current.filters).toEqual({
       statuses: ["running"],
+      labels: [],
       lineIds: ["line-a"],
       sourceIds: [],
       assigneeIds: [],
     });
+  });
+
+  it("loads filters stored before labels existed", () => {
+    window.localStorage.setItem(
+      "sp:work-orders:filters:factory-1",
+      JSON.stringify({ statuses: ["waiting"], lineIds: [], sourceIds: [], assigneeIds: [] }),
+    );
+    const { result } = renderHook(() => useWorkOrderListState("factory-1"));
+    expect(result.current.filters).toEqual({
+      statuses: ["waiting"],
+      labels: [],
+      lineIds: [],
+      sourceIds: [],
+      assigneeIds: [],
+    });
+  });
+
+  it("persists label filters across mounts", () => {
+    const first = renderHook(() => useWorkOrderListState("factory-1"));
+    act(() => {
+      first.result.current.toggleFilter("labels", "review");
+      first.result.current.toggleFilter("labels", "mergeable");
+    });
+    first.unmount();
+
+    const second = renderHook(() => useWorkOrderListState("factory-1"));
+    expect(second.result.current.filters.labels).toEqual(["review", "mergeable"]);
+  });
+
+  it("drops unknown label values from storage", () => {
+    window.localStorage.setItem(
+      "sp:work-orders:filters:factory-1",
+      JSON.stringify({
+        statuses: [],
+        labels: ["review", "needs-attention"],
+        lineIds: [],
+        sourceIds: [],
+        assigneeIds: [],
+      }),
+    );
+    const { result } = renderHook(() => useWorkOrderListState("factory-1"));
+    expect(result.current.filters.labels).toEqual(["review"]);
   });
 
   it("toggleFilter adds and removes values within one dimension", () => {

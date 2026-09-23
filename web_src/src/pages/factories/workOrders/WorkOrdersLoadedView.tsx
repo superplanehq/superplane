@@ -5,6 +5,8 @@ import type {
   FactoriesWorkOrder,
 } from "@/api-client";
 import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
 import {
@@ -68,12 +70,16 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   } = usePRFeedbackWorkOrderAttention(pullRequests);
   const { data: factoryIntakes } = useFactoryIntakes(organizationId, factory.id ?? "");
   const intakes = factoryIntakes ?? [];
+  const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
     [entries, state.scope, currentUserId],
   );
-  const filtered = useMemo(() => applyWorkOrderFilters(scoped, state.filters), [scoped, state.filters]);
+  const filtered = useMemo(
+    () => applyWorkOrderFilters(scoped, state.filters, { showPullRequestMerge }),
+    [scoped, state.filters, showPullRequestMerge],
+  );
   const searched = useMemo(() => applyWorkOrderSearch(filtered, state.search), [filtered, state.search]);
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
@@ -149,6 +155,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           permissionsLoading={props.permissionsLoading}
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
+          showPullRequestMerge={showPullRequestMerge}
         />
       </div>
 
