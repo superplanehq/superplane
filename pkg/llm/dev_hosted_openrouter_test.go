@@ -119,31 +119,6 @@ func TestSeedDevHostedOpenRouter(t *testing.T) {
 		assert.Equal(t, "claude-sonnet-4-6", defaultModel.Model)
 	})
 
-	t.Run("keeps an OpenRouter default that remains allowed", func(t *testing.T) {
-		require.NoError(t, setInstallationDefaultHostedModel(db, models.UsageProviderOpenRouter, "deepseek/deepseek-v4-pro"))
-
-		require.NoError(t, llm.SeedDevHostedOpenRouter(t.Context(), db, r.Encryptor, cfg))
-
-		defaultModel, err := models.GetInstallationDefaultHostedLLMModel(db)
-		require.NoError(t, err)
-		assert.Equal(t, models.UsageProviderOpenRouter, defaultModel.Provider)
-		assert.Equal(t, "deepseek/deepseek-v4-pro", defaultModel.Model)
-	})
-
-	t.Run("replaces an OpenRouter default that left the allowlist", func(t *testing.T) {
-		withOldModel := cfg
-		withOldModel.Models = []string{"openai/gpt-4.1", "deepseek/deepseek-v4-flash"}
-		require.NoError(t, llm.SeedDevHostedOpenRouter(t.Context(), db, r.Encryptor, withOldModel))
-		require.NoError(t, setInstallationDefaultHostedModel(db, models.UsageProviderOpenRouter, "openai/gpt-4.1"))
-
-		require.NoError(t, llm.SeedDevHostedOpenRouter(t.Context(), db, r.Encryptor, cfg))
-
-		defaultModel, err := models.GetInstallationDefaultHostedLLMModel(db)
-		require.NoError(t, err)
-		assert.Equal(t, models.UsageProviderOpenRouter, defaultModel.Provider)
-		assert.Equal(t, "deepseek/deepseek-v4-flash", defaultModel.Model)
-	})
-
 	t.Run("replaces the default when SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL is set", func(t *testing.T) {
 		require.NoError(t, setInstallationDefaultHostedModel(db, models.UsageProviderAnthropic, "claude-sonnet-4-6"))
 

@@ -52,7 +52,7 @@ trigger is deleted. Productive.io webhooks are organization-wide and need the Ul
 registers one remote webhook for task created and one for task updated, both pointing at
 `{WEBHOOKS_BASE_URL}/api/v1/webhooks/{id}`. Deliveries for other projects are ignored.
 
-Productive.io does not put the event name in the request body. Each remote webhook has its own
+Productive.io puts the task resource under `object.data`. Each remote webhook has its own
 signature, and SuperPlane uses that signature to tell a created task from an updated task.
 
 Productive.io rejects registration with a 403 "webhooks_limit_exceeded" response on plans that do not

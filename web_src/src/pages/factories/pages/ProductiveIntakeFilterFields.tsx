@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useId, type Dispatch, type SetStateAction } from "react";
 
-import { intakeSettingsSectionDomId, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import type { IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 const PRODUCTIVE_INTAKE_SETTINGS_COPY = {
@@ -28,7 +28,7 @@ export function ProductiveIntakeFilterFields({
 
   return (
     <div className="flex flex-col gap-6">
-      <fieldset id={intakeSettingsSectionDomId("filters")} className="scroll-mt-6 min-w-0">
+      <fieldset className="min-w-0">
         <legend className="workspace-section-title">{PRODUCTIVE_INTAKE_SETTINGS_COPY.filtersLabel}</legend>
         <div className="mt-2 flex flex-col gap-1.5">
           <div

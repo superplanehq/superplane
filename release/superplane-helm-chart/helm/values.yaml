@@ -32,6 +32,18 @@ api:
       cpu: 100m
       memory: 128Mi
 
+# WebSocket hubs run separately from the API. Ingress sends /ws here.
+websocket:
+  replicas: 1
+  dbPoolSize: 5
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 domain:
   name: ""
   configMapName: "base-domain"

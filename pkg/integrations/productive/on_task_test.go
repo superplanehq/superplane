@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -33,28 +34,34 @@ func nodeMetadata(t *testing.T, metadata *contexts.MetadataContext) NodeMetadata
 	return stored
 }
 
-// taskWebhookBody builds the JSON:API single-resource body Productive.io
-// delivers on a task.created or task.updated webhook.
+// taskWebhookBody builds the envelope Productive.io posts for a task webhook.
+// The task resource is the JSON:API document under object.data.
 func taskWebhookBody(id, projectID, title string) []byte {
 	body, _ := json.Marshal(map[string]any{
-		"data": map[string]any{
-			"id":   id,
-			"type": "tasks",
-			"attributes": map[string]any{
-				"title": title,
-			},
-			"relationships": map[string]any{
-				"project": map[string]any{
-					"data": map[string]any{"type": "projects", "id": projectID},
+		"event":     "create_task",
+		"item_type": "task",
+		"item_id":   id,
+		"object": map[string]any{
+			"data": map[string]any{
+				"id":   id,
+				"type": "tasks",
+				"attributes": map[string]any{
+					"title":   title,
+					"type_id": 1,
 				},
-				"assignee": map[string]any{"data": nil},
+				"relationships": map[string]any{
+					"project": map[string]any{
+						"data": map[string]any{"type": "projects", "id": projectID},
+					},
+					"assignee": map[string]any{"data": nil},
+				},
 			},
-		},
-		"included": []any{
-			map[string]any{
-				"id":         projectID,
-				"type":       "projects",
-				"attributes": map[string]any{"name": "sentry-intake-test-project"},
+			"included": []any{
+				map[string]any{
+					"id":         projectID,
+					"type":       "projects",
+					"attributes": map[string]any{"name": "sentry-intake-test-project"},
+				},
 			},
 		},
 	})
@@ -351,6 +358,51 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		meta, ok := envelope["meta"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, TaskUpdatedEvent, meta["event"])
+	})
+
+	t.Run("production task.created payload with a shared token emits", func(t *testing.T) {
+		body, err := os.ReadFile("testdata/task_created_delivery.json")
+		require.NoError(t, err)
+		events := &contexts.EventContext{}
+		configuration := map[string]any{"project": "1049891", "actions": []string{ActionCreated}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders("", signWebhookBody("shared-token", "1710000000", body)),
+			Query:         map[string][]string{"event": {TaskCreatedEvent}},
+			Configuration: configuration,
+			Body:          body,
+			Webhook: &contexts.NodeWebhookContext{
+				Secret: TaskCreatedEvent + "=shared-token\n" + TaskUpdatedEvent + "=shared-token",
+			},
+			Events: events,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		envelope, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		document, ok := envelope["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "20305431", document["id"])
+		attributes, ok := document["attributes"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "webhook test 100000", attributes["title"])
+	})
+
+	t.Run("json api task without the delivery envelope -> missing task data", func(t *testing.T) {
+		body := []byte(`{"data":{"id":"91","type":"tasks","attributes":{"title":"Fix payment retries"}}}`)
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: createdTaskConfiguration(),
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        &contexts.EventContext{},
+		})
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		require.ErrorContains(t, err, "missing task data")
 	})
 
 	t.Run("delivery for another project -> ignored", func(t *testing.T) {

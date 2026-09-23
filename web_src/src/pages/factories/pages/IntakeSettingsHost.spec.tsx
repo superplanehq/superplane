@@ -17,12 +17,7 @@ import {
   renderHost,
   SENTRY_INTAKE,
 } from "./IntakeSettingsHost.spec.fixtures";
-import {
-  DEFAULT_GITHUB_INTAKE_SETTINGS,
-  intakeDeleteHelper,
-  intakeSettingsTitle,
-  intakeSettingsToApi,
-} from "./intakeSourceSettingsModel";
+import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
 
 const {
   useCanvas,
@@ -219,32 +214,29 @@ describe("IntakeSettingsHost", () => {
     renderHost();
 
     const dialog = screen.getByTestId("intake-source-settings");
-    expect(within(dialog).getByTestId("intake-settings-topbar").querySelector("h2")).toHaveTextContent(
-      intakeSettingsTitle("github-issues"),
-    );
+    expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("intake-connection")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("switch", { name: "A new issue is opened" })).toBeChecked();
-    expect(within(dialog).getByRole("switch", { name: "A closed issue is re-opened" })).toBeChecked();
-    expect(within(dialog).getByRole("switch", { name: 'The "superplane" label is added to the issue' })).toBeChecked();
-    const nav = within(dialog).getByRole("navigation", { name: "Intake settings" });
+    expect(within(dialog).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
     expect(
-      within(nav)
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["Settings", "Canvas"]);
+      within(dialog).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
+    ).toBeChecked();
+    expect(
+      within(dialog)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["General", "Automation"]);
     expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("intake-source-settings-pause")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("intake-danger-zone")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("intake-settings-toc")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("intake-source-settings-save")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
+    expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
     const user = userEvent.setup();
     renderHost();
 
-    await user.click(screen.getByTestId("intake-settings-tab-automation"));
+    await user.click(screen.getByRole("tab", { name: "Automation" }));
 
     expect(useCanvas).toHaveBeenCalledWith("org-1", "app-github-issues-intake", { enabled: true });
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
@@ -287,7 +279,7 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     renderHost();
 
-    await user.click(screen.getByTestId("intake-settings-tab-automation"));
+    await user.click(screen.getByRole("tab", { name: "Automation" }));
 
     const automation = screen.getByTestId("intake-source-automation");
     expect(automation).toHaveTextContent("This intake has no automation yet.");
@@ -306,7 +298,7 @@ describe("IntakeSettingsHost", () => {
     });
   });
 
-  it("saves the Jira completion column from Settings", async () => {
+  it("saves the Jira completion column from General settings", async () => {
     const user = userEvent.setup();
     renderHost({
       intake: connectedJiraIntake({
@@ -317,7 +309,7 @@ describe("IntakeSettingsHost", () => {
     });
 
     expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
-    expect(screen.getByTestId("jira-move-on-complete")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
     await user.click(screen.getByTestId("jira-completion-column-select"));
     await user.click(screen.getByRole("option", { name: "QA" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
@@ -341,7 +333,7 @@ describe("IntakeSettingsHost", () => {
 
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(intakeDeleteHelper("github-issues"));
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-github");
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -389,7 +381,7 @@ describe("IntakeSettingsHost", () => {
 
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(intakeDeleteHelper("jira-issues"));
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-jira");
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -419,7 +411,7 @@ describe("IntakeSettingsHost", () => {
 
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(intakeDeleteHelper("productive-tasks"));
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-productive");
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -466,27 +458,6 @@ describe("IntakeSettingsHost", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("shows one Jira connection as a settings link", () => {
-    useConnectedIntegrations.mockReturnValue({
-      data: [
-        {
-          metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
-          status: { state: "ready" },
-        },
-      ],
-      isLoading: false,
-      refetch: vi.fn(),
-    });
-    renderHost({ intake: JIRA_INTAKE });
-
-    expect(screen.getByText("Integration")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Atlassian/ })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/settings/organization/integrations/jira-1",
-    );
-    expect(screen.queryByTestId("intake-connection-jira-2")).not.toBeInTheDocument();
-  });
-
   it("saves a new Jira connection and project", async () => {
     const user = userEvent.setup();
     renderHost({ intake: JIRA_INTAKE });
@@ -494,8 +465,7 @@ describe("IntakeSettingsHost", () => {
     expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
     expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent("This intake has no live connection.");
     await user.click(screen.getByTestId("intake-connection-jira-2"));
-    await user.click(within(screen.getByTestId("intake-connection-project-select")).getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: "Operations" }));
+    await user.click(screen.getByTestId("intake-connection-project-OPS"));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
@@ -517,7 +487,7 @@ describe("IntakeSettingsHost", () => {
     });
 
     expect(screen.getByTestId("intake-connection-jira-2")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-project-select")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-project-OPS")).toBeInTheDocument();
   });
 
   it("returns to intake settings after Connect Jira", async () => {

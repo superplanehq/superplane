@@ -2,7 +2,6 @@ package llm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/config"
@@ -72,13 +71,7 @@ func syncDevDefaultHostedModel(tx *gorm.DB, cfg config.DevHostedOpenRouterConfig
 	nextModel := cfg.DefaultModel
 	if nextModel == "" {
 		if current.IsSet() {
-			err = models.AssertDefaultHostedLLMModelAllowed(tx, current)
-			if err == nil {
-				return nil
-			}
-			if !errors.Is(err, models.ErrDefaultHostedModelNotOnAllowlist) {
-				return err
-			}
+			return nil
 		}
 		nextModel = cfg.Models[0]
 	}
