@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -11,6 +11,7 @@ const ORG_ID = "org-1";
 const registryResponse = {
   features: [
     { id: "factories", label: "Factories", description: "Software factories", released: false },
+    { id: "new_canvas", label: "New Canvas", description: "Canvas v2", released: false },
     { id: "claude_managed_agents", label: "Claude Managed Agents", description: "Chat", released: true },
   ],
   enabled: ["factories"],
@@ -39,21 +40,33 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function featureTogglePath(featureId: string) {
+  return `/admin/api/organizations/${ORG_ID}/experimental-features/${featureId}`;
+}
+
+function stubFetch(registry = registryResponse) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
+        return jsonResponse(registry);
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/experimental-features/`)) {
+        return jsonResponse({ status: init?.method === "DELETE" ? "disabled" : "enabled" });
+      }
+      return new Response("not found", { status: 404 });
+    }),
+  );
+}
+
+function featureToggleCalls() {
+  return vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "POST" || init?.method === "DELETE");
+}
+
 describe("OrgExperimentalFeaturesTable", () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
-          return jsonResponse(registryResponse);
-        }
-        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/experimental-features/`)) {
-          return jsonResponse({ status: init?.method === "DELETE" ? "disabled" : "enabled" });
-        }
-        return new Response("not found", { status: 404 });
-      }),
-    );
+    stubFetch();
   });
 
   afterEach(() => {
@@ -81,12 +94,68 @@ describe("OrgExperimentalFeaturesTable", () => {
 
     await user.click(await screen.findByRole("switch", { name: "Toggle Factories" }));
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-      `/admin/api/organizations/${ORG_ID}/experimental-features/factories`,
-      {
-        method: "DELETE",
-        credentials: "include",
-      },
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(featureTogglePath("factories"), {
+      method: "DELETE",
+      credentials: "include",
+    });
+  });
+
+  it("shows a master switch when visible flags exist", async () => {
+    renderTable();
+
+    expect(await screen.findByRole("switch", { name: "Toggle all experimental features" })).toBeInTheDocument();
+  });
+
+  it("shows the master switch off when flags are mixed", async () => {
+    renderTable();
+
+    expect(await screen.findByRole("switch", { name: "Toggle all experimental features" })).toHaveAttribute(
+      "data-state",
+      "unchecked",
     );
+  });
+
+  it("shows the master switch on when every visible flag is on", async () => {
+    stubFetch({
+      ...registryResponse,
+      enabled: ["factories", "new_canvas"],
+    });
+    renderTable();
+
+    expect(await screen.findByRole("switch", { name: "Toggle all experimental features" })).toHaveAttribute(
+      "data-state",
+      "checked",
+    );
+  });
+
+  it("enables only visible flags that are off", async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(await screen.findByRole("switch", { name: "Toggle all experimental features" }));
+
+    await waitFor(() => {
+      expect(featureToggleCalls()).toEqual([
+        [featureTogglePath("new_canvas"), { method: "POST", credentials: "include" }],
+      ]);
+    });
+  });
+
+  it("disables only visible flags that are on", async () => {
+    stubFetch({
+      ...registryResponse,
+      enabled: ["factories", "new_canvas", "claude_managed_agents"],
+    });
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(await screen.findByRole("switch", { name: "Toggle all experimental features" }));
+
+    await waitFor(() => {
+      expect(featureToggleCalls()).toEqual([
+        [featureTogglePath("factories"), { method: "DELETE", credentials: "include" }],
+        [featureTogglePath("new_canvas"), { method: "DELETE", credentials: "include" }],
+      ]);
+    });
   });
 });
