@@ -4,6 +4,7 @@ import { Link } from "@/components/Link/link";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
+import { cn } from "@/lib/utils";
 import { Pencil } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -21,7 +22,11 @@ interface SettingsAutomationWorkspaceProps {
   editHref?: string;
   editLabel?: string;
   editTestId?: string;
+  /** Stack the edit control under a popup close button in the top-right corner. */
+  editPlacement?: SettingsAutomationEditPlacement;
 }
+
+export type SettingsAutomationEditPlacement = "canvasCorner" | "belowClose";
 
 const DEFAULT_EDIT_LABEL = "Edit automation";
 const DEFAULT_EDIT_TEST_ID = "settings-automation-edit";
@@ -39,8 +44,23 @@ export function SettingsAutomationHeaderRow({ tabs }: { tabs?: ReactNode }) {
   );
 }
 
+const EDIT_PLACEMENT_CLASS: Record<SettingsAutomationEditPlacement, string> = {
+  canvasCorner: "top-2 right-2",
+  belowClose: "top-11 right-4",
+};
+
 /** Small pencil on the dotted canvas. Use on empty and loaded automation panes. */
-export function SettingsAutomationCanvasEdit({ href, label, testId }: { href: string; label: string; testId: string }) {
+export function SettingsAutomationCanvasEdit({
+  href,
+  label,
+  testId,
+  placement = "canvasCorner",
+}: {
+  href: string;
+  label: string;
+  testId: string;
+  placement?: SettingsAutomationEditPlacement;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -48,7 +68,10 @@ export function SettingsAutomationCanvasEdit({ href, label, testId }: { href: st
           href={href}
           aria-label={label}
           data-testid={testId}
-          className="absolute top-2 right-2 z-20 flex size-6 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-background/80 hover:text-foreground"
+          className={cn(
+            "absolute z-20 flex size-6 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-background/80 hover:text-foreground",
+            EDIT_PLACEMENT_CLASS[placement],
+          )}
         >
           <Pencil className="size-3.5" aria-hidden />
         </Link>
@@ -67,6 +90,7 @@ export function SettingsAutomationWorkspace({
   editHref,
   editLabel = DEFAULT_EDIT_LABEL,
   editTestId = DEFAULT_EDIT_TEST_ID,
+  editPlacement = "canvasCorner",
 }: SettingsAutomationWorkspaceProps) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const resolvedCanvasId = canvasId ?? "";
@@ -115,7 +139,9 @@ export function SettingsAutomationWorkspace({
           />
         </div>
       </div>
-      {editHref ? <SettingsAutomationCanvasEdit href={editHref} label={editLabel} testId={editTestId} /> : null}
+      {editHref ? (
+        <SettingsAutomationCanvasEdit href={editHref} label={editLabel} testId={editTestId} placement={editPlacement} />
+      ) : null}
     </section>
   );
 }
