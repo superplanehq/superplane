@@ -16,6 +16,7 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
   const [step, setStep] = useState<ProductiveSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
@@ -66,6 +67,7 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
         source: "SOURCE_PRODUCTIVE_TASKS",
         integrationId,
         resourceId: projectId,
+        ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
     } catch (cause) {
@@ -81,6 +83,8 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
     setIntegrationId,
     projectId,
     setProjectId,
+    skipInitialImport,
+    setSkipInitialImport,
     connectOpen,
     setConnectOpen,
     error,
