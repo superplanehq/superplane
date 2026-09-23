@@ -152,6 +152,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "SKILL.md must be 64 KiB or smaller")
 	case errors.Is(err, models.ErrFactoryAgentResourceMCPCapReached):
 		return grpcerrors.FailedPrecondition(err, "this workspace already has 20 enabled MCP connections")
+	case errors.Is(err, errFactoryAgentResourceNotConnected):
+		return grpcerrors.FailedPrecondition(err, "Connect this MCP server first.")
+	case errors.Is(err, errListMCPTools):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane could not load the tools. Try again.")
 	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
@@ -188,6 +192,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 var errInvalidArgument = errors.New("invalid argument")
 var errCustomAutomationsDisabled = errors.New("custom automations are not enabled")
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
+var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
+var errListMCPTools = errors.New("could not list MCP tools")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 
 func invalidArgument(message string) error {

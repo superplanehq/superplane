@@ -238,3 +238,83 @@ func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
 	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[1].Path)
 	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[2].Path)
 }
+
+func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	kept, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.deepwiki.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+	disabled, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "linear", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.linear.app/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
+		Source:   models.FactoryAgentResourceSourceInline,
+		Markdown: "# Review copy",
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration: map[string]any{
+			"disabledAgentResourceIds": []any{disabled.ID.String()},
+		},
+	}, nil, []runner.BrokerTaskFile{
+		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
+	})
+	require.Len(t, environment, 1)
+	require.Len(t, files, 4)
+	assert.Equal(t, "prompts/implement.txt", files[0].Path)
+	assert.Contains(t, files[0].Content, "You can use these resources.")
+	assert.Contains(t, files[0].Content, "MCP servers: "+kept.Name)
+	assert.Contains(t, files[0].Content, "Skills: review-copy")
+	assert.NotContains(t, files[0].Content, "linear")
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
+	var payload struct {
+		Servers []struct {
+			Name string `json:"name"`
+		} `json:"servers"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
+	require.Len(t, payload.Servers, 1)
+	assert.Equal(t, "deepwiki", payload.Servers[0].Name)
+}
+
+func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	disabled, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.deepwiki.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration: map[string]any{
+			"disabledAgentResourceIds": []string{disabled.ID.String()},
+		},
+	}, nil, []runner.BrokerTaskFile{
+		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
+	})
+	assert.Empty(t, environment)
+	require.Len(t, files, 1)
+	assert.Equal(t, "Implement the plan.\n", files[0].Content)
+}

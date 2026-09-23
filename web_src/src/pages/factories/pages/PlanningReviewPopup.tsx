@@ -13,6 +13,8 @@ export function PlanningReviewPopup({
   initialDraft = PLANNING_REVIEW_DRAFT,
   onSave,
   organizationId,
+  factoryId,
+  factoryKey,
   automationHref,
   isLoading = false,
 }: {
@@ -20,6 +22,8 @@ export function PlanningReviewPopup({
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   automationHref?: string;
   isLoading?: boolean;
 }) {
@@ -41,6 +45,8 @@ export function PlanningReviewPopup({
         onSave={onSave}
         onCancel={onClose}
         organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
         automationHref={automationHref}
         isLoading={isLoading}
       />

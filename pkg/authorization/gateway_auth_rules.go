@@ -347,6 +347,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/line-runner-models"}: {
 			Resource:                     "factories",
 			Action:                       "read",
