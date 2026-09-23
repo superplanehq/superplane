@@ -36,6 +36,7 @@ type rpcError struct {
 }
 
 type rpcResponse struct {
+	ID     json.RawMessage `json:"id"`
 	Result json.RawMessage `json:"result"`
 	Error  *rpcError       `json:"error"`
 }
@@ -181,7 +182,7 @@ func postMCP(
 		return nextSession, nil
 	}
 
-	decoded, err := readMCPJSON(resp)
+	decoded, err := readMCPJSON(resp, payload.ID)
 	if err != nil {
 		return "", err
 	}
@@ -208,10 +209,10 @@ func postMCP(
 	return nextSession, nil
 }
 
-func readMCPJSON(resp *http.Response) ([]byte, error) {
+func readMCPJSON(resp *http.Response, requestID int) ([]byte, error) {
 	limited := io.LimitReader(resp.Body, MaxMetadataBytes)
 	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
-		return sseJSONPayload(limited)
+		return sseJSONPayload(limited, requestID)
 	}
 	raw, err := io.ReadAll(limited)
 	if err != nil {
@@ -228,7 +229,7 @@ func decodeJSONBody(body []byte) ([]byte, error) {
 	return trimmed, nil
 }
 
-func sseJSONPayload(body io.Reader) ([]byte, error) {
+func sseJSONPayload(body io.Reader, requestID int) ([]byte, error) {
 	reader := bufio.NewReader(body)
 	var dataLines []string
 	for {
@@ -237,7 +238,7 @@ func sseJSONPayload(body io.Reader) ([]byte, error) {
 		if hasLine {
 			line = strings.TrimRight(line, "\r\n")
 			if line == "" {
-				if payload := sseDataPayload(dataLines); len(payload) > 0 {
+				if payload := matchingRPCResponse(sseDataPayload(dataLines), requestID); len(payload) > 0 {
 					return payload, nil
 				}
 				dataLines = nil
@@ -246,7 +247,7 @@ func sseJSONPayload(body io.Reader) ([]byte, error) {
 			}
 		}
 		if err == io.EOF {
-			if payload := sseDataPayload(dataLines); len(payload) > 0 {
+			if payload := matchingRPCResponse(sseDataPayload(dataLines), requestID); len(payload) > 0 {
 				return payload, nil
 			}
 			return nil, fmt.Errorf("the MCP server did not return JSON")
@@ -266,4 +267,25 @@ func sseDataPayload(lines []string) []byte {
 		return nil
 	}
 	return payload
+}
+
+func matchingRPCResponse(raw []byte, requestID int) []byte {
+	if len(raw) == 0 {
+		return nil
+	}
+	var envelope rpcResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil
+	}
+	if len(bytes.TrimSpace(envelope.ID)) == 0 || string(envelope.ID) == "null" {
+		return nil
+	}
+	var id int
+	if err := json.Unmarshal(envelope.ID, &id); err != nil {
+		return nil
+	}
+	if id != requestID {
+		return nil
+	}
+	return raw
 }

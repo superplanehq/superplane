@@ -163,6 +163,32 @@ func TestListToolsReturnsBeforeSSEStreamEnds(t *testing.T) {
 	require.Equal(t, []Tool{{Name: "ping", Description: "Ping the server."}}, tools)
 }
 
+func TestListToolsSkipsSSENotifications(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		var payload rpcRequest
+		require.NoError(t, json.Unmarshal(body, &payload))
+		w.Header().Set("Content-Type", "text/event-stream")
+		switch payload.Method {
+		case "initialize":
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n\n")
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\"}\n\n")
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"Ping the server.\"}]}}\n\n")
+		default:
+			t.Fatalf("unexpected method %s", payload.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	tools, err := ListTools(context.Background(), server.Client(), server.URL, nil)
+	require.NoError(t, err)
+	require.Equal(t, []Tool{{Name: "ping", Description: "Ping the server."}}, tools)
+}
+
 func TestListToolsFollowsNextCursor(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
