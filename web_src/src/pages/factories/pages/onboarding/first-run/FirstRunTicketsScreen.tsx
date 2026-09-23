@@ -65,8 +65,6 @@ export function FirstRunTicketsScreen({
   const copy = FIRST_RUN_COPY.tickets;
   const canAnalyze = canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
   const jiraProjectVisible = ticketSource === "jira" && jiraConnected;
-  const completionVisible =
-    showJiraCompletion && jiraProjectVisible && Boolean(jiraProjectId && organizationId && jiraIntegrationId);
 
   return (
     <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere}>
@@ -118,18 +116,16 @@ export function FirstRunTicketsScreen({
           />
         </FirstRunPanel>
 
-        {completionVisible ? (
-          <fieldset disabled={saving} className="m-0 min-w-0 border-0 p-0">
-            <JiraCompletionColumnFields
-              organizationId={organizationId}
-              integrationId={jiraIntegrationId}
-              projectId={jiraProjectId}
-              value={jiraCompletion}
-              onChange={(next) => onJiraCompletionChange?.(next)}
-              layout="plain"
-            />
-          </fieldset>
-        ) : null}
+        <FirstRunJiraCompletionSection
+          visible={showJiraCompletion}
+          jiraProjectVisible={jiraProjectVisible}
+          saving={saving}
+          organizationId={organizationId}
+          jiraIntegrationId={jiraIntegrationId}
+          jiraProjectId={jiraProjectId}
+          jiraCompletion={jiraCompletion}
+          onJiraCompletionChange={onJiraCompletionChange}
+        />
 
         <div className="space-y-3">
           <LoadingButton
@@ -146,6 +142,43 @@ export function FirstRunTicketsScreen({
         </div>
       </div>
     </FirstRunShell>
+  );
+}
+
+function FirstRunJiraCompletionSection({
+  visible,
+  jiraProjectVisible,
+  saving,
+  organizationId,
+  jiraIntegrationId,
+  jiraProjectId,
+  jiraCompletion,
+  onJiraCompletionChange,
+}: {
+  visible: boolean;
+  jiraProjectVisible: boolean;
+  saving: boolean;
+  organizationId: string;
+  jiraIntegrationId: string;
+  jiraProjectId: string;
+  jiraCompletion: JiraCompletionColumnValue;
+  onJiraCompletionChange?: (next: JiraCompletionColumnValue) => void;
+}) {
+  if (!visible || !jiraProjectVisible || !jiraProjectId || !organizationId || !jiraIntegrationId) {
+    return null;
+  }
+
+  return (
+    <fieldset disabled={saving} className="m-0 min-w-0 border-0 p-0">
+      <JiraCompletionColumnFields
+        organizationId={organizationId}
+        integrationId={jiraIntegrationId}
+        projectId={jiraProjectId}
+        value={jiraCompletion}
+        onChange={(next) => onJiraCompletionChange?.(next)}
+        layout="plain"
+      />
+    </fieldset>
   );
 }
 
