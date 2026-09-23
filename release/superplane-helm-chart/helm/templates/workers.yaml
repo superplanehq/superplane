@@ -49,6 +49,10 @@ spec:
                 name: {{ include "secrets.email.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            {{- if .Values.polar.enabled }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
           env:
             - name: START_CONSUMERS
               value: "yes"

@@ -72,11 +72,11 @@ spec:
                 name: {{ include "secrets.sentry.name" . }}
             - secretRef:
                 name: {{ include "secrets.dash0Web.name" . }}
-            {{- if or .Values.posthog.enabled (ne .Values.posthog.secretName "") }}
+            {{- if .Values.posthog.enabled }}
             - secretRef:
                 name: {{ include "secrets.posthog.name" . }}
             {{- end }}
-            {{- if or .Values.polar.enabled (ne .Values.polar.secretName "") }}
+            {{- if .Values.polar.enabled }}
             - secretRef:
                 name: {{ include "secrets.polar.name" . }}
             {{- end }}
