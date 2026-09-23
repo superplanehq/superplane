@@ -15,6 +15,7 @@ export function JiraCompletionColumnFields({
   value,
   onChange,
   layout = "boxed",
+  showSection = true,
 }: {
   organizationId: string;
   integrationId: string;
@@ -23,6 +24,8 @@ export function JiraCompletionColumnFields({
   onChange: (next: JiraCompletionColumnValue) => void;
   /** `plain` is a form section without a nested option card. */
   layout?: "boxed" | "plain";
+  /** False when the page heading already names this section. */
+  showSection?: boolean;
 }) {
   const enabled = Boolean(organizationId && integrationId && projectId);
   const statusesQuery = useIntegrationResources(
@@ -57,7 +60,7 @@ export function JiraCompletionColumnFields({
 
   return (
     <fieldset className="min-w-0" data-testid="jira-completion-column">
-      <legend className="workspace-section-title">{JIRA_COMPLETION_COLUMN_COPY.section}</legend>
+      {showSection ? <legend className="workspace-section-title">{JIRA_COMPLETION_COLUMN_COPY.section}</legend> : null}
       <div className={cn("flex flex-col", layout === "plain" ? "mt-3 gap-3" : "mt-2 gap-2")}>
         <MoveOnCompleteControl layout={layout} checked={value.jiraMoveOnComplete} onChange={onChange} value={value} />
         {value.jiraMoveOnComplete ? (
