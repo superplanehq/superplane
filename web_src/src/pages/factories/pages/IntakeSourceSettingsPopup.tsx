@@ -376,11 +376,7 @@ function IntakeSettingsGeneralPanel({
             onSettingsChange={onDraftChange}
             layout="grid"
           />
-          <ProductiveIntakeFilterFields
-            sourceId={sourceId}
-            settings={draft}
-            onSettingsChange={onDraftChange}
-          />
+          <ProductiveIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
           <IntakeSettingsLifecycle
             sourceId={sourceId}
             paused={paused}
