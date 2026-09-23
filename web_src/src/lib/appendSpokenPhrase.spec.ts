@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { appendSpokenPhrase, stripTrailingSpokenPhrase } from "./appendSpokenPhrase";
+import { appendSpokenPhrase, stripLeadingSpokenPhrase, stripTrailingSpokenPhrase } from "./appendSpokenPhrase";
 
 describe("appendSpokenPhrase", () => {
   it("appends the first phrase with no extra space", () => {
@@ -61,5 +61,23 @@ describe("stripTrailingSpokenPhrase", () => {
 
   it("keeps the value when the live phrase is only a partial suffix", () => {
     expect(stripTrailingSpokenPhrase("unhello", "hello")).toBe("unhello");
+  });
+});
+
+describe("stripLeadingSpokenPhrase", () => {
+  it("returns the remaining words after a completed prefix", () => {
+    expect(stripLeadingSpokenPhrase("hello world", "hello")).toBe("world");
+  });
+
+  it("returns an empty string when the completed phrase is the full live phrase", () => {
+    expect(stripLeadingSpokenPhrase("hello", "hello")).toBe("");
+  });
+
+  it("returns null when the completed phrase is not a prefix", () => {
+    expect(stripLeadingSpokenPhrase("hello world", "goodbye")).toBe(null);
+  });
+
+  it("returns null when the completed phrase is only a partial word", () => {
+    expect(stripLeadingSpokenPhrase("hello world", "he")).toBe(null);
   });
 });

@@ -8,6 +8,22 @@ export function appendSpokenPhrase(current: string, phrase: string, maxLength?: 
   return maxLength === undefined ? next : next.slice(0, maxLength);
 }
 
+export function stripLeadingSpokenPhrase(livePhrase: string, phrase: string): string | null {
+  const spoken = phrase.trim();
+  const live = livePhrase.trim();
+  if (!spoken || !live.startsWith(spoken)) {
+    return null;
+  }
+  const rest = live.slice(spoken.length);
+  if (rest.length === 0) {
+    return "";
+  }
+  if (!/^\s/.test(rest)) {
+    return null;
+  }
+  return rest.trimStart();
+}
+
 export function stripTrailingSpokenPhrase(value: string, phrase: string): string {
   const spoken = phrase.trim();
   if (!spoken || !value.endsWith(spoken)) {

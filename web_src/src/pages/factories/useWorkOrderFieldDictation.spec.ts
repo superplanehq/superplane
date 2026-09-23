@@ -48,6 +48,13 @@ function emitFinalPhrases(transcripts: string[]) {
   });
 }
 
+function emitResults(results: Array<{ transcript: string; isFinal: boolean }>, resultIndex = 0) {
+  latestRecognition().onresult?.({
+    resultIndex,
+    results: results.map(({ transcript, isFinal }) => Object.assign([{ transcript }], { isFinal, 0: { transcript } })),
+  });
+}
+
 describe("useWorkOrderFieldDictation", () => {
   beforeEach(() => {
     FakeSpeechRecognition.instances = [];
@@ -238,6 +245,45 @@ describe("useWorkOrderFieldDictation", () => {
     expect(onDescriptionChange).toHaveBeenLastCalledWith("Notes hello");
     expect(onDescriptionChange.mock.calls.some((call) => call[0] === "Notes hello hello")).toBe(false);
     expect(onTitleChange).not.toHaveBeenCalled();
+  });
+
+  it("replaces remaining live words after a partial final across fields", () => {
+    const onTitleChange = vi.fn();
+    const onDescriptionChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkOrderFieldDictation({
+        title: "Fix bugs",
+        description: "Notes",
+        maxTitleLength: 256,
+        maxDescriptionLength: 5000,
+        onTitleChange,
+        onDescriptionChange,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+      emitResults([
+        { transcript: "hello ", isFinal: false },
+        { transcript: "world", isFinal: false },
+      ]);
+      result.current.rememberTitle();
+      emitResults([
+        { transcript: "hello", isFinal: true },
+        { transcript: "world", isFinal: false },
+      ]);
+      result.current.rememberDescription();
+      emitResults(
+        [
+          { transcript: "hello", isFinal: true },
+          { transcript: "world today", isFinal: false },
+        ],
+        1,
+      );
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Notes hello world today");
+    expect(onDescriptionChange.mock.calls.some((call) => call[0] === "Notes hello world world today")).toBe(false);
   });
 
   it("keeps retained words when focus returns after the phrase is final", () => {
