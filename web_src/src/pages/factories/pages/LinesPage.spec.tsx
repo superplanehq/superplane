@@ -1618,7 +1618,7 @@ describe("LinesPage board editing", () => {
     const scopeAll = within(actions).getByTestId("work-orders-scope-all");
     const filter = within(actions).getByTestId("work-orders-filter-trigger");
     const search = within(actions).getByTestId("work-orders-search-trigger");
-    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
+    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Active");
     expect(within(actions).getByTestId("work-orders-scope-my")).toBeInTheDocument();
     expect(scopeAll.className).toMatch(/rounded-full/);
     expect(filter).toHaveAccessibleName("Filter");

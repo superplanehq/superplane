@@ -289,10 +289,10 @@ describe("scope + filter + search + ordering", () => {
 
   const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, running, draft, failed, closed], factory);
 
-  it("labels the attention scope and describes My as work you started", () => {
+  it("labels the active scope and describes My as work you started", () => {
     const attention = WORK_ORDER_SCOPES.find((scope) => scope.id === "active");
-    expect(attention?.label).toBe("Needs attention");
-    expect(attention?.tooltip).toBe("Tasks that need your attention.");
+    expect(attention?.label).toBe("Active");
+    expect(attention?.tooltip).toBe("Draft, waiting, and failed tasks.");
     expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
       "Tasks you created or started. SuperPlane assigns those to you.",
     );
