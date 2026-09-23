@@ -53,6 +53,32 @@ func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	assert.Equal(t, first.ID.String(), next.Orders[0].GetId())
 }
 
+func Test__ListWorkOrders_KeepsStatesWhenUserIDIsSet(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "User State Filter", "", "US")
+	require.NoError(t, err)
+
+	draft, err := factoryModel.CreateWorkOrder(db, "Draft for me", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	open, err := factoryModel.CreateWorkOrder(db, "Open for me", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = open.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	userID := r.User.String()
+	resp, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		UserId:    &userID,
+		States:    []pb.WorkOrder_State{pb.WorkOrder_STATE_DRAFT},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Orders, 1)
+	assert.Equal(t, draft.ID.String(), resp.Orders[0].GetId())
+}
+
 func Test__ListWorkOrders_UsesDefaultLimit(t *testing.T) {
 	r := support.Setup(t)
 	ctx := t.Context()

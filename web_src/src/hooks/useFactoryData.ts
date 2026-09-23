@@ -51,6 +51,7 @@ import {
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
   normalizeWorkOrdersPageQuery,
+  uniqueWorkOrdersById,
   WORK_ORDER_LIST_PAGE_SIZE,
   workOrdersPageFromResponse,
   type WorkOrdersPageCursor,
@@ -275,6 +276,14 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
   };
 }
 
+export function mergeFactoryBoardWorkOrders(
+  backlog: FactoriesWorkOrderSummary[],
+  open: FactoriesWorkOrderSummary[],
+  done: FactoriesWorkOrderSummary[],
+): FactoriesWorkOrderSummary[] {
+  return uniqueWorkOrdersById([...backlog, ...open, ...done]);
+}
+
 export function useFactoryBoardWorkOrders(
   organizationId: string,
   factoryId: string,
@@ -291,7 +300,7 @@ export function useFactoryBoardWorkOrders(
   const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, options);
 
   return {
-    workOrders: [...backlog.orders, ...open.orders, ...closed.orders],
+    workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
     isLoading: backlog.isLoading || open.isLoading || closed.isLoading,
     backlog: boardColumnPage(backlog),
     open: boardColumnPage(open),
