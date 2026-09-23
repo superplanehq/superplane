@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -32,14 +32,21 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 
 # On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
 # host directories that the CI cache can restore and store between jobs.
+# Locally, overlay docker-compose.runner.yml so the same make targets start
+# the task-broker and runner workers. CI does not build the worker image.
 COMPOSE_FILES := -f docker-compose.dev.yml
 GO_CACHE_DIRS :=
+N ?= 10
+TASK_BROKER_HOST_PORT ?= 8091
 ifneq ($(strip $(CI)),)
 COMPOSE_FILES += -f docker-compose.ci.yml
 GO_CACHE_DIRS := tmp/go tmp/go-build
+else
+COMPOSE_FILES += -f docker-compose.runner.yml
 endif
 
 COMPOSE=docker compose $(COMPOSE_FILES)
+COMPOSE_RUNNER=$(COMPOSE) --profile local-runner
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
@@ -62,7 +69,7 @@ GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV)
 #
 
 lint:
-	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
+	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... -exclude ./runner/... ./...
 
 tidy:
 	$(COMPOSE) exec app go mod tidy
@@ -108,10 +115,13 @@ test.shell:
 #
 
 format.go:
-	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -w"
+	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -not -path './runner/*' -print0 | xargs -0 gofmt -s -w"
 
 check.format.go:
-	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
+	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -not -path './runner/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
+
+format.runner:
+	$(COMPOSE) exec app bash -c "gofmt -s -w runner/fleet-manager runner/runner runner/shared runner/task-broker runner/test"
 
 format.js:
 	cd web_src && npm run format
@@ -126,6 +136,11 @@ dev.up:
 	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
 	@echo "Starting development containers..."
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
+ifeq ($(strip $(CI)),)
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) build task-broker runner
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build broker-db
+	@echo "Runner images built. broker-db is ready."
+endif
 	@echo "Development containers are ready."
 
 dev.setup:
@@ -137,6 +152,11 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
+ifeq ($(strip $(CI)),)
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build task-broker
+	$(COMPOSE_RUNNER) run --rm -T --no-deps task-broker-init
+	@echo "Task broker ready at http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
+endif
 
 dev.setup.npm:
 	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
@@ -158,11 +178,21 @@ dev.setup.no.cache:
 
 dev.server:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+ifeq ($(strip $(CI)),)
+	$(COMPOSE_RUNNER) up -d --no-build --scale runner=$(N) runner
+endif
 	$(COMPOSE) exec -d app bash /app/docker-entrypoint.dev.sh
 	@bash ./scripts/wait-for-app
+ifeq ($(strip $(CI)),)
+	@echo "Task broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
+	@echo "Runner workers: $(N)"
+endif
 
 dev.server.fg:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+ifeq ($(strip $(CI)),)
+	$(COMPOSE_RUNNER) up -d --no-build --scale runner=$(N) runner
+endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
 
 dev.start.ephemeral:
@@ -181,7 +211,31 @@ dev.logs.otel:
 	$(COMPOSE) logs -f otel
 
 dev.down:
-	$(COMPOSE) down --remove-orphans
+	$(COMPOSE_RUNNER) down --remove-orphans
+
+doctor-local:
+	$(COMPOSE_RUNNER) exec runner sh -c '\
+	  missing=0; \
+	  for cmd in claude codex opencode playwright node git gh jq python3 bash; do \
+	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
+	      echo "$$cmd missing" >&2; \
+	      missing=1; \
+	      continue; \
+	    fi; \
+	    echo "$$cmd=$$(command -v "$$cmd")"; \
+	  done; \
+	  echo "claude=$$(claude --version 2>/dev/null | head -n1)"; \
+	  echo "codex=$$(codex --version 2>/dev/null | head -n1)"; \
+	  echo "opencode=$$(opencode --version 2>/dev/null | head -n1)"; \
+	  echo "playwright=$$(playwright --version 2>/dev/null | head -n1)"; \
+	  playwright cli --help >/dev/null 2>&1 || missing=1; \
+	  echo "node=$$(node --version 2>/dev/null)"; \
+	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
+	  shot=$$(mktemp /tmp/playwright-doctor.XXXXXX.png); \
+	  playwright screenshot about:blank "$$shot" >/dev/null 2>&1 || missing=1; \
+	  test -s "$$shot" || missing=1; \
+	  rm -f "$$shot"; \
+	  test "$$missing" -eq 0'
 
 dev.console:
 	$(COMPOSE) run --rm app /bin/bash
