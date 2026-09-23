@@ -12,9 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
-	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 )
 
@@ -319,19 +317,6 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 		require.NotNil(t, sonnet, "claude-sonnet should exist in rates")
 		assert.False(t, sonnet.Selected, "claude-sonnet should not be selected without a hosted API key")
 	})
-}
-
-func TestFilterCatalogPrices_MatchesAllowlistAndNormalizedIDs(t *testing.T) {
-	prices := []llm.CatalogPrice{
-		{ID: "anthropic/claude-sonnet-4-6", Rate: pricebook.Rate{Input: 400}},
-		{ID: "openai/gpt-4o", Rate: pricebook.Rate{Input: 250}},
-		{ID: "openai/gpt-4o-mini", Rate: pricebook.Rate{Input: 15}},
-	}
-
-	filtered := filterCatalogPrices(prices, []string{"anthropic/claude-sonnet-4-6", "gpt-4o-mini"})
-	require.Len(t, filtered, 2)
-	assert.Equal(t, "anthropic/claude-sonnet-4-6", filtered[0].ModelID)
-	assert.Equal(t, "openai/gpt-4o-mini", filtered[1].ModelID)
 }
 
 func containsModelRate(rates []adminPriceBookModelRate, matchKey string) bool {

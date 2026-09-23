@@ -148,7 +148,7 @@ func (s *Service) collect(ctx context.Context, tx *gorm.DB) (collectResult, erro
 
 		fetchedPricedProvider = true
 		var updated, added int
-		out.rates, updated, added = models.ApplyCatalogPrices(out.rates, filterCatalogPrices(prices, provider.AllowedModels))
+		out.rates, updated, added = models.ApplyCatalogPrices(out.rates, FilterCatalogPrices(prices, provider.AllowedModels))
 		out.updated += updated
 		out.added += added
 	}
@@ -159,7 +159,8 @@ func (s *Service) collect(ctx context.Context, tx *gorm.DB) (collectResult, erro
 	return out, nil
 }
 
-func filterCatalogPrices(prices []llm.CatalogPrice, allowlist []string) []models.CatalogModelPrice {
+// FilterCatalogPrices keeps catalog prices that match a provider allowlist.
+func FilterCatalogPrices(prices []llm.CatalogPrice, allowlist []string) []models.CatalogModelPrice {
 	provider := models.HostedLLMProvider{AllowedModels: allowlist}
 	filtered := make([]models.CatalogModelPrice, 0)
 	for _, price := range prices {
