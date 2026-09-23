@@ -74,7 +74,7 @@ export const SUB_CENT_VM_USAGE_HISTORY_ROW: FactoriesWorkOrderRunUsageRow = {
   costMicros: "183150",
   hostedCostMicros: "180000",
   byokCostMicros: "0",
-  models: ["openrouter/x-ai/grok-4.6"],
+  models: ["x-ai/grok-4.6"],
   byokModels: [],
   machineTypes: ["e1-large-amd64"],
 };

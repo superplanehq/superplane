@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -89,7 +90,7 @@ func (s *Service) Sync(ctx context.Context, tx *gorm.DB, opts Options) (Result, 
 	}
 
 	if err := models.LoadCurrentPriceBook(tx); err != nil {
-		return Result{}, err
+		log.Errorf("pricebooksync: published version %s but failed to reload in-memory book: %v", published.Version, err)
 	}
 
 	out.Published = true
@@ -148,7 +149,7 @@ func (s *Service) collect(ctx context.Context, tx *gorm.DB) (collectResult, erro
 
 		fetchedPricedProvider = true
 		var updated, added int
-		out.rates, updated, added = models.ApplyCatalogPrices(out.rates, FilterCatalogPrices(prices, provider.AllowedModels))
+		out.rates, updated, added = models.ApplyCatalogPrices(out.rates, FilterCatalogPrices(provider.Provider, prices, provider.AllowedModels))
 		out.updated += updated
 		out.added += added
 	}
@@ -160,14 +161,22 @@ func (s *Service) collect(ctx context.Context, tx *gorm.DB) (collectResult, erro
 }
 
 // FilterCatalogPrices keeps catalog prices that match a provider allowlist.
-func FilterCatalogPrices(prices []llm.CatalogPrice, allowlist []string) []models.CatalogModelPrice {
+func FilterCatalogPrices(providerName string, prices []llm.CatalogPrice, allowlist []string) []models.CatalogModelPrice {
 	provider := models.HostedLLMProvider{AllowedModels: allowlist}
 	filtered := make([]models.CatalogModelPrice, 0)
 	for _, price := range prices {
 		if !catalogPriceAllowed(provider, price.ID) {
 			continue
 		}
-		filtered = append(filtered, models.CatalogModelPrice{ModelID: price.ID, Rate: price.Rate})
+		id := pricebook.CatalogModelID(price.ID)
+		if id == "" {
+			continue
+		}
+		filtered = append(filtered, models.CatalogModelPrice{
+			Provider: providerName,
+			ModelID:  id,
+			Rate:     price.Rate,
+		})
 	}
 	return filtered
 }

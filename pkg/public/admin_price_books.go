@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type adminPriceBookVersion struct {
 }
 
 type adminPriceBookModelRate struct {
+	Provider                  string `json:"provider"`
 	MatchKey                  string `json:"match_key"`
 	MatchMode                 string `json:"match_mode"`
 	InputCentsPerMillion      int64  `json:"input_cents_per_million"`
@@ -88,10 +90,15 @@ func (s *Server) adminSavePriceBooks(w http.ResponseWriter, r *http.Request) {
 
 	rates := make([]models.UsagePriceBookRate, 0, len(req.Models)+len(req.VMs))
 	for _, model := range req.Models {
+		mode := model.MatchMode
+		if strings.TrimSpace(mode) == "" {
+			mode = models.UsagePriceBookMatchExact
+		}
 		rates = append(rates, models.UsagePriceBookRate{
 			UsageKind:                 models.UsageKindModel,
+			Provider:                  model.Provider,
 			MatchKey:                  model.MatchKey,
-			MatchMode:                 model.MatchMode,
+			MatchMode:                 mode,
 			InputCentsPerMillion:      model.InputCentsPerMillion,
 			OutputCentsPerMillion:     model.OutputCentsPerMillion,
 			CacheReadCentsPerMillion:  model.CacheReadCentsPerMillion,
@@ -169,8 +176,52 @@ func (s *Server) adminActivatePriceBook(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, payload)
 }
 
+func (s *Server) adminDeletePriceBook(w http.ResponseWriter, r *http.Request) {
+	version := strings.TrimSpace(r.URL.Query().Get("version"))
+	if version == "" {
+		http.Error(w, "Version is required", http.StatusBadRequest)
+		return
+	}
+
+	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return models.DeleteUsagePriceBook(tx, version)
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Price book not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, models.ErrUsagePriceBookCurrent) {
+			http.Error(w, "You cannot delete the current price book. Switch to another version first.", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, models.ErrUsagePriceBookLast) {
+			http.Error(w, "You cannot delete the last price book.", http.StatusConflict)
+			return
+		}
+		log.Errorf("admin: failed to delete price book %s: %v", version, err)
+		http.Error(w, "Failed to delete price book", http.StatusInternalServerError)
+		return
+	}
+
+	payload, status, message := loadAdminPriceBooks(database.DB(r.Context()), "")
+	if status != http.StatusOK {
+		http.Error(w, message, status)
+		return
+	}
+	respondJSON(w, payload)
+}
+
 func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	provider := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("provider")))
+	if provider == "" {
+		provider = models.UsageProviderOpenRouter
+	}
+	if provider != models.UsageProviderOpenRouter {
+		http.Error(w, catalogPricesUnavailableMessage(provider), http.StatusBadRequest)
+		return
+	}
 	svc := pricebooksync.New(s.encryptor, s.registry.HTTPContext())
 	result, err := svc.Sync(ctx, database.DB(ctx), pricebooksync.Options{SkipWhenUnchanged: false})
 	if err != nil {
@@ -214,6 +265,17 @@ func reloadCurrentPriceBook(ctx context.Context) {
 }
 
 const adminPriceBookConflictMessage = "The current price book changed. Load the latest version and try again."
+
+func catalogPricesUnavailableMessage(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case models.UsageProviderAnthropic:
+		return "The Anthropic API does not publish prices."
+	case models.UsageProviderOpenAI:
+		return "The OpenAI API does not publish prices."
+	default:
+		return "This provider does not publish catalog prices."
+	}
+}
 
 func writePublishPriceBookError(w http.ResponseWriter, err error) {
 	if errors.Is(err, models.ErrUsagePriceBookConflict) {
@@ -300,41 +362,13 @@ func buildAdminPriceBooksResponse(
 
 	allowlist := hostedModelAllowlist(providers)
 
-	prefixes := make([]pricebook.PrefixRate, 0)
-	families := make([]pricebook.FamilyRate, 0)
-	for _, row := range rows {
-		if row.UsageKind != models.UsageKindModel {
-			continue
-		}
-		rate := pricebook.Rate{
-			Input:      row.InputCentsPerMillion,
-			Output:     row.OutputCentsPerMillion,
-			CacheRead:  row.CacheReadCentsPerMillion,
-			CacheWrite: row.CacheWriteCentsPerMillion,
-			Reasoning:  row.ReasoningCentsPerMillion,
-		}
-		switch row.MatchMode {
-		case models.UsagePriceBookMatchPrefix:
-			prefixes = append(prefixes, pricebook.PrefixRate{Prefix: row.MatchKey, Rate: rate})
-		case models.UsagePriceBookMatchFamily:
-			families = append(families, pricebook.FamilyRate{Token: row.MatchKey, Rate: rate})
-		}
-	}
-	selectedKeys := make(map[string]bool)
-	for _, model := range allowlist {
-		match, ok := pricebook.MatchModel(model, prefixes, families)
-		if ok {
-			selectedKeys[match.Key+"\x00"+match.Mode] = true
-		}
-	}
-
 	modelRates := make([]adminPriceBookModelRate, 0)
 	vmRates := make([]adminPriceBookVMRate, 0)
 	for _, row := range rows {
 		switch strings.TrimSpace(row.UsageKind) {
 		case models.UsageKindModel:
-			key := row.MatchKey + "\x00" + row.MatchMode
 			modelRates = append(modelRates, adminPriceBookModelRate{
+				Provider:                  row.Provider,
 				MatchKey:                  row.MatchKey,
 				MatchMode:                 row.MatchMode,
 				InputCentsPerMillion:      row.InputCentsPerMillion,
@@ -342,7 +376,7 @@ func buildAdminPriceBooksResponse(
 				CacheReadCentsPerMillion:  row.CacheReadCentsPerMillion,
 				CacheWriteCentsPerMillion: row.CacheWriteCentsPerMillion,
 				ReasoningCentsPerMillion:  row.ReasoningCentsPerMillion,
-				Selected:                  selectedKeys[key],
+				Selected:                  allowlist[hostedAllowlistKey{provider: row.Provider, model: row.MatchKey}],
 			})
 		case models.UsageKindCompute:
 			vmRates = append(vmRates, adminPriceBookVMRate{
@@ -351,6 +385,10 @@ func buildAdminPriceBooksResponse(
 				MicrosPerSecond: row.MicrosPerSecond,
 			})
 		}
+	}
+
+	if selected.Version == currentVersion {
+		modelRates = appendAllowlistedModelRates(modelRates, allowlist)
 	}
 
 	return adminPriceBooksResponse{
@@ -364,17 +402,60 @@ func buildAdminPriceBooksResponse(
 	}
 }
 
-func hostedModelAllowlist(providers []models.HostedLLMProvider) []string {
-	allowlist := make([]string, 0)
+type hostedAllowlistKey struct {
+	provider string
+	model    string
+}
+
+func hostedModelAllowlist(providers []models.HostedLLMProvider) map[hostedAllowlistKey]bool {
+	allowlist := map[hostedAllowlistKey]bool{}
 	for _, provider := range providers {
 		if !provider.OffersHostedModels() {
 			continue
 		}
 		for _, model := range provider.AllowedModels {
-			if strings.TrimSpace(model) != "" {
-				allowlist = append(allowlist, model)
+			key := strings.ToLower(strings.TrimSpace(pricebook.CatalogModelID(model)))
+			if key == "" {
+				continue
 			}
+			allowlist[hostedAllowlistKey{provider: provider.Provider, model: key}] = true
 		}
 	}
 	return allowlist
+}
+
+func appendAllowlistedModelRates(modelRates []adminPriceBookModelRate, allowlist map[hostedAllowlistKey]bool) []adminPriceBookModelRate {
+	present := map[hostedAllowlistKey]struct{}{}
+	for _, rate := range modelRates {
+		present[hostedAllowlistKey{provider: rate.Provider, model: rate.MatchKey}] = struct{}{}
+	}
+	for key := range allowlist {
+		if _, ok := present[key]; ok {
+			continue
+		}
+		rate, _ := pricebook.Lookup(key.provider, key.model)
+		modelRates = append(modelRates, adminPriceBookModelRate{
+			Provider:                  key.provider,
+			MatchKey:                  key.model,
+			MatchMode:                 models.UsagePriceBookMatchExact,
+			InputCentsPerMillion:      rate.Input,
+			OutputCentsPerMillion:     rate.Output,
+			CacheReadCentsPerMillion:  rate.CacheRead,
+			CacheWriteCentsPerMillion: rate.CacheWrite,
+			ReasoningCentsPerMillion:  rate.Reasoning,
+			Selected:                  true,
+		})
+	}
+	slices.SortFunc(modelRates, compareAdminModelRates)
+	return modelRates
+}
+
+func compareAdminModelRates(a, b adminPriceBookModelRate) int {
+	if order := strings.Compare(a.Provider, b.Provider); order != 0 {
+		return order
+	}
+	if order := strings.Compare(a.MatchKey, b.MatchKey); order != 0 {
+		return order
+	}
+	return strings.Compare(a.MatchMode, b.MatchMode)
 }

@@ -29,6 +29,7 @@ import (
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -618,6 +619,10 @@ func Start() {
 		encryptorInstance = crypto.NewNoOpEncryptor()
 	} else {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
+	}
+
+	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
+		log.WithError(err).Error("development hosted OpenRouter seed skipped")
 	}
 
 	authService, err := authorization.NewAuthService()

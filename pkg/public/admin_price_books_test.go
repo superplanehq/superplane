@@ -44,36 +44,59 @@ func TestAdminGetPriceBooks(t *testing.T) {
 
 		var body adminPriceBooksResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		assert.Equal(t, "2026-09-09.1", body.CurrentVersion)
-		assert.Equal(t, "2026-09-09.1", body.Version)
-		require.GreaterOrEqual(t, len(body.Versions), 2)
-		assert.Equal(t, "2026-09-09.1", body.Versions[0].Version)
+		assert.Equal(t, "2026-09-23.1", body.CurrentVersion)
+		assert.Equal(t, "2026-09-23.1", body.Version)
+		require.GreaterOrEqual(t, len(body.Versions), 1)
+		assert.Equal(t, "2026-09-23.1", body.Versions[0].Version)
 		require.NotEmpty(t, body.Models)
 		require.NotEmpty(t, body.VMs)
 
-		assert.True(t, containsModelRate(body.Models, "claude-sonnet"))
+		assert.True(t, containsModelRate(body.Models, "claude-sonnet-4-6"))
 		assert.True(t, containsVMRate(body.VMs, "e1-large-amd64", 70))
 		assert.True(t, modelRatesAreSorted(body.Models))
 		assert.True(t, vmRatesAreSorted(body.VMs))
 	})
 
 	t.Run("admin loads an explicit older version", func(t *testing.T) {
+		getBody := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, getBody.Code)
+		var current adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(getBody.Body.Bytes(), &current))
+
+		payload, err := json.Marshal(adminPriceBooksSaveRequest{
+			BaseVersion: current.Version,
+			Models:      current.Models,
+			VMs:         current.VMs,
+		})
+		require.NoError(t, err)
+		save := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        "/admin/api/price-books",
+			authCookie:  token,
+			body:        payload,
+			contentType: "application/json",
+		})
+		require.Equal(t, http.StatusOK, save.Code)
+
 		response := execRequest(server, requestParams{
 			method:     "GET",
-			path:       "/admin/api/price-books?version=2026-08-31.1",
+			path:       "/admin/api/price-books?version=2026-09-23.1",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		var body adminPriceBooksResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		assert.Equal(t, "2026-09-09.1", body.CurrentVersion)
-		assert.Equal(t, "2026-08-31.1", body.Version)
+		assert.NotEqual(t, "2026-09-23.1", body.CurrentVersion)
+		assert.Equal(t, "2026-09-23.1", body.Version)
 		require.NotEmpty(t, body.Models)
 		require.NotEmpty(t, body.VMs)
-		assert.True(t, containsModelRate(body.Models, "claude-sonnet"))
-		assert.True(t, containsVMRate(body.VMs, "e1-large-amd64", 0))
-		assert.False(t, containsModelRate(body.Models, "gemini-2.5-pro"))
+		assert.True(t, containsModelRate(body.Models, "claude-sonnet-4-6"))
+		assert.True(t, containsVMRate(body.VMs, "e1-large-amd64", 70))
 	})
 
 	t.Run("unknown version returns 404", func(t *testing.T) {
@@ -89,7 +112,7 @@ func TestAdminGetPriceBooks(t *testing.T) {
 func TestAdminSaveAndActivatePriceBooks(t *testing.T) {
 	server, _, token := setupAdminTestServer(t)
 	t.Cleanup(func() {
-		_ = models.ActivateUsagePriceBook(database.Conn(), "2026-09-09.1")
+		_ = models.ActivateUsagePriceBook(database.Conn(), "2026-09-23.1")
 	})
 
 	getBody := execRequest(server, requestParams{
@@ -126,7 +149,7 @@ func TestAdminSaveAndActivatePriceBooks(t *testing.T) {
 
 	var saved adminPriceBooksResponse
 	require.NoError(t, json.Unmarshal(save.Body.Bytes(), &saved))
-	assert.NotEqual(t, "2026-09-09.1", saved.CurrentVersion)
+	assert.NotEqual(t, "2026-09-23.1", saved.CurrentVersion)
 	assert.Equal(t, saved.CurrentVersion, saved.Version)
 	assert.True(t, containsVMRate(saved.VMs, "e1-test-amd64", 9))
 
@@ -134,21 +157,21 @@ func TestAdminSaveAndActivatePriceBooks(t *testing.T) {
 		method:      "PUT",
 		path:        "/admin/api/price-books/current",
 		authCookie:  token,
-		body:        []byte(`{"version":"2026-09-09.1"}`),
+		body:        []byte(`{"version":"2026-09-23.1"}`),
 		contentType: "application/json",
 	})
 	require.Equal(t, http.StatusOK, activate.Code)
 	var restored adminPriceBooksResponse
 	require.NoError(t, json.Unmarshal(activate.Body.Bytes(), &restored))
-	assert.Equal(t, "2026-09-09.1", restored.CurrentVersion)
-	assert.Equal(t, "2026-09-09.1", restored.Version)
+	assert.Equal(t, "2026-09-23.1", restored.CurrentVersion)
+	assert.Equal(t, "2026-09-23.1", restored.Version)
 	assert.False(t, containsVMRate(restored.VMs, "e1-test-amd64", 9))
 }
 
 func TestAdminSavePriceBooks_RejectsStaleBaseVersion(t *testing.T) {
 	server, _, token := setupAdminTestServer(t)
 	t.Cleanup(func() {
-		_ = models.ActivateUsagePriceBook(database.Conn(), "2026-09-09.1")
+		_ = models.ActivateUsagePriceBook(database.Conn(), "2026-09-23.1")
 	})
 
 	getBody := execRequest(server, requestParams{
@@ -161,7 +184,7 @@ func TestAdminSavePriceBooks_RejectsStaleBaseVersion(t *testing.T) {
 	require.NoError(t, json.Unmarshal(getBody.Body.Bytes(), &current))
 
 	payload, err := json.Marshal(adminPriceBooksSaveRequest{
-		BaseVersion: "2026-08-31.1",
+		BaseVersion: "missing-base",
 		Models:      current.Models,
 		VMs:         current.VMs,
 	})
@@ -240,15 +263,15 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 		}
 	})
 
-	t.Run("prefix allowlist selects matching prefix rate", func(t *testing.T) {
+	t.Run("exact allowlist selects matching catalog id", func(t *testing.T) {
 		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
-			Provider:      "openai",
+			Provider:      "anthropic",
 			APIKey:        []byte("encrypted"),
-			AllowedModels: datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}),
+			AllowedModels: datatypes.NewJSONSlice([]string{"claude-sonnet-4-6"}),
 		})
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'anthropic'")
 		})
 
 		response := execRequest(server, requestParams{
@@ -260,48 +283,24 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 
 		var body adminPriceBooksResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		sonnet := findModelRate(body.Models, "claude-sonnet")
-		require.NotNil(t, sonnet, "claude-sonnet should exist in rates")
-		assert.True(t, sonnet.Selected, "claude-sonnet should be selected when an allowlist entry matches")
+		sonnet := findModelRate(body.Models, "claude-sonnet-4-6")
+		require.NotNil(t, sonnet, "claude-sonnet-4-6 should exist in rates")
+		assert.Equal(t, "anthropic", sonnet.Provider)
+		assert.True(t, sonnet.Selected, "claude-sonnet-4-6 should be selected when an allowlist entry matches")
 
 		nonSelected := findModelRate(body.Models, "gpt-4o")
 		require.NotNil(t, nonSelected, "gpt-4o should exist in rates")
 		assert.False(t, nonSelected.Selected, "gpt-4o should not be selected with an anthropic allowlist")
 	})
 
-	t.Run("family allowlist selects matching family rate", func(t *testing.T) {
-		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
-			Provider:      "openai",
-			APIKey:        []byte("encrypted"),
-			AllowedModels: datatypes.NewJSONSlice([]string{"some-vendor/sonnet-v3"}),
-		})
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
-		})
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/price-books?version=2026-08-31.1",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		var body adminPriceBooksResponse
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		sonnet := findModelRate(body.Models, "sonnet")
-		require.NotNil(t, sonnet, "sonnet family rate should exist in 2026-08-31.1")
-		assert.True(t, sonnet.Selected, "sonnet family rate should be selected when an allowlist entry matches the family token")
-	})
-
 	t.Run("keyless provider allowlist does not select rates", func(t *testing.T) {
 		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
-			Provider:      "openai",
-			AllowedModels: datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}),
+			Provider:      "anthropic",
+			AllowedModels: datatypes.NewJSONSlice([]string{"claude-sonnet-4-6"}),
 		})
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'openai'")
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'anthropic'")
 		})
 
 		response := execRequest(server, requestParams{
@@ -313,10 +312,113 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 
 		var body adminPriceBooksResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		sonnet := findModelRate(body.Models, "claude-sonnet")
-		require.NotNil(t, sonnet, "claude-sonnet should exist in rates")
-		assert.False(t, sonnet.Selected, "claude-sonnet should not be selected without a hosted API key")
+		sonnet := findModelRate(body.Models, "claude-sonnet-4-6")
+		require.NotNil(t, sonnet, "claude-sonnet-4-6 should exist in rates")
+		assert.False(t, sonnet.Selected, "claude-sonnet-4-6 should not be selected without a hosted API key")
 	})
+
+	t.Run("allowlisted model missing from the book is selected for pricing", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      "anthropic",
+			APIKey:        []byte("encrypted"),
+			AllowedModels: datatypes.NewJSONSlice([]string{"claude-opus-99", "unknown-lab-model"}),
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'anthropic'")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.True(t, modelRatesAreSorted(body.Models))
+
+		opus := findModelRate(body.Models, "claude-opus-99")
+		require.NotNil(t, opus)
+		assert.Equal(t, "anthropic", opus.Provider)
+		assert.Equal(t, models.UsagePriceBookMatchExact, opus.MatchMode)
+		assert.True(t, opus.Selected)
+		assert.Equal(t, int64(1500), opus.InputCentsPerMillion)
+		assert.Equal(t, int64(7500), opus.OutputCentsPerMillion)
+
+		unknown := findModelRate(body.Models, "unknown-lab-model")
+		require.NotNil(t, unknown)
+		assert.Equal(t, "anthropic", unknown.Provider)
+		assert.True(t, unknown.Selected)
+		assert.Equal(t, int64(0), unknown.InputCentsPerMillion)
+		assert.Equal(t, int64(0), unknown.OutputCentsPerMillion)
+	})
+}
+
+func TestAdminSyncPriceBooks_RejectsProvidersWithoutCatalogPrices(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	response := execRequest(server, requestParams{
+		method:     "POST",
+		path:       "/admin/api/price-books/sync?provider=anthropic",
+		authCookie: token,
+	})
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Contains(t, response.Body.String(), "The Anthropic API does not publish prices.")
+}
+
+func TestAdminDeletePriceBook(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	getBody := execRequest(server, requestParams{
+		method:     "GET",
+		path:       "/admin/api/price-books",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, getBody.Code)
+	var current adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(getBody.Body.Bytes(), &current))
+
+	payload, err := json.Marshal(adminPriceBooksSaveRequest{
+		BaseVersion: current.Version,
+		Models:      current.Models,
+		VMs:         current.VMs,
+	})
+	require.NoError(t, err)
+	save := execRequest(server, requestParams{
+		method:      "PUT",
+		path:        "/admin/api/price-books",
+		authCookie:  token,
+		body:        payload,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, save.Code)
+	var saved adminPriceBooksResponse
+	require.NoError(t, json.Unmarshal(save.Body.Bytes(), &saved))
+
+	currentDelete := execRequest(server, requestParams{
+		method:     "DELETE",
+		path:       "/admin/api/price-books?version=" + saved.Version,
+		authCookie: token,
+	})
+	assert.Equal(t, http.StatusConflict, currentDelete.Code)
+
+	activate := execRequest(server, requestParams{
+		method:      "PUT",
+		path:        "/admin/api/price-books/current",
+		authCookie:  token,
+		body:        []byte(`{"version":"` + current.Version + `"}`),
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, activate.Code)
+
+	deleted := execRequest(server, requestParams{
+		method:     "DELETE",
+		path:       "/admin/api/price-books?version=" + saved.Version,
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, deleted.Code)
 }
 
 func containsModelRate(rates []adminPriceBookModelRate, matchKey string) bool {
@@ -344,6 +446,12 @@ func modelRatesAreSorted(rates []adminPriceBookModelRate) bool {
 	for i := 1; i < len(rates); i++ {
 		previous := rates[i-1]
 		current := rates[i]
+		if previous.Provider != current.Provider {
+			if previous.Provider > current.Provider {
+				return false
+			}
+			continue
+		}
 		if previous.MatchKey == current.MatchKey {
 			if previous.MatchMode > current.MatchMode {
 				return false

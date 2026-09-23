@@ -27,10 +27,32 @@ func Test__FilterCatalogPrices__MatchesAllowlistAndNormalizedIDs(t *testing.T) {
 		{ID: "openai/gpt-4o-mini", Rate: pricebook.Rate{Input: 15}},
 	}
 
-	filtered := pricebooksync.FilterCatalogPrices(prices, []string{"anthropic/claude-sonnet-4-6", "gpt-4o-mini"})
+	filtered := pricebooksync.FilterCatalogPrices(
+		models.UsageProviderOpenRouter,
+		prices,
+		[]string{"anthropic/claude-sonnet-4-6", "gpt-4o-mini"},
+	)
 	require.Len(t, filtered, 2)
+	assert.Equal(t, models.UsageProviderOpenRouter, filtered[0].Provider)
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", filtered[0].ModelID)
 	assert.Equal(t, "openai/gpt-4o-mini", filtered[1].ModelID)
+}
+
+func Test__FilterCatalogPrices__KeepsCatalogIDs(t *testing.T) {
+	prices := []llm.CatalogPrice{
+		{ID: "openrouter/x-ai/grok-4.6", Rate: pricebook.Rate{Input: 200}},
+		{ID: "anthropic/claude-sonnet-4.6", Rate: pricebook.Rate{Input: 300}},
+	}
+
+	filtered := pricebooksync.FilterCatalogPrices(
+		models.UsageProviderOpenRouter,
+		prices,
+		[]string{"openrouter/x-ai/grok-4.6", "anthropic/claude-sonnet-4.6"},
+	)
+	require.Len(t, filtered, 2)
+	assert.Equal(t, models.UsageProviderOpenRouter, filtered[0].Provider)
+	assert.Equal(t, "x-ai/grok-4.6", filtered[0].ModelID)
+	assert.Equal(t, "anthropic/claude-sonnet-4.6", filtered[1].ModelID)
 }
 
 func Test__Sync__SkipsPublishWhenRatesUnchanged(t *testing.T) {

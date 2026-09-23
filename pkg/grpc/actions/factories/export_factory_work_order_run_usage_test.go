@@ -106,7 +106,7 @@ func Test__ExportFactoryWorkOrderRunUsage(t *testing.T) {
 	assert.Equal(t, oldOccurredAt.UTC().Format(time.RFC3339), row[0])
 	assert.Equal(t, r.UserModel.Name, row[1])
 	assert.Equal(t, factory.WorkOrderKey(order.Number), row[2])
-	assert.Equal(t, "anthropic/claude-sonnet-4-6 (your keys)", row[3])
+	assert.Equal(t, "claude-sonnet-4-6 (your keys)", row[3])
 	assert.Equal(t, "1000000", row[4])
 	assert.Equal(t, computeMachineType, row[6])
 	assert.Equal(t, strconv.FormatInt(computeSeconds, 10), row[7])
