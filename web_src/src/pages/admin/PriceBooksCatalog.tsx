@@ -1,30 +1,21 @@
-import { Link } from "@/components/Link/link";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { hostedProviderLabel } from "@/lib/hostedCredit";
-import { BookOpen, ChevronDown, ChevronRight } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import AdminPagination from "./AdminPagination";
+import { BookOpen } from "lucide-react";
+import type { ReactNode } from "react";
 import { formatDate } from "./formatDate";
-import { AddModelRateForm, AddVMRateForm } from "./priceBooksForms";
-import { EmptyRatesMessage, ModelsTable, tableWrapClass, VMsTable } from "./priceBooksTables";
+import { AddVMRateForm } from "./priceBooksForms";
+import { ModelsPanel, type PriceBookProvider } from "./priceBooksModelsPanel";
+import { tableWrapClass, VMsTable } from "./priceBooksTables";
 import type { PriceBookModelRate, PriceBooksResponse, PriceBookVMRate } from "./priceBooksApi";
 
 export type PriceBooksTab = "models" | "machines";
-export type PriceBookProvider = "openrouter" | "anthropic" | "openai";
-
-const UNUSED_PAGE_SIZE = 50;
-const PROVIDERS: PriceBookProvider[] = ["openrouter", "anthropic", "openai"];
+export type { PriceBookProvider };
 
 function isPriceBooksTab(value: string): value is PriceBooksTab {
   return value === "models" || value === "machines";
-}
-
-function isPriceBookProvider(value: string): value is PriceBookProvider {
-  return value === "openrouter" || value === "anthropic" || value === "openai";
 }
 
 function PriceBooksHeader() {
@@ -218,190 +209,6 @@ function PriceBooksToolbar({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ModelsPanel({
-  isCurrent,
-  models,
-  provider,
-  saving,
-  syncing,
-  actionsDisabled,
-  onProviderChange,
-  onModelChange,
-  onAddModel,
-  onSave,
-  onSync,
-}: {
-  isCurrent: boolean;
-  models: PriceBookModelRate[];
-  provider: PriceBookProvider;
-  saving: boolean;
-  syncing: boolean;
-  actionsDisabled: boolean;
-  onProviderChange: (provider: PriceBookProvider) => void;
-  onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-  onAddModel: (rate: PriceBookModelRate) => boolean;
-  onSave: () => void;
-  onSync: (provider: PriceBookProvider) => void;
-}) {
-  const providerRows = models.map((rate, index) => ({ rate, index })).filter(({ rate }) => rate.provider === provider);
-  const selectedRows = providerRows.filter(({ rate }) => rate.selected);
-  const unusedRows = providerRows.filter(({ rate }) => !rate.selected);
-  const hasNoRates = providerRows.length === 0;
-
-  return (
-    <>
-      <Tabs
-        value={provider}
-        onValueChange={(nextProvider) => {
-          if (isPriceBookProvider(nextProvider)) {
-            onProviderChange(nextProvider);
-          }
-        }}
-      >
-        <TabsList>
-          {PROVIDERS.map((item) => (
-            <TabsTrigger key={item} value={item}>
-              {hostedProviderLabel(item)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      {isCurrent && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <ProviderUpdateControl
-            provider={provider}
-            syncing={syncing}
-            actionsDisabled={actionsDisabled}
-            onSync={onSync}
-          />
-          <Button
-            type="button"
-            size="sm"
-            data-testid="admin-price-book-save"
-            disabled={actionsDisabled}
-            onClick={onSave}
-          >
-            {saving ? "Saving rates..." : "Save rates"}
-          </Button>
-        </div>
-      )}
-      {hasNoRates ? (
-        <EmptyRatesMessage message="This version has no model rates for this provider." />
-      ) : (
-        <>
-          <div>
-            <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Selected models</Text>
-            {selectedRows.length > 0 ? (
-              <ModelsTable rows={selectedRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
-            ) : (
-              <EmptyRatesMessage
-                message="No models are selected in Hosted LLM settings."
-                action={
-                  <Link
-                    href="/admin/settings"
-                    className="mt-3 inline-block text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Open Hosted LLM settings
-                  </Link>
-                }
-              />
-            )}
-          </div>
-          <UnusedModelsSection
-            key={provider}
-            rows={unusedRows}
-            editable={isCurrent && !actionsDisabled}
-            onChange={onModelChange}
-          />
-        </>
-      )}
-      {isCurrent && <AddModelRateForm provider={provider} disabled={actionsDisabled} onAdd={onAddModel} />}
-    </>
-  );
-}
-
-function ProviderUpdateControl({
-  provider,
-  syncing,
-  actionsDisabled,
-  onSync,
-}: {
-  provider: PriceBookProvider;
-  syncing: boolean;
-  actionsDisabled: boolean;
-  onSync: (provider: PriceBookProvider) => void;
-}) {
-  if (provider !== "openrouter") {
-    return (
-      <div>
-        <Button type="button" variant="outline" size="sm" disabled data-testid="admin-price-book-sync-disabled">
-          Update model rates
-        </Button>
-        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {provider === "anthropic"
-            ? "The Anthropic API does not publish prices. Edit rates here."
-            : "The OpenAI API does not publish prices. Edit rates here."}
-        </Text>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        data-testid="admin-price-book-sync"
-        disabled={actionsDisabled}
-        onClick={() => onSync(provider)}
-      >
-        {syncing ? "Updating model rates..." : "Update model rates"}
-      </Button>
-      <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Creates a new current version from the OpenRouter catalog. Past usage keeps recorded costs.
-      </Text>
-    </div>
-  );
-}
-
-function UnusedModelsSection({
-  rows,
-  editable,
-  onChange,
-}: {
-  rows: { rate: PriceBookModelRate; index: number }[];
-  editable: boolean;
-  onChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const pageRows = rows.slice(offset, offset + UNUSED_PAGE_SIZE);
-
-  return (
-    <div>
-      <button
-        type="button"
-        className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
-        data-testid="admin-price-book-unused-toggle"
-        onClick={() => setOpen((current) => !current)}
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        Unused models ({rows.length})
-      </button>
-      {open &&
-        (rows.length > 0 ? (
-          <>
-            <ModelsTable rows={pageRows} editable={editable} onChange={onChange} />
-            <AdminPagination offset={offset} total={rows.length} pageSize={UNUSED_PAGE_SIZE} onPageChange={setOffset} />
-          </>
-        ) : (
-          <EmptyRatesMessage message="No unused model rates for this provider." />
-        ))}
     </div>
   );
 }
