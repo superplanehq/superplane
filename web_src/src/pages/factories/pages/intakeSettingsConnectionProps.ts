@@ -7,12 +7,14 @@ export function intakeSettingsConnectionProps(
   intake: ConfiguredLineIntakeSource,
   connection: IntakeConnectionModel,
   savedBinding: IntakeConnectionBinding,
+  integrationsBasePath: string,
 ): IntakeSettingsConnection | undefined {
   if (!connection.enabled) {
     return undefined;
   }
   return {
     health: intake.health,
+    integrationsBasePath,
     binding: connection.binding,
     integrations: connection.integrations,
     integrationsLoading: connection.integrationsLoading,

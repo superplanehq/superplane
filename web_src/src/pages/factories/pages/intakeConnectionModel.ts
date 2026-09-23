@@ -24,13 +24,18 @@ export function intakeProviderAppName(sourceId: LineIntakeSourceId): string {
 }
 
 export function intakeProviderDisplayName(sourceId: LineIntakeSourceId): string {
-  if (sourceId === "jira-issues") {
-    return "Jira";
+  switch (sourceId) {
+    case "github-issues":
+      return "GitHub";
+    case "jira-issues":
+      return "Jira";
+    case "sentry-exceptions":
+      return "Sentry";
+    case "pagerduty-incidents":
+      return "PagerDuty";
+    case "productive-tasks":
+      return "Productive.io";
   }
-  if (sourceId === "sentry-exceptions") {
-    return "Sentry";
-  }
-  return "Productive.io";
 }
 
 export const INTAKE_CONNECTION_COPY = {
@@ -38,6 +43,7 @@ export const INTAKE_CONNECTION_COPY = {
   chooseJira: "Choose the Jira site that SuperPlane will monitor.",
   chooseSentry: "Choose the Sentry organization that SuperPlane will monitor.",
   chooseProductive: "Choose the Productive.io account that SuperPlane will monitor.",
+  integration: "Integration",
   project: "Project",
   connect: "Connect",
   connecting: "Connecting...",
@@ -62,6 +68,14 @@ export function intakeChooseConnectionCopy(sourceId: LineIntakeSourceId): string
     return INTAKE_CONNECTION_COPY.chooseSentry;
   }
   return INTAKE_CONNECTION_COPY.chooseProductive;
+}
+
+export function intakeIntegrationInstanceName(integration: OrganizationsIntegration): string {
+  const name = integration.metadata?.name?.trim();
+  if (name) {
+    return name;
+  }
+  return INTAKE_CONNECTION_COPY.integration;
 }
 
 export function intakeHealthBanner(health: FactoryIntakeHealth | undefined): string | undefined {

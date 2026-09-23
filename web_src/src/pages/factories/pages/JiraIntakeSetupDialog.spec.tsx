@@ -106,7 +106,8 @@ async function chooseProjectAndWaitForDone(user: ReturnType<typeof userEvent.set
   expect(await screen.findByRole("heading", { name: JIRA_COMPLETION_COLUMN_COPY.section })).toBeInTheDocument();
   expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepCompletionHelper)).toBeInTheDocument();
   expect(screen.queryByTestId("jira-intake-setup-stepper")).not.toBeInTheDocument();
-  expect(screen.getByTestId("jira-move-on-complete").parentElement).not.toHaveClass("rounded-lg");
+  expect(screen.getByTestId("jira-move-on-complete")).not.toHaveClass("rounded-lg");
+  expect(screen.getByTestId("jira-completion-column")).toContainElement(screen.getByTestId("jira-move-on-complete"));
   await waitFor(() => {
     expect(screen.getByTestId("jira-completion-column-select")).toHaveTextContent("Done");
   });

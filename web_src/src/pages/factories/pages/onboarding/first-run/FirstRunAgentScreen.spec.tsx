@@ -46,7 +46,8 @@ describe("FirstRunAgentScreen", () => {
     const completion = screen.getByTestId("jira-completion-column");
     expect(completion).toBeInTheDocument();
     expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
-    expect(screen.getByTestId("jira-move-on-complete").parentElement).not.toHaveClass("rounded-lg");
+    expect(screen.getByTestId("jira-move-on-complete")).not.toHaveClass("rounded-lg");
+    expect(completion).toContainElement(screen.getByTestId("jira-completion-column-select"));
     await user.click(screen.getByTestId("jira-move-on-complete"));
     expect(onChange).toHaveBeenCalledWith({ jiraMoveOnComplete: false, jiraCompletionColumn: "Done" });
   });

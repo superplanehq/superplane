@@ -578,7 +578,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("settings=automation");
     expect(screen.getByTestId("intake-source-settings")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("intake-settings-tab-general")).toHaveAttribute("aria-current", "page");
   });
 
   it("opens an existing phase automation in the board view popup", async () => {
@@ -1223,7 +1223,7 @@ describe("LinesPage board extras", () => {
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
+    await user.click(screen.getByTestId("intake-settings-tab-automation"));
 
     expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
@@ -1247,8 +1247,8 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
 
     expect(
-      within(screen.getByTestId("intake-source-settings")).getByRole("heading", { name: "Intake Triage issues" }),
-    ).toBeInTheDocument();
+      within(screen.getByTestId("intake-source-settings")).getByTestId("intake-settings-topbar").querySelector("h2"),
+    ).toHaveTextContent("GitHub intake");
   });
 
   it("does not list intake runs under the GitHub issues row", () => {

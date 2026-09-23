@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useFloating, autoUpdate, offset, flip, shift, size } from "@floating-ui/react";
+import { ChevronDownIcon } from "lucide-react";
 import { Icon } from "@/components/Icon";
-import { twMerge } from "tailwind-merge";
+import { selectTriggerClassName } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export interface AutoCompleteOption {
   value: string;
@@ -18,6 +20,8 @@ export interface AutoCompleteSelectProps {
   className?: string;
   error?: boolean;
   disabled?: boolean;
+  id?: string;
+  testId?: string;
 }
 
 export function AutoCompleteSelect({
@@ -28,6 +32,8 @@ export function AutoCompleteSelect({
   className,
   error = false,
   disabled = false,
+  id,
+  testId,
 }: AutoCompleteSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -139,13 +145,14 @@ export function AutoCompleteSelect({
     <div className="relative w-full min-w-0">
       <div
         ref={refs.setReference}
-        className={twMerge(
-          "relative flex items-center w-full min-w-0 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100",
-          "border rounded-md focus-within:outline-none focus-within:ring-2 cursor-pointer",
-          error
-            ? "border-red-300 dark:border-red-600 focus-within:ring-red-500"
-            : "border-gray-300 dark:border-gray-600 focus-within:ring-blue-500",
-          disabled && "opacity-50 cursor-not-allowed",
+        id={id}
+        data-testid={testId}
+        data-size="default"
+        className={cn(
+          selectTriggerClassName,
+          "relative w-full min-w-0 cursor-pointer focus-within:border-gray-500 focus-within:ring-[3px] focus-within:ring-ring/50",
+          error && "border-destructive focus-within:ring-destructive/50",
+          disabled && "cursor-not-allowed opacity-50",
           className,
         )}
         onClick={() => {
@@ -157,7 +164,7 @@ export function AutoCompleteSelect({
         }}
       >
         {!isOpen && selectedOption && query === "" ? (
-          <span className="flex-1 min-w-0 text-gray-800 dark:text-gray-100 truncate">{selectedOption.label}</span>
+          <span className="flex-1 min-w-0 truncate">{selectedOption.label}</span>
         ) : (
           <input
             ref={inputRef}
@@ -165,7 +172,7 @@ export function AutoCompleteSelect({
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup="listbox"
-            className="flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-muted-foreground"
             placeholder={placeholder}
             value={query}
             onChange={handleInputChange}
@@ -176,20 +183,13 @@ export function AutoCompleteSelect({
           />
         )}
         <div
-          className="ml-2"
+          className="shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             setIsOpen(!isOpen);
           }}
         >
-          <Icon
-            name="chevron-down"
-            size="sm"
-            className={twMerge(
-              "ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0 transition-transform",
-              isOpen && "rotate-180",
-            )}
-          />
+          <ChevronDownIcon className={cn("size-4 opacity-50 transition-transform", isOpen && "rotate-180")} />
         </div>
       </div>
 
@@ -198,18 +198,18 @@ export function AutoCompleteSelect({
           ref={refs.setFloating}
           style={floatingStyles}
           role="listbox"
-          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-600 focus:outline-none"
+          className="z-50 max-h-60 overflow-auto rounded-md bg-popover text-popover-foreground shadow-md border border-border focus:outline-none"
         >
           <div ref={listRef}>
             {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="px-3 py-2 text-sm text-muted-foreground">
                 {query !== "" ? "No options found" : "No connections available"}
               </div>
             ) : (
               Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
                 <div key={groupName}>
                   {Object.keys(groupedOptions).length > 1 && (
-                    <div className="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-600">
+                    <div className="px-3 py-1 text-xs font-medium text-muted-foreground bg-muted border-b border-border">
                       {groupName}
                     </div>
                   )}
@@ -220,15 +220,15 @@ export function AutoCompleteSelect({
                         key={option.value}
                         role="option"
                         aria-selected={isSelected}
-                        className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-500 hover:text-white text-gray-800 dark:text-gray-100"
+                        className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleOptionSelect(option.value)}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={twMerge("block truncate", isSelected ? "font-medium" : "font-normal")}>
+                          <span className={cn("block truncate", isSelected ? "font-medium" : "font-normal")}>
                             {option.label}
                           </span>
-                          {isSelected && <Icon name="check" size="sm" className="text-blue-500" />}
+                          {isSelected && <Icon name="check" size="sm" className="text-primary" />}
                         </div>
                       </div>
                     );

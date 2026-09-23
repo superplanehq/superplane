@@ -1,14 +1,27 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Settings, Workflow } from "lucide-react";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { cn } from "@/lib/utils";
+import {
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
 import { IntakeConnectionFields, type IntakeConnectionFieldsProps } from "./IntakeConnectionFields";
-import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
+import { IntakeSettingsLifecycle } from "./IntakeSourceSettingsFooter";
+import { IntakeSettingsSidebar } from "./IntakeSettingsSidebar";
+import { IntakeSettingsTableOfContents } from "./IntakeSettingsTableOfContents";
 import {
   INTAKE_SETTINGS_COPY,
+  intakeSettingsSections,
   intakeSettingsTabs,
+  intakeSettingsTitle,
+  resolveIntakeSettingsTab,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -16,12 +29,8 @@ import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import {
-  SettingsAutomationCanvasEdit,
-  SettingsAutomationHeaderRow,
-  SettingsAutomationWorkspace,
-} from "./SettingsAutomationWorkspace";
-import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
+import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
+import { PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
@@ -94,80 +103,78 @@ export function IntakeSourceSettingsPopup({
   initialTab = "general",
   connection,
 }: IntakeSourceSettingsPopupProps) {
-  const tabs = intakeSettingsTabs(Boolean(agent));
-  const hasAgent = Boolean(agent);
+  const tabs = useMemo(() => intakeSettingsTabs(Boolean(agent)), [agent]);
   const [draft, setDraft] = useState(settings);
-  const [tab, setTab] = useState<IntakeSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
+  const [tab, setTab] = useState<IntakeSettingsTab>(() => resolveIntakeSettingsTab(tabs, initialTab));
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
 
   useEffect(() => {
-    const next = intakeSettingsTabs(hasAgent);
-    if (!next.includes(tab)) {
-      setTab("general");
-    }
-  }, [tab, hasAgent]);
+    setTab((current) => resolveIntakeSettingsTab(tabs, current));
+  }, [tabs]);
 
   return (
-    <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={`Intake ${settings.name}`} onClose={onClose}>
-        <SettingsAutomationHeaderRow
-          tabs={
-            <Tabs value={tab} onValueChange={(value) => setTab(value as IntakeSettingsTab)}>
-              <TabsList aria-label={INTAKE_SETTINGS_COPY.tabsLabel}>
-                <TabsTrigger value="general" data-testid="intake-settings-tab-general">
-                  <Settings />
-                  {INTAKE_SETTINGS_COPY.generalTab}
-                </TabsTrigger>
-                {tabs.includes("agent") ? (
-                  <TabsTrigger value="agent" data-testid="intake-settings-tab-agent">
-                    <Bot />
-                    {INTAKE_SETTINGS_COPY.agentTab}
-                  </TabsTrigger>
-                ) : null}
-                <TabsTrigger value="automation" data-testid="intake-settings-tab-automation">
-                  <Workflow />
-                  {INTAKE_SETTINGS_COPY.automationTab}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+    <PopupShell
+      testId="intake-source-settings"
+      canvas
+      fixed={fixed}
+      onDismiss={onClose}
+      className="bg-sidebar! text-sidebar-foreground"
+    >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar">
+        <IntakeSettingsSidebar
+          sourceId={sourceId}
+          title={intakeSettingsTitle(sourceId)}
+          tabs={tabs}
+          active={tab}
+          onSelect={setTab}
+          onClose={onClose}
+          save={
+            tab === "general"
+              ? {
+                  draft,
+                  savePending,
+                  saveError,
+                  onSave,
+                  onClose,
+                  saveDisabled: connection?.saveDisabled,
+                }
+              : undefined
           }
         />
-      </PopupHeader>
-      <IntakeSettingsTabPanel
-        tab={tab}
-        sourceId={sourceId}
-        organizationId={organizationId}
-        integrationId={integrationId}
-        resourceId={resourceId}
-        labelOptions={labelOptions}
-        labelOptionsLoading={labelOptionsLoading}
-        draft={draft}
-        agent={agent}
-        automationGraph={automationGraph}
-        automationLoading={automationLoading}
-        automationError={automationError}
-        onRetryAutomation={onRetryAutomation}
-        canvasId={canvasId}
-        runHrefFor={runHrefFor}
-        editAutomationHref={editAutomationHref}
-        savePending={savePending}
-        saveError={saveError}
-        paused={paused}
-        pausePending={pausePending}
-        deletePending={deletePending}
-        pauseError={pauseError}
-        deleteError={deleteError}
-        onPause={onPause}
-        onResume={onResume}
-        onDelete={onDelete}
-        onDraftChange={setDraft}
-        onSave={onSave}
-        onClose={onClose}
-        connection={connection}
-      />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <IntakeSettingsTabPanel
+            tab={tab}
+            sourceId={sourceId}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            resourceId={resourceId}
+            labelOptions={labelOptions}
+            labelOptionsLoading={labelOptionsLoading}
+            draft={draft}
+            agent={agent}
+            automationGraph={automationGraph}
+            automationLoading={automationLoading}
+            automationError={automationError}
+            onRetryAutomation={onRetryAutomation}
+            canvasId={canvasId}
+            runHrefFor={runHrefFor}
+            editAutomationHref={editAutomationHref}
+            onDraftChange={setDraft}
+            connection={connection}
+            paused={paused}
+            pausePending={pausePending}
+            deletePending={deletePending}
+            pauseError={pauseError}
+            deleteError={deleteError}
+            onPause={onPause}
+            onResume={onResume}
+            onDelete={onDelete}
+          />
+        </div>
+      </div>
     </PopupShell>
   );
 }
@@ -189,8 +196,8 @@ function IntakeSettingsTabPanel({
   canvasId,
   runHrefFor,
   editAutomationHref,
-  savePending,
-  saveError,
+  onDraftChange,
+  connection,
   paused,
   pausePending,
   deletePending,
@@ -199,10 +206,6 @@ function IntakeSettingsTabPanel({
   onPause,
   onResume,
   onDelete,
-  onDraftChange,
-  onSave,
-  onClose,
-  connection,
 }: {
   tab: IntakeSettingsTab;
   sourceId: LineIntakeSourceId;
@@ -220,8 +223,8 @@ function IntakeSettingsTabPanel({
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
   editAutomationHref?: string;
-  savePending?: boolean;
-  saveError?: string;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  connection?: IntakeSettingsConnection;
   paused: boolean;
   pausePending: boolean;
   deletePending: boolean;
@@ -230,10 +233,6 @@ function IntakeSettingsTabPanel({
   onPause?: () => Promise<void> | void;
   onResume?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
-  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
-  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
-  onClose: () => void;
-  connection?: IntakeSettingsConnection;
 }) {
   if (tab === "automation") {
     return (
@@ -264,7 +263,7 @@ function IntakeSettingsTabPanel({
     );
   }
   return (
-    <IntakeGeneralTab
+    <IntakeSettingsGeneralPanel
       sourceId={sourceId}
       organizationId={organizationId}
       integrationId={integrationId}
@@ -272,8 +271,8 @@ function IntakeSettingsTabPanel({
       labelOptions={labelOptions}
       labelOptionsLoading={labelOptionsLoading}
       draft={draft}
-      savePending={savePending}
-      saveError={saveError}
+      onDraftChange={onDraftChange}
+      connection={connection}
       paused={paused}
       pausePending={pausePending}
       deletePending={deletePending}
@@ -282,15 +281,11 @@ function IntakeSettingsTabPanel({
       onPause={onPause}
       onResume={onResume}
       onDelete={onDelete}
-      onDraftChange={onDraftChange}
-      onSave={onSave}
-      onClose={onClose}
-      connection={connection}
     />
   );
 }
 
-function IntakeGeneralTab({
+function IntakeSettingsGeneralPanel({
   sourceId,
   organizationId,
   integrationId,
@@ -298,8 +293,8 @@ function IntakeGeneralTab({
   labelOptions,
   labelOptionsLoading,
   draft,
-  savePending,
-  saveError,
+  onDraftChange,
+  connection,
   paused,
   pausePending,
   deletePending,
@@ -308,10 +303,6 @@ function IntakeGeneralTab({
   onPause,
   onResume,
   onDelete,
-  onDraftChange,
-  onSave,
-  onClose,
-  connection,
 }: {
   sourceId: LineIntakeSourceId;
   organizationId?: string;
@@ -320,8 +311,8 @@ function IntakeGeneralTab({
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
-  savePending?: boolean;
-  saveError?: string;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  connection?: IntakeSettingsConnection;
   paused: boolean;
   pausePending: boolean;
   deletePending: boolean;
@@ -330,18 +321,20 @@ function IntakeGeneralTab({
   onPause?: () => Promise<void> | void;
   onResume?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
-  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
-  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
-  onClose: () => void;
-  connection?: IntakeSettingsConnection;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sections = useMemo(() => intakeSettingsSections(sourceId, Boolean(connection)), [connection, sourceId]);
+
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+    <div className="flex min-h-0 min-w-0 flex-1">
+      <IntakeSettingsTableOfContents sections={sections} scrollContainerRef={scrollRef} />
+      <IntakeSectionScroll ref={scrollRef} width={connection ? "connection" : "wide"}>
+        <div className="flex flex-col gap-8">
           {connection ? (
             <IntakeConnectionFields
               sourceId={sourceId}
+              organizationId={organizationId}
+              integrationsBasePath={connection.integrationsBasePath}
               health={connection.health}
               binding={connection.binding}
               integrations={connection.integrations}
@@ -363,6 +356,8 @@ function IntakeGeneralTab({
             onSettingsChange={onDraftChange}
             labelOptions={labelOptions}
             labelOptionsLoading={labelOptionsLoading}
+            part="all"
+            layout="grid"
           />
           <JiraIntakeFilterFields
             sourceId={sourceId}
@@ -371,30 +366,54 @@ function IntakeGeneralTab({
             organizationId={organizationId}
             integrationId={integrationId}
             projectId={resourceId}
+            part="all"
+            layout="grid"
           />
-          <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <SentryIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            layout="grid"
+          />
+          <IntakeSettingsLifecycle
+            sourceId={sourceId}
+            paused={paused}
+            pausePending={pausePending}
+            deletePending={deletePending}
+            pauseError={pauseError}
+            deleteError={deleteError}
+            onPause={onPause}
+            onResume={onResume}
+            onDelete={onDelete}
+          />
         </div>
-      </div>
-      <IntakeSourceSettingsFooter
-        sourceId={sourceId}
-        draft={draft}
-        savePending={savePending}
-        saveError={saveError}
-        paused={paused}
-        pausePending={pausePending}
-        deletePending={deletePending}
-        pauseError={pauseError}
-        deleteError={deleteError}
-        onPause={onPause}
-        onResume={onResume}
-        onDelete={onDelete}
-        onSave={onSave}
-        onClose={onClose}
-        saveDisabled={connection?.saveDisabled}
-      />
-    </>
+      </IntakeSectionScroll>
+    </div>
   );
 }
+
+const IntakeSectionScroll = forwardRef<
+  HTMLDivElement,
+  {
+    children: ReactNode;
+    width?: "wide" | "connection" | "narrow";
+  }
+>(function IntakeSectionScroll({ children, width = "wide" }, ref) {
+  return (
+    <div ref={ref} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      <div
+        className={cn(
+          "w-full",
+          width === "wide" && "max-w-5xl",
+          width === "connection" && "max-w-2xl",
+          width === "narrow" && "max-w-xl",
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+});
 
 function IntakeAutomationTab({
   graph,
@@ -432,6 +451,7 @@ function IntakeAutomationTab({
       workflowNodes={graph.specNodes}
       editHref={editHref}
       editLabel={INTAKE_SETTINGS_COPY.editAutomation}
+      editPlacement="belowClose"
     />
   );
 }
@@ -473,6 +493,7 @@ function IntakeAutomationEmpty({
           href={editHref}
           label={INTAKE_SETTINGS_COPY.editAutomation}
           testId="settings-automation-edit"
+          placement="belowClose"
         />
       ) : null}
     </section>

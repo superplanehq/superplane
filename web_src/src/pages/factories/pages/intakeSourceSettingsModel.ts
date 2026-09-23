@@ -1,6 +1,18 @@
 import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
+import { INTAKE_CONNECTION_COPY, intakeProviderDisplayName } from "./intakeConnectionModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
+
+export type IntakeSettingsSectionId = "connection" | "triggers" | "labels" | "filters" | "factory" | "danger";
+
+export interface IntakeSettingsSection {
+  id: IntakeSettingsSectionId;
+  label: string;
+}
+
+export function intakeSettingsSectionDomId(id: IntakeSettingsSectionId): string {
+  return `intake-settings-${id}`;
+}
 
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
@@ -12,6 +24,16 @@ export function isIntakeSettingsTab(value: string | null | undefined): value is 
 
 export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {
   return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
+}
+
+export function resolveIntakeSettingsTab(
+  tabs: readonly IntakeSettingsTab[],
+  tab: IntakeSettingsTab,
+): IntakeSettingsTab {
+  if (tabs.includes(tab)) {
+    return tab;
+  }
+  return "general";
 }
 
 export interface IntakeSourceSettings {
@@ -78,12 +100,23 @@ export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
   jiraCompletionColumn: "",
 } as const;
 
+const INTAKE_SETTINGS_TITLE_BY_SOURCE: Record<LineIntakeSourceId, string> = {
+  "github-issues": "GitHub intake",
+  "jira-issues": "Jira intake",
+  "sentry-exceptions": "Sentry intake",
+  "pagerduty-incidents": "PagerDuty intake",
+  "productive-tasks": "Productive intake",
+};
+
+export function intakeSettingsTitle(sourceId: LineIntakeSourceId): string {
+  return INTAKE_SETTINGS_TITLE_BY_SOURCE[sourceId];
+}
+
 export const INTAKE_SETTINGS_COPY = {
-  title: "Intake GitHub issues",
   tabsLabel: "Intake settings",
-  generalTab: "General",
+  generalTab: "Settings",
   agentTab: "Agent",
-  automationTab: "Automation",
+  automationTab: "Canvas",
   editAutomation: "Edit automation",
   automationLoading: "The automation is loading.",
   automationEmpty: "This intake has no automation yet.",
@@ -103,6 +136,9 @@ export const INTAKE_SETTINGS_COPY = {
   labelsEmpty: "No labels found in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
   authorsWithAccess: "Author is a repository collaborator",
+  eventsThatCreateTasks: "Events that create tasks",
+  eventsThatCreateTasksHelper: "The events you select here create tasks in the factory.",
+  dangerZone: "Pause or delete",
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
@@ -110,16 +146,24 @@ export const INTAKE_SETTINGS_COPY = {
   resume: "Resume intake",
   pausing: "Pausing",
   resuming: "Resuming",
-  pauseHelper: "SuperPlane stops new items. Tasks in Backlog stay.",
   delete: "Delete intake",
   deleteTitle: "Delete this intake?",
-  deleteDescription:
-    "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
   deleteCancel: "Keep intake",
   deleteConfirm: "Delete intake",
   pauseError: "SuperPlane could not change the intake. Try again.",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
+
+export function intakeSettingsTabLabel(tab: IntakeSettingsTab): string {
+  switch (tab) {
+    case "general":
+      return INTAKE_SETTINGS_COPY.generalTab;
+    case "agent":
+      return INTAKE_SETTINGS_COPY.agentTab;
+    case "automation":
+      return INTAKE_SETTINGS_COPY.automationTab;
+  }
+}
 
 export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
   return (
@@ -128,6 +172,54 @@ export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
     sourceId === "jira-issues" ||
     sourceId === "productive-tasks"
   );
+}
+
+function intakeStopsListeningCopy(sourceId: LineIntakeSourceId): string {
+  return `SuperPlane stops listening for changes from ${intakeProviderDisplayName(sourceId)}.`;
+}
+
+export function intakePauseHelper(sourceId: LineIntakeSourceId): string {
+  return `${intakeStopsListeningCopy(sourceId)} You can still import one item to Backlog by hand.`;
+}
+
+export function intakeDeleteHelper(sourceId: LineIntakeSourceId): string {
+  return `${intakeStopsListeningCopy(sourceId)} Delete also removes this intake from Backlog. Tasks that this intake created stay in Backlog.`;
+}
+
+export function intakeDangerZoneHelper(sourceId: LineIntakeSourceId): string {
+  return `Pause stops SuperPlane from listening for changes from ${intakeProviderDisplayName(sourceId)}. Delete removes this intake from Backlog.`;
+}
+
+export function intakeSettingsSections(sourceId: LineIntakeSourceId, hasConnection: boolean): IntakeSettingsSection[] {
+  const sections: IntakeSettingsSection[] = [];
+
+  if (hasConnection) {
+    sections.push({ id: "connection", label: INTAKE_CONNECTION_COPY.section });
+  }
+
+  switch (sourceId) {
+    case "github-issues":
+      sections.push({ id: "triggers", label: "Triggers" });
+      sections.push({ id: "filters", label: INTAKE_SETTINGS_COPY.filtersLabel });
+      break;
+    case "jira-issues":
+      sections.push({ id: "triggers", label: INTAKE_SETTINGS_COPY.eventsThatCreateTasks });
+      sections.push({ id: "labels", label: "Labels" });
+      sections.push({ id: "factory", label: "When task completes" });
+      break;
+    case "sentry-exceptions":
+      sections.push({ id: "triggers", label: INTAKE_SETTINGS_COPY.eventsThatCreateTasks });
+      break;
+    case "productive-tasks":
+    case "pagerduty-incidents":
+      break;
+  }
+
+  if (intakeSupportsPause(sourceId)) {
+    sections.push({ id: "danger", label: INTAKE_SETTINGS_COPY.dangerZone });
+  }
+
+  return sections;
 }
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {

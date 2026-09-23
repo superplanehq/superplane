@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import {
   addIntakeLabel,
   INTAKE_SETTINGS_COPY,
+  intakeSettingsSectionDomId,
   toggleIntakeLabel,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -19,6 +20,8 @@ export function GitHubIntakeFilterFields({
   onSettingsChange,
   labelOptions = [],
   labelOptionsLoading = false,
+  part = "all",
+  layout = "stack",
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
@@ -26,6 +29,9 @@ export function GitHubIntakeFilterFields({
   /** Labels that exist in the connected repository. */
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
+  /** Which block to show. The settings sidebar shows one block at a time. */
+  part?: "all" | "create" | "filters";
+  layout?: "stack" | "grid";
 }) {
   if (sourceId !== "github-issues") {
     return null;
@@ -45,53 +51,60 @@ export function GitHubIntakeFilterFields({
     });
   }
 
+  const optionListClassName =
+    layout === "grid" ? "mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2" : "mt-2 flex flex-col gap-2";
+
   return (
     <div className="flex flex-col gap-6">
-      <fieldset className="min-w-0">
-        <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.intakeSection}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.newIssues}
-            checked={settings.newIssues}
-            onChange={() => update("newIssues", !settings.newIssues)}
-          />
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.reopenedIssues}
-            checked={settings.reopenedIssues}
-            onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
-          />
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.superplaneLabelAdded}
-            checked={settings.superplaneLabelAdded}
-            onChange={() => update("superplaneLabelAdded", !settings.superplaneLabelAdded)}
-          />
-        </div>
-      </fieldset>
-      <fieldset className="min-w-0">
-        <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.filtersLabel}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          <div className="flex flex-col gap-1.5">
+      {part === "filters" ? null : (
+        <fieldset id={intakeSettingsSectionDomId("triggers")} className="scroll-mt-6 min-w-0">
+          <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.intakeSection}</legend>
+          <div className={optionListClassName}>
             <IntakeSettingsCheckbox
-              title={INTAKE_SETTINGS_COPY.filterByLabel}
-              checked={settings.filterByLabel}
-              onChange={() => toggleFilterByLabel()}
+              title={INTAKE_SETTINGS_COPY.newIssues}
+              checked={settings.newIssues}
+              onChange={() => update("newIssues", !settings.newIssues)}
             />
-            {settings.filterByLabel ? (
-              <IntakeLabelField
-                labels={settings.labels}
-                options={labelOptions}
-                loading={labelOptionsLoading}
-                onChange={(labels) => update("labels", labels)}
-              />
-            ) : null}
+            <IntakeSettingsCheckbox
+              title={INTAKE_SETTINGS_COPY.reopenedIssues}
+              checked={settings.reopenedIssues}
+              onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
+            />
+            <IntakeSettingsCheckbox
+              title={INTAKE_SETTINGS_COPY.superplaneLabelAdded}
+              checked={settings.superplaneLabelAdded}
+              onChange={() => update("superplaneLabelAdded", !settings.superplaneLabelAdded)}
+            />
           </div>
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.authorsWithAccess}
-            checked={settings.authorsWithAccess}
-            onChange={() => update("authorsWithAccess", !settings.authorsWithAccess)}
-          />
-        </div>
-      </fieldset>
+        </fieldset>
+      )}
+      {part === "create" ? null : (
+        <fieldset id={intakeSettingsSectionDomId("filters")} className="scroll-mt-6 min-w-0">
+          <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.filtersLabel}</legend>
+          <div className={optionListClassName}>
+            <div className="flex flex-col gap-1.5">
+              <IntakeSettingsCheckbox
+                title={INTAKE_SETTINGS_COPY.filterByLabel}
+                checked={settings.filterByLabel}
+                onChange={() => toggleFilterByLabel()}
+              />
+              {settings.filterByLabel ? (
+                <IntakeLabelField
+                  labels={settings.labels}
+                  options={labelOptions}
+                  loading={labelOptionsLoading}
+                  onChange={(labels) => update("labels", labels)}
+                />
+              ) : null}
+            </div>
+            <IntakeSettingsCheckbox
+              title={INTAKE_SETTINGS_COPY.authorsWithAccess}
+              checked={settings.authorsWithAccess}
+              onChange={() => update("authorsWithAccess", !settings.authorsWithAccess)}
+            />
+          </div>
+        </fieldset>
+      )}
     </div>
   );
 }
