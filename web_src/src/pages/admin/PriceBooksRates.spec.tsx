@@ -348,3 +348,170 @@ describe("PriceBooks unused models", () => {
     expect(screen.getByText("The Anthropic API does not publish prices.")).toBeInTheDocument();
   });
 });
+
+describe("PriceBooks model rate editing", () => {
+  const anthropicCatalog = {
+    ...currentCatalog,
+    models: [
+      currentCatalog.models[0],
+      {
+        ...currentCatalog.models[0],
+        provider: "anthropic",
+        match_key: "claude-sonnet",
+      },
+    ],
+  };
+
+  it("hides Save rates and Edit rates on OpenRouter", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(currentCatalog)),
+    );
+
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    expect(screen.getByTestId("admin-price-book-sync")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-price-book-save")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit rates" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("edits Anthropic rates and saves changed cents", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT" && String(input) === "/admin/api/price-books") {
+        const body = JSON.parse(String(init.body)) as {
+          base_version: string;
+          models: { provider: string; match_key: string; input_cents_per_million: number }[];
+        };
+        expect(body.base_version).toBe("2026-09-09.1");
+        const anthropic = body.models.find((rate) => rate.provider === "anthropic");
+        expect(anthropic?.match_key).toBe("claude-sonnet");
+        expect(anthropic?.input_cents_per_million).toBe(450);
+        return jsonResponse(savedCatalog);
+      }
+      return jsonResponse(anthropicCatalog);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    expect(screen.queryByTestId("admin-price-book-save")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
+    expect(input).toHaveValue(3);
+    await user.clear(input);
+    await user.type(input, "4.50");
+
+    await user.click(screen.getByTestId("admin-price-book-save"));
+    await waitFor(() => {
+      expect(showSuccessToast).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("cancels Anthropic edits and restores previous values", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(anthropicCatalog)),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
+    expect(input).toHaveValue(3);
+    await user.clear(input);
+    await user.type(input, "9.99");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-price-book-save")).not.toBeInTheDocument();
+  });
+
+  it("keeps Anthropic price cells read-only for older versions", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("version=2026-08-31.1")) {
+          return jsonResponse({ ...olderCatalog, models: [{ ...olderCatalog.models[0], provider: "anthropic" }] });
+        }
+        return jsonResponse(anthropicCatalog);
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByTestId("admin-price-book-version"));
+    await user.click(await screen.findByRole("option", { name: "2026-08-31.1" }));
+    expect(await screen.findByText("older-model")).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: "Edit rates" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("discards unconfirmed Anthropic edits when the provider changes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(anthropicCatalog)),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
+    await user.clear(input);
+    await user.type(input, "9.99");
+
+    await user.click(screen.getByRole("tab", { name: "OpenRouter" }));
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("discards unconfirmed Anthropic edits when the Machines tab opens", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(anthropicCatalog)),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
+    await user.clear(input);
+    await user.type(input, "9.99");
+
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
+    await user.click(screen.getByRole("tab", { name: "Models" }));
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+});

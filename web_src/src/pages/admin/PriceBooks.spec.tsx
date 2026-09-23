@@ -196,13 +196,16 @@ describe("PriceBooks catalog", () => {
     renderPage();
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
     await user.click(screen.getByTestId("admin-price-book-version"));
     await user.click(await screen.findByRole("option", { name: "2026-08-31.1" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("admin-price-book-save")).toBeDisabled();
     });
-    expect(screen.getByTestId("admin-price-book-sync")).toBeDisabled();
+    expect(screen.getByTestId("admin-price-book-sync-disabled")).toBeDisabled();
   });
 
   it("disables activate until the selected version finishes loading", async () => {
