@@ -58,7 +58,7 @@ import {
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -241,11 +241,13 @@ export function useFactoryWorkOrdersPage(
     initialPageParam: undefined as WorkOrdersPageCursor | undefined,
     enabled: Boolean(organizationId && factoryId) && (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 
   return {
     orders: flattenWorkOrdersPages(query.data?.pages),
     isLoading: query.isLoading,
+    isPlaceholderData: query.isPlaceholderData,
     hasNextPage: Boolean(query.hasNextPage),
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
@@ -261,6 +263,7 @@ export type FactoryBoardColumnPage = {
 export type FactoryBoardWorkOrders = {
   workOrders: FactoriesWorkOrderSummary[];
   isLoading: boolean;
+  isPlaceholderData: boolean;
   backlog: FactoryBoardColumnPage;
   open: FactoryBoardColumnPage;
   done: FactoryBoardColumnPage;
@@ -302,6 +305,7 @@ export function useFactoryBoardWorkOrders(
   return {
     workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
     isLoading: backlog.isLoading || open.isLoading || closed.isLoading,
+    isPlaceholderData: backlog.isPlaceholderData || open.isPlaceholderData || closed.isPlaceholderData,
     backlog: boardColumnPage(backlog),
     open: boardColumnPage(open),
     done: boardColumnPage(closed),
