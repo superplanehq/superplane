@@ -236,6 +236,7 @@ rabbitmq:
 blobStorage:
   provider: filesystem
   bucket: ""
+  region: ""
   localPath: /var/lib/superplane/blobs
   credentialsFile: ""
 
