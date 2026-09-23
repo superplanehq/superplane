@@ -10,7 +10,13 @@ export type SpokenPhraseField = {
   maxLength?: number;
 };
 
-export function useSpokenPhraseDictation(fieldRef: MutableRefObject<SpokenPhraseField>): UseSpeechDictationResult {
+export type UseSpokenPhraseDictationResult = UseSpeechDictationResult & {
+  resetSnapshot: () => void;
+};
+
+export function useSpokenPhraseDictation(
+  fieldRef: MutableRefObject<SpokenPhraseField>,
+): UseSpokenPhraseDictationResult {
   const committedRef = useRef(fieldRef.current.getValue());
   const livePhraseRef = useRef("");
   const valueRef = useRef(fieldRef.current.getValue());
@@ -23,9 +29,18 @@ export function useSpokenPhraseDictation(fieldRef: MutableRefObject<SpokenPhrase
     fieldRef.current.setValue(next);
   };
 
+  const resetSnapshot = () => {
+    livePhraseRef.current = "";
+    committedRef.current = fieldRef.current.getValue();
+    valueRef.current = committedRef.current;
+  };
+
   const currentValue = fieldRef.current.getValue();
   valueRef.current = currentValue;
-  committedRef.current = stripTrailingSpokenPhrase(currentValue, livePhraseRef.current);
+  const expectedValue = appendSpokenPhrase(committedRef.current, livePhraseRef.current, fieldRef.current.maxLength);
+  if (currentValue !== expectedValue) {
+    committedRef.current = stripTrailingSpokenPhrase(currentValue, livePhraseRef.current);
+  }
 
   const dictation = useSpeechDictation({
     onFinalPhrase: (phrase) => {
@@ -42,10 +57,9 @@ export function useSpokenPhraseDictation(fieldRef: MutableRefObject<SpokenPhrase
 
   return {
     ...dictation,
+    resetSnapshot,
     start: () => {
-      committedRef.current = fieldRef.current.getValue();
-      livePhraseRef.current = "";
-      valueRef.current = committedRef.current;
+      resetSnapshot();
       dictation.start();
     },
     stop: () => {

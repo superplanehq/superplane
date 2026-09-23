@@ -10,15 +10,12 @@ export function appendSpokenPhrase(current: string, phrase: string, maxLength?: 
 
 export function stripTrailingSpokenPhrase(value: string, phrase: string): string {
   const spoken = phrase.trim();
-  if (!spoken) {
+  if (!spoken || !value.endsWith(spoken)) {
     return value;
   }
-  if (value === spoken) {
-    return "";
-  }
-  const spacedSuffix = ` ${spoken}`;
-  if (value.endsWith(spacedSuffix)) {
-    return value.slice(0, -spacedSuffix.length);
+  const prefix = value.slice(0, -spoken.length);
+  if (prefix.length === 0 || /\s$/.test(prefix)) {
+    return prefix;
   }
   return value;
 }

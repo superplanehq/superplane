@@ -181,4 +181,89 @@ describe("useWorkOrderFieldDictation", () => {
 
     expect(onDescriptionChange).toHaveBeenLastCalledWith("Please Fix refunds on retry");
   });
+
+  it("does not overwrite the title when focus moves during description dictation", () => {
+    const onTitleChange = vi.fn();
+    const onDescriptionChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkOrderFieldDictation({
+        title: "Fix bugs",
+        description: "Refunds fail.",
+        maxTitleLength: 256,
+        maxDescriptionLength: 5000,
+        onTitleChange,
+        onDescriptionChange,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("Retry", false);
+      result.current.rememberTitle();
+      emitTranscript("on checkout", false);
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Refunds fail. Retry");
+    expect(onTitleChange).toHaveBeenLastCalledWith("Fix bugs on checkout");
+    expect(onTitleChange.mock.calls.some((call) => String(call[0]).startsWith("Refunds fail."))).toBe(false);
+  });
+
+  it("replaces live words after a newline when the field re-renders", () => {
+    const onDescriptionChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ description }) =>
+        useWorkOrderFieldDictation({
+          title: "",
+          description,
+          maxTitleLength: 256,
+          maxDescriptionLength: 5000,
+          onTitleChange: vi.fn(),
+          onDescriptionChange,
+        }),
+      { initialProps: { description: "Notes\n" } },
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("hello", false);
+    });
+    rerender({ description: "Notes\nhello" });
+    act(() => {
+      emitTranscript("hello there", false);
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Notes\nhello there");
+    expect(onDescriptionChange.mock.calls.some((call) => call[0] === "Notes\nhello hello there")).toBe(false);
+  });
+
+  it("replaces clipped live words when the final phrase changes", () => {
+    const title = "A".repeat(250);
+    const onTitleChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ currentTitle }) =>
+        useWorkOrderFieldDictation({
+          title: currentTitle,
+          description: "",
+          maxTitleLength: 256,
+          maxDescriptionLength: 5000,
+          onTitleChange,
+          onDescriptionChange: vi.fn(),
+        }),
+      { initialProps: { currentTitle: title } },
+    );
+
+    act(() => {
+      result.current.rememberTitle();
+      result.current.start();
+      emitTranscript("refunds", false);
+    });
+    const clippedTitle = `${title} refun`;
+    expect(onTitleChange).toHaveBeenLastCalledWith(clippedTitle);
+    rerender({ currentTitle: clippedTitle });
+    act(() => {
+      emitTranscript("returns", true);
+    });
+
+    expect(onTitleChange).toHaveBeenLastCalledWith(`${title} retur`);
+  });
 });
