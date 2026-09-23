@@ -83,8 +83,8 @@ dispatch a factory line. Factory nodes use those integrations, not `.env`
 `ANTHROPIC_API_KEY`. After you change `runner/runner/Dockerfile.local`, run
 `make dev.up` again. Check tools with `make doctor-local` after
 `make dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter
-Agent. If an old sibling `../runner` Compose project still holds port `8091`
-or `5432`, stop it first.
+Agent. If an old sibling `../runner` Compose project still holds port `8091`,
+stop it first.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
 in `.env` only when you need the SuperPlane-hosted provider. See

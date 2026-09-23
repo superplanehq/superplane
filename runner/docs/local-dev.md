@@ -26,8 +26,8 @@ Stop both stacks with `make dev.down`. After you change
 `runner/Dockerfile.local`, run `make dev.up` again so Compose rebuilds the
 worker image.
 
-If a sibling `../runner` Compose project still holds port `8091` or `5432`,
-stop it first. Do not run two brokers at the same time.
+If a sibling `../runner` Compose project still holds port `8091`, stop it
+first. Do not run two brokers at the same time.
 
 ## Connect SuperPlane
 
