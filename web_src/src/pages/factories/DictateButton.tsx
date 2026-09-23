@@ -30,39 +30,32 @@ export function DictateButton({ dictation, copy, disabled = false }: DictateButt
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      {dictation.interimPhrase ? (
-        <span className="truncate text-[12px] text-muted-foreground" aria-live="polite" data-testid="dictate-interim">
-          {dictation.interimPhrase}
-        </span>
-      ) : null}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={cn(
-          "size-8 rounded-full text-muted-foreground",
-          dictation.isListening &&
-            "text-destructive bg-destructive/15 ring-2 ring-destructive animate-pulse hover:bg-destructive/15 hover:text-destructive dark:hover:bg-destructive/15 dark:hover:text-destructive motion-reduce:animate-none",
-        )}
-        disabled={disabled}
-        aria-label={dictation.isListening ? copy.stopDictation : copy.dictate}
-        aria-pressed={dictation.isListening}
-        data-testid="dictate-button"
-        onClick={() => {
-          if (dictation.isListening) {
-            dictation.stop();
-            return;
-          }
-          dictation.start();
-        }}
-      >
-        {dictation.isListening ? (
-          <Square className="size-3 fill-current" aria-hidden data-testid="dictate-stop-icon" />
-        ) : (
-          <Mic className="size-4" aria-hidden data-testid="dictate-mic-icon" />
-        )}
-      </Button>
-    </div>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={cn(
+        "size-8 rounded-full text-muted-foreground",
+        dictation.isListening &&
+          "text-destructive bg-destructive/15 ring-2 ring-destructive animate-pulse hover:bg-destructive/15 hover:text-destructive dark:hover:bg-destructive/15 dark:hover:text-destructive motion-reduce:animate-none",
+      )}
+      disabled={disabled}
+      aria-label={dictation.isListening ? copy.stopDictation : copy.dictate}
+      aria-pressed={dictation.isListening}
+      data-testid="dictate-button"
+      onClick={() => {
+        if (dictation.isListening) {
+          dictation.stop();
+          return;
+        }
+        dictation.start();
+      }}
+    >
+      {dictation.isListening ? (
+        <Square className="size-3 fill-current" aria-hidden data-testid="dictate-stop-icon" />
+      ) : (
+        <Mic className="size-4" aria-hidden data-testid="dictate-mic-icon" />
+      )}
+    </Button>
   );
 }
