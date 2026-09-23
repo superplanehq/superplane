@@ -403,7 +403,7 @@ describe("PriceBooks model rate editing", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit rates" }));
 
-    const input = screen.getAllByRole("spinbutton")[0];
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
     expect(input).toHaveValue(3);
     await user.clear(input);
     await user.type(input, "4.50");
@@ -428,7 +428,7 @@ describe("PriceBooks model rate editing", () => {
     await user.click(screen.getByRole("tab", { name: "Anthropic" }));
     await user.click(screen.getByRole("button", { name: "Edit rates" }));
 
-    const input = screen.getAllByRole("spinbutton")[0];
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
     expect(input).toHaveValue(3);
     await user.clear(input);
     await user.type(input, "9.99");
@@ -462,6 +462,56 @@ describe("PriceBooks model rate editing", () => {
     expect(await screen.findByText("older-model")).toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: "Edit rates" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("discards unconfirmed Anthropic edits when the provider changes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(anthropicCatalog)),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
+    await user.clear(input);
+    await user.type(input, "9.99");
+
+    await user.click(screen.getByRole("tab", { name: "OpenRouter" }));
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it("discards unconfirmed Anthropic edits when the Machines tab opens", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(anthropicCatalog)),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    await user.click(screen.getByRole("button", { name: "Edit rates" }));
+
+    const input = screen.getByRole("spinbutton", { name: "Input for claude-sonnet" });
+    await user.clear(input);
+    await user.type(input, "9.99");
+
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
+    await user.click(screen.getByRole("tab", { name: "Models" }));
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+
+    expect(screen.getByText("$3.00")).toBeInTheDocument();
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 });

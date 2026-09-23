@@ -1,6 +1,7 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import AdminPagination from "./AdminPagination";
@@ -90,26 +91,36 @@ export function ModelsTable({
                 <RateCell
                   cents={rate.input_cents_per_million}
                   editing={editing}
+                  inputId={rateInputId(rate, "input")}
+                  label={`Input for ${rate.match_key}`}
                   onChange={(cents) => onRateChange?.(index, { input_cents_per_million: cents })}
                 />
                 <RateCell
                   cents={rate.output_cents_per_million}
                   editing={editing}
+                  inputId={rateInputId(rate, "output")}
+                  label={`Output for ${rate.match_key}`}
                   onChange={(cents) => onRateChange?.(index, { output_cents_per_million: cents })}
                 />
                 <RateCell
                   cents={rate.cache_read_cents_per_million}
                   editing={editing}
+                  inputId={rateInputId(rate, "cache_read")}
+                  label={`Cache read for ${rate.match_key}`}
                   onChange={(cents) => onRateChange?.(index, { cache_read_cents_per_million: cents })}
                 />
                 <RateCell
                   cents={rate.cache_write_cents_per_million}
                   editing={editing}
+                  inputId={rateInputId(rate, "cache_write")}
+                  label={`Cache write for ${rate.match_key}`}
                   onChange={(cents) => onRateChange?.(index, { cache_write_cents_per_million: cents })}
                 />
                 <RateCell
                   cents={rate.reasoning_cents_per_million}
                   editing={editing}
+                  inputId={rateInputId(rate, "reasoning")}
+                  label={`Reasoning for ${rate.match_key}`}
                   onChange={(cents) => onRateChange?.(index, { reasoning_cents_per_million: cents })}
                 />
               </tr>
@@ -129,13 +140,21 @@ export function ModelsTable({
   );
 }
 
+function rateInputId(rate: PriceBookModelRate, field: Exclude<ModelSortField, "model">) {
+  return `price-book-rate-${rate.provider}-${rate.match_mode}-${rate.match_key}-${field}`;
+}
+
 function RateCell({
   cents,
   editing,
+  inputId,
+  label,
   onChange,
 }: {
   cents: number;
   editing?: boolean;
+  inputId: string;
+  label: string;
   onChange?: (cents: number) => void;
 }) {
   if (!editing) {
@@ -143,7 +162,11 @@ function RateCell({
   }
   return (
     <td className={numericCellClass}>
+      <Label htmlFor={inputId} className="sr-only">
+        {label}
+      </Label>
       <Input
+        id={inputId}
         type="number"
         min="0"
         step="0.01"

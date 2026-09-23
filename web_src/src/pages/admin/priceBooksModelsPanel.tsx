@@ -17,6 +17,71 @@ function isPriceBookProvider(value: string): value is PriceBookProvider {
   return value === "openrouter" || value === "anthropic" || value === "openai";
 }
 
+function useModelRateEditing(
+  isCurrent: boolean,
+  models: PriceBookModelRate[],
+  onModelsChange: (updater: (current: PriceBookModelRate[]) => PriceBookModelRate[]) => void,
+) {
+  const [editing, setEditing] = useState(false);
+  const snapshotRef = useRef<PriceBookModelRate[]>([]);
+  const onModelsChangeRef = useRef(onModelsChange);
+  onModelsChangeRef.current = onModelsChange;
+
+  const leaveEditMode = () => {
+    setEditing(false);
+    snapshotRef.current = [];
+  };
+
+  const restoreSnapshot = () => {
+    const snapshot = snapshotRef.current;
+    if (snapshot.length === 0) {
+      return;
+    }
+    onModelsChange(() => snapshot.map((rate) => ({ ...rate })));
+  };
+
+  const enterEditMode = () => {
+    snapshotRef.current = models.map((rate) => ({ ...rate }));
+    setEditing(true);
+  };
+
+  const handleRateChange = (index: number, updates: Partial<PriceBookModelRate>) => {
+    onModelsChange((current) =>
+      current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...updates } : rate)),
+    );
+  };
+
+  const handleCancelEdit = () => {
+    restoreSnapshot();
+    leaveEditMode();
+  };
+
+  useEffect(() => {
+    if (!isCurrent) {
+      leaveEditMode();
+    }
+  }, [isCurrent]);
+
+  useEffect(() => {
+    return () => {
+      const snapshot = snapshotRef.current;
+      if (snapshot.length === 0) {
+        return;
+      }
+      onModelsChangeRef.current(() => snapshot.map((rate) => ({ ...rate })));
+    };
+  }, []);
+
+  return {
+    editing,
+    isEditing: isCurrent && editing,
+    enterEditMode,
+    handleCancelEdit,
+    handleRateChange,
+    leaveEditMode,
+  };
+}
+
 export function ModelsPanel({
   isCurrent,
   models,
@@ -44,38 +109,11 @@ export function ModelsPanel({
   const selectedRows = providerRows.filter(({ rate }) => rate.selected);
   const unusedRows = providerRows.filter(({ rate }) => !rate.selected);
   const hasNoRates = providerRows.length === 0;
-
-  const [editing, setEditing] = useState(false);
-  const snapshotRef = useRef<PriceBookModelRate[]>([]);
-
-  const leaveEditMode = () => {
-    setEditing(false);
-    snapshotRef.current = [];
-  };
-
-  const enterEditMode = () => {
-    snapshotRef.current = models.map((rate) => ({ ...rate }));
-    setEditing(true);
-  };
-
-  const handleRateChange = (index: number, updates: Partial<PriceBookModelRate>) => {
-    onModelsChange((current) =>
-      current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...updates } : rate)),
-    );
-  };
-
-  const handleCancelEdit = () => {
-    onModelsChange(() => snapshotRef.current.map((rate) => ({ ...rate })));
-    leaveEditMode();
-  };
-
-  useEffect(() => {
-    if (!isCurrent) {
-      leaveEditMode();
-    }
-  }, [isCurrent]);
-
-  const isEditing = isCurrent && editing;
+  const { editing, isEditing, enterEditMode, handleCancelEdit, handleRateChange, leaveEditMode } = useModelRateEditing(
+    isCurrent,
+    models,
+    onModelsChange,
+  );
 
   return (
     <>
@@ -83,7 +121,9 @@ export function ModelsPanel({
         value={provider}
         onValueChange={(nextProvider) => {
           if (isPriceBookProvider(nextProvider) && nextProvider !== provider) {
-            leaveEditMode();
+            if (editing) {
+              handleCancelEdit();
+            }
             onProviderChange(nextProvider);
           }
         }}
