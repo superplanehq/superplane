@@ -73,7 +73,6 @@ import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from 
 import { CanvasPageLoadingOverlay } from "@/ui/CanvasPage/CanvasPageLoadingOverlay";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
 import { useAppPageAgentSuggestions } from "./useAppPageAgentSuggestions";
-import { useAutoLayoutOnUpdatePreference } from "./useAutoLayoutOnUpdatePreference";
 import {
   appendWorkflowFragment,
   removeWorkflowEdges,
@@ -395,7 +394,7 @@ export function AppPage({
     refetchOnMount: false,
   });
   const factoryOwnedApp = isFactoryApp(liveCanvas?.metadata?.factoryId);
-  const factoryAutoLayout = factoryConfigure && factoryOwnedApp;
+  const factoryAutoLayout = false;
   const urlViewFlags = useMemo(
     () => (factoryOwnedApp ? clampWorkflowViewFlagsForFactoryApp(rawUrlViewFlags) : rawUrlViewFlags),
     [factoryOwnedApp, rawUrlViewFlags],
@@ -700,7 +699,6 @@ export function AppPage({
 
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
-  const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
   const { handleToggleAutoFocus, isAutoFocusEnabled } = useCanvasAutoFocusPreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
@@ -1936,7 +1934,7 @@ export function AppPage({
 
   const commitTopologyMutation = useTopologyMutationCommit({
     factoryAutoLayout,
-    autoLayoutOnUpdate: isAutoLayoutOnUpdateEnabled,
+    autoLayoutOnUpdate: false,
     components,
     getCurrentWorkflow: getCurrentWorkflowSnapshot,
     applyLocalWorkflow: applyLocalWorkflowUpdate,
@@ -3849,8 +3847,7 @@ export function AppPage({
           onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
           onDuplicateNodes={!isReadOnly ? handleNodesDuplicate : undefined}
           onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
-          isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
-          onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
+          isAutoLayoutOnUpdateEnabled={false}
           onToggleView={resolveFactoryAwareToggleView(isReadOnly, factoryOwnedApp, handleNodeCollapseChange)}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}

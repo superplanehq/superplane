@@ -3,7 +3,6 @@ import type { Edge, Node } from "@xyflow/react";
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { agentRunnerStepTitles, AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunnerSteps";
 import { factoryEdgePalette, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
-import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 import { buildStyledCanvasEdges } from "@/ui/CanvasPage/factoryCanvasEdgeStyle";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
@@ -88,31 +87,11 @@ export function compactLineCanvasGraph(
     });
 
   const rawEdges = canvas.edges.map((edge, index) => toFlowEdge(edge, index));
-  const layout = layoutFactoryRunLeafGraph(
-    rawNodes.map((node) => ({ id: node.id, position: node.position, width: node.width, height: node.height })),
-    rawEdges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-    })),
-  );
-
-  const nodes = rawNodes.map((node) => ({
-    ...node,
-    position: layout.positions.get(node.id) ?? node.position,
-    data: {
-      ...node.data,
-      isSideSource: layout.sideHandleNodeIds.has(node.id),
-      isSpineSource: layout.spineSourceNodeIds.has(node.id),
-      isSideTarget: layout.sideTargetNodeIds.has(node.id),
-    },
-  }));
 
   const edges =
     buildStyledCanvasEdges({
       edges: rawEdges,
-      nodes,
+      nodes: rawNodes,
       isVerticalFlow: true,
       resolvedThemeIsDark,
       edgeDefaults: { type: "custom", style: factoryEdgePalette(resolvedThemeIsDark).default },
@@ -120,8 +99,8 @@ export function compactLineCanvasGraph(
       isEditMode: false,
       isReadOnly: true,
       stableEdgeDelete: () => undefined,
-      factoryRunLeafLayout: layout,
+      factoryRunLeafLayout: null,
     }) ?? rawEdges;
 
-  return { nodes, edges };
+  return { nodes: rawNodes, edges };
 }
