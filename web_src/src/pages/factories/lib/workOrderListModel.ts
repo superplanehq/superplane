@@ -271,15 +271,14 @@ function formatUsageTooltip(totalTokens: number, totalCostCents: number, duratio
 }
 
 /**
- * Scope pills next to the page title. `active` (Needs attention) keeps
- * drafts, waiting work, and failed runs. `my` keeps work assigned to the
- * viewer.
+ * Scope pills next to the page title. `active` keeps drafts, waiting
+ * work, and failed runs. `my` keeps work assigned to the viewer.
  */
 export type WorkOrderScope = "all" | "active" | "my";
 
 export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; tooltip: string }> = [
   { id: "all", label: "All", tooltip: "Every task in this workspace." },
-  { id: "active", label: "Needs attention", tooltip: "Tasks that need your attention." },
+  { id: "active", label: "Active", tooltip: "Draft, waiting, and failed tasks." },
   {
     id: "my",
     label: "My",
@@ -287,7 +286,7 @@ export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; toolt
   },
 ];
 
-/** Statuses that the Needs attention scope keeps. Running is in flight. */
+/** Statuses that the Active scope keeps. Running is in flight. */
 const ACTIVE_SCOPE_STATUSES: WorkOrderDisplayStatus[] = ["draft", "waiting", "failed"];
 
 /** Ordering options in the Display menu. `updated` is the default. */

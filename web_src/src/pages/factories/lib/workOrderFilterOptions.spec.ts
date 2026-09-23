@@ -43,7 +43,7 @@ describe("buildStatusFilterOptions", () => {
       "cancelled",
     ]);
     expect(options.every((option) => Boolean(option.dot))).toBe(true);
-    expect(options.find((option) => option.value === "waiting")?.label).toBe("Needs attention");
+    expect(options.find((option) => option.value === "waiting")?.label).toBe("Waiting");
   });
 });
 
