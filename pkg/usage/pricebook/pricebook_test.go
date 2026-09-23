@@ -66,6 +66,20 @@ func TestEstimateMicros_ExactCatalogIDWins(t *testing.T) {
 	assert.True(t, IsPriced("openrouter", "x-ai/grok-4.6"))
 }
 
+func TestEstimateMicros_ExactOpenRouterFreeCatalogID(t *testing.T) {
+	t.Cleanup(Reset)
+	Replace(Book{
+		Version: "test-free",
+		ExactRates: []ExactRate{
+			{Provider: "openrouter", ModelID: "openrouter/free", Rate: Rate{Input: 50}},
+		},
+	})
+
+	got := EstimateMicros("openrouter", "openrouter/openrouter/free", 1_000_000, 0, 0, 0, 0)
+	assert.Equal(t, int64(500_000), got)
+	assert.True(t, IsPriced("openrouter", "openrouter/free"))
+}
+
 func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 	got := EstimateMicros("openai", "unknown-lab-model", 10_000, 10_000, 0, 0, 0)
 	assert.Equal(t, int64(0), got)
