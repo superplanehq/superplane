@@ -52,10 +52,13 @@ func (t *OnTask) Documentation() string {
 
 ## Webhook Setup
 
-This trigger registers a Productive.io webhook automatically when configured, and removes it when the
-trigger is deleted. Productive.io sells webhooks as a plan feature and rejects registration with a 403
-"webhooks_limit_exceeded" response on plans that do not include it, in which case setup fails until the
-organization upgrades to a plan with webhooks.`
+This trigger registers Productive.io webhooks automatically when configured, and removes them when the
+trigger is deleted. Productive.io webhooks are organization-wide and need the Ultimate plan. SuperPlane
+registers one remote webhook for task created and one for task updated, both pointing at
+` + "`{WEBHOOKS_BASE_URL}/api/v1/webhooks/{id}`" + `. Deliveries for other projects are ignored.
+
+Productive.io rejects registration with a 403 "webhooks_limit_exceeded" response on plans that do not
+include webhooks, in which case setup fails until the organization upgrades.`
 }
 
 func (t *OnTask) Icon() string {
@@ -175,6 +178,14 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 	if payload.Data == nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("missing task data")
+	}
+
+	//
+	// Productive.io webhooks are organization-wide. A delivery for another
+	// project is not this node's news.
+	//
+	if taskProjectID(payload.Data) != config.Project {
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, payload.Data)); err != nil {
