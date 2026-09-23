@@ -42,6 +42,7 @@ import {
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
   DEFAULT_FACTORY_PLANNING,
+  DRAFT_WORK_ORDER,
   factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
@@ -1535,6 +1536,20 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByTestId("lines-done-menu-edit")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-create")).not.toBeInTheDocument();
+  });
+
+  it("shows one Backlog card when My is on and the same draft is in every column list", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrders.mockReturnValue({
+      data: [DRAFT_WORK_ORDER, DRAFT_WORK_ORDER, DRAFT_WORK_ORDER],
+    });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-scope-my"));
+
+    const cardId = `work-order-card-${DRAFT_WORK_ORDER.id}`;
+    expect(within(screen.getByTestId("lines-backlog-column")).getAllByTestId(cardId)).toHaveLength(1);
+    expect(screen.getAllByTestId(cardId)).toHaveLength(1);
   });
 
   it("hides the phase path and shows work-order filters", async () => {

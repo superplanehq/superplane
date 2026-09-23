@@ -885,16 +885,18 @@ func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilt
 
 	if filters.UserID != nil && unassigned {
 		return query.Where(`
-			NOT EXISTS (
-				SELECT 1 FROM factory_work_order_assignees
-				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-			)
-			OR EXISTS (
-				SELECT 1 FROM factory_work_order_assignees
-				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-				AND factory_work_order_assignees.user_id = ?
-			)
-			OR factory_work_orders.created_by_id = ?`, *filters.UserID, *filters.UserID)
+			(
+				NOT EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				)
+				OR EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+					AND factory_work_order_assignees.user_id = ?
+				)
+				OR factory_work_orders.created_by_id = ?
+			)`, *filters.UserID, *filters.UserID)
 	}
 
 	if unassigned {
@@ -906,12 +908,14 @@ func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilt
 	}
 
 	return query.Where(`
-		EXISTS (
-			SELECT 1 FROM factory_work_order_assignees
-			WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-			AND factory_work_order_assignees.user_id = ?
-		)
-		OR factory_work_orders.created_by_id = ?`, *filters.UserID, *filters.UserID)
+		(
+			EXISTS (
+				SELECT 1 FROM factory_work_order_assignees
+				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				AND factory_work_order_assignees.user_id = ?
+			)
+			OR factory_work_orders.created_by_id = ?
+		)`, *filters.UserID, *filters.UserID)
 }
 
 func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
