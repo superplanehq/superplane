@@ -22,7 +22,7 @@ import (
 
 func Test__FilterCatalogPrices__MatchesAllowlistAndNormalizedIDs(t *testing.T) {
 	prices := []llm.CatalogPrice{
-		{ID: "anthropic/claude-sonnet-4-6", Rate: pricebook.Rate{Input: 400}},
+		{ID: "anthropic/claude-sonnet-4.6", Rate: pricebook.Rate{Input: 400}},
 		{ID: "openai/gpt-4o", Rate: pricebook.Rate{Input: 250}},
 		{ID: "openai/gpt-4o-mini", Rate: pricebook.Rate{Input: 15}},
 	}
@@ -30,11 +30,11 @@ func Test__FilterCatalogPrices__MatchesAllowlistAndNormalizedIDs(t *testing.T) {
 	filtered := pricebooksync.FilterCatalogPrices(
 		models.UsageProviderOpenRouter,
 		prices,
-		[]string{"anthropic/claude-sonnet-4-6", "gpt-4o-mini"},
+		[]string{"anthropic/claude-sonnet-4.6", "gpt-4o-mini"},
 	)
 	require.Len(t, filtered, 2)
 	assert.Equal(t, models.UsageProviderOpenRouter, filtered[0].Provider)
-	assert.Equal(t, "anthropic/claude-sonnet-4-6", filtered[0].ModelID)
+	assert.Equal(t, "anthropic/claude-sonnet-4.6", filtered[0].ModelID)
 	assert.Equal(t, "openai/gpt-4o-mini", filtered[1].ModelID)
 }
 
@@ -59,13 +59,13 @@ func Test__Sync__SkipsPublishWhenRatesUnchanged(t *testing.T) {
 	_ = support.Setup(t)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
-		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-09.1")
+		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-23.1")
 	})
 
 	current, err := models.FindCurrentUsagePriceBook(db)
 	require.NoError(t, err)
 
-	upsertOpenRouterProvider(t, db, datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}))
+	upsertOpenRouterProvider(t, db, datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4.6"}))
 
 	svc := pricebooksync.New(crypto.NewNoOpEncryptor(), openRouterHTTPContext(sonnetCatalogBody("0.000003", "0.000015")))
 	result, err := svc.Sync(t.Context(), db, pricebooksync.Options{SkipWhenUnchanged: true})
@@ -82,14 +82,14 @@ func Test__Sync__PublishesWhenRatesChange(t *testing.T) {
 	_ = support.Setup(t)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
-		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-09.1")
+		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-23.1")
 	})
 	t.Cleanup(pricebook.Reset)
 
 	current, err := models.FindCurrentUsagePriceBook(db)
 	require.NoError(t, err)
 
-	upsertOpenRouterProvider(t, db, datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}))
+	upsertOpenRouterProvider(t, db, datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4.6"}))
 
 	svc := pricebooksync.New(crypto.NewNoOpEncryptor(), openRouterHTTPContext(sonnetCatalogBody("0.000004", "0.000015")))
 	result, err := svc.Sync(t.Context(), db, pricebooksync.Options{SkipWhenUnchanged: true})
@@ -102,7 +102,7 @@ func Test__Sync__PublishesWhenModelAdded(t *testing.T) {
 	_ = support.Setup(t)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
-		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-09.1")
+		_ = models.ActivateUsagePriceBook(database.DB(t.Context()), "2026-09-23.1")
 	})
 	t.Cleanup(pricebook.Reset)
 
@@ -145,7 +145,7 @@ func sonnetCatalogBody(prompt, completion string) string {
 	return `{
 		"data":[
 			{
-				"id":"anthropic/claude-sonnet-4-6",
+				"id":"anthropic/claude-sonnet-4.6",
 				"pricing":{
 					"prompt":"` + prompt + `",
 					"completion":"` + completion + `",
