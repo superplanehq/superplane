@@ -7,11 +7,22 @@ import { Check, Loader2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
-import { IntakeSetupWizard } from "./IntakeSetupWizard";
+import { IntakeSetupWizard, type IntakeSetupStepItem } from "./IntakeSetupWizard";
 import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
 import { JiraCompletionColumnFields } from "./JiraCompletionColumnFields";
+import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 import { useJiraIntakeSetup, type JiraIntakeSetupModel } from "./useJiraIntakeSetup";
+
+const JIRA_INTAKE_STEPS: IntakeSetupStepItem[] = [
+  { id: "connection", label: "Connect Jira" },
+  { id: "project", label: "Choose project" },
+  { id: "completion", label: JIRA_INTAKE_SETUP_COPY.wizardStepColumn },
+];
+
+/** Full-width wizard action. Disabled stays a solid control, not a faded pill. */
+const JIRA_INTAKE_ACTION_CLASS =
+  "h-10 w-full rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100";
 
 interface JiraIntakeSetupDialogProps {
   organizationId: string;
@@ -24,14 +35,7 @@ interface JiraIntakeSetupDialogProps {
 export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
   const location = useLocation();
   const setup = useJiraIntakeSetup(props.organizationId, props.factoryId, props.selectIntegrationId);
-  const title =
-    setup.step === "connection" ? JIRA_INTAKE_SETUP_COPY.wizardStepConnect : JIRA_INTAKE_SETUP_COPY.wizardStepProject;
-  const helper =
-    setup.step === "connection"
-      ? JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : setup.skipInitialImport
-        ? JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
-        : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+  const copy = jiraIntakeWizardCopy(setup);
   const showConnectAction =
     setup.step === "connection" && !setup.connectedQuery.isLoading && setup.jiraIntegrations.length === 0;
 
@@ -41,8 +45,10 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
         testId="jira-intake-setup"
         integrationName="Jira"
         step={setup.step}
-        title={title}
-        helper={helper}
+        steps={JIRA_INTAKE_STEPS}
+        plain={setup.step === "completion"}
+        title={copy.title}
+        helper={copy.helper}
         stepAction={
           showConnectAction ? (
             <Button
@@ -56,13 +62,7 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
           ) : undefined
         }
         footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
-        onBack={() => {
-          if (setup.step === "project") {
-            setup.returnToConnection();
-            return;
-          }
-          props.onClose();
-        }}
+        onBack={() => leaveJiraIntakeStep(setup, props.onClose)}
       >
         {showConnectAction && !setup.error ? null : (
           <div>
@@ -94,6 +94,39 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
   );
 }
 
+function jiraIntakeWizardCopy(setup: JiraIntakeSetupModel): { title: string; helper: string } {
+  if (setup.step === "connection") {
+    return {
+      title: JIRA_INTAKE_SETUP_COPY.wizardStepConnect,
+      helper: JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper,
+    };
+  }
+  if (setup.step === "completion") {
+    return {
+      title: JIRA_COMPLETION_COLUMN_COPY.section,
+      helper: JIRA_INTAKE_SETUP_COPY.wizardStepCompletionHelper,
+    };
+  }
+  return {
+    title: JIRA_INTAKE_SETUP_COPY.wizardStepProject,
+    helper: setup.skipInitialImport
+      ? JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
+      : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper,
+  };
+}
+
+function leaveJiraIntakeStep(setup: JiraIntakeSetupModel, onClose: () => void) {
+  if (setup.step === "completion") {
+    setup.setStep("project");
+    return;
+  }
+  if (setup.step === "project") {
+    setup.returnToConnection();
+    return;
+  }
+  onClose();
+}
+
 function SetupStepBody({ organizationId, setup }: { organizationId: string; setup: JiraIntakeSetupModel }) {
   if (setup.step === "connection") {
     return (
@@ -106,18 +139,28 @@ function SetupStepBody({ organizationId, setup }: { organizationId: string; setu
     );
   }
 
+  if (setup.step === "completion") {
+    return (
+      <JiraCompletionColumnFields
+        organizationId={organizationId}
+        integrationId={setup.integrationId}
+        projectId={setup.projectId}
+        value={setup.jiraCompletion}
+        onChange={setup.setJiraCompletion}
+        layout="plain"
+        showSection={false}
+      />
+    );
+  }
+
   return (
     <ProjectStep
-      organizationId={organizationId}
-      integrationId={setup.integrationId}
       projects={setup.projectsQuery.data ?? []}
       selectedId={setup.projectId}
       loading={setup.projectsQuery.isLoading}
       error={setup.projectsQuery.isError}
       onSelect={setup.setProjectId}
       onRetry={() => void setup.projectsQuery.refetch()}
-      completion={setup.jiraCompletion}
-      onCompletionChange={setup.setJiraCompletion}
     />
   );
 }
@@ -173,27 +216,19 @@ function ConnectionStep({
 }
 
 function ProjectStep({
-  organizationId,
-  integrationId,
   projects,
   selectedId,
   loading,
   error,
   onSelect,
   onRetry,
-  completion,
-  onCompletionChange,
 }: {
-  organizationId: string;
-  integrationId: string;
   projects: Array<{ id?: string; name?: string }>;
   selectedId: string;
   loading: boolean;
   error: boolean;
   onSelect: (id: string) => void;
   onRetry: () => void;
-  completion: JiraIntakeSetupModel["jiraCompletion"];
-  onCompletionChange: JiraIntakeSetupModel["setJiraCompletion"];
 }) {
   if (loading) {
     return (
@@ -216,20 +251,7 @@ function ProjectStep({
   if (projects.length === 0) {
     return <p className="workspace-body-text text-muted-foreground">{JIRA_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>;
   }
-  return (
-    <div className="space-y-6">
-      <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />
-      {selectedId ? (
-        <JiraCompletionColumnFields
-          organizationId={organizationId}
-          integrationId={integrationId}
-          projectId={selectedId}
-          value={completion}
-          onChange={onCompletionChange}
-        />
-      ) : null}
-    </div>
-  );
+  return <ProjectPicker projects={projects} selectedId={selectedId} onSelect={onSelect} />;
 }
 
 function ProjectPicker({
@@ -303,7 +325,7 @@ function SetupFooter({ setup, onCreated }: { setup: JiraIntakeSetupModel; onCrea
       <div>
         <Button
           type="button"
-          className="w-full"
+          className={JIRA_INTAKE_ACTION_CLASS}
           disabled={!setup.integrationId}
           onClick={() => setup.setStep("project")}
           data-testid="jira-setup-continue"
@@ -314,16 +336,32 @@ function SetupFooter({ setup, onCreated }: { setup: JiraIntakeSetupModel; onCrea
     );
   }
 
+  if (setup.step === "project") {
+    return (
+      <div className="space-y-4">
+        <IntakeSkipInitialImportField
+          checked={setup.skipInitialImport}
+          onCheckedChange={setup.setSkipInitialImport}
+          testId="jira-skip-initial-import"
+        />
+        <Button
+          type="button"
+          className={JIRA_INTAKE_ACTION_CLASS}
+          disabled={!setup.projectId}
+          onClick={() => setup.setStep("completion")}
+          data-testid="jira-setup-continue"
+        >
+          {JIRA_INTAKE_SETUP_COPY.wizardContinue}
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      <IntakeSkipInitialImportField
-        checked={setup.skipInitialImport}
-        onCheckedChange={setup.setSkipInitialImport}
-        testId="jira-skip-initial-import"
-      />
+    <div>
       <Button
         type="button"
-        className="w-full"
+        className={JIRA_INTAKE_ACTION_CLASS}
         disabled={!setup.projectId || setup.createIntake.isPending}
         onClick={() => {
           void setup.createBoundIntake().then((created) => {
