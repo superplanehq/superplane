@@ -19,6 +19,9 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-workers
     spec:
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -46,6 +49,10 @@ spec:
                 name: {{ include "secrets.email.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            {{- if .Values.polar.enabled }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
           env:
             - name: START_CONSUMERS
               value: "yes"
