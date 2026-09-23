@@ -43,7 +43,7 @@ func Test__Sync__SkipsPublishWhenRatesUnchanged(t *testing.T) {
 	current, err := models.FindCurrentUsagePriceBook(db)
 	require.NoError(t, err)
 
-	upsertOpenRouterProvider(t, db, nil)
+	upsertOpenRouterProvider(t, db, datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}))
 
 	svc := pricebooksync.New(crypto.NewNoOpEncryptor(), openRouterHTTPContext(sonnetCatalogBody("0.000003", "0.000015")))
 	result, err := svc.Sync(t.Context(), db, pricebooksync.Options{SkipWhenUnchanged: true})
