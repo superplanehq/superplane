@@ -9,6 +9,97 @@ import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
+const xmlEditorOptions = {
+  minimap: { enabled: false },
+  fontSize: 13,
+  lineNumbers: "on" as const,
+  wordWrap: "on" as const,
+  folding: true,
+  autoIndent: "advanced" as const,
+  formatOnPaste: true,
+  formatOnType: true,
+  tabSize: 2,
+  insertSpaces: true,
+  scrollBeyondLastLine: false,
+  renderWhitespace: "boundary" as const,
+  smoothScrolling: true,
+  cursorBlinking: "smooth" as const,
+  contextmenu: true,
+  selectOnLineNumbers: true,
+  bracketPairColorization: {
+    enabled: true,
+  },
+  suggestOnTriggerCharacters: true,
+  quickSuggestions: {
+    other: true,
+    strings: true,
+    comments: false,
+  },
+  wordBasedSuggestions: "off" as const,
+};
+
+function XMLExpandedEditorDialog({
+  open,
+  onOpenChange,
+  title,
+  editorValue,
+  monacoTheme,
+  copied,
+  onCopy,
+  onChange,
+  onMount,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  editorValue: string;
+  monacoTheme: string;
+  copied: boolean;
+  onCopy: () => void;
+  onChange: (value: string | undefined) => void;
+  onMount: ReturnType<typeof useMonacoExpressionAutocomplete>["handleEditorMount"];
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">Expanded XML editor for {title}.</DialogDescription>
+          <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopy();
+              }}
+            >
+              {React.createElement(resolveIcon("copy"), { size: 14 })}
+              Copy
+            </Button>
+          </SimpleTooltip>
+        </div>
+        <div className="flex-1 border border-gray-200 dark:border-gray-600 rounded-md">
+          <Editor
+            height="600px"
+            defaultLanguage="xml"
+            value={editorValue}
+            onChange={onChange}
+            onMount={onMount}
+            theme={monacoTheme}
+            options={{
+              ...xmlEditorOptions,
+              automaticLayout: true,
+            }}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -58,34 +149,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
     onChange(valueToUse || undefined);
   };
 
-  const editorOptions = {
-    minimap: { enabled: false },
-    fontSize: 13,
-    lineNumbers: "on" as const,
-    wordWrap: "on" as const,
-    folding: true,
-    autoIndent: "advanced" as const,
-    formatOnPaste: true,
-    formatOnType: true,
-    tabSize: 2,
-    insertSpaces: true,
-    scrollBeyondLastLine: false,
-    renderWhitespace: "boundary" as const,
-    smoothScrolling: true,
-    cursorBlinking: "smooth" as const,
-    contextmenu: true,
-    selectOnLineNumbers: true,
-    bracketPairColorization: {
-      enabled: true,
-    },
-    suggestOnTriggerCharacters: true,
-    quickSuggestions: {
-      other: true,
-      strings: true,
-      comments: false,
-    },
-    wordBasedSuggestions: "off" as const,
-  };
+  const fieldTitle = field.label || field.name || "";
 
   return (
     <>
@@ -110,52 +174,23 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
             onChange={handleEditorChange}
             onMount={handleEditorMount}
             theme={monacoTheme}
-            options={editorOptions}
+            options={xmlEditorOptions}
           />
         </div>
         {validationError && <p className="text-red-600 dark:text-red-400 text-xs">{validationError}</p>}
       </div>
 
-      {/* Expanded Editor Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between">
-            <DialogTitle>{field.label || field.name}</DialogTitle>
-            <DialogDescription className="sr-only">
-              Expanded XML editor for {field.label || field.name}.
-            </DialogDescription>
-            <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyToClipboard();
-                }}
-              >
-                {React.createElement(resolveIcon("copy"), { size: 14 })}
-                Copy
-              </Button>
-            </SimpleTooltip>
-          </div>
-          <div className="flex-1 border border-gray-200 dark:border-gray-600 rounded-md">
-            <Editor
-              height="600px"
-              defaultLanguage="xml"
-              value={editorValue}
-              onChange={handleEditorChange}
-              onMount={handleEditorMount}
-              theme={monacoTheme}
-              options={{
-                ...editorOptions,
-                automaticLayout: true,
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <XMLExpandedEditorDialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        title={fieldTitle}
+        editorValue={editorValue}
+        monacoTheme={monacoTheme}
+        copied={copied}
+        onCopy={copyToClipboard}
+        onChange={handleEditorChange}
+        onMount={handleEditorMount}
+      />
     </>
   );
 };
