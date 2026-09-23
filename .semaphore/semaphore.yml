@@ -205,8 +205,8 @@ after_pipeline:
         commands:
           - test-results gen-pipeline-report
 
-# Runner promotions use SuperPlane targets runner-images, runner-s3, and
-# runner-ami. Replace the mock env on those targets before a real publish.
+# One SuperPlane target `runner-prod` for all runner promotions.
+# Auto-promote only on main. Replace the mock env before a real publish.
 # Do not use production.
 promotions:
   - name: Deploy to Production
@@ -217,16 +217,16 @@ promotions:
 
   - name: Publish runner images
     pipeline_file: runner-docker-publish.yml
-    deployment_target: runner-images
+    deployment_target: runner-prod
     auto_promote:
       when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
 
   - name: Publish runner binaries to S3
     pipeline_file: runner-binary-s3.yml
-    deployment_target: runner-s3
+    deployment_target: runner-prod
     auto_promote:
       when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
 
   - name: Build runner AMIs
     pipeline_file: runner-build-amis.yml
-    deployment_target: runner-ami
+    deployment_target: runner-prod

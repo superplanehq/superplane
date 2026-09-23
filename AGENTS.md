@@ -32,9 +32,9 @@ A clean clone does not contain these files until `make dev.setup` or
 `make pb.gen` runs. CI is Semaphore (`.semaphore/`), not GitHub Actions. CI
 runs `make dev.setup`, which includes `pb.gen`. App blocks skip `/runner/**`.
 Runner tests and publish pipelines run when `/runner` changes. Create
-deployment targets `runner-images`, `runner-s3`, and `runner-ami` on the
-SuperPlane Semaphore project and attach `GHCR_TOKEN`, `aws-prod`, `runner-s3`,
-`aws-prod-ami-builder`, and `aws-credentials`. Do not put runner jobs on
+deployment target `runner-prod` on the SuperPlane Semaphore project and
+attach `GHCR_TOKEN` plus the AWS keys used for S3, ECS, and AMI jobs.
+Auto-promote those pipelines only from `main`. Do not put runner jobs on
 `production`.
 
 ### Do not rediscover the build system
