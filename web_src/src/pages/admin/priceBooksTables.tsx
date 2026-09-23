@@ -1,10 +1,17 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import AdminPagination from "./AdminPagination";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
-import { formatCentsPerMillionUsd, formatMicrosPerSecondUsdPerMinute } from "./priceBookFormat";
+import {
+  centsToUsdInput,
+  formatCentsPerMillionUsd,
+  formatMicrosPerSecondUsdPerMinute,
+  usdInputToCents,
+} from "./priceBookFormat";
 import type { PriceBookModelRate, PriceBookVMRate } from "./priceBooksApi";
 
 export const tableWrapClass =
@@ -37,7 +44,17 @@ const MODEL_COLUMNS: { field: ModelSortField; label: string; numeric: boolean }[
   { field: "reasoning", label: "Reasoning", numeric: true },
 ];
 
-export function ModelsTable({ rows, pageSize }: { rows: IndexedModelRate[]; pageSize?: number }) {
+export function ModelsTable({
+  rows,
+  pageSize,
+  editing,
+  onRateChange,
+}: {
+  rows: IndexedModelRate[];
+  pageSize?: number;
+  editing?: boolean;
+  onRateChange?: (index: number, updates: Partial<PriceBookModelRate>) => void;
+}) {
   const sort = useColumnSort<ModelSortField>("model");
   const sorted = useMemo(() => sortModelRows(rows, sort.field, sort.direction), [rows, sort.direction, sort.field]);
   const offset = usePagedOffset(sort.field, sort.direction, pageSize, sorted.length);
@@ -68,14 +85,44 @@ export function ModelsTable({ rows, pageSize }: { rows: IndexedModelRate[]; page
             </tr>
           </thead>
           <tbody>
-            {visible.map(({ rate }) => (
+            {visible.map(({ rate, index }) => (
               <tr key={`${rate.provider}:${rate.match_key}:${rate.match_mode}`} className={rowClass}>
                 <td className={`${bodyCellClass} font-mono text-xs`}>{rate.match_key}</td>
-                <td className={numericCellClass}>{formatCentsPerMillionUsd(rate.input_cents_per_million)}</td>
-                <td className={numericCellClass}>{formatCentsPerMillionUsd(rate.output_cents_per_million)}</td>
-                <td className={numericCellClass}>{formatCentsPerMillionUsd(rate.cache_read_cents_per_million)}</td>
-                <td className={numericCellClass}>{formatCentsPerMillionUsd(rate.cache_write_cents_per_million)}</td>
-                <td className={numericCellClass}>{formatCentsPerMillionUsd(rate.reasoning_cents_per_million)}</td>
+                <RateCell
+                  cents={rate.input_cents_per_million}
+                  editing={editing}
+                  inputId={rateInputId(rate, "input")}
+                  label={`Input for ${rate.match_key}`}
+                  onChange={(cents) => onRateChange?.(index, { input_cents_per_million: cents })}
+                />
+                <RateCell
+                  cents={rate.output_cents_per_million}
+                  editing={editing}
+                  inputId={rateInputId(rate, "output")}
+                  label={`Output for ${rate.match_key}`}
+                  onChange={(cents) => onRateChange?.(index, { output_cents_per_million: cents })}
+                />
+                <RateCell
+                  cents={rate.cache_read_cents_per_million}
+                  editing={editing}
+                  inputId={rateInputId(rate, "cache_read")}
+                  label={`Cache read for ${rate.match_key}`}
+                  onChange={(cents) => onRateChange?.(index, { cache_read_cents_per_million: cents })}
+                />
+                <RateCell
+                  cents={rate.cache_write_cents_per_million}
+                  editing={editing}
+                  inputId={rateInputId(rate, "cache_write")}
+                  label={`Cache write for ${rate.match_key}`}
+                  onChange={(cents) => onRateChange?.(index, { cache_write_cents_per_million: cents })}
+                />
+                <RateCell
+                  cents={rate.reasoning_cents_per_million}
+                  editing={editing}
+                  inputId={rateInputId(rate, "reasoning")}
+                  label={`Reasoning for ${rate.match_key}`}
+                  onChange={(cents) => onRateChange?.(index, { reasoning_cents_per_million: cents })}
+                />
               </tr>
             ))}
           </tbody>
@@ -90,6 +137,44 @@ export function ModelsTable({ rows, pageSize }: { rows: IndexedModelRate[]; page
         />
       ) : null}
     </>
+  );
+}
+
+function rateInputId(rate: PriceBookModelRate, field: Exclude<ModelSortField, "model">) {
+  return `price-book-rate-${rate.provider}-${rate.match_mode}-${rate.match_key}-${field}`;
+}
+
+function RateCell({
+  cents,
+  editing,
+  inputId,
+  label,
+  onChange,
+}: {
+  cents: number;
+  editing?: boolean;
+  inputId: string;
+  label: string;
+  onChange?: (cents: number) => void;
+}) {
+  if (!editing) {
+    return <td className={numericCellClass}>{formatCentsPerMillionUsd(cents)}</td>;
+  }
+  return (
+    <td className={numericCellClass}>
+      <Label htmlFor={inputId} className="sr-only">
+        {label}
+      </Label>
+      <Input
+        id={inputId}
+        type="number"
+        min="0"
+        step="0.01"
+        value={centsToUsdInput(cents)}
+        onChange={(event) => onChange?.(usdInputToCents(event.target.value))}
+        className="ml-auto w-24 text-right tabular-nums"
+      />
+    </td>
   );
 }
 

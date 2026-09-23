@@ -68,6 +68,7 @@ export function PriceBooks() {
         onAddVM={edits.handleAddVM}
         onSave={edits.handleSave}
         onSync={edits.handleSync}
+        onModelsChange={catalog.setModels}
         onActivate={() => setActivateOpen(true)}
         onDelete={() => setDeleteOpen(true)}
       />

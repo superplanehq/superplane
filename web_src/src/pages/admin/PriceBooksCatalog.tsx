@@ -59,8 +59,9 @@ type PriceBooksCatalogProps = {
   onVersionChange: (version: string) => void;
   onRemoveVM: (index: number) => void;
   onAddVM: (rate: PriceBookVMRate) => boolean;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
   onSync: (provider: PriceBookProvider) => void;
+  onModelsChange: (updater: (current: PriceBookModelRate[]) => PriceBookModelRate[]) => void;
   onActivate: () => void;
   onDelete: () => void;
 };
@@ -113,6 +114,7 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             onProviderChange={props.onProviderChange}
             onSave={props.onSave}
             onSync={props.onSync}
+            onModelsChange={props.onModelsChange}
           />
         </TabsContent>
         <TabsContent value="machines" className="mt-3 space-y-4">
@@ -222,7 +224,7 @@ function VMsPanel({
   actionsDisabled: boolean;
   onRemoveVM: (index: number) => void;
   onAddVM: (rate: PriceBookVMRate) => boolean;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
 }) {
   return (
     <>
