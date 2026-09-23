@@ -1,4 +1,4 @@
-import { useRef, type MutableRefObject } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 
 import { appendSpokenPhrase, stripLeadingSpokenPhrase, stripTrailingSpokenPhrase } from "@/lib/appendSpokenPhrase";
 
@@ -104,7 +104,9 @@ export function useSpokenPhraseDictation(
     syncFromField();
   };
 
-  syncFromField();
+  useEffect(() => {
+    syncFromField();
+  });
 
   const dictation = useSpeechDictation({
     onFinalPhrase: (phrase) => {
