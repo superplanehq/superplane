@@ -329,7 +329,11 @@ func seedProductiveTasks(
 	}
 
 	project, _ := binding.Configuration["project"].(string)
-	documents, err := client.ListNewestOpenTaskDocuments(project, intakeSeedSize)
+	documents, err := client.ListNewestOpenTaskDocuments(
+		project,
+		intakeSeedSize,
+		productiveIntakeExcludesKeyTasks(tx, canvasID),
+	)
 	if err != nil {
 		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
 	}
@@ -354,6 +358,19 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	slices.Reverse(events)
 
 	return events
+}
+
+func productiveIntakeExcludesKeyTasks(tx *gorm.DB, canvasID uuid.UUID) bool {
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{canvasID})
+	if err != nil {
+		return true
+	}
+	spec, ok := specs[canvasID]
+	if !ok {
+		return true
+	}
+	source := models.FactoryIntakeSourceProductiveTasks
+	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec).ExcludeKeyTasks
 }
 
 func seedSentryIssues(
