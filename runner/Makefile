@@ -8,9 +8,9 @@ LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslm
 # Starts a DB via docker compose, waits for it, runs tests, then tears down.
 .PHONY: test-integration
 test-integration:
-	docker compose up -d db
+	docker compose -f ../docker-compose.dev.yml --profile local-runner up -d --wait broker-db
 	TEST_DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
-	docker compose stop db
+	docker compose -f ../docker-compose.dev.yml --profile local-runner stop broker-db
 
 LOCAL_BROKER_LISTEN ?= :8081
 LOCAL_BROKER_URL ?= http://127.0.0.1:8081
