@@ -194,24 +194,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
   });
 
-  it("hides the completion column until this screen is last", () => {
-    render(
-      <FirstRunTicketsScreen
-        ticketSource="jira"
-        jiraConnected
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
-        jiraProjects={[{ id: "PAY", name: "Payments" }]}
-        jiraProjectId="PAY"
-        onSelectTicketSource={vi.fn()}
-        onAnalyzeTickets={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
-  });
-
-  it("shows the completion column below the project card when this screen is last", async () => {
+  it("shows the completion column after a Jira project is chosen", async () => {
     const user = userEvent.setup();
     const onJiraCompletionChange = vi.fn();
 
@@ -219,7 +202,6 @@ describe("FirstRunTicketsScreen", () => {
       <FirstRunTicketsScreen
         ticketSource="jira"
         jiraConnected
-        showJiraCompletion
         organizationId="org-1"
         jiraIntegrationId="jira-1"
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
@@ -230,9 +212,7 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    const completion = screen.getByTestId("jira-completion-column");
-    expect(completion).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-jira-projects")).not.toContainElement(completion);
+    expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
     expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
     expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
     await user.click(screen.getByTestId("jira-move-on-complete"));
