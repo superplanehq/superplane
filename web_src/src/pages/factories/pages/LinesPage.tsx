@@ -81,7 +81,7 @@ import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
+import { LineBoardColumnCardList, LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -288,6 +288,7 @@ export function LinesPage() {
   const {
     workOrders,
     isLoading: workOrdersLoading,
+    isPlaceholderData,
     backlog: backlogPage,
     open: openPage,
     done: donePage,
@@ -406,7 +407,7 @@ export function LinesPage() {
   const redirectCanonical = Boolean(
     routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber),
   );
-  const holdBoard = workOrdersLoading && !redirectCanonical && Boolean(selectedLine);
+  const holdBoard = workOrdersLoading && !isPlaceholderData && !redirectCanonical && Boolean(selectedLine);
   const overlayHoldsBoard = useWorkspaceLoading(WORKSPACE_LOADING_COPY.board, holdBoard);
 
   if (redirectCanonical && canonicalNumber) {
@@ -683,6 +684,7 @@ export function LinesPage() {
             line={selectedLine}
             apps={factoryApps}
             workOrders={visibleWorkOrders}
+            cardsPending={Boolean(isPlaceholderData)}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
@@ -707,17 +709,17 @@ export function LinesPage() {
             colorView={columnColorView}
             columnPaging={{
               backlog: {
-                hasMore: backlogPage.hasNextPage,
+                hasMore: !isPlaceholderData && backlogPage.hasNextPage,
                 isLoading: backlogPage.isFetchingNextPage,
                 onLoadMore: backlogPage.fetchNextPage,
               },
               open: {
-                hasMore: openPage.hasNextPage,
+                hasMore: !isPlaceholderData && openPage.hasNextPage,
                 isLoading: openPage.isFetchingNextPage,
                 onLoadMore: openPage.fetchNextPage,
               },
               done: {
-                hasMore: donePage.hasNextPage,
+                hasMore: !isPlaceholderData && donePage.hasNextPage,
                 isLoading: donePage.isFetchingNextPage,
                 onLoadMore: donePage.fetchNextPage,
               },
@@ -875,6 +877,7 @@ function LineDetail({
   line,
   apps,
   workOrders,
+  cardsPending,
   canCreateWorkOrder,
   canUpdate,
   onCreateWorkOrder,
@@ -905,6 +908,7 @@ function LineDetail({
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders: FactoriesWorkOrder[];
+  cardsPending: boolean;
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
@@ -1017,6 +1021,7 @@ function LineDetail({
           backlogOrders={backlogOrders}
           verifyOrders={verifyOrders}
           doneOrders={doneOrders}
+          cardsPending={cardsPending}
           columnPaging={columnPaging}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
@@ -1262,6 +1267,7 @@ function PhaseBoard({
   backlogOrders,
   verifyOrders,
   doneOrders,
+  cardsPending,
   columnPaging,
   columns,
   canCreateWorkOrder,
@@ -1289,6 +1295,7 @@ function PhaseBoard({
   backlogOrders: FactoriesWorkOrder[];
   verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
+  cardsPending: boolean;
   columnPaging: BoardPaging;
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
@@ -1442,6 +1449,7 @@ function PhaseBoard({
           automationRowCount={automationRowCount}
           onAutomationRowAction={onAutomationRowAction}
           paging={columnPaging.backlog}
+          cardsPending={cardsPending}
         />
       </div>
       {columns.map((column, index) => {
@@ -1473,6 +1481,7 @@ function PhaseBoard({
               automationRowCount={automationRowCount}
               onAutomationRowAction={onAutomationRowAction}
               paging={columnPaging.open}
+              cardsPending={cardsPending}
             />
           </div>
         );
@@ -1496,6 +1505,7 @@ function PhaseBoard({
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddVerifyAutomation}
           paging={columnPaging.open}
+          cardsPending={cardsPending}
         />
       </div>
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
@@ -1515,6 +1525,7 @@ function PhaseBoard({
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddDoneAutomation}
           paging={columnPaging.done}
+          cardsPending={cardsPending}
         />
       </div>
     </WorkOrderKanbanBoard>
@@ -1538,6 +1549,7 @@ function VerifyColumn({
   onAutomationRowAction,
   onAddAutomation,
   paging,
+  cardsPending,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1555,9 +1567,9 @@ function VerifyColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
+  cardsPending: boolean;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const scrollRef = useRef<HTMLUListElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1575,6 +1587,7 @@ function VerifyColumn({
       tone="neutral"
       surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Verify."
+      keepChildrenWhenEmpty={cardsPending}
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
@@ -1618,11 +1631,11 @@ function VerifyColumn({
       banner={<LaneListenerList listeners={listeners} testId="lines-verify-listeners" />}
       testId="lines-verify-column"
     >
-      <ul
-        ref={scrollRef}
+      <LineBoardColumnCardList
+        pending={cardsPending}
         className={workOrderKanbanLaneScrollClassName}
-        data-testid="lines-verify-column-scroll"
-        onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+        testId="lines-verify-column-scroll"
+        onScroll={loadMoreIfNeeded}
       >
         {orders.map((order) => (
           <li key={order.id}>
@@ -1633,7 +1646,7 @@ function VerifyColumn({
             />
           </li>
         ))}
-      </ul>
+      </LineBoardColumnCardList>
     </WorkOrderBoardLane>
   );
 }
@@ -1653,6 +1666,7 @@ function DoneColumn({
   onAutomationRowAction,
   onAddAutomation,
   paging,
+  cardsPending,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1668,9 +1682,9 @@ function DoneColumn({
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
+  cardsPending: boolean;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const scrollRef = useRef<HTMLUListElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1688,6 +1702,7 @@ function DoneColumn({
       tone="done"
       surfaceClassName={lane.surfaceClassName}
       emptyDescription="No tasks in Done."
+      keepChildrenWhenEmpty={cardsPending}
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
@@ -1718,11 +1733,11 @@ function DoneColumn({
       })}
       testId="lines-done-column"
     >
-      <ul
-        ref={scrollRef}
+      <LineBoardColumnCardList
+        pending={cardsPending}
         className={workOrderKanbanLaneScrollClassName}
-        data-testid="lines-done-column-scroll"
-        onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+        testId="lines-done-column-scroll"
+        onScroll={loadMoreIfNeeded}
       >
         {orders.map((order) => (
           <li key={order.id}>
@@ -1733,7 +1748,7 @@ function DoneColumn({
             />
           </li>
         ))}
-      </ul>
+      </LineBoardColumnCardList>
     </WorkOrderBoardLane>
   );
 }
@@ -1768,6 +1783,7 @@ function PhaseColumn({
   automationRowCount,
   onAutomationRowAction,
   paging,
+  cardsPending,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -1787,8 +1803,8 @@ function PhaseColumn({
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   paging: BoardColumnPaging;
+  cardsPending: boolean;
 }) {
-  const scrollRef = useRef<HTMLUListElement>(null);
   const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
@@ -1815,6 +1831,7 @@ function PhaseColumn({
         surfaceClassName={lane.surfaceClassName}
         className={lane.className}
         emptyDescription="Nothing here."
+        keepChildrenWhenEmpty={cardsPending}
         canRename={canRename}
         onRename={onRename}
         titleTestId={`lines-column-title-phase-${column.stepIndex}`}
@@ -1847,18 +1864,18 @@ function PhaseColumn({
           </div>
         }
       >
-        <ul
-          ref={scrollRef}
+        <LineBoardColumnCardList
+          pending={cardsPending}
           className={workOrderKanbanLaneScrollClassName}
-          onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
-          data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
+          testId={`lines-phase-column-scroll-${column.stepIndex}`}
+          onScroll={loadMoreIfNeeded}
         >
           {visibleRuns.map((run) => (
             <li key={run.executionId}>
               <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
             </li>
           ))}
-        </ul>
+        </LineBoardColumnCardList>
       </WorkOrderBoardLane>
       <ParallelismSettingsDialog
         open={parallelismOpen}

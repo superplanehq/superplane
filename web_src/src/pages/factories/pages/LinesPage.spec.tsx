@@ -47,6 +47,7 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  DRAFT_WORK_ORDER,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
@@ -339,6 +340,59 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("status", { name: "Loading the board" })).toBeInTheDocument();
     expect(screen.queryByTestId("lines-phase-board")).not.toBeInTheDocument();
     expect(screen.queryByText("Nothing here.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the columns and shows task skeletons while filter pages are placeholders", () => {
+    const fetchNextOpen = vi.fn();
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [DRAFT_WORK_ORDER],
+      isLoading: false,
+      isPlaceholderData: true,
+      backlog: idleBoardPage(),
+      open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
+      done: idleBoardPage(),
+    });
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-phase-board")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading the board" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("status", { name: "Loading tasks" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Nothing here.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-wo-draft-refunds")).not.toBeInTheDocument();
+
+    fireEvent.scroll(screen.getByTestId("lines-phase-column-scroll-0"));
+    expect(fetchNextOpen).not.toHaveBeenCalled();
+  });
+
+  it("fades the board cards in after a filter placeholder stretch", () => {
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [DRAFT_WORK_ORDER],
+      isLoading: false,
+      isPlaceholderData: true,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    const view = renderLinesBoard();
+
+    expect(screen.getAllByRole("status", { name: "Loading tasks" }).length).toBeGreaterThan(0);
+
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: [DRAFT_WORK_ORDER],
+      isLoading: false,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    expect(screen.queryByRole("status", { name: "Loading tasks" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-column-scroll")).toHaveAttribute("data-reveal");
+    expect(screen.getByTestId("work-order-card-wo-draft-refunds")).toBeInTheDocument();
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
