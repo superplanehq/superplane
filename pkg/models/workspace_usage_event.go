@@ -105,6 +105,7 @@ type ComputeUsageEventInput struct {
 // still persist. Org canvases are skipped. Each billed call gets its own
 // row, including retries of the same node execution.
 func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
+	in.Model = pricebook.CatalogModelID(in.Model)
 	if in.Provider == "" || in.Model == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
 		return fmt.Errorf("workspace usage event requires provider, model, node execution, and canvas run")
 	}
@@ -128,7 +129,7 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 		providerCostMicros = *in.CostMicros
 		version = pricebook.Version + "+provider"
 	} else {
-		if fundingSourceIsHosted(in.FundingSource) && !pricebook.IsPriced(in.Model) {
+		if fundingSourceIsHosted(in.FundingSource) && !pricebook.IsPriced(in.Provider, in.Model) {
 			log.WithFields(log.Fields{
 				"provider": in.Provider,
 				"model":    in.Model,
@@ -654,7 +655,7 @@ type usageByMachineTypeRow struct {
 }
 
 func formatUsageModelName(provider, model string) string {
-	model = strings.TrimSpace(model)
+	model = pricebook.CatalogModelID(model)
 	if model == "" {
 		return ""
 	}
@@ -913,8 +914,8 @@ const workOrderRunUsageSelect = `
 	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
-	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source IS DISTINCT FROM '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS models,
-	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS byok_models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source IS DISTINCT FROM '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS byok_models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
 
 type workOrderRunUsageScanRow struct {
@@ -1024,8 +1025,8 @@ func workOrderRunUsageRowsFromScan(rows []workOrderRunUsageScanRow) []WorkOrderR
 			CostMicros:           row.CostMicros,
 			HostedCostMicros:     row.HostedCostMicros,
 			BYOKCostMicros:       row.BYOKCostMicros,
-			Models:               splitUsageAgg(row.Models),
-			BYOKModels:           splitUsageAgg(row.BYOKModels),
+			Models:               splitUsageModelAgg(row.Models),
+			BYOKModels:           splitUsageModelAgg(row.BYOKModels),
 			MachineTypes:         splitUsageAgg(row.MachineTypes),
 		})
 	}
@@ -1042,6 +1043,27 @@ func splitUsageAgg(value string) []string {
 		if trimmed := strings.TrimSpace(part); trimmed != "" {
 			out = append(out, trimmed)
 		}
+	}
+	return out
+}
+
+func splitUsageModelAgg(value string) []string {
+	parts := splitUsageAgg(value)
+	if len(parts) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		model := pricebook.CatalogModelID(part)
+		if model == "" {
+			continue
+		}
+		if _, dup := seen[model]; dup {
+			continue
+		}
+		seen[model] = struct{}{}
+		out = append(out, model)
 	}
 	return out
 }
