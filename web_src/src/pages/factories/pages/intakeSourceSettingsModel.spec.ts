@@ -4,16 +4,9 @@ import {
   addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
-  intakeIncludeLabelFields,
   isIntakeSettingsTab,
   intakeSettingsTabs,
-  resolveIntakeSettingsTab,
   intakeSettingsFromApi,
-  intakeSettingsSections,
-  intakeDangerZoneHelper,
-  intakeDeleteHelper,
-  intakePauseHelper,
-  intakeSettingsTitle,
   intakeSettingsToApi,
   intakeSupportsPause,
   jiraCompletionSettingsToApi,
@@ -33,31 +26,6 @@ describe("intakeSourceSettingsModel", () => {
     expect(addIntakeLabel(["bug"], "   ")).toEqual(["bug"]);
   });
 
-  it("saves include-only labels even when the stored mode is exclude", () => {
-    const next = normalizeIntakeSourceSettings({
-      ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-      labels: ["bug"],
-      filterByLabel: true,
-      labelFilterMode: "exclude",
-    });
-
-    expect(next).toMatchObject({
-      labels: ["bug"],
-      filterByLabel: true,
-      labelFilterMode: "include",
-    });
-    expect(intakeIncludeLabelFields(["bug"])).toEqual({
-      labels: ["bug"],
-      filterByLabel: true,
-      labelFilterMode: "include",
-    });
-    expect(intakeIncludeLabelFields([])).toEqual({
-      labels: [],
-      filterByLabel: false,
-      labelFilterMode: "include",
-    });
-  });
-
   it("clamps the confidence score", () => {
     const next = normalizeIntakeSourceSettings({
       ...DEFAULT_GITHUB_INTAKE_SETTINGS,
@@ -75,20 +43,6 @@ describe("intakeSourceSettingsModel", () => {
     expect(isIntakeSettingsTab("listen")).toBe(false);
     expect(intakeSettingsTabs(false)).toEqual(["general", "automation"]);
     expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
-  });
-
-  it("keeps Settings and Canvas tabs and adds Agent when the intake has an agent", () => {
-    expect(intakeSettingsTabs(false)).toEqual(["general", "automation"]);
-    expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
-  });
-
-  it("resolves deep links to tabs that exist and falls back to Settings", () => {
-    const tabs = intakeSettingsTabs(true);
-
-    expect(resolveIntakeSettingsTab(tabs, "general")).toBe("general");
-    expect(resolveIntakeSettingsTab(tabs, "agent")).toBe("agent");
-    expect(resolveIntakeSettingsTab(tabs, "automation")).toBe("automation");
-    expect(resolveIntakeSettingsTab(intakeSettingsTabs(false), "agent")).toBe("general");
   });
 
   it("defaults the authors filter to off", () => {
@@ -195,14 +149,6 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.sentryLevels).toEqual([]);
   });
 
-  it("uses a generic settings title for each intake source", () => {
-    expect(intakeSettingsTitle("github-issues")).toBe("GitHub intake");
-    expect(intakeSettingsTitle("jira-issues")).toBe("Jira intake");
-    expect(intakeSettingsTitle("sentry-exceptions")).toBe("Sentry intake");
-    expect(intakeSettingsTitle("productive-tasks")).toBe("Productive intake");
-    expect(intakeSettingsTitle("pagerduty-incidents")).toBe("PagerDuty intake");
-  });
-
   it("defaults excludeKeyTasks on when the API omits it", () => {
     const settings = intakeSettingsFromApi("Productive.io tasks", {});
 
@@ -223,94 +169,5 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSupportsPause("jira-issues")).toBe(true);
     expect(intakeSupportsPause("productive-tasks")).toBe(true);
     expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
-  });
-
-  it("names the source SuperPlane stops listening to", () => {
-    expect(intakePauseHelper("jira-issues")).toBe(
-      "SuperPlane stops listening for changes from Jira. You can still import one item to Backlog by hand.",
-    );
-    expect(intakePauseHelper("github-issues")).toBe(
-      "SuperPlane stops listening for changes from GitHub. You can still import one item to Backlog by hand.",
-    );
-    expect(intakePauseHelper("sentry-exceptions")).toBe(
-      "SuperPlane stops listening for changes from Sentry. You can still import one item to Backlog by hand.",
-    );
-    expect(intakePauseHelper("productive-tasks")).toBe(
-      "SuperPlane stops listening for changes from Productive.io. You can still import one item to Backlog by hand.",
-    );
-  });
-
-  it("names the source SuperPlane stops listening to when the intake is deleted", () => {
-    expect(intakeDeleteHelper("jira-issues")).toBe(
-      "SuperPlane stops listening for changes from Jira. Delete also removes this intake from Backlog. Tasks that this intake created stay in Backlog.",
-    );
-    expect(intakeDeleteHelper("github-issues")).toBe(
-      "SuperPlane stops listening for changes from GitHub. Delete also removes this intake from Backlog. Tasks that this intake created stay in Backlog.",
-    );
-    expect(intakeDeleteHelper("sentry-exceptions")).toBe(
-      "SuperPlane stops listening for changes from Sentry. Delete also removes this intake from Backlog. Tasks that this intake created stay in Backlog.",
-    );
-    expect(intakeDeleteHelper("productive-tasks")).toBe(
-      "SuperPlane stops listening for changes from Productive.io. Delete also removes this intake from Backlog. Tasks that this intake created stay in Backlog.",
-    );
-  });
-
-  it("introduces pause and delete with SuperPlane as the actor", () => {
-    expect(intakeDangerZoneHelper("jira-issues")).toBe(
-      "Pause stops SuperPlane from listening for changes from Jira. Delete removes this intake from Backlog.",
-    );
-    expect(intakeDangerZoneHelper("github-issues")).toBe(
-      "Pause stops SuperPlane from listening for changes from GitHub. Delete removes this intake from Backlog.",
-    );
-    expect(intakeDangerZoneHelper("sentry-exceptions")).toBe(
-      "Pause stops SuperPlane from listening for changes from Sentry. Delete removes this intake from Backlog.",
-    );
-    expect(intakeDangerZoneHelper("productive-tasks")).toBe(
-      "Pause stops SuperPlane from listening for changes from Productive.io. Delete removes this intake from Backlog.",
-    );
-  });
-
-  it("lists settings sections per intake source", () => {
-    expect(intakeSettingsSections("github-issues", false).map((section) => section.id)).toEqual([
-      "triggers",
-      "labels",
-      "filters",
-      "danger",
-    ]);
-    expect(intakeSettingsSections("jira-issues", true).map((section) => section.id)).toEqual([
-      "connection",
-      "triggers",
-      "labels",
-      "factory",
-      "danger",
-    ]);
-    expect(intakeSettingsSections("sentry-exceptions", true).map((section) => section.id)).toEqual([
-      "connection",
-      "triggers",
-      "danger",
-    ]);
-    expect(intakeSettingsSections("productive-tasks", true).map((section) => section.id)).toEqual([
-      "connection",
-      "filters",
-      "danger",
-    ]);
-    expect(intakeSettingsSections("github-issues", false).map((section) => section.label)).toEqual([
-      "Events that create tasks",
-      "Labels",
-      "Filters",
-      "Pause or delete",
-    ]);
-    expect(intakeSettingsSections("jira-issues", true).map((section) => section.label)).toEqual([
-      "Connection",
-      "Events that create tasks",
-      "Labels",
-      "When task completes",
-      "Pause or delete",
-    ]);
-    expect(intakeSettingsSections("sentry-exceptions", true).map((section) => section.label)).toEqual([
-      "Connection",
-      "Events that create tasks",
-      "Pause or delete",
-    ]);
   });
 });

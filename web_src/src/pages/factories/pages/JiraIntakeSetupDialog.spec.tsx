@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
-import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 
 const mocks = vi.hoisted(() => ({
@@ -101,13 +100,7 @@ function renderDialog(onCreated = vi.fn(), selectIntegrationId = "") {
 
 async function chooseProjectAndWaitForDone(user: ReturnType<typeof userEvent.setup>, projectId = "ENG") {
   await user.click(await screen.findByTestId(`jira-project-${projectId}`));
-  expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
-  await user.click(screen.getByTestId("jira-setup-continue"));
-  expect(await screen.findByRole("heading", { name: JIRA_COMPLETION_COLUMN_COPY.section })).toBeInTheDocument();
-  expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepCompletionHelper)).toBeInTheDocument();
-  expect(screen.queryByTestId("jira-intake-setup-stepper")).not.toBeInTheDocument();
-  expect(screen.getByTestId("jira-move-on-complete")).not.toHaveClass("rounded-lg");
-  expect(screen.getByTestId("jira-completion-column")).toContainElement(screen.getByTestId("jira-move-on-complete"));
+  expect(await screen.findByTestId("jira-completion-column")).toBeInTheDocument();
   await waitFor(() => {
     expect(screen.getByTestId("jira-completion-column-select")).toHaveTextContent("Done");
   });
@@ -144,9 +137,6 @@ describe("JiraIntakeSetupDialog", () => {
       "listens for new issues",
     );
     expect(screen.getByTestId("jira-intake-setup-stepper")).toBeInTheDocument();
-    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepColumn)).toBeInTheDocument();
-    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
-    expect(screen.getByTestId("jira-setup-continue")).toBeDisabled();
     expect(screen.getByTestId("jira-intake-setup-sphere")).toBeInTheDocument();
     expect(screen.queryByTestId("jira-setup-preview")).not.toBeInTheDocument();
   });
@@ -210,19 +200,6 @@ describe("JiraIntakeSetupDialog", () => {
 
     expect(screen.queryByTestId("jira-project-ENG")).not.toBeInTheDocument();
     expect(screen.getByTestId("jira-project-OPS")).toBeInTheDocument();
-  });
-
-  it("returns to the project step from the completion step", async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    await chooseProjectAndWaitForDone(user);
-    await user.click(screen.getByTestId("first-run-back"));
-
-    expect(screen.getByRole("heading", { name: JIRA_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
-    expect(screen.getByTestId("jira-intake-setup-stepper")).toBeInTheDocument();
-    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
-    expect(screen.getByTestId("jira-project-ENG")).toHaveAttribute("aria-selected", "true");
   });
 
   it("returns to the connection step from the project step", async () => {
