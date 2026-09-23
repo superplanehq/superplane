@@ -120,7 +120,8 @@ Full steps, webhook URLs, and factory CLIs on the Compose worker:
 **`make fleet-manager`** is only for the EC2 provisioner.
 **`make local-dev-help`** lists this. **`make task-broker`** runs on the
 Compose network and listens on **127.0.0.1:8081**. Start Postgres first with
-root **`make dev.up`**. Enqueue with **`Authorization: Bearer dev-local-token`**
+root **`make dev.up`**. The target creates database **`broker`** when that
+database is missing. Enqueue with **`Authorization: Bearer dev-local-token`**
 and **`"fleet_id":"local"`**.
 
 ## Run task-broker

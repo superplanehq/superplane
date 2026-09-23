@@ -79,7 +79,8 @@ GitHub and the applicable agent integration before you dispatch a factory line.
 
 Use these targets from this directory when you debug the broker and workers
 without the Compose task-broker service. Postgres must already be running
-(`make dev.up` from the repo root).
+(`make dev.up` from the repo root). `make task-broker` creates database
+`broker` when that database is missing.
 
 ```bash
 make task-broker

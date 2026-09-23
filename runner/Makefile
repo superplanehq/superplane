@@ -91,11 +91,14 @@ fleet-manager: build
 # 127.0.0.1 so register-local-fleet and make runner can connect.
 task-broker:
 	@set -eu; \
-	cid=$$(docker compose --project-directory "$(CURDIR)/.." -f "$(CURDIR)/../docker-compose.dev.yml" ps -q db); \
+	compose="docker compose --project-directory $(CURDIR)/.. -f $(CURDIR)/../docker-compose.dev.yml"; \
+	cid=$$($$compose ps -q db); \
 	if [ -z "$$cid" ]; then \
 	  echo "Postgres is not running. From the SuperPlane repo root, run: make dev.up" >&2; \
 	  exit 1; \
 	fi; \
+	$$compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
+	  || $$compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
 	net=$$(docker inspect -f '{{range $$name, $$conf := .NetworkSettings.Networks}}{{$$name}}{{end}}' "$$cid"); \
 	port=$$(printf '%s' "$(LOCAL_BROKER_LISTEN)" | sed 's/.*://'); \
 	docker run --rm -it --init --network "$$net" \
