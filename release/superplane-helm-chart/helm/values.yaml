@@ -94,6 +94,18 @@ dash0Web:
   serviceName: "superplane-web"
   environment: ""
 
+posthog:
+  secretName: ""
+  enabled: false
+  key: ""
+
+polar:
+  secretName: ""
+  enabled: false
+  accessToken: ""
+  environment: "sandbox"
+  webhookSecret: ""
+
 #
 # Secret used to sign JWT session tokens
 #
@@ -235,3 +247,13 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
+
+#
+# Kubernetes service account. create stays false.
+# Set name to use an existing account.
+# Set annotations to bind a cloud identity, for example GKE Workload Identity.
+#
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
