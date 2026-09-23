@@ -80,6 +80,10 @@ a factory line. Factory nodes use those integrations, not `.env`
 again in the runner repository. Check tools with `make doctor-local`.
 OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 
+Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
+in `.env` only when you need the SuperPlane-hosted provider. See
+[Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+
 ## Additional Development Resources
 
 ### Overview

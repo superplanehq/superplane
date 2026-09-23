@@ -106,6 +106,7 @@ export function FirstRunFlow({
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
         jiraCompletion={jiraCompletion}
+        showJiraCompletion
         organizationId="org-1"
         jiraIntegrationId={jiraConnected ? "jira-story" : ""}
         onSelectTicketSource={setTicketSource}
