@@ -256,7 +256,11 @@ func PublishUsagePriceBook(tx *gorm.DB, rates []UsagePriceBookRate, expectedCurr
 // Call LoadCurrentPriceBook after the commit.
 func ActivateUsagePriceBook(tx *gorm.DB, version string) error {
 	version = strings.TrimSpace(version)
-	book, err := FindUsagePriceBook(tx, version)
+	books, err := lockUsagePriceBooks(tx)
+	if err != nil {
+		return err
+	}
+	book, err := usagePriceBookByVersion(books, version)
 	if err != nil {
 		return err
 	}
@@ -361,19 +365,18 @@ func compareUsagePriceBookRates(a, b UsagePriceBookRate) int {
 // DeleteUsagePriceBook removes one non-current catalog version.
 func DeleteUsagePriceBook(tx *gorm.DB, version string) error {
 	version = strings.TrimSpace(version)
-	book, err := FindUsagePriceBook(tx, version)
+	books, err := lockUsagePriceBooks(tx)
+	if err != nil {
+		return err
+	}
+	book, err := usagePriceBookByVersion(books, version)
 	if err != nil {
 		return err
 	}
 	if book.IsCurrent {
 		return ErrUsagePriceBookCurrent
 	}
-
-	var count int64
-	if err := tx.Model(&UsagePriceBook{}).Count(&count).Error; err != nil {
-		return err
-	}
-	if count <= 1 {
+	if len(books) <= 1 {
 		return ErrUsagePriceBookLast
 	}
 
@@ -381,4 +384,22 @@ func DeleteUsagePriceBook(tx *gorm.DB, version string) error {
 		return err
 	}
 	return tx.Where("version = ?", version).Delete(&UsagePriceBook{}).Error
+}
+
+func lockUsagePriceBooks(tx *gorm.DB) ([]UsagePriceBook, error) {
+	var books []UsagePriceBook
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Order("version").Find(&books).Error
+	if err != nil {
+		return nil, err
+	}
+	return books, nil
+}
+
+func usagePriceBookByVersion(books []UsagePriceBook, version string) (*UsagePriceBook, error) {
+	for i := range books {
+		if books[i].Version == version {
+			return &books[i], nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
 }
