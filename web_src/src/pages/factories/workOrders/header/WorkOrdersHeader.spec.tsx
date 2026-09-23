@@ -11,10 +11,12 @@ function HeaderHarness({
   onCreateWorkOrder,
   canCreate = true,
   intakes = [],
+  showPullRequestMerge = false,
 }: {
   onCreateWorkOrder: () => void;
   canCreate?: boolean;
   intakes?: FactoriesFactoryIntake[];
+  showPullRequestMerge?: boolean;
 }) {
   const state = useWorkOrderListState("factory-1");
   return (
@@ -26,6 +28,7 @@ function HeaderHarness({
       onCreateWorkOrder={onCreateWorkOrder}
       canCreate={canCreate}
       permissionsLoading={false}
+      showPullRequestMerge={showPullRequestMerge}
     />
   );
 }
@@ -66,7 +69,7 @@ describe("WorkOrdersHeader", () => {
     ).toBeTruthy();
   });
 
-  it("lists Label after Status, with Review and Mergeable", async () => {
+  it("lists Label after Status, with Review only when merge is off", async () => {
     const user = userEvent.setup();
     render(<HeaderHarness onCreateWorkOrder={vi.fn()} />);
 
@@ -83,6 +86,16 @@ describe("WorkOrdersHeader", () => {
     ).toBeTruthy();
 
     await user.hover(labels);
+    expect(await screen.findByTestId("work-orders-filter-labels-review")).toHaveTextContent("Review");
+    expect(screen.queryByTestId("work-orders-filter-labels-mergeable")).not.toBeInTheDocument();
+  });
+
+  it("lists Mergeable in Label when the merge pill is on", async () => {
+    const user = userEvent.setup();
+    render(<HeaderHarness onCreateWorkOrder={vi.fn()} showPullRequestMerge />);
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-labels"));
     expect(await screen.findByTestId("work-orders-filter-labels-review")).toHaveTextContent("Review");
     expect(screen.getByTestId("work-orders-filter-labels-mergeable")).toHaveTextContent("Mergeable");
   });

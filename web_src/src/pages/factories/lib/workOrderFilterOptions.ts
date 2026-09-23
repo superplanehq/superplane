@@ -9,7 +9,8 @@ import {
 import {
   MANUAL_FILTER_VALUE,
   UNASSIGNED_FILTER_VALUE,
-  WORK_ORDER_FILTER_LABELS,
+  visibleWorkOrderFilterLabels,
+  visibleWorkOrderFilters,
   WORK_ORDER_FILTER_LABEL_META,
   type WorkOrderFilters,
   type WorkOrderListEntry,
@@ -38,8 +39,8 @@ export function buildStatusFilterOptions(): WorkOrderFilterOption[] {
   });
 }
 
-export function buildLabelFilterOptions(): WorkOrderFilterOption[] {
-  return WORK_ORDER_FILTER_LABELS.map((label) => ({
+export function buildLabelFilterOptions(showPullRequestMerge = false): WorkOrderFilterOption[] {
+  return visibleWorkOrderFilterLabels(showPullRequestMerge).map((label) => ({
     value: label,
     label: WORK_ORDER_FILTER_LABEL_META[label].label,
   }));
@@ -130,29 +131,31 @@ export function buildWorkOrderFilterChips(
     lines: WorkOrderFilterOption[];
     sources: WorkOrderFilterOption[];
     assignees: WorkOrderFilterOption[];
+    showPullRequestMerge?: boolean;
   },
 ): WorkOrderFilterChip[] {
+  const visibleFilters = visibleWorkOrderFilters(filters, options.showPullRequestMerge ?? false);
   const lineLabels = toLabelMap(options.lines);
   const sourceLabels = toLabelMap(options.sources);
   const assigneeLabels = toLabelMap(options.assignees);
 
   return [
-    ...filters.statuses.map((status) => ({
+    ...visibleFilters.statuses.map((status) => ({
       dimension: "statuses" as const,
       value: status,
       label: `Status is ${getWorkOrderDisplayStatusMeta(status).filterLabel}`,
     })),
-    ...filters.labels.map((label) => ({
+    ...visibleFilters.labels.map((label) => ({
       dimension: "labels" as const,
       value: label,
       label: `Label is ${WORK_ORDER_FILTER_LABEL_META[label].label}`,
     })),
-    ...filters.lineIds.map((lineId) => ({
+    ...visibleFilters.lineIds.map((lineId) => ({
       dimension: "lineIds" as const,
       value: lineId,
       label: `Line is ${lineLabels.get(lineId) ?? "Unknown line"}`,
     })),
-    ...filters.sourceIds.map((sourceId) => ({
+    ...visibleFilters.sourceIds.map((sourceId) => ({
       dimension: "sourceIds" as const,
       value: sourceId,
       label:
@@ -160,7 +163,7 @@ export function buildWorkOrderFilterChips(
           ? CREATED_MANUALLY
           : `Source is ${sourceLabels.get(sourceId) ?? sourceFilterLabel(sourceId)}`,
     })),
-    ...filters.assigneeIds.map((assigneeId) => ({
+    ...visibleFilters.assigneeIds.map((assigneeId) => ({
       dimension: "assigneeIds" as const,
       value: assigneeId,
       label:

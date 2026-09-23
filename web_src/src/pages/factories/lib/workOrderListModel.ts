@@ -326,6 +326,23 @@ export const WORK_ORDER_FILTER_LABEL_META: Record<WorkOrderFilterLabel, { label:
 };
 
 /**
+ * Labels the Filter menu can offer. Mergeable stays hidden until the
+ * pull-request merge feature is on, matching the card pill.
+ */
+export function visibleWorkOrderFilterLabels(showPullRequestMerge = false): WorkOrderFilterLabel[] {
+  return WORK_ORDER_FILTER_LABELS.filter((label) => label !== "mergeable" || showPullRequestMerge);
+}
+
+/** Drops Mergeable when that pill is not shown, so stored filters cannot hide unmatched tasks. */
+export function visibleWorkOrderFilters(filters: WorkOrderFilters, showPullRequestMerge = false): WorkOrderFilters {
+  const allowed = new Set(visibleWorkOrderFilterLabels(showPullRequestMerge));
+  return {
+    ...filters,
+    labels: filters.labels.filter((label) => allowed.has(label)),
+  };
+}
+
+/**
  * Filters chosen in the Filter menu. Each dimension narrows independently
  * (AND across dimensions, OR within one), and an empty array means the
  * dimension is not filtering at all.
@@ -384,23 +401,31 @@ function workOrderMatchesFilterLabel(order: FactoriesWorkOrderSummary, label: Wo
   return workOrderCardPullRequestIsMergeable(card.pullRequest);
 }
 
-export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: WorkOrderFilters): WorkOrderListEntry[] {
+export function applyWorkOrderFilters(
+  entries: WorkOrderListEntry[],
+  filters: WorkOrderFilters,
+  options: { showPullRequestMerge?: boolean } = {},
+): WorkOrderListEntry[] {
+  const { statuses, labels, lineIds, sourceIds, assigneeIds } = visibleWorkOrderFilters(
+    filters,
+    options.showPullRequestMerge ?? false,
+  );
   let result = entries;
-  if (filters.statuses.length > 0) {
-    result = result.filter((entry) => filters.statuses.includes(entry.displayStatus));
+  if (statuses.length > 0) {
+    result = result.filter((entry) => statuses.includes(entry.displayStatus));
   }
-  if (filters.labels.length > 0) {
-    result = result.filter((entry) => filters.labels.some((label) => workOrderMatchesFilterLabel(entry.order, label)));
+  if (labels.length > 0) {
+    result = result.filter((entry) => labels.some((label) => workOrderMatchesFilterLabel(entry.order, label)));
   }
-  if (filters.lineIds.length > 0) {
-    result = result.filter((entry) => entry.lineIds.some((lineId) => filters.lineIds.includes(lineId)));
+  if (lineIds.length > 0) {
+    result = result.filter((entry) => entry.lineIds.some((lineId) => lineIds.includes(lineId)));
   }
-  if (filters.sourceIds.length > 0) {
-    result = result.filter((entry) => filters.sourceIds.includes(entry.sourceId));
+  if (sourceIds.length > 0) {
+    result = result.filter((entry) => sourceIds.includes(entry.sourceId));
   }
-  if (filters.assigneeIds.length > 0) {
-    const people = filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-    const wantsUnassigned = filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE);
+  if (assigneeIds.length > 0) {
+    const people = assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+    const wantsUnassigned = assigneeIds.includes(UNASSIGNED_FILTER_VALUE);
     result = result.filter((entry) => {
       if (wantsUnassigned && entry.assigneeIds.length === 0) {
         return true;

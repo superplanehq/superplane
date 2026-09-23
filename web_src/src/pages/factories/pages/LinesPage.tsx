@@ -32,7 +32,7 @@ import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -111,7 +111,9 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  countWorkOrderFilters,
   UNASSIGNED_FILTER_VALUE,
+  visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
 } from "../lib/workOrderListModel";
 import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
@@ -229,15 +231,20 @@ function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
   factory: FactoriesFactory | null | undefined,
   state: WorkOrderListState,
-  currentUserId?: string,
+  currentUserId: string | undefined,
+  showPullRequestMerge: boolean,
 ): FactoriesWorkOrder[] {
   const entries = factory ? buildWorkOrderListEntries(workOrders, factory) : [];
   const visibleIds = new Set(
     applyWorkOrderSearch(
-      applyWorkOrderFilters(applyWorkOrderScope(entries, state.scope, currentUserId), {
-        ...state.filters,
-        lineIds: [],
-      }),
+      applyWorkOrderFilters(
+        applyWorkOrderScope(entries, state.scope, currentUserId),
+        {
+          ...state.filters,
+          lineIds: [],
+        },
+        { showPullRequestMerge },
+      ),
       state.search,
     ).map((entry) => entry.id),
   );
@@ -304,6 +311,7 @@ export function LinesPage() {
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+  const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
@@ -336,8 +344,8 @@ export function LinesPage() {
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
   const visibleWorkOrders = useMemo(
-    () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId),
-    [currentUserId, factory, listState.filters, listState.scope, listState.search, workOrders],
+    () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
+    [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
@@ -787,6 +795,7 @@ function LineDetailHeader({
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
+  const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
   const sourceOptions = useMemo(() => buildSourceFilterOptions(intakes, entries), [entries, intakes]);
   const assigneeOptions = useMemo(
@@ -801,6 +810,8 @@ function LineDetailHeader({
     [entries, orgUsers],
   );
   const title = humanizeLineName(line.name);
+  const visibleFilterCount =
+    countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
 
   const handleRename = async (name: string) => {
     if (!line.id) {
@@ -844,7 +855,12 @@ function LineDetailHeader({
             options={WORK_ORDER_SCOPES}
             testIdPrefix="work-orders-scope"
           />
-          <FilterMenu state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
+          <FilterMenu
+            state={state}
+            sourceOptions={sourceOptions}
+            assigneeOptions={assigneeOptions}
+            showPullRequestMerge={showPullRequestMerge}
+          />
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -862,8 +878,13 @@ function LineDetailHeader({
         </>
       }
       belowRow={
-        state.filterCount > 0 ? (
-          <FilterChips state={state} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
+        visibleFilterCount > 0 ? (
+          <FilterChips
+            state={state}
+            sourceOptions={sourceOptions}
+            assigneeOptions={assigneeOptions}
+            showPullRequestMerge={showPullRequestMerge}
+          />
         ) : undefined
       }
     />

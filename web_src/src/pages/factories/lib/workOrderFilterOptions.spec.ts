@@ -49,8 +49,12 @@ describe("buildStatusFilterOptions", () => {
 });
 
 describe("buildLabelFilterOptions", () => {
-  it("lists Review and Mergeable", () => {
-    expect(buildLabelFilterOptions()).toEqual([
+  it("lists Review only when the merge pill is off", () => {
+    expect(buildLabelFilterOptions()).toEqual([{ value: "review", label: "Review" }]);
+  });
+
+  it("lists Review and Mergeable when the merge pill is on", () => {
+    expect(buildLabelFilterOptions(true)).toEqual([
       { value: "review", label: "Review" },
       { value: "mergeable", label: "Mergeable" },
     ]);
@@ -148,7 +152,7 @@ describe("buildWorkOrderFilterChips", () => {
         sourceIds: ["github-issues", MANUAL_FILTER_VALUE],
         assigneeIds: ["u1", UNASSIGNED_FILTER_VALUE],
       },
-      options,
+      { ...options, showPullRequestMerge: true },
     );
 
     expect(chips.map((chip) => chip.label)).toEqual([
@@ -161,6 +165,11 @@ describe("buildWorkOrderFilterChips", () => {
       "Owner is Alex",
       "No Owner",
     ]);
+  });
+
+  it("hides a stored Mergeable chip when the merge pill is off", () => {
+    const chips = buildWorkOrderFilterChips({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["review", "mergeable"] }, options);
+    expect(chips.map((chip) => chip.label)).toEqual(["Label is Review"]);
   });
 
   it("returns nothing when no filter is applied", () => {

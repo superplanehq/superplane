@@ -20,6 +20,7 @@ import {
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
+  visibleWorkOrderFilterLabels,
   WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -426,37 +427,27 @@ describe("scope + filter + search + ordering", () => {
     expect(githubWaiting.map((e) => e.id)).toEqual(["github-wait"]);
   });
 
-  it("label filter keeps tasks with the Review or Mergeable card pill", () => {
+  it("label filter keeps Review, and Mergeable only when that pill is on", () => {
     const withPullRequests = buildWorkOrderListEntries(
       [
         order({ id: "open-review", pullRequests: [pullRequest("open-review")] }),
-        order({
-          id: "open-mergeable",
-          pullRequests: [pullRequest("open-mergeable", { mergeable: true })],
-        }),
+        order({ id: "open-mergeable", pullRequests: [pullRequest("open-mergeable", { mergeable: true })] }),
         order({ id: "draft-pr", pullRequests: [pullRequest("draft-pr", { state: "STATE_DRAFT" })] }),
         order({ id: "idle-wait" }),
       ],
       factory,
     );
+    const ids = (labels: Array<"review" | "mergeable">, showPullRequestMerge?: boolean) =>
+      applyWorkOrderFilters(withPullRequests, { ...EMPTY_WORK_ORDER_FILTERS, labels }, { showPullRequestMerge }).map(
+        (entry) => entry.id,
+      );
 
-    const review = applyWorkOrderFilters(withPullRequests, {
-      ...EMPTY_WORK_ORDER_FILTERS,
-      labels: ["review"],
-    });
-    expect(review.map((entry) => entry.id)).toEqual(["open-review", "open-mergeable"]);
-
-    const mergeable = applyWorkOrderFilters(withPullRequests, {
-      ...EMPTY_WORK_ORDER_FILTERS,
-      labels: ["mergeable"],
-    });
-    expect(mergeable.map((entry) => entry.id)).toEqual(["open-mergeable"]);
-
-    const either = applyWorkOrderFilters(withPullRequests, {
-      ...EMPTY_WORK_ORDER_FILTERS,
-      labels: ["review", "mergeable"],
-    });
-    expect(either.map((entry) => entry.id)).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["review"])).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["mergeable"], true)).toEqual(["open-mergeable"]);
+    expect(ids(["review", "mergeable"], true)).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["mergeable"])).toEqual(["open-review", "open-mergeable", "draft-pr", "idle-wait"]);
+    expect(visibleWorkOrderFilterLabels()).toEqual(["review"]);
+    expect(visibleWorkOrderFilterLabels(true)).toEqual(["review", "mergeable"]);
   });
 
   it("search matches on title, description, line, and assignee names", () => {
