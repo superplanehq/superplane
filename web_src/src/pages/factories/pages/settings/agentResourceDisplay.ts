@@ -31,6 +31,15 @@ export function connectionNeedsOAuthAction(
   return resource.oauthStatus !== "OAUTH_STATUS_CONNECTED";
 }
 
+export function connectionIsEstablished(
+  resource: Pick<FactoriesFactoryAgentResource, "auth" | "oauthStatus">,
+): boolean {
+  if (resource.auth !== "AUTH_OAUTH") {
+    return true;
+  }
+  return resource.oauthStatus === "OAUTH_STATUS_CONNECTED";
+}
+
 export function skillSourceLabel(
   resource: Pick<FactoriesFactoryAgentResource, "repository" | "ref" | "markdown">,
 ): string {

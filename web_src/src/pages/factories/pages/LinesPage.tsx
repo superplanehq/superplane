@@ -592,6 +592,7 @@ export function LinesPage() {
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
           organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
