@@ -1,0 +1,23 @@
+FROM amazon/aws-cli:2.22.35
+
+# install vim, jq, openssl and other utilities
+RUN yum install -y vim jq tar gzip unzip openssl
+
+# install helm
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
+
+# install kubectl
+RUN curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl" \
+  && chmod +x kubectl \
+  && mv kubectl /usr/local/bin/
+
+# install terraform
+RUN curl -fsSL https://releases.hashicorp.com/terraform/1.10.4/terraform_1.10.4_linux_amd64.zip -o terraform.zip \
+  && unzip terraform.zip \
+  && mv terraform /usr/local/bin/ \
+  && rm terraform.zip
+
+# install eksctl
+RUN curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" \
+  && tar -xzf eksctl_Linux_amd64.tar.gz -C /usr/local/bin \
+  && rm eksctl_Linux_amd64.tar.gz
