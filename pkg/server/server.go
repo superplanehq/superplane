@@ -298,6 +298,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
+		log.Println("Starting Price Book Sync Worker")
+
+		w := workers.NewPriceBookSyncWorker(encryptor, registry)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Planning Session Cleanup Worker")
 
