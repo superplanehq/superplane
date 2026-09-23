@@ -205,9 +205,9 @@ after_pipeline:
         commands:
           - test-results gen-pipeline-report
 
-# Runner promotions stay off production. Child pipelines declare their own
-# secrets (ghcr-push-token, runner-s3, aws-prod, aws-prod-ami-builder,
-# aws-credentials). Add deployment_target after those targets exist.
+# Runner promotions use SuperPlane targets runner-images, runner-s3, and
+# runner-ami. Replace the mock env on those targets before a real publish.
+# Do not use production.
 promotions:
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
@@ -217,13 +217,16 @@ promotions:
 
   - name: Publish runner images
     pipeline_file: runner-docker-publish.yml
+    deployment_target: runner-images
     auto_promote:
       when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
 
   - name: Publish runner binaries to S3
     pipeline_file: runner-binary-s3.yml
+    deployment_target: runner-s3
     auto_promote:
       when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
 
   - name: Build runner AMIs
     pipeline_file: runner-build-amis.yml
+    deployment_target: runner-ami

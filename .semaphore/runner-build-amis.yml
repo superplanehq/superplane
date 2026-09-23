@@ -9,6 +9,7 @@ agent:
 promotions:
   - name: Release runner AMIs
     pipeline_file: runner-release-amis.yml
+    deployment_target: runner-ami
 
 blocks:
   - name: Build AMIs (amd64 + arm64)
