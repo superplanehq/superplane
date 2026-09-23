@@ -242,7 +242,7 @@ services:
       POSTGRES_PASSWORD: broker
       POSTGRES_DB: broker
     ports:
-      - "5432:5432"
+      - "${BROKER_DB_HOST_PORT:-5432}:5432"
     volumes:
       - broker-postgres-data:/var/lib/postgresql/data
     healthcheck:

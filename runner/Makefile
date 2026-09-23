@@ -5,12 +5,15 @@ LOCAL_TMP ?= /tmp
 LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable
 
 # Run integration tests that require Postgres.
-# Starts a DB via docker compose, waits for it, runs tests, then tears down.
+# Uses a separate Compose project and host port so it does not share or
+# stop the local broker-db.
 .PHONY: test-integration
 test-integration:
-	docker compose -f ../docker-compose.dev.yml --profile local-runner up -d --wait broker-db
-	TEST_DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
-	docker compose -f ../docker-compose.dev.yml --profile local-runner stop broker-db
+	@set -eu; \
+	cleanup() { BROKER_DB_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml --profile local-runner down -v; }; \
+	trap cleanup EXIT; \
+	BROKER_DB_HOST_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml --profile local-runner up -d --wait broker-db; \
+	TEST_DATABASE_URL=postgres://broker:broker@127.0.0.1:5433/broker?sslmode=disable go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
 
 LOCAL_BROKER_LISTEN ?= :8081
 LOCAL_BROKER_URL ?= http://127.0.0.1:8081
