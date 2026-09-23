@@ -267,7 +267,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "work_orders",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"}: {
 			Resource:                     "factories",
@@ -540,7 +540,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge},
 		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{id}/onboarding"}: {
 			Resource:                     "factories",

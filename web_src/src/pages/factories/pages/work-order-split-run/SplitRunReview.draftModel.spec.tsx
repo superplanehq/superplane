@@ -18,6 +18,14 @@ vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
   Element.prototype.setPointerCapture ??= () => {};
