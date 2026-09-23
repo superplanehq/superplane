@@ -1149,6 +1149,7 @@ CREATE TABLE public.usage_price_book_rates (
     cache_write_cents_per_million bigint DEFAULT 0 NOT NULL,
     reasoning_cents_per_million bigint DEFAULT 0 NOT NULL,
     micros_per_second bigint DEFAULT 0 NOT NULL,
+    provider text DEFAULT ''::text NOT NULL,
     CONSTRAINT usage_price_book_rates_match_mode_check CHECK ((match_mode = ANY (ARRAY['exact'::text, 'prefix'::text, 'family'::text]))),
     CONSTRAINT usage_price_book_rates_usage_kind_check CHECK ((usage_kind = ANY (ARRAY['model'::text, 'compute'::text])))
 );
@@ -2142,11 +2143,11 @@ ALTER TABLE ONLY public.usage_price_book_rates
 
 
 --
--- Name: usage_price_book_rates usage_price_book_rates_version_usage_kind_match_key_match_m_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: usage_price_book_rates usage_price_book_rates_version_kind_provider_key_mode_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.usage_price_book_rates
-    ADD CONSTRAINT usage_price_book_rates_version_usage_kind_match_key_match_m_key UNIQUE (version, usage_kind, match_key, match_mode);
+    ADD CONSTRAINT usage_price_book_rates_version_kind_provider_key_mode_key UNIQUE (version, usage_kind, provider, match_key, match_mode);
 
 
 --
@@ -4507,7 +4508,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260922193722	f
+20260923004505	f
 \.
 
 
