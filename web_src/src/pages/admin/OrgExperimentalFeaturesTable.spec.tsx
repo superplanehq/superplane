@@ -158,4 +158,38 @@ describe("OrgExperimentalFeaturesTable", () => {
       ]);
     });
   });
+
+  it("shows an error and server state when a later bulk request fails", async () => {
+    let registry = {
+      ...registryResponse,
+      enabled: ["factories", "new_canvas", "claude_managed_agents"],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
+          return jsonResponse(registry);
+        }
+        if (url === featureTogglePath("factories") && init?.method === "DELETE") {
+          registry = { ...registry, enabled: ["new_canvas", "claude_managed_agents"] };
+          return jsonResponse({ status: "disabled" });
+        }
+        if (url === featureTogglePath("new_canvas") && init?.method === "DELETE") {
+          return new Response("failed", { status: 500 });
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(await screen.findByRole("switch", { name: "Toggle all experimental features" }));
+
+    expect(await screen.findByText("Failed to disable experimental features")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("switch", { name: "Toggle Factories" })).toHaveAttribute("data-state", "unchecked");
+    });
+    expect(screen.getByRole("switch", { name: "Toggle New Canvas" })).toHaveAttribute("data-state", "checked");
+  });
 });
