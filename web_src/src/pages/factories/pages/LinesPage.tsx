@@ -114,6 +114,7 @@ import {
   UNASSIGNED_FILTER_VALUE,
   WORK_ORDER_SCOPES,
 } from "../lib/workOrderListModel";
+import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
@@ -240,13 +241,15 @@ function applyVisibleWorkOrders(
       state.search,
     ).map((entry) => entry.id),
   );
-  return workOrders.filter((order) => {
-    const id = order.id;
-    if (!id) {
-      return false;
-    }
-    return visibleIds.has(id);
-  });
+  return uniqueWorkOrdersById(
+    workOrders.filter((order) => {
+      const id = order.id;
+      if (!id) {
+        return false;
+      }
+      return visibleIds.has(id);
+    }),
+  );
 }
 
 function prFeedbackSetupHref(

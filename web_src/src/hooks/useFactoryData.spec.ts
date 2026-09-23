@@ -13,13 +13,22 @@ vi.mock("@/api-client", () => ({
   factoriesCreateWorkOrder,
 }));
 
-import { useCreateWorkOrder } from "./useFactoryData";
+import { mergeFactoryBoardWorkOrders, useCreateWorkOrder } from "./useFactoryData";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return createElement(QueryClientProvider, { client: queryClient }, children);
   };
 }
+
+describe("mergeFactoryBoardWorkOrders", () => {
+  it("keeps one row when backlog, open, and done share an id", () => {
+    const shared = { id: "wo-1", title: "first" };
+    expect(
+      mergeFactoryBoardWorkOrders([shared], [{ id: "wo-1", title: "open copy" }], [{ id: "wo-1", title: "done copy" }]),
+    ).toEqual([shared]);
+  });
+});
 
 describe("useCreateWorkOrder", () => {
   beforeEach(() => {
