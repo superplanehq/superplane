@@ -64,6 +64,100 @@ function useAgentResourceSearch() {
   return { tab, addDialogOpen, setTab, setAddDialogOpen };
 }
 
+async function saveCreatedOrUpdatedAgentResource(args: {
+  isUpdate: boolean;
+  create: () => Promise<unknown>;
+  update: () => Promise<unknown>;
+  onUpdated: () => void;
+  onCreated: () => void;
+  updatedMessage: string;
+  createdMessage: string;
+  failedMessage: string;
+}) {
+  try {
+    if (args.isUpdate) {
+      await args.update();
+      showSuccessToast(args.updatedMessage);
+      args.onUpdated();
+      return;
+    }
+    await args.create();
+    showSuccessToast(args.createdMessage);
+    args.onCreated();
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, args.failedMessage));
+    throw error;
+  }
+}
+
+async function saveConnectionResource(args: {
+  draft: AgentResourceConnectionDraft;
+  editResource?: FactoriesFactoryAgentResource;
+  createResource: ReturnType<typeof useCreateFactoryAgentResource>;
+  updateResource: ReturnType<typeof useUpdateFactoryAgentResource>;
+  setEditResource: (resource?: FactoriesFactoryAgentResource) => void;
+  setAddDialogOpen: (open: boolean) => void;
+}) {
+  const resourceId = args.editResource?.id;
+  await saveCreatedOrUpdatedAgentResource({
+    isUpdate: Boolean(resourceId),
+    update: () =>
+      args.updateResource.mutateAsync({
+        resourceId: resourceId ?? "",
+        name: args.draft.name,
+        url: args.draft.url,
+        auth: args.draft.auth,
+        headers: args.draft.headers,
+      }),
+    create: () =>
+      args.createResource.mutateAsync({
+        kind: "KIND_MCP_SERVER",
+        name: args.draft.name,
+        enabled: true,
+        url: args.draft.url,
+        auth: args.draft.auth,
+        headers: args.draft.headers,
+      }),
+    onUpdated: () => args.setEditResource(undefined),
+    onCreated: () => args.setAddDialogOpen(false),
+    updatedMessage: AGENT_RESOURCES_COPY.updated,
+    createdMessage: AGENT_RESOURCES_COPY.created,
+    failedMessage: args.editResource ? AGENT_RESOURCES_COPY.updateFailed : AGENT_RESOURCES_COPY.createFailed,
+  });
+}
+
+async function saveSkillResource(args: {
+  draft: AgentResourceSkillDraft;
+  editResource?: FactoriesFactoryAgentResource;
+  createResource: ReturnType<typeof useCreateFactoryAgentResource>;
+  updateResource: ReturnType<typeof useUpdateFactoryAgentResource>;
+  setEditResource: (resource?: FactoriesFactoryAgentResource) => void;
+  setAddDialogOpen: (open: boolean) => void;
+}) {
+  const resourceId = args.editResource?.id;
+  await saveCreatedOrUpdatedAgentResource({
+    isUpdate: Boolean(resourceId),
+    update: () =>
+      args.updateResource.mutateAsync({
+        resourceId: resourceId ?? "",
+        name: args.draft.name,
+        markdown: args.draft.markdown,
+      }),
+    create: () =>
+      args.createResource.mutateAsync({
+        kind: "KIND_SKILL",
+        name: args.draft.name,
+        enabled: true,
+        markdown: args.draft.markdown,
+      }),
+    onUpdated: () => args.setEditResource(undefined),
+    onCreated: () => args.setAddDialogOpen(false),
+    updatedMessage: AGENT_RESOURCES_COPY.skillUpdated,
+    createdMessage: AGENT_RESOURCES_COPY.skillCreated,
+    failedMessage: args.editResource ? AGENT_RESOURCES_COPY.skillUpdateFailed : AGENT_RESOURCES_COPY.skillCreateFailed,
+  });
+}
+
 function useAgentResourceActions({
   organizationId,
   factoryId,
@@ -99,68 +193,25 @@ function useAgentResourceActions({
     }
   };
 
-  const saveConnection = async (draft: AgentResourceConnectionDraft) => {
-    try {
-      if (editResource?.id) {
-        await updateResource.mutateAsync({
-          resourceId: editResource.id,
-          name: draft.name,
-          url: draft.url,
-          auth: draft.auth,
-          headers: draft.headers,
-        });
-        showSuccessToast(AGENT_RESOURCES_COPY.updated);
-        setEditResource(undefined);
-        return;
-      }
-      await createResource.mutateAsync({
-        kind: "KIND_MCP_SERVER",
-        name: draft.name,
-        enabled: true,
-        url: draft.url,
-        auth: draft.auth,
-        headers: draft.headers,
-      });
-      showSuccessToast(AGENT_RESOURCES_COPY.created);
-      setAddDialogOpen(false);
-    } catch (error) {
-      showErrorToast(
-        getApiErrorMessage(error, editResource ? AGENT_RESOURCES_COPY.updateFailed : AGENT_RESOURCES_COPY.createFailed),
-      );
-      throw error;
-    }
-  };
+  const saveConnection = (draft: AgentResourceConnectionDraft) =>
+    saveConnectionResource({
+      draft,
+      editResource,
+      createResource,
+      updateResource,
+      setEditResource,
+      setAddDialogOpen,
+    });
 
-  const saveSkill = async (draft: AgentResourceSkillDraft) => {
-    try {
-      if (editResource?.id) {
-        await updateResource.mutateAsync({
-          resourceId: editResource.id,
-          name: draft.name,
-          markdown: draft.markdown,
-        });
-        showSuccessToast(AGENT_RESOURCES_COPY.skillUpdated);
-        setEditResource(undefined);
-        return;
-      }
-      await createResource.mutateAsync({
-        kind: "KIND_SKILL",
-        name: draft.name,
-        enabled: true,
-        markdown: draft.markdown,
-      });
-      showSuccessToast(AGENT_RESOURCES_COPY.skillCreated);
-      setAddDialogOpen(false);
-    } catch (error) {
-      showErrorToast(
-        getApiErrorMessage(
-          error,
-          editResource ? AGENT_RESOURCES_COPY.skillUpdateFailed : AGENT_RESOURCES_COPY.skillCreateFailed,
-        ),
-      );
-      throw error;
-    }
-  };
+  const saveSkill = (draft: AgentResourceSkillDraft) =>
+    saveSkillResource({
+      draft,
+      editResource,
+      createResource,
+      updateResource,
+      setEditResource,
+      setAddDialogOpen,
+    });
 
   const disconnectResource = (resource: FactoriesFactoryAgentResource) => {
     if (!resource.id) {
