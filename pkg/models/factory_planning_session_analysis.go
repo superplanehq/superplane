@@ -225,13 +225,33 @@ var (
 
 // ProposeClarity publishes how well the task is defined.
 func (s *FactoryPlanningSession) ProposeClarity(tx *gorm.DB, score float64, summary string) error {
+	if err := s.guardPlanningScoreEnabled(tx, "clarity"); err != nil {
+		return err
+	}
 	return s.proposePlanningScore(tx, planningClarityScore, score, summary)
 }
 
 // ProposeConfidence publishes how likely a coding agent completes the task in
 // one run without steering.
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
+	if err := s.guardPlanningScoreEnabled(tx, "confidence"); err != nil {
+		return err
+	}
 	return s.proposePlanningScore(tx, planningConfidenceScore, score, summary)
+}
+
+func (s *FactoryPlanningSession) guardPlanningScoreEnabled(tx *gorm.DB, score string) error {
+	factoryModel, err := FindFactory(tx, s.OrganizationID, s.FactoryID)
+	if err != nil {
+		return err
+	}
+	if score == "clarity" && !factoryModel.PlanningClarity {
+		return fmt.Errorf("%w: clarity is disabled", ErrFactoryPlanningSessionInvalid)
+	}
+	if score == "confidence" && !factoryModel.PlanningConfidence {
+		return fmt.Errorf("%w: confidence is disabled", ErrFactoryPlanningSessionInvalid)
+	}
+	return nil
 }
 
 func (s *FactoryPlanningSession) proposePlanningScore(tx *gorm.DB, kind planningScoreKind, score float64, summary string) error {
@@ -323,6 +343,23 @@ func planningScoreLevel(score float64) string {
 	return FactoryWorkOrderCheckLevelCritical
 }
 
+func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
+	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
+	if err != nil {
+		return "Call propose_clarity and propose_confidence every turn. "
+	}
+	switch {
+	case factoryModel.PlanningClarity && factoryModel.PlanningConfidence:
+		return "Call propose_clarity and propose_confidence every turn. "
+	case factoryModel.PlanningClarity:
+		return "Call propose_clarity every turn. "
+	case factoryModel.PlanningConfidence:
+		return "Call propose_confidence every turn. "
+	default:
+		return ""
+	}
+}
+
 func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (string, error) {
 	if session == nil {
 		return "", nil
@@ -351,7 +388,9 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if b.Len() > 0 {
 		b.WriteString("\n")
 	}
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. Call propose_clarity and propose_confidence every turn. If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
+	b.WriteString(planningScoreCallSentence(tx, session))
+	b.WriteString("If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(artifacts.spec)

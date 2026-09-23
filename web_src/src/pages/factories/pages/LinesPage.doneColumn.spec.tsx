@@ -26,17 +26,25 @@ import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LinesPage } from "./LinesPage";
 
+const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryBoardWorkOrders = vi.fn(() => ({
+  workOrders: useFactoryWorkOrders().data ?? [],
+  isLoading: false,
+  backlog: idleBoardPage(),
+  open: idleBoardPage(),
+  done: idleBoardPage(),
+}));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
+  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
   useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
-  useFactoryPullRequests: () => ({ data: [] }),
   useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -72,7 +80,7 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -81,22 +89,6 @@ vi.mock("@/hooks/usePageTitle", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
-}));
-
-vi.mock("./useWorkOrderPlanningSurvey", () => ({
-  useWorkOrderPlanningSurvey: () => false,
-  useWorkOrderPlanningActivity: () => ({
-    hasAgentQuestion: false,
-    isWaiting: false,
-    isWorking: false,
-    session: null,
-  }),
-  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
-    "planning-session-by-work-order",
-    organizationId,
-    factoryId,
-    workOrderId,
-  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({

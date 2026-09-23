@@ -22,12 +22,15 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   "application/pdf",
   "text/plain",
   "text/markdown",
+  "application/json",
+  "text/csv",
+  "application/yaml",
   ...ALLOWED_WORK_ORDER_VIDEO_TYPES,
 ] as const;
 
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"] as const;
 
-const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
   ".png": "image/png",
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
@@ -37,6 +40,10 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   ".txt": "text/plain",
   ".markdown": "text/markdown",
   ".md": "text/markdown",
+  ".json": "application/json",
+  ".csv": "text/csv",
+  ".yaml": "application/yaml",
+  ".yml": "application/yaml",
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".mov": "video/quicktime",
@@ -46,18 +53,10 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   ".mkv": "video/x-matroska",
 };
 
-export const WORK_ORDER_FILE_ACCEPT = [
-  ...ALLOWED_WORK_ORDER_FILE_TYPES,
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".pdf",
-  ".txt",
-  ".md",
-  ...VIDEO_EXTENSIONS,
-].join(",");
+const WORK_ORDER_FILE_EXTENSIONS = Object.keys(WORK_ORDER_FILE_TYPES_BY_EXTENSION);
+
+/** Accept attribute for work-order file inputs: every allowed type plus the extensions some browsers map to them. */
+export const WORK_ORDER_FILE_ACCEPT = [...ALLOWED_WORK_ORDER_FILE_TYPES, ...WORK_ORDER_FILE_EXTENSIONS].join(",");
 
 export const WORK_ORDER_VISUAL_FILE_ACCEPT = [
   ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
@@ -91,8 +90,12 @@ export function workOrderFileRef(id: string): string {
   return `${FILE_REF_SCHEME}://${id}`;
 }
 
+function isAllowedWorkOrderContentType(contentType: string): boolean {
+  return (ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
+}
+
 export function isAllowedWorkOrderFile(file: File): boolean {
-  return Boolean(workOrderUploadContentType(file)) && file.size > 0;
+  return isAllowedWorkOrderContentType(resolveWorkOrderFileMimeType(file)) && file.size > 0;
 }
 
 export function isInlineWorkOrderImage(contentType: string | undefined): boolean {
@@ -140,11 +143,8 @@ export function isWorkOrderVideoSource(args: { contentType?: string; src?: strin
 }
 
 export function workOrderUploadContentType(file: File): string {
-  const type = normalizeWorkOrderFileType(file.type);
-  if ((ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(type)) {
-    return type;
-  }
-  return contentTypeFromFilename(file.name);
+  const type = resolveWorkOrderFileMimeType(file);
+  return isAllowedWorkOrderContentType(type) ? type : "";
 }
 
 export function workOrderFileContentTypeMap(files: WorkOrderFileRef[] | undefined): Record<string, string> {
@@ -180,15 +180,27 @@ export function normalizeWorkOrderFileType(contentType: string | undefined): str
   if (value === "video/x-mp4") {
     return "video/mp4";
   }
+  if (value === "text/yaml" || value === "application/x-yaml") {
+    return "application/yaml";
+  }
   return value;
 }
 
-function contentTypeFromFilename(filename: string): string {
-  const name = filename.toLowerCase();
-  const matches = Object.entries(CONTENT_TYPE_BY_EXTENSION)
-    .filter(([extension]) => name.endsWith(extension))
-    .sort((left, right) => right[0].length - left[0].length);
-  return matches[0]?.[1] ?? "";
+/** Resolves the MIME type a file is stored with. Browsers send an empty type or application/octet-stream for many text files, so the filename decides. */
+export function resolveWorkOrderFileMimeType(file: Pick<File, "name" | "type">): string {
+  const declared = normalizeWorkOrderFileType(file.type);
+  if (declared && declared !== "application/octet-stream") {
+    return declared;
+  }
+  return workOrderMimeTypeFromFilename(file.name);
+}
+
+export function workOrderMimeTypeFromFilename(filename: string): string {
+  const extension = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  if (!extension.startsWith(".")) {
+    return "";
+  }
+  return WORK_ORDER_FILE_TYPES_BY_EXTENSION[extension] ?? "";
 }
 
 function contentTypeFromDownloadUrl(src: string, files?: WorkOrderFileRef[]): string | undefined {

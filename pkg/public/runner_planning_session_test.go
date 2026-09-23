@@ -52,6 +52,7 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
+	mustEnableClarityCheck(t, db, factoryModel)
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
@@ -101,6 +102,7 @@ func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
+	mustEnableClarityCheck(t, db, factoryModel)
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
@@ -230,11 +232,18 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			wantMessage: "lookup timeout",
 		},
 		{
-			name:          "client disconnect is 499",
-			err:           fmt.Errorf("lookup: %w", context.Canceled),
+			name:          "driver-style wrapped cancellation on canceled request is 499",
+			err:           fmt.Errorf("timeout: context already done: %w", context.Canceled),
 			session:       session,
 			cancelRequest: true,
-			status:        499,
+			status:        statusClientClosedRequest,
+		},
+		{
+			name:          "plain canceled error on canceled request is 499",
+			err:           context.Canceled,
+			session:       session,
+			cancelRequest: true,
+			status:        statusClientClosedRequest,
 		},
 		{
 			name:        "canceled error with live request stays 500",
@@ -265,19 +274,11 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			wantMessage: context.DeadlineExceeded.Error(),
 		},
 		{
-			name:          "deadline exceeded after client disconnect stays 500",
+			name:          "deadline exceeded after client disconnect is 499",
 			err:           fmt.Errorf("lookup: %w", context.DeadlineExceeded),
 			session:       session,
 			cancelRequest: true,
-			status:        http.StatusInternalServerError,
-			body:          "Lookup failed\n",
-			wantCapture:   true,
-			wantTags: map[string]string{
-				"route":               "/api/v1/runner/planning-sessions/clarity",
-				"planning_session_id": sessionID.String(),
-				"draft_work_order_id": draftID.String(),
-			},
-			wantMessage: context.DeadlineExceeded.Error(),
+			status:        statusClientClosedRequest,
 		},
 	}
 
@@ -356,6 +357,28 @@ func TestWritePlanningWaitError(t *testing.T) {
 		}
 	})
 
+	t.Run("driver timeout on canceled request returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		ctx, cancel := context.WithCancel(req.Context())
+		cancel()
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, fmt.Errorf("timeout: context already done: %w", context.Canceled))
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
 	t.Run("canceled error with live request stays 500", func(t *testing.T) {
 		transport := bindTestSentryHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
@@ -404,8 +427,9 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
 	r := support.Setup(t)
 	transport := bindTestSentryHub(t)
-	server, session, _, token := mustPlanningRunnerSession(t, r)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
+	mustEnableClarityCheck(t, db, factoryModel)
 	session.DraftWorkOrderID = nil
 	require.NoError(t, db.Model(session).Updates(map[string]any{
 		"draft_work_order_id": nil,
@@ -985,6 +1009,15 @@ func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Serv
 	})
 	require.NoError(t, err)
 	return server, session, factoryModel, mustPlanningRunnerToken(t, signer, session)
+}
+
+// mustEnableClarityCheck turns the opt-in Clarity check on so the clarity
+// route accepts the request. New factories start with Clarity off.
+func mustEnableClarityCheck(t *testing.T, db *gorm.DB, factoryModel *models.Factory) {
+	t.Helper()
+	planning := factoryModel.Planning()
+	planning.Clarity = true
+	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
 }
 
 func mustPlanningRunnerToken(t *testing.T, signer *jwt.Signer, session *models.FactoryPlanningSession) string {

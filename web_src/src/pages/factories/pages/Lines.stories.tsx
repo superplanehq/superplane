@@ -322,7 +322,7 @@ export const LineBoardHostedCreditEmpty: Story = {
   },
 };
 
-/** Purchased hosted credit remains at or below $20. The board shows a low-credit warning. */
+/** Purchased hosted credit remains at or below $20. The amber chip shows the balance next to the title. */
 export const LineBoardHostedCreditLow: Story = {
   name: "Line board — hosted credit low",
   render: () => {

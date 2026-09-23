@@ -57,6 +57,28 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "Write")
 }
 
+func TestAllowedClaudeToolsOmitsDisabledPlanningScores(t *testing.T) {
+	clarityOnly := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_PLANNING_CONFIDENCE":   "false",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
+	})
+	assert.Contains(t, clarityOnly, "mcp__superplane__propose_clarity")
+	assert.NotContains(t, clarityOnly, "mcp__superplane__propose_confidence")
+
+	confidenceOnly := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_PLANNING_CLARITY":      "false",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
+	})
+	assert.Contains(t, confidenceOnly, "mcp__superplane__propose_confidence")
+	assert.NotContains(t, confidenceOnly, "mcp__superplane__propose_clarity")
+}
+
 func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))

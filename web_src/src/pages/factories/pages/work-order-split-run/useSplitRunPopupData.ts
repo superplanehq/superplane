@@ -1,4 +1,4 @@
-import { useFactoryPullRequests, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
+import { useWorkOrder, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 
 import {
   collectSplitRunArtifacts,
@@ -25,11 +25,7 @@ export function useSplitRunPopupData(args: {
   const fixturePullRequests = collectSplitRunPullRequests(fixture);
   const useLive = hasLiveWorkOrder(organizationId, factoryId, orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
-  const livePullRequestsQuery = useFactoryPullRequests(
-    organizationId ?? "",
-    factoryId ?? "",
-    orderId ? { workOrderIds: [orderId] } : undefined,
-  );
+  const liveWorkOrderQuery = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const artifacts = resolveSplitRunPopupArtifacts({
     fixtureArtifacts,
     liveArtifacts: liveArtifactsQuery.data,
@@ -37,7 +33,7 @@ export function useSplitRunPopupData(args: {
   });
   const pullRequests = resolveSplitRunPopupPullRequests({
     fixturePullRequests,
-    livePullRequests: livePullRequestsQuery.data,
+    livePullRequests: liveWorkOrderQuery.data?.pullRequests,
     useLive,
   });
   const artifactDescription = splitRunDescriptionMarkdown(artifacts) || splitRunDescriptionMarkdown(fixtureArtifacts);
@@ -54,7 +50,7 @@ export function useSplitRunPopupData(args: {
     useLive,
     artifactsLoading: useLive && liveArtifactsQuery.isLoading,
     artifactsError: useLive ? (liveArtifactsQuery.error ?? null) : null,
-    pullRequestsLoading: useLive && livePullRequestsQuery.isLoading,
-    pullRequestsError: useLive ? (livePullRequestsQuery.error ?? null) : null,
+    pullRequestsLoading: useLive && liveWorkOrderQuery.isLoading,
+    pullRequestsError: useLive ? (liveWorkOrderQuery.error ?? null) : null,
   };
 }

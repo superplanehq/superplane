@@ -1,12 +1,10 @@
-import { useNotificationSettings } from "@/hooks/useNotificationSettings";
-import { useAccount } from "@/contexts/useAccount";
+import { usePermissions } from "@/contexts/usePermissions";
 import {
   currentBrowserNotificationPermission,
   parseUserNotificationEvent,
   raiseUserBrowserNotification,
   shouldRaiseBrowserNotification,
 } from "@/lib/browserNotifications";
-import { accountNotificationsFromSettings } from "@/lib/notificationSettings";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -19,12 +17,10 @@ export function UserNotificationsListener({ organizationId }: { organizationId: 
 }
 
 export function useUserNotificationsWebsocket(organizationId: string): void {
-  const { account } = useAccount();
+  const { currentUserId, browserNotificationPreferences } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
-  const { data: settings } = useNotificationSettings(organizationId);
-  const form = accountNotificationsFromSettings(settings);
-  const enabled = Boolean(account && organizationId && form.browserEnabled);
+  const enabled = Boolean(currentUserId && organizationId && browserNotificationPreferences.enabled);
 
   const onMessage = useCallback(
     (event: MessageEvent<unknown>) => {
@@ -36,7 +32,7 @@ export function useUserNotificationsWebsocket(organizationId: string): void {
       if (
         !shouldRaiseBrowserNotification({
           permission: currentBrowserNotificationPermission(),
-          showWhileViewing: form.browserShowWhileViewing,
+          showWhileViewing: browserNotificationPreferences.showWhileViewing,
           tabVisible: document.visibilityState === "visible",
           pathname: location.pathname,
           factoryKey: payload.factoryKey ?? "",
@@ -49,7 +45,7 @@ export function useUserNotificationsWebsocket(organizationId: string): void {
       }
       raiseUserBrowserNotification(payload, navigate);
     },
-    [form.browserShowWhileViewing, location.pathname, navigate],
+    [browserNotificationPreferences.showWhileViewing, location.pathname, navigate],
   );
 
   const url = organizationId ? `${SOCKET_SERVER_URL}?organization_id=${organizationId}` : null;

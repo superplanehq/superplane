@@ -123,8 +123,23 @@ export function uploadedComposerImage(id: string, filename: string): UploadedWor
   };
 }
 
+export function uploadedComposerFile(id: string, filename: string): UploadedWorkOrderFile {
+  return {
+    id,
+    filename,
+    contentType: "text/plain",
+    ref: `sp-file://${id}`,
+    previewUrl: `https://cdn.example.com/${filename}`,
+    isImage: false,
+  };
+}
+
 export function composerPng(name: string) {
   return new File(["img"], name, { type: "image/png" });
+}
+
+export function composerTextFile(name: string) {
+  return new File(["notes"], name, { type: "text/plain" });
 }
 
 export const WAITING_COMPOSER_VIEW = { machineStatus: "waiting" as const };

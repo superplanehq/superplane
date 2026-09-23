@@ -1,6 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
-import { useMe } from "@/hooks/useMe";
+import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,7 @@ import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../workOrders/WorkOrdersEmptyStates";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 /**
@@ -21,8 +21,7 @@ import { factoryContentBodyClassName, factorySectionHeaderClassName } from "./fa
  */
 export function WorkOrdersPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: me } = useMe(false);
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
 
   usePageTitle(["Tasks", factory?.name ?? "Workspace"]);
 
@@ -37,15 +36,12 @@ export function WorkOrdersPage() {
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(workOrders);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
-  const { headerKicker: hostedCreditHeaderKicker, banner: hostedCreditEmptyBanner } = useHostedCreditChrome(
-    organizationId,
-    factoryKey,
-  );
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
   const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
 
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
@@ -81,14 +77,13 @@ export function WorkOrdersPage() {
       workOrders={workOrders}
       pullRequests={pullRequests}
       state={state}
-      currentUserId={me?.id}
+      currentUserId={currentUserId}
       canCreate={canCreate}
       onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
       hostedCreditHeaderKicker={hostedCreditHeaderKicker}
-      hostedCreditEmptyBanner={hostedCreditEmptyBanner}
       brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />

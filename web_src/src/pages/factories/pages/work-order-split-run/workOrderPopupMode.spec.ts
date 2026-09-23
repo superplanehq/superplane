@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 
 describe("workOrderPopupMode", () => {
-  it("waits for Task Refinement access before choosing a popup", () => {
+  it("waits for Planning settings before choosing a popup", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
@@ -40,18 +40,31 @@ describe("workOrderPopupMode", () => {
     ).toBe("analysis");
   });
 
-  it("uses the classic popup when refinement is disabled", () => {
+  it("uses the analysis popup for a draft when Planning is off", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
         refinementEnabled: false,
         analysisActive: true,
         hasLookupIdentity: true,
+        isDraft: true,
       }),
-    ).toBe("classic");
+    ).toBe("analysis");
   });
 
-  it("uses the analysis popup for a pinned session after the flag is disabled", () => {
+  it("uses the analysis popup for a started task when Planning is off", () => {
+    expect(
+      workOrderPopupMode({
+        hasPlanningSession: false,
+        refinementEnabled: false,
+        analysisActive: false,
+        hasLookupIdentity: true,
+        isDraft: false,
+      }),
+    ).toBe("analysis");
+  });
+
+  it("uses the analysis popup for a pinned session after Planning is off", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: true,
@@ -73,7 +86,7 @@ describe("workOrderPopupMode", () => {
     ).toBe("analysis");
   });
 
-  it("keeps a draft that never had a refinement session in classic mode", () => {
+  it("uses the analysis popup for a draft that never had a refinement session", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
@@ -83,7 +96,7 @@ describe("workOrderPopupMode", () => {
         hasLookupIdentity: true,
         isDraft: true,
       }),
-    ).toBe("classic");
+    ).toBe("analysis");
   });
 
   it("uses the analysis popup for a started task while artifacts load", () => {
@@ -100,7 +113,7 @@ describe("workOrderPopupMode", () => {
     ).toBe("analysis");
   });
 
-  it("waits for artifacts before keeping an unrefined draft in classic mode", () => {
+  it("waits for artifacts before opening an unrefined draft", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
@@ -128,7 +141,7 @@ describe("workOrderPopupMode", () => {
     ).toBe("analysis");
   });
 
-  it("uses the classic popup when refinement is disabled even if a score exists", () => {
+  it("uses the analysis popup for a draft when Planning is off even if a score exists", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
@@ -136,8 +149,9 @@ describe("workOrderPopupMode", () => {
         refinementEnabled: false,
         analysisActive: false,
         hasLookupIdentity: true,
+        isDraft: true,
       }),
-    ).toBe("classic");
+    ).toBe("analysis");
   });
 
   it("keeps the analysis popup after Start when a score or spec exists", () => {

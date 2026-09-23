@@ -8,11 +8,13 @@ import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 
 export interface CreateWorkOrderRequestAttachButtonProps {
   disabled?: boolean;
+  accept?: string;
   onAttach: (files: FileList | File[]) => void;
 }
 
 export function CreateWorkOrderRequestAttachButton({
   disabled = false,
+  accept = WORK_ORDER_VISUAL_FILE_ACCEPT,
   onAttach,
 }: CreateWorkOrderRequestAttachButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -24,7 +26,7 @@ export function CreateWorkOrderRequestAttachButton({
         type="file"
         hidden
         multiple
-        accept={WORK_ORDER_VISUAL_FILE_ACCEPT}
+        accept={accept}
         data-testid="create-work-order-request-image-input"
         onChange={(event) => {
           const files = event.target.files;

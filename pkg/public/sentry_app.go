@@ -3,15 +3,17 @@ package public
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations/sentry"
+	sentryintegration "github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
@@ -42,12 +44,12 @@ func (s *Server) HandleSentryAppInstall(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if _, ok := sentry.HostedAppFromEnv(); !ok {
+	if _, ok := sentryintegration.HostedAppFromEnv(); !ok {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
-	sentry.EnableHostedInstallBind(s.encryptor)
+	sentryintegration.EnableHostedInstallBind(s.encryptor)
 	setSentryAppSetupStateCookie(w, state)
 	s.dispatchIntegrationRequest(w, r, integration)
 }
@@ -79,7 +81,7 @@ func (s *Server) HandleSentryAppSetup(w http.ResponseWriter, r *http.Request) {
 // Sentry app. One Sentry install can map to more than one SuperPlane
 // connection.
 func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) {
-	app, ok := sentry.HostedAppFromEnv()
+	app, ok := sentryintegration.HostedAppFromEnv()
 	if !ok {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -91,14 +93,14 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := sentry.VerifyWebhookSignature(r.Header.Get("Sentry-Hook-Signature"), body, []byte(app.ClientSecret)); err != nil {
+	if err := sentryintegration.VerifyWebhookSignature(r.Header.Get("Sentry-Hook-Signature"), body, []byte(app.ClientSecret)); err != nil {
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 
 	installationUUID := sentryInstallationUUID(body)
-	if uuid, ok := sentry.ParseInstallationDeletedUUID(r.Header.Get("Sentry-Hook-Resource"), body); ok {
-		if err := sentry.ForgetKnownHostedInstallation(uuid); err != nil {
+	if uuid, ok := sentryintegration.ParseInstallationDeletedUUID(r.Header.Get("Sentry-Hook-Resource"), body); ok {
+		if err := sentryintegration.ForgetKnownHostedInstallation(uuid); err != nil {
 			log.WithError(err).Error("failed to drop the grant of a deleted Sentry app install")
 		}
 	}
@@ -106,6 +108,11 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	integrations, err := models.ListSentryIntegrationsByInstallationUUID(database.DB(r.Context()), installationUUID)
 	if err != nil {
 		log.WithError(err).Error("failed to list Sentry app integrations")
+		captureSentryWebhookErrorToSentry(
+			r,
+			fmt.Errorf("lookup failed for installation %s: %w", installationUUID, err),
+			"installation_uuid", installationUUID,
+		)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -117,6 +124,8 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	dropped := false
+	var failedIntegrationIDs []string
+	var failedInnerStatuses []int
 	for i := range integrations {
 		cloned, err := cloneRequestWithBody(r, body)
 		if err != nil {
@@ -124,12 +133,25 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		if !s.deliverSentryWebhook(cloned, &integrations[i]) {
+		finished, integrationID, innerStatus := s.deliverSentryWebhook(cloned, &integrations[i])
+		if !finished {
 			dropped = true
+			failedIntegrationIDs = append(failedIntegrationIDs, integrationID)
+			failedInnerStatuses = append(failedInnerStatuses, innerStatus)
 		}
 	}
 
 	if dropped {
+		captureSentryWebhookErrorToSentry(
+			r,
+			fmt.Errorf(
+				"dropped webhook delivery for installation %s: integration_ids=%v inner_statuses=%v",
+				installationUUID, failedIntegrationIDs, failedInnerStatuses,
+			),
+			"installation_uuid", installationUUID,
+			"integration_ids", strings.Join(failedIntegrationIDs, ","),
+			"inner_statuses", joinStatuses(failedInnerStatuses),
+		)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -138,13 +160,16 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 }
 
 // deliverSentryWebhook sends the event to one connection and reports whether
-// Sentry can consider the delivery finished.
-func (s *Server) deliverSentryWebhook(r *http.Request, integration *models.Integration) bool {
+// Sentry can consider the delivery finished. It also returns the integration
+// id and inner status for error reporting.
+func (s *Server) deliverSentryWebhook(r *http.Request, integration *models.Integration) (finished bool, integrationID string, innerStatus int) {
+	integrationID = integration.ID.String()
 	recorder := httptest.NewRecorder()
 	s.dispatchIntegrationRequest(recorder, r, integration)
-	finished := sentryDeliveryFinished(recorder.Code)
+	finished = sentryDeliveryFinished(recorder.Code)
+	innerStatus = recorder.Code
 	if recorder.Code < http.StatusBadRequest {
-		return finished
+		return
 	}
 
 	entry := log.WithFields(log.Fields{
@@ -153,11 +178,20 @@ func (s *Server) deliverSentryWebhook(r *http.Request, integration *models.Integ
 	})
 	if finished {
 		entry.Warn("Sentry app webhook delivery was rejected")
-		return finished
+		return
 	}
 
 	entry.Error("Sentry app webhook delivery failed")
-	return finished
+	captureSentryWebhookErrorToSentry(
+		r,
+		fmt.Errorf(
+			"delivery failed for integration %s: inner_status=%d",
+			integration.ID.String(), recorder.Code,
+		),
+		"integration_id", integration.ID.String(),
+		"inner_status", fmt.Sprintf("%d", recorder.Code),
+	)
+	return
 }
 
 // sentryDeliveryFinished reads the answer of one connection. A server error
@@ -167,8 +201,8 @@ func sentryDeliveryFinished(status int) bool {
 	return status < http.StatusInternalServerError
 }
 
-func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentry.HostedApp, body []byte) {
-	grant, ok := sentry.ParseInstallationCreatedGrant(r.Header.Get("Sentry-Hook-Resource"), body)
+func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentryintegration.HostedApp, body []byte) {
+	grant, ok := sentryintegration.ParseInstallationCreatedGrant(r.Header.Get("Sentry-Hook-Resource"), body)
 	if !ok {
 		return
 	}
@@ -178,11 +212,11 @@ func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentry.Hos
 	}
 }
 
-func (s *Server) rememberHostedSentryGrant(app sentry.HostedApp, grant sentry.InstallationGrant) error {
+func (s *Server) rememberHostedSentryGrant(app sentryintegration.HostedApp, grant sentryintegration.InstallationGrant) error {
 	if s.registry == nil || s.registry.HTTPContext() == nil {
 		return nil
 	}
-	return sentry.RememberHostedInstallGrant(s.registry.HTTPContext(), app, grant)
+	return sentryintegration.RememberHostedInstallGrant(s.registry.HTTPContext(), app, grant)
 }
 
 func findSentryAppSetupIntegration(r *http.Request) (*models.Integration, error) {
@@ -226,7 +260,7 @@ func authorizeHostedSentryAppCallback(ctx context.Context, integration *models.I
 		return http.StatusForbidden
 	}
 
-	var metadata sentry.Metadata
+	var metadata sentryintegration.Metadata
 	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
 		return http.StatusForbidden
 	}
@@ -264,7 +298,7 @@ func isHostedSentryApp(integration *models.Integration) bool {
 		return false
 	}
 
-	var metadata sentry.Metadata
+	var metadata sentryintegration.Metadata
 	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
 		return false
 	}
@@ -300,4 +334,43 @@ func sentryAppSetupStateFromRequest(r *http.Request) string {
 		return ""
 	}
 	return strings.TrimSpace(cookie.Value)
+}
+
+func captureSentryWebhookErrorToSentry(r *http.Request, err error, tags ...string) {
+	hub := sentry.CurrentHub()
+	if hub == nil || hub.Client() == nil {
+		return
+	}
+	hub.WithScope(func(scope *sentry.Scope) {
+		applySentryWebhookErrorTags(scope, r, tags)
+		hub.CaptureException(err)
+	})
+}
+
+func applySentryWebhookErrorTags(scope *sentry.Scope, r *http.Request, tags []string) {
+	if len(tags)%2 != 0 {
+		return
+	}
+	for i := 0; i < len(tags); i += 2 {
+		key := tags[i]
+		value := tags[i+1]
+		if key == "" || value == "" {
+			continue
+		}
+		scope.SetTag(key, value)
+	}
+	if r != nil {
+		if resource := r.Header.Get("Sentry-Hook-Resource"); resource != "" {
+			scope.SetTag("hook_resource", resource)
+		}
+		scope.SetRequest(r)
+	}
+}
+
+func joinStatuses(statuses []int) string {
+	parts := make([]string, len(statuses))
+	for i, s := range statuses {
+		parts[i] = fmt.Sprintf("%d", s)
+	}
+	return strings.Join(parts, ",")
 }

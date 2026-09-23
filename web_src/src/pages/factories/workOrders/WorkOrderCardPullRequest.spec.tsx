@@ -41,6 +41,16 @@ const cardProps = {
   onOpen: vi.fn(),
 };
 
+const experimentalFeatureHas = { current: (_id: string) => true };
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (id: string) => experimentalFeatureHas.current(id),
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 const openPullRequest: FactoriesFactoryPullRequest = {
   id: "pr-2323",
   workOrderId: "wo-waiting",
@@ -164,5 +174,31 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.getByRole("link", { name: "Review pull request #2323. 1 more pull request." })).toHaveTextContent(
       "Review #2323 +1",
     );
+  });
+
+  it("hides the Mergeable chip when the pull request merge flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderCard({ pullRequests: [{ ...openPullRequest, mergeable: true }] });
+
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
+  });
+
+  it("shows Status checks passed when the pull request is mergeable but the flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderCard({
+      pullRequests: [{ ...openPullRequest, mergeable: true }],
+      checksPassedOrderIds: new Set(["wo-waiting"]),
+      checksPassedLabels: new Map([
+        ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+      ]),
+    });
+
+    expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "2e46445" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/app/commit/2e46445",
+    );
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
   });
 });

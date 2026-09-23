@@ -22,6 +22,16 @@ type InvokeFunctionOutputPayload = OutputPayload & {
   data?: InvokeFunctionData;
 };
 
+function invokeFunctionResultDisplay(data: InvokeFunctionData | undefined): string | undefined {
+  if (data?.resultRaw !== undefined) {
+    return String(data.resultRaw);
+  }
+  if (data?.result !== undefined) {
+    return typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+  }
+  return undefined;
+}
+
 export const invokeFunctionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
@@ -50,10 +60,9 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
       details["Execution ID"] = data.executionId;
     }
 
-    if (data?.resultRaw !== undefined) {
-      details["Result"] = String(data.resultRaw);
-    } else if (data?.result !== undefined) {
-      details["Result"] = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+    const resultDisplay = invokeFunctionResultDisplay(data);
+    if (resultDisplay !== undefined) {
+      details["Result"] = resultDisplay;
     }
 
     return details;

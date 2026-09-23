@@ -7,9 +7,9 @@ import {
   isInlineWorkOrderImage,
   isInlineWorkOrderVideo,
   MAX_WORK_ORDER_FILE_BYTES,
+  resolveWorkOrderFileMimeType,
   setWorkOrderFilePreviewUrl,
   workOrderFileRef,
-  workOrderUploadContentType,
 } from "@/lib/workOrderFiles";
 import { useCallback, useState } from "react";
 
@@ -65,6 +65,7 @@ async function uploadOneWorkOrderFile(
   args: { organizationId: string; factoryId: string; orderId?: string },
   file: File,
 ): Promise<UploadedWorkOrderFile | null> {
+  const contentType = resolveWorkOrderFileMimeType(file);
   if (!isAllowedWorkOrderFile(file)) {
     showErrorToast("This file type is not allowed.");
     return null;
@@ -73,8 +74,6 @@ async function uploadOneWorkOrderFile(
     showErrorToast("Each file must be 50 MB or smaller.");
     return null;
   }
-
-  const contentType = workOrderUploadContentType(file);
 
   try {
     const created = args.orderId

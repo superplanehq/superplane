@@ -34,7 +34,15 @@ function renderLinesBoard(
   return render(<LinesBoardSpecHarness path={path} openCreateWorkOrder={openCreateWorkOrder} factory={factory} />);
 }
 
+const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryBoardWorkOrders = vi.fn(() => ({
+  workOrders: useFactoryWorkOrders().data ?? [],
+  isLoading: false,
+  backlog: idleBoardPage(),
+  open: idleBoardPage(),
+  done: idleBoardPage(),
+}));
 const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const searchFactoryIntakeItems = vi.fn(() => ({
@@ -44,6 +52,12 @@ const searchFactoryIntakeItems = vi.fn(() => ({
 }));
 const importFactoryIntakeItem = vi.fn();
 const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("./planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: vi.fn(async () => null),
+  sendPlanningSessionMessage: vi.fn(),
+  answerPlanningSessionSurvey: vi.fn(),
+}));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -73,14 +87,20 @@ async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
 }
 
 vi.mock("@/hooks/useFactoryData", () => ({
+  useFactory: () => ({
+    data: { id: "factory-1", planning: { enabled: true, clarity: true, confidence: true } },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
+  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
-  useFactoryPullRequests: () => ({ data: [] }),
   useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -116,7 +136,7 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -125,22 +145,6 @@ vi.mock("@/hooks/usePageTitle", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
-}));
-
-vi.mock("./useWorkOrderPlanningSurvey", () => ({
-  useWorkOrderPlanningSurvey: () => false,
-  useWorkOrderPlanningActivity: () => ({
-    hasAgentQuestion: false,
-    isWaiting: false,
-    isWorking: false,
-    session: null,
-  }),
-  workOrderPlanningSessionQueryKey: (organizationId: string, factoryId: string, workOrderId: string) => [
-    "planning-session-by-work-order",
-    organizationId,
-    factoryId,
-    workOrderId,
-  ],
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -238,9 +242,8 @@ describe("LinesPage backlog create", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
 
-    expect(
-      within(screen.getByTestId("split-run-attention-note")).queryByRole("button", { name: "Refine" }),
-    ).not.toBeInTheDocument();
+    const dialog = await screen.findByTestId("work-order-split-run");
+    expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
   });
 
@@ -265,7 +268,8 @@ describe("LinesPage backlog create", () => {
     await waitFor(() => {
       expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
   });
 
   it("opens the popup from a just-imported order that already has a number", async () => {

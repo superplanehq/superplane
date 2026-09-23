@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useEditorState, type Editor } from "@tiptap/react";
@@ -18,10 +19,10 @@ import {
 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+
 import { hrefFromInput } from "./lib/workOrderDescriptionHref";
 import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
-import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
-import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
 

@@ -465,15 +465,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByTestId("intake-source-settings-save")).toBeDisabled();
   });
 
-  it("hides pause and delete for a GitHub intake", () => {
-    renderPopup();
-
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
-  });
-
-  it.each(["sentry-exceptions", "jira-issues"] as const)(
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "pauses, resumes, and deletes a %s intake after confirmation",
     async (sourceId) => {
       const onPause = vi.fn();
@@ -501,15 +493,18 @@ describe("IntakeSourceSettingsPopup", () => {
     },
   );
 
-  it.each(["sentry-exceptions", "jira-issues"] as const)("offers resume for a paused %s intake", async (sourceId) => {
-    const onResume = vi.fn();
-    const user = userEvent.setup();
-    renderPopup({ sourceId, paused: true, onResume });
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+    "offers resume for a paused %s intake",
+    async (sourceId) => {
+      const onResume = vi.fn();
+      const user = userEvent.setup();
+      renderPopup({ sourceId, paused: true, onResume });
 
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-source-settings-resume"));
-    expect(onResume).toHaveBeenCalledTimes(1);
-  });
+      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+      await user.click(screen.getByTestId("intake-source-settings-resume"));
+      expect(onResume).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("keeps a failed pause from rejecting and shows the error", async () => {
     const onPause = vi.fn().mockRejectedValue(new Error("pause failed"));

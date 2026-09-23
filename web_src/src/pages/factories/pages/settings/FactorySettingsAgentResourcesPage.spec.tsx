@@ -4,7 +4,12 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
-import { HEADER_MCP_RESOURCE, INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
+import {
+  HEADER_MCP_RESOURCE,
+  INLINE_SKILL,
+  UI_UX_PRO_MAX_SKILL,
+  OAUTH_NOT_CONNECTED_RESOURCE,
+} from "../../__fixtures__/agentResourceFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -89,6 +94,46 @@ describe("FactorySettingsAgentResourcesPage", () => {
     expect(screen.getByText("docs")).toBeInTheDocument();
     expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.getByText("Header")).toBeInTheDocument();
+    expect(screen.getByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("View tools");
+  }, 10000);
+
+  it("lists tools for a connected MCP server", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={connectionsPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      />,
+    );
+
+    await user.click(
+      await screen.findByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }),
+    );
+    expect(await screen.findByTestId("agent-resource-tools-dialog")).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-resource-tools-list")).toHaveTextContent("search");
+    expect(screen.getByText("Search the catalog.")).toBeInTheDocument();
+  }, 10000);
+
+  it("hides view tools when sign-in is not connected", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={connectionsPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [OAUTH_NOT_CONNECTED_RESOURCE] },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      />,
+    );
+
+    await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 });
+    expect(
+      screen.queryByTestId(`agent-resource-view-tools-${OAUTH_NOT_CONNECTED_RESOURCE.id}`),
+    ).not.toBeInTheDocument();
   }, 10000);
 
   it("opens the add MCP server dialog from the query string", async () => {
@@ -101,8 +146,27 @@ describe("FactorySettingsAgentResourcesPage", () => {
     );
 
     expect(await screen.findByTestId("agent-resource-connection-dialog", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByTestId("agent-resource-name")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-resource-url")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-resource-auth")).toHaveTextContent("Sign-in");
+    expect(screen.queryByTestId("agent-resource-headers")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("keeps header auth when editing a header connection", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={connectionsPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      />,
+    );
+
+    await user.click(await screen.findByTestId(`agent-resource-menu-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }));
+    await user.click(screen.getByText("Edit"));
+    expect(await screen.findByTestId("agent-resource-connection-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-resource-auth")).toHaveTextContent("Header");
   }, 10000);
 
   it("shows the skills empty state", async () => {

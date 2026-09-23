@@ -9,19 +9,21 @@ import (
 )
 
 const (
-	prFeedbackCommentTriggerNodeID     = "on-pr-comment"
-	prFeedbackAcknowledgeCommentNodeID = "acknowledge-pr-comment"
-	prFeedbackReviewTriggerNodeID      = "on-pr-review"
-	prFeedbackReplyTriggerNodeID       = "on-pr-review-reply"
-	prFeedbackFindNodeID               = "find-pull-request"
-	prFeedbackActivityNodeID           = "add-pr-activity"
-	prFeedbackRunnerNodeID             = "address-pr-feedback"
-	prFeedbackReviewFindNodeID         = "find-pull-request-for-review"
-	prFeedbackReviewActivityNodeID     = "add-pr-review-activity"
-	prFeedbackReviewRunnerNodeID       = "address-pr-review-feedback"
-	prFeedbackReplyFindNodeID          = "find-pull-request-for-review-reply"
-	prFeedbackReplyActivityNodeID      = "add-pr-review-reply-activity"
-	prFeedbackReplyRunnerNodeID        = "address-pr-review-reply-feedback"
+	prFeedbackCommentTriggerNodeID         = "on-pr-comment"
+	prFeedbackAcknowledgeCommentNodeID     = "acknowledge-pr-comment"
+	prFeedbackAcknowledgeReviewNodeID      = "acknowledge-pr-review"
+	prFeedbackAcknowledgeReviewReplyNodeID = "acknowledge-pr-review-reply"
+	prFeedbackReviewTriggerNodeID          = "on-pr-review"
+	prFeedbackReplyTriggerNodeID           = "on-pr-review-reply"
+	prFeedbackFindNodeID                   = "find-pull-request"
+	prFeedbackActivityNodeID               = "add-pr-activity"
+	prFeedbackRunnerNodeID                 = "address-pr-feedback"
+	prFeedbackReviewFindNodeID             = "find-pull-request-for-review"
+	prFeedbackReviewActivityNodeID         = "add-pr-review-activity"
+	prFeedbackReviewRunnerNodeID           = "address-pr-review-feedback"
+	prFeedbackReplyFindNodeID              = "find-pull-request-for-review-reply"
+	prFeedbackReplyActivityNodeID          = "add-pr-review-reply-activity"
+	prFeedbackReplyRunnerNodeID            = "address-pr-review-reply-feedback"
 
 	prFeedbackFindComponent     = "findPullRequest"
 	prFeedbackActivityComponent = "addPullRequestActivity"
@@ -41,6 +43,13 @@ const (
 
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
 	prFeedbackChecksTemplateID     = "pr-feedback:checks"
+
+	prFeedbackCommentFlowY = 80
+	prFeedbackReviewFlowY  = 360
+	prFeedbackReplyFlowY   = 640
+
+	prFeedbackAcknowledgeX       = 360
+	prFeedbackAcknowledgeOffsetY = 120
 
 	// A node with no concurrency spec runs one execution at a time across
 	// every pull request. Waiting for checks or addressing comments on one
@@ -103,27 +112,16 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		RunnerID:     prFeedbackRunnerNodeID,
 		Title:        prFeedbackCommentActivityTitleExpression(),
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
-		Y:            80,
+		Y:            prFeedbackCommentFlowY,
 	}, request)
-	commentFlow.nodes = append(commentFlow.nodes, yaml.Node{
-		ID:        prFeedbackAcknowledgeCommentNodeID,
-		Name:      "Acknowledge PR Comment",
-		Type:      yaml.NodeTypeAction,
-		Component: "github.addReaction",
-		Configuration: map[string]any{
-			"repository": "{{ root().data.repository.full_name }}",
-			"commentId":  "{{ root().data.comment.id }}",
-			"content":    "eyes",
-			"target":     "issueComment",
-		},
-		Integration: request.Binding.integrationRef(),
-		Position:    yaml.Position{X: 360, Y: -40},
-	})
-	commentFlow.edges = append(commentFlow.edges, yaml.Edge{
-		Channel:  "default",
-		SourceID: prFeedbackCommentTriggerNodeID,
-		TargetID: prFeedbackAcknowledgeCommentNodeID,
-	})
+	commentFlow = commentFlow.withAcknowledge(prFeedbackAcknowledgeReactionNode(
+		prFeedbackAcknowledgeCommentNodeID,
+		"Acknowledge PR Comment",
+		prFeedbackCommentAcknowledgeCommentIDExpression(),
+		"issueComment",
+		prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
+		request.Binding,
+	))
 	reviewFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
 		Trigger: yaml.Node{
 			ID:            prFeedbackReviewTriggerNodeID,
@@ -140,8 +138,16 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		RunnerID:     prFeedbackReviewRunnerNodeID,
 		Title:        prFeedbackReviewActivityTitleExpression(),
 		Description:  prFeedbackReviewActivityDescriptionExpression(),
-		Y:            260,
+		Y:            prFeedbackReviewFlowY,
 	}, request)
+	reviewFlow = reviewFlow.withAcknowledge(prFeedbackAcknowledgeReactionNode(
+		prFeedbackAcknowledgeReviewNodeID,
+		"Acknowledge PR Review",
+		prFeedbackReviewAcknowledgeCommentIDExpression(),
+		"reviewComment",
+		prFeedbackAcknowledgePosition(prFeedbackReviewFlowY),
+		request.Binding,
+	))
 	replyFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
 		Trigger: yaml.Node{
 			ID:        prFeedbackReplyTriggerNodeID,
@@ -164,8 +170,16 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		RunnerID:     prFeedbackReplyRunnerNodeID,
 		Title:        prFeedbackReplyActivityTitleExpression(),
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
-		Y:            440,
+		Y:            prFeedbackReplyFlowY,
 	}, request)
+	replyFlow = replyFlow.withAcknowledge(prFeedbackAcknowledgeReactionNode(
+		prFeedbackAcknowledgeReviewReplyNodeID,
+		"Acknowledge PR Review Reply",
+		prFeedbackCommentAcknowledgeCommentIDExpression(),
+		"reviewComment",
+		prFeedbackAcknowledgePosition(prFeedbackReplyFlowY),
+		request.Binding,
+	))
 
 	return withPRFeedbackConcurrency(&yaml.Canvas{
 		APIVersion: yaml.APIVersion,
@@ -233,8 +247,47 @@ type prFeedbackDiscussionFlowRequest struct {
 }
 
 type prFeedbackDiscussionFlowSpec struct {
-	nodes []yaml.Node
-	edges []yaml.Edge
+	triggerID string
+	nodes     []yaml.Node
+	edges     []yaml.Edge
+}
+
+func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
+	flow.nodes = append(flow.nodes, node)
+	flow.edges = append(flow.edges, yaml.Edge{
+		Channel:  "default",
+		SourceID: flow.triggerID,
+		TargetID: node.ID,
+	})
+	return flow
+}
+
+func prFeedbackAcknowledgeReactionNode(
+	id string,
+	name string,
+	commentID string,
+	target string,
+	position yaml.Position,
+	binding *intakeBinding,
+) yaml.Node {
+	return yaml.Node{
+		ID:        id,
+		Name:      name,
+		Type:      yaml.NodeTypeAction,
+		Component: "github.addReaction",
+		Configuration: map[string]any{
+			"repository": "{{ root().data.repository.full_name }}",
+			"commentId":  commentID,
+			"content":    "eyes",
+			"target":     target,
+		},
+		Integration: binding.integrationRef(),
+		Position:    position,
+	}
+}
+
+func prFeedbackAcknowledgePosition(flowY int) yaml.Position {
+	return yaml.Position{X: prFeedbackAcknowledgeX, Y: flowY - prFeedbackAcknowledgeOffsetY}
 }
 
 func prFeedbackDiscussionFlowNodes(
@@ -243,6 +296,7 @@ func prFeedbackDiscussionFlowNodes(
 ) prFeedbackDiscussionFlowSpec {
 	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
 	return prFeedbackDiscussionFlowSpec{
+		triggerID: flow.Trigger.ID,
 		nodes: []yaml.Node{
 			flow.Trigger,
 			{
@@ -307,6 +361,14 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 		configuration["allowedBots"] = allowedBotsNodeValue(allowedBots)
 	}
 	return configuration
+}
+
+func prFeedbackCommentAcknowledgeCommentIDExpression() string {
+	return "{{ root().data.comment.id }}"
+}
+
+func prFeedbackReviewAcknowledgeCommentIDExpression() string {
+	return `{{ first(root().data.review_comments ?? [])?.id ?? "" }}`
 }
 
 func prFeedbackCommentActivityDescriptionExpression() string {

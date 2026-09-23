@@ -99,6 +99,16 @@ func serializeBrowser(settings *models.UserNotificationSettings) *pb.Notificatio
 	}
 }
 
+func serializeBrowserNotificationPreferences(
+	settings *models.UserNotificationSettings,
+) *pb.BrowserNotificationPreferences {
+	browser := serializeBrowser(settings)
+	return &pb.BrowserNotificationPreferences{
+		Enabled:          browser.Scope != pb.NotificationSettings_WORKSPACE_SCOPE_NONE,
+		ShowWhileViewing: browser.ShowWhileViewing,
+	}
+}
+
 func serializeAllScopeEventTypes(eventTypes []string) []pb.NotificationSettings_Type {
 	protoTypes := serializeEventTypes(eventTypes)
 	if len(protoTypes) == 0 && len(eventTypes) == 0 {

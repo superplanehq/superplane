@@ -234,6 +234,7 @@ export function useAgentResourcesPage() {
 
   return {
     organizationId,
+    factoryId,
     factory,
     canUpdate,
     tab,

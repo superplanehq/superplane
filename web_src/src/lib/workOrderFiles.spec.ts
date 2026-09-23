@@ -9,6 +9,7 @@ import {
   isBrowserPlayableWorkOrderVideo,
   isReachableWorkOrderFileUrl,
   parseWorkOrderFileId,
+  resolveWorkOrderFileMimeType,
   rewriteWorkOrderFileRefs,
   revokeWorkOrderFilePreviewUrl,
   setWorkOrderFilePreviewUrl,
@@ -49,6 +50,28 @@ describe("workOrderFiles", () => {
     expect(isInlineWorkOrderVideo("image/png")).toBe(false);
     expect(isBrowserPlayableWorkOrderVideo("video/mp4")).toBe(true);
     expect(isBrowserPlayableWorkOrderVideo("video/quicktime", "clip.mov", "clip.mov")).toBe(false);
+  });
+
+  it("accepts the allowed text data files", () => {
+    expect(isAllowedWorkOrderFile(new File(["x"], "data.json", { type: "application/json" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "rows.csv", { type: "text/csv" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "config.yaml", { type: "application/yaml" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "config.yaml", { type: "text/yaml" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "config.yml", { type: "application/x-yaml" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "page.html", { type: "text/html" }))).toBe(false);
+  });
+
+  it("resolves the MIME type from the filename when the browser sends none", () => {
+    expect(resolveWorkOrderFileMimeType({ name: "notes.txt", type: "" })).toBe("text/plain");
+    expect(resolveWorkOrderFileMimeType({ name: "readme.md", type: "application/octet-stream" })).toBe("text/markdown");
+    expect(resolveWorkOrderFileMimeType({ name: "data.json", type: "" })).toBe("application/json");
+    expect(resolveWorkOrderFileMimeType({ name: "rows.csv", type: "" })).toBe("text/csv");
+    expect(resolveWorkOrderFileMimeType({ name: "config.yaml", type: "" })).toBe("application/yaml");
+    expect(resolveWorkOrderFileMimeType({ name: "config.yml", type: "" })).toBe("application/yaml");
+    expect(resolveWorkOrderFileMimeType({ name: "shot.png", type: "image/png" })).toBe("image/png");
+    expect(resolveWorkOrderFileMimeType({ name: "archive", type: "" })).toBe("");
+    expect(isAllowedWorkOrderFile(new File(["x"], "notes.md", { type: "" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "archive.zip", { type: "" }))).toBe(false);
   });
 
   it("treats http, https, and blob URLs as reachable image sources", () => {

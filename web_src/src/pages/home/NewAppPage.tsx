@@ -4,7 +4,6 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { FreshOrgLanding } from "./FreshOrgLanding";
 import { HomePageShell } from "./HomePageShell";
 import { RequireClassicAppsSurface } from "./RequireClassicAppsSurface";
-import { useNewAppFolderContext } from "./useNewAppFolderContext";
 
 export function NewAppPage() {
   return (
@@ -15,15 +14,14 @@ export function NewAppPage() {
 }
 
 function ClassicNewAppPage() {
-  const { folder, folderContextPending } = useNewAppFolderContext();
-  const title = folder ? `Create New App in ${folder.title} Folder` : "Create a new app";
+  const title = "Create a new app";
   usePageTitle([title]);
   useReportPageReady(true);
 
   return (
     <RequirePermission resource="canvases" action="create">
       <HomePageShell>
-        <FreshOrgLanding folder={folder} folderContextPending={folderContextPending} title={title} />
+        <FreshOrgLanding title={title} />
       </HomePageShell>
     </RequirePermission>
   );

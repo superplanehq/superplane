@@ -185,7 +185,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
-		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, intakeAnalysisNodeID))
+		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, backlogRefinementNodeID))
 	})
 
 	t.Run("Backlog keeps the Claude agent when the instance default is unset", func(t *testing.T) {
@@ -205,9 +205,9 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
-		analysis := findYAMLNode(t, defaults, intakeAnalysisNodeID)
-		assert.Equal(t, "runnerClaudeCode", analysis.Component)
-		assert.Equal(t, "opus", analysis.Configuration["model"])
+		refinement := findYAMLNode(t, defaults, backlogRefinementNodeID)
+		assert.Equal(t, "runnerClaudeCode", refinement.Component)
+		assert.Equal(t, "opus", refinement.Configuration["model"])
 	})
 
 	t.Run("a discussion PR feedback handler resets to its generated graph", func(t *testing.T) {

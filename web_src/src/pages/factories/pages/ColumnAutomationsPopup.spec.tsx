@@ -50,7 +50,7 @@ const DISABLED: ColumnAutomation = {
   kind: "analysis",
   name: "Task analysis",
   trigger: "On task in Backlog",
-  action: "Score the task",
+  action: "Plan the task",
   catalogId: "analysis",
   health: "disabled",
 };

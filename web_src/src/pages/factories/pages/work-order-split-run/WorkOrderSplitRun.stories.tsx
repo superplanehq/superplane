@@ -1,7 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_FACTORY_CREATE_WITH_AGENT } from "@/lib/experimentalFeatures";
-
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
 import {
@@ -62,7 +60,6 @@ function refineChatOnBoard() {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/${DRAFT_WORK_ORDER.number}?lineId=${line.id}`}
       factoriesFixture={refineChatBoardFixture()}
-      experimentalFeatures={[FEATURE_FACTORY_CREATE_WITH_AGENT]}
     />
   );
 }
