@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, LoaderCircle, Timer, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleX, LoaderCircle, type LucideIcon } from "lucide-react";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
@@ -13,8 +13,7 @@ export type WorkOrderAttentionReason =
   | "checksPassed"
   | "fixesPaused"
   | "failed"
-  | "stopped"
-  | "stalled";
+  | "stopped";
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
   approval: "Waiting for user review",
@@ -24,7 +23,6 @@ export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string
   fixesPaused: "Automatic fixes paused",
   failed: "Run failed",
   stopped: "Stopped",
-  stalled: "Needs attention",
 };
 
 export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReason, string> = {
@@ -35,7 +33,6 @@ export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReaso
   fixesPaused: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   failed: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
   stopped: "border-slate-500/40 bg-slate-500/15 text-slate-800 dark:text-slate-300",
-  stalled: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
 };
 
 export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideIcon> = {
@@ -46,7 +43,6 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
   fixesPaused: CircleX,
   failed: CircleX,
   stopped: CircleX,
-  stalled: Timer,
 };
 
 /**
@@ -58,7 +54,7 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
  * limit is Automatic fixes paused and hides user review. A finished
  * passed check wait is Status checks passed. A visible status note is
  * Waiting for user review.
- * Waiting with no note is Needs attention. Other statuses return none.
+ * Waiting with no note returns none. Other statuses return none.
  * The note body is not classified.
  */
 export function getWorkOrderAttentionReasons(
@@ -103,10 +99,7 @@ export function getWorkOrderAttentionReasons(
   if (options.checksPassed) {
     reasons.push("checksPassed");
   }
-  if (reasons.length > 0) {
-    return reasons;
-  }
-  return ["stalled"];
+  return reasons;
 }
 
 export function getWorkOrderAttentionReason(
