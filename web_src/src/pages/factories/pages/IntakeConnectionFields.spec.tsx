@@ -86,8 +86,15 @@ describe("IntakeConnectionFields", () => {
       ],
     });
 
-    expect(await screen.findByRole("link", { name: /Atlassian/ })).toBeInTheDocument();
+    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent(INTAKE_CONNECTION_COPY.missing);
+    expect(screen.getByText(INTAKE_CONNECTION_COPY.chooseJira)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Atlassian/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-connection-project-select")).not.toBeInTheDocument();
     expect(onBindingChange).not.toHaveBeenCalled();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("intake-connection-jira-1"));
+    expect(onBindingChange).toHaveBeenCalledWith({ integrationId: "jira-1", resourceId: "" });
   });
 
   it("uses shadcn Select trigger chrome on the project picker", () => {

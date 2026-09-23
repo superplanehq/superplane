@@ -63,8 +63,10 @@ export function IntakeConnectionFields({
   onRetryProjects,
 }: IntakeConnectionFieldsProps) {
   const providerName = intakeProviderDisplayName(sourceId);
-  const banner = intakeHealthBanner(health);
   const selected = selectedIntakeIntegration(integrations, binding.integrationId);
+  const healthBanner = intakeHealthBanner(health);
+  const missingSavedConnection = Boolean(binding.integrationId) && !integrationsLoading && !selected;
+  const banner = healthBanner ?? (missingSavedConnection ? INTAKE_CONNECTION_COPY.missing : undefined);
   const selectedReady = selected?.status?.state === "ready";
   const reconnectLabel = intakeReconnectLabel(selected);
   const showReconnect = Boolean(selected && !selectedReady && onReconnect);
@@ -125,7 +127,7 @@ export function IntakeConnectionFields({
           {reconnectLabel}
         </Button>
       ) : null}
-      {binding.integrationId ? (
+      {selected ? (
         <ProjectList
           projects={projects}
           selectedId={binding.resourceId}
@@ -183,7 +185,10 @@ function ConnectionList({
     return null;
   }
 
-  if (singleIntegration) {
+  const selectedMatchesOnlyConnection = selectedId === singleIntegrationId;
+  const showCompactConnection = Boolean(singleIntegration) && (!selectedId || selectedMatchesOnlyConnection);
+
+  if (showCompactConnection && singleIntegration) {
     const settingsHref = singleIntegrationId
       ? integrationDetailPath(integrationsBasePath, singleIntegrationId)
       : undefined;
