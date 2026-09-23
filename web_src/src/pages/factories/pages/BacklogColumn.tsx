@@ -4,7 +4,6 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
-import { useRef } from "react";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -16,7 +15,7 @@ import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { LineBoardOrderCard } from "./LineBoardOrderCard";
+import { LineBoardColumnCardList, LineBoardOrderCard } from "./LineBoardOrderCard";
 import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
 import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
@@ -60,6 +59,7 @@ export type BacklogColumnProps = {
     isLoading: boolean;
     onLoadMore: () => void;
   };
+  cardsPending?: boolean;
 };
 
 export type BacklogIntakePanel = {
@@ -97,6 +97,7 @@ export function BacklogColumn({
   automationRowCount,
   onAutomationRowAction,
   paging,
+  cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
@@ -167,6 +168,7 @@ export function BacklogColumn({
           atCapacity={atCapacity}
           createPopover={createPopover}
           paging={paging}
+          cardsPending={cardsPending}
         />
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
@@ -255,11 +257,14 @@ function BacklogColumnOrderList({
   atCapacity,
   createPopover,
   paging,
-}: Pick<BacklogColumnProps, "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging"> & {
+  cardsPending,
+}: Pick<
+  BacklogColumnProps,
+  "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging" | "cardsPending"
+> & {
   atCapacity: boolean;
   createPopover: BacklogCreatePopoverProps;
 }) {
-  const scrollRef = useRef<HTMLUListElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging?.hasMore,
     isLoading: paging?.isLoading,
@@ -267,11 +272,11 @@ function BacklogColumnOrderList({
   });
 
   return (
-    <ul
-      ref={scrollRef}
+    <LineBoardColumnCardList
+      pending={Boolean(cardsPending)}
       className={workOrderKanbanLaneScrollClassName}
-      data-testid="lines-backlog-column-scroll"
-      onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+      testId="lines-backlog-column-scroll"
+      onScroll={loadMoreIfNeeded}
     >
       {orders.map((order) => (
         <li key={order.id}>
@@ -288,7 +293,7 @@ function BacklogColumnOrderList({
           <BacklogCreatePopover variant="ghost" {...createPopover} />
         </li>
       )}
-    </ul>
+    </LineBoardColumnCardList>
   );
 }
 
