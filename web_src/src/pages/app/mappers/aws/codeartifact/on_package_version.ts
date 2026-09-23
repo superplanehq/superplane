@@ -3,7 +3,7 @@ import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import type { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import type { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
+import type { PackageVersionChanges, PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
 import { formatPackageLabel, formatPackageName } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { Predicate } from "../../eventDisplay";
@@ -42,25 +42,14 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     const detail = eventData?.detail as PackageVersionDetail;
 
     const values: Record<string, string> = {
-      Domain: stringOrDash(detail?.domainName),
-      Repository: stringOrDash(detail?.repositoryName),
-      "Package Format": stringOrDash(detail?.packageFormat),
-      Namespace: stringOrDash(detail?.packageNamespace ?? undefined),
-      Package: stringOrDash(formatPackageName(detail?.packageNamespace, detail?.packageName)),
-      Version: stringOrDash(detail?.packageVersion),
-      State: stringOrDash(detail?.packageVersionState),
-      Operation: stringOrDash(detail?.operationType),
+      ...packageVersionIdentityValues(detail),
       Region: stringOrDash(eventData?.region),
       Account: stringOrDash(eventData?.account),
     };
 
     const changes = detail?.changes;
     if (changes) {
-      values["Assets Added"] = numberOrZero(changes.assetsAdded).toString();
-      values["Assets Removed"] = numberOrZero(changes.assetsRemoved).toString();
-      values["Assets Updated"] = numberOrZero(changes.assetsUpdated).toString();
-      values["Metadata Updated"] = stringOrDash(changes.metadataUpdated);
-      values["Status Changed"] = stringOrDash(changes.statusChanged);
+      Object.assign(values, packageVersionChangeValues(changes));
     }
 
     return values;
@@ -92,6 +81,29 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function packageVersionIdentityValues(detail: PackageVersionDetail | undefined): Record<string, string> {
+  return {
+    Domain: stringOrDash(detail?.domainName),
+    Repository: stringOrDash(detail?.repositoryName),
+    "Package Format": stringOrDash(detail?.packageFormat),
+    Namespace: stringOrDash(detail?.packageNamespace ?? undefined),
+    Package: stringOrDash(formatPackageName(detail?.packageNamespace, detail?.packageName)),
+    Version: stringOrDash(detail?.packageVersion),
+    State: stringOrDash(detail?.packageVersionState),
+    Operation: stringOrDash(detail?.operationType),
+  };
+}
+
+function packageVersionChangeValues(changes: PackageVersionChanges): Record<string, string> {
+  return {
+    "Assets Added": numberOrZero(changes.assetsAdded).toString(),
+    "Assets Removed": numberOrZero(changes.assetsRemoved).toString(),
+    "Assets Updated": numberOrZero(changes.assetsUpdated).toString(),
+    "Metadata Updated": stringOrDash(changes.metadataUpdated),
+    "Status Changed": stringOrDash(changes.statusChanged),
+  };
+}
 
 function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
   const items: MetadataItem[] = [];
