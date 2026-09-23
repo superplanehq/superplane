@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, X } from "lucide-react";
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 
 import { IntakeEventRow } from "./IntakeEventRow";
 import {
@@ -82,15 +82,6 @@ export function GitHubIntakeFilterFields({
     onSettingsChange((current) => ({ ...current, [key]: value }));
   }
 
-  function setLabels(labels: string[]) {
-    onSettingsChange((current) => ({
-      ...current,
-      labels,
-      filterByLabel: labels.length > 0,
-      labelFilterMode: labels.length > 0 ? current.labelFilterMode : "include",
-    }));
-  }
-
   const showEvents = part === "all" || part === "create";
   const showFilters = part === "all" || part === "filters";
 
@@ -134,7 +125,14 @@ export function GitHubIntakeFilterFields({
             labels={settings.labels}
             options={labelOptions}
             loading={labelOptionsLoading}
-            onChange={setLabels}
+            onChange={(labels) =>
+              onSettingsChange((current) => ({
+                ...current,
+                labels,
+                filterByLabel: labels.length > 0,
+                labelFilterMode: labels.length > 0 ? current.labelFilterMode : "include",
+              }))
+            }
           />
         </section>
       ) : null}
@@ -198,106 +196,23 @@ function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFie
     close();
   }
 
-  function remove(label: string) {
-    onChange(labels.filter((entry) => entry !== label));
-  }
-
   return (
     <div className="mt-2 flex flex-col gap-2" data-testid="intake-label-options">
-      {labels.length > 0 ? (
-        <ul className="flex flex-wrap items-center gap-1.5">
-          {labels.map((label) => (
-            <li key={label}>
-              <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-foreground/20 bg-accent/50 px-2 py-1 text-[13px] text-foreground">
-                <span className="min-w-0 truncate">{label}</span>
-                <button
-                  type="button"
-                  className="rounded-sm text-muted-foreground hover:text-foreground"
-                  aria-label={`Remove ${label}`}
-                  onClick={() => remove(label)}
-                >
-                  <X className="size-3.5" aria-hidden />
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <GitHubSelectedLabels labels={labels} onRemove={(label) => onChange(labels.filter((entry) => entry !== label))} />
       {typing ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Input
-              ref={inputRef}
-              value={draft}
-              aria-label={INTAKE_SETTINGS_COPY.labelInput}
-              aria-autocomplete="list"
-              aria-expanded={suggestions.length > 0}
-              placeholder={INTAKE_SETTINGS_COPY.labelPlaceholder}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  close();
-                  return;
-                }
-                if (event.key !== "Enter") {
-                  return;
-                }
-                event.preventDefault();
-                addDraft();
-              }}
-              data-testid="intake-label-input"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0"
-              disabled={draft.trim().length === 0}
-              onClick={() => addDraft()}
-              data-testid="intake-label-add"
-            >
-              {INTAKE_SETTINGS_COPY.labelAdd}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="shrink-0"
-              onClick={() => close()}
-              data-testid="intake-label-cancel"
-            >
-              {INTAKE_SETTINGS_COPY.labelCancel}
-            </Button>
-          </div>
-          {loading && draft.trim().length > 0 ? (
-            <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsLoading}</p>
-          ) : null}
-          {suggestions.length > 0 ? (
-            <ul
-              role="listbox"
-              aria-label={GITHUB_INTAKE_SETTINGS_COPY.labelSuggestions}
-              className="max-h-40 overflow-y-auto rounded-lg border border-border bg-card py-1"
-              data-testid="intake-label-suggestions"
-            >
-              {suggestions.map((label) => (
-                <li key={label}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={false}
-                    className="flex w-full px-3 py-1.5 text-left text-[13px] text-foreground hover:bg-accent/60"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      add(label);
-                      close();
-                    }}
-                  >
-                    {label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        <GitHubLabelDraft
+          draft={draft}
+          loading={loading}
+          suggestions={suggestions}
+          inputRef={inputRef}
+          onDraftChange={setDraft}
+          onAddDraft={() => addDraft()}
+          onClose={() => close()}
+          onPick={(label) => {
+            add(label);
+            close();
+          }}
+        />
       ) : (
         <div>
           <Button
@@ -313,5 +228,133 @@ function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFie
         </div>
       )}
     </div>
+  );
+}
+
+function GitHubSelectedLabels({ labels, onRemove }: { labels: string[]; onRemove: (label: string) => void }) {
+  if (labels.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="flex flex-wrap items-center gap-1.5">
+      {labels.map((label) => (
+        <li key={label}>
+          <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-foreground/20 bg-accent/50 px-2 py-1 text-[13px] text-foreground">
+            <span className="min-w-0 truncate">{label}</span>
+            <button
+              type="button"
+              className="rounded-sm text-muted-foreground hover:text-foreground"
+              aria-label={`Remove ${label}`}
+              onClick={() => onRemove(label)}
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function GitHubLabelDraft({
+  draft,
+  loading,
+  suggestions,
+  inputRef,
+  onDraftChange,
+  onAddDraft,
+  onClose,
+  onPick,
+}: {
+  draft: string;
+  loading: boolean;
+  suggestions: string[];
+  inputRef: RefObject<HTMLInputElement | null>;
+  onDraftChange: (value: string) => void;
+  onAddDraft: () => void;
+  onClose: () => void;
+  onPick: (label: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <Input
+          ref={inputRef}
+          value={draft}
+          aria-label={INTAKE_SETTINGS_COPY.labelInput}
+          aria-autocomplete="list"
+          aria-expanded={suggestions.length > 0}
+          placeholder={INTAKE_SETTINGS_COPY.labelPlaceholder}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              onClose();
+              return;
+            }
+            if (event.key !== "Enter") {
+              return;
+            }
+            event.preventDefault();
+            onAddDraft();
+          }}
+          data-testid="intake-label-input"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className="shrink-0"
+          disabled={draft.trim().length === 0}
+          onClick={() => onAddDraft()}
+          data-testid="intake-label-add"
+        >
+          {INTAKE_SETTINGS_COPY.labelAdd}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="shrink-0"
+          onClick={() => onClose()}
+          data-testid="intake-label-cancel"
+        >
+          {INTAKE_SETTINGS_COPY.labelCancel}
+        </Button>
+      </div>
+      {loading && draft.trim().length > 0 ? (
+        <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsLoading}</p>
+      ) : null}
+      <GitHubLabelSuggestions suggestions={suggestions} onPick={(label) => onPick(label)} />
+    </div>
+  );
+}
+
+function GitHubLabelSuggestions({ suggestions, onPick }: { suggestions: string[]; onPick: (label: string) => void }) {
+  if (suggestions.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul
+      role="listbox"
+      aria-label={GITHUB_INTAKE_SETTINGS_COPY.labelSuggestions}
+      className="max-h-40 overflow-y-auto rounded-lg border border-border bg-card py-1"
+      data-testid="intake-label-suggestions"
+    >
+      {suggestions.map((label) => (
+        <li key={label}>
+          <button
+            type="button"
+            role="option"
+            aria-selected={false}
+            className="flex w-full px-3 py-1.5 text-left text-[13px] text-foreground hover:bg-accent/60"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onPick(label)}
+          >
+            {label}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
