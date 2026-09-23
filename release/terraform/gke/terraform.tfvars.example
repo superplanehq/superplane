@@ -31,6 +31,9 @@ letsencrypt_email = "admin@example.com"
 # node_count      = 2
 # machine_type    = "e2-medium"
 
+# Set to false and apply before terraform destroy
+# gke_deletion_protection = true
+
 # -----------------------------------------------------------------------------
 # Optional Variables - Cloud SQL
 # -----------------------------------------------------------------------------
@@ -39,6 +42,9 @@ letsencrypt_email = "admin@example.com"
 # db_version       = "POSTGRES_17"
 # db_tier          = "db-custom-2-4096"  # 2 vCPUs, 4GB RAM
 # db_name          = "superplane"
+
+# Set to false and apply before terraform destroy
+# sql_deletion_protection = true
 
 # Optionally provide a database password (otherwise one will be generated)
 # db_password = "your-secure-password"

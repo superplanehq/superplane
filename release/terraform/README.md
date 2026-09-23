@@ -55,6 +55,17 @@ Each deployment creates:
 - Cloud provider CLI (gcloud or aws) authenticated
 - kubectl
 
+## Checks
+
+```bash
+make check
+make format
+```
+
+These targets build the GKE utils image and run Terraform in that container.
+The EKS image installs the same Terraform version.
+Validate does not call AWS or GCP.
+
 ## Architecture
 
 ```

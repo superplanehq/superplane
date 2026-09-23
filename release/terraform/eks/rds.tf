@@ -93,6 +93,21 @@ resource "aws_security_group" "rds" {
 # RDS PostgreSQL Instance
 # -----------------------------------------------------------------------------
 
+# These are the arguments that replace the instance. A new suffix is stored
+# with the replacement, so the next delete does not reuse a snapshot name.
+# The instance cannot be a keeper. That reference cycles with final_snapshot_identifier.
+resource "random_id" "rds_final_snapshot" {
+  byte_length = 4
+
+  keepers = {
+    identifier        = var.db_instance_identifier
+    db_name           = var.db_name
+    username          = var.db_username
+    allocated_storage = tostring(var.db_allocated_storage)
+    subnet_group      = aws_db_subnet_group.superplane.name
+  }
+}
+
 resource "aws_db_instance" "superplane" {
   identifier = var.db_instance_identifier
 
@@ -120,9 +135,9 @@ resource "aws_db_instance" "superplane" {
   backup_window           = "03:00-04:00"
   maintenance_window      = "Mon:04:00-Mon:05:00"
 
-  deletion_protection = var.rds_deletion_protection
-  skip_final_snapshot = false
-  final_snapshot_identifier = "${var.db_instance_identifier}-final-snapshot"
+  deletion_protection       = var.rds_deletion_protection
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${var.db_instance_identifier}-final-${random_id.rds_final_snapshot.hex}"
 
   tags = {
     Name = var.db_instance_identifier
