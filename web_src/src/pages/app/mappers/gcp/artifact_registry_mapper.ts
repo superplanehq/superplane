@@ -78,31 +78,13 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     const data = getArtifactData<GetArtifactAnalysisData>(context.execution);
     const details: Record<string, string> = {};
 
-    if (payload?.timestamp) {
-      details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
-    }
-
-    if (data?.resourceUri) {
-      details["Image"] = data.resourceUri;
-    }
-
-    if (data?.scanStatus) {
-      details["Scan Status"] = data.scanStatus;
-    }
-
-    if (typeof data?.vulnerabilities === "number") {
-      details["Vulnerabilities"] = String(data.vulnerabilities);
-    }
-
-    if (typeof data?.critical === "number" && data.critical > 0) {
-      details["Critical"] = String(data.critical);
-    }
-    if (typeof data?.high === "number" && data.high > 0) {
-      details["High"] = String(data.high);
-    }
-    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0) {
-      details["Fixes Available"] = String(data.fixAvailable);
-    }
+    addTimestampDetail(details, "Retrieved At", payload?.timestamp);
+    addDetail(details, "Image", data?.resourceUri);
+    addDetail(details, "Scan Status", data?.scanStatus);
+    addNumberDetail(details, "Vulnerabilities", data?.vulnerabilities);
+    addPositiveCountDetail(details, "Critical", data?.critical);
+    addPositiveCountDetail(details, "High", data?.high);
+    addPositiveCountDetail(details, "Fixes Available", data?.fixAvailable);
 
     return details;
   },
@@ -112,6 +94,30 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
+
+function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = value;
+  }
+}
+
+function addTimestampDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = new Date(value).toLocaleString();
+  }
+}
+
+function addNumberDetail(details: Record<string, string>, key: string, value: unknown) {
+  if (typeof value === "number") {
+    details[key] = String(value);
+  }
+}
+
+function addPositiveCountDetail(details: Record<string, string>, key: string, value: unknown) {
+  if (typeof value === "number" && value > 0) {
+    details[key] = String(value);
+  }
+}
 
 function artifactTimestampDetails(data: ArtifactVersionData | undefined): Record<string, string> {
   const details: Record<string, string> = {};
