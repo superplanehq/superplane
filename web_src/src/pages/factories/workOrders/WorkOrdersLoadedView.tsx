@@ -15,6 +15,8 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  countWorkOrderFilters,
+  visibleWorkOrderFilters,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
@@ -84,6 +86,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
+  const visibleFilterCount = countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge));
   const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
@@ -97,7 +100,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       );
     }
     if (ordered.length === 0) {
-      if (state.scope !== "all" && state.filterCount === 0 && state.search.trim().length === 0) {
+      if (state.scope !== "all" && visibleFilterCount === 0 && state.search.trim().length === 0) {
         return (
           <WorkOrdersScopedEmptyState
             scopeLabel={state.scope === "my" ? "your work" : "active work"}

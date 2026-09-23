@@ -20,7 +20,9 @@ import {
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
+  countWorkOrderFilters,
   visibleWorkOrderFilterLabels,
+  visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -448,6 +450,12 @@ describe("scope + filter + search + ordering", () => {
     expect(ids(["mergeable"])).toEqual(["open-review", "open-mergeable", "draft-pr", "idle-wait"]);
     expect(visibleWorkOrderFilterLabels()).toEqual(["review"]);
     expect(visibleWorkOrderFilterLabels(true)).toEqual(["review", "mergeable"]);
+    expect(countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }))).toBe(
+      0,
+    );
+    expect(
+      countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }, true)),
+    ).toBe(1);
   });
 
   it("search matches on title, description, line, and assignee names", () => {
