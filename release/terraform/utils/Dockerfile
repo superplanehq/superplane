@@ -22,11 +22,14 @@ RUN apk add --no-cache \
       unzip \
       vim \
     && curl -fsSL -o /tmp/google-cloud-cli.tar.gz https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-586.0.0-linux-x86_64.tar.gz \
+    && printf '%s  /tmp/google-cloud-cli.tar.gz\n' '6c774c76793eedd501150b59da653610fbe3eaac169e822965b722de75a2f001' > /tmp/google-cloud-cli.sha256 \
+    && sha256sum -c /tmp/google-cloud-cli.sha256 \
     && tar -xzf /tmp/google-cloud-cli.tar.gz -C / \
-    && rm /tmp/google-cloud-cli.tar.gz \
+    && rm /tmp/google-cloud-cli.tar.gz /tmp/google-cloud-cli.sha256 \
     && rm -rf /google-cloud-sdk/platform/bundledpythonunix \
     && gcloud config set core/disable_usage_reporting true \
     && gcloud config set component_manager/disable_update_check true \
+    && gcloud components install gke-gcloud-auth-plugin --quiet \
     && curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl \
     && printf '%s  /usr/local/bin/kubectl\n' '7c27adc64a84d1c0cc3dcf7bf4b6e916cc00f3f576a2dbac51b318d926032437' > /tmp/kubectl.sha256 \
     && sha256sum -c /tmp/kubectl.sha256 \
@@ -47,5 +50,6 @@ RUN apk add --no-cache \
     && terraform version \
     && kubectl version --client=true \
     && gcloud version \
+    && gke-gcloud-auth-plugin --version \
     && aws --version \
     && eksctl version

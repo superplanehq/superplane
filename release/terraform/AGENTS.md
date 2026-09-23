@@ -3,8 +3,8 @@
 Read this file when you edit `release/terraform`. For repository setup, read
 [AGENTS.md](../../AGENTS.md) first.
 
-`gke/` and `eks/` are the install stacks. `utils/Makefile` only builds the
-shell image: `build` and `shell`.
+`gke/` and `eks/` are the install stacks. `utils/Makefile` builds one image:
+`build`, `gke.shell`, and `eks.shell`.
 
 ## Checks
 
