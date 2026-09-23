@@ -30,8 +30,8 @@ RUN apk add --no-cache \
     && gcloud config set core/disable_usage_reporting true \
     && gcloud config set component_manager/disable_update_check true \
     && gcloud components install gke-gcloud-auth-plugin --quiet \
-    && curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl \
-    && printf '%s  /usr/local/bin/kubectl\n' '7c27adc64a84d1c0cc3dcf7bf4b6e916cc00f3f576a2dbac51b318d926032437' > /tmp/kubectl.sha256 \
+    && curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.36.5/bin/linux/amd64/kubectl \
+    && printf '%s  /usr/local/bin/kubectl\n' '33bc88a24c3b09cf55bfd59e6ca977881b61fc3f25ab65bc80c65b430248648e' > /tmp/kubectl.sha256 \
     && sha256sum -c /tmp/kubectl.sha256 \
     && rm /tmp/kubectl.sha256 \
     && chmod +x /usr/local/bin/kubectl \
