@@ -1,0 +1,57 @@
+# -----------------------------------------------------------------------------
+# Required Variables
+# -----------------------------------------------------------------------------
+
+# Your GCP project ID
+project_id = "my-gcp-project"
+
+# Domain name for SuperPlane (must have DNS configured to point to the static IP)
+domain_name = "superplane.example.com"
+
+# Name of the pre-created global static IP address
+# Create it with: gcloud compute addresses create superplane-ip --global --ip-version=IPV4
+static_ip_name = "superplane-ip"
+
+# Email for Let's Encrypt certificate notifications
+letsencrypt_email = "admin@example.com"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - GCP Region/Zone
+# -----------------------------------------------------------------------------
+
+# region = "us-central1"
+# zone   = "us-central1-a"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - GKE Cluster
+# -----------------------------------------------------------------------------
+
+# cluster_name    = "superplane"
+# cluster_version = "1.31"
+# node_count      = 2
+# machine_type    = "e2-medium"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Cloud SQL
+# -----------------------------------------------------------------------------
+
+# db_instance_name = "superplane-db"
+# db_version       = "POSTGRES_17"
+# db_tier          = "db-custom-2-4096"  # 2 vCPUs, 4GB RAM
+# db_name          = "superplane"
+
+# Optionally provide a database password (otherwise one will be generated)
+# db_password = "your-secure-password"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - SuperPlane
+# -----------------------------------------------------------------------------
+
+# superplane_namespace = "superplane"
+# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Network
+# -----------------------------------------------------------------------------
+
+# network = "default"
