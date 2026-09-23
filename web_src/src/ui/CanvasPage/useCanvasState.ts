@@ -82,6 +82,9 @@ function buildSyncedNodes(
       selected: existingNode?.selected ?? newNode.selected,
       position,
       dragging: existingNode?.dragging,
+      // React Flow drops handle positions when a node loses `measured`.
+      // Without handle positions it does not draw edges.
+      measured: existingNode?.measured ?? newNode.measured,
     };
   });
 

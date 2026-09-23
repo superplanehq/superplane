@@ -82,6 +82,23 @@ describe("useCanvasState", () => {
     expect(result.current.nodes.find((n) => n.id === "a")?.position).toEqual({ x: 50, y: 50 });
   });
 
+  it("keeps React Flow measurements when props resync nodes", () => {
+    const { result, rerender } = renderHook(({ props }) => useCanvasState(props), {
+      initialProps: { props: makeProps([makeNode("a", 0, 0)]) },
+    });
+
+    act(() => {
+      result.current.onNodesChange([{ id: "a", type: "dimensions", dimensions: { width: 280, height: 97 } }]);
+    });
+    expect(result.current.nodes.find((n) => n.id === "a")?.measured).toEqual({ width: 280, height: 97 });
+
+    rerender({ props: makeProps([makeNode("a", 10, 10)]) });
+
+    const nodeA = result.current.nodes.find((n) => n.id === "a");
+    expect(nodeA?.position).toEqual({ x: 10, y: 10 });
+    expect(nodeA?.measured).toEqual({ width: 280, height: 97 });
+  });
+
   it("does not resync edges when only node positions change", () => {
     const initialNodes = [makeNode("a", 0, 0), makeNode("b", 100, 100)];
     const initialEdges = [makeEdge("edge-a-b", "a", "b")];
