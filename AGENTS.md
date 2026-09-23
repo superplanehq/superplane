@@ -111,6 +111,10 @@ again so Compose rebuilds the worker. Check tools with `make doctor-local` in
 the runner repository. OpenCode must be on the runner `PATH` for Run OpenRouter
 Agent. SuperPlane does not download OpenCode in the prompt prepare step.
 
+Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
+in `.env` only when you need the SuperPlane-hosted provider. See
+[docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
 (`BLOCK_SIGNUP=yes`).
