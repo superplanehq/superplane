@@ -1,0 +1,31 @@
+# Promoted when /runner is green on main.
+# ghcr-push-token is the SuperPlane GHCR secret (GHCR_PUSH_TOKEN).
+version: v1.0
+name: Publish runner Docker images
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+promotions:
+  - name: Deploy runner services
+    pipeline_file: runner-deploy-services.yml
+    deployment_target: runner-images
+    auto_promote:
+      when: "result = 'passed'"
+
+blocks:
+  - name: Push to GHCR
+    task:
+      secrets:
+        - name: ghcr-push-token
+      jobs:
+        - name: ghcr publish
+          commands:
+            - checkout
+            - export IMAGE_PREFIX="ghcr.io/superplanehq/runner"
+            - export IMAGE_TAG="$(echo "$SEMAPHORE_GIT_SHA" | cut -c1-12)"
+            - echo "${GHCR_PUSH_TOKEN:-${GHCR_TOKEN}}" | docker login ghcr.io -u superplanehq --password-stdin
+            - cd runner
+            - make docker-publish-ghcr

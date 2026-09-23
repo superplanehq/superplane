@@ -89,6 +89,7 @@ func TestBrokerUsesUnrestrictedHTTP(t *testing.T) {
 		{name: "docker desktop host", baseURL: "http://host.docker.internal:8091", want: true},
 		{name: "localhost", baseURL: "http://localhost:8091", want: true},
 		{name: "loopback", baseURL: "http://127.0.0.1:8091", want: true},
+		{name: "compose service", baseURL: "http://task-broker:8081", want: true},
 		{name: "rfc1918", baseURL: "http://192.168.65.254:8091", want: true},
 		{name: "public broker", baseURL: "https://broker.example", want: false},
 		{name: "invalid", baseURL: ":", want: false},
