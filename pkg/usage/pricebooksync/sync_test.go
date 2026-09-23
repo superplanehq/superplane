@@ -67,7 +67,7 @@ func Test__Sync__PublishesWhenRatesChange(t *testing.T) {
 	current, err := models.FindCurrentUsagePriceBook(db)
 	require.NoError(t, err)
 
-	upsertOpenRouterProvider(t, db, nil)
+	upsertOpenRouterProvider(t, db, datatypes.NewJSONSlice([]string{"anthropic/claude-sonnet-4-6"}))
 
 	svc := pricebooksync.New(crypto.NewNoOpEncryptor(), openRouterHTTPContext(sonnetCatalogBody("0.000004", "0.000015")))
 	result, err := svc.Sync(t.Context(), db, pricebooksync.Options{SkipWhenUnchanged: true})
@@ -124,7 +124,13 @@ func sonnetCatalogBody(prompt, completion string) string {
 		"data":[
 			{
 				"id":"anthropic/claude-sonnet-4-6",
-				"pricing":{"prompt":"` + prompt + `","completion":"` + completion + `"}
+				"pricing":{
+					"prompt":"` + prompt + `",
+					"completion":"` + completion + `",
+					"input_cache_read":"0.0000003",
+					"input_cache_write":"0.00000375",
+					"internal_reasoning":"0"
+				}
 			}
 		]
 	}`
