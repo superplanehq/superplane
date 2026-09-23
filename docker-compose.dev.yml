@@ -96,7 +96,9 @@ services:
       # Empty TASK_BROKER_FLEET_ID keeps node machine types. Unset FLEET_ID uses fleet
       # `local` only when BASE_URL is the local Docker host.
       TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://task-broker:8081}
-      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-http://localhost:8091}
+      # Empty default. A hardcoded localhost public URL would hide a remote
+      # TASK_BROKER_BASE_URL. Local Compose rewrites task-broker for the browser.
+      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
       # Bearer; must match broker AUTH_TOKEN (runner compose default: dev-local-token).
       TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-local-token}

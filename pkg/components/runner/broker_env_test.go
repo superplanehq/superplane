@@ -21,6 +21,7 @@ func TestBrowserTaskBrokerBaseURL(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "http://localhost:8091", browserTaskBrokerBaseURL("http://host.docker.internal:8091"))
+	assert.Equal(t, "http://localhost:8091", browserTaskBrokerBaseURL("http://task-broker:8081"))
 	assert.Equal(t, "https://broker.example", browserTaskBrokerBaseURL("https://broker.example"))
 	assert.Equal(t, "http://localhost:8091", browserTaskBrokerBaseURL("http://localhost:8091"))
 }

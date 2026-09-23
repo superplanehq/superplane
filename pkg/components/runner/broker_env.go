@@ -23,7 +23,12 @@ func browserTaskBrokerBaseURL(raw string) string {
 	if err != nil {
 		return raw
 	}
-	if !strings.EqualFold(parsed.Hostname(), "host.docker.internal") {
+	host := strings.ToLower(parsed.Hostname())
+	if host == "task-broker" {
+		parsed.Host = net.JoinHostPort("localhost", "8091")
+		return strings.TrimRight(parsed.String(), "/")
+	}
+	if host != "host.docker.internal" {
 		return raw
 	}
 	port := parsed.Port()

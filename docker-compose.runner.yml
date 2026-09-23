@@ -29,7 +29,7 @@ services:
       context: ./runner
       dockerfile: task-broker/Dockerfile
     ports:
-      - "${TASK_BROKER_HOST_PORT:-8091}:8081"
+      - "127.0.0.1:${TASK_BROKER_HOST_PORT:-8091}:8081"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
