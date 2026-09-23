@@ -4,6 +4,7 @@ import {
   factoryWorkOrdersPageKey,
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
+  uniqueWorkOrdersById,
   workOrderMatchesPageQuery,
   workOrderMatchesUser,
   workOrdersPageFromResponse,
@@ -36,6 +37,21 @@ describe("workOrderListPagination", () => {
         { orders: [{ id: "wo-1" }], hasNextPage: false },
       ]).map((order) => order.id),
     ).toEqual(["wo-2", "wo-1"]);
+  });
+
+  it("keeps the first row when two pages share an id", () => {
+    expect(
+      flattenWorkOrdersPages([
+        { orders: [{ id: "wo-1", title: "first" }], hasNextPage: true },
+        { orders: [{ id: "wo-1", title: "second" }, { id: "wo-2" }], hasNextPage: false },
+      ]).map((order) => order.id),
+    ).toEqual(["wo-1", "wo-2"]);
+    expect(
+      uniqueWorkOrdersById([
+        { id: "wo-1", title: "first" },
+        { id: "wo-1", title: "second" },
+      ]),
+    ).toEqual([{ id: "wo-1", title: "first" }]);
   });
 
   it("maps a list response onto a page", () => {
