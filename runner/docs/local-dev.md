@@ -15,8 +15,8 @@ make dev.server
 
 | Command | App | Runner stack |
 | --- | --- | --- |
-| `make dev.up` | Build the app image. Start `db`, `rabbitmq`, and the idle app shell. | Build the task-broker and worker images. Start `broker-db`. |
-| `make dev.setup` | Install npm and Go modules. Generate protos. Create and migrate `superplane_dev`. | Start task-broker so GORM migrates the `broker` database. Register fleets `local` and `e1-*`. |
+| `make dev.up` | Build the app image. Start `db`, `rabbitmq`, and the idle app shell. | Build the task-broker and worker images. |
+| `make dev.setup` | Install npm and Go modules. Generate protos. Create and migrate `superplane_dev`. Create database `broker` on that Postgres. | Start task-broker so GORM migrates `broker`. Register fleets `local` and `e1-*`. |
 | `make dev.server` | Start air and Vite. | Start 10 runner workers. Override the count with `N=1 make dev.server`. |
 
 The broker listens on **http://127.0.0.1:8091**. SuperPlane pgweb uses host

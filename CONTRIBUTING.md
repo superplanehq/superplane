@@ -54,8 +54,8 @@ Once inside the cloned repository, bring up Docker, install dependencies and
 migrations, then start the development server:
 
 ```sh
-make dev.up        # Build app and runner images. Start db, rabbitmq, app shell, broker-db
-make dev.setup     # Codegen, Go + JS deps, migrate superplane_dev, start task-broker, register fleets
+make dev.up        # Build app and runner images. Start db, rabbitmq, and the app shell
+make dev.setup     # Codegen, Go + JS deps, migrate superplane_dev, create database broker, start task-broker, register fleets
 make dev.server    # Start air, Vite, and runner workers (UI at http://localhost:8000)
 ```
 

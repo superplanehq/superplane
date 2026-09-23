@@ -90,13 +90,14 @@ or Node installed on the host, only Docker.
 Run these three steps once, in order:
 
 1. `make dev.up` — builds the app and runner images and starts dependency
-   containers (app shell, db, rabbitmq, broker-db). The first run builds the
+   containers (app shell, db, rabbitmq). The first run builds the
    images (~3-5 min); later runs reuse them. After you change
    `runner/runner/Dockerfile.local`, run `make dev.up` again. If a sibling
    `../runner` Compose project still holds port `8091` or `5432`, stop it first.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
-   codegen, creates + migrates `superplane_dev`, starts task-broker so GORM
-   migrates the `broker` database, and registers local fleets. Re-run when
+   codegen, creates + migrates `superplane_dev`, creates database `broker`
+   on that Postgres, starts task-broker so GORM migrates it, and registers
+   local fleets. Re-run when
    protos, Go modules, or frontend deps change. By
    default only `superplane_dev` is migrated; use
    `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need
