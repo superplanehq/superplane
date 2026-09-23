@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
 
@@ -98,6 +99,30 @@ describe("ProductiveIntakeSetupDialog", () => {
         source: "SOURCE_PRODUCTIVE_TASKS",
         integrationId: "integration-1",
         resourceId: "project-1",
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("creates a bound intake without importing existing issues", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await screen.findByTestId("productive-project-project-1");
+    expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
+    expect(screen.getByTestId("productive-skip-initial-import")).not.toBeChecked();
+    await user.click(screen.getByTestId("productive-skip-initial-import"));
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
+    await user.click(screen.getByTestId("productive-project-project-1"));
+    await user.click(screen.getByTestId("productive-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_PRODUCTIVE_TASKS",
+        integrationId: "integration-1",
+        resourceId: "project-1",
+        skipInitialImport: true,
       });
     });
     expect(onCreated).toHaveBeenCalled();

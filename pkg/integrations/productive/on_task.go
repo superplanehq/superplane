@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -52,10 +53,16 @@ func (t *OnTask) Documentation() string {
 
 ## Webhook Setup
 
-This trigger registers a Productive.io webhook automatically when configured, and removes it when the
-trigger is deleted. Productive.io sells webhooks as a plan feature and rejects registration with a 403
-"webhooks_limit_exceeded" response on plans that do not include it, in which case setup fails until the
-organization upgrades to a plan with webhooks.`
+This trigger registers Productive.io webhooks automatically when configured, and removes them when the
+trigger is deleted. Productive.io webhooks are organization-wide and need the Ultimate plan. SuperPlane
+registers one remote webhook for task created and one for task updated, both pointing at
+` + "`{WEBHOOKS_BASE_URL}/api/v1/webhooks/{id}`" + `. Deliveries for other projects are ignored.
+
+Productive.io does not put the event name in the request body. Each remote webhook has its own
+signature, and SuperPlane uses that signature to tell a created task from an updated task.
+
+Productive.io rejects registration with a 403 "webhooks_limit_exceeded" response on plans that do not
+include webhooks, in which case setup fails until the organization upgrades.`
 }
 
 func (t *OnTask) Icon() string {
@@ -146,7 +153,17 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	event := ctx.Headers.Get(EventHeader)
+	//
+	// Productive.io does not send an event header. The signature token of
+	// the remote webhook that delivered the body is the event name.
+	//
+	event, code, err := signedWebhookEvent(ctx)
+	if err != nil {
+		return code, nil, err
+	}
+	if event == "" {
+		event = deliveryEventName(ctx)
+	}
 	if event == "" {
 		return http.StatusBadRequest, nil, fmt.Errorf("missing %s header", EventHeader)
 	}
@@ -161,11 +178,6 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
-	code, err := verifyWebhookSignature(ctx)
-	if err != nil {
-		return code, nil, err
-	}
-
 	payload := struct {
 		Data map[string]any `json:"data"`
 	}{}
@@ -177,6 +189,14 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusBadRequest, nil, fmt.Errorf("missing task data")
 	}
 
+	//
+	// Productive.io webhooks are organization-wide. A delivery for another
+	// project is not this node's news.
+	//
+	if taskProjectID(payload.Data) != config.Project {
+		return http.StatusOK, nil, nil
+	}
+
 	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, payload.Data)); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -186,6 +206,19 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// deliveryEventName reads the event SuperPlane put on the webhook URL, then
+// the custom header. The URL event is a path segment or a query value.
+// Productive.io does not send the header on a real delivery. The signature
+// token is checked before this name is trusted.
+func deliveryEventName(ctx core.WebhookRequestContext) string {
+	if ctx.Query != nil {
+		if event := strings.TrimSpace(ctx.Query.Get("event")); event != "" {
+			return event
+		}
+	}
+	return strings.TrimSpace(ctx.Headers.Get(EventHeader))
 }
 
 func decodeOnTaskConfiguration(raw any) (OnTaskConfiguration, error) {

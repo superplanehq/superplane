@@ -27,6 +27,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
+import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
@@ -374,6 +375,11 @@ function IntakeSettingsGeneralPanel({
             settings={draft}
             onSettingsChange={onDraftChange}
             layout="grid"
+          />
+          <ProductiveIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
           />
           <IntakeSettingsLifecycle
             sourceId={sourceId}

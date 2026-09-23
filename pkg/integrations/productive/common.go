@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -32,8 +33,7 @@ const (
 	ResourceTypeProject = "project"
 
 	// TaskCreatedEvent and TaskUpdatedEvent name the change a task event
-	// carries, in the "meta" object of the emitted envelope. Productive.io
-	// sends the same names in the EventHeader of a webhook delivery.
+	// carries, in the "meta" object of the emitted envelope.
 	TaskCreatedEvent = "task.created"
 	TaskUpdatedEvent = "task.updated"
 
@@ -42,13 +42,27 @@ const (
 	ActionCreated = "created"
 	ActionUpdated = "updated"
 
-	// EventHeader carries the event a webhook delivery reports, one of
-	// TaskCreatedEvent or TaskUpdatedEvent.
+	// WebhookTypeStandard is Productive.io type_id for a normal webhook
+	// (not Zapier).
+	WebhookTypeStandard = 1
+
+	// EventNewTask and EventUpdatedTask are Productive.io event_id values
+	// for task created and task updated.
+	EventNewTask     = 1
+	EventUpdatedTask = 24
+
+	// TaskTypeRegular is a normal Productive.io task. TaskTypeMilestone is
+	// a key task.
+	TaskTypeRegular   = 1
+	TaskTypeMilestone = 3
+
+	// EventHeader is a custom header SuperPlane asks Productive.io to send.
+	// Productive.io does not send it on real deliveries, so the signature
+	// token is what tells a created task from an updated task.
 	EventHeader = "X-Productive-Event"
 
-	// SignatureHeader carries a hex-encoded HMAC-SHA256 of the raw request
-	// body, keyed with the webhook's secret.
-	SignatureHeader = "X-Productive-Signature"
+	// SignatureHeader carries Productive.io's HMAC of timestamp + "." + body.
+	SignatureHeader = "Productive-Signature"
 )
 
 // NodeMetadata is stored on productive.onTask nodes, so canvas cards can show
@@ -82,32 +96,173 @@ func actionForEvent(event string) (string, bool) {
 	}
 }
 
-// verifyWebhookSignature checks the SignatureHeader against an HMAC-SHA256 of
-// the raw request body, keyed with the node's webhook secret. Productive.io
-// signs the bytes exactly as delivered, so the raw body must be used rather
-// than a re-serialized payload.
-func verifyWebhookSignature(ctx core.WebhookRequestContext) (int, error) {
-	signature := strings.TrimSpace(ctx.Headers.Get(SignatureHeader))
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing %s header", SignatureHeader)
+// webhookSecretEntry is one Productive.io signature token and the event
+// that webhook was registered for. A delivery is signed with exactly one
+// of these tokens, which is how SuperPlane tells created from updated.
+type webhookSecretEntry struct {
+	event string
+	token string
+}
+
+// signedWebhookEvent checks Productive-Signature (t=<unix>, s=<hex>)
+// against HMAC-SHA256 of timestamp + "." + raw body. When one stored
+// token matches, it returns that token's event. When several tokens
+// match, the event is empty and the caller may use EventHeader.
+func signedWebhookEvent(ctx core.WebhookRequestContext) (string, int, error) {
+	timestamp, signature, ok := parseProductiveSignature(ctx.Headers.Get(SignatureHeader))
+	if !ok {
+		return "", http.StatusForbidden, fmt.Errorf("missing %s header", SignatureHeader)
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
+		return "", http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	if len(secret) == 0 {
-		return http.StatusInternalServerError, fmt.Errorf("missing webhook secret")
+	entries := webhookSecretEntries(secret)
+	if len(entries) == 0 {
+		return "", http.StatusInternalServerError, fmt.Errorf("missing webhook secret")
 	}
 
+	matched := []string{}
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		expected := webhookSignatureHex([]byte(entry.token), timestamp, ctx.Body)
+		if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
+			continue
+		}
+		if seen[entry.event] {
+			continue
+		}
+		seen[entry.event] = true
+		matched = append(matched, entry.event)
+	}
+
+	if len(matched) == 0 {
+		return "", http.StatusForbidden, fmt.Errorf("invalid webhook signature")
+	}
+	if len(matched) == 1 {
+		return matched[0], http.StatusOK, nil
+	}
+	return "", http.StatusOK, nil
+}
+
+// webhookSecretEntries reads the signature tokens stored at registration.
+// New records are "event=token" lines. Older records with two lines are
+// created then updated. One older line is a token both webhooks shared,
+// so it does not name the event.
+func webhookSecretEntries(secret []byte) []webhookSecretEntry {
+	lines := []string{}
+	for _, part := range strings.Split(string(secret), "\n") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			lines = append(lines, part)
+		}
+	}
+
+	labeled := false
+	for _, line := range lines {
+		if strings.Contains(line, "=") {
+			labeled = true
+			break
+		}
+	}
+	if !labeled {
+		return legacyWebhookSecretEntries(lines)
+	}
+
+	entries := make([]webhookSecretEntry, 0, len(lines))
+	for _, line := range lines {
+		event, token, ok := strings.Cut(line, "=")
+		event = strings.TrimSpace(event)
+		token = strings.TrimSpace(token)
+		if !ok || event == "" || token == "" {
+			continue
+		}
+		entries = append(entries, webhookSecretEntry{event: event, token: token})
+	}
+	return entries
+}
+
+func legacyWebhookSecretEntries(tokens []string) []webhookSecretEntry {
+	// The previous registration stored one copy of a token that both
+	// webhooks shared. Attach it to both events so a match does not
+	// name one of them. The URL query or the header names the event.
+	if len(tokens) == 1 {
+		return []webhookSecretEntry{
+			{event: TaskCreatedEvent, token: tokens[0]},
+			{event: TaskUpdatedEvent, token: tokens[0]},
+		}
+	}
+
+	entries := make([]webhookSecretEntry, 0, len(tokens))
+	for i, token := range tokens {
+		if i >= len(remoteWebhookEvents) {
+			break
+		}
+		entries = append(entries, webhookSecretEntry{
+			event: remoteWebhookEvents[i].eventName,
+			token: token,
+		})
+	}
+	return entries
+}
+
+func webhookSignatureHex(secret []byte, timestamp string, body []byte) string {
 	mac := hmac.New(sha256.New, secret)
-	mac.Write(ctx.Body)
-	expected := hex.EncodeToString(mac.Sum(nil))
+	mac.Write([]byte(timestamp))
+	mac.Write([]byte("."))
+	mac.Write(body)
+	return hex.EncodeToString(mac.Sum(nil))
+}
 
-	if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
-		return http.StatusForbidden, fmt.Errorf("invalid webhook signature")
+// parseProductiveSignature reads t= and s= from a Productive-Signature header.
+func parseProductiveSignature(header string) (timestamp, signature string, ok bool) {
+	for _, part := range strings.Split(header, ",") {
+		key, value, found := strings.Cut(strings.TrimSpace(part), "=")
+		if !found {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "t":
+			timestamp = strings.TrimSpace(value)
+		case "s":
+			signature = strings.TrimSpace(value)
+		}
 	}
+	return timestamp, signature, timestamp != "" && signature != ""
+}
 
-	return http.StatusOK, nil
+// taskProjectID reads the project relationship id from a JSON:API task.
+func taskProjectID(document map[string]any) string {
+	relationships, _ := document["relationships"].(map[string]any)
+	project, _ := relationships["project"].(map[string]any)
+	data, _ := project["data"].(map[string]any)
+	id, _ := data["id"].(string)
+	return strings.TrimSpace(id)
+}
+
+// taskTypeID reads attributes.type_id from a JSON:API task.
+func taskTypeID(document map[string]any) int {
+	attributes, _ := document["attributes"].(map[string]any)
+	return numberAttribute(attributes["type_id"])
+}
+
+func numberAttribute(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(typed))
+		if err != nil {
+			return 0
+		}
+		return n
+	default:
+		return 0
+	}
 }

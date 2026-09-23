@@ -177,6 +177,20 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsTitle("pagerduty-incidents")).toBe("PagerDuty intake");
   });
 
+  it("defaults excludeKeyTasks on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Productive.io tasks", {});
+
+    expect(settings.excludeKeyTasks).toBe(true);
+    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(true);
+  });
+
+  it("round-trips excludeKeyTasks through the API shape", () => {
+    const settings = intakeSettingsFromApi("Productive.io tasks", { excludeKeyTasks: false });
+
+    expect(settings.excludeKeyTasks).toBe(false);
+    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
+  });
+
   it("offers pause for GitHub, Sentry, Jira, and Productive.io intakes", () => {
     expect(intakeSupportsPause("github-issues")).toBe(true);
     expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
@@ -250,6 +264,7 @@ describe("intakeSourceSettingsModel", () => {
     ]);
     expect(intakeSettingsSections("productive-tasks", true).map((section) => section.id)).toEqual([
       "connection",
+      "filters",
       "danger",
     ]);
     expect(intakeSettingsSections("github-issues", false).map((section) => section.label)).toEqual([

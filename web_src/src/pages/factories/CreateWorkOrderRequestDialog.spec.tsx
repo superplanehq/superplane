@@ -2,6 +2,8 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
+
 import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 
@@ -132,7 +134,7 @@ describe("CreateWorkOrderRequestDialog", () => {
       CREATE_WORK_ORDER_REQUEST_COPY.attach,
     );
     expect(screen.getByTestId("create-work-order-request-image-input").getAttribute("accept")).toBe(
-      "image/png,image/jpeg,image/gif,image/webp",
+      WORK_ORDER_FILE_ACCEPT,
     );
     expect(screen.getByTestId("create-work-order-request-create")).toBeDisabled();
   });
@@ -271,30 +273,76 @@ describe("CreateWorkOrderRequestDialog", () => {
     expect(title).toHaveValue("Checkout retry");
   });
 
-  it("does not attach a non-image file", async () => {
+  it("attaches text files as chips and includes them in the create payload", async () => {
     const user = userEvent.setup();
+    const onCreate = vi.fn();
     const onUploadFiles = vi.fn().mockResolvedValue([
       {
         id: "file-3",
-        filename: "notes.md",
-        contentType: "text/markdown",
+        filename: "notes.txt",
+        contentType: "text/plain",
         ref: "sp-file://file-3",
-        previewUrl: "https://cdn.example.com/notes.md",
+        previewUrl: "https://cdn.example.com/notes.txt",
         isImage: false,
       },
     ]);
 
     renderRequestDialog({
       description: "Refunds fail.",
+      onCreate,
       onUploadFiles,
     });
 
     await user.upload(
       screen.getByTestId("create-work-order-request-image-input"),
-      new File(["notes"], "notes.md", { type: "text/markdown" }),
+      new File(["notes"], "notes.txt", { type: "text/plain" }),
     );
 
-    expect(screen.queryByTestId("create-work-order-request-attachment-file-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("create-work-order-request-file-file-3")).toHaveTextContent("notes.txt");
+    await user.click(screen.getByTestId("create-work-order-request-create"));
+
+    expect(onCreate).toHaveBeenCalledWith({
+      title: "Refunds fail.",
+      description: "Refunds fail.\n\n[notes.txt](sp-file://file-3)",
+    });
+  });
+
+  it("still attaches text files when the image stack is full", async () => {
+    const user = userEvent.setup();
+    const onUploadFiles = vi.fn().mockImplementation(async (files: FileList | File[]) =>
+      Array.from(files).map((file) =>
+        file.type.startsWith("image/")
+          ? {
+              id: "file-img",
+              filename: file.name,
+              contentType: "image/png",
+              ref: "sp-file://file-img",
+              previewUrl: "https://cdn.example.com/img.png",
+              isImage: true,
+            }
+          : {
+              id: "file-txt",
+              filename: file.name,
+              contentType: "text/plain",
+              ref: "sp-file://file-txt",
+              previewUrl: "https://cdn.example.com/notes.txt",
+              isImage: false,
+            },
+      ),
+    );
+    const description = Array.from({ length: 8 }, (_, index) => `![shot-${index}](sp-file://file-${index})`).join(
+      "\n\n",
+    );
+
+    renderRequestDialog({ description, onUploadFiles });
+
+    await user.upload(screen.getByTestId("create-work-order-request-image-input"), [
+      new File(["img"], "extra.png", { type: "image/png" }),
+      new File(["notes"], "notes.txt", { type: "text/plain" }),
+    ]);
+
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+    expect(screen.getByTestId("create-work-order-request-file-file-txt")).toHaveTextContent("notes.txt");
   });
 
   it("removes a description image from the expand card", async () => {
@@ -352,14 +400,49 @@ describe("CreateWorkOrderRequestDialog", () => {
     renderRequestDialog();
 
     expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.dictate);
+    expect(screen.getByTestId("dictate-mic-icon")).toBeInTheDocument();
+    expect(screen.queryByTestId("dictate-stop-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dictate-button")).not.toHaveClass(
+      "text-destructive",
+      "bg-destructive/15",
+      "ring-destructive",
+    );
     expect(FakeSpeechRecognition.instances).toHaveLength(0);
 
     await user.click(screen.getByTestId("dictate-button"));
 
     expect(latestRecognition().start).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.stopDictation);
+    expect(screen.getByTestId("dictate-button")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("dictate-stop-icon")).toBeInTheDocument();
+    expect(screen.queryByTestId("dictate-mic-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dictate-button")).toHaveClass(
+      "text-destructive",
+      "bg-destructive/15",
+      "ring-2",
+      "ring-destructive",
+      "animate-pulse",
+      "hover:bg-destructive/15",
+      "hover:text-destructive",
+      "dark:hover:bg-destructive/15",
+      "dark:hover:text-destructive",
+      "motion-reduce:animate-none",
+    );
+
+    await user.click(screen.getByTestId("dictate-button"));
+
+    expect(latestRecognition().abort).toHaveBeenCalled();
+    expect(screen.getByTestId("dictate-button")).toHaveAccessibleName(CREATE_WORK_ORDER_REQUEST_COPY.dictate);
+    expect(screen.getByTestId("dictate-mic-icon")).toBeInTheDocument();
+    expect(screen.queryByTestId("dictate-stop-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dictate-button")).not.toHaveClass(
+      "text-destructive",
+      "bg-destructive/15",
+      "ring-destructive",
+    );
   });
 
-  it("shows the interim phrase without appending it", async () => {
+  it("writes the live phrase into the description and keeps the toolbar still", async () => {
     vi.stubGlobal("SpeechRecognition", FakeSpeechRecognition);
     const user = userEvent.setup();
     const onDescriptionChange = vi.fn();
@@ -370,8 +453,8 @@ describe("CreateWorkOrderRequestDialog", () => {
       emitTranscript("Fix refunds", false);
     });
 
-    expect(screen.getByTestId("dictate-interim")).toHaveTextContent("Fix refunds");
-    expect(onDescriptionChange).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("dictate-interim")).not.toBeInTheDocument();
+    expect(onDescriptionChange).toHaveBeenCalledWith("Fix refunds");
     expect(screen.getByTestId("create-work-order-request-title")).toHaveValue("");
   });
 

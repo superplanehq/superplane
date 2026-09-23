@@ -51,7 +51,7 @@ export const LEVEL_LABEL: Record<WorkOrderCheckLevel, { label: string; className
     badgeClassName: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
   },
   caution: {
-    label: "Needs attention",
+    label: "Caution",
     className: "text-amber-700 dark:text-amber-400",
     badgeClassName: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   },
@@ -80,7 +80,7 @@ const CONFIDENCE_BAND_LABEL: Record<ConfidenceBand, (typeof LEVEL_LABEL)[WorkOrd
   },
 };
 
-/** Clarity and Confidence use High / Medium / Low. Other checks use Healthy / Needs attention. */
+/** Clarity and Confidence use High / Medium / Low. Other checks use Healthy / Caution. */
 export function workOrderCheckStatus(check: Pick<WorkOrderCheckPresentation, "name" | "score" | "level">) {
   if (isScoreCheckName(check.name)) {
     return CONFIDENCE_BAND_LABEL[confidenceBandForScore(check.score)];

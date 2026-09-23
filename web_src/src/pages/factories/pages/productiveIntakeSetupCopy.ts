@@ -6,6 +6,7 @@ export const PRODUCTIVE_INTAKE_SETUP_COPY = {
   wizardStepProject: "Which Productive.io project should create tasks?",
   wizardStepProjectHelper:
     "SuperPlane adds the 30 newest open tasks from this project. SuperPlane also listens for new tasks.",
+  wizardStepProjectHelperSkip: "SuperPlane listens for new tasks. SuperPlane does not import existing tasks.",
   wizardConnect: "Connect Productive.io",
   wizardConnectAnother: "Connect another account",
   wizardContinue: "Continue",
