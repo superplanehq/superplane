@@ -39,30 +39,43 @@ func Test__ProductiveWebhookHandler__CompareConfig(t *testing.T) {
 func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 	handler := &ProductiveWebhookHandler{}
 
-	t.Run("creates the webhook with SuperPlane's secret", func(t *testing.T) {
+	t.Run("creates one remote webhook per task event and stores the signature token", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				jsonResponse(`{"data":{"id":"555","type":"webhooks"}}`),
+				jsonResponse(`{"data":{"id":"555","type":"webhooks","attributes":{"signature_token":"sig-token"}}}`),
+				jsonResponse(`{"data":{"id":"556","type":"webhooks","attributes":{"signature_token":"sig-token"}}}`),
 			},
+		}
+		webhook := &contexts.WebhookContext{
+			URL:           "https://sp.test/hook",
+			Configuration: WebhookConfiguration{ProjectID: "1"},
 		}
 
 		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpContext,
 			Integration: authorizedIntegration(),
-			Webhook: &contexts.WebhookContext{
-				URL:           "https://sp.test/hook",
-				Secret:        []byte("s3cr3t"),
-				Configuration: WebhookConfiguration{ProjectID: "1"},
-			},
+			Webhook:     webhook,
 		})
 
 		require.NoError(t, err)
 		webhookMetadata, ok := metadata.(*WebhookMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "555", webhookMetadata.ID)
+		assert.Equal(t, []string{"555", "556"}, webhookMetadata.IDs)
+		assert.Equal(t, []byte("sig-token"), webhook.Secret)
 
-		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		require.Len(t, httpContext.Requests, 2)
+		bodies := []string{}
+		for _, req := range httpContext.Requests {
+			assert.Equal(t, http.MethodPost, req.Method)
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			payload := string(body)
+			assert.Contains(t, payload, "https://sp.test/hook")
+			assert.NotContains(t, payload, "event_types")
+			bodies = append(bodies, payload)
+		}
+		assert.Contains(t, strings.Join(bodies, "\n"), `"event_id":1`)
+		assert.Contains(t, strings.Join(bodies, "\n"), `"event_id":24`)
 	})
 
 	t.Run("webhooks_limit_exceeded is surfaced as a plan limitation", func(t *testing.T) {
@@ -82,7 +95,6 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 			Integration: authorizedIntegration(),
 			Webhook: &contexts.WebhookContext{
 				URL:           "https://sp.test/hook",
-				Secret:        []byte("s3cr3t"),
 				Configuration: WebhookConfiguration{ProjectID: "1"},
 			},
 		})
@@ -96,7 +108,29 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 	handler := &ProductiveWebhookHandler{}
 
-	t.Run("deletes the webhook", func(t *testing.T) {
+	t.Run("deletes every remote webhook", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{jsonResponse(`{}`), jsonResponse(`{}`)},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: authorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      WebhookMetadata{IDs: []string{"555", "556"}},
+				Configuration: WebhookConfiguration{ProjectID: "1"},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/webhooks/555")
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/webhooks/556")
+	})
+
+	t.Run("deletes a legacy single-id webhook", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{jsonResponse(`{}`)},
 		}
@@ -112,7 +146,7 @@ func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/webhooks/555")
 	})
 
 	// A failed Setup (e.g. webhooks_limit_exceeded) leaves the webhook record
@@ -147,7 +181,7 @@ func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 			HTTP:        httpContext,
 			Integration: authorizedIntegration(),
 			Webhook: &contexts.WebhookContext{
-				Metadata:      WebhookMetadata{ID: "555"},
+				Metadata:      WebhookMetadata{IDs: []string{"555"}},
 				Configuration: WebhookConfiguration{ProjectID: "1"},
 			},
 		})

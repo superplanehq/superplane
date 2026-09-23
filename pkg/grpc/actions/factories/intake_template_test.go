@@ -112,18 +112,24 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, "true", filter.Configuration["expression"])
 	})
 
-	t.Run("PagerDuty and Productive.io create a work order without a filter", func(t *testing.T) {
-		for _, source := range []string{
-			models.FactoryIntakeSourcePagerDutyIncidents,
-			models.FactoryIntakeSourceProductiveTasks,
-		} {
-			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
-			require.NoError(t, err)
-			assert.Equal(t, []yaml.Edge{
-				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
-			}, canvas.Spec.Edges)
-			assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
-		}
+	t.Run("PagerDuty creates a work order without a filter", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourcePagerDutyIncidents})
+		require.NoError(t, err)
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
+	})
+
+	t.Run("Productive.io filters key tasks by default", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceProductiveTasks})
+		require.NoError(t, err)
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
 	})
 
 	t.Run("every action node works on a whole batch at once", func(t *testing.T) {

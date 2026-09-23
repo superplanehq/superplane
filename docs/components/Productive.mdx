@@ -47,10 +47,11 @@ The On Task trigger starts a workflow execution when task events occur in a Prod
 
 ### Webhook Setup
 
-This trigger registers a Productive.io webhook automatically when configured, and removes it when the
-trigger is deleted. Productive.io sells webhooks as a plan feature and rejects registration with a 403
-"webhooks_limit_exceeded" response on plans that do not include it, in which case setup fails until the
-organization upgrades to a plan with webhooks.
+This trigger registers Productive.io webhooks automatically when you configure it, and removes them when you delete the trigger.
+
+Productive.io webhooks are organization-wide and need the Ultimate plan. SuperPlane registers one remote webhook for new tasks and one for updated tasks. Both webhooks POST to `{WEBHOOKS_BASE_URL}/api/v1/webhooks/{id}`. SuperPlane ignores deliveries for other projects.
+
+If the Productive.io plan does not include webhooks, registration fails with HTTP 403 `webhooks_limit_exceeded`. Upgrade the plan, then save the intake again.
 
 ### Example Data
 

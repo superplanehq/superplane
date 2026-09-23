@@ -1,9 +1,6 @@
 package productive
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -38,23 +35,26 @@ func nodeMetadata(t *testing.T, metadata *contexts.MetadataContext) NodeMetadata
 
 // taskWebhookBody builds the JSON:API single-resource body Productive.io
 // delivers on a task.created or task.updated webhook.
-func taskWebhookBody(id, title string) []byte {
+func taskWebhookBody(id, projectID, title string) []byte {
 	body, _ := json.Marshal(map[string]any{
 		"data": map[string]any{
 			"id":         id,
 			"type":       "tasks",
 			"attributes": map[string]any{"title": title},
+			"relationships": map[string]any{
+				"project": map[string]any{
+					"data": map[string]any{"type": "projects", "id": projectID},
+				},
+			},
 		},
 	})
 	return body
 }
 
-// signWebhookBody signs body the way SuperPlane verifies it: a hex-encoded
-// HMAC-SHA256 keyed with the webhook secret.
-func signWebhookBody(secret string, body []byte) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	return hex.EncodeToString(mac.Sum(nil))
+// signWebhookBody signs body the way Productive.io does: HMAC-SHA256 of
+// timestamp + "." + raw body, returned as Productive-Signature t=, s=.
+func signWebhookBody(secret, timestamp string, body []byte) string {
+	return "t=" + timestamp + ", s=" + webhookSignatureHex([]byte(secret), timestamp, body)
 }
 
 func webhookHeaders(event, signature string) http.Header {
@@ -205,7 +205,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       webhookHeaders(TaskUpdatedEvent, ""),
 			Configuration: configuration,
-			Body:          taskWebhookBody("91", "Fix payment retries"),
+			Body:          taskWebhookBody("91", "1", "Fix payment retries"),
 			Events:        events,
 		})
 
@@ -218,7 +218,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       webhookHeaders(TaskCreatedEvent, ""),
 			Configuration: createdTaskConfiguration(),
-			Body:          taskWebhookBody("91", "Fix payment retries"),
+			Body:          taskWebhookBody("91", "1", "Fix payment retries"),
 			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
 		})
 
@@ -228,9 +228,9 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 
 	t.Run("invalid signature -> error", func(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:       webhookHeaders(TaskCreatedEvent, "not-the-right-signature"),
+			Headers:       webhookHeaders(TaskCreatedEvent, "t=1710000000, s="+strings.Repeat("ab", 32)),
 			Configuration: createdTaskConfiguration(),
-			Body:          taskWebhookBody("91", "Fix payment retries"),
+			Body:          taskWebhookBody("91", "1", "Fix payment retries"),
 			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
 		})
 
@@ -239,11 +239,11 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("valid task.created delivery -> emits the envelope", func(t *testing.T) {
-		body := taskWebhookBody("91", "Fix payment retries")
+		body := taskWebhookBody("91", "1", "Fix payment retries")
 		events := &contexts.EventContext{}
 
 		code, response, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", body)),
+			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
 			Configuration: createdTaskConfiguration(),
 			Body:          body,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
@@ -270,12 +270,12 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("valid task.updated delivery matching updated actions -> emits the envelope", func(t *testing.T) {
-		body := taskWebhookBody("91", "Fix payment retries")
+		body := taskWebhookBody("91", "1", "Fix payment retries")
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", body)),
+			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
 			Configuration: configuration,
 			Body:          body,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
@@ -285,6 +285,23 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		require.Equal(t, 1, events.Count())
+	})
+
+	t.Run("delivery for another project -> ignored", func(t *testing.T) {
+		body := taskWebhookBody("91", "other-project", "Fix payment retries")
+		events := &contexts.EventContext{}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: createdTaskConfiguration(),
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Zero(t, events.Count())
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -32,8 +33,8 @@ const (
 	ResourceTypeProject = "project"
 
 	// TaskCreatedEvent and TaskUpdatedEvent name the change a task event
-	// carries, in the "meta" object of the emitted envelope. Productive.io
-	// sends the same names in the EventHeader of a webhook delivery.
+	// carries, in the "meta" object of the emitted envelope. SuperPlane
+	// asks Productive.io to send the same names in EventHeader.
 	TaskCreatedEvent = "task.created"
 	TaskUpdatedEvent = "task.updated"
 
@@ -42,13 +43,26 @@ const (
 	ActionCreated = "created"
 	ActionUpdated = "updated"
 
-	// EventHeader carries the event a webhook delivery reports, one of
-	// TaskCreatedEvent or TaskUpdatedEvent.
+	// WebhookTypeStandard is Productive.io type_id for a normal webhook
+	// (not Zapier).
+	WebhookTypeStandard = 1
+
+	// EventNewTask and EventUpdatedTask are Productive.io event_id values
+	// for task created and task updated.
+	EventNewTask     = 1
+	EventUpdatedTask = 24
+
+	// TaskTypeRegular is a normal Productive.io task. TaskTypeMilestone is
+	// a key task.
+	TaskTypeRegular   = 1
+	TaskTypeMilestone = 3
+
+	// EventHeader is set as a Productive.io custom header on each remote
+	// webhook so a shared SuperPlane URL can tell created from updated.
 	EventHeader = "X-Productive-Event"
 
-	// SignatureHeader carries a hex-encoded HMAC-SHA256 of the raw request
-	// body, keyed with the webhook's secret.
-	SignatureHeader = "X-Productive-Signature"
+	// SignatureHeader carries Productive.io's HMAC of timestamp + "." + body.
+	SignatureHeader = "Productive-Signature"
 )
 
 // NodeMetadata is stored on productive.onTask nodes, so canvas cards can show
@@ -82,13 +96,12 @@ func actionForEvent(event string) (string, bool) {
 	}
 }
 
-// verifyWebhookSignature checks the SignatureHeader against an HMAC-SHA256 of
-// the raw request body, keyed with the node's webhook secret. Productive.io
-// signs the bytes exactly as delivered, so the raw body must be used rather
-// than a re-serialized payload.
+// verifyWebhookSignature checks Productive-Signature (t=<unix>, s=<hex>)
+// against HMAC-SHA256 of timestamp + "." + raw body, keyed with the
+// signature token Productive.io returned at registration.
 func verifyWebhookSignature(ctx core.WebhookRequestContext) (int, error) {
-	signature := strings.TrimSpace(ctx.Headers.Get(SignatureHeader))
-	if signature == "" {
+	timestamp, signature, ok := parseProductiveSignature(ctx.Headers.Get(SignatureHeader))
+	if !ok {
 		return http.StatusForbidden, fmt.Errorf("missing %s header", SignatureHeader)
 	}
 
@@ -101,13 +114,83 @@ func verifyWebhookSignature(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("missing webhook secret")
 	}
 
-	mac := hmac.New(sha256.New, secret)
-	mac.Write(ctx.Body)
-	expected := hex.EncodeToString(mac.Sum(nil))
-
-	if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
-		return http.StatusForbidden, fmt.Errorf("invalid webhook signature")
+	for _, token := range webhookSecretTokens(secret) {
+		if hmac.Equal([]byte(strings.ToLower(signature)), []byte(webhookSignatureHex(token, timestamp, ctx.Body))) {
+			return http.StatusOK, nil
+		}
 	}
 
-	return http.StatusOK, nil
+	return http.StatusForbidden, fmt.Errorf("invalid webhook signature")
+}
+
+func webhookSecretTokens(secret []byte) [][]byte {
+	parts := strings.Split(string(secret), "\n")
+	tokens := make([][]byte, 0, len(parts))
+	for _, part := range parts {
+		token := strings.TrimSpace(part)
+		if token == "" {
+			continue
+		}
+		tokens = append(tokens, []byte(token))
+	}
+	return tokens
+}
+
+func webhookSignatureHex(secret []byte, timestamp string, body []byte) string {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(timestamp))
+	mac.Write([]byte("."))
+	mac.Write(body)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// parseProductiveSignature reads t= and s= from a Productive-Signature header.
+func parseProductiveSignature(header string) (timestamp, signature string, ok bool) {
+	for _, part := range strings.Split(header, ",") {
+		key, value, found := strings.Cut(strings.TrimSpace(part), "=")
+		if !found {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "t":
+			timestamp = strings.TrimSpace(value)
+		case "s":
+			signature = strings.TrimSpace(value)
+		}
+	}
+	return timestamp, signature, timestamp != "" && signature != ""
+}
+
+// taskProjectID reads the project relationship id from a JSON:API task.
+func taskProjectID(document map[string]any) string {
+	relationships, _ := document["relationships"].(map[string]any)
+	project, _ := relationships["project"].(map[string]any)
+	data, _ := project["data"].(map[string]any)
+	id, _ := data["id"].(string)
+	return strings.TrimSpace(id)
+}
+
+// taskTypeID reads attributes.type_id from a JSON:API task.
+func taskTypeID(document map[string]any) int {
+	attributes, _ := document["attributes"].(map[string]any)
+	return numberAttribute(attributes["type_id"])
+}
+
+func numberAttribute(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(typed))
+		if err != nil {
+			return 0
+		}
+		return n
+	default:
+		return 0
+	}
 }
