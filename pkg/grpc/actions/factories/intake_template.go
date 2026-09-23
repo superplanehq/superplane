@@ -426,6 +426,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		return defaultSentryIntakeSettings()
 	}
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		return defaultProductiveIntakeSettings()
+	}
 	return defaultIntakeSettings()
 }
 

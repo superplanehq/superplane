@@ -120,7 +120,7 @@ func Test__Client__ListTasks(t *testing.T) {
 		]}`),
 	}}
 
-	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10)
+	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10, false)
 	require.NoError(t, err)
 	require.Len(t, tasks, 2)
 	assert.Equal(t, Task{
@@ -137,6 +137,19 @@ func Test__Client__ListTasks(t *testing.T) {
 	assert.Equal(t, "retry", query.Get("filter[query]"))
 	assert.Equal(t, "1", query.Get("filter[status]"))
 	assert.Equal(t, "10", query.Get("page[size]"))
+	assert.Empty(t, query.Get("filter[type_id]"))
+}
+
+func Test__Client__ListTasks_RegularOnly(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[]}`),
+	}}
+
+	_, err := testClient(t, httpContext).ListTasks("42", "", 10, true)
+	require.NoError(t, err)
+
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "1", query.Get("filter[type_id]"))
 }
 
 func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
@@ -151,7 +164,7 @@ func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
 		]}`),
 	}}
 
-	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30)
+	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30, false)
 	require.NoError(t, err)
 	require.Len(t, documents, 1)
 
@@ -209,12 +222,12 @@ func Test__Client__GetTask_NotFound(t *testing.T) {
 func Test__Client__CreateWebhook(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-			jsonResponse(`{"data":{"id":"555","type":"webhooks"}}`),
+			jsonResponse(`{"data":{"id":"555","type":"webhooks","attributes":{"signature_token":"sig-token"}}}`),
 		}}
 
-		webhook, err := testClient(t, httpContext).CreateWebhook("42", "https://superplane.example/webhooks/abc", "s3cr3t")
+		webhook, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
 		require.NoError(t, err)
-		assert.Equal(t, &Webhook{ID: "555"}, webhook)
+		assert.Equal(t, &Webhook{ID: "555", SignatureToken: "sig-token"}, webhook)
 
 		require.Len(t, httpContext.Requests, 1)
 		req := httpContext.Requests[0]
@@ -225,9 +238,16 @@ func Test__Client__CreateWebhook(t *testing.T) {
 
 		body, err := io.ReadAll(req.Body)
 		require.NoError(t, err)
-		assert.Contains(t, string(body), "https://superplane.example/webhooks/abc")
-		assert.Contains(t, string(body), "s3cr3t")
-		assert.Contains(t, string(body), `"id":"42"`)
+		payload := string(body)
+		assert.Contains(t, payload, "https://superplane.example/webhooks/abc")
+		assert.Contains(t, payload, `"name":"SuperPlane"`)
+		assert.Contains(t, payload, `"event_id":1`)
+		assert.Contains(t, payload, `"target_url":"https://superplane.example/webhooks/abc"`)
+		assert.Contains(t, payload, `"type_id":1`)
+		assert.Contains(t, payload, TaskCreatedEvent)
+		assert.NotContains(t, payload, "event_types")
+		assert.NotContains(t, payload, `"secret"`)
+		assert.NotContains(t, payload, `"relationships"`)
 	})
 
 	t.Run("webhooks_limit_exceeded -> ErrWebhooksLimitExceeded", func(t *testing.T) {
@@ -238,7 +258,7 @@ func Test__Client__CreateWebhook(t *testing.T) {
 			},
 		}}
 
-		_, err := testClient(t, httpContext).CreateWebhook("42", "https://superplane.example/webhooks/abc", "s3cr3t")
+		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
 		require.ErrorIs(t, err, ErrWebhooksLimitExceeded)
 	})
 
@@ -250,7 +270,7 @@ func Test__Client__CreateWebhook(t *testing.T) {
 			},
 		}}
 
-		_, err := testClient(t, httpContext).CreateWebhook("42", "https://superplane.example/webhooks/abc", "s3cr3t")
+		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
 		require.Error(t, err)
 		assert.False(t, errors.Is(err, ErrWebhooksLimitExceeded))
 	})
