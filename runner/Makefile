@@ -11,12 +11,12 @@ LOCAL_BROKER_DATABASE_URL ?= postgres://postgres:the-cake-is-a-lie@db:5432/broke
 .PHONY: test-integration
 test-integration:
 	@set -eu; \
-	compose="docker compose -p runner-integration -f ../docker-compose.dev.yml"; \
-	cleanup() { $$compose down -v; }; \
+	compose() { docker compose -p runner-integration -f ../docker-compose.dev.yml "$$@"; }; \
+	cleanup() { compose down -v; }; \
 	trap cleanup EXIT; \
-	$$compose up -d --wait db; \
-	$$compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
-	  || $$compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
+	compose up -d --wait db; \
+	compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
+	  || compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
 	net=$$(docker network ls --filter label=com.docker.compose.project=runner-integration --format '{{.Name}}'); \
 	docker run --rm --network "$$net" \
 	  -v "$$(pwd):/src" -w /src \
@@ -91,14 +91,16 @@ fleet-manager: build
 # 127.0.0.1 so register-local-fleet and make runner can connect.
 task-broker:
 	@set -eu; \
-	compose="docker compose --project-directory $(CURDIR)/.. -f $(CURDIR)/../docker-compose.dev.yml"; \
-	cid=$$($$compose ps -q db); \
+	project_dir="$(CURDIR)/.."; \
+	compose_file="$(CURDIR)/../docker-compose.dev.yml"; \
+	compose() { docker compose --project-directory "$$project_dir" -f "$$compose_file" "$$@"; }; \
+	cid=$$(compose ps -q db); \
 	if [ -z "$$cid" ]; then \
 	  echo "Postgres is not running. From the SuperPlane repo root, run: make dev.up" >&2; \
 	  exit 1; \
 	fi; \
-	$$compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
-	  || $$compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
+	compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
+	  || compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
 	net=$$(docker inspect -f '{{range $$name, $$conf := .NetworkSettings.Networks}}{{$$name}}{{end}}' "$$cid"); \
 	port=$$(printf '%s' "$(LOCAL_BROKER_LISTEN)" | sed 's/.*://'); \
 	docker run --rm -it --init --network "$$net" \
