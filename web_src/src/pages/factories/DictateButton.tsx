@@ -43,7 +43,7 @@ export function DictateButton({ dictation, copy, disabled = false }: DictateButt
         className={cn(
           "size-8 rounded-full text-muted-foreground",
           dictation.isListening &&
-            "text-destructive bg-destructive/15 ring-2 ring-destructive animate-pulse motion-reduce:animate-none",
+            "text-destructive bg-destructive/15 ring-2 ring-destructive animate-pulse hover:bg-destructive/15 hover:text-destructive dark:hover:bg-destructive/15 dark:hover:text-destructive motion-reduce:animate-none",
         )}
         disabled={disabled}
         aria-label={dictation.isListening ? copy.stopDictation : copy.dictate}

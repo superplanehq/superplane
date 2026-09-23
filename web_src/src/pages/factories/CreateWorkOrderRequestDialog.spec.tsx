@@ -374,6 +374,10 @@ describe("CreateWorkOrderRequestDialog", () => {
       "ring-2",
       "ring-destructive",
       "animate-pulse",
+      "hover:bg-destructive/15",
+      "hover:text-destructive",
+      "dark:hover:bg-destructive/15",
+      "dark:hover:text-destructive",
       "motion-reduce:animate-none",
     );
 
