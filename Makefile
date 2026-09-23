@@ -32,8 +32,8 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 
 # On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
 # host directories that the CI cache can restore and store between jobs.
-# Locally, overlay docker-compose.runner.yml so the same make targets start
-# the task-broker and runner workers. CI does not build the worker image.
+# Runner services live in docker-compose.dev.yml under the local-runner profile.
+# CI does not enable that profile, so it does not build the worker image.
 COMPOSE_FILES := -f docker-compose.dev.yml
 GO_CACHE_DIRS :=
 N ?= 10
@@ -41,8 +41,6 @@ TASK_BROKER_HOST_PORT ?= 8091
 ifneq ($(strip $(CI)),)
 COMPOSE_FILES += -f docker-compose.ci.yml
 GO_CACHE_DIRS := tmp/go tmp/go-build
-else
-COMPOSE_FILES += -f docker-compose.runner.yml
 endif
 
 COMPOSE=docker compose $(COMPOSE_FILES)
