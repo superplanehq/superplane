@@ -47,18 +47,27 @@ Access SuperPlane at `https://your-domain.com`
 
 ## Destroy
 
+Deletion protection is enabled for the RDS instance.
+Set the flag to false in `terraform.tfvars`.
+
+```hcl
+rds_deletion_protection = false
+```
+
+Apply the flag:
+
 ```bash
-# Disable deletion protection on the database
-aws rds modify-db-instance \
-  --db-instance-identifier superplane-db \
-  --no-deletion-protection \
-  --apply-immediately
+terraform apply
+```
 
-# Wait for modification to complete
-aws rds wait db-instance-available --db-instance-identifier superplane-db
+Destroy the deployment:
 
+```bash
 terraform destroy
 ```
+
+Terraform keeps a final RDS snapshot when it deletes the instance.
+The snapshot name has a random suffix, so the next destroy can use a new name.
 
 ## Notes
 

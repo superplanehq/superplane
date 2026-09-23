@@ -12,6 +12,7 @@ Read more only when the task needs it:
   [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
   [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
 - `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
+- Install Terraform: [release/terraform/AGENTS.md](release/terraform/AGENTS.md)
 - Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
 
 ## Read this first
@@ -155,6 +156,8 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
   `make check.build.ui`. Run `make check.lint.ui` locally before you open a
   pull request. CI fails when the ESLint budget grows.
+- After editing `release/terraform/` HCL: `make terraform.format`, then
+  `make terraform.check`. See [release/terraform/AGENTS.md](release/terraform/AGENTS.md).
 - After updating `protos/`: regenerate protos, the OpenAPI spec, and the CLI/UI
   SDKs with `make pb.gen` (requires a running `app` container from `make dev.up`).
   Generated files stay gitignored; a clean `git status` after `pb.gen` is
@@ -258,6 +261,7 @@ contractions, slang, or idioms).
   - Frontend: `make format.js`, `make check.lint.ui`, `make check.build.ui`.
     Run ESLint locally (`make check.lint.ui`) before you open a pull request.
   - Protos: `make pb.gen` and `make check.proto.field.numbers`.
+  - Terraform: `make terraform.check`.
 
 For user-facing UI strings while designing or implementing frontend work, follow
 [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md) together with

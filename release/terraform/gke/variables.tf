@@ -153,13 +153,13 @@ variable "master_ipv4_cidr_block" {
 }
 
 variable "gke_deletion_protection" {
-  description = "Enable deletion protection on the GKE cluster"
+  description = "Enable deletion protection on the GKE cluster. Set this to false and apply before destroy."
   type        = bool
   default     = true
 }
 
 variable "sql_deletion_protection" {
-  description = "Enable deletion protection on the Cloud SQL instance"
+  description = "Enable deletion protection on the Cloud SQL instance. Set this to false and apply before destroy."
   type        = bool
   default     = true
 }

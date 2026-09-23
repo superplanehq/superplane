@@ -37,7 +37,7 @@ blocks:
   - name: "Backend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -85,7 +85,7 @@ blocks:
   - name: "Security"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -114,7 +114,7 @@ blocks:
   - name: "Frontend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -157,7 +157,7 @@ blocks:
   - name: "Build Image"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       secrets:
         - name: ghcr-push-token
@@ -198,6 +198,16 @@ blocks:
             - export TEST_DATABASE_URL='postgresql://postgres:@0.0.0.0:5432/postgres?sslmode=disable'
             - go test ./... -count=1 -p 1
 
+  - name: "Terraform"
+    dependencies: []
+    run:
+      when: "change_in('/release/terraform', {exclude: ['**/*.md'], default_branch: 'main'})"
+    task:
+      jobs:
+        - name: Format and validate
+          commands:
+            - make terraform.check
+
 after_pipeline:
   task:
     jobs:
@@ -213,7 +223,7 @@ promotions:
     pipeline_file: deploy-to-production.yml
     deployment_target: production
     auto_promote:
-      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/runner/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
 
   - name: Publish runner images
     pipeline_file: runner-docker-publish.yml
