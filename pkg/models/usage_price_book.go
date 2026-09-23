@@ -17,6 +17,12 @@ import (
 // ErrUsagePriceBookConflict is returned when a publish uses a stale current version.
 var ErrUsagePriceBookConflict = errors.New("current price book changed")
 
+// ErrUsagePriceBookCurrent is returned when a delete targets the current version.
+var ErrUsagePriceBookCurrent = errors.New("cannot delete the current price book")
+
+// ErrUsagePriceBookLast is returned when a delete would remove the last version.
+var ErrUsagePriceBookLast = errors.New("cannot delete the last price book")
+
 const (
 	UsagePriceBookMatchExact  = "exact"
 	UsagePriceBookMatchPrefix = "prefix"
@@ -40,6 +46,7 @@ type UsagePriceBookRate struct {
 	ID                        uuid.UUID
 	Version                   string
 	UsageKind                 string
+	Provider                  string
 	MatchKey                  string
 	MatchMode                 string
 	InputCentsPerMillion      int64
@@ -123,6 +130,7 @@ func CloneUsagePriceBookRates(rows []UsagePriceBookRate) []UsagePriceBookRate {
 	for _, row := range rows {
 		cloned = append(cloned, NormalizeUsagePriceBookRate(UsagePriceBookRate{
 			UsageKind:                 row.UsageKind,
+			Provider:                  row.Provider,
 			MatchKey:                  row.MatchKey,
 			MatchMode:                 row.MatchMode,
 			InputCentsPerMillion:      row.InputCentsPerMillion,
@@ -139,8 +147,12 @@ func CloneUsagePriceBookRates(rows []UsagePriceBookRate) []UsagePriceBookRate {
 // NormalizeUsagePriceBookRate trims identity fields and lowercases the match key.
 func NormalizeUsagePriceBookRate(row UsagePriceBookRate) UsagePriceBookRate {
 	row.UsageKind = strings.TrimSpace(row.UsageKind)
+	row.Provider = strings.ToLower(strings.TrimSpace(row.Provider))
 	row.MatchKey = strings.ToLower(strings.TrimSpace(row.MatchKey))
 	row.MatchMode = strings.TrimSpace(row.MatchMode)
+	if row.UsageKind == UsageKindModel {
+		row.MatchKey = strings.ToLower(strings.TrimSpace(pricebook.CatalogModelID(row.MatchKey)))
+	}
 	return row
 }
 
@@ -154,7 +166,12 @@ func ValidateUsagePriceBookRates(rows []UsagePriceBookRate) error {
 		}
 		switch normalized.UsageKind {
 		case UsageKindModel:
-			if normalized.MatchMode != UsagePriceBookMatchPrefix && normalized.MatchMode != UsagePriceBookMatchFamily {
+			if normalized.Provider == "" {
+				return fmt.Errorf("model provider cannot be empty")
+			}
+			if normalized.MatchMode != UsagePriceBookMatchExact &&
+				normalized.MatchMode != UsagePriceBookMatchPrefix &&
+				normalized.MatchMode != UsagePriceBookMatchFamily {
 				return fmt.Errorf("invalid model match mode: %s", normalized.MatchMode)
 			}
 			if normalized.InputCentsPerMillion < 0 ||
@@ -175,9 +192,9 @@ func ValidateUsagePriceBookRates(rows []UsagePriceBookRate) error {
 			return fmt.Errorf("invalid usage kind: %s", normalized.UsageKind)
 		}
 
-		id := normalized.UsageKind + "\x00" + normalized.MatchKey + "\x00" + normalized.MatchMode
+		id := normalized.UsageKind + "\x00" + normalized.Provider + "\x00" + normalized.MatchKey + "\x00" + normalized.MatchMode
 		if _, ok := seen[id]; ok {
-			return fmt.Errorf("duplicate rate: %s %s %s", normalized.UsageKind, normalized.MatchKey, normalized.MatchMode)
+			return fmt.Errorf("duplicate rate: %s %s %s %s", normalized.UsageKind, normalized.Provider, normalized.MatchKey, normalized.MatchMode)
 		}
 		seen[id] = struct{}{}
 	}
@@ -282,6 +299,12 @@ func LoadCurrentPriceBook(tx *gorm.DB) error {
 				Reasoning:  row.ReasoningCentsPerMillion,
 			}
 			switch row.MatchMode {
+			case UsagePriceBookMatchExact:
+				loaded.ExactRates = append(loaded.ExactRates, pricebook.ExactRate{
+					Provider: row.Provider,
+					ModelID:  row.MatchKey,
+					Rate:     rate,
+				})
 			case UsagePriceBookMatchPrefix:
 				loaded.PrefixRates = append(loaded.PrefixRates, pricebook.PrefixRate{
 					Prefix: row.MatchKey,
@@ -326,8 +349,36 @@ func clearCurrentUsagePriceBook(tx *gorm.DB) error {
 }
 
 func compareUsagePriceBookRates(a, b UsagePriceBookRate) int {
+	if providerOrder := strings.Compare(a.Provider, b.Provider); providerOrder != 0 {
+		return providerOrder
+	}
 	if keyOrder := strings.Compare(a.MatchKey, b.MatchKey); keyOrder != 0 {
 		return keyOrder
 	}
 	return strings.Compare(a.MatchMode, b.MatchMode)
+}
+
+// DeleteUsagePriceBook removes one non-current catalog version.
+func DeleteUsagePriceBook(tx *gorm.DB, version string) error {
+	version = strings.TrimSpace(version)
+	book, err := FindUsagePriceBook(tx, version)
+	if err != nil {
+		return err
+	}
+	if book.IsCurrent {
+		return ErrUsagePriceBookCurrent
+	}
+
+	var count int64
+	if err := tx.Model(&UsagePriceBook{}).Count(&count).Error; err != nil {
+		return err
+	}
+	if count <= 1 {
+		return ErrUsagePriceBookLast
+	}
+
+	if err := tx.Where("version = ?", version).Delete(&UsagePriceBookRate{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("version = ?", version).Delete(&UsagePriceBook{}).Error
 }

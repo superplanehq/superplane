@@ -46,12 +46,25 @@ type FamilyRate struct {
 	Rate  Rate
 }
 
+// ExactRate prices one provider catalog model id.
+type ExactRate struct {
+	Provider string
+	ModelID  string
+	Rate     Rate
+}
+
 // Book is one versioned catalog of model and compute rates.
 type Book struct {
 	Version      string
+	ExactRates   []ExactRate
 	PrefixRates  []PrefixRate
 	FamilyRates  []FamilyRate
 	ComputeRates map[string]int64
+}
+
+type exactKey struct {
+	provider string
+	model    string
 }
 
 type entry struct {
@@ -136,6 +149,7 @@ func defaultComputeRates() map[string]int64 {
 
 type bookState struct {
 	version      string
+	exact        map[exactKey]Rate
 	rates        []entry
 	familyRates  []familyEntry
 	computeRates map[string]int64
@@ -144,6 +158,7 @@ type bookState struct {
 func defaultBook() bookState {
 	return bookState{
 		version:      FallbackVersion,
+		exact:        map[exactKey]Rate{},
 		rates:        defaultPrefixRates(),
 		familyRates:  defaultFamilyRates(),
 		computeRates: defaultComputeRates(),
@@ -154,10 +169,19 @@ func defaultBook() bookState {
 func Replace(book Book) {
 	next := bookState{
 		version:      strings.TrimSpace(book.Version),
+		exact:        map[exactKey]Rate{},
 		computeRates: map[string]int64{},
 	}
 	if next.version == "" {
 		next.version = FallbackVersion
+	}
+	for _, item := range book.ExactRates {
+		provider := strings.ToLower(strings.TrimSpace(item.Provider))
+		model := strings.ToLower(strings.TrimSpace(CatalogModelID(item.ModelID)))
+		if provider == "" || model == "" {
+			continue
+		}
+		next.exact[exactKey{provider: provider, model: model}] = item.Rate
 	}
 	for _, item := range book.PrefixRates {
 		prefix := strings.ToLower(strings.TrimSpace(item.Prefix))
@@ -180,10 +204,10 @@ func Replace(book Book) {
 		}
 		next.computeRates[normalized] = rate
 	}
-	if len(next.rates) == 0 {
+	if len(next.exact) == 0 && len(next.rates) == 0 {
 		next.rates = defaultPrefixRates()
 	}
-	if len(next.familyRates) == 0 {
+	if len(next.exact) == 0 && len(next.familyRates) == 0 {
 		next.familyRates = defaultFamilyRates()
 	}
 
@@ -204,11 +228,10 @@ func Reset() {
 // EstimateMicros prices a call in millionths of a US dollar.
 // Unknown models return 0 so token counts still record.
 func EstimateMicros(provider, model string, input, output, cacheRead, cacheWrite, reasoning int64) int64 {
-	rate, ok := lookup(model)
+	rate, ok := lookup(provider, model)
 	if !ok {
 		return 0
 	}
-	_ = provider
 	return micros(input, rate.Input) +
 		micros(output, rate.Output) +
 		micros(cacheRead, rate.CacheRead) +
@@ -261,9 +284,9 @@ func SetComputeRates(rates map[string]int64) {
 	mu.Unlock()
 }
 
-// IsPriced is true when the price book has a rate for the model id.
-func IsPriced(model string) bool {
-	_, ok := lookup(model)
+// IsPriced is true when the price book has a rate for the provider and model id.
+func IsPriced(provider, model string) bool {
+	_, ok := lookup(provider, model)
 	return ok
 }
 
@@ -275,17 +298,64 @@ func MicrosToCents(micros int64) int64 {
 	return micros / microsPerCent
 }
 
-func lookup(model string) (Rate, bool) {
+func lookup(provider, model string) (Rate, bool) {
+	if rate, ok := lookupExact(provider, model); ok {
+		return rate, true
+	}
 	normalized := normalizeModelID(model)
 	if rate, ok := lookupPrefix(normalized); ok {
 		return rate, true
 	}
-	return lookupFamilyToken(normalized)
+	if rate, ok := lookupFamilyToken(normalized); ok {
+		return rate, true
+	}
+	return lookupCompiledIn(normalized)
+}
+
+func lookupCompiledIn(normalized string) (Rate, bool) {
+	bestPrefix := ""
+	var best Rate
+	found := false
+	for _, item := range defaultPrefixRates() {
+		if !strings.HasPrefix(normalized, item.prefix) {
+			continue
+		}
+		if !found || len(item.prefix) > len(bestPrefix) {
+			bestPrefix = item.prefix
+			best = item.rate
+			found = true
+		}
+	}
+	if found {
+		return best, true
+	}
+	parts := strings.Split(normalized, "-")
+	for _, family := range defaultFamilyRates() {
+		for _, part := range parts {
+			if part == family.token {
+				return family.rate, true
+			}
+		}
+	}
+	return Rate{}, false
+}
+
+func lookupExact(provider, model string) (Rate, bool) {
+	key := exactKey{
+		provider: strings.ToLower(strings.TrimSpace(provider)),
+		model:    strings.ToLower(strings.TrimSpace(CatalogModelID(model))),
+	}
+	if key.provider == "" || key.model == "" {
+		return Rate{}, false
+	}
+	mu.RLock()
+	defer mu.RUnlock()
+	rate, ok := current.exact[key]
+	return rate, ok
 }
 
 func normalizeModelID(model string) string {
-	normalized := strings.ToLower(strings.TrimSpace(model))
-	normalized = strings.TrimPrefix(normalized, "openrouter/")
+	normalized := strings.ToLower(strings.TrimSpace(CatalogModelID(model)))
 	provider, rest, found := strings.Cut(normalized, "/")
 	if found && provider != "" && rest != "" && !strings.Contains(rest, "/") {
 		return rest

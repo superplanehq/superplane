@@ -778,7 +778,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const payload = {
     type: "result",
     result: resultTextFrom(lastResult, formatter),
-    model: openRouterModelId(currentModel) || model,
+    model: catalogModelId(currentModel) || catalogModelId(model),
     usage,
   };
   if (lastCost) {

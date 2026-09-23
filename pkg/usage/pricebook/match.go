@@ -10,6 +10,18 @@ type ModelMatch struct {
 	Mode string
 }
 
+// CatalogModelID trims an OpenRouter gateway prefix and keeps the catalog id.
+func CatalogModelID(model string) string {
+	normalized := strings.TrimSpace(model)
+	for {
+		lower := strings.ToLower(normalized)
+		if !strings.HasPrefix(lower, "openrouter/") {
+			return normalized
+		}
+		normalized = normalized[len("openrouter/"):]
+	}
+}
+
 // NormalizeModelID lowercases a model id and strips a single provider prefix.
 func NormalizeModelID(model string) string {
 	return normalizeModelID(model)

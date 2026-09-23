@@ -33,13 +33,15 @@ const catalogFor = (version: string, matchKey: string, current = "2026-09-09.1")
   versions,
   models: [
     {
+      provider: "openrouter",
       match_key: matchKey,
-      match_mode: "prefix",
+      match_mode: "exact",
       input_cents_per_million: 300,
       output_cents_per_million: 1500,
       cache_read_cents_per_million: 30,
       cache_write_cents_per_million: 375,
       reasoning_cents_per_million: 0,
+      selected: true,
     },
   ],
   vms: [
@@ -168,9 +170,9 @@ describe("PriceBooks", () => {
     await user.type(input, "4");
     await user.tab();
 
-    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
     await user.type(screen.getByLabelText("Machine type", { selector: "#price-book-add-vm-key" }), "e1-test-amd64");
-    await user.click(screen.getByRole("button", { name: "Add VM rate" }));
+    await user.click(screen.getByRole("button", { name: "Add machine rate" }));
     await user.click(screen.getByTestId("admin-price-book-save-vms"));
 
     await waitFor(() => {
@@ -183,7 +185,7 @@ describe("PriceBooks", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (init?.method === "POST" && String(input) === "/admin/api/price-books/sync") {
+        if (init?.method === "POST" && String(input).startsWith("/admin/api/price-books/sync")) {
           return jsonResponse({ ...savedCatalog, updated_count: 1, added_count: 0, skipped_providers: [] });
         }
         return jsonResponse(currentCatalog);
@@ -327,7 +329,7 @@ describe("PriceBooks", () => {
     renderPage();
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
     const machineType = screen.getByDisplayValue("e1-large-amd64");
     await user.clear(machineType);
     await user.type(machineType, " E1-XLARGE-AMD64 ");
@@ -371,7 +373,7 @@ describe("PriceBooks", () => {
     renderPage();
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
     const machineType = screen.getByDisplayValue("e1-large-amd64");
 
     await user.clear(machineType);
@@ -388,7 +390,7 @@ describe("PriceBooks", () => {
     await user.clear(machineType);
     await user.type(machineType, "e1-small-amd64");
     await user.tab();
-    expect(showErrorToast).toHaveBeenCalledWith("That VM rate already exists.");
+    expect(showErrorToast).toHaveBeenCalledWith("That machine rate already exists.");
     expect(machineType).toHaveValue("e1-large-amd64");
 
     await user.click(screen.getByTestId("admin-price-book-save-vms"));
@@ -412,9 +414,9 @@ describe("PriceBooks", () => {
     renderPage();
     expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
     await user.click(screen.getByRole("button", { name: "Remove" }));
-    expect(screen.getByText("This version has no VM rates.")).toBeInTheDocument();
+    expect(screen.getByText("This version has no machine rates.")).toBeInTheDocument();
     expect(screen.getByTestId("admin-price-book-save-vms")).toBeEnabled();
 
     await user.click(screen.getByTestId("admin-price-book-save-vms"));
@@ -442,13 +444,13 @@ describe("PriceBooks", () => {
     await user.click(await screen.findByRole("option", { name: "2026-08-31.1" }));
     expect(await screen.findByText("older-model")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "VMs" }));
+    await user.click(screen.getByRole("tab", { name: "Machines" }));
     expect(screen.getByText("e1-large-amd64")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("e1-large-amd64")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });
 
-  it("shows selected model in selected group and unselected in other group", async () => {
+  it("shows selected models and keeps unused models collapsed", async () => {
     const catalog = {
       ...currentCatalog,
       models: [
@@ -457,8 +459,9 @@ describe("PriceBooks", () => {
           selected: true,
         },
         {
+          provider: "openrouter",
           match_key: "other-model",
-          match_mode: "prefix",
+          match_mode: "exact",
           input_cents_per_million: 100,
           output_cents_per_million: 500,
           cache_read_cents_per_million: 10,
@@ -473,18 +476,26 @@ describe("PriceBooks", () => {
       vi.fn(async () => jsonResponse(catalog)),
     );
 
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByText("Selected models")).toBeInTheDocument();
-    expect(screen.getByText("Other models")).toBeInTheDocument();
     expect(screen.getByText("claude-sonnet")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-price-book-unused-toggle")).toHaveTextContent("Unused models (1)");
+    expect(screen.queryByText("other-model")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("admin-price-book-unused-toggle"));
     expect(screen.getByText("other-model")).toBeInTheDocument();
   });
 
   it("shows empty state when no model is selected", async () => {
+    const catalog = {
+      ...currentCatalog,
+      models: [{ ...currentCatalog.models[0], selected: false }],
+    };
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => jsonResponse(currentCatalog)),
+      vi.fn(async () => jsonResponse(catalog)),
     );
 
     renderPage();
@@ -494,7 +505,7 @@ describe("PriceBooks", () => {
     expect(screen.getByRole("link", { name: "Open Hosted LLM settings" })).toHaveAttribute("href", "/admin/settings");
   });
 
-  it("shows empty state when every model rate is selected", async () => {
+  it("shows empty unused models after expand when every model is selected", async () => {
     const catalog = {
       ...currentCatalog,
       models: [
@@ -509,14 +520,15 @@ describe("PriceBooks", () => {
       vi.fn(async () => jsonResponse(catalog)),
     );
 
+    const user = userEvent.setup();
     renderPage();
 
-    expect(await screen.findByText("Other models")).toBeInTheDocument();
-    expect(screen.getByText("No other model rates in this version.")).toBeInTheDocument();
-    expect(screen.getByText("claude-sonnet")).toBeInTheDocument();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+    await user.click(screen.getByTestId("admin-price-book-unused-toggle"));
+    expect(screen.getByText("No unused model rates for this provider.")).toBeInTheDocument();
   });
 
-  it("edits a rate in the other models group", async () => {
+  it("edits a rate in the unused models group", async () => {
     const catalog = {
       ...currentCatalog,
       models: [
@@ -525,8 +537,9 @@ describe("PriceBooks", () => {
           selected: true,
         },
         {
+          provider: "openrouter",
           match_key: "other-model",
-          match_mode: "prefix",
+          match_mode: "exact",
           input_cents_per_million: 100,
           output_cents_per_million: 500,
           cache_read_cents_per_million: 10,
@@ -551,6 +564,7 @@ describe("PriceBooks", () => {
     const user = userEvent.setup();
     renderPage();
 
+    await user.click(await screen.findByTestId("admin-price-book-unused-toggle"));
     expect(await screen.findByText("other-model")).toBeInTheDocument();
     const inputs = screen.getAllByDisplayValue("1.00");
     const otherInput = inputs.find((input) => input.closest("tr")?.textContent?.includes("other-model"));
@@ -563,5 +577,21 @@ describe("PriceBooks", () => {
     await waitFor(() => {
       expect(showSuccessToast).toHaveBeenCalled();
     });
+  });
+
+  it("disables update on Anthropic and OpenAI tabs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(currentCatalog)),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("claude-sonnet")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-price-book-sync")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Anthropic" }));
+    expect(screen.getByTestId("admin-price-book-sync-disabled")).toBeDisabled();
+    expect(screen.getByText("The Anthropic API does not publish prices. Edit rates here.")).toBeInTheDocument();
   });
 });

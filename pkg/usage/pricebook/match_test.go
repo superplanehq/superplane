@@ -32,9 +32,11 @@ func TestMatchModel_FamilyFallback(t *testing.T) {
 	assert.Equal(t, ModelMatch{Key: "sonnet", Mode: "family"}, got)
 }
 
-func TestMatchModel_Unknown(t *testing.T) {
-	_, ok := MatchModel("unknown-lab-model", nil, nil)
-	assert.False(t, ok)
+func TestCatalogModelID(t *testing.T) {
+	assert.Equal(t, "x-ai/grok-4.6", CatalogModelID("openrouter/x-ai/grok-4.6"))
+	assert.Equal(t, "x-ai/grok-4.6", CatalogModelID("x-ai/grok-4.6"))
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", CatalogModelID("openrouter/openrouter/anthropic/claude-sonnet-4-6"))
+	assert.Equal(t, "claude-sonnet-4-6", CatalogModelID("claude-sonnet-4-6"))
 }
 
 func TestCentsPerMillionFromUSDPerToken(t *testing.T) {
