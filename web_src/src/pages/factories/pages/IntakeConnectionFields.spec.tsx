@@ -73,12 +73,30 @@ describe("IntakeConnectionFields", () => {
     expect(onBindingChange).toHaveBeenCalledWith({ integrationId: "jira-2", resourceId: "" });
   });
 
+  it("does not replace an existing integration that is missing from the loaded list", async () => {
+    const onBindingChange = vi.fn();
+    renderFields({
+      onBindingChange,
+      binding: { integrationId: "jira-old", resourceId: "KAN" },
+      integrations: [
+        {
+          metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
+          status: { state: "ready" },
+        },
+      ],
+    });
+
+    expect(await screen.findByRole("link", { name: /Atlassian/ })).toBeInTheDocument();
+    expect(onBindingChange).not.toHaveBeenCalled();
+  });
+
   it("uses shadcn Select trigger chrome on the project picker", () => {
     renderFields({
       binding: { integrationId: "jira-1", resourceId: "KAN" },
       projects: [{ id: "KAN", name: "setntry-intake-test-project (KAN)" }],
     });
 
+    expect(screen.getByLabelText(INTAKE_CONNECTION_COPY.project)).toHaveAttribute("id", "intake-connection-project");
     const trigger = screen.getByTestId("intake-connection-project-select").querySelector("div.relative.flex");
     expect(trigger?.className).toContain("h-8");
     expect(trigger?.className).toContain("bg-white");

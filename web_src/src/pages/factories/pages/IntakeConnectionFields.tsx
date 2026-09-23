@@ -165,7 +165,7 @@ function ConnectionList({
   const singleIntegrationId = singleIntegration?.metadata?.id ?? "";
 
   useEffect(() => {
-    if (loading || !singleIntegrationId || singleIntegrationId === selectedId) {
+    if (loading || selectedId || !singleIntegrationId) {
       return;
     }
     onSelect(singleIntegrationId);
@@ -307,8 +307,14 @@ function ProjectList({
 
   return (
     <div className="space-y-2" data-testid="intake-connection-project-select">
-      <Label>{INTAKE_CONNECTION_COPY.project}</Label>
-      <AutoCompleteSelect options={options} value={selectedId} onChange={onSelect} placeholder="Search projects" />
+      <Label htmlFor="intake-connection-project">{INTAKE_CONNECTION_COPY.project}</Label>
+      <AutoCompleteSelect
+        id="intake-connection-project"
+        options={options}
+        value={selectedId}
+        onChange={onSelect}
+        placeholder="Search projects"
+      />
     </div>
   );
 }

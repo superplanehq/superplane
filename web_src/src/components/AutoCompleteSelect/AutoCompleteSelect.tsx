@@ -42,7 +42,13 @@ export function AutoCompleteSelect({
 
   const { refs, floatingStyles } = useFloating({
     open: isOpen,
-    onOpenChange: setIsOpen,
+    onOpenChange: (open) => {
+      if (disabled) {
+        setIsOpen(false);
+        return;
+      }
+      setIsOpen(open);
+    },
     middleware: [
       offset(4),
       flip(),
@@ -81,9 +87,16 @@ export function AutoCompleteSelect({
     groupedOptions[group].push(option);
   });
 
-  const handleInputFocus = () => {
+  const openPicker = () => {
+    if (disabled) {
+      return;
+    }
     setIsOpen(true);
     setQuery("");
+  };
+
+  const handleInputFocus = () => {
+    openPicker();
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
@@ -106,6 +119,9 @@ export function AutoCompleteSelect({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) {
+      return;
+    }
     setQuery(e.target.value);
     if (!isOpen) setIsOpen(true);
   };
@@ -141,52 +157,73 @@ export function AutoCompleteSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [refs.reference, refs.floating]);
 
+  useEffect(() => {
+    if (disabled && isOpen) {
+      setIsOpen(false);
+      setQuery("");
+    }
+  }, [disabled, isOpen]);
+
+  const showSelectedLabel = !isOpen && Boolean(selectedOption) && query === "";
+
   return (
     <div className="relative w-full min-w-0">
       <div
         ref={refs.setReference}
-        id={id}
         data-testid={testId}
         data-size="default"
+        aria-disabled={disabled || undefined}
         className={cn(
           selectTriggerClassName,
           "relative w-full min-w-0 cursor-pointer focus-within:border-gray-500 focus-within:ring-[3px] focus-within:ring-ring/50",
           error && "border-destructive focus-within:ring-destructive/50",
-          disabled && "cursor-not-allowed opacity-50",
+          disabled && "pointer-events-none cursor-not-allowed opacity-50",
           className,
         )}
         onClick={() => {
+          if (disabled) {
+            return;
+          }
           if (!isOpen) {
-            setIsOpen(true);
-            setQuery("");
+            openPicker();
           }
           inputRef.current?.focus();
         }}
       >
-        {!isOpen && selectedOption && query === "" ? (
-          <span className="flex-1 min-w-0 truncate">{selectedOption.label}</span>
-        ) : (
-          <input
-            ref={inputRef}
-            type="text"
-            role="combobox"
-            aria-expanded={isOpen}
-            aria-haspopup="listbox"
-            className="flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-muted-foreground"
-            placeholder={placeholder}
-            value={query}
-            onChange={handleInputChange}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-          />
-        )}
+        {showSelectedLabel ? <span className="flex-1 min-w-0 truncate">{selectedOption?.label}</span> : null}
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          className={cn(
+            "flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-muted-foreground",
+            showSelectedLabel && "sr-only",
+          )}
+          placeholder={placeholder}
+          value={query}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+        />
         <div
           className="shrink-0"
           onClick={(e) => {
             e.stopPropagation();
-            setIsOpen(!isOpen);
+            if (disabled) {
+              return;
+            }
+            if (isOpen) {
+              setIsOpen(false);
+              setQuery("");
+              return;
+            }
+            openPicker();
+            inputRef.current?.focus();
           }}
         >
           <ChevronDownIcon className={cn("size-4 opacity-50 transition-transform", isOpen && "rotate-180")} />
