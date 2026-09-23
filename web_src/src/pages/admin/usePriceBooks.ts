@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   activatePriceBook,
+  deletePriceBook,
   fetchPriceBooks,
   savePriceBooks,
   syncPriceBooks,
@@ -175,10 +176,7 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [activating, setActivating] = useState(false);
-  const modelKeys = useMemo(
-    () => new Set(catalog.models.map((rate) => `${rate.match_key}:${rate.match_mode}`)),
-    [catalog.models],
-  );
+  const [deleting, setDeleting] = useState(false);
   const vmKeys = useMemo(
     () => new Set(catalog.vms.map((rate) => `${rate.match_key}:${rate.match_mode}`)),
     [catalog.vms],
@@ -188,12 +186,14 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
     saving,
     syncing,
     activating,
-    handleAddModel: (rate: PriceBookModelRate) => appendUniqueModel(catalog.models, modelKeys, rate, catalog.setModels),
+    deleting,
     handleAddVM: (rate: PriceBookVMRate) => appendUniqueVM(catalog.vms, vmKeys, rate, catalog.setVMs),
     handleSave: () => void saveCurrentRates(catalog, setSaving),
-    handleSync: () => void syncCurrentRates(catalog, setSyncing),
+    handleSync: (provider: string) => void syncCurrentRates(catalog, provider, setSyncing),
     handleActivate: (targetVersion: string, onDone: () => void) =>
       void activateCurrentVersion(targetVersion, catalog, setActivating, onDone),
+    handleDelete: (targetVersion: string, onDone: () => void) =>
+      void deleteCurrentVersion(targetVersion, catalog, setDeleting, onDone),
     handleModelChange: (index: number, patch: Partial<PriceBookModelRate>) => {
       catalog.setModels((current) =>
         current.map((rate, rateIndex) => (rateIndex === index ? { ...rate, ...patch } : rate)),
@@ -223,7 +223,7 @@ function patchVMRate(catalog: PriceBookEditCatalog, index: number, patch: Partia
       (rate, rateIndex) => rateIndex !== index && rate.match_key === matchKey && rate.match_mode === matchMode,
     );
     if (duplicate) {
-      showErrorToast("That VM rate already exists.");
+      showErrorToast("That machine rate already exists.");
       return false;
     }
 
@@ -243,25 +243,6 @@ function normalizeVMMatchKey(matchKey: string): string | undefined {
   return key;
 }
 
-function appendUniqueModel(
-  models: PriceBookModelRate[],
-  keys: Set<string>,
-  rate: PriceBookModelRate,
-  setModels: Dispatch<SetStateAction<PriceBookModelRate[]>>,
-): boolean {
-  const key = rate.match_key.trim().toLowerCase();
-  if (key === "") {
-    showErrorToast("Enter a match key.");
-    return false;
-  }
-  if (keys.has(`${key}:${rate.match_mode}`)) {
-    showErrorToast("That model rate already exists.");
-    return false;
-  }
-  setModels([...models, { ...rate, match_key: key }]);
-  return true;
-}
-
 function appendUniqueVM(
   vms: PriceBookVMRate[],
   keys: Set<string>,
@@ -273,7 +254,7 @@ function appendUniqueVM(
     return false;
   }
   if (keys.has(`${key}:${rate.match_mode}`)) {
-    showErrorToast("That VM rate already exists.");
+    showErrorToast("That machine rate already exists.");
     return false;
   }
   setVMs([...vms, { ...rate, match_key: key }]);
@@ -293,17 +274,36 @@ async function saveCurrentRates(catalog: PriceBookEditCatalog, setSaving: (value
   }
 }
 
-async function syncCurrentRates(catalog: PriceBookEditCatalog, setSyncing: (value: boolean) => void) {
+async function syncCurrentRates(catalog: PriceBookEditCatalog, provider: string, setSyncing: (value: boolean) => void) {
   setSyncing(true);
   catalog.supersedeLoads();
   try {
-    const payload = await syncPriceBooks();
+    const payload = await syncPriceBooks(provider);
     catalog.applyCatalog(payload);
     showSuccessToast(`Updated ${payload.updated_count} model rates and added ${payload.added_count}.`);
   } catch (error) {
     showErrorToast(error instanceof Error ? error.message : "Failed to update model rates");
   } finally {
     setSyncing(false);
+  }
+}
+
+async function deleteCurrentVersion(
+  version: string,
+  catalog: PriceBookEditCatalog,
+  setDeleting: (value: boolean) => void,
+  onDone: () => void,
+) {
+  setDeleting(true);
+  catalog.supersedeLoads();
+  try {
+    catalog.applyCatalog(await deletePriceBook(version));
+    onDone();
+    showSuccessToast("Deleted this price book version.");
+  } catch (error) {
+    showErrorToast(error instanceof Error ? error.message : "Failed to delete price book");
+  } finally {
+    setDeleting(false);
   }
 }
 

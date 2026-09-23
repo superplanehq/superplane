@@ -1,4 +1,3 @@
-import { Link } from "@/components/Link/link";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,14 +6,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatDate } from "./formatDate";
-import { AddModelRateForm, AddVMRateForm } from "./priceBooksForms";
-import { EmptyRatesMessage, ModelsTable, tableWrapClass, VMsTable } from "./priceBooksTables";
+import { AddVMRateForm } from "./priceBooksForms";
+import { ModelsPanel, type PriceBookProvider } from "./priceBooksModelsPanel";
+import { tableWrapClass, VMsTable } from "./priceBooksTables";
 import type { PriceBookModelRate, PriceBooksResponse, PriceBookVMRate } from "./priceBooksApi";
 
-type PriceBooksTab = "models" | "vms";
+export type PriceBooksTab = "models" | "machines";
+export type { PriceBookProvider };
 
 function isPriceBooksTab(value: string): value is PriceBooksTab {
-  return value === "models" || value === "vms";
+  return value === "models" || value === "machines";
 }
 
 function PriceBooksHeader() {
@@ -22,7 +23,7 @@ function PriceBooksHeader() {
     <div>
       <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Price Books</h1>
       <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Rates that SuperPlane uses to price hosted models and runner VMs.
+        Rates that SuperPlane uses to price hosted models and runner machines.
       </Text>
     </div>
   );
@@ -46,26 +47,30 @@ type PriceBooksCatalogProps = {
   models: PriceBookModelRate[];
   vms: PriceBookVMRate[];
   tab: PriceBooksTab;
+  provider: PriceBookProvider;
   saving: boolean;
   syncing: boolean;
   activating: boolean;
+  deleting: boolean;
   versionLoading: boolean;
   pendingVersion?: string;
   onTabChange: (tab: PriceBooksTab) => void;
+  onProviderChange: (provider: PriceBookProvider) => void;
   onVersionChange: (version: string) => void;
   onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
   onVMChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
   onRemoveVM: (index: number) => void;
-  onAddModel: (rate: PriceBookModelRate) => boolean;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
-  onSync: () => void;
+  onSync: (provider: PriceBookProvider) => void;
   onActivate: () => void;
+  onDelete: () => void;
 };
 
 export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
   const isCurrent = props.data.version === props.data.current_version;
-  const actionsDisabled = props.saving || props.syncing || props.activating || props.versionLoading;
+  const actionsDisabled = props.saving || props.syncing || props.activating || props.deleting || props.versionLoading;
+  const canDelete = props.data.versions.length > 1 && !isCurrent;
 
   return (
     <div className="space-y-6">
@@ -73,11 +78,14 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
         data={props.data}
         isCurrent={isCurrent}
         activating={props.activating}
-        mutating={props.saving || props.syncing || props.activating}
+        deleting={props.deleting}
+        mutating={props.saving || props.syncing || props.activating || props.deleting}
         actionsDisabled={actionsDisabled}
+        canDelete={canDelete}
         pendingVersion={props.pendingVersion}
         onVersionChange={props.onVersionChange}
         onActivate={props.onActivate}
+        onDelete={props.onDelete}
       />
       <Tabs
         value={props.tab}
@@ -90,7 +98,7 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList>
             <TabsTrigger value="models">Models</TabsTrigger>
-            <TabsTrigger value="vms">VMs</TabsTrigger>
+            <TabsTrigger value="machines">Machines</TabsTrigger>
           </TabsList>
           <Text className="text-xs text-gray-500 dark:text-gray-400">
             {props.tab === "models" ? "USD per 1 million tokens" : "USD per minute of machine time"}
@@ -100,16 +108,17 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
           <ModelsPanel
             isCurrent={isCurrent}
             models={props.models}
+            provider={props.provider}
             saving={props.saving}
             syncing={props.syncing}
             actionsDisabled={actionsDisabled}
+            onProviderChange={props.onProviderChange}
             onModelChange={props.onModelChange}
-            onAddModel={props.onAddModel}
             onSave={props.onSave}
             onSync={props.onSync}
           />
         </TabsContent>
-        <TabsContent value="vms" className="mt-3 space-y-4">
+        <TabsContent value="machines" className="mt-3 space-y-4">
           <VMsPanel
             isCurrent={isCurrent}
             vms={props.vms}
@@ -130,20 +139,26 @@ function PriceBooksToolbar({
   data,
   isCurrent,
   activating,
+  deleting,
   mutating,
   actionsDisabled,
+  canDelete,
   pendingVersion,
   onVersionChange,
   onActivate,
+  onDelete,
 }: {
   data: PriceBooksResponse;
   isCurrent: boolean;
   activating: boolean;
+  deleting: boolean;
   mutating: boolean;
   actionsDisabled: boolean;
+  canDelete: boolean;
   pendingVersion?: string;
   onVersionChange: (version: string) => void;
   onActivate: () => void;
+  onDelete: () => void;
 }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -165,113 +180,34 @@ function PriceBooksToolbar({
           </Select>
           <Text className="text-xs text-gray-500 dark:text-gray-400">Effective {formatDate(data.effective_at)}</Text>
         </div>
-        {!isCurrent && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            data-testid="admin-price-book-activate"
-            disabled={actionsDisabled}
-            onClick={onActivate}
-          >
-            {activating ? "Switching version..." : "Use this version"}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ModelsPanel({
-  isCurrent,
-  models,
-  saving,
-  syncing,
-  actionsDisabled,
-  onModelChange,
-  onAddModel,
-  onSave,
-  onSync,
-}: {
-  isCurrent: boolean;
-  models: PriceBookModelRate[];
-  saving: boolean;
-  syncing: boolean;
-  actionsDisabled: boolean;
-  onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-  onAddModel: (rate: PriceBookModelRate) => boolean;
-  onSave: () => void;
-  onSync: () => void;
-}) {
-  const hasNoRates = models.length === 0;
-
-  const selectedRows = models.map((rate, index) => ({ rate, index })).filter(({ rate }) => rate.selected);
-  const otherRows = models.map((rate, index) => ({ rate, index })).filter(({ rate }) => !rate.selected);
-
-  return (
-    <>
-      {isCurrent && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          {!isCurrent && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              data-testid="admin-price-book-sync"
+              data-testid="admin-price-book-activate"
               disabled={actionsDisabled}
-              onClick={onSync}
+              onClick={onActivate}
             >
-              {syncing ? "Updating model rates..." : "Update model rates"}
+              {activating ? "Switching version..." : "Use this version"}
             </Button>
-            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Creates a new current version from enabled provider catalogs. Past usage keeps recorded costs.
-            </Text>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            data-testid="admin-price-book-save"
-            disabled={actionsDisabled}
-            onClick={onSave}
-          >
-            {saving ? "Saving rates..." : "Save rates"}
-          </Button>
+          )}
+          {canDelete && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="admin-price-book-delete"
+              disabled={actionsDisabled}
+              onClick={onDelete}
+            >
+              {deleting ? "Deleting version..." : "Delete this version"}
+            </Button>
+          )}
         </div>
-      )}
-      {hasNoRates ? (
-        <EmptyRatesMessage message="This version has no model rates." />
-      ) : (
-        <>
-          <div>
-            <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Selected models</Text>
-            {selectedRows.length > 0 ? (
-              <ModelsTable rows={selectedRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
-            ) : (
-              <EmptyRatesMessage
-                message="No models are selected in Hosted LLM settings."
-                action={
-                  <Link
-                    href="/admin/settings"
-                    className="mt-3 inline-block text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Open Hosted LLM settings
-                  </Link>
-                }
-              />
-            )}
-          </div>
-          <div>
-            <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Other models</Text>
-            {otherRows.length > 0 ? (
-              <ModelsTable rows={otherRows} editable={isCurrent && !actionsDisabled} onChange={onModelChange} />
-            ) : (
-              <EmptyRatesMessage message="No other model rates in this version." />
-            )}
-          </div>
-        </>
-      )}
-      {isCurrent && <AddModelRateForm disabled={actionsDisabled} onAdd={onAddModel} />}
-    </>
+      </div>
+    </div>
   );
 }
 
