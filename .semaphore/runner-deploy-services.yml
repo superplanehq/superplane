@@ -1,4 +1,4 @@
-# Credentials come from the runner-images deployment target (aws-prod).
+# aws-prod supplies AWS credentials for ECS updates.
 version: v1.0
 name: Deploy runner services
 
@@ -8,6 +8,8 @@ agent:
     os_image: ubuntu2404
 
 global_job_config:
+  secrets:
+    - name: aws-prod
   env_vars:
     - name: AWS_DEFAULT_REGION
       value: us-east-1

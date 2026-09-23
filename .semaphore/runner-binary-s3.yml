@@ -1,5 +1,5 @@
 # Promoted when /runner is green on main.
-# Credentials come from the runner-s3 deployment target.
+# runner-s3 supplies AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
 version: v1.0
 name: Publish runner binaries to S3
 
@@ -9,6 +9,8 @@ agent:
     os_image: ubuntu2404
 
 global_job_config:
+  secrets:
+    - name: runner-s3
   prologue:
     commands:
       - checkout

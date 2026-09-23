@@ -1,4 +1,4 @@
-# After runner-ami exists, set deployment_target on the release promotion.
+# aws-prod-ami-builder supplies AWS credentials for Packer.
 version: v1.0
 name: Build runner AMIs
 agent:
@@ -13,6 +13,8 @@ promotions:
 blocks:
   - name: Build AMIs (amd64 + arm64)
     task:
+      secrets:
+        - name: aws-prod-ami-builder
       env_vars:
         - name: AWS_DEFAULT_REGION
           value: us-east-1

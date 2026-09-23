@@ -1,4 +1,4 @@
-# Credentials come from the runner-ami deployment target (aws-credentials).
+# aws-credentials supplies AWS credentials for the SSM fleet update.
 version: v1.0
 name: Release runner AMIs
 agent:
@@ -13,6 +13,8 @@ agent:
 blocks:
   - name: Promote AMIs to fleet config
     task:
+      secrets:
+        - name: aws-credentials
       env_vars:
         - name: AWS_DEFAULT_REGION
           value: us-east-1

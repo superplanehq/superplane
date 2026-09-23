@@ -205,8 +205,9 @@ after_pipeline:
         commands:
           - test-results gen-pipeline-report
 
-# Create SuperPlane targets runner-images, runner-s3, and runner-ami,
-# then set deployment_target on the runner promotions. Do not use production.
+# Runner promotions stay off production. Child pipelines declare their own
+# secrets (ghcr-push-token, runner-s3, aws-prod, aws-prod-ami-builder,
+# aws-credentials). Add deployment_target after those targets exist.
 promotions:
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
