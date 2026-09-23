@@ -6,12 +6,14 @@ import {
   filterIntakeConnections,
   intakeChooseConnectionCopy,
   intakeConnectLabel,
+  intakeIntegrationInstanceName,
   intakeConnectionChanged,
   intakeConnectionComplete,
   intakeConnectionFromSource,
   intakeConnectionReturnPath,
   intakeHealthBanner,
   intakeProviderAppName,
+  intakeProviderDisplayName,
   intakeReconnectLabel,
   intakeSourceAllowsRebind,
   showIntakeConnectAction,
@@ -30,6 +32,14 @@ describe("intakeConnectionModel", () => {
     expect(intakeProviderAppName("jira-issues")).toBe("jira");
     expect(intakeProviderAppName("sentry-exceptions")).toBe("sentry");
     expect(intakeProviderAppName("productive-tasks")).toBe("productive");
+  });
+
+  it("maps the provider display name", () => {
+    expect(intakeProviderDisplayName("jira-issues")).toBe("Jira");
+    expect(intakeProviderDisplayName("sentry-exceptions")).toBe("Sentry");
+    expect(intakeProviderDisplayName("github-issues")).toBe("GitHub");
+    expect(intakeProviderDisplayName("productive-tasks")).toBe("Productive.io");
+    expect(intakeProviderDisplayName("pagerduty-incidents")).toBe("PagerDuty");
   });
 
   it("returns health banners for repair states", () => {
@@ -74,6 +84,12 @@ describe("intakeConnectionModel", () => {
     expect(showIntakeConnectAction(1, false)).toBe(false);
     expect(showIntakeConnectAction(0, true)).toBe(false);
     expect(intakeChooseConnectionCopy("jira-issues")).toBe("Choose the Jira site that SuperPlane will monitor.");
+    expect(
+      intakeIntegrationInstanceName({
+        metadata: { id: "jira-1", name: "  Atlassian  ", integrationName: "jira" },
+      }),
+    ).toBe("Atlassian");
+    expect(intakeIntegrationInstanceName({ metadata: { id: "jira-1", integrationName: "jira" } })).toBe("Integration");
     expect(
       intakeReconnectLabel({
         metadata: { id: "jira-1", name: "Jira", integrationName: "jira" },
