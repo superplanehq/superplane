@@ -4,6 +4,7 @@ import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder } fro
 
 import {
   buildAssigneeFilterOptions,
+  buildLabelFilterOptions,
   buildLineFilterOptions,
   buildSourceFilterOptions,
   buildStatusFilterOptions,
@@ -44,6 +45,15 @@ describe("buildStatusFilterOptions", () => {
     ]);
     expect(options.every((option) => Boolean(option.dot))).toBe(true);
     expect(options.find((option) => option.value === "waiting")?.label).toBe("Waiting");
+  });
+});
+
+describe("buildLabelFilterOptions", () => {
+  it("lists Review and Mergeable", () => {
+    expect(buildLabelFilterOptions()).toEqual([
+      { value: "review", label: "Review" },
+      { value: "mergeable", label: "Mergeable" },
+    ]);
   });
 });
 
@@ -133,6 +143,7 @@ describe("buildWorkOrderFilterChips", () => {
     const chips = buildWorkOrderFilterChips(
       {
         statuses: ["running"],
+        labels: ["review", "mergeable"],
         lineIds: ["line-a"],
         sourceIds: ["github-issues", MANUAL_FILTER_VALUE],
         assigneeIds: ["u1", UNASSIGNED_FILTER_VALUE],
@@ -142,6 +153,8 @@ describe("buildWorkOrderFilterChips", () => {
 
     expect(chips.map((chip) => chip.label)).toEqual([
       "Status is Running",
+      "Label is Review",
+      "Label is Mergeable",
       "Line is hotfix",
       "Source is GitHub issues",
       "Created manually",

@@ -5,7 +5,9 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderSummary,
 } from "@/api-client";
+import { selectWorkOrderCardPullRequest, workOrderCardPullRequestIsMergeable } from "./workOrderCardPullRequest";
 import { workOrderListSource } from "./workOrderCardSource";
+import { pullRequestState } from "./workOrderPullRequest";
 import { workOrderMatchesUser } from "./workOrderListPagination";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatDurationSeconds, formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
@@ -313,6 +315,16 @@ export const UNASSIGNED_FILTER_VALUE = "unassigned";
 
 export { MANUAL_FILTER_VALUE } from "./workOrderCardSource";
 
+/** Card labels the Filter menu can keep: Review (open PR) and Mergeable. */
+export const WORK_ORDER_FILTER_LABELS = ["review", "mergeable"] as const;
+
+export type WorkOrderFilterLabel = (typeof WORK_ORDER_FILTER_LABELS)[number];
+
+export const WORK_ORDER_FILTER_LABEL_META: Record<WorkOrderFilterLabel, { label: string }> = {
+  review: { label: "Review" },
+  mergeable: { label: "Mergeable" },
+};
+
 /**
  * Filters chosen in the Filter menu. Each dimension narrows independently
  * (AND across dimensions, OR within one), and an empty array means the
@@ -320,6 +332,7 @@ export { MANUAL_FILTER_VALUE } from "./workOrderCardSource";
  */
 export interface WorkOrderFilters {
   statuses: WorkOrderDisplayStatus[];
+  labels: WorkOrderFilterLabel[];
   lineIds: string[];
   sourceIds: string[];
   assigneeIds: string[];
@@ -327,13 +340,20 @@ export interface WorkOrderFilters {
 
 export const EMPTY_WORK_ORDER_FILTERS: WorkOrderFilters = {
   statuses: [],
+  labels: [],
   lineIds: [],
   sourceIds: [],
   assigneeIds: [],
 };
 
 export function countWorkOrderFilters(filters: WorkOrderFilters): number {
-  return filters.statuses.length + filters.lineIds.length + filters.sourceIds.length + filters.assigneeIds.length;
+  return (
+    filters.statuses.length +
+    filters.labels.length +
+    filters.lineIds.length +
+    filters.sourceIds.length +
+    filters.assigneeIds.length
+  );
 }
 
 export function applyWorkOrderScope(
@@ -353,10 +373,24 @@ export function applyWorkOrderScope(
   return entries.filter((entry) => workOrderMatchesUser(entry.order, currentUserId));
 }
 
+function workOrderMatchesFilterLabel(order: FactoriesWorkOrderSummary, label: WorkOrderFilterLabel): boolean {
+  const card = selectWorkOrderCardPullRequest(order.pullRequests, order.id ?? "");
+  if (!card) {
+    return false;
+  }
+  if (label === "review") {
+    return pullRequestState(card.pullRequest.state) === "open";
+  }
+  return workOrderCardPullRequestIsMergeable(card.pullRequest);
+}
+
 export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: WorkOrderFilters): WorkOrderListEntry[] {
   let result = entries;
   if (filters.statuses.length > 0) {
     result = result.filter((entry) => filters.statuses.includes(entry.displayStatus));
+  }
+  if (filters.labels.length > 0) {
+    result = result.filter((entry) => filters.labels.some((label) => workOrderMatchesFilterLabel(entry.order, label)));
   }
   if (filters.lineIds.length > 0) {
     result = result.filter((entry) => entry.lineIds.some((lineId) => filters.lineIds.includes(lineId)));

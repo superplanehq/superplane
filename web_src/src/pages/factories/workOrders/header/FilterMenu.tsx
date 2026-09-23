@@ -13,7 +13,11 @@ import {
 } from "@/ui/dropdownMenu";
 import { Check, Funnel } from "lucide-react";
 import type { WorkOrderFilterDimension, WorkOrderListState } from "../../lib/useWorkOrderListState";
-import { buildStatusFilterOptions, type WorkOrderFilterOption } from "../../lib/workOrderFilterOptions";
+import {
+  buildLabelFilterOptions,
+  buildStatusFilterOptions,
+  type WorkOrderFilterOption,
+} from "../../lib/workOrderFilterOptions";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
@@ -55,6 +59,14 @@ export function FilterMenu({ state, lineOptions, sourceOptions, assigneeOptions 
           dimension="statuses"
           state={state}
           options={buildStatusFilterOptions()}
+        />
+
+        <FilterSubMenu
+          label="Label"
+          resetLabel="Any label"
+          dimension="labels"
+          state={state}
+          options={buildLabelFilterOptions()}
         />
 
         {lineOptions ? (

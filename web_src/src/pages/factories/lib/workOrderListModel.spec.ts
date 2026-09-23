@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import type {
   FactoriesFactory,
+  FactoriesFactoryPullRequest,
   FactoriesLineRef,
   FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
@@ -46,6 +47,21 @@ function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
     updatedAt: "2024-06-02T00:00:00Z",
     lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
     ...rest,
+  };
+}
+
+function pullRequest(
+  workOrderId: string,
+  overrides: Partial<FactoriesFactoryPullRequest> = {},
+): FactoriesFactoryPullRequest {
+  return {
+    id: `pr-${workOrderId}`,
+    workOrderId,
+    number: "12",
+    url: `https://github.com/acme/payments/pull/12`,
+    title: "Ship refund retries",
+    state: "STATE_OPEN",
+    ...overrides,
   };
 }
 
@@ -408,6 +424,39 @@ describe("scope + filter + search + ordering", () => {
       { ...EMPTY_WORK_ORDER_FILTERS, statuses: ["waiting"], sourceIds: ["github-issues"] },
     );
     expect(githubWaiting.map((e) => e.id)).toEqual(["github-wait"]);
+  });
+
+  it("label filter keeps tasks with the Review or Mergeable card pill", () => {
+    const withPullRequests = buildWorkOrderListEntries(
+      [
+        order({ id: "open-review", pullRequests: [pullRequest("open-review")] }),
+        order({
+          id: "open-mergeable",
+          pullRequests: [pullRequest("open-mergeable", { mergeable: true })],
+        }),
+        order({ id: "draft-pr", pullRequests: [pullRequest("draft-pr", { state: "STATE_DRAFT" })] }),
+        order({ id: "idle-wait" }),
+      ],
+      factory,
+    );
+
+    const review = applyWorkOrderFilters(withPullRequests, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      labels: ["review"],
+    });
+    expect(review.map((entry) => entry.id)).toEqual(["open-review", "open-mergeable"]);
+
+    const mergeable = applyWorkOrderFilters(withPullRequests, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      labels: ["mergeable"],
+    });
+    expect(mergeable.map((entry) => entry.id)).toEqual(["open-mergeable"]);
+
+    const either = applyWorkOrderFilters(withPullRequests, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      labels: ["review", "mergeable"],
+    });
+    expect(either.map((entry) => entry.id)).toEqual(["open-review", "open-mergeable"]);
   });
 
   it("search matches on title, description, line, and assignee names", () => {
