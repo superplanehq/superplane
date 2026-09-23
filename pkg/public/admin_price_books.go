@@ -11,9 +11,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"github.com/superplanehq/superplane/pkg/usage/pricebooksync"
 	"gorm.io/gorm"
 )
 
@@ -222,9 +222,10 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, catalogPricesUnavailableMessage(provider), http.StatusBadRequest)
 		return
 	}
-	sync, err := s.collectCatalogRates(ctx, database.DB(ctx), provider)
+	svc := pricebooksync.New(s.encryptor, s.registry.HTTPContext())
+	result, err := svc.Sync(ctx, database.DB(ctx), pricebooksync.Options{SkipWhenUnchanged: false})
 	if err != nil {
-		if errors.Is(err, errNoPricedCatalogProvider) {
+		if errors.Is(err, pricebooksync.ErrNoPricedCatalogProvider) {
 			http.Error(w, "No enabled provider publishes catalog prices", http.StatusBadRequest)
 			return
 		}
@@ -232,42 +233,26 @@ func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Price book not found", http.StatusNotFound)
 			return
 		}
-		log.Errorf("admin: failed to read provider catalog prices: %v", err)
-		http.Error(w, "Unable to update model rates from the provider", http.StatusBadGateway)
-		return
-	}
-
-	var published *models.UsagePriceBook
-	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		book, pubErr := models.PublishUsagePriceBook(tx, sync.rates, sync.baseVersion)
-		if pubErr != nil {
-			return pubErr
-		}
-		published = book
-		return nil
-	})
-	if err != nil {
 		if errors.Is(err, models.ErrUsagePriceBookConflict) {
 			writePublishPriceBookError(w, err)
 			return
 		}
-		log.Errorf("admin: failed to publish synced price book: %v", err)
-		http.Error(w, "Failed to save price books", http.StatusInternalServerError)
+		log.Errorf("admin: failed to sync price book from provider catalog: %v", err)
+		http.Error(w, "Unable to update model rates from the provider", http.StatusBadGateway)
 		return
 	}
-	reloadCurrentPriceBook(ctx)
 
-	payload, status, message := loadAdminPriceBooks(database.DB(ctx), published.Version)
+	payload, status, message := loadAdminPriceBooks(database.DB(ctx), result.Book.Version)
 	if status != http.StatusOK {
-		log.Errorf("admin: failed to load synced price book %s: %s", published.Version, message)
+		log.Errorf("admin: failed to load synced price book %s: %s", result.Book.Version, message)
 		http.Error(w, "Failed to load price books", http.StatusInternalServerError)
 		return
 	}
 	respondJSON(w, adminPriceBookSyncResponse{
 		adminPriceBooksResponse: payload,
-		UpdatedCount:            sync.updated,
-		AddedCount:              sync.added,
-		SkippedProviders:        sync.skipped,
+		UpdatedCount:            result.UpdatedCount,
+		AddedCount:              result.AddedCount,
+		SkippedProviders:        result.SkippedProviders,
 	})
 }
 
@@ -278,8 +263,6 @@ func reloadCurrentPriceBook(ctx context.Context) {
 		log.Errorf("admin: failed to reload the current price book: %v", err)
 	}
 }
-
-var errNoPricedCatalogProvider = errors.New("no enabled provider publishes catalog prices")
 
 const adminPriceBookConflictMessage = "The current price book changed. Load the latest version and try again."
 
@@ -300,88 +283,6 @@ func writePublishPriceBookError(w http.ResponseWriter, err error) {
 		return
 	}
 	http.Error(w, err.Error(), http.StatusBadRequest)
-}
-
-// catalogSync is the price book that provider catalogs produce, before it is published.
-type catalogSync struct {
-	rates       []models.UsagePriceBookRate
-	baseVersion string
-	updated     int
-	added       int
-	skipped     []string
-}
-
-// collectCatalogRates reads the current rates and merges provider catalog
-// prices into them. It runs outside a transaction because it calls provider
-// HTTP APIs.
-func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB, targetProvider string) (catalogSync, error) {
-	current, err := models.FindCurrentUsagePriceBook(tx)
-	if err != nil {
-		return catalogSync{}, err
-	}
-	rows, err := models.ListUsagePriceBookRates(tx, current.Version)
-	if err != nil {
-		return catalogSync{}, err
-	}
-	providers, err := models.ListHostedLLMProviders(tx)
-	if err != nil {
-		return catalogSync{}, err
-	}
-
-	sync := catalogSync{
-		rates:       models.CloneUsagePriceBookRates(rows),
-		baseVersion: current.Version,
-		skipped:     make([]string, 0),
-	}
-	for _, provider := range providers {
-		if provider.Provider != targetProvider {
-			continue
-		}
-		if !provider.Enabled || !provider.HasAPIKey() {
-			return catalogSync{}, errNoPricedCatalogProvider
-		}
-
-		apiKey, decryptErr := llm.DecryptAPIKey(ctx, s.encryptor, provider.Provider, provider.APIKey)
-		if decryptErr != nil {
-			return catalogSync{}, decryptErr
-		}
-		prices, listErr := llm.ListCatalogPrices(
-			ctx,
-			s.registry.HTTPContext(),
-			provider.Provider,
-			llm.Credentials{APIKey: apiKey, BaseURL: provider.BaseURL},
-		)
-		if listErr != nil {
-			if errors.Is(listErr, llm.ErrNoCatalogPrices) {
-				return catalogSync{}, errNoPricedCatalogProvider
-			}
-			return catalogSync{}, listErr
-		}
-
-		var updated, added int
-		sync.rates, updated, added = models.ApplyCatalogPrices(sync.rates, catalogModelPrices(provider.Provider, prices))
-		sync.updated += updated
-		sync.added += added
-		return sync, nil
-	}
-
-	return catalogSync{}, errNoPricedCatalogProvider
-}
-
-func catalogModelPrices(provider string, prices []llm.CatalogPrice) []models.CatalogModelPrice {
-	mapped := make([]models.CatalogModelPrice, 0, len(prices))
-	for _, price := range prices {
-		id := pricebook.CatalogModelID(price.ID)
-		if id == "" {
-			continue
-		}
-		mapped = append(mapped, models.CatalogModelPrice{
-			Provider: provider,
-			ModelID:  id,
-			Rate:     price.Rate,
-		})
-	}
-	return mapped
 }
 
 func loadAdminPriceBooks(tx *gorm.DB, requestedVersion string) (adminPriceBooksResponse, int, string) {

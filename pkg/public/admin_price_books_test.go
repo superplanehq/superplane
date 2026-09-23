@@ -12,9 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
-	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 )
 
@@ -421,19 +419,6 @@ func TestAdminDeletePriceBook(t *testing.T) {
 		authCookie: token,
 	})
 	require.Equal(t, http.StatusOK, deleted.Code)
-}
-
-func TestCatalogModelPrices_KeepsCatalogIDs(t *testing.T) {
-	prices := []llm.CatalogPrice{
-		{ID: "openrouter/x-ai/grok-4.6", Rate: pricebook.Rate{Input: 200}},
-		{ID: "anthropic/claude-sonnet-4.6", Rate: pricebook.Rate{Input: 300}},
-	}
-
-	mapped := catalogModelPrices("openrouter", prices)
-	require.Len(t, mapped, 2)
-	assert.Equal(t, "openrouter", mapped[0].Provider)
-	assert.Equal(t, "x-ai/grok-4.6", mapped[0].ModelID)
-	assert.Equal(t, "anthropic/claude-sonnet-4.6", mapped[1].ModelID)
 }
 
 func containsModelRate(rates []adminPriceBookModelRate, matchKey string) bool {
