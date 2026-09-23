@@ -1,35 +1,31 @@
 # Utils
 
-Docker images for managing Superplane infrastructure on different cloud providers.
+Docker image for managing SuperPlane infrastructure on GKE and EKS.
 
-## Available Images
+## Image
 
-| Image            | Purpose                                 |
-| ---------------- | --------------------------------------- |
-| `Dockerfile.gke` | Google Kubernetes Engine (GKE) on GCP   |
-| `Dockerfile.eks` | Elastic Kubernetes Service (EKS) on AWS |
-
-Each image comes pre-installed with:
+`Dockerfile` installs:
 
 - Terraform
 - Helm
 - kubectl
-- Cloud-specific CLI (gcloud / aws-cli)
-- Common utilities (vim, jq)
+- gcloud
+- gke-gcloud-auth-plugin
+- AWS CLI
+- eksctl
+- vim and jq
+
+The base image is the pinned Helm release.
 
 ## Usage
 
 From this directory, run:
 
 ```bash
-# GKE
 make gke.shell
-
-# EKS
 make eks.shell
 ```
 
-This builds the image and drops you into an interactive shell with:
-
-- Cloud credentials mounted (persisted across sessions)
-- Workspace mounted at `/workspace`
+Both targets build the same image and mount the install stacks at `/workspace`.
+`make gke.shell` mounts gcloud credentials at `/root/.config/gcloud`.
+`make eks.shell` mounts AWS credentials at `/root/.aws`.
