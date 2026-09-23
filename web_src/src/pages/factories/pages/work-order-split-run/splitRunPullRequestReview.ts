@@ -1,6 +1,7 @@
 import type { FactoriesFactoryPullRequest, FactoryPullRequestMergeabilityMergeMethod } from "@/api-client";
 
-import { pullRequestState } from "../../lib/workOrderPullRequest";
+import { selectWorkOrderCardPullRequest } from "../../lib/workOrderCardPullRequest";
+import { pullRequestLabel, pullRequestState } from "../../lib/workOrderPullRequest";
 
 import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
 
@@ -33,6 +34,26 @@ export function isPullRequestReviewFooter(footer: SplitRunFooter): boolean {
   return Boolean(
     footer.kind === "waiting" && footer.attentionCard && footer.note && pullRequestReviewNote(footer.note),
   );
+}
+
+export function trackedPullRequestReviewNote(
+  pullRequests: FactoriesFactoryPullRequest[] | undefined,
+  workOrderId: string | undefined,
+): SplitRunFooterNote | undefined {
+  const pullRequest = selectWorkOrderCardPullRequest(pullRequests, workOrderId ?? "")?.pullRequest;
+  const href = pullRequest?.url?.trim();
+  if (!pullRequest || pullRequestState(pullRequest.state) !== "open" || !href) {
+    return undefined;
+  }
+
+  return {
+    headline: PULL_REQUEST_REVIEW_COPY.headline,
+    text: PULL_REQUEST_REVIEW_COPY.closing,
+    cta: {
+      label: `Review PR ${pullRequestLabel(pullRequest)}`,
+      href,
+    },
+  };
 }
 
 export function pullRequestForReviewHref(
