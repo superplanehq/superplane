@@ -1,4 +1,4 @@
-# Local SuperPlane start uses ../docker-compose.runner.yml from the repo root.
+# Local SuperPlane start uses the local-runner profile in ../docker-compose.dev.yml.
 # This file stays for `make test-integration` in this directory.
 services:
   db:
