@@ -33,7 +33,7 @@ type UseFactoryConfigureSessionOptions = {
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
   onFactoryConfigureDone?: () => void;
-  /** Called after Configure Save. Discard still uses onFactoryConfigureDone. */
+  /** Called after Configure Save. Falls back to onFactoryConfigureDone. */
   onFactoryConfigureSaved?: () => void;
   editSessionActive: boolean;
   setEditSessionActive: Dispatch<SetStateAction<boolean>>;
@@ -105,7 +105,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
   onFactoryConfigureSavedRef.current = onFactoryConfigureSaved;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
-  const { allowNextConfigureEnter } = useFactoryConfigureEnter(options);
+  useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
@@ -141,7 +141,6 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               setLastSavedWorkflowSnapshot,
               handleCommitStaging,
               canvasName: saveOptions?.canvasName,
-              onAfterCommit: allowNextConfigureEnter,
               onDone: () => (onFactoryConfigureSavedRef.current ?? onFactoryConfigureDoneRef.current)?.(),
             });
           },
@@ -167,6 +166,4 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
           },
         };
   }
-
-  return { allowNextConfigureEnter };
 }

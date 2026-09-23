@@ -58,13 +58,11 @@ export function useFactoryAppCanvasPageModel() {
     configureBusy,
     configureActionsRef,
   });
+  /** Save and Discard both leave Configure and return to the view URL. */
   const handleConfigureDone = useCallback(() => {
     clearDraftTitle();
     navigateDone();
   }, [clearDraftTitle, navigateDone]);
-  const handleConfigureSaved = useCallback(() => {
-    clearDraftTitle();
-  }, [clearDraftTitle]);
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
@@ -114,7 +112,6 @@ export function useFactoryAppCanvasPageModel() {
     handleConfigureSave,
     handleConfigureDiscard,
     handleConfigureDone,
-    handleConfigureSaved,
     handleConfigureBusyChange,
     from: route.from,
     runId: route.runId,
