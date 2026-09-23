@@ -1,5 +1,4 @@
-# Both utils images install the same Terraform. Validate does not call GCP or AWS,
-# so the GKE image checks every stack.
+# Validate does not call GCP or AWS.
 REPO_ROOT := $(abspath ../..)
 
 run = docker run --rm \
@@ -8,10 +7,10 @@ run = docker run --rm \
 	-e TF_IN_AUTOMATION=1 \
 	-v $(REPO_ROOT):/workspace \
 	-w /workspace \
-	gke-image:latest
+	terraform-utils:latest
 
 image:
-	$(MAKE) -C utils gke.build
+	$(MAKE) -C utils build
 
 format: image
 	$(run) /bin/bash -c 'terraform fmt -recursive release/terraform'

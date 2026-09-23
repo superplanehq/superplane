@@ -62,8 +62,7 @@ make check
 make format
 ```
 
-These targets build the GKE utils image and run Terraform in that container.
-The EKS image installs the same Terraform version.
+These targets build the utils image and run Terraform in that container.
 Validate does not call AWS or GCP.
 
 ## Architecture
