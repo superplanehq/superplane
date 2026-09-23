@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { appendSpokenPhrase } from "./appendSpokenPhrase";
+import { appendSpokenPhrase, stripTrailingSpokenPhrase } from "./appendSpokenPhrase";
 
 describe("appendSpokenPhrase", () => {
   it("appends the first phrase with no extra space", () => {
@@ -13,6 +13,10 @@ describe("appendSpokenPhrase", () => {
 
   it("does not insert a space when the field already ends with whitespace", () => {
     expect(appendSpokenPhrase("Fix refunds ", "on retry")).toBe("Fix refunds on retry");
+  });
+
+  it("does not insert a space when the field already ends with a newline", () => {
+    expect(appendSpokenPhrase("Notes\n", "hello")).toBe("Notes\nhello");
   });
 
   it("trims the spoken phrase", () => {
@@ -31,5 +35,31 @@ describe("appendSpokenPhrase", () => {
   it("truncates a description to 5000 characters", () => {
     const current = "B".repeat(4996);
     expect(appendSpokenPhrase(current, "overflow", 5000)).toBe(`${current} ove`);
+  });
+});
+
+describe("stripTrailingSpokenPhrase", () => {
+  it("returns the value when the live phrase is empty", () => {
+    expect(stripTrailingSpokenPhrase("Fix refunds", "  ")).toBe("Fix refunds");
+  });
+
+  it("clears the value when it is only the live phrase", () => {
+    expect(stripTrailingSpokenPhrase("Fix refunds", "Fix refunds")).toBe("");
+  });
+
+  it("removes a spaced live suffix", () => {
+    expect(stripTrailingSpokenPhrase("Please Fix refunds", "Fix refunds")).toBe("Please ");
+  });
+
+  it("removes a live suffix after a newline", () => {
+    expect(stripTrailingSpokenPhrase("Notes\nhello", "hello")).toBe("Notes\n");
+  });
+
+  it("keeps the value when the live phrase is not a suffix", () => {
+    expect(stripTrailingSpokenPhrase("Fix refunds now", "Fix refunds")).toBe("Fix refunds now");
+  });
+
+  it("keeps the value when the live phrase is only a partial suffix", () => {
+    expect(stripTrailingSpokenPhrase("unhello", "hello")).toBe("unhello");
   });
 });
