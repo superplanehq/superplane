@@ -87,4 +87,35 @@ describe("useFactoryBoardLaneScroll", () => {
     rerender(<Lane persistenceKey="ws:line-a:step-0" ready />);
     expect(screen.getByTestId("lane").scrollTop).toBe(1760);
   });
+
+  it("does not overwrite saved scroll when the lane becomes not ready", () => {
+    const { rerender } = render(<Lane persistenceKey="ws:line-a:step-0" />);
+    const lane = screen.getByTestId("lane");
+    lane.scrollTop = 1760;
+    fireEvent.scroll(lane);
+
+    rerender(<Lane persistenceKey="ws:line-a:step-0" ready={false} />);
+    const pending = screen.getByTestId("lane");
+    pending.scrollTop = 40;
+    fireEvent.scroll(pending);
+
+    rerender(<Lane persistenceKey="ws:line-a:step-0" ready />);
+    expect(screen.getByTestId("lane").scrollTop).toBe(1760);
+  });
+
+  it("does not save clamped scroll when unmounting while not ready", () => {
+    const { rerender, unmount } = render(<Lane persistenceKey="ws:line-a:step-0" />);
+    const lane = screen.getByTestId("lane");
+    lane.scrollTop = 1760;
+    fireEvent.scroll(lane);
+
+    rerender(<Lane persistenceKey="ws:line-a:step-0" ready={false} />);
+    const pending = screen.getByTestId("lane");
+    pending.scrollTop = 40;
+    fireEvent.scroll(pending);
+    unmount();
+
+    render(<Lane persistenceKey="ws:line-a:step-0" />);
+    expect(screen.getByTestId("lane").scrollTop).toBe(1760);
+  });
 });

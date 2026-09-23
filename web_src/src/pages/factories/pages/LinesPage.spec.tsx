@@ -1924,6 +1924,58 @@ describe("LinesPage Implement phase window", () => {
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
   });
 
+  it("keeps Implement column scroll after a filter placeholder stretch", () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const orders = Array.from({ length: 8 }, (_, index) =>
+      dispatchDraftToImplement(kickoffDraft(index), new Date(Date.now() + index * 1000).toISOString()),
+    );
+    useFactoryWorkOrders.mockReturnValue({ data: orders });
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    const view = renderLinesBoard();
+
+    const scroller = screen.getByTestId("lines-phase-column-scroll-0");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(1760);
+
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      isPlaceholderData: true,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    const pending = screen.getByTestId("lines-phase-column-scroll-0");
+    pending.scrollTop = 40;
+    fireEvent.scroll(pending);
+
+    useFactoryBoardWorkOrders.mockReturnValue({
+      workOrders: orders,
+      isLoading: false,
+      isPlaceholderData: false,
+      backlog: idleBoardPage(),
+      open: idleBoardPage(),
+      done: idleBoardPage(),
+    });
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
+  });
+
   it("does not keep backlog scroll when the line changes", async () => {
     restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
     const orders = Array.from({ length: 8 }, (_, index) => kickoffDraft(index));
