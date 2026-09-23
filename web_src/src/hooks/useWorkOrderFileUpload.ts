@@ -5,6 +5,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
+  isInlineWorkOrderVideo,
   MAX_WORK_ORDER_FILE_BYTES,
   resolveWorkOrderFileMimeType,
   setWorkOrderFilePreviewUrl,
@@ -19,6 +20,7 @@ export type UploadedWorkOrderFile = {
   ref: string;
   previewUrl: string;
   isImage: boolean;
+  isVideo?: boolean;
 };
 
 export function useWorkOrderFileUpload({
@@ -69,7 +71,7 @@ async function uploadOneWorkOrderFile(
     return null;
   }
   if (file.size > MAX_WORK_ORDER_FILE_BYTES) {
-    showErrorToast("Each file must be 10 MB or smaller.");
+    showErrorToast("Each file must be 50 MB or smaller.");
     return null;
   }
 
@@ -120,6 +122,7 @@ async function uploadOneWorkOrderFile(
       ref: workOrderFileRef(id),
       previewUrl,
       isImage: isInlineWorkOrderImage(contentType),
+      isVideo: isInlineWorkOrderVideo(contentType),
     };
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "The file could not be stored."));

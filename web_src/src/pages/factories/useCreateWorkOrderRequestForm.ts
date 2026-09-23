@@ -3,6 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { showErrorToast } from "@/lib/toast";
+import {
+  isInlineWorkOrderVideo,
+  resolveWorkOrderFileMimeType,
+  revokeWorkOrderFilePreviewUrl,
+} from "@/lib/workOrderFiles";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import type { CreateWorkOrderRequestDraft } from "./CreateWorkOrderRequestDialog";
@@ -88,7 +93,7 @@ export function useCreateWorkOrderRequestForm({
       countCreateWorkOrderRequestImages(description, attachedFilesRef.current),
     );
     if (selected.rejectedCount > 0) {
-      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images.`);
+      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images or videos.`);
     }
     if (selected.accepted.length === 0) {
       return [];
@@ -97,10 +102,11 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleAttach = async (files: FileList | File[]) => {
-    // The create dialog keeps its image-only attach stack; text files stay on the description editor.
-    const uploaded = (await uploadAcceptedFiles(Array.from(files).filter(isSupportedImageFile))).filter(
-      (file) => file.isImage,
+    // The create dialog keeps its image and video attach stack. Text files stay on the description editor.
+    const visualFiles = Array.from(files).filter(
+      (file) => isSupportedImageFile(file) || isInlineWorkOrderVideo(resolveWorkOrderFileMimeType(file)),
     );
+    const uploaded = (await uploadAcceptedFiles(visualFiles)).filter((file) => file.isImage || file.isVideo);
     if (uploaded.length === 0) {
       return;
     }
@@ -108,6 +114,7 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleRemoveAttachment = (id: string) => {
+    revokeWorkOrderFilePreviewUrl(id);
     setAttachedFiles((current) => current.filter((file) => file.id !== id));
     const nextDescription = removeCreateWorkOrderRequestMarkdownImage(description, id);
     if (nextDescription !== description) {

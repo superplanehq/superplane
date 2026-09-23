@@ -22,8 +22,8 @@ describe("createWorkOrderRequestImages", () => {
         },
       ),
     ).toEqual([
-      { id: "file-1", alt: "Checkout", src: "https://cdn.example.com/checkout.png" },
-      { id: "file-2", alt: "Receipt", src: "https://cdn.example.com/receipt.png" },
+      { id: "file-1", alt: "Checkout", src: "https://cdn.example.com/checkout.png", isVideo: false },
+      { id: "file-2", alt: "Receipt", src: "https://cdn.example.com/receipt.png", isVideo: false },
     ]);
   });
 
@@ -66,7 +66,7 @@ describe("mergeCreateWorkOrderRequestImages", () => {
       ),
     ).toEqual([
       { id: "file-1", alt: "Checkout", src: "https://cdn.example.com/checkout.png" },
-      { id: "file-2", alt: "receipt.png", src: "https://cdn.example.com/receipt.png" },
+      { id: "file-2", alt: "receipt.png", src: "https://cdn.example.com/receipt.png", isVideo: false },
     ]);
   });
 });

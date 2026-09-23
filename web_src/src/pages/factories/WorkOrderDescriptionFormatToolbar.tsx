@@ -19,9 +19,10 @@ import {
 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+
 import { hrefFromInput } from "./lib/workOrderDescriptionHref";
 import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
-import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
 

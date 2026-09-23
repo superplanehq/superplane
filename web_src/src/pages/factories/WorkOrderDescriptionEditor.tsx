@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
-import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
+import { resolveWorkOrderFileSrc, revokeWorkOrderFilePreviewUrl, parseWorkOrderFileId } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
 import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
@@ -26,6 +26,7 @@ interface WorkOrderDescriptionEditorProps {
   className?: string;
   placeholder?: string;
   fileUrls?: Record<string, string>;
+  fileContentTypes?: Record<string, string>;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   isUploading?: boolean;
   canRemoveImages?: boolean;
@@ -62,6 +63,7 @@ export function WorkOrderDescriptionEditor({
   className,
   placeholder = "Add description…",
   fileUrls,
+  fileContentTypes,
   onUploadFiles,
   isUploading = false,
   canRemoveImages = false,
@@ -191,6 +193,7 @@ export function WorkOrderDescriptionEditor({
     editor.storage.image = {
       ...(editor.storage.image ?? {}),
       downloadUrls: urls,
+      contentTypes: { ...(editor.storage.image?.contentTypes ?? {}), ...(fileContentTypes ?? {}) },
     };
     const isNewEditor = editor !== lastEditorRef.current;
     const urlsChanged = !areUrlMapsEqual(lastFileUrlsRef.current, fileUrls);
@@ -219,7 +222,7 @@ export function WorkOrderDescriptionEditor({
     if (tr.docChanged) {
       view.dispatch(tr);
     }
-  }, [editor, fileUrls]);
+  }, [editor, fileUrls, fileContentTypes]);
 
   useEffect(() => {
     if (!editor) {
@@ -231,6 +234,18 @@ export function WorkOrderDescriptionEditor({
     emittedMarkdownRef.current = value;
     editor.commands.setContent(value, { contentType: "markdown" });
   }, [editor, value]);
+
+  useEffect(() => {
+    return () => {
+      const markdown = emittedMarkdownRef.current;
+      for (const match of markdown.matchAll(/sp-file:\/\/([0-9a-fA-F-]+)/g)) {
+        const id = parseWorkOrderFileId(`sp-file://${match[1]}`);
+        if (id) {
+          revokeWorkOrderFilePreviewUrl(id);
+        }
+      }
+    };
+  }, [editor]);
 
   return (
     <>

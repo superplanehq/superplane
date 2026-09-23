@@ -2,6 +2,8 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
+import { WORK_ORDER_VISUAL_FILE_ACCEPT } from "@/lib/workOrderFiles";
+
 import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 
@@ -132,7 +134,7 @@ describe("CreateWorkOrderRequestDialog", () => {
       CREATE_WORK_ORDER_REQUEST_COPY.attach,
     );
     expect(screen.getByTestId("create-work-order-request-image-input").getAttribute("accept")).toBe(
-      "image/png,image/jpeg,image/gif,image/webp",
+      WORK_ORDER_VISUAL_FILE_ACCEPT,
     );
     expect(screen.getByTestId("create-work-order-request-create")).toBeDisabled();
   });
@@ -337,7 +339,7 @@ describe("CreateWorkOrderRequestDialog", () => {
 
     expect(onUploadFiles).toHaveBeenCalledTimes(1);
     expect(Array.from(onUploadFiles.mock.calls[0][0] as File[])).toHaveLength(1);
-    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images or videos.");
   });
 
   it("hides the dictate button when speech recognition is missing", () => {

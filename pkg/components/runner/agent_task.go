@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"embed"
 	"fmt"
 	"net/url"
 	"path"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/blob"
 )
+
+//go:embed fetch_task_attachments.sh process_video_attachments.sh
+var attachmentSetupScripts embed.FS
 
 type AgentPromptCommand func(promptName, model string) string
 
@@ -27,11 +31,16 @@ type AgentBrokerTaskInput struct {
 	Setups          []IntegrationSetup
 	Model           string
 	PromptCommand   AgentPromptCommand
+	Attachments     []TaskAttachment
 }
 
 type TaskAttachment struct {
-	URL      string
-	Filename string
+	ID          string
+	URL         string
+	Filename    string
+	ContentType string
+	SizeBytes   int64
+	Checksum    string
 }
 
 func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand, files []BrokerTaskFile) {
@@ -52,9 +61,9 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 		Command: WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    LiveLogKindSetup,
 	})
-	if fetch := AttachmentFetchCommand(CollectTaskAttachmentsFromSteps(AgentStepsForDispatch(input.Steps, input.DispatchedSteps))); fetch != nil {
-		commands = append(commands, *fetch)
-	}
+	attachmentFiles, attachmentCommands := AttachmentSetup(ResolveTaskAttachments(input))
+	files = append(files, attachmentFiles...)
+	commands = append(commands, attachmentCommands...)
 	commands = append(commands, setupCommands...)
 
 	for i, step := range input.Steps {
@@ -143,7 +152,7 @@ func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingD
 		promptName := stepSlug + ".txt"
 		return BrokerTaskFile{
 				Path:    "prompts/" + promptName,
-				Content: ApplyIntegrationUsage(stringPtrValue(dispatched.Prompt), usage),
+				Content: ApplyAttachmentInstructions(ApplyIntegrationUsage(stringPtrValue(dispatched.Prompt), usage)),
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(original.Name, promptName),
@@ -298,37 +307,81 @@ func CollectTaskAttachments(texts ...string) []TaskAttachment {
 			seen[raw] = struct{}{}
 			attachments = append(attachments, TaskAttachment{
 				URL:      raw,
-				Filename: attachmentFilename(raw, len(attachments)+1),
+				Filename: scrapeAttachmentFilename(raw),
 			})
 		}
 	}
 	return attachments
 }
 
+func AttachmentSetup(attachments []TaskAttachment) (files []BrokerTaskFile, commands []BrokerCommand) {
+	if len(attachments) == 0 {
+		return nil, nil
+	}
+	files = append(AttachmentSetupFiles(), BrokerTaskFile{
+		Path:    AttachmentManifestPath,
+		Content: AttachmentManifestJSON(attachments),
+		Mode:    "0644",
+	})
+	if fetch := AttachmentFetchCommand(attachments); fetch != nil {
+		commands = append(commands, *fetch)
+	}
+	if HasVideoAttachment(attachments) {
+		commands = append(commands, VideoAttachmentCommand())
+	}
+	return files, commands
+}
+
 func AttachmentFetchCommand(attachments []TaskAttachment) *BrokerCommand {
 	if len(attachments) == 0 {
 		return nil
 	}
-	var builder strings.Builder
-	builder.WriteString(`mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
-	builder.WriteByte('\n')
-	for _, attachment := range attachments {
-		builder.WriteString(`curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
-		builder.WriteString(attachment.Filename)
-		builder.WriteString(`" `)
-		builder.WriteString(ShellSingleQuote(attachment.URL))
-		builder.WriteByte('\n')
-	}
-	command := builder.String()
 	return &BrokerCommand{
 		Name:    "Fetch task attachments",
-		Command: WithTaskBinOnPath(command),
+		Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/fetch_task_attachments.sh"`),
 		Kind:    LiveLogKindSetup,
 		Preview: LiveLogText("Download task files"),
 	}
 }
 
-func attachmentFilename(raw string, index int) string {
+func AttachmentSetupFiles() []BrokerTaskFile {
+	fetch, err := attachmentSetupScripts.ReadFile("fetch_task_attachments.sh")
+	if err != nil {
+		panic(err)
+	}
+	process, err := attachmentSetupScripts.ReadFile("process_video_attachments.sh")
+	if err != nil {
+		panic(err)
+	}
+	return []BrokerTaskFile{
+		{Path: AttachmentFetchScriptPath, Content: string(fetch), Mode: "0755"},
+		{Path: AttachmentProcessScriptPath, Content: string(process), Mode: "0755"},
+	}
+}
+
+func AppendAttachmentSetupFiles(files []BrokerTaskFile) []BrokerTaskFile {
+	for _, file := range files {
+		if file.Path == AttachmentFetchScriptPath {
+			return files
+		}
+	}
+	return append(files, AttachmentSetupFiles()...)
+}
+
+func VideoAttachmentCommand() BrokerCommand {
+	return BrokerCommand{
+		Name:    "Process video attachments",
+		Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/process_video_attachments.sh"`),
+		Kind:    LiveLogKindSetup,
+		Preview: LiveLogText("Extract still frames and transcribe task videos"),
+	}
+}
+
+func VideoAttachmentCommands() []BrokerCommand {
+	return []BrokerCommand{VideoAttachmentCommand()}
+}
+
+func scrapeAttachmentFilename(raw string) string {
 	parsed, err := url.Parse(raw)
 	base := "file"
 	if err == nil {
@@ -336,16 +389,9 @@ func attachmentFilename(raw string, index int) string {
 			base = name
 		}
 	}
-	var cleaned strings.Builder
-	for _, r := range filepath.Base(base) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-', r == '_':
-			cleaned.WriteRune(r)
-		}
-	}
-	name := cleaned.String()
-	if name == "" || name == "." {
-		name = "file"
-	}
-	return fmt.Sprintf("%02d-%s", index, name)
+	return sanitizeAttachmentName(base)
+}
+
+func attachmentFilename(raw string, index int) string {
+	return fmt.Sprintf("%02d-%s", index, scrapeAttachmentFilename(raw))
 }

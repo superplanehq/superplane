@@ -152,12 +152,12 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
-	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
-	dispatched = runner.AppendVisualEvidenceProtocol(dispatched, runner.HasArtifactUploadToken(environment))
-	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
+	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
+	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments)
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)

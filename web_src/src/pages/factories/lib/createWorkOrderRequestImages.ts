@@ -1,6 +1,12 @@
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
-import { parseWorkOrderFileId, resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
+import {
+  isInlineWorkOrderVideo,
+  isWorkOrderVideoSource,
+  parseWorkOrderFileId,
+  resolveWorkOrderFileSrc,
+  workOrderUploadContentType,
+} from "@/lib/workOrderFiles";
 
 const MARKDOWN_IMAGE = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
@@ -8,6 +14,7 @@ export interface CreateWorkOrderRequestImage {
   id: string;
   alt: string;
   src: string;
+  isVideo?: boolean;
 }
 
 export function createWorkOrderRequestImages(
@@ -31,6 +38,7 @@ export function createWorkOrderRequestImages(
       id: parseWorkOrderFileId(rawSrc) ?? rawSrc,
       alt,
       src,
+      isVideo: isWorkOrderVideoSource({ src, alt }),
     });
   }
   return images;
@@ -46,7 +54,7 @@ export function countCreateWorkOrderRequestImages(markdown: string, attached: Up
     seen.add(parseWorkOrderFileId(rawSrc) ?? rawSrc);
   }
   for (const file of attached) {
-    if (file.isImage) {
+    if (file.isImage || file.isVideo) {
       seen.add(file.id);
     }
   }
@@ -58,19 +66,19 @@ export function selectCreateWorkOrderRequestUploads(
   currentImageCount: number,
 ): { accepted: File[]; rejectedCount: number } {
   const remaining = Math.max(0, MAX_IMAGE_ATTACHMENTS - currentImageCount);
-  const images: File[] = [];
+  const visual: File[] = [];
   const others: File[] = [];
   for (const file of Array.from(files)) {
-    if (isSupportedImageFile(file)) {
-      images.push(file);
+    if (isSupportedImageFile(file) || isInlineWorkOrderVideo(workOrderUploadContentType(file))) {
+      visual.push(file);
     } else {
       others.push(file);
     }
   }
-  const acceptedImages = images.slice(0, remaining);
+  const acceptedVisual = visual.slice(0, remaining);
   return {
-    accepted: [...acceptedImages, ...others],
-    rejectedCount: images.length - acceptedImages.length,
+    accepted: [...acceptedVisual, ...others],
+    rejectedCount: visual.length - acceptedVisual.length,
   };
 }
 
@@ -81,7 +89,7 @@ export function mergeCreateWorkOrderRequestImages(
   const images = [...fromDescription];
   const seen = new Set(fromDescription.map((image) => image.id));
   for (const file of attached) {
-    if (!file.isImage || seen.has(file.id)) {
+    if ((!file.isImage && !file.isVideo) || seen.has(file.id)) {
       continue;
     }
     const src = file.previewUrl || resolveWorkOrderFileSrc(file.ref);
@@ -93,6 +101,8 @@ export function mergeCreateWorkOrderRequestImages(
       id: file.id,
       alt: file.filename,
       src,
+      isVideo:
+        Boolean(file.isVideo) || isWorkOrderVideoSource({ contentType: file.contentType, src, alt: file.filename }),
     });
   }
   return images;
@@ -100,7 +110,7 @@ export function mergeCreateWorkOrderRequestImages(
 
 export function appendUploadedWorkOrderImages(description: string, files: UploadedWorkOrderFile[]): string {
   const blocks = files.map((file) =>
-    file.isImage
+    file.isImage || file.isVideo
       ? `![${markdownFileLabel(file.filename)}](${file.ref})`
       : `[${markdownFileLabel(file.filename)}](${file.ref})`,
   );

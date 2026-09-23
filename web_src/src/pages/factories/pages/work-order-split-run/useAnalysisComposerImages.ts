@@ -4,6 +4,7 @@ import type { FilesFile } from "@/api-client";
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { showErrorToast } from "@/lib/toast";
+import { revokeWorkOrderFilePreviewUrl } from "@/lib/workOrderFiles";
 
 import {
   countCreateWorkOrderRequestImages,
@@ -32,7 +33,7 @@ export function useAnalysisComposerImages({
       countCreateWorkOrderRequestImages("", pendingRef.current),
     );
     if (selected.rejectedCount > 0) {
-      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images.`);
+      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images or videos.`);
     }
     if (selected.accepted.length === 0) {
       return;
@@ -47,12 +48,13 @@ export function useAnalysisComposerImages({
 
   return {
     pending,
-    pendingFiles: pending.filter((file) => !file.isImage),
+    pendingFiles: pending.filter((file) => !file.isImage && !file.isVideo),
     previewImages: mergeCreateWorkOrderRequestImages([], pending),
     transcriptFiles: uploadedFiles.map(uploadedWorkOrderFileAsTranscriptFile),
     canAttach: Boolean(onUploadFiles) && !disabled,
     attach,
     remove: (id: string) => {
+      revokeWorkOrderFilePreviewUrl(id);
       setPending((current) => current.filter((file) => file.id !== id));
     },
     takePending: () => {

@@ -42,7 +42,24 @@ describe("insertUploadedFiles", () => {
       },
     ]);
 
-    expect(editor.getHTML()).toContain("notes.txt");
+    expect(editor.getHTML()).toContain("sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    editor.destroy();
+  });
+
+  it("inserts an image markdown node for video uploads", () => {
+    const editor = markdownEditor();
+    insertUploadedFiles(editor, [
+      {
+        id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        filename: "clip.mp4",
+        contentType: "video/mp4",
+        ref: "sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        previewUrl: "blob:preview",
+        isImage: false,
+        isVideo: true,
+      },
+    ]);
+
     expect(editor.getHTML()).toContain("sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
     editor.destroy();
   });
