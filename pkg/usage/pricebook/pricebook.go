@@ -317,6 +317,11 @@ func SetComputeRates(rates map[string]int64) {
 	mu.Unlock()
 }
 
+// Lookup returns the rate for a provider and model id.
+func Lookup(provider, model string) (Rate, bool) {
+	return lookup(provider, model)
+}
+
 // IsPriced is true when the price book has a rate for the provider and model id.
 func IsPriced(provider, model string) bool {
 	_, ok := lookup(provider, model)

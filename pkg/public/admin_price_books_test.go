@@ -318,6 +318,44 @@ func TestAdminGetPriceBooks_SelectedFlag(t *testing.T) {
 		require.NotNil(t, sonnet, "claude-sonnet-4-6 should exist in rates")
 		assert.False(t, sonnet.Selected, "claude-sonnet-4-6 should not be selected without a hosted API key")
 	})
+
+	t.Run("allowlisted model missing from the book is selected for pricing", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      "anthropic",
+			APIKey:        []byte("encrypted"),
+			AllowedModels: datatypes.NewJSONSlice([]string{"claude-opus-99", "unknown-lab-model"}),
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Delete(&models.HostedLLMProvider{}, "provider = 'anthropic'")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/price-books",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminPriceBooksResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.True(t, modelRatesAreSorted(body.Models))
+
+		opus := findModelRate(body.Models, "claude-opus-99")
+		require.NotNil(t, opus)
+		assert.Equal(t, "anthropic", opus.Provider)
+		assert.Equal(t, models.UsagePriceBookMatchExact, opus.MatchMode)
+		assert.True(t, opus.Selected)
+		assert.Equal(t, int64(1500), opus.InputCentsPerMillion)
+		assert.Equal(t, int64(7500), opus.OutputCentsPerMillion)
+
+		unknown := findModelRate(body.Models, "unknown-lab-model")
+		require.NotNil(t, unknown)
+		assert.Equal(t, "anthropic", unknown.Provider)
+		assert.True(t, unknown.Selected)
+		assert.Equal(t, int64(0), unknown.InputCentsPerMillion)
+		assert.Equal(t, int64(0), unknown.OutputCentsPerMillion)
+	})
 }
 
 func TestAdminSyncPriceBooks_RejectsProvidersWithoutCatalogPrices(t *testing.T) {

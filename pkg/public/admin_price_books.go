@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -485,6 +486,10 @@ func buildAdminPriceBooksResponse(
 		}
 	}
 
+	if selected.Version == currentVersion {
+		modelRates = appendAllowlistedModelRates(modelRates, allowlist)
+	}
+
 	return adminPriceBooksResponse{
 		CurrentVersion: currentVersion,
 		Version:        selected.Version,
@@ -516,4 +521,40 @@ func hostedModelAllowlist(providers []models.HostedLLMProvider) map[hostedAllowl
 		}
 	}
 	return allowlist
+}
+
+func appendAllowlistedModelRates(modelRates []adminPriceBookModelRate, allowlist map[hostedAllowlistKey]bool) []adminPriceBookModelRate {
+	present := map[hostedAllowlistKey]struct{}{}
+	for _, rate := range modelRates {
+		present[hostedAllowlistKey{provider: rate.Provider, model: rate.MatchKey}] = struct{}{}
+	}
+	for key := range allowlist {
+		if _, ok := present[key]; ok {
+			continue
+		}
+		rate, _ := pricebook.Lookup(key.provider, key.model)
+		modelRates = append(modelRates, adminPriceBookModelRate{
+			Provider:                  key.provider,
+			MatchKey:                  key.model,
+			MatchMode:                 models.UsagePriceBookMatchExact,
+			InputCentsPerMillion:      rate.Input,
+			OutputCentsPerMillion:     rate.Output,
+			CacheReadCentsPerMillion:  rate.CacheRead,
+			CacheWriteCentsPerMillion: rate.CacheWrite,
+			ReasoningCentsPerMillion:  rate.Reasoning,
+			Selected:                  true,
+		})
+	}
+	slices.SortFunc(modelRates, compareAdminModelRates)
+	return modelRates
+}
+
+func compareAdminModelRates(a, b adminPriceBookModelRate) int {
+	if order := strings.Compare(a.Provider, b.Provider); order != 0 {
+		return order
+	}
+	if order := strings.Compare(a.MatchKey, b.MatchKey); order != 0 {
+		return order
+	}
+	return strings.Compare(a.MatchMode, b.MatchMode)
 }
