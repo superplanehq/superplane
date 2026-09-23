@@ -134,6 +134,8 @@ export function IntakeSettingsHost({
                 draft: agent.draft ?? undefined,
                 isLoading: agent.isLoading || !agent.draft,
                 organizationId,
+                factoryId,
+                factoryKey,
                 onSave: agent.save,
               }
             : undefined

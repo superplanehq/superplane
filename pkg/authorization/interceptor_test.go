@@ -329,6 +329,7 @@ func TestAgentResourceRoutesRequireWorkspaceAgentResourcesFeature(t *testing.T) 
 	required := []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources}
 	routes := []HTTPRoute{
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/agent-resources"},
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/agent-resources"},
 		{Method: http.MethodPatch, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"},
 		{Method: http.MethodDelete, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"},

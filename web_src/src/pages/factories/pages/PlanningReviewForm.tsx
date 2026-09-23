@@ -7,6 +7,8 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
+import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
+import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
 
 const EXPRESSION_CONTEXT = {
@@ -19,11 +21,15 @@ export function PlanningReviewForm({
   draft,
   onChange,
   organizationId,
+  factoryId,
+  factoryKey,
   showVisualEvidenceSetting = false,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   showVisualEvidenceSetting?: boolean;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
@@ -40,6 +46,8 @@ export function PlanningReviewForm({
           key={component.id}
           component={component}
           organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
           showVisualEvidenceSetting={showVisualEvidenceSetting}
           onChange={(next) => updateComponent(component.id, next)}
         />
@@ -51,11 +59,15 @@ export function PlanningReviewForm({
 function AgentPanel({
   component,
   organizationId,
+  factoryId,
+  factoryKey,
   showVisualEvidenceSetting,
   onChange,
 }: {
   component: PlanningReviewComponent;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   showVisualEvidenceSetting: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
@@ -122,6 +134,13 @@ function AgentPanel({
       <PlanningReviewStepList
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
+      />
+      <PlanningReviewResourcesCard
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        disabledIds={disabledAgentResourceIds(component.configuration)}
+        onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
       />
     </div>
   );

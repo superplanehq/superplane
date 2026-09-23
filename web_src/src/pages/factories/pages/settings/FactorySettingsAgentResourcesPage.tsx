@@ -5,16 +5,20 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { useState } from "react";
 
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { AgentResourceSkillDialog } from "./AgentResourceSkillDialog";
+import { AgentResourceToolsDialog } from "./AgentResourceToolsDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import {
   connectionAuthLabel,
+  connectionIsEstablished,
   connectionNeedsOAuthAction,
   connectionStatusLabel,
   skillSourceLabel,
@@ -24,6 +28,13 @@ import { useAgentResourcesPage } from "./useAgentResourcesPage";
 
 export function FactorySettingsAgentResourcesPage() {
   const page = useAgentResourcesPage();
+  const [toolsResource, setToolsResource] = useState<FactoriesFactoryAgentResource | undefined>();
+  const toolsQuery = useFactoryAgentResourceTools(
+    page.organizationId,
+    page.factoryId,
+    toolsResource?.id ?? "",
+    Boolean(toolsResource?.id),
+  );
   usePageTitle([AGENT_RESOURCES_COPY.title, "Settings", page.factory.name ?? "Workspace"]);
 
   return (
@@ -59,6 +70,7 @@ export function FactorySettingsAgentResourcesPage() {
             onDisconnect={page.disconnectResource}
             onToggleEnabled={page.toggleEnabled}
             onConnect={(resource) => void page.startOAuthRedirect(resource)}
+            onViewTools={setToolsResource}
           />
         </TabsContent>
         <TabsContent value="skills" className="mt-4">
@@ -75,6 +87,14 @@ export function FactorySettingsAgentResourcesPage() {
         </TabsContent>
       </Tabs>
       <AgentResourcePageDialogs page={page} />
+      <AgentResourceToolsDialog
+        open={Boolean(toolsResource)}
+        resource={toolsResource}
+        tools={toolsQuery.data ?? []}
+        isLoading={toolsQuery.isLoading}
+        isError={toolsQuery.isError}
+        onClose={() => setToolsResource(undefined)}
+      />
     </FactorySettingsPageFrame>
   );
 }
@@ -169,6 +189,7 @@ function ConnectionsPanel({
   onDisconnect,
   onToggleEnabled,
   onConnect,
+  onViewTools,
 }: {
   canUpdate: boolean;
   isLoading: boolean;
@@ -180,6 +201,7 @@ function ConnectionsPanel({
   onDisconnect: (resource: FactoriesFactoryAgentResource) => void;
   onToggleEnabled: (resource: FactoriesFactoryAgentResource, enabled: boolean) => void;
   onConnect: (resource: FactoriesFactoryAgentResource) => void;
+  onViewTools: (resource: FactoriesFactoryAgentResource) => void;
 }) {
   if (isLoading) {
     return <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.loading}</p>;
@@ -214,6 +236,7 @@ function ConnectionsPanel({
             onDisconnect={() => onDisconnect(resource)}
             onToggleEnabled={(enabled) => onToggleEnabled(resource, enabled)}
             onConnect={() => onConnect(resource)}
+            onViewTools={() => onViewTools(resource)}
           />
         ))}
       </ul>
@@ -229,6 +252,7 @@ function ConnectionRow({
   onDisconnect,
   onToggleEnabled,
   onConnect,
+  onViewTools,
 }: {
   resource: FactoriesFactoryAgentResource;
   canUpdate: boolean;
@@ -237,12 +261,14 @@ function ConnectionRow({
   onDisconnect: () => void;
   onToggleEnabled: (enabled: boolean) => void;
   onConnect: () => void;
+  onViewTools: () => void;
 }) {
   const name = resource.name?.trim() || AGENT_RESOURCES_COPY.unnamedResource;
   const status = connectionStatusLabel(resource);
   const needsOAuth = connectionNeedsOAuthAction(resource);
   const reconnect =
     resource.oauthStatus === "OAUTH_STATUS_NEEDS_RECONNECT" || resource.oauthStatus === "OAUTH_STATUS_VENDOR_REJECTED";
+  const showTools = connectionIsEstablished(resource);
 
   return (
     <li
@@ -263,6 +289,17 @@ function ConnectionRow({
         aria-label={`Enable ${name}`}
         data-testid={`agent-resource-enabled-${resource.id}`}
       />
+      {showTools ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onViewTools}
+          data-testid={`agent-resource-view-tools-${resource.id}`}
+        >
+          {AGENT_RESOURCES_COPY.viewTools}
+        </Button>
+      ) : null}
       {needsOAuth ? (
         <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
           <Button type="button" size="sm" variant="outline" onClick={onConnect} disabled={!canUpdate}>
