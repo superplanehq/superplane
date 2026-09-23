@@ -14,7 +14,7 @@ func isLocalTaskBrokerURL(raw string) bool {
 		return false
 	}
 	host := strings.ToLower(parsed.Hostname())
-	return host == "host.docker.internal" || host == "localhost" || host == "127.0.0.1"
+	return host == "host.docker.internal" || host == "localhost" || host == "127.0.0.1" || host == "task-broker"
 }
 
 func browserTaskBrokerBaseURL(raw string) string {
@@ -23,7 +23,12 @@ func browserTaskBrokerBaseURL(raw string) string {
 	if err != nil {
 		return raw
 	}
-	if !strings.EqualFold(parsed.Hostname(), "host.docker.internal") {
+	host := strings.ToLower(parsed.Hostname())
+	if host == "task-broker" {
+		parsed.Host = net.JoinHostPort("localhost", "8091")
+		return strings.TrimRight(parsed.String(), "/")
+	}
+	if host != "host.docker.internal" {
 		return raw
 	}
 	port := parsed.Port()
