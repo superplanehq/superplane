@@ -21,6 +21,7 @@ import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
@@ -1422,6 +1423,7 @@ function PhaseBoard({
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
+          lineId={lineId}
           orders={backlogOrders}
           title={backlogTitle}
           size={backlogSize}
@@ -1491,6 +1493,7 @@ function PhaseBoard({
         <VerifyColumn
           orders={verifyOrders}
           title={verifyTitle}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "verify") : undefined}
           listeners={verifyListeners}
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
@@ -1513,6 +1516,7 @@ function PhaseBoard({
         <DoneColumn
           orders={doneOrders}
           title={doneTitle}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "done") : undefined}
           colorId={columnColors.done ?? null}
           colorView={colorView}
           onColorChange={(colorId) => void setColumnColor("done", colorId)}
@@ -1550,6 +1554,7 @@ function VerifyColumn({
   onAddAutomation,
   paging,
   cardsPending,
+  scrollPersistenceKey,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1568,8 +1573,10 @@ function VerifyColumn({
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
   cardsPending: boolean;
+  scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1632,10 +1639,14 @@ function VerifyColumn({
       testId="lines-verify-column"
     >
       <LineBoardColumnCardList
+        ref={scrollRef}
         pending={cardsPending}
         className={workOrderKanbanLaneScrollClassName}
         testId="lines-verify-column-scroll"
-        onScroll={loadMoreIfNeeded}
+        onScroll={(element) => {
+          handleScroll(element);
+          loadMoreIfNeeded(element);
+        }}
       >
         {orders.map((order) => (
           <li key={order.id}>
@@ -1667,6 +1678,7 @@ function DoneColumn({
   onAddAutomation,
   paging,
   cardsPending,
+  scrollPersistenceKey,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1683,8 +1695,10 @@ function DoneColumn({
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
   cardsPending: boolean;
+  scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
     isLoading: paging.isLoading,
@@ -1734,10 +1748,14 @@ function DoneColumn({
       testId="lines-done-column"
     >
       <LineBoardColumnCardList
+        ref={scrollRef}
         pending={cardsPending}
         className={workOrderKanbanLaneScrollClassName}
         testId="lines-done-column-scroll"
-        onScroll={loadMoreIfNeeded}
+        onScroll={(element) => {
+          handleScroll(element);
+          loadMoreIfNeeded(element);
+        }}
       >
         {orders.map((order) => (
           <li key={order.id}>
@@ -1805,6 +1823,10 @@ function PhaseColumn({
   paging: BoardColumnPaging;
   cardsPending: boolean;
 }) {
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(
+    lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, `step-${column.stepIndex}`) : undefined,
+    !cardsPending,
+  );
   const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
@@ -1865,10 +1887,14 @@ function PhaseColumn({
         }
       >
         <LineBoardColumnCardList
+          ref={scrollRef}
           pending={cardsPending}
           className={workOrderKanbanLaneScrollClassName}
           testId={`lines-phase-column-scroll-${column.stepIndex}`}
-          onScroll={loadMoreIfNeeded}
+          onScroll={(element) => {
+            handleScroll(element);
+            loadMoreIfNeeded(element);
+          }}
         >
           {visibleRuns.map((run) => (
             <li key={run.executionId}>
