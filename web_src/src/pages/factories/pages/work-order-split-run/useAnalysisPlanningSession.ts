@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { emptyCreateWithAgentView } from "../createWithAgentDemo";
 import {
   answerPlanningSessionSurvey,
+  endPlanningSession,
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
 } from "../planningSessionClient";
@@ -30,6 +31,7 @@ export const ANALYSIS_PLANNING_COPY = {
   microphoneDenied: "Microphone access was denied. Allow access and try again.",
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
+  failedStop: "The analysis did not stop. Try again.",
   failedLoad: "The analysis session did not load. Try again.",
 };
 
@@ -133,30 +135,94 @@ function analysisView(session: PlanningSessionPayload | null, composer: string, 
   });
 }
 
-function analysisSendState(
-  session: PlanningSessionPayload | null,
-  machineStatus: string,
-  canUpdate: boolean,
-  sendPending: boolean,
-  isUploading = false,
-) {
+function analysisLiveFlags(session: PlanningSessionPayload | null, machineStatus: string) {
   const stopped = machineStatus === "failed" || machineStatus === "passed";
-  const isLive = Boolean(session?.id && session.state !== "ended" && !stopped);
-  const canRestart = Boolean(session?.id && (session.state === "ended" || stopped));
-  return { isLive, canSend: canUpdate && !sendPending && !isUploading && (isLive || canRestart) };
+  return {
+    isLive: Boolean(session?.id && session.state !== "ended" && !stopped),
+    canRestart: Boolean(session?.id && (session.state === "ended" || stopped)),
+  };
+}
+
+function analysisSendState(args: {
+  session: PlanningSessionPayload | null;
+  machineStatus: string;
+  canUpdate: boolean;
+  sendPending: boolean;
+  isUploading?: boolean;
+  stopPending?: boolean;
+}) {
+  const { session, machineStatus, canUpdate, sendPending, isUploading = false, stopPending = false } = args;
+  const { isLive, canRestart } = analysisLiveFlags(session, machineStatus);
+  const idle = canUpdate && !sendPending && !stopPending;
+  return {
+    isLive,
+    canSend: idle && !isUploading && (isLive || canRestart),
+    canStop: idle && isLive,
+  };
+}
+
+function usePlanningSessionMutations(args: {
+  organizationId: string;
+  factoryId: string;
+  sessionId: string;
+  queryKey: ReturnType<typeof workOrderPlanningSessionQueryKey>;
+  queryClient: QueryClient;
+  setComposer: (value: string) => void;
+  setComposerError: (value: string) => void;
+}) {
+  const { organizationId, factoryId, sessionId, queryKey, queryClient, setComposer, setComposerError } = args;
+  const cacheSession = (next: PlanningSessionPayload) => {
+    queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
+      mergePlanningSessionHistory(previous, next),
+    );
+  };
+  const onMutationSuccess = (next: PlanningSessionPayload) => {
+    cacheSession(next);
+    setComposer("");
+    setComposerError("");
+  };
+  const onMutationError = (error: Error) => {
+    setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
+  };
+  const sendMessage = useMutation({
+    mutationFn: (text: string) => sendPlanningSessionMessage(organizationId, factoryId, sessionId, text),
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+  const answerSurvey = useMutation({
+    mutationFn: (text: string) => answerPlanningSessionSurvey(organizationId, factoryId, sessionId, text),
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+  const stopSession = useMutation({
+    mutationFn: () => endPlanningSession(organizationId, factoryId, sessionId),
+    onSuccess: (next) => {
+      cacheSession(next);
+      setComposerError("");
+    },
+    onError: (error: Error) => {
+      setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedStop));
+    },
+  });
+  return { sendMessage, answerSurvey, stopSession };
+}
+
+function analysisPlanningArgs(args: AnalysisPlanningSessionArgs) {
+  return {
+    organizationId: args.organizationId ?? "",
+    factoryId: args.factoryId ?? "",
+    workOrderId: args.workOrderId ?? "",
+    enabled: args.enabled,
+    canUpdate: args.canUpdate,
+    analysisDelivered: args.analysisDelivered ?? false,
+    isUploading: args.isUploading ?? false,
+    uploadFiles: args.uploadFiles,
+  };
 }
 
 export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
-  const {
-    organizationId = "",
-    factoryId = "",
-    workOrderId = "",
-    enabled,
-    canUpdate,
-    analysisDelivered = false,
-    isUploading = false,
-    uploadFiles,
-  } = args;
+  const { organizationId, factoryId, workOrderId, enabled, canUpdate, analysisDelivered, isUploading, uploadFiles } =
+    analysisPlanningArgs(args);
   const queryClient = useQueryClient();
   const [composer, setComposer] = useState("");
   const [composerError, setComposerError] = useState("");
@@ -176,26 +242,14 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     session,
   });
 
-  const onMutationSuccess = (next: PlanningSessionPayload) => {
-    queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
-      mergePlanningSessionHistory(previous, next),
-    );
-    setComposer("");
-    setComposerError("");
-  };
-  const onMutationError = (error: Error) => {
-    setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
-  };
-
-  const sendMessage = useMutation({
-    mutationFn: (text: string) => sendPlanningSessionMessage(organizationId, factoryId, session?.id ?? "", text),
-    onSuccess: onMutationSuccess,
-    onError: onMutationError,
-  });
-  const answerSurvey = useMutation({
-    mutationFn: (text: string) => answerPlanningSessionSurvey(organizationId, factoryId, session?.id ?? "", text),
-    onSuccess: onMutationSuccess,
-    onError: onMutationError,
+  const { sendMessage, answerSurvey, stopSession } = usePlanningSessionMutations({
+    organizationId,
+    factoryId,
+    sessionId: session?.id ?? "",
+    queryKey,
+    queryClient,
+    setComposer,
+    setComposerError,
   });
 
   const view = usePlanningSessionLiveRun(
@@ -203,13 +257,84 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     analysisView(session, composer, analysisDelivered),
     analysisDelivered,
   );
-  const { isLive, canSend } = analysisSendState(
+  const sendPending = sendMessage.isPending || answerSurvey.isPending;
+  const { isLive, canSend, canStop } = analysisSendState({
     session,
-    view.machineStatus,
+    machineStatus: view.machineStatus,
     canUpdate,
-    sendMessage.isPending || answerSurvey.isPending,
+    sendPending,
     isUploading,
-  );
+    stopPending: stopSession.isPending,
+  });
+  const actions = useAnalysisComposerActions({
+    composer,
+    canSend,
+    canStop,
+    canUpdate,
+    sessionId: session?.id ?? "",
+    sendMessage,
+    answerSurvey,
+    stopSession,
+    setComposerError,
+    queryClient,
+    organizationId,
+    factoryId,
+    workOrderId,
+    uploadFiles,
+  });
+
+  return {
+    organizationId,
+    session,
+    sessionId: session?.id ?? "",
+    queryError: query.error,
+    isLoading: query.isLoading,
+    view,
+    composer,
+    composerError,
+    canSend,
+    canStop,
+    isUploading,
+    isLive,
+    showChat: Boolean(session?.id),
+    onComposerChange: setComposer,
+    stopping: stopSession.isPending,
+    ...actions,
+  };
+}
+
+function useAnalysisComposerActions(args: {
+  composer: string;
+  canSend: boolean;
+  canStop: boolean;
+  canUpdate: boolean;
+  sessionId: string;
+  sendMessage: ReturnType<typeof usePlanningSessionMutations>["sendMessage"];
+  answerSurvey: ReturnType<typeof usePlanningSessionMutations>["answerSurvey"];
+  stopSession: ReturnType<typeof usePlanningSessionMutations>["stopSession"];
+  setComposerError: (value: string) => void;
+  queryClient: QueryClient;
+  organizationId: string;
+  factoryId: string;
+  workOrderId: string;
+  uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
+}) {
+  const {
+    composer,
+    canSend,
+    canStop,
+    canUpdate,
+    sessionId,
+    sendMessage,
+    answerSurvey,
+    stopSession,
+    setComposerError,
+    queryClient,
+    organizationId,
+    factoryId,
+    workOrderId,
+    uploadFiles,
+  } = args;
   const submit = (text: string, send: (body: string) => void) => {
     const trimmed = text.trim();
     if (!trimmed || !canSend) {
@@ -232,6 +357,17 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
       return false;
     }
   };
+  const onStop = async () => {
+    if (!canStop || !sessionId) {
+      return;
+    }
+    setComposerError("");
+    try {
+      await stopSession.mutateAsync();
+    } catch {
+      return;
+    }
+  };
   const onUploadFiles = async (files: FileList | File[]) => {
     if (!uploadFiles) {
       return [];
@@ -244,22 +380,9 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     }
     return uploaded;
   };
-
   return {
-    organizationId,
-    session,
-    sessionId: session?.id ?? "",
-    queryError: query.error,
-    isLoading: query.isLoading,
-    view,
-    composer,
-    composerError,
-    canSend,
-    isUploading,
-    isLive,
-    showChat: Boolean(session?.id),
-    onComposerChange: setComposer,
     onSend,
+    onStop: canUpdate ? onStop : undefined,
     onUploadFiles: uploadFiles ? onUploadFiles : undefined,
     onSubmitSurvey: (text: string) => {
       submit(text, answerSurvey.mutate);

@@ -243,6 +243,7 @@ vi.mock("./planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: vi.fn(async () => null),
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
+  endPlanningSession: vi.fn(),
 }));
 
 const enabledExperimentalFeatures = new Set<string>();

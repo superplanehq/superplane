@@ -91,6 +91,7 @@ export function analysisChat(
     canSend: true,
     onComposerChange: vi.fn(),
     onSend: vi.fn(),
+    onStop: vi.fn(),
     onSubmitSurvey: vi.fn(),
     ...rest,
   };
