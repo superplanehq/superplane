@@ -35,13 +35,12 @@ The control plane provides the SuperPlane user interface, APIs, workflow coordin
 
 | Resource | Recommended |
 | --- | --- |
-| Kubernetes worker nodes | 3 nodes |
+| Kubernetes worker nodes | at least 3 nodes |
 | Capacity per node | 2 vCPU, 8 GiB RAM |-
 
 Additional information:
 - This capacity covers SuperPlane services.
-- PostgreSQL and RabbitMQ can run in the cluster or as managed services, such as Amazon RDS for PostgreSQL and Amazon MQ for RabbitMQ.
-- For production deployments, we recommend using a managed service.
+- For production deployments, we recommend running PostgreSQL and RabbitMQ in managed services, such as Amazon RDS and Amazon MQ.
 - Blob storage uses an external object storage service.
 
 **Single-host installation**
