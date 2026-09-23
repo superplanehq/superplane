@@ -4,12 +4,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { useCallback, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
-import {
-  factoryAppConfigurePath,
-  factoryAppRunPath,
-  factorySettingsSectionPath,
-  jiraIntakeIntegrationIdFromSearch,
-} from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath, factoryAppRunPath, jiraIntakeIntegrationIdFromSearch } from "../lib/factoryPagePaths";
 import { factoryIntakeUpdateInput, intakeConnectionFromSource } from "./intakeConnectionModel";
 import { IntakeConnectionDialogs } from "./IntakeConnectionDialogs";
 import { intakeSettingsConnectionProps } from "./intakeSettingsConnectionProps";
@@ -147,12 +142,7 @@ export function IntakeSettingsHost({
         }
         onClose={onClose}
         initialTab={initialTab}
-        connection={intakeSettingsConnectionProps(
-          intake,
-          connection,
-          savedBinding,
-          factorySettingsSectionPath(organizationId, factoryKey, "organization", "integrations"),
-        )}
+        connection={intakeSettingsConnectionProps(intake, connection, savedBinding)}
         fixed
       />
       <IntakeConnectionDialogs organizationId={organizationId} sourceId={intake.source.id} connection={connection} />
