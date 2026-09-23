@@ -105,7 +105,7 @@ variable "db_password" {
 }
 
 variable "rds_deletion_protection" {
-  description = "Enable deletion protection for RDS instance. Set to false to allow deletion during terraform destroy."
+  description = "Enable deletion protection on the RDS instance. Set this to false and apply before destroy."
   type        = bool
   default     = true
 }

@@ -55,8 +55,28 @@ Access SuperPlane at `https://your-domain.com`
 
 ## Destroy
 
+Deletion protection is enabled for the GKE cluster and the Cloud SQL instance.
+Set both flags to false in `terraform.tfvars`.
+
+```hcl
+gke_deletion_protection = false
+sql_deletion_protection = false
+```
+
+Apply the flags:
+
 ```bash
-gcloud sql instances patch superplane-db --no-deletion-protection
+terraform apply
+```
+
+Destroy the deployment:
+
+```bash
 terraform destroy
+```
+
+The static IP is not a Terraform resource. Delete it after destroy:
+
+```bash
 gcloud compute addresses delete superplane-ip --global
 ```

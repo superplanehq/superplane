@@ -68,7 +68,7 @@ resource "aws_eks_cluster" "superplane" {
       resources = ["secrets"]
     }
   }
-  
+
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   depends_on = [
@@ -119,7 +119,7 @@ resource "aws_launch_template" "eks_nodes" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"  # Enforces IMDSv2
+    http_tokens                 = "required" # Enforces IMDSv2
     http_put_response_hop_limit = 1
     instance_metadata_tags      = "enabled"
   }
@@ -197,8 +197,8 @@ resource "aws_iam_role_policy_attachment" "ebs_csi" {
 # -----------------------------------------------------------------------------
 
 resource "aws_eks_addon" "ebs_csi" {
-  cluster_name = aws_eks_cluster.superplane.name
-  addon_name   = "aws-ebs-csi-driver"
+  cluster_name             = aws_eks_cluster.superplane.name
+  addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = aws_iam_role.ebs_csi.arn
 
   depends_on = [

@@ -93,6 +93,11 @@ resource "aws_security_group" "rds" {
 # RDS PostgreSQL Instance
 # -----------------------------------------------------------------------------
 
+# A new id is created with each instance, so a later destroy does not reuse a snapshot name.
+resource "random_id" "rds_final_snapshot" {
+  byte_length = 4
+}
+
 resource "aws_db_instance" "superplane" {
   identifier = var.db_instance_identifier
 
@@ -120,9 +125,9 @@ resource "aws_db_instance" "superplane" {
   backup_window           = "03:00-04:00"
   maintenance_window      = "Mon:04:00-Mon:05:00"
 
-  deletion_protection = var.rds_deletion_protection
-  skip_final_snapshot = false
-  final_snapshot_identifier = "${var.db_instance_identifier}-final-snapshot"
+  deletion_protection       = var.rds_deletion_protection
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${var.db_instance_identifier}-final-${random_id.rds_final_snapshot.hex}"
 
   tags = {
     Name = var.db_instance_identifier

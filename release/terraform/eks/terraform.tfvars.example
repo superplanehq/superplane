@@ -44,6 +44,9 @@ letsencrypt_email = "admin@example.com"
 # db_name                = "superplane"
 # db_username            = "postgres"
 
+# Set to false and apply before terraform destroy
+# rds_deletion_protection = true
+
 # Optionally provide a database password (otherwise one will be generated)
 # db_password = "your-secure-password"
 
