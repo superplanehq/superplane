@@ -717,12 +717,12 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	require.NoError(t, database.Conn().Create(&node).Error)
 }
 
-var seedUsagePriceBookVersions = []string{"2026-08-31.1", "2026-08-31.2", "2026-09-09.1"}
+var seedUsagePriceBookVersions = []string{"2026-09-23.1"}
 
 func restoreSeedUsagePriceBooks(t require.TestingT) {
 	db := database.Conn()
 	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
 	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
-	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-09.1"))
+	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-23.1"))
 	require.NoError(t, models.LoadCurrentPriceBook(db))
 }

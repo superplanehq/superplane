@@ -3,16 +3,16 @@ import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useState } from "react";
-import { PriceBooksCatalog, PriceBooksMessage } from "./PriceBooksCatalog";
+import { PriceBooksCatalog, PriceBooksMessage, type PriceBookProvider, type PriceBooksTab } from "./PriceBooksCatalog";
 import { usePriceBookCatalog, usePriceBookEdits } from "./usePriceBooks";
-
-type PriceBooksTab = "models" | "vms";
 
 export function PriceBooks() {
   const catalog = usePriceBookCatalog();
   const edits = usePriceBookEdits(catalog);
   const [tab, setTab] = useState<PriceBooksTab>("models");
+  const [provider, setProvider] = useState<PriceBookProvider>("openrouter");
   const [activateOpen, setActivateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useReportPageReady(!catalog.loading);
 
@@ -50,24 +50,26 @@ export function PriceBooks() {
         models={catalog.models}
         vms={catalog.vms}
         tab={tab}
+        provider={provider}
         saving={edits.saving}
         syncing={edits.syncing}
         activating={edits.activating}
+        deleting={edits.deleting}
         versionLoading={catalog.versionLoading}
         pendingVersion={catalog.pendingVersion}
         onTabChange={setTab}
+        onProviderChange={setProvider}
         onVersionChange={(version) => {
           setActivateOpen(false);
+          setDeleteOpen(false);
           void catalog.loadPriceBooks(version);
         }}
-        onModelChange={edits.handleModelChange}
-        onVMChange={edits.handleVMChange}
         onRemoveVM={edits.handleRemoveVM}
-        onAddModel={edits.handleAddModel}
         onAddVM={edits.handleAddVM}
         onSave={edits.handleSave}
         onSync={edits.handleSync}
         onActivate={() => setActivateOpen(true)}
+        onDelete={() => setDeleteOpen(true)}
       />
       <Dialog open={activateOpen} onClose={() => setActivateOpen(false)} size="md">
         <DialogTitle className="text-gray-800 dark:text-gray-100">Use this version</DialogTitle>
@@ -84,6 +86,24 @@ export function PriceBooks() {
           </Button>
           <Button variant="outline" onClick={() => setActivateOpen(false)}>
             Keep current version
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} size="md">
+        <DialogTitle className="text-gray-800 dark:text-gray-100">Delete this version</DialogTitle>
+        <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+          <p>SuperPlane removes this version from the catalog. Past usage keeps recorded costs.</p>
+        </DialogDescription>
+        <DialogActions>
+          <Button
+            data-testid="admin-price-book-delete-confirm"
+            disabled={edits.deleting || catalog.versionLoading}
+            onClick={() => edits.handleDelete(data.version, () => setDeleteOpen(false))}
+          >
+            {edits.deleting ? "Deleting version..." : "Delete this version"}
+          </Button>
+          <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+            Keep this version
           </Button>
         </DialogActions>
       </Dialog>
