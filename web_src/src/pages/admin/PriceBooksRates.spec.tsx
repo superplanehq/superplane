@@ -202,6 +202,53 @@ describe("PriceBooks unused models", () => {
     expect(screen.getByText("other-model")).toBeInTheDocument();
   });
 
+  it("clamps unused pagination when a later reload has fewer rows", async () => {
+    const unusedRate = (index: number) => ({
+      provider: "openrouter",
+      match_key: `other-model-${String(index).padStart(2, "0")}`,
+      match_mode: "exact",
+      input_cents_per_million: 100,
+      output_cents_per_million: 500,
+      cache_read_cents_per_million: 10,
+      cache_write_cents_per_million: 50,
+      reasoning_cents_per_million: 0,
+      selected: false,
+    });
+    const largeCatalog = {
+      ...currentCatalog,
+      models: [currentCatalog.models[0], ...Array.from({ length: 51 }, (_, index) => unusedRate(index))],
+    };
+    const smallCatalog = {
+      ...savedCatalog,
+      models: [currentCatalog.models[0], ...Array.from({ length: 20 }, (_, index) => unusedRate(index))],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "POST" && String(input).startsWith("/admin/api/price-books/sync")) {
+          return jsonResponse({ ...smallCatalog, updated_count: 1, added_count: 0, skipped_providers: [] });
+        }
+        return jsonResponse(largeCatalog);
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByTestId("admin-price-book-unused-toggle"));
+    expect(screen.getByText("other-model-00")).toBeInTheDocument();
+    expect(screen.queryByText("other-model-50")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("other-model-50")).toBeInTheDocument();
+    expect(screen.queryByText("other-model-00")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("admin-price-book-sync"));
+    await waitFor(() => {
+      expect(screen.getByText("other-model-00")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("other-model-50")).not.toBeInTheDocument();
+  });
+
   it("shows empty state when no model is selected", async () => {
     const catalog = {
       ...currentCatalog,

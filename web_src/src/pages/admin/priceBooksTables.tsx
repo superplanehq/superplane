@@ -40,7 +40,7 @@ const MODEL_COLUMNS: { field: ModelSortField; label: string; numeric: boolean }[
 export function ModelsTable({ rows, pageSize }: { rows: IndexedModelRate[]; pageSize?: number }) {
   const sort = useColumnSort<ModelSortField>("model");
   const sorted = useMemo(() => sortModelRows(rows, sort.field, sort.direction), [rows, sort.direction, sort.field]);
-  const offset = usePagedOffset(sort.field, sort.direction, pageSize);
+  const offset = usePagedOffset(sort.field, sort.direction, pageSize, sorted.length);
   const visible = pageSize ? sorted.slice(offset.value, offset.value + pageSize) : sorted;
 
   if (rows.length === 0) {
@@ -175,15 +175,30 @@ function useColumnSort<TField extends string>(initialField: TField) {
   return { field, direction, onSort };
 }
 
-function usePagedOffset(field: string, direction: SortDirection, pageSize: number | undefined) {
-  const resetKey = pageSize ? `${field}:${direction}` : "";
+function usePagedOffset(field: string, direction: SortDirection, pageSize: number | undefined, total: number) {
+  const sortKey = pageSize ? `${field}:${direction}` : "";
   const [offset, setOffset] = useState(0);
-  const [appliedResetKey, setAppliedResetKey] = useState(resetKey);
-  if (appliedResetKey !== resetKey) {
-    setAppliedResetKey(resetKey);
-    setOffset(0);
+  const [appliedSortKey, setAppliedSortKey] = useState(sortKey);
+
+  let nextOffset = offset;
+  if (appliedSortKey !== sortKey) {
+    setAppliedSortKey(sortKey);
+    nextOffset = 0;
+  } else if (pageSize) {
+    if (total <= 0) {
+      nextOffset = 0;
+    } else {
+      const maxOffset = Math.floor((total - 1) / pageSize) * pageSize;
+      if (nextOffset > maxOffset) {
+        nextOffset = maxOffset;
+      }
+    }
   }
-  return { value: offset, setValue: setOffset };
+  if (nextOffset !== offset) {
+    setOffset(nextOffset);
+  }
+
+  return { value: nextOffset, setValue: setOffset };
 }
 
 function sortModelRows(rows: IndexedModelRate[], field: ModelSortField, direction: SortDirection) {
