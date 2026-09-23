@@ -57,7 +57,6 @@ import {
   doneFooterForStatus,
   SPLIT_RUN_DRAFT_NOTE,
   SPLIT_RUN_FAILED_NOTE_TEXT,
-  SPLIT_RUN_WAITING_NOTE,
   type SplitRunFooter,
   type SplitRunFooterKind,
   type SplitRunFooterTone,
@@ -242,12 +241,6 @@ function footerRun(current: FactoriesWorkOrderExecution | undefined): { appId: s
   }
   return { appId, runId };
 }
-
-const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
-  key: "waiting-person",
-  headline: SPLIT_RUN_WAITING_NOTE.headline,
-  text: SPLIT_RUN_WAITING_NOTE.text ?? "",
-};
 
 const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
 
@@ -559,10 +552,11 @@ function waitingReviewSurface(
       checks,
     );
   }
+  const note = notes[0] ?? trackedPullRequestReviewNote(order.pullRequests, order.id);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
-      note: notes[0] ?? trackedPullRequestReviewNote(order.pullRequests, order.id) ?? WAITING_FALLBACK_NOTE,
+      note,
       status: displayStatus,
     }),
     notes,

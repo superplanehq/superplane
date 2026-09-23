@@ -10,7 +10,6 @@ import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, RotateCcw, XI
 export type DecisionFooterKind =
   | "draft"
   | "running"
-  | "waiting"
   | "statusNote"
   | "failed"
   | "completed"
@@ -37,16 +36,6 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     actions: [
       { id: "archive", label: "Archive", emphasis: "quiet" },
       { id: "start", label: "Start", emphasis: "primary" },
-    ],
-  },
-  waiting: {
-    title: "Add refund reconciliation test",
-    headline: "This task needs a decision",
-    text: "Every automation finished. This task is ready to complete.",
-    tone: "waiting",
-    actions: [
-      { id: "reject", label: "Reject", emphasis: "quiet" },
-      { id: "approve", label: "Approve", emphasis: "primary" },
     ],
   },
   statusNote: {

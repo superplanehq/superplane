@@ -216,7 +216,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("keeps a waiting state bar when a waiting order has no notes", () => {
+  it("omits the decision strip when a waiting order has no notes", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "Ship idempotent refund retries",
@@ -231,9 +231,9 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
-    expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.note).toBeUndefined();
+    expect(fixture.footer.attentionCard).toBeUndefined();
+    expect(fixture.footer.actions).toEqual([]);
   });
 
   it("derives pull request review from a tracked pull request when status notes are missing", () => {
@@ -662,8 +662,8 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.note).toBeUndefined();
+    expect(fixture.footer.actions).toEqual([]);
   });
 
   it("marks a failed implement step as failed", () => {
