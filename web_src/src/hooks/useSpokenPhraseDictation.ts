@@ -14,6 +14,7 @@ export type SpokenPhraseField = {
 type FieldSnapshot = {
   committed: string;
   livePhrase: string;
+  segmentId: number;
 };
 
 export type UseSpokenPhraseDictationResult = UseSpeechDictationResult & {
@@ -28,6 +29,7 @@ export function useSpokenPhraseDictation(
   const committedRef = useRef(fieldRef.current.getValue());
   const livePhraseRef = useRef("");
   const valueRef = useRef(fieldRef.current.getValue());
+  const segmentIdRef = useRef(0);
 
   const write = (next: string) => {
     if (next === valueRef.current) {
@@ -37,11 +39,34 @@ export function useSpokenPhraseDictation(
     fieldRef.current.setValue(next);
   };
 
+  const syncFromField = () => {
+    const currentValue = fieldRef.current.getValue();
+    valueRef.current = currentValue;
+    const expectedValue = appendSpokenPhrase(committedRef.current, livePhraseRef.current, fieldRef.current.maxLength);
+    if (currentValue !== expectedValue) {
+      committedRef.current = stripTrailingSpokenPhrase(currentValue, livePhraseRef.current);
+    }
+  };
+
   const resetSnapshot = () => {
     snapshotsRef.current.clear();
     livePhraseRef.current = "";
     committedRef.current = fieldRef.current.getValue();
     valueRef.current = committedRef.current;
+  };
+
+  const finishSegment = () => {
+    segmentIdRef.current += 1;
+  };
+
+  const restoreSnapshot = (saved: FieldSnapshot) => {
+    if (saved.livePhrase && saved.segmentId !== segmentIdRef.current) {
+      committedRef.current = appendSpokenPhrase(saved.committed, saved.livePhrase);
+      livePhraseRef.current = "";
+      return;
+    }
+    committedRef.current = saved.committed;
+    livePhraseRef.current = saved.livePhrase;
   };
 
   const activateField = (nextKey: string) => {
@@ -51,26 +76,20 @@ export function useSpokenPhraseDictation(
     snapshotsRef.current.set(fieldKeyRef.current, {
       committed: committedRef.current,
       livePhrase: livePhraseRef.current,
+      segmentId: segmentIdRef.current,
     });
     fieldKeyRef.current = nextKey;
     const saved = snapshotsRef.current.get(nextKey);
     if (saved) {
-      committedRef.current = saved.committed;
-      livePhraseRef.current = saved.livePhrase;
-      valueRef.current = fieldRef.current.getValue();
-      return;
+      restoreSnapshot(saved);
+    } else {
+      livePhraseRef.current = "";
+      committedRef.current = fieldRef.current.getValue();
     }
-    livePhraseRef.current = "";
-    committedRef.current = fieldRef.current.getValue();
-    valueRef.current = committedRef.current;
+    syncFromField();
   };
 
-  const currentValue = fieldRef.current.getValue();
-  valueRef.current = currentValue;
-  const expectedValue = appendSpokenPhrase(committedRef.current, livePhraseRef.current, fieldRef.current.maxLength);
-  if (currentValue !== expectedValue) {
-    committedRef.current = stripTrailingSpokenPhrase(currentValue, livePhraseRef.current);
-  }
+  syncFromField();
 
   const dictation = useSpeechDictation({
     onFinalPhrase: (phrase) => {
@@ -78,6 +97,7 @@ export function useSpokenPhraseDictation(
       committedRef.current = next;
       livePhraseRef.current = "";
       write(next);
+      finishSegment();
     },
     onInterimPhrase: (livePhrase) => {
       livePhraseRef.current = livePhrase;
@@ -100,6 +120,7 @@ export function useSpokenPhraseDictation(
         livePhraseRef.current = "";
         write(next);
       }
+      finishSegment();
       dictation.stop();
     },
   };

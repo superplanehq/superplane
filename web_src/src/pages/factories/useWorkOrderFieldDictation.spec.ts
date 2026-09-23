@@ -240,6 +240,65 @@ describe("useWorkOrderFieldDictation", () => {
     expect(onTitleChange).not.toHaveBeenCalled();
   });
 
+  it("keeps retained words when focus returns after the phrase is final", () => {
+    const onTitleChange = vi.fn();
+    const onDescriptionChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkOrderFieldDictation({
+        title: "Fix bugs",
+        description: "Notes",
+        maxTitleLength: 256,
+        maxDescriptionLength: 5000,
+        onTitleChange,
+        onDescriptionChange,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+      emitTranscript("hello", false);
+      result.current.rememberTitle();
+      emitTranscript("hello", true);
+      result.current.rememberDescription();
+      emitTranscript("next", true);
+    });
+
+    expect(onDescriptionChange).toHaveBeenLastCalledWith("Notes hello next");
+    expect(onTitleChange).toHaveBeenLastCalledWith("Fix bugs hello");
+  });
+
+  it("appends to an updated title after a cached snapshot", () => {
+    const onTitleChange = vi.fn();
+    const onDescriptionChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ title, description }) =>
+        useWorkOrderFieldDictation({
+          title,
+          description,
+          maxTitleLength: 256,
+          maxDescriptionLength: 5000,
+          onTitleChange,
+          onDescriptionChange,
+        }),
+      { initialProps: { title: "", description: "" } },
+    );
+
+    act(() => {
+      result.current.start();
+      result.current.rememberTitle();
+      result.current.rememberDescription();
+      emitTranscript("Fix refunds", true);
+    });
+    rerender({ title: "Fix refunds", description: "Fix refunds" });
+    act(() => {
+      result.current.rememberTitle();
+      emitTranscript("on checkout", true);
+    });
+
+    expect(onTitleChange).toHaveBeenLastCalledWith("Fix refunds on checkout");
+    expect(onTitleChange.mock.calls.some((call) => call[0] === "on checkout")).toBe(false);
+  });
+
   it("replaces live words after a newline when the field re-renders", () => {
     const onDescriptionChange = vi.fn();
     const { result, rerender } = renderHook(
