@@ -4,17 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BookOpen } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  centsToUsdInput,
-  formatMatchMode,
-  formatMicrosPerSecondUsdPerMinute,
-  usdInputToCents,
-} from "./priceBookFormat";
+import { centsToUsdInput, formatMicrosPerSecondUsdPerMinute, usdInputToCents } from "./priceBookFormat";
 import type { PriceBookModelRate, PriceBookVMRate } from "./priceBooksApi";
 
 export const tableWrapClass =
   "bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70";
-const headerCellClass = "text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400";
+const headerCellClass =
+  "text-left px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400";
 const numericHeaderCellClass = `${headerCellClass} text-right`;
 const bodyCellClass = "px-4 py-2.5 text-gray-700 dark:text-gray-300";
 const numericCellClass = `${bodyCellClass} text-right tabular-nums`;
@@ -81,8 +77,7 @@ export function ModelsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-100 dark:border-gray-700/70">
-            <th className={headerCellClass}>Match</th>
-            <th className={headerCellClass}>Mode</th>
+            <th className={headerCellClass}>Model</th>
             <th className={numericHeaderCellClass}>Input</th>
             <th className={numericHeaderCellClass}>Output</th>
             <th className={numericHeaderCellClass}>Cache read</th>
@@ -92,9 +87,8 @@ export function ModelsTable({
         </thead>
         <tbody>
           {rows.map(({ rate, index }) => (
-            <tr key={`${rate.match_key}:${rate.match_mode}`} className={rowClass}>
+            <tr key={`${rate.provider}:${rate.match_key}:${rate.match_mode}`} className={rowClass}>
               <td className={`${bodyCellClass} font-mono text-xs`}>{rate.match_key}</td>
-              <td className={bodyCellClass}>{formatMatchMode(rate.match_mode)}</td>
               {(
                 [
                   ["input_cents_per_million", rate.input_cents_per_million],
@@ -176,7 +170,7 @@ export function VMsTable({
   onRemove: (index: number) => void;
 }) {
   if (rates.length === 0) {
-    return <EmptyRatesMessage message="This version has no VM rates." />;
+    return <EmptyRatesMessage message="This version has no machine rates." />;
   }
 
   return (

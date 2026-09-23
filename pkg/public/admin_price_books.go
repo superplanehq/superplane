@@ -23,6 +23,7 @@ type adminPriceBookVersion struct {
 }
 
 type adminPriceBookModelRate struct {
+	Provider                  string `json:"provider"`
 	MatchKey                  string `json:"match_key"`
 	MatchMode                 string `json:"match_mode"`
 	InputCentsPerMillion      int64  `json:"input_cents_per_million"`
@@ -88,10 +89,15 @@ func (s *Server) adminSavePriceBooks(w http.ResponseWriter, r *http.Request) {
 
 	rates := make([]models.UsagePriceBookRate, 0, len(req.Models)+len(req.VMs))
 	for _, model := range req.Models {
+		mode := model.MatchMode
+		if strings.TrimSpace(mode) == "" {
+			mode = models.UsagePriceBookMatchExact
+		}
 		rates = append(rates, models.UsagePriceBookRate{
 			UsageKind:                 models.UsageKindModel,
+			Provider:                  model.Provider,
 			MatchKey:                  model.MatchKey,
-			MatchMode:                 model.MatchMode,
+			MatchMode:                 mode,
 			InputCentsPerMillion:      model.InputCentsPerMillion,
 			OutputCentsPerMillion:     model.OutputCentsPerMillion,
 			CacheReadCentsPerMillion:  model.CacheReadCentsPerMillion,
@@ -169,9 +175,53 @@ func (s *Server) adminActivatePriceBook(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, payload)
 }
 
+func (s *Server) adminDeletePriceBook(w http.ResponseWriter, r *http.Request) {
+	version := strings.TrimSpace(r.URL.Query().Get("version"))
+	if version == "" {
+		http.Error(w, "Version is required", http.StatusBadRequest)
+		return
+	}
+
+	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return models.DeleteUsagePriceBook(tx, version)
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Price book not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, models.ErrUsagePriceBookCurrent) {
+			http.Error(w, "You cannot delete the current price book. Switch to another version first.", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, models.ErrUsagePriceBookLast) {
+			http.Error(w, "You cannot delete the last price book.", http.StatusConflict)
+			return
+		}
+		log.Errorf("admin: failed to delete price book %s: %v", version, err)
+		http.Error(w, "Failed to delete price book", http.StatusInternalServerError)
+		return
+	}
+
+	payload, status, message := loadAdminPriceBooks(database.DB(r.Context()), "")
+	if status != http.StatusOK {
+		http.Error(w, message, status)
+		return
+	}
+	respondJSON(w, payload)
+}
+
 func (s *Server) adminSyncPriceBooks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	sync, err := s.collectCatalogRates(ctx, database.DB(ctx))
+	provider := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("provider")))
+	if provider == "" {
+		provider = models.UsageProviderOpenRouter
+	}
+	if provider != models.UsageProviderOpenRouter {
+		http.Error(w, catalogPricesUnavailableMessage(provider), http.StatusBadRequest)
+		return
+	}
+	sync, err := s.collectCatalogRates(ctx, database.DB(ctx), provider)
 	if err != nil {
 		if errors.Is(err, errNoPricedCatalogProvider) {
 			http.Error(w, "No enabled provider publishes catalog prices", http.StatusBadRequest)
@@ -232,6 +282,17 @@ var errNoPricedCatalogProvider = errors.New("no enabled provider publishes catal
 
 const adminPriceBookConflictMessage = "The current price book changed. Load the latest version and try again."
 
+func catalogPricesUnavailableMessage(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case models.UsageProviderAnthropic:
+		return "The Anthropic API does not publish prices."
+	case models.UsageProviderOpenAI:
+		return "The OpenAI API does not publish prices."
+	default:
+		return "This provider does not publish catalog prices."
+	}
+}
+
 func writePublishPriceBookError(w http.ResponseWriter, err error) {
 	if errors.Is(err, models.ErrUsagePriceBookConflict) {
 		http.Error(w, adminPriceBookConflictMessage, http.StatusConflict)
@@ -252,7 +313,7 @@ type catalogSync struct {
 // collectCatalogRates reads the current rates and merges provider catalog
 // prices into them. It runs outside a transaction because it calls provider
 // HTTP APIs.
-func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB) (catalogSync, error) {
+func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB, targetProvider string) (catalogSync, error) {
 	current, err := models.FindCurrentUsagePriceBook(tx)
 	if err != nil {
 		return catalogSync{}, err
@@ -271,14 +332,12 @@ func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB) (catalogS
 		baseVersion: current.Version,
 		skipped:     make([]string, 0),
 	}
-	fetchedPricedProvider := false
 	for _, provider := range providers {
-		if !provider.Enabled || !provider.HasAPIKey() {
+		if provider.Provider != targetProvider {
 			continue
 		}
-		if provider.Provider != models.UsageProviderOpenRouter {
-			sync.skipped = append(sync.skipped, provider.Provider)
-			continue
+		if !provider.Enabled || !provider.HasAPIKey() {
+			return catalogSync{}, errNoPricedCatalogProvider
 		}
 
 		apiKey, decryptErr := llm.DecryptAPIKey(ctx, s.encryptor, provider.Provider, provider.APIKey)
@@ -293,42 +352,35 @@ func (s *Server) collectCatalogRates(ctx context.Context, tx *gorm.DB) (catalogS
 		)
 		if listErr != nil {
 			if errors.Is(listErr, llm.ErrNoCatalogPrices) {
-				sync.skipped = append(sync.skipped, provider.Provider)
-				continue
+				return catalogSync{}, errNoPricedCatalogProvider
 			}
 			return catalogSync{}, listErr
 		}
 
-		fetchedPricedProvider = true
 		var updated, added int
-		sync.rates, updated, added = models.ApplyCatalogPrices(sync.rates, filterCatalogPrices(prices, provider.AllowedModels))
+		sync.rates, updated, added = models.ApplyCatalogPrices(sync.rates, catalogModelPrices(provider.Provider, prices))
 		sync.updated += updated
 		sync.added += added
+		return sync, nil
 	}
 
-	if !fetchedPricedProvider {
-		return catalogSync{}, errNoPricedCatalogProvider
-	}
-	return sync, nil
+	return catalogSync{}, errNoPricedCatalogProvider
 }
 
-func filterCatalogPrices(prices []llm.CatalogPrice, allowlist []string) []models.CatalogModelPrice {
-	provider := models.HostedLLMProvider{AllowedModels: allowlist}
-	filtered := make([]models.CatalogModelPrice, 0)
+func catalogModelPrices(provider string, prices []llm.CatalogPrice) []models.CatalogModelPrice {
+	mapped := make([]models.CatalogModelPrice, 0, len(prices))
 	for _, price := range prices {
-		if !catalogPriceAllowed(provider, price.ID) {
+		id := pricebook.CatalogModelID(price.ID)
+		if id == "" {
 			continue
 		}
-		filtered = append(filtered, models.CatalogModelPrice{ModelID: price.ID, Rate: price.Rate})
+		mapped = append(mapped, models.CatalogModelPrice{
+			Provider: provider,
+			ModelID:  id,
+			Rate:     price.Rate,
+		})
 	}
-	return filtered
-}
-
-func catalogPriceAllowed(provider models.HostedLLMProvider, id string) bool {
-	if provider.AllowsModel(id) {
-		return true
-	}
-	return provider.AllowsModel(pricebook.NormalizeModelID(id))
+	return mapped
 }
 
 func loadAdminPriceBooks(tx *gorm.DB, requestedVersion string) (adminPriceBooksResponse, int, string) {
@@ -408,41 +460,13 @@ func buildAdminPriceBooksResponse(
 
 	allowlist := hostedModelAllowlist(providers)
 
-	prefixes := make([]pricebook.PrefixRate, 0)
-	families := make([]pricebook.FamilyRate, 0)
-	for _, row := range rows {
-		if row.UsageKind != models.UsageKindModel {
-			continue
-		}
-		rate := pricebook.Rate{
-			Input:      row.InputCentsPerMillion,
-			Output:     row.OutputCentsPerMillion,
-			CacheRead:  row.CacheReadCentsPerMillion,
-			CacheWrite: row.CacheWriteCentsPerMillion,
-			Reasoning:  row.ReasoningCentsPerMillion,
-		}
-		switch row.MatchMode {
-		case models.UsagePriceBookMatchPrefix:
-			prefixes = append(prefixes, pricebook.PrefixRate{Prefix: row.MatchKey, Rate: rate})
-		case models.UsagePriceBookMatchFamily:
-			families = append(families, pricebook.FamilyRate{Token: row.MatchKey, Rate: rate})
-		}
-	}
-	selectedKeys := make(map[string]bool)
-	for _, model := range allowlist {
-		match, ok := pricebook.MatchModel(model, prefixes, families)
-		if ok {
-			selectedKeys[match.Key+"\x00"+match.Mode] = true
-		}
-	}
-
 	modelRates := make([]adminPriceBookModelRate, 0)
 	vmRates := make([]adminPriceBookVMRate, 0)
 	for _, row := range rows {
 		switch strings.TrimSpace(row.UsageKind) {
 		case models.UsageKindModel:
-			key := row.MatchKey + "\x00" + row.MatchMode
 			modelRates = append(modelRates, adminPriceBookModelRate{
+				Provider:                  row.Provider,
 				MatchKey:                  row.MatchKey,
 				MatchMode:                 row.MatchMode,
 				InputCentsPerMillion:      row.InputCentsPerMillion,
@@ -450,7 +474,7 @@ func buildAdminPriceBooksResponse(
 				CacheReadCentsPerMillion:  row.CacheReadCentsPerMillion,
 				CacheWriteCentsPerMillion: row.CacheWriteCentsPerMillion,
 				ReasoningCentsPerMillion:  row.ReasoningCentsPerMillion,
-				Selected:                  selectedKeys[key],
+				Selected:                  allowlist[hostedAllowlistKey{provider: row.Provider, model: row.MatchKey}],
 			})
 		case models.UsageKindCompute:
 			vmRates = append(vmRates, adminPriceBookVMRate{
@@ -472,16 +496,23 @@ func buildAdminPriceBooksResponse(
 	}
 }
 
-func hostedModelAllowlist(providers []models.HostedLLMProvider) []string {
-	allowlist := make([]string, 0)
+type hostedAllowlistKey struct {
+	provider string
+	model    string
+}
+
+func hostedModelAllowlist(providers []models.HostedLLMProvider) map[hostedAllowlistKey]bool {
+	allowlist := map[hostedAllowlistKey]bool{}
 	for _, provider := range providers {
 		if !provider.OffersHostedModels() {
 			continue
 		}
 		for _, model := range provider.AllowedModels {
-			if strings.TrimSpace(model) != "" {
-				allowlist = append(allowlist, model)
+			key := strings.ToLower(strings.TrimSpace(pricebook.CatalogModelID(model)))
+			if key == "" {
+				continue
 			}
+			allowlist[hostedAllowlistKey{provider: provider.Provider, model: key}] = true
 		}
 	}
 	return allowlist
