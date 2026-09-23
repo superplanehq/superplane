@@ -1,17 +1,38 @@
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { useId, type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction } from "react";
 
-import type { IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import { IntakeEventRow } from "./IntakeEventRow";
+import {
+  INTAKE_SETTINGS_COPY,
+  intakeSettingsSectionDomId,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
-const SENTRY_INTAKE_SETTINGS_COPY = {
-  intakeSection: "Create task when:",
-  newIssues: "A new issue is created",
-  regressedIssues: "An issue becomes unresolved",
-  assignedIssues: "An issue is assigned",
-} as const;
+const SENTRY_INTAKE_EVENTS = [
+  {
+    key: "sentryNewIssues",
+    title: "A new issue is created",
+    description: "Sentry adds an issue.",
+    testId: "sentry-intake-new-issues",
+  },
+  {
+    key: "sentryRegressedIssues",
+    title: "An issue becomes unresolved",
+    description: "Sentry marks a resolved issue as unresolved.",
+    testId: "sentry-intake-regressed-issues",
+  },
+  {
+    key: "sentryAssignedIssues",
+    title: "An issue is assigned",
+    description: "A person assigns the issue.",
+    testId: "sentry-intake-assigned-issues",
+  },
+] as const satisfies ReadonlyArray<{
+  key: "sentryNewIssues" | "sentryRegressedIssues" | "sentryAssignedIssues";
+  title: string;
+  description: string;
+  testId: string;
+}>;
 
 export function SentryIntakeFilterFields({
   sourceId,
@@ -21,8 +42,9 @@ export function SentryIntakeFilterFields({
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  /** Kept for callers that still pass a layout. The event list is always a stack. */
+  layout?: "stack" | "grid";
 }) {
-  const idPrefix = useId();
   if (sourceId !== "sentry-exceptions") {
     return null;
   }
@@ -33,55 +55,26 @@ export function SentryIntakeFilterFields({
 
   return (
     <div className="flex flex-col gap-6">
-      <fieldset className="min-w-0">
-        <legend className="workspace-section-title">{SENTRY_INTAKE_SETTINGS_COPY.intakeSection}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          <IntakeSettingsCheckbox
-            id={`${idPrefix}-new-issues`}
-            title={SENTRY_INTAKE_SETTINGS_COPY.newIssues}
-            checked={settings.sentryNewIssues}
-            onChange={() => update("sentryNewIssues", !settings.sentryNewIssues)}
-          />
-          <IntakeSettingsCheckbox
-            id={`${idPrefix}-regressed-issues`}
-            title={SENTRY_INTAKE_SETTINGS_COPY.regressedIssues}
-            checked={settings.sentryRegressedIssues}
-            onChange={() => update("sentryRegressedIssues", !settings.sentryRegressedIssues)}
-          />
-          <IntakeSettingsCheckbox
-            id={`${idPrefix}-assigned-issues`}
-            title={SENTRY_INTAKE_SETTINGS_COPY.assignedIssues}
-            checked={settings.sentryAssignedIssues}
-            onChange={() => update("sentryAssignedIssues", !settings.sentryAssignedIssues)}
-          />
+      <section id={intakeSettingsSectionDomId("triggers")} className="scroll-mt-6 min-w-0">
+        <h3 className="workspace-section-title">{INTAKE_SETTINGS_COPY.eventsThatCreateTasks}</h3>
+        <p className="mt-1 text-[13px] text-muted-foreground">{INTAKE_SETTINGS_COPY.eventsThatCreateTasksHelper}</p>
+        <div
+          className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border"
+          role="group"
+          aria-label={INTAKE_SETTINGS_COPY.eventsThatCreateTasks}
+        >
+          {SENTRY_INTAKE_EVENTS.map((event) => (
+            <IntakeEventRow
+              key={event.key}
+              title={event.title}
+              description={event.description}
+              active={settings[event.key]}
+              onToggle={() => update(event.key, !settings[event.key])}
+              testId={event.testId}
+            />
+          ))}
         </div>
-      </fieldset>
-    </div>
-  );
-}
-
-function IntakeSettingsCheckbox({
-  id,
-  title,
-  checked,
-  onChange,
-}: {
-  id: string;
-  title: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-        checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
-      )}
-    >
-      <Checkbox id={id} checked={checked} onChange={onChange} />
-      <Label htmlFor={id} className="min-w-0 cursor-pointer text-[13px] font-medium tracking-[-0.01em] text-foreground">
-        {title}
-      </Label>
+      </section>
     </div>
   );
 }

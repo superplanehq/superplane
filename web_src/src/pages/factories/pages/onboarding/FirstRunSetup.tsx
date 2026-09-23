@@ -1,4 +1,3 @@
-import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { organizationMatchesRoute } from "@/lib/accountOrganizations";
@@ -7,10 +6,11 @@ import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
+import { FirstRunAgentScreen } from "./first-run/FirstRunAgentScreen";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
@@ -24,10 +24,8 @@ import {
   useFreshConnectionsOnConnectScreen,
   type FirstRunScreen,
   type FirstRunSetupFlow,
-  type IntegrationId,
   type OnboardingPageModel,
 } from "./useFirstRunSetupFlow";
-import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
@@ -63,56 +61,21 @@ function signOut() {
   window.location.href = "/logout";
 }
 
-function AgentScreen({
-  organizationId,
-  setup,
-  chrome,
-  sphere,
-  saving,
-  loading,
-  onRequestConnect,
-  onContinue,
-}: {
-  organizationId: string;
-  setup: OnboardingSetupApi;
-  chrome: FirstRunChrome;
-  sphere?: FirstRunSphereProps;
-  saving: boolean;
-  loading: boolean;
-  onRequestConnect: (id: IntegrationId) => void;
-  onContinue: () => void;
-}) {
-  return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
-      <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{AGENT_STEP.purpose}</p>
-      </FirstRunHeading>
-
-      <div className="mt-8 space-y-4">
-        {loading ? (
-          <p className="text-[13px] text-muted-foreground" role="status">
-            {FIRST_RUN_COPY.agent.loading}
-          </p>
-        ) : null}
-        <fieldset disabled={saving || loading} className="contents">
-          <FirstRunPanel>
-            <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={onRequestConnect} />
-          </FirstRunPanel>
-        </fieldset>
-        <LoadingButton
-          type="button"
-          className="w-full"
-          disabled={!setup.agentReady || loading}
-          loading={saving}
-          loadingText={FIRST_RUN_COPY.finish.saving}
-          onClick={onContinue}
-          data-testid="first-run-finish-setup"
-        >
-          {FIRST_RUN_COPY.finish.action}
-        </LoadingButton>
-      </div>
-    </FirstRunShell>
-  );
+function agentJiraCompletion(
+  organizationId: string,
+  ticketSource: FirstRunSetupFlow["ticketSource"],
+  model: OnboardingPageModel,
+) {
+  if (ticketSource !== "jira" || !model.jiraProjectId || !model.jiraIntegrationId) {
+    return undefined;
+  }
+  return {
+    organizationId,
+    integrationId: model.jiraIntegrationId,
+    projectId: model.jiraProjectId,
+    value: model.jiraCompletion,
+    onChange: model.setJiraCompletion,
+  };
 }
 
 /**
@@ -175,6 +138,7 @@ function TicketsScreenHost({
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
       jiraCompletion={model.jiraCompletion}
+      showJiraCompletion={flow.skipAgentScreen}
       organizationId={organizationId}
       jiraIntegrationId={model.jiraIntegrationId}
       onSelectTicketSource={flow.selectTicketSource}
@@ -296,15 +260,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   }
 
   return (
-    <AgentScreen
-      organizationId={organizationId}
-      setup={setup}
+    <FirstRunAgentScreen
       chrome={chromeFor("agent")}
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.blockingAction === "finishing-setup" || model.saving}
       loading={model.agentLoading}
-      onRequestConnect={model.requestConnect}
+      agentReady={setup.agentReady}
+      intro={AGENT_STEP.purpose}
+      jiraCompletion={agentJiraCompletion(organizationId, flow.ticketSource, model)}
       onContinue={() => void flow.finishSetup()}
-    />
+    >
+      <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={model.requestConnect} />
+    </FirstRunAgentScreen>
   );
 }
