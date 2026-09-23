@@ -52,17 +52,45 @@ func TestEstimateMicros_OpenRouterGatewayPrefixedModel(t *testing.T) {
 	assert.Equal(t, int64(150_000), gemini)
 }
 
+func TestEstimateMicros_ExactCatalogIDWins(t *testing.T) {
+	t.Cleanup(Reset)
+	Replace(Book{
+		Version: "test-exact",
+		ExactRates: []ExactRate{
+			{Provider: "openrouter", ModelID: "x-ai/grok-4.6", Rate: Rate{Input: 200}},
+		},
+	})
+
+	got := EstimateMicros("openrouter", "openrouter/x-ai/grok-4.6", 1_000_000, 0, 0, 0, 0)
+	assert.Equal(t, int64(2_000_000), got)
+	assert.True(t, IsPriced("openrouter", "x-ai/grok-4.6"))
+}
+
+func TestEstimateMicros_ExactOpenRouterFreeCatalogID(t *testing.T) {
+	t.Cleanup(Reset)
+	Replace(Book{
+		Version: "test-free",
+		ExactRates: []ExactRate{
+			{Provider: "openrouter", ModelID: "openrouter/free", Rate: Rate{Input: 50}},
+		},
+	})
+
+	got := EstimateMicros("openrouter", "openrouter/openrouter/free", 1_000_000, 0, 0, 0, 0)
+	assert.Equal(t, int64(500_000), got)
+	assert.True(t, IsPriced("openrouter", "openrouter/free"))
+}
+
 func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 	got := EstimateMicros("openai", "unknown-lab-model", 10_000, 10_000, 0, 0, 0)
 	assert.Equal(t, int64(0), got)
 }
 
 func TestIsPriced(t *testing.T) {
-	assert.True(t, IsPriced("claude-sonnet-4-6"))
-	assert.True(t, IsPriced("openrouter/anthropic/claude-sonnet-4-6"))
-	assert.True(t, IsPriced("openrouter/x-ai/grok-4.6"))
-	assert.True(t, IsPriced("google/gemini-3.7-flash"))
-	assert.False(t, IsPriced("unknown-lab-model"))
+	assert.True(t, IsPriced("anthropic", "claude-sonnet-4-6"))
+	assert.True(t, IsPriced("openrouter", "openrouter/anthropic/claude-sonnet-4-6"))
+	assert.True(t, IsPriced("openrouter", "openrouter/x-ai/grok-4.6"))
+	assert.True(t, IsPriced("openrouter", "google/gemini-3.7-flash"))
+	assert.False(t, IsPriced("openai", "unknown-lab-model"))
 }
 
 func TestEstimateMicros_OpenAICacheReadIsPriced(t *testing.T) {
