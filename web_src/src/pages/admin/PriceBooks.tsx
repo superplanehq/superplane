@@ -67,7 +67,6 @@ export function PriceBooks() {
         onModelChange={edits.handleModelChange}
         onVMChange={edits.handleVMChange}
         onRemoveVM={edits.handleRemoveVM}
-        onAddModel={edits.handleAddModel}
         onAddVM={edits.handleAddVM}
         onSave={edits.handleSave}
         onSync={edits.handleSync}

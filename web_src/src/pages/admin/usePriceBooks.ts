@@ -177,10 +177,6 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
   const [syncing, setSyncing] = useState(false);
   const [activating, setActivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const modelKeys = useMemo(
-    () => new Set(catalog.models.map((rate) => `${rate.provider}:${rate.match_key}:${rate.match_mode}`)),
-    [catalog.models],
-  );
   const vmKeys = useMemo(
     () => new Set(catalog.vms.map((rate) => `${rate.match_key}:${rate.match_mode}`)),
     [catalog.vms],
@@ -191,7 +187,6 @@ export function usePriceBookEdits(catalog: PriceBookEditCatalog) {
     syncing,
     activating,
     deleting,
-    handleAddModel: (rate: PriceBookModelRate) => appendUniqueModel(catalog.models, modelKeys, rate, catalog.setModels),
     handleAddVM: (rate: PriceBookVMRate) => appendUniqueVM(catalog.vms, vmKeys, rate, catalog.setVMs),
     handleSave: () => void saveCurrentRates(catalog, setSaving),
     handleSync: (provider: string) => void syncCurrentRates(catalog, provider, setSyncing),
@@ -246,30 +241,6 @@ function normalizeVMMatchKey(matchKey: string): string | undefined {
     return undefined;
   }
   return key;
-}
-
-function appendUniqueModel(
-  models: PriceBookModelRate[],
-  keys: Set<string>,
-  rate: PriceBookModelRate,
-  setModels: Dispatch<SetStateAction<PriceBookModelRate[]>>,
-): boolean {
-  const key = rate.match_key.trim().toLowerCase();
-  const provider = rate.provider.trim().toLowerCase();
-  if (provider === "") {
-    showErrorToast("Select a provider.");
-    return false;
-  }
-  if (key === "") {
-    showErrorToast("Enter a model.");
-    return false;
-  }
-  if (keys.has(`${provider}:${key}:${rate.match_mode}`)) {
-    showErrorToast("That model rate already exists.");
-    return false;
-  }
-  setModels([...models, { ...rate, provider, match_key: key }]);
-  return true;
 }
 
 function appendUniqueVM(

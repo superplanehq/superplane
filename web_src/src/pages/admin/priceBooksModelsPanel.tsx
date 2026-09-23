@@ -6,7 +6,6 @@ import { hostedProviderLabel } from "@/lib/hostedCredit";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import AdminPagination from "./AdminPagination";
-import { AddModelRateForm } from "./priceBooksForms";
 import { EmptyRatesMessage, ModelsTable } from "./priceBooksTables";
 import type { PriceBookModelRate } from "./priceBooksApi";
 
@@ -28,7 +27,6 @@ export function ModelsPanel({
   actionsDisabled,
   onProviderChange,
   onModelChange,
-  onAddModel,
   onSave,
   onSync,
 }: {
@@ -40,7 +38,6 @@ export function ModelsPanel({
   actionsDisabled: boolean;
   onProviderChange: (provider: PriceBookProvider) => void;
   onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
-  onAddModel: (rate: PriceBookModelRate) => boolean;
   onSave: () => void;
   onSync: (provider: PriceBookProvider) => void;
 }) {
@@ -116,7 +113,6 @@ export function ModelsPanel({
           />
         </>
       )}
-      {isCurrent && <AddModelRateForm provider={provider} disabled={actionsDisabled} onAdd={onAddModel} />}
     </>
   );
 }

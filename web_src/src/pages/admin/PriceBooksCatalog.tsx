@@ -60,7 +60,6 @@ type PriceBooksCatalogProps = {
   onModelChange: (index: number, patch: Partial<PriceBookModelRate>) => void;
   onVMChange: (index: number, patch: Partial<PriceBookVMRate>) => boolean;
   onRemoveVM: (index: number) => void;
-  onAddModel: (rate: PriceBookModelRate) => boolean;
   onAddVM: (rate: PriceBookVMRate) => boolean;
   onSave: () => void;
   onSync: (provider: PriceBookProvider) => void;
@@ -115,7 +114,6 @@ export function PriceBooksCatalog(props: PriceBooksCatalogProps) {
             actionsDisabled={actionsDisabled}
             onProviderChange={props.onProviderChange}
             onModelChange={props.onModelChange}
-            onAddModel={props.onAddModel}
             onSave={props.onSave}
             onSync={props.onSync}
           />
