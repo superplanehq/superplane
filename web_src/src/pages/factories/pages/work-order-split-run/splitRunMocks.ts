@@ -73,6 +73,7 @@ import type {
 import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
 import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
 import { withNotifyImplementLog } from "./splitRunNotifyFixture";
+import { trackedPullRequestReviewNote } from "./splitRunPullRequestReview";
 
 export type SplitRunPhaseId = string;
 
@@ -561,7 +562,7 @@ function waitingReviewSurface(
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
-      note: notes[0] ?? WAITING_FALLBACK_NOTE,
+      note: notes[0] ?? trackedPullRequestReviewNote(order.pullRequests, order.id) ?? WAITING_FALLBACK_NOTE,
       status: displayStatus,
     }),
     notes,

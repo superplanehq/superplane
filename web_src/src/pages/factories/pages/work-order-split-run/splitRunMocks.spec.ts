@@ -30,6 +30,7 @@ import {
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
+import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
   return {
@@ -233,6 +234,36 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footer.note?.headline).toBe("This task needs a decision");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+  });
+
+  it("derives pull request review from a tracked pull request when status notes are missing", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        pullRequests: [
+          {
+            id: "pr-6812",
+            workOrderId: "wo-1",
+            number: "6812",
+            url: "https://github.com/acme/payments/pull/6812",
+            state: "STATE_OPEN",
+          },
+        ],
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(isPullRequestReviewFooter(fixture.footer)).toBe(true);
+    expect(fixture.footer.note?.cta).toEqual({
+      label: "Review PR #6812",
+      href: "https://github.com/acme/payments/pull/6812",
+    });
   });
 
   it("does not treat a missing execution step index as the first step", () => {
