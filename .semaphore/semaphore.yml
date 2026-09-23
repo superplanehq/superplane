@@ -205,9 +205,8 @@ after_pipeline:
         commands:
           - test-results gen-pipeline-report
 
-# Runner promotions require SuperPlane deployment targets runner-images,
-# runner-s3, and runner-ami. Attach GHCR_TOKEN, aws-prod, runner-s3,
-# aws-prod-ami-builder, and aws-credentials there. Do not use production.
+# Create SuperPlane targets runner-images, runner-s3, and runner-ami,
+# then set deployment_target on the runner promotions. Do not use production.
 promotions:
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
@@ -217,16 +216,13 @@ promotions:
 
   - name: Publish runner images
     pipeline_file: runner-docker-publish.yml
-    deployment_target: runner-images
     auto_promote:
       when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
 
   - name: Publish runner binaries to S3
     pipeline_file: runner-binary-s3.yml
-    deployment_target: runner-s3
     auto_promote:
       when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
 
   - name: Build runner AMIs
     pipeline_file: runner-build-amis.yml
-    deployment_target: runner-ami

@@ -1,5 +1,5 @@
 # Promoted when /runner is green on main.
-# Credentials come from the runner-images deployment target (GHCR_TOKEN).
+# After runner-images exists, set deployment_target on the deploy promotion.
 version: v1.0
 name: Publish runner Docker images
 
@@ -11,7 +11,6 @@ agent:
 promotions:
   - name: Deploy runner services
     pipeline_file: runner-deploy-services.yml
-    deployment_target: runner-images
     auto_promote:
       when: "result = 'passed'"
 

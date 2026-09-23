@@ -1,4 +1,4 @@
-# Credentials come from the runner-ami deployment target (aws-prod-ami-builder).
+# After runner-ami exists, set deployment_target on the release promotion.
 version: v1.0
 name: Build runner AMIs
 agent:
@@ -9,7 +9,6 @@ agent:
 promotions:
   - name: Release runner AMIs
     pipeline_file: runner-release-amis.yml
-    deployment_target: runner-ami
 
 blocks:
   - name: Build AMIs (amd64 + arm64)
