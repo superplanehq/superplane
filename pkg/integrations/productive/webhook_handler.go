@@ -3,7 +3,7 @@ package productive
 import (
 	"errors"
 	"fmt"
-	"slices"
+	"net/url"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -94,7 +94,7 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 	tokens := make([]string, 0, len(remoteWebhookEvents))
 
 	for _, event := range remoteWebhookEvents {
-		webhook, err := client.CreateWebhook(ctx.Webhook.GetURL(), event.eventID, event.eventName)
+		webhook, err := client.CreateWebhook(eventTargetURL(ctx.Webhook.GetURL(), event.eventName), event.eventID, event.eventName)
 		if err != nil {
 			h.deleteRemoteWebhooks(client, ids)
 
@@ -106,14 +106,16 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 		}
 
 		ids = append(ids, webhook.ID)
-		if token := strings.TrimSpace(webhook.SignatureToken); token != "" && !slices.Contains(tokens, token) {
-			tokens = append(tokens, token)
+		token := strings.TrimSpace(webhook.SignatureToken)
+		if token == "" {
+			h.deleteRemoteWebhooks(client, ids)
+			return nil, fmt.Errorf("productive.io did not return a webhook signature token")
 		}
-	}
 
-	if len(tokens) == 0 {
-		h.deleteRemoteWebhooks(client, ids)
-		return nil, fmt.Errorf("productive.io did not return a webhook signature token")
+		// Store event=token for each webhook. A unique token names the
+		// event. When both webhooks share a token, the event query on
+		// the target URL names it instead.
+		tokens = append(tokens, event.eventName+"="+token)
 	}
 
 	if err := ctx.Webhook.SetSecret([]byte(strings.Join(tokens, "\n"))); err != nil {
@@ -141,6 +143,22 @@ func (h *ProductiveWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error
 	}
 
 	return h.deleteRemoteWebhooks(client, ids)
+}
+
+// eventTargetURL puts the event on the target URL. Productive.io does not
+// send an event header, and two webhooks can share one signature token.
+// The query value is used only when the signature token does not name
+// one event by itself.
+func eventTargetURL(webhookURL, eventName string) string {
+	parsed, err := url.Parse(webhookURL)
+	if err != nil {
+		return webhookURL
+	}
+
+	query := parsed.Query()
+	query.Set("event", eventName)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func (h *ProductiveWebhookHandler) deleteRemoteWebhooks(client *Client, ids []string) error {

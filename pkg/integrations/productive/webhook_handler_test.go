@@ -61,7 +61,7 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 		webhookMetadata, ok := metadata.(*WebhookMetadata)
 		require.True(t, ok)
 		assert.Equal(t, []string{"555", "556"}, webhookMetadata.IDs)
-		assert.Equal(t, []byte("sig-token"), webhook.Secret)
+		assert.Equal(t, []byte("task.created=sig-token\ntask.updated=sig-token"), webhook.Secret)
 
 		require.Len(t, httpContext.Requests, 2)
 		bodies := []string{}
@@ -76,6 +76,8 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 		}
 		assert.Contains(t, strings.Join(bodies, "\n"), `"event_id":1`)
 		assert.Contains(t, strings.Join(bodies, "\n"), `"event_id":24`)
+		assert.Contains(t, strings.Join(bodies, "\n"), "event=task.created")
+		assert.Contains(t, strings.Join(bodies, "\n"), "event=task.updated")
 	})
 
 	t.Run("webhooks_limit_exceeded is surfaced as a plan limitation", func(t *testing.T) {

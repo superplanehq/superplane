@@ -33,8 +33,7 @@ const (
 	ResourceTypeProject = "project"
 
 	// TaskCreatedEvent and TaskUpdatedEvent name the change a task event
-	// carries, in the "meta" object of the emitted envelope. SuperPlane
-	// asks Productive.io to send the same names in EventHeader.
+	// carries, in the "meta" object of the emitted envelope.
 	TaskCreatedEvent = "task.created"
 	TaskUpdatedEvent = "task.updated"
 
@@ -57,8 +56,9 @@ const (
 	TaskTypeRegular   = 1
 	TaskTypeMilestone = 3
 
-	// EventHeader is set as a Productive.io custom header on each remote
-	// webhook so a shared SuperPlane URL can tell created from updated.
+	// EventHeader is a custom header SuperPlane asks Productive.io to send.
+	// Productive.io does not send it on real deliveries, so the signature
+	// token is what tells a created task from an updated task.
 	EventHeader = "X-Productive-Event"
 
 	// SignatureHeader carries Productive.io's HMAC of timestamp + "." + body.
@@ -96,44 +96,115 @@ func actionForEvent(event string) (string, bool) {
 	}
 }
 
-// verifyWebhookSignature checks Productive-Signature (t=<unix>, s=<hex>)
-// against HMAC-SHA256 of timestamp + "." + raw body, keyed with the
-// signature token Productive.io returned at registration.
-func verifyWebhookSignature(ctx core.WebhookRequestContext) (int, error) {
+// webhookSecretEntry is one Productive.io signature token and the event
+// that webhook was registered for. A delivery is signed with exactly one
+// of these tokens, which is how SuperPlane tells created from updated.
+type webhookSecretEntry struct {
+	event string
+	token string
+}
+
+// signedWebhookEvent checks Productive-Signature (t=<unix>, s=<hex>)
+// against HMAC-SHA256 of timestamp + "." + raw body. When one stored
+// token matches, it returns that token's event. When several tokens
+// match, the event is empty and the caller may use EventHeader.
+func signedWebhookEvent(ctx core.WebhookRequestContext) (string, int, error) {
 	timestamp, signature, ok := parseProductiveSignature(ctx.Headers.Get(SignatureHeader))
 	if !ok {
-		return http.StatusForbidden, fmt.Errorf("missing %s header", SignatureHeader)
+		return "", http.StatusForbidden, fmt.Errorf("missing %s header", SignatureHeader)
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
+		return "", http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	if len(secret) == 0 {
-		return http.StatusInternalServerError, fmt.Errorf("missing webhook secret")
+	entries := webhookSecretEntries(secret)
+	if len(entries) == 0 {
+		return "", http.StatusInternalServerError, fmt.Errorf("missing webhook secret")
 	}
 
-	for _, token := range webhookSecretTokens(secret) {
-		if hmac.Equal([]byte(strings.ToLower(signature)), []byte(webhookSignatureHex(token, timestamp, ctx.Body))) {
-			return http.StatusOK, nil
-		}
-	}
-
-	return http.StatusForbidden, fmt.Errorf("invalid webhook signature")
-}
-
-func webhookSecretTokens(secret []byte) [][]byte {
-	parts := strings.Split(string(secret), "\n")
-	tokens := make([][]byte, 0, len(parts))
-	for _, part := range parts {
-		token := strings.TrimSpace(part)
-		if token == "" {
+	matched := []string{}
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		expected := webhookSignatureHex([]byte(entry.token), timestamp, ctx.Body)
+		if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
 			continue
 		}
-		tokens = append(tokens, []byte(token))
+		if seen[entry.event] {
+			continue
+		}
+		seen[entry.event] = true
+		matched = append(matched, entry.event)
 	}
-	return tokens
+
+	if len(matched) == 0 {
+		return "", http.StatusForbidden, fmt.Errorf("invalid webhook signature")
+	}
+	if len(matched) == 1 {
+		return matched[0], http.StatusOK, nil
+	}
+	return "", http.StatusOK, nil
+}
+
+// webhookSecretEntries reads the signature tokens stored at registration.
+// New records are "event=token" lines. Older records with two lines are
+// created then updated. One older line is a token both webhooks shared,
+// so it does not name the event.
+func webhookSecretEntries(secret []byte) []webhookSecretEntry {
+	lines := []string{}
+	for _, part := range strings.Split(string(secret), "\n") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			lines = append(lines, part)
+		}
+	}
+
+	labeled := false
+	for _, line := range lines {
+		if strings.Contains(line, "=") {
+			labeled = true
+			break
+		}
+	}
+	if !labeled {
+		return legacyWebhookSecretEntries(lines)
+	}
+
+	entries := make([]webhookSecretEntry, 0, len(lines))
+	for _, line := range lines {
+		event, token, ok := strings.Cut(line, "=")
+		event = strings.TrimSpace(event)
+		token = strings.TrimSpace(token)
+		if !ok || event == "" || token == "" {
+			continue
+		}
+		entries = append(entries, webhookSecretEntry{event: event, token: token})
+	}
+	return entries
+}
+
+func legacyWebhookSecretEntries(tokens []string) []webhookSecretEntry {
+	// The previous registration stored one copy of a token that both
+	// webhooks shared. That copy does not say which event arrived.
+	if len(tokens) < 2 {
+		if len(tokens) == 0 {
+			return nil
+		}
+		return []webhookSecretEntry{{token: tokens[0]}}
+	}
+
+	entries := make([]webhookSecretEntry, 0, len(tokens))
+	for i, token := range tokens {
+		if i >= len(remoteWebhookEvents) {
+			break
+		}
+		entries = append(entries, webhookSecretEntry{
+			event: remoteWebhookEvents[i].eventName,
+			token: token,
+		})
+	}
+	return entries
 }
 
 func webhookSignatureHex(secret []byte, timestamp string, body []byte) string {
