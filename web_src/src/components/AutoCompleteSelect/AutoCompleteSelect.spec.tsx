@@ -44,6 +44,7 @@ describe("AutoCompleteSelect", () => {
     );
 
     expect(screen.getByLabelText("Project")).toHaveAttribute("id", "project-select");
+    expect(screen.getByLabelText("Project")).toHaveAttribute("data-slot", "input");
   });
 
   it("does not open when disabled", async () => {

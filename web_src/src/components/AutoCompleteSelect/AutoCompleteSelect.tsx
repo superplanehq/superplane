@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useFloating, autoUpdate, offset, flip, shift, size } from "@floating-ui/react";
 import { ChevronDownIcon } from "lucide-react";
 import { Icon } from "@/components/Icon";
+import { Input } from "@/components/ui/input";
 import { selectTriggerClassName } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -191,7 +192,7 @@ export function AutoCompleteSelect({
         }}
       >
         {showSelectedLabel ? <span className="flex-1 min-w-0 truncate">{selectedOption?.label}</span> : null}
-        <input
+        <Input
           ref={inputRef}
           id={id}
           type="text"
@@ -199,7 +200,9 @@ export function AutoCompleteSelect({
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           className={cn(
-            "flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-muted-foreground",
+            "h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 py-0 shadow-none",
+            "focus:border-transparent focus:shadow-none focus:ring-0",
+            "placeholder:text-muted-foreground",
             showSelectedLabel && "sr-only",
           )}
           placeholder={placeholder}

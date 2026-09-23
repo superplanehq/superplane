@@ -1,6 +1,7 @@
 import { AutoCompleteSelect } from "@/components/AutoCompleteSelect/AutoCompleteSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useLayoutEffect, useMemo } from "react";
@@ -135,16 +136,7 @@ function UpdateIssueSwitch({
   onChange: (next: JiraCompletionColumnValue) => void;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={JIRA_COMPLETION_COLUMN_COPY.update}
-      data-testid="jira-move-on-complete"
-      data-active={checked ? "true" : "false"}
-      onClick={() => onChange({ ...value, jiraMoveOnComplete: !value.jiraMoveOnComplete })}
-      className="flex w-full items-center gap-4 px-3 py-2.5 text-left hover:bg-accent/40"
-    >
+    <div className="flex w-full items-center gap-4 px-3 py-2.5 text-left">
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-medium tracking-[-0.01em] text-foreground">
           {JIRA_COMPLETION_COLUMN_COPY.update}
@@ -153,21 +145,14 @@ function UpdateIssueSwitch({
           {JIRA_COMPLETION_COLUMN_COPY.updateDescription}
         </span>
       </span>
-      <span
-        aria-hidden
-        className={cn(
-          "relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors",
-          checked ? "bg-foreground" : "bg-muted-foreground/30",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 size-4 rounded-full bg-background shadow-sm transition-transform",
-            checked ? "translate-x-4" : "translate-x-0.5",
-          )}
-        />
-      </span>
-    </button>
+      <Switch
+        checked={checked}
+        onCheckedChange={(jiraMoveOnComplete) => onChange({ ...value, jiraMoveOnComplete })}
+        aria-label={JIRA_COMPLETION_COLUMN_COPY.update}
+        data-testid="jira-move-on-complete"
+        data-active={checked ? "true" : "false"}
+      />
+    </div>
   );
 }
 
