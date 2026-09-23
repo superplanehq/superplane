@@ -42,11 +42,11 @@ import {
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
   DEFAULT_FACTORY_PLANNING,
+  DRAFT_WORK_ORDER,
   factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
-  DRAFT_WORK_ORDER,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
@@ -113,6 +113,7 @@ const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummar
 const useFactoryBoardWorkOrders = vi.fn(() => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
+  isPlaceholderData: false,
   backlog: idleBoardPage(),
   open: idleBoardPage(),
   done: idleBoardPage(),
@@ -284,6 +285,7 @@ async function resetLinesBoardMocks() {
   useFactoryBoardWorkOrders.mockImplementation(() => ({
     workOrders: useFactoryWorkOrders().data ?? [],
     isLoading: false,
+    isPlaceholderData: false,
     backlog: idleBoardPage(),
     open: idleBoardPage(),
     done: idleBoardPage(),
@@ -330,6 +332,7 @@ describe("LinesPage board", () => {
     useFactoryBoardWorkOrders.mockReturnValue({
       workOrders: [],
       isLoading: true,
+      isPlaceholderData: false,
       backlog: idleBoardPage(),
       open: idleBoardPage(),
       done: idleBoardPage(),
@@ -1856,6 +1859,7 @@ describe("LinesPage Implement phase window", () => {
     useFactoryBoardWorkOrders.mockReturnValue({
       workOrders: orders,
       isLoading: false,
+      isPlaceholderData: false,
       backlog: idleBoardPage(),
       open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
       done: idleBoardPage(),
