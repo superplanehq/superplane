@@ -86,7 +86,7 @@ describe("workOrderPopupMode", () => {
     ).toBe("analysis");
   });
 
-  it("keeps a draft that never had a refinement session in classic mode", () => {
+  it("uses the analysis popup for a draft that never had a refinement session", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,
@@ -96,7 +96,7 @@ describe("workOrderPopupMode", () => {
         hasLookupIdentity: true,
         isDraft: true,
       }),
-    ).toBe("classic");
+    ).toBe("analysis");
   });
 
   it("uses the analysis popup for a started task while artifacts load", () => {
@@ -113,7 +113,7 @@ describe("workOrderPopupMode", () => {
     ).toBe("analysis");
   });
 
-  it("waits for artifacts before keeping an unrefined draft in classic mode", () => {
+  it("waits for artifacts before opening an unrefined draft", () => {
     expect(
       workOrderPopupMode({
         hasPlanningSession: false,

@@ -3,6 +3,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
   composeIntentDocument,
+  EMPTY_INTENT_DOCUMENT,
   INTENT_ARTIFACT_NAME,
   SPEC_ARTIFACT_NAME,
   type IntentDocument,
@@ -21,21 +22,16 @@ import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 export type SplitRunPopupTab = "description" | "log";
 
 export function refinePopupShowsAutomations(args: {
-  mode: "classic" | "analysis";
   footerKind: SplitRunFixture["footer"]["kind"];
   sourceOnly?: boolean;
 }) {
   if (args.sourceOnly) {
     return true;
   }
-  return !(args.mode === "analysis" && args.footerKind === "draft");
+  return args.footerKind !== "draft";
 }
 
-/** Classic Description uses a 3/2 reading-to-side split. */
-export const SPLIT_RUN_PANE_GRID_CLASSNAME =
-  "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
-
-/** Refine overlay size. Chat-only is 48rem. Plan open is 80rem. Classic stays 70rem. */
+/** Refine overlay size. Chat-only is 48rem. Plan open is 80rem. */
 export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
   "has-[[data-refine-chat-solo]]:w-[min(48rem,calc(100vw-5rem))] has-[[data-refine-plan-open]]:w-[min(80rem,calc(100vw-5rem))] transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
@@ -204,10 +200,14 @@ export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]):
 export function splitRunIntentDocument(args: {
   artifacts: FactoriesWorkOrderArtifact[];
   description: string;
+  skipDescriptionFallback?: boolean;
 }): IntentDocument {
   const intent = splitRunIntentMarkdown(args.artifacts);
   if (intent) {
     return parseIntentDocument(intent);
+  }
+  if (args.skipDescriptionFallback) {
+    return EMPTY_INTENT_DOCUMENT;
   }
   return composeIntentDocument(args.description, firstArtifactMarkdown(args.artifacts, PLAN_NAMES));
 }
@@ -242,18 +242,6 @@ export function splitRunLinkedArtifacts(
       }
       return !isOriginTicketArtifact(artifact, source);
     })
-    .sort(compareArtifactsByCreatedAt);
-}
-
-/** Classic mode keeps the analysis document in the artifact list. */
-export function classicSplitRunLinkedArtifacts(
-  artifacts: FactoriesWorkOrderArtifact[],
-  source?: SplitRunSource,
-): FactoriesWorkOrderArtifact[] {
-  return artifacts
-    .filter(
-      (artifact) => !DESCRIPTION_NAMES.includes(artifactName(artifact)) && !isOriginTicketArtifact(artifact, source),
-    )
     .sort(compareArtifactsByCreatedAt);
 }
 

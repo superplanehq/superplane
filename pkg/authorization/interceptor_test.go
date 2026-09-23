@@ -305,11 +305,31 @@ func TestCreateFactoryAutomationRequiresCustomAutomationsFeature(t *testing.T) {
 	assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCustomAutomations}, rule.RequiredExperimentalFeatures)
 }
 
+func TestMergeRoutesRequirePullRequestMergeFeature(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	required := []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge}
+	routes := []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/mergeability"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"},
+	}
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, required, rule.RequiredExperimentalFeatures)
+		if route.Method == http.MethodGet {
+			assert.Equal(t, "read", rule.Action)
+			continue
+		}
+		assert.Equal(t, "update", rule.Action)
+	}
+}
+
 func TestAgentResourceRoutesRequireWorkspaceAgentResourcesFeature(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	required := []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources}
 	routes := []HTTPRoute{
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/agent-resources"},
+		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/agent-resources"},
 		{Method: http.MethodPatch, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"},
 		{Method: http.MethodDelete, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"},

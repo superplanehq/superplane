@@ -18,16 +18,17 @@ import {
 } from "../planningSessionView";
 import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
 
-const POLL_MS = 1500;
-
 export function workOrderPlanningSessionQueryKey(organizationId: string, factoryId: string, workOrderId: string) {
-  return ["planning-session-by-work-order", organizationId, factoryId, workOrderId] as const;
+  return factoryQueryKeys.planningSession(organizationId, factoryId, workOrderId);
 }
 
 export const ANALYSIS_PLANNING_COPY = {
   composerPlaceholder: "Tell the agent more about this task",
   send: "Send",
   sendShortcut: "Enter",
+  dictate: "Dictate",
+  stopDictation: "Stop dictation",
+  microphoneDenied: "Microphone access was denied. Allow access and try again.",
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
   failedStop: "The analysis did not stop. Try again.",
@@ -39,31 +40,20 @@ type AnalysisPlanningSessionArgs = {
   factoryId?: string;
   workOrderId?: string;
   enabled: boolean;
-  pollForSession?: boolean;
   canUpdate: boolean;
   analysisDelivered?: boolean;
   isUploading?: boolean;
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 };
 
-export function analysisSessionPollInterval(
-  pollForSession: boolean,
-  session: PlanningSessionPayload | null | undefined,
-) {
-  if (session && session.state !== "ended") {
-    return POLL_MS;
-  }
-  return pollForSession && !session ? POLL_MS : false;
-}
-
 function usePlanningSessionLookup(
-  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled" | "pollForSession">> & {
+  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled">> & {
     organizationId: string;
     factoryId: string;
     workOrderId: string;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled, pollForSession } = args;
+  const { organizationId, factoryId, workOrderId, enabled } = args;
   return useQuery<PlanningSessionPayload | null>({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -73,8 +63,7 @@ function usePlanningSessionLookup(
         previous as PlanningSessionPayload | null | undefined,
         next as PlanningSessionPayload | null,
       ),
-    refetchInterval: (current) =>
-      analysisSessionPollInterval(pollForSession, current.state.data as PlanningSessionPayload | null | undefined),
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -93,6 +82,9 @@ async function refreshAnalysisWorkOrder(
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
     }),
     queryClient.invalidateQueries({
       queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
@@ -221,7 +213,6 @@ function analysisPlanningArgs(args: AnalysisPlanningSessionArgs) {
     factoryId: args.factoryId ?? "",
     workOrderId: args.workOrderId ?? "",
     enabled: args.enabled,
-    pollForSession: args.pollForSession ?? false,
     canUpdate: args.canUpdate,
     analysisDelivered: args.analysisDelivered ?? false,
     isUploading: args.isUploading ?? false,
@@ -230,17 +221,8 @@ function analysisPlanningArgs(args: AnalysisPlanningSessionArgs) {
 }
 
 export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
-  const {
-    organizationId,
-    factoryId,
-    workOrderId,
-    enabled,
-    pollForSession,
-    canUpdate,
-    analysisDelivered,
-    isUploading,
-    uploadFiles,
-  } = analysisPlanningArgs(args);
+  const { organizationId, factoryId, workOrderId, enabled, canUpdate, analysisDelivered, isUploading, uploadFiles } =
+    analysisPlanningArgs(args);
   const queryClient = useQueryClient();
   const [composer, setComposer] = useState("");
   const [composerError, setComposerError] = useState("");
@@ -250,7 +232,6 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
-    pollForSession,
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({

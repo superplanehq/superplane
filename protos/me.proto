@@ -152,6 +152,11 @@ message MeResponse {
   User user = 1;
 }
 
+message BrowserNotificationPreferences {
+  bool enabled = 1;
+  bool show_while_viewing = 2;
+}
+
 message User {
   string id = 1;
   string name = 2;
@@ -163,6 +168,7 @@ message User {
   repeated string roles = 8;
   repeated string groups = 9;
   bool is_owner = 10;
+  BrowserNotificationPreferences browser_notification_preferences = 11;
 }
 
 message RegenerateTokenResponse {

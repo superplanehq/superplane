@@ -6,8 +6,9 @@ import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
-import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
-import { ClassicWorkOrderPopup } from "./ClassicWorkOrderPopup";
+import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
+import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
@@ -53,7 +54,6 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     factoryId,
     workOrderId: orderId,
     enabled: canLookupSession,
-    pollForSession: refinementEnabled && isAnalyzing,
     canUpdate,
     isUploading: fileUpload.isUploading,
     uploadFiles: fileUpload.uploadFiles,
@@ -78,10 +78,7 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} fixed={fixed} onClose={onClose} />;
   }
-  if (mode === "analysis") {
-    return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
-  }
-  return <ClassicWorkOrderPopup {...props} popupData={popupData} sessionLookupError={analysis.queryError} />;
+  return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
 }
 
 function LoadingWorkOrderPopup({ title, fixed, onClose }: { title: string; fixed: boolean; onClose?: () => void }) {
@@ -171,40 +168,43 @@ function AnalysisWorkOrderPopup({
       className={analysisPopupClassName(fullPage, sourceOnly)}
       onDismiss={onClose}
     >
-      <SplitRunPopupTabs
-        fixture={viewFixture}
-        edits={edits}
-        popupData={popupData}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        lineId={lineId}
-        tab={tab}
-        onTabChange={setTab}
-        canUpdate={canUpdate}
-        footerActions={footerActions}
-        resultFooter={descriptionReview}
-        sidebarNote={showSidebarNote ? review : undefined}
-        analysis={stripAnalysis}
-        sourceOnly={sourceOnly}
-        header={analysisPopupHeader({
-          edits,
-          fixture,
-          organizationId,
-          factoryKey,
-          orderNumber,
-          lineId,
-          onClose,
-          fullPage,
-          toggleFullPage,
-          mutations,
-          footerBusy: footerActions.busy,
-          reviewActions,
-        })}
-      />
-      {sourceOnly || (!showSidebarNote && tab !== "description") ? review : null}
+      <LiveHeaderSpendProvider>
+        <SplitRunPopupTabs
+          fixture={viewFixture}
+          edits={edits}
+          popupData={popupData}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          orderId={orderId}
+          orderNumber={orderNumber}
+          lineId={lineId}
+          tab={tab}
+          onTabChange={setTab}
+          canUpdate={canUpdate}
+          footerActions={footerActions}
+          resultFooter={descriptionReview}
+          sidebarNote={showSidebarNote ? review : undefined}
+          analysis={stripAnalysis}
+          sourceOnly={sourceOnly}
+          sessionLookupError={analysis.queryError?.message}
+          header={analysisPopupHeader({
+            edits,
+            fixture,
+            organizationId,
+            factoryKey,
+            orderNumber,
+            lineId,
+            onClose,
+            fullPage,
+            toggleFullPage,
+            mutations,
+            footerBusy: footerActions.busy,
+            reviewActions,
+          })}
+        />
+        {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
+      </LiveHeaderSpendProvider>
     </PopupShell>
   );
 }
@@ -262,7 +262,7 @@ function analysisPopupHeader(args: {
       }
       accessory={views}
     >
-      <OwnerTimeCostRow
+      <LiveOwnerTimeCostRow
         fixture={{ ...args.fixture, owner: args.edits.owner }}
         assigneeIds={args.edits.assigneeIds}
         usageByModel={args.fixture.usageByModel}
@@ -403,6 +403,13 @@ function analysisReviewCompact(
 
 function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
   return !sourceOnly && !showSidebarNote && tab === "description";
+}
+
+function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
+  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
+    return review;
+  }
+  return null;
 }
 
 /** The split-run dialog width applies only to the Planning layout in a fixed popup. */

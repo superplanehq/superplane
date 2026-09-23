@@ -22,7 +22,12 @@ import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import type { PlanningSessionPayload } from "../pages/planningSessionView";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
-import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import {
+  DEFAULT_FACTORY_USAGE,
+  EMPTY_USAGE_REPORT,
+  ACTIVE_TRIAL_ENDS_AT,
+  type StorybookUsageReport,
+} from "./usageReportFixtures";
 import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
@@ -382,6 +387,8 @@ export interface FactoriesFixture {
   intakeItemCatalog?: BacklogIntakeItemCatalog;
   /** Workspace agent resources (MCP connections and skill shells). */
   agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
+  /** Tools returned by GET .../agent-resources/{id}/tools. */
+  agentResourceToolsById?: Record<string, Array<{ name: string; description?: string }>>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
@@ -424,7 +431,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationBilling: {
     plan: "trial",
     planSource: "system",
-    trialEndsAt: "2026-09-22T12:00:00.000Z",
+    trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",

@@ -6,7 +6,6 @@ import { useWorkOrder } from "@/hooks/useFactoryData";
 
 import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
-import { ClassicWorkOrderSplitRunOverview } from "./ClassicWorkOrderSplitRunOverview";
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { splitRunStatusLabel, type SplitRunFixture } from "./splitRunMocks";
@@ -20,7 +19,6 @@ import { WorkOrderSplitRunBody } from "./WorkOrderSplitRunBody";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 type SplitRunPopupTabsProps = {
-  mode?: "classic" | "analysis";
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
@@ -43,7 +41,6 @@ type SplitRunPopupTabsProps = {
 };
 
 function SplitRunPopupOverview({
-  mode,
   fixture,
   edits,
   popupData,
@@ -57,10 +54,8 @@ function SplitRunPopupOverview({
   sidebarNote,
   analysis,
   sourceOnly,
-  sessionLookupError,
 }: Pick<
   SplitRunPopupTabsProps,
-  | "mode"
   | "fixture"
   | "edits"
   | "popupData"
@@ -73,34 +68,7 @@ function SplitRunPopupOverview({
   | "sidebarNote"
   | "analysis"
   | "sourceOnly"
-  | "sessionLookupError"
 > & { files?: FilesFile[] }) {
-  if (mode === "classic") {
-    return (
-      <ClassicWorkOrderSplitRunOverview
-        description={edits.description}
-        artifacts={popupData.artifacts}
-        artifactsLoading={popupData.artifactsLoading}
-        pullRequests={popupData.pullRequests}
-        pullRequestsLoading={popupData.pullRequestsLoading}
-        pullRequestsError={popupData.pullRequestsError}
-        checks={fixture.checks}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        files={files}
-        expandFirstCheck={fixture.footer.kind === "draft"}
-        canEditDescription={edits.canEditDescription}
-        descriptionBusy={edits.descriptionBusy}
-        onDescriptionSave={edits.saveDescription}
-        source={fixture.source}
-        sessionLookupError={sessionLookupError}
-        sidebarNote={sidebarNote}
-      />
-    );
-  }
   return (
     <WorkOrderSplitRunOverview
       title={edits.title}
@@ -133,7 +101,6 @@ function SplitRunPopupOverview({
 }
 
 export function SplitRunPopupTabs({
-  mode = "analysis",
   fixture,
   edits,
   popupData,
@@ -162,7 +129,6 @@ export function SplitRunPopupTabs({
   });
   const description = (
     <SplitRunPopupOverview
-      mode={mode}
       fixture={fixture}
       edits={edits}
       popupData={popupData}
@@ -176,15 +142,18 @@ export function SplitRunPopupTabs({
       sidebarNote={sidebarNote}
       analysis={analysis}
       sourceOnly={sourceOnly}
-      sessionLookupError={sessionLookupError}
     />
   );
-  const showAutomations = refinePopupShowsAutomations({ mode, footerKind: fixture.footer.kind, sourceOnly });
+  const showAutomations = refinePopupShowsAutomations({ footerKind: fixture.footer.kind, sourceOnly });
+  const lookupErrorNote = sessionLookupErrorNote(sessionLookupError);
   if (!showAutomations) {
     return (
       <>
         {header(null)}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{description}</div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {lookupErrorNote}
+          {description}
+        </div>
       </>
     );
   }
@@ -206,9 +175,14 @@ export function SplitRunPopupTabs({
         />,
       )}
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+        {lookupErrorNote}
         {description}
       </TabsContent>
-      <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <TabsContent
+        value="log"
+        forceMount
+        className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+      >
         <WorkOrderSplitRunBody
           organizationId={organizationId}
           factoryId={factoryId}
@@ -225,6 +199,17 @@ export function SplitRunPopupTabs({
         />
       </TabsContent>
     </Tabs>
+  );
+}
+
+function sessionLookupErrorNote(error?: string) {
+  if (!error) {
+    return null;
+  }
+  return (
+    <p className="shrink-0 px-8 pt-4 text-[13px] text-destructive" role="alert">
+      The refinement session did not load. Refresh the page to try again.
+    </p>
   );
 }
 

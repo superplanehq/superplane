@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
+import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { showErrorToast } from "@/lib/toast";
 
@@ -97,7 +97,10 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleAttach = async (files: FileList | File[]) => {
-    const uploaded = (await uploadAcceptedFiles(files)).filter((file) => file.isImage);
+    // The create dialog keeps its image-only attach stack; text files stay on the description editor.
+    const uploaded = (await uploadAcceptedFiles(Array.from(files).filter(isSupportedImageFile))).filter(
+      (file) => file.isImage,
+    );
     if (uploaded.length === 0) {
       return;
     }

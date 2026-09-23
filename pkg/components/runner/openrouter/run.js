@@ -534,14 +534,23 @@ function ensureOpenCodeModelCatalog(
     return "bundled";
   }
 
-  const reason = refreshResult.error
-    ? `: ${refreshResult.error.message}`
-    : refreshResult.status !== 0
-      ? `: refresh exited with status ${refreshResult.status}`
-      : ": the refreshed catalog does not list the model";
+  if (catalogRefreshFailed(refreshResult)) {
+    return "unavailable";
+  }
+
   throw new Error(
-    `OpenCode could not refresh metadata for ${catalogModelId(model)}${reason}`,
+    `OpenCode could not refresh metadata for ${catalogModelId(model)}: the refreshed catalog does not list the model`,
   );
+}
+
+function catalogRefreshFailed(result) {
+  if (!result) {
+    return true;
+  }
+  if (result.error) {
+    return true;
+  }
+  return result.status !== 0;
 }
 
 function ensureXdgDirs(taskDir) {
@@ -626,6 +635,11 @@ async function runPrompt(promptFile, model, helpers = {}) {
   if (catalogSource === "bundled") {
     printLiveLogLine(
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
+    );
+  }
+  if (catalogSource === "unavailable") {
+    printLiveLogLine(
+      `Model catalog refresh unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
     );
   }
   writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);

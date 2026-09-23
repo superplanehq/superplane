@@ -1,14 +1,19 @@
-import type { FormEvent, ReactNode } from "react";
-import { ArrowUp, Loader2, Square } from "lucide-react";
+import { useRef, type FormEvent, type ReactNode } from "react";
+import { ArrowUp, FileText, Loader2, Square, X } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
+import { useSpeechDictation, type UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { appendSpokenPhrase } from "@/lib/appendSpokenPhrase";
 import { cn } from "@/lib/utils";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
+import { DictateButton } from "../../DictateButton";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -196,10 +201,20 @@ function AnalysisComposer({
   showStop: boolean;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
+  const composerRef = useRef(analysis.composer);
+  composerRef.current = analysis.composer;
+  const dictation = useSpeechDictation({
+    onFinalPhrase: (phrase) => {
+      const next = appendSpokenPhrase(composerRef.current, phrase);
+      composerRef.current = next;
+      analysis.onComposerChange(next);
+    },
+  });
   const send = async () => {
     if (!canSubmit) {
       return;
     }
+    dictation.stop();
     const pending = images.takePending();
     const result = await analysis.onSend(appendUploadedWorkOrderImages(analysis.composer, pending));
     if (result === false) {
@@ -259,17 +274,7 @@ function AnalysisComposer({
               rows={2}
             />
             <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
-              <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
-                {analysis.onUploadFiles ? (
-                  <CreateWorkOrderRequestAttachButton
-                    disabled={!images.canAttach}
-                    onAttach={(files) => void images.attach(files)}
-                  />
-                ) : null}
-                {images.previewImages.length > 0 ? (
-                  <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
-                ) : null}
-              </div>
+              <AnalysisComposerAddons analysis={analysis} images={images} dictation={dictation} />
               <AnalysisComposerActions
                 canSubmit={canSubmit}
                 showStop={showStop}
@@ -324,6 +329,35 @@ function AnalysisComposerActions({
   );
 }
 
+function AnalysisComposerAddons({
+  analysis,
+  images,
+  dictation,
+}: {
+  analysis: IntentAnalysisChat;
+  images: ReturnType<typeof useAnalysisComposerImages>;
+  dictation: UseSpeechDictationResult;
+}) {
+  return (
+    <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
+      {analysis.onUploadFiles ? (
+        <CreateWorkOrderRequestAttachButton
+          accept={WORK_ORDER_FILE_ACCEPT}
+          disabled={!images.canAttach}
+          onAttach={(files) => void images.attach(files)}
+        />
+      ) : null}
+      <DictateButton dictation={dictation} copy={ANALYSIS_PLANNING_COPY} disabled={!analysis.canSend} />
+      {images.previewImages.length > 0 ? (
+        <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
+      ) : null}
+      {images.pendingFiles.length > 0 ? (
+        <PendingWorkOrderFileChips files={images.pendingFiles} onRemove={images.remove} />
+      ) : null}
+    </div>
+  );
+}
+
 function AnalysisStopButton({
   onStop,
   stopping,
@@ -351,6 +385,42 @@ function AnalysisStopButton({
         <Square className="size-3 fill-current" aria-hidden />
       )}
     </InputGroupButton>
+  );
+}
+
+function PendingWorkOrderFileChips({
+  files,
+  onRemove,
+}: {
+  files: UploadedWorkOrderFile[];
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-end gap-1.5" data-testid="create-work-order-request-file-chips">
+      {files.map((file) => (
+        <span
+          key={file.id}
+          className="flex max-w-44 items-center gap-1 rounded-md border bg-card px-1.5 py-1 text-[12px] text-foreground"
+          data-testid={`create-work-order-request-file-${file.id}`}
+        >
+          <FileText className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="truncate" title={file.filename}>
+            {file.filename}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="size-4 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Remove ${file.filename}`}
+            data-testid={`create-work-order-request-file-remove-${file.id}`}
+            onClick={() => onRemove(file.id)}
+          >
+            <X className="size-3" aria-hidden />
+          </Button>
+        </span>
+      ))}
+    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import {
   analysisChat,
@@ -308,6 +309,11 @@ describe("WorkOrderIntentDocument", () => {
       </StrictMode>,
     );
 
+    expect(screen.queryByRole("heading", { name: INTENT_DOCUMENT_TITLE })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the spec" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).not.toHaveAttribute("data-reveal");
+
     rerender(
       <TooltipProvider>
         <StrictMode>
@@ -316,6 +322,8 @@ describe("WorkOrderIntentDocument", () => {
       </TooltipProvider>,
     );
 
+    expect(screen.queryByRole("status", { name: "Loading the spec" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-reveal");
     expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
     expect(screen.getByRole("heading", { name: "Constraints" })).toBeInTheDocument();
   });

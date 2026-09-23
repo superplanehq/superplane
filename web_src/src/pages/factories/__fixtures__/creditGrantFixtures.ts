@@ -1,5 +1,7 @@
 import type { OrganizationsOrganizationCreditGrant } from "@/api-client";
 
+import { IN_FOURTEEN_DAYS } from "./factoryPageIds";
+
 /** Storybook payload for GET /organizations/{id}/credit-grants. */
 export const DEFAULT_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
   {
@@ -7,7 +9,7 @@ export const DEFAULT_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
     kind: "welcome",
     amountCents: "5000",
     createdAt: "2026-08-01T12:00:00.000Z",
-    expiresAt: "2026-09-22T12:00:00.000Z",
+    expiresAt: IN_FOURTEEN_DAYS,
   },
 ];
 
@@ -39,6 +41,6 @@ export const MIXED_CREDIT_GRANTS: OrganizationsOrganizationCreditGrant[] = [
     kind: "welcome",
     amountCents: "5000",
     createdAt: "2026-08-01T12:00:00.000Z",
-    expiresAt: "2026-09-22T12:00:00.000Z",
+    expiresAt: IN_FOURTEEN_DAYS,
   },
 ];

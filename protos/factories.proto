@@ -310,19 +310,6 @@ service Factories {
     };
   }
 
-  rpc ListFactoryPullRequests(
-    ListFactoryPullRequestsRequest
-  ) returns (ListFactoryPullRequestsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/prs"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory pull requests";
-      description: "Returns pull requests tracked by a factory";
-      tags: "Factory";
-    };
-  }
-
   rpc DescribeFactoryPullRequest(
     DescribeFactoryPullRequestRequest
   ) returns (DescribeFactoryPullRequestResponse) {
@@ -434,7 +421,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List factory work orders";
-      description: "Returns a list of work orders for a factory";
+      description: "Returns one page of work orders for a factory. The default page size is 100. Pass before_id to return orders older than that id.";
       tags: "Factory";
     };
   }
@@ -724,6 +711,17 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Disconnect MCP OAuth";
       description: "Revokes stored tokens when the vendor advertises a revoke endpoint.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryAgentResourceTools(ListFactoryAgentResourceToolsRequest) returns (ListFactoryAgentResourceToolsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List MCP tools";
+      description: "Calls tools/list on a connected MCP server. The result is read-only.";
       tags: "Factory";
     };
   }
@@ -1426,16 +1424,6 @@ message FactoryPullRequest {
   bool mergeable = 19;
 }
 
-message ListFactoryPullRequestsRequest {
-  string factory_id = 1;
-  optional int64 order = 2;
-  repeated string work_order_ids = 3;
-}
-
-message ListFactoryPullRequestsResponse {
-  repeated FactoryPullRequest pull_requests = 1;
-}
-
 message DescribeFactoryPullRequestRequest {
   string factory_id = 1;
   string pr_id = 2;
@@ -1567,16 +1555,20 @@ message RefreshBacklogResponse {
 
 message ListWorkOrdersRequest {
   string factory_id = 1;
-  repeated string assignee_ids = 2;
-  repeated WorkOrder.State states = 3;
-  repeated WorkOrder.Result results = 4;
-  optional bool unassigned = 5;
-  // User ID. Returns orders where this user is an assignee or the creator.
-  optional string mine = 6;
+  repeated WorkOrder.State states = 2;
+  repeated WorkOrder.Result results = 3;
+  optional bool unassigned = 4;
+  // Returns orders assigned to this user or created by them.
+  optional string user_id = 5;
+  // Page size. Zero or omitted uses 100.
+  uint32 limit = 6;
+  // Return orders older than this id in updated_at DESC, id DESC order.
+  string before_id = 7;
 }
 
 message ListWorkOrdersResponse {
   repeated WorkOrderSummary orders = 1;
+  bool has_next_page = 2;
 }
 
 message CreateWorkOrderRequest {
@@ -1663,6 +1655,8 @@ message WorkOrder {
   repeated WorkOrderCheck checks = 22;
   // Board fields for the analysis session. The opened card loads the full session.
   PlanningSessionSummary planning_session = 23;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 24;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1690,6 +1684,8 @@ message WorkOrderSummary {
   repeated WorkOrderCheckScore check_scores = 18;
   // Analysis session fields the board needs. The opened card loads the full session.
   PlanningSessionSummary planning_session = 19;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 20;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2527,6 +2523,20 @@ message DisconnectFactoryAgentResourceOAuthRequest {
 
 message DisconnectFactoryAgentResourceOAuthResponse {
   FactoryAgentResource resource = 1;
+}
+
+message FactoryAgentResourceTool {
+  string name = 1;
+  string description = 2;
+}
+
+message ListFactoryAgentResourceToolsRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message ListFactoryAgentResourceToolsResponse {
+  repeated FactoryAgentResourceTool tools = 1;
 }
 
 message UsageByModel {

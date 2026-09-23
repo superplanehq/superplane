@@ -14,7 +14,7 @@ import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
  *   and the cache focused on the "still in flight" window.
  * - Correlation key is `run.rootEvent.nodeId === triggerNodeId`. The trigger
  *   API does not return a run id, so we rely on this back-reference (kept
- *   fresh by `run_started` / `run_finished` websocket invalidations via
+ *   fresh by `run_started` / `run_finished` websocket cache updates via
  *   {@link useCanvasWebsocket}).
  * - The query is only enabled when there is at least one trigger node id to
  *   watch and a canvas id is available, so tables with no row actions skip

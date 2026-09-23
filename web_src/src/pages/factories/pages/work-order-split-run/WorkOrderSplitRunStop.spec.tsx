@@ -177,14 +177,15 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const note = screen.getByTestId("split-run-attention-note");
+    const strip = screen.getByTestId("split-run-intent-status-card");
+    const settings = within(strip).getByTestId("split-run-intent-settings");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
-    expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
-    await user.click(within(note).getByRole("button", { name: "Start" }));
+    expect(within(settings).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    await user.click(within(strip).getByRole("button", { name: "Start" }));
+    await user.click(await screen.findByRole("button", { name: "Start anyway" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined);
-    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("popup-work-order-archive-button"));
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
   });

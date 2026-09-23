@@ -31,6 +31,10 @@ const (
 	minPlanningHoldSeconds   = 1
 	maxPlanningHoldSeconds   = 60
 	maxPlanningActivityBytes = 256 * 1024
+
+	// statusClientClosedRequest mirrors the codes.Canceled mapping described in
+	// pkg/grpc/errors/grpcerrors.go.
+	statusClientClosedRequest = 499
 )
 
 type planningSurveyRequest struct {
@@ -359,6 +363,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
+	messages.PublishPlanningBoardStatus(session)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
@@ -539,19 +544,18 @@ func writeJSON(w http.ResponseWriter, status int, body any) error {
 	return nil
 }
 
-func requestCanceledByClient(r *http.Request, err error) bool {
+func isPlanningRequestCanceled(r *http.Request, err error) bool {
 	if r == nil {
 		return false
 	}
-	ctxErr := r.Context().Err()
-	if ctxErr == nil {
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
-	return errors.Is(ctxErr, context.Canceled) && errors.Is(err, context.Canceled)
+	return errors.Is(r.Context().Err(), context.Canceled)
 }
 
 func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	if requestCanceledByClient(r, err) {
+	if isPlanningRequestCanceled(r, err) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 		return
 	}
@@ -567,9 +571,9 @@ func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *m
 		http.Error(w, "planning session not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
-	case requestCanceledByClient(r, err):
-		log.WithError(err).Debug("runner planning session client disconnected")
-		w.WriteHeader(499)
+	case isPlanningRequestCanceled(r, err):
+		log.WithError(err).WithField("route", resolveCriticalHTTPRoute(r)).Info("runner planning session client disconnected")
+		w.WriteHeader(statusClientClosedRequest)
 	default:
 		log.WithError(err).Error("runner planning session failed")
 		captureRunnerPlanningErrorToSentry(r, session, err)

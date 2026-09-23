@@ -42,9 +42,17 @@ export function buildLineFilterOptions(lines: FactoriesFactoryLine[]): WorkOrder
     .map((line) => ({ value: line.id, label: line.name?.trim() || "Untitled line" }));
 }
 
-/** People on at least one task, sorted by name, with No Owner first. */
-export function buildAssigneeFilterOptions(entries: WorkOrderListEntry[]): WorkOrderFilterOption[] {
+/** People on at least one task or in extraPeople, sorted by name, with No Owner first. */
+export function buildAssigneeFilterOptions(
+  entries: WorkOrderListEntry[],
+  extraPeople: Array<{ id?: string; name?: string }> = [],
+): WorkOrderFilterOption[] {
   const byId = new Map<string, string>();
+  for (const person of extraPeople) {
+    if (person.id) {
+      byId.set(person.id, person.name?.trim() || "Unknown");
+    }
+  }
   for (const entry of entries) {
     for (const assignee of entry.order.assignees ?? []) {
       if (assignee.id) {

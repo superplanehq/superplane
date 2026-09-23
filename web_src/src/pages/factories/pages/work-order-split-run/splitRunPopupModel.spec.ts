@@ -31,10 +31,9 @@ import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks"
 
 describe("splitRunPopupModel", () => {
   it("hides Automations on a draft refine popup", () => {
-    expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "draft" })).toBe(false);
-    expect(refinePopupShowsAutomations({ mode: "classic", footerKind: "draft" })).toBe(true);
-    expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "draft", sourceOnly: true })).toBe(true);
-    expect(refinePopupShowsAutomations({ mode: "analysis", footerKind: "running" })).toBe(true);
+    expect(refinePopupShowsAutomations({ footerKind: "draft" })).toBe(false);
+    expect(refinePopupShowsAutomations({ footerKind: "draft", sourceOnly: true })).toBe(true);
+    expect(refinePopupShowsAutomations({ footerKind: "running" })).toBe(true);
   });
 
   it("opens the automation run for the preferred phase, then the latest phase run", () => {
@@ -233,6 +232,16 @@ describe("splitRunPopupModel", () => {
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunIntentDocument({ artifacts, description }).summary).toBeTruthy();
     expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
+  });
+
+  it("does not compose a description fallback while artifacts are still loading", () => {
+    expect(
+      splitRunIntentDocument({
+        artifacts: [],
+        description: "The mermaid charts are sometimes unreadable in the dark mode",
+        skipDescriptionFallback: true,
+      }),
+    ).toEqual({ title: "", summary: "", plan: "" });
   });
 
   it("prefers spec.md over intent.md", () => {

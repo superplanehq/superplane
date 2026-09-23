@@ -1,5 +1,5 @@
 import { useBacklogAnalysisScoredOrderIds } from "@/hooks/useBacklogAnalysisRuns";
-import { useFactoryIntakeRuns, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useFactoryIntakeRuns, useFactoryIntakeRunsWebsocket, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 
 import { lineIntakeSourceForApiSource } from "../../lineIntakeModel";
 import {
@@ -33,6 +33,12 @@ export function useFirstRunAnalysis(
   const intakes = useFactoryIntakes(organizationId, factoryId);
   const intake = firstRunBacklogIntake(intakes.data);
   const runs = useFactoryIntakeRuns(organizationId, factoryId, intake?.id);
+  useFactoryIntakeRunsWebsocket({
+    organizationId,
+    factoryId,
+    intakeId: intake?.id,
+    canvasId: intake?.canvasId,
+  });
   const scoredOrderIds = useBacklogAnalysisScoredOrderIds(organizationId, factoryId);
   const initialImportStatus = intake?.initialImportStatus;
   const backlogIntakeMissing = intakes.isSuccess && !intake;

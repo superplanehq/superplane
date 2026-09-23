@@ -47,6 +47,11 @@ var allowedFileContentTypes = []string{
 	"application/pdf",
 	"text/plain",
 	"text/markdown",
+	"application/json",
+	"text/csv",
+	"application/yaml",
+	"text/yaml",
+	"application/x-yaml",
 }
 
 var allowedArtifactContentTypes = []string{
@@ -615,6 +620,9 @@ func normalizeContentType(contentType string) string {
 	}
 	if value == "image/jpg" {
 		return "image/jpeg"
+	}
+	if value == "text/yaml" || value == "application/x-yaml" {
+		return "application/yaml"
 	}
 	return value
 }

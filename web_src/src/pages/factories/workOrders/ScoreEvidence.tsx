@@ -31,8 +31,8 @@ const NUMBER_TONE: Record<ConfidenceBand, string> = {
 
 /**
  * Two labeled score items: name, five bars, number. Hover peeks the summary,
- * click pins it. The refine strip, the classic draft footer, and previews
- * share this row so the scores read the same everywhere.
+ * click pins it. The refine strip, the draft footer, and previews share this
+ * row so the scores read the same everywhere.
  */
 export function ScoreEvidenceRow({
   clarity,

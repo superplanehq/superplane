@@ -66,7 +66,7 @@ func CreateFactoryPullRequest(
 		)
 	}
 
-	serialized, err := serializeFactoryPullRequests(db, []models.FactoryPullRequest{*pullRequest})
+	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
