@@ -1,108 +1,272 @@
-import { TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Check, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Text } from "@/components/Text/text";
 import { usePermissions } from "@/contexts/usePermissions";
 import { BYOK_PROVIDERS, useBYOKLLMModels, useUpdateBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
+import { SELECTABLE_LLM_SOURCE_HOSTED } from "@/lib/selectableLLMModels";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { ModelAllowlistEditor } from "@/pages/organization/settings/ModelAllowlistEditor";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import {
   byokProviderProductName,
-  disconnectedProviderMessage,
   ORGANIZATION_LLM_MODELS_COPY as COPY,
-  shouldShowLLMModelsLandingBanner,
+  providerKeyHeading,
+  providerKeyIntegrationLink,
 } from "./organizationLLMModelsCopy";
+import { workspaceModelSource } from "./workspaceModelSource";
 
-const PROVIDERS = [...BYOK_PROVIDERS];
+type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
+
+const BYOK_INTEGRATION_NAMES: Record<string, string> = {
+  anthropic: "claude",
+  openai: "openai",
+  openrouter: "openrouter",
+};
 
 export function FactorySettingsOrganizationLLMModelsPage() {
-  const { organizationId, factory } = useFactorySettingsLayout();
+  const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("org", "update") && !permissionsLoading;
   const integrationsHref = useIntegrationsBasePath(organizationId);
+
   const anthropic = useBYOKLLMModels(organizationId, "anthropic", true);
   const openai = useBYOKLLMModels(organizationId, "openai", true);
   const openrouter = useBYOKLLMModels(organizationId, "openrouter", true);
-  const showLanding = shouldShowLLMModelsLandingBanner([anthropic, openai, openrouter]);
+  const byokQueries: Record<string, BYOKQuery> = { anthropic, openai, openrouter };
+  const connected = BYOK_PROVIDERS.filter((provider) => {
+    const query = byokQueries[provider];
+    return query.data?.connected || (query.isError && !query.isLoading);
+  });
+  const byokLoading = BYOK_PROVIDERS.some((provider) => byokQueries[provider].isLoading);
+
+  const hosted = useSelectableLLMModels(organizationId, { factoryId, sources: [SELECTABLE_LLM_SOURCE_HOSTED] });
+  const source = workspaceModelSource(factory.onboarding?.agentHarness, connected.length > 0);
 
   usePageTitle([COPY.pageTitle, "Settings", factory.name ?? "Workspace"]);
 
   return (
     <FactorySettingsPageFrame title={COPY.pageTitle} subtitle={COPY.pageSubtitle}>
       <div data-testid="factory-settings-llm-models" className="flex flex-col gap-5">
-        {showLanding ? <LLMModelsLandingBanner integrationsHref={integrationsHref} /> : null}
-        {PROVIDERS.map((provider) => (
-          <FactorySettingsCard
-            key={provider}
-            title={byokProviderProductName(provider)}
-            data-testid={`factory-settings-llm-models-${provider}`}
-          >
-            <BYOKProviderAllowlist
+        <FactorySettingsCard
+          title={COPY.modelsTitle}
+          data-testid="llm-models-list"
+          action={
+            <Badge variant="outline" data-testid="llm-models-source-badge">
+              {source === "hosted" ? COPY.hostedBadge : COPY.ownKeyBadge}
+            </Badge>
+          }
+        >
+          {source === "hosted" ? (
+            <HostedModelList
+              models={hosted.data ?? []}
+              isLoading={hosted.isLoading}
+              isError={Boolean(hosted.isError)}
+            />
+          ) : (
+            <OwnKeyModelLists
               organizationId={organizationId}
-              provider={provider}
+              connected={connected}
+              byokQueries={byokQueries}
+              isLoading={byokLoading}
               canUpdate={canUpdate}
               integrationsHref={integrationsHref}
             />
-          </FactorySettingsCard>
-        ))}
+          )}
+        </FactorySettingsCard>
       </div>
     </FactorySettingsPageFrame>
   );
 }
 
-function LLMModelsLandingBanner({ integrationsHref }: { integrationsHref: string }) {
+function StatusText({ children }: { children: string }) {
+  return <p className="text-[13px] text-muted-foreground">{children}</p>;
+}
+
+function HostedModelList({
+  models,
+  isLoading,
+  isError,
+}: {
+  models: Array<{ key: string; label: string }>;
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  if (isLoading) return <StatusText>{COPY.loading}</StatusText>;
+  if (isError) return <StatusText>{COPY.listError}</StatusText>;
+  if (models.length === 0) return <StatusText>{COPY.hostedModelsEmpty}</StatusText>;
+
+  return (
+    <div className="space-y-3" data-testid="llm-models-hosted">
+      <p className="text-xs text-muted-foreground">{COPY.hostedModelsHelper}</p>
+      <ul className="max-h-56 space-y-2 overflow-auto">
+        {models.map((model) => (
+          <li key={model.key} className="flex items-center gap-2 text-[13px]">
+            <Check className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="font-mono text-xs">{model.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function OwnKeyModelLists({
+  organizationId,
+  connected,
+  byokQueries,
+  isLoading,
+  canUpdate,
+  integrationsHref,
+}: {
+  organizationId: string;
+  connected: string[];
+  byokQueries: Record<string, BYOKQuery>;
+  isLoading: boolean;
+  canUpdate: boolean;
+  integrationsHref: string;
+}) {
+  if (isLoading && connected.length === 0) return <StatusText>{COPY.loading}</StatusText>;
+  if (connected.length === 0) return <NoProviderNotice integrationsHref={integrationsHref} />;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {connected.map((provider, index) => (
+        <div
+          key={provider}
+          className={cn("space-y-3", index > 0 && "border-t border-border pt-4")}
+          data-testid={`llm-models-provider-${provider}`}
+        >
+          <ProviderKeyHeader
+            provider={provider}
+            integrationHref={integrationDetailHref(integrationsHref, byokQueries[provider]?.data?.integrationId)}
+          />
+          <ProviderModelAllowlist
+            organizationId={organizationId}
+            provider={provider}
+            query={byokQueries[provider]}
+            canUpdate={canUpdate}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function integrationDetailHref(integrationsHref: string, integrationId: string | undefined): string {
+  return integrationId ? `${integrationsHref}/${integrationId}` : integrationsHref;
+}
+
+function ProviderKeyHeader({ provider, integrationHref }: { provider: string; integrationHref: string }) {
   return (
     <div
-      role="status"
-      data-testid="llm-models-empty-banner"
-      className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/90 px-3.5 py-2.5 text-sm text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
+      data-testid={`llm-models-key-${provider}`}
     >
       <div className="flex min-w-0 items-start gap-2">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
-        <p>
-          <span className="font-medium">{COPY.landingTitle}. </span>
-          {COPY.landingDescription}
-        </p>
+        <IntegrationIcon
+          integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
+          className="mt-0.5 size-4 shrink-0"
+          size={16}
+        />
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{providerKeyHeading(provider)}</p>
+          <p className="text-[12px] text-muted-foreground">{COPY.ownKeyHelper}</p>
+        </div>
       </div>
-      <Button
-        asChild
-        variant="outline"
-        size="sm"
-        className="border-amber-300 bg-amber-100/70 text-amber-950 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-50 dark:hover:bg-amber-900/60"
-      >
-        <Link to={integrationsHref}>{COPY.landingAction}</Link>
+      <Button asChild variant="outline" size="sm">
+        <Link to={integrationHref}>
+          {providerKeyIntegrationLink(provider)}
+          <ArrowUpRight className="size-3.5" aria-hidden />
+        </Link>
       </Button>
     </div>
   );
 }
 
-function BYOKProviderAllowlist({
+function NoProviderNotice({ integrationsHref }: { integrationsHref: string }) {
+  return (
+    <div
+      role="status"
+      data-testid="llm-models-empty-banner"
+      className="flex w-full flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-[13px] text-muted-foreground"
+    >
+      <div className="flex min-w-0 items-start gap-2">
+        <KeyRound className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <p>
+          <span className="font-medium text-foreground">{COPY.noProviderTitle}. </span>
+          {COPY.noProviderDescription}
+        </p>
+      </div>
+      <Button asChild variant="outline" size="sm">
+        <Link to={integrationsHref}>{COPY.noProviderAction}</Link>
+      </Button>
+    </div>
+  );
+}
+
+function modelIdsOf(models: Array<{ id?: string }> | undefined): string[] {
+  return (models ?? []).map((model) => model.id ?? "").filter(Boolean);
+}
+
+function ProviderModelAllowlist({
   organizationId,
   provider,
+  query: providerQuery,
   canUpdate,
-  integrationsHref,
 }: {
   organizationId: string;
   provider: string;
+  query: BYOKQuery | undefined;
   canUpdate: boolean;
-  integrationsHref: string;
 }) {
-  const { data, isLoading, error } = useBYOKLLMModels(organizationId, provider, true);
+  const savedIds = modelIdsOf(providerQuery?.data?.selected);
+  const candidates = modelIdsOf(providerQuery?.data?.candidates);
+  const modelIds = candidates.length > 0 ? candidates : savedIds;
+
+  if (providerQuery?.isLoading) return <StatusText>{COPY.loading}</StatusText>;
+  if (providerQuery?.error) return <StatusText>{COPY.listError}</StatusText>;
+  if (modelIds.length === 0) return <StatusText>{COPY.emptyCatalog}</StatusText>;
+
+  return (
+    <ProviderModelEditor
+      organizationId={organizationId}
+      provider={provider}
+      modelIds={modelIds}
+      savedIds={savedIds}
+      canUpdate={canUpdate}
+    />
+  );
+}
+
+function ProviderModelEditor({
+  organizationId,
+  provider,
+  modelIds,
+  savedIds,
+  canUpdate,
+}: {
+  organizationId: string;
+  provider: string;
+  modelIds: string[];
+  savedIds: string[];
+  canUpdate: boolean;
+}) {
   const update = useUpdateBYOKLLMModels(organizationId);
-  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<string[] | null>(null);
-  const selected = draft ?? (data?.selected ?? []).map((model) => model.id ?? "").filter(Boolean);
-  const candidates = (data?.candidates ?? []).map((model) => model.id ?? "").filter(Boolean);
-  const modelIds = candidates.length > 0 ? candidates : selected;
+  const selected = draft ?? savedIds;
 
   const save = async () => {
     try {
@@ -115,91 +279,20 @@ function BYOKProviderAllowlist({
   };
 
   return (
-    <BYOKAllowlistBody
-      canUpdate={canUpdate}
-      connected={Boolean(data?.connected)}
-      error={Boolean(error)}
-      integrationsHref={integrationsHref}
-      isLoading={isLoading}
-      isPending={update.isPending}
-      modelIds={modelIds}
-      provider={provider}
-      query={query}
-      selected={selected}
-      showSave={draft !== null}
-      onQueryChange={setQuery}
-      onSave={() => void save()}
-      onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
-    />
-  );
-}
-
-function BYOKAllowlistBody({
-  canUpdate,
-  connected,
-  error,
-  integrationsHref,
-  isLoading,
-  isPending,
-  modelIds,
-  provider,
-  query,
-  selected,
-  showSave,
-  onQueryChange,
-  onSave,
-  onToggle,
-}: {
-  canUpdate: boolean;
-  connected: boolean;
-  error: boolean;
-  integrationsHref: string;
-  isLoading: boolean;
-  isPending: boolean;
-  modelIds: string[];
-  provider: string;
-  query: string;
-  selected: string[];
-  showSave: boolean;
-  onQueryChange: (query: string) => void;
-  onSave: () => void;
-  onToggle: (model: string, checked: boolean) => void;
-}) {
-  if (isLoading) {
-    return <Text className="text-[13px] text-muted-foreground">{COPY.loading}</Text>;
-  }
-  if (error) {
-    return <Text className="text-[13px] text-destructive">{COPY.listError}</Text>;
-  }
-  if (!connected) {
-    return (
-      <div className="space-y-2">
-        <Text className="text-[13px] text-muted-foreground">{disconnectedProviderMessage(provider)}</Text>
-        <Link to={integrationsHref} className="inline-block text-[13px] text-foreground underline underline-offset-2">
-          {COPY.disconnectedLink}
-        </Link>
-      </div>
-    );
-  }
-  if (modelIds.length === 0) {
-    return <Text className="text-[13px] text-muted-foreground">{COPY.emptyCatalog}</Text>;
-  }
-
-  return (
     <div className="space-y-3">
       <ModelAllowlistEditor
         modelIds={modelIds}
         selected={selected}
-        query={query}
-        onQueryChange={onQueryChange}
-        onToggle={onToggle}
-        disabled={!canUpdate || isPending}
+        query={search}
+        onQueryChange={setSearch}
+        onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
+        disabled={!canUpdate || update.isPending}
         searchLabel={`Search ${byokProviderProductName(provider)} models`}
         showCount
       />
       <PermissionTooltip allowed={canUpdate} message={COPY.noPermission}>
-        <Button type="button" onClick={onSave} disabled={!canUpdate || isPending || !showSave}>
-          {isPending ? COPY.saving : COPY.save}
+        <Button type="button" onClick={() => void save()} disabled={!canUpdate || update.isPending || draft === null}>
+          {update.isPending ? COPY.saving : COPY.save}
         </Button>
       </PermissionTooltip>
     </div>
