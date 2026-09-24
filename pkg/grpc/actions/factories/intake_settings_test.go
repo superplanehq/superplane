@@ -633,6 +633,43 @@ func Test__intakeFilterExpressionFor_ProductiveKeyTasks(t *testing.T) {
 		assert.Equal(t, true, evalRootDataExpression(t, expression, regularTask))
 		assert.Equal(t, false, evalRootDataExpression(t, expression, keyTask))
 	})
+
+	t.Run("keeps a task only when it is in a selected task list", func(t *testing.T) {
+		settings := defaultProductiveIntakeSettings()
+		settings.ExcludeKeyTasks = false
+		settings.TaskListIDs = []string{"list-a", "list-b"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceProductiveTasks, settings)
+		assert.Equal(
+			t,
+			`(root().data.data.relationships.task_list.data.id ?? "") in ["list-a","list-b"]`,
+			expression,
+		)
+
+		inList := map[string]any{
+			"data": map[string]any{
+				"relationships": map[string]any{
+					"task_list": map[string]any{"data": map[string]any{"id": "list-a"}},
+				},
+			},
+		}
+		otherList := map[string]any{
+			"data": map[string]any{
+				"relationships": map[string]any{
+					"task_list": map[string]any{"data": map[string]any{"id": "list-c"}},
+				},
+			},
+		}
+		assert.Equal(t, true, evalRootDataExpression(t, expression, inList))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, otherList))
+
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, intakeGraph{FilterNodeID: intakeFilterNodeID}, models.LiveCanvasSpec{
+			Nodes: []models.Node{{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": expression},
+			}},
+		})
+		assert.Equal(t, []string{"list-a", "list-b"}, parsed.TaskListIDs)
+	})
 }
 
 func Test__intakeSettingsFromGraph_ProductiveKeyTasks(t *testing.T) {

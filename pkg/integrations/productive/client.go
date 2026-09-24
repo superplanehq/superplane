@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -201,8 +202,15 @@ type Task struct {
 	Title       string
 	Description string
 	ProjectID   string
+	TaskListID  string
 	Closed      bool
 	TypeID      int
+}
+
+// TaskList is a Productive.io task list inside one project.
+type TaskList struct {
+	ID   string
+	Name string
 }
 
 func (t Task) IsKeyTask() bool {
@@ -225,6 +233,7 @@ func taskFromDocument(doc resourceDocument) Task {
 		Title:       title,
 		Description: description,
 		ProjectID:   projectID,
+		TaskListID:  doc.Relationships["task_list"].Data.ID,
 		Closed:      closed,
 		TypeID:      numberAttribute(doc.Attributes["type_id"]),
 	}
@@ -298,18 +307,21 @@ type taskListOptions struct {
 	query       string
 	openOnly    bool
 	regularOnly bool
+	taskListIDs []string
 	sort        string
 	pageSize    int
 }
 
 // ListTasks returns open tasks from one project, optionally filtered by text.
-// When regularOnly is set, key tasks (milestones) are omitted.
-func (c *Client) ListTasks(projectID, query string, limit int, regularOnly bool) ([]Task, error) {
+// When regularOnly is set, key tasks (milestones) are omitted. A non-empty
+// taskListIDs keeps tasks that belong to those task lists.
+func (c *Client) ListTasks(projectID, query string, limit int, regularOnly bool, taskListIDs []string) ([]Task, error) {
 	url := c.taskListURL(taskListOptions{
 		projectID:   projectID,
 		query:       query,
 		openOnly:    true,
 		regularOnly: regularOnly,
+		taskListIDs: taskListIDs,
 		sort:        sortNewestCreated,
 		pageSize:    limit,
 	})
@@ -335,11 +347,12 @@ func (c *Client) ListTasks(projectID, query string, limit int, regularOnly bool)
 // open task in the project, newest first. Seeding an intake replays these
 // through the graph the trigger feeds, and that graph reads attributes Task
 // does not keep.
-func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int, regularOnly bool) ([]map[string]any, error) {
+func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int, regularOnly bool, taskListIDs []string) ([]map[string]any, error) {
 	return c.listTaskDocuments(taskListOptions{
 		projectID:   projectID,
 		openOnly:    true,
 		regularOnly: regularOnly,
+		taskListIDs: taskListIDs,
 		sort:        sortNewestCreated,
 		pageSize:    limit,
 	})
@@ -356,6 +369,15 @@ func (c *Client) listTaskDocuments(options taskListOptions) ([]map[string]any, e
 	}{}
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("error parsing tasks: %v", err)
+	}
+
+	for i := range response.Data {
+		if taskListID(response.Data[i]) != "" || len(options.taskListIDs) != 1 {
+			continue
+		}
+		// A list filtered to one task list can omit the relationship.
+		// The intake filter reads that id, so write the only possible value.
+		setTaskListID(response.Data[i], options.taskListIDs[0])
 	}
 
 	return response.Data, nil
@@ -380,12 +402,59 @@ func (c *Client) taskListURL(options taskListOptions) string {
 		params.Set("filter[query]", query)
 	}
 
+	if len(options.taskListIDs) > 0 {
+		params.Set("filter[task_list_id]", strings.Join(options.taskListIDs, ","))
+		params.Set("include", "task_list")
+	}
+
 	return fmt.Sprintf("%s/tasks?%s", c.BaseURL, params.Encode())
+}
+
+// ListTaskLists returns the active task lists of one project. Productive.io
+// paginates responses, so pages are walked until a short page ends them.
+func (c *Client) ListTaskLists(projectID string) ([]TaskList, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("project is required")
+	}
+
+	lists := []TaskList{}
+	for page := 1; page <= maxProjectPages; page++ {
+		params := url.Values{}
+		params.Set("filter[project_id]", projectID)
+		params.Set("filter[status]", "1")
+		params.Set("page[number]", strconv.Itoa(page))
+		params.Set("page[size]", strconv.Itoa(projectsPageSize))
+
+		body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/task_lists?%s", c.BaseURL, params.Encode()), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		response := resourceListResponse{}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, fmt.Errorf("error parsing task lists: %v", err)
+		}
+
+		for _, doc := range response.Data {
+			name, _ := doc.Attributes["name"].(string)
+			lists = append(lists, TaskList{ID: doc.ID, Name: name})
+		}
+
+		if len(response.Data) < projectsPageSize {
+			break
+		}
+	}
+
+	sort.Slice(lists, func(i, j int) bool {
+		return strings.ToLower(lists[i].Name) < strings.ToLower(lists[j].Name)
+	})
+	return lists, nil
 }
 
 // GetTask returns one task by its Productive.io resource id.
 func (c *Client) GetTask(id string) (*Task, error) {
-	body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/tasks/%s", c.BaseURL, url.PathEscape(id)), nil)
+	body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/tasks/%s?include=task_list", c.BaseURL, url.PathEscape(id)), nil)
 	if err != nil {
 		return nil, err
 	}

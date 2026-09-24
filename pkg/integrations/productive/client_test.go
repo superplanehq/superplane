@@ -120,7 +120,7 @@ func Test__Client__ListTasks(t *testing.T) {
 		]}`),
 	}}
 
-	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10, false)
+	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10, false, nil)
 	require.NoError(t, err)
 	require.Len(t, tasks, 2)
 	assert.Equal(t, Task{
@@ -145,7 +145,7 @@ func Test__Client__ListTasks_RegularOnly(t *testing.T) {
 		jsonResponse(`{"data":[]}`),
 	}}
 
-	_, err := testClient(t, httpContext).ListTasks("42", "", 10, true)
+	_, err := testClient(t, httpContext).ListTasks("42", "", 10, true, nil)
 	require.NoError(t, err)
 
 	query := httpContext.Requests[0].URL.Query()
@@ -164,7 +164,7 @@ func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
 		]}`),
 	}}
 
-	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30, false)
+	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30, false, nil)
 	require.NoError(t, err)
 	require.Len(t, documents, 1)
 

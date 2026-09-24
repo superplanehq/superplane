@@ -43,6 +43,8 @@ export interface IntakeSourceSettings {
   sentryLevels: string[];
   /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
   excludeKeyTasks: boolean;
+  /** Productive.io task list ids that still create a task. Empty means every task list. */
+  taskListIds: string[];
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -63,6 +65,7 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryAssignedIssues: false,
   sentryLevels: [],
   excludeKeyTasks: true,
+  taskListIds: [],
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
@@ -152,10 +155,31 @@ export function normalizeIntakeSourceSettings(
   const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
   const hiddenSentryTriggers =
     sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
+  const taskListIds = normalizeTaskListIds(draft.taskListIds);
   if (!draft.filterByLabel) {
-    return { ...draft, ...hiddenSentryTriggers, confidencePct, labels: [], labelFilterMode: "include", sentryLevels };
+    return {
+      ...draft,
+      ...hiddenSentryTriggers,
+      confidencePct,
+      labels: [],
+      labelFilterMode: "include",
+      sentryLevels,
+      taskListIds,
+    };
   }
-  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels };
+  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels, taskListIds };
+}
+
+function normalizeTaskListIds(ids: string[]): string[] {
+  const normalized: string[] = [];
+  for (const id of ids) {
+    const next = id.trim();
+    if (next.length === 0 || normalized.includes(next)) {
+      continue;
+    }
+    normalized.push(next);
+  }
+  return normalized;
 }
 
 type IntakeToggles = Pick<
@@ -198,7 +222,16 @@ export function intakeSettingsFromApi(
     jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    ...productiveFiltersFromApi(settings),
+  };
+}
+
+function productiveFiltersFromApi(
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): Pick<IntakeSourceSettings, "excludeKeyTasks" | "taskListIds"> {
+  return {
     excludeKeyTasks: settings?.excludeKeyTasks ?? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS.excludeKeyTasks,
+    taskListIds: normalizeTaskListIds(settings?.taskListIds ?? []),
   };
 }
 
@@ -225,6 +258,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     sentryAssignedIssues: false,
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
     excludeKeyTasks: settings.excludeKeyTasks,
+    taskListIds: normalizeTaskListIds(settings.taskListIds),
   };
 }
 

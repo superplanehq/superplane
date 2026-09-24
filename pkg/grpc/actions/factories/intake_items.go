@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -75,6 +76,7 @@ type productiveIntakeItemSource struct {
 	productive            *productive.Client
 	projectID             string
 	organizationID        string
+	taskListIDs           []string
 	excludeKeyTasks       bool
 	projectProbe          sync.Once
 	projectReadabilityErr error
@@ -114,7 +116,9 @@ func newLiveIntakeItemSource(
 		return nil, err
 	}
 	if productiveSource, ok := source.(*productiveIntakeItemSource); ok {
-		productiveSource.excludeKeyTasks = productiveIntakeExcludesKeyTasks(tx, intake.CanvasID)
+		settings := productiveIntakeSettings(tx, intake.CanvasID)
+		productiveSource.excludeKeyTasks = settings.ExcludeKeyTasks
+		productiveSource.taskListIDs = settings.TaskListIDs
 	}
 	return source, nil
 }
@@ -461,7 +465,7 @@ func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeIte
 }
 
 func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	tasks, err := s.productive.ListTasks(s.projectID, query, limit, s.excludeKeyTasks)
+	tasks, err := s.productive.ListTasks(s.projectID, query, limit, s.excludeKeyTasks, s.taskListIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +489,7 @@ func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeI
 	if task.ProjectID != "" && task.ProjectID != s.projectID {
 		return nil, errIntakeItemNotFound
 	}
-	if s.excludeKeyTasks && task.IsKeyTask() {
+	if !s.acceptsTask(*task) {
 		return nil, errIntakeItemNotFound
 	}
 
@@ -519,10 +523,20 @@ func (s *productiveIntakeItemSource) IsItemAvailable(_ context.Context, id strin
 	if err != nil {
 		return false, err
 	}
-	if s.excludeKeyTasks && task.IsKeyTask() {
+	if !s.acceptsTask(*task) {
 		return false, nil
 	}
 	return !task.Closed, nil
+}
+
+func (s *productiveIntakeItemSource) acceptsTask(task productive.Task) bool {
+	if s.excludeKeyTasks && task.IsKeyTask() {
+		return false
+	}
+	if len(s.taskListIDs) == 0 {
+		return true
+	}
+	return slices.Contains(s.taskListIDs, task.TaskListID)
 }
 
 func productiveTaskItem(task productive.Task, organizationID string) IntakeItem {
