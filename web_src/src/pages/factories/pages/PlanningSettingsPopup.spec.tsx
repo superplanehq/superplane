@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
-import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
@@ -27,6 +27,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/hooks/useFactoryAgentResources", () => ({
   useFactoryAgentResources: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
+  useFactoryAgentResourceTools: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
 }));
 
 function defaultAgentSlot(overrides: Partial<PlanningReviewAgentSlot> = {}): PlanningReviewAgentSlot {
@@ -150,8 +151,8 @@ describe("PlanningSettingsPopup", () => {
   it("shows workspace resources on the Agent tab when the workspace ids are set", async () => {
     const user = userEvent.setup();
     vi.mocked(useExperimentalFeature).mockReturnValue({
-      has: (feature: string) => feature === FEATURE_WORKSPACE_AGENT_RESOURCES,
-      enabledExperimentalFeatures: [FEATURE_WORKSPACE_AGENT_RESOURCES],
+      has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
     });
     vi.mocked(useFactoryAgentResources).mockImplementation((_org, _factory, kind) => {

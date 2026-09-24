@@ -68,6 +68,27 @@ func Test__ExperimentalFeatures(t *testing.T) {
 		assert.True(t, reloaded.HasExperimentalFeature("exp-feature"))
 	})
 
+	t.Run("legacy agent resources flag enables MCP and skills", func(t *testing.T) {
+		org, err := CreateOrganization("expfeat-agent-alias", "")
+		require.NoError(t, err)
+		require.NoError(t, EnableExperimentalFeature(org.ID, features.FeatureWorkspaceAgentResources))
+		reloaded, err := FindOrganizationByID(org.ID.String())
+		require.NoError(t, err)
+		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureWorkspaceMCP))
+		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureWorkspaceSkills))
+	})
+
+	t.Run("MCP or skills flag satisfies the legacy agent resources alias", func(t *testing.T) {
+		org, err := CreateOrganization("expfeat-mcp-alias", "")
+		require.NoError(t, err)
+		require.NoError(t, EnableExperimentalFeature(org.ID, features.FeatureWorkspaceMCP))
+		reloaded, err := FindOrganizationByID(org.ID.String())
+		require.NoError(t, err)
+		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureWorkspaceAgentResources))
+		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureWorkspaceMCP))
+		assert.False(t, reloaded.HasExperimentalFeature(features.FeatureWorkspaceSkills))
+	})
+
 	t.Run("released features short-circuit to true regardless of stored list", func(t *testing.T) {
 		original := stubReleasedFeature(t, "graduated")
 		t.Cleanup(original)

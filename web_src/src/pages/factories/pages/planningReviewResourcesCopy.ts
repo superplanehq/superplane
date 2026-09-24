@@ -3,7 +3,7 @@ export const PLANNING_REVIEW_RESOURCES_COPY = {
   kindMcp: "MCP server",
   kindSkill: "Skill",
   settingsLink: "workspace settings page",
-  manage: "Manage resources",
+  manage: "Manage",
   offForWorkspace: "Off for the workspace.",
   loading: "Loading resources…",
   loadError: "SuperPlane could not load resources. Try again.",

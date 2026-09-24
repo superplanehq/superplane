@@ -19,12 +19,14 @@ import (
 
 func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceAgentResources(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	server := httptest.NewServer(mcpToolsHandler(t, []map[string]any{
-		{"name": "search", "description": "Search the catalog."},
+		{"name": "search", "description": "Search the catalog.", "annotations": map[string]any{"readOnlyHint": true}},
+		{"name": "create_issue", "description": "Create an issue."},
 	}))
 	t.Cleanup(server.Close)
 
@@ -40,13 +42,17 @@ func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 		ResourceId: resource.ID.String(),
 	})
 	require.NoError(t, err)
-	require.Len(t, response.GetTools(), 1)
+	require.Len(t, response.GetTools(), 2)
 	assert.Equal(t, "search", response.GetTools()[0].GetName())
 	assert.Equal(t, "Search the catalog.", response.GetTools()[0].GetDescription())
+	assert.True(t, response.GetTools()[0].GetReadOnly())
+	assert.Equal(t, "create_issue", response.GetTools()[1].GetName())
+	assert.False(t, response.GetTools()[1].GetReadOnly())
 }
 
 func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceAgentResources(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -69,6 +75,7 @@ func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceAgentResources(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -92,6 +99,7 @@ func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRejectsNonJSON(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceAgentResources(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

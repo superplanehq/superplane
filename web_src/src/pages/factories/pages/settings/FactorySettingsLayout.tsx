@@ -9,8 +9,9 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   FEATURE_ORGANIZATION_BYOK,
-  FEATURE_WORKSPACE_AGENT_RESOURCES,
+  FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_MODELS,
+  FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
@@ -44,8 +45,11 @@ import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScro
 /** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
 const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
 
-/** Nav item id for workspace Agent resources, gated behind `FEATURE_WORKSPACE_AGENT_RESOURCES`. */
-const WORKSPACE_AGENT_RESOURCES_NAV_ITEM_ID = "workspace-agent-resources";
+/** Nav item id for workspace MCP servers, gated behind `FEATURE_WORKSPACE_MCP`. */
+const WORKSPACE_MCP_NAV_ITEM_ID = "workspace-mcp";
+
+/** Nav item id for workspace skills, gated behind `FEATURE_WORKSPACE_SKILLS`. */
+const WORKSPACE_SKILLS_NAV_ITEM_ID = "workspace-skills";
 
 /** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
 const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
@@ -63,8 +67,11 @@ function visibleFactorySettingsNavGroups(
   if (!hasExperimentalFeature(FEATURE_WORKSPACE_MODELS)) {
     hiddenNavItemIds.add(WORKSPACE_MODELS_NAV_ITEM_ID);
   }
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_AGENT_RESOURCES)) {
-    hiddenNavItemIds.add(WORKSPACE_AGENT_RESOURCES_NAV_ITEM_ID);
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP)) {
+    hiddenNavItemIds.add(WORKSPACE_MCP_NAV_ITEM_ID);
+  }
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_SKILLS)) {
+    hiddenNavItemIds.add(WORKSPACE_SKILLS_NAV_ITEM_ID);
   }
   if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
     hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);

@@ -1,4 +1,9 @@
 import { useCallback, useMemo } from "react";
+import {
+  FEATURE_WORKSPACE_AGENT_RESOURCES,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import { useExperimentalFeaturesRegistry } from "./useExperimentalFeatures";
 import { useOrganization } from "./useOrganizationData";
 import { useOrganizationId } from "./useOrganizationId";
@@ -31,7 +36,18 @@ export function useExperimentalFeature(organizationId?: string): ExperimentalFea
 
   const availableFeatures = useMemo(() => new Set(availableFeatureIds), [availableFeatureIds]);
 
-  const has = useCallback((featureId: string) => availableFeatures.has(featureId), [availableFeatures]);
+  const has = useCallback(
+    (featureId: string) => {
+      if (availableFeatures.has(featureId)) {
+        return true;
+      }
+      if (featureId === FEATURE_WORKSPACE_MCP || featureId === FEATURE_WORKSPACE_SKILLS) {
+        return availableFeatures.has(FEATURE_WORKSPACE_AGENT_RESOURCES);
+      }
+      return false;
+    },
+    [availableFeatures],
+  );
 
   return { has, enabledExperimentalFeatures: [...availableFeatureIds], isLoading };
 }
