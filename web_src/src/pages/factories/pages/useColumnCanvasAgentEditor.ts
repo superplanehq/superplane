@@ -1,5 +1,12 @@
 import type { CanvasesCanvas } from "@/api-client";
-import { canvasKeys, useCanvas, useCommitCanvasStaging, useUpdateCanvasVersion } from "@/hooks/useCanvasData";
+import {
+  canvasKeys,
+  useCanvas,
+  useCanvasStaging,
+  useCommitCanvasStaging,
+  useDiscardCanvasStaging,
+  useUpdateCanvasVersion,
+} from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,7 +22,18 @@ import { resolveFactoryAppTemplate } from "../lib/factoryAppTemplate";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
+const AGENT_SAVED_NOTICE = "Agent saved.";
+const AGENT_SAVED_AFTER_DISCARD_NOTICE =
+  "Agent saved. Earlier canvas edits were discarded because the live canvas changed.";
+const STALE_STAGING_UPDATE_MESSAGE = "stale staging cannot be updated";
 const REFINEMENT_AGENT_NODE_ID = "refine-task";
+
+type CanvasDraftSummary = {
+  hasStaging?: boolean;
+  stale?: boolean;
+};
+
+type StageCanvasYaml = (input: { versionId: string; canvasYaml: string }) => Promise<unknown>;
 
 interface ColumnCanvasAgentEditorOptions {
   showVisualEvidenceSetting?: boolean;
@@ -45,8 +63,10 @@ export function useColumnCanvasAgentEditor(
   const enabled = Boolean(appId);
   const canvasId = appId ?? "";
   const canvasQuery = useCanvas(organizationId, canvasId, { enabled });
+  const canvasStagingQuery = useCanvasStaging(appId, enabled);
   const updateVersion = useUpdateCanvasVersion(canvasId);
   const commitStaging = useCommitCanvasStaging(canvasId);
+  const discardCanvasStaging = useDiscardCanvasStaging(canvasId);
   const queryClient = useQueryClient();
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -67,6 +87,14 @@ export function useColumnCanvasAgentEditor(
       stageYaml: (input) => updateVersion.mutateAsync(input),
       commit: (message) => commitStaging.mutateAsync(message),
       invalidate: () => queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) }),
+      readStagingSummary: async () => {
+        const result = await canvasStagingQuery.refetch();
+        if (result.error) {
+          throw result.error;
+        }
+        return result.data;
+      },
+      discardStaging: () => discardCanvasStaging.mutateAsync(undefined),
     });
   };
 
@@ -89,11 +117,24 @@ export async function persistColumnAgent(args: {
   agentNodeId?: string;
   agentNodeIds?: string[];
   draft: PlanningReviewDraft;
-  stageYaml: (input: { versionId: string; canvasYaml: string }) => Promise<unknown>;
+  stageYaml: StageCanvasYaml;
   commit: (message: string) => Promise<unknown>;
   invalidate: () => Promise<unknown> | unknown;
+  readStagingSummary: () => Promise<CanvasDraftSummary | undefined>;
+  discardStaging: () => Promise<unknown>;
 }) {
-  const { canvas, agentNodeId, agentNodeIds, appId, draft, stageYaml, commit, invalidate } = args;
+  const {
+    canvas,
+    agentNodeId,
+    agentNodeIds,
+    appId,
+    draft,
+    stageYaml,
+    commit,
+    invalidate,
+    readStagingSummary,
+    discardStaging,
+  } = args;
   const targetNodeIds = agentNodeIds?.length ? agentNodeIds : agentNodeId ? [agentNodeId] : [];
   if (!canvas || targetNodeIds.length === 0 || !appId) {
     throw new Error("Agent canvas is not loaded");
@@ -103,16 +144,57 @@ export async function persistColumnAgent(args: {
     throw new Error("Canvas has no live version");
   }
 
+  const canvasYaml = serializeColumnAgentCanvasNodes(canvas, targetNodeIds, draft);
+
   try {
-    await stageYaml({
+    const summary = await readStagingSummary();
+    let discardedEarlierEdits = false;
+    if (canvasDraftIsStale(summary)) {
+      await discardStaging();
+      discardedEarlierEdits = true;
+    }
+
+    const discardedDuringStage = await stageColumnAgentDiscardingStaleDraft({
+      stageYaml,
+      discardStaging,
       versionId: liveVersionId,
-      canvasYaml: serializeColumnAgentCanvasNodes(canvas, targetNodeIds, draft),
+      canvasYaml,
     });
     await commit(UPDATE_AGENT_COMMIT_MESSAGE);
     await invalidate();
-    showSuccessToast("Agent saved.");
+    showSuccessToast(
+      discardedEarlierEdits || discardedDuringStage ? AGENT_SAVED_AFTER_DISCARD_NOTICE : AGENT_SAVED_NOTICE,
+    );
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Failed to save agent"));
     throw error;
   }
+}
+
+function canvasDraftIsStale(summary: CanvasDraftSummary | undefined): boolean {
+  return Boolean(summary?.hasStaging && summary.stale);
+}
+
+function isStaleStagingUpdateError(error: unknown): boolean {
+  return getApiErrorMessage(error, "").includes(STALE_STAGING_UPDATE_MESSAGE);
+}
+
+async function stageColumnAgentDiscardingStaleDraft(args: {
+  stageYaml: StageCanvasYaml;
+  discardStaging: () => Promise<unknown>;
+  versionId: string;
+  canvasYaml: string;
+}): Promise<boolean> {
+  try {
+    await args.stageYaml({ versionId: args.versionId, canvasYaml: args.canvasYaml });
+    return false;
+  } catch (error) {
+    if (!isStaleStagingUpdateError(error)) {
+      throw error;
+    }
+  }
+
+  await args.discardStaging();
+  await args.stageYaml({ versionId: args.versionId, canvasYaml: args.canvasYaml });
+  return true;
 }
