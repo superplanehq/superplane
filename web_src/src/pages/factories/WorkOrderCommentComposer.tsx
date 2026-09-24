@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { SkillSlashMenu } from "@/components/AgentSidebar/SkillSlashMenu";
 import type { SuperplaneUsersUser } from "@/api-client";
+import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useWorkOrderMentionComposer } from "@/hooks/useWorkOrderMentionComposer";
+import { skillSlashCandidatesFromResources, type SkillSlashCandidate } from "@/lib/skillSlash";
 import { cn } from "@/lib/utils";
 import { WorkOrderMentionText } from "@/pages/app/markdownMentions";
 import { ArrowUp, Loader2 } from "lucide-react";
@@ -12,18 +15,22 @@ import { WorkOrderMentionMenu } from "./WorkOrderMentionMenu";
 
 interface WorkOrderCommentComposerProps {
   organizationId: string;
+  factoryId?: string;
   canComment: boolean;
   isSubmitting: boolean;
   onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void>;
   members?: SuperplaneUsersUser[];
+  skills?: SkillSlashCandidate[];
 }
 
 export function WorkOrderCommentComposer({
   organizationId,
+  factoryId,
   canComment,
   isSubmitting,
   onSubmit,
   members,
+  skills,
 }: WorkOrderCommentComposerProps) {
   if (members) {
     return (
@@ -32,6 +39,7 @@ export function WorkOrderCommentComposer({
         isSubmitting={isSubmitting}
         onSubmit={onSubmit}
         users={members}
+        skills={skills ?? []}
       />
     );
   }
@@ -39,6 +47,7 @@ export function WorkOrderCommentComposer({
   return (
     <WorkOrderCommentComposerLoaded
       organizationId={organizationId}
+      factoryId={factoryId}
       canComment={canComment}
       isSubmitting={isSubmitting}
       onSubmit={onSubmit}
@@ -48,17 +57,20 @@ export function WorkOrderCommentComposer({
 
 function WorkOrderCommentComposerLoaded({
   organizationId,
+  factoryId,
   canComment,
   isSubmitting,
   onSubmit,
-}: Omit<WorkOrderCommentComposerProps, "members">) {
+}: Omit<WorkOrderCommentComposerProps, "members" | "skills">) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
+  const skillsQuery = useFactoryAgentResources(organizationId, factoryId ?? "", "KIND_SKILL", Boolean(factoryId));
   return (
     <WorkOrderCommentComposerView
       canComment={canComment}
       isSubmitting={isSubmitting}
       onSubmit={onSubmit}
       users={users}
+      skills={skillSlashCandidatesFromResources(skillsQuery.data ?? [])}
     />
   );
 }
@@ -68,13 +80,15 @@ function WorkOrderCommentComposerView({
   isSubmitting,
   onSubmit,
   users,
+  skills,
 }: {
   canComment: boolean;
   isSubmitting: boolean;
   onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void>;
   users: SuperplaneUsersUser[];
+  skills: SkillSlashCandidate[];
 }) {
-  const composer = useWorkOrderMentionComposer(users);
+  const composer = useWorkOrderMentionComposer(users, skills);
   const canSubmit = canComment && Boolean(composer.body.trim()) && !isSubmitting;
 
   const handleSubmit = async () => {
@@ -157,6 +171,12 @@ function WorkOrderCommentComposerInput({
         highlightIndex={composer.highlightIndex}
         onHighlight={composer.setHighlightIndex}
         onSelect={composer.handleSelectMention}
+      />
+      <SkillSlashMenu
+        candidates={composer.skillSuggestions}
+        highlightIndex={composer.highlightIndex}
+        onHighlight={composer.setHighlightIndex}
+        onSelect={composer.handleSelectSkill}
       />
       <label htmlFor="work-order-comment" className="sr-only">
         Add a comment

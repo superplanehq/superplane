@@ -31,7 +31,12 @@ export function useExperimentalFeature(organizationId?: string): ExperimentalFea
 
   const availableFeatures = useMemo(() => new Set(availableFeatureIds), [availableFeatureIds]);
 
-  const has = useCallback((featureId: string) => availableFeatures.has(featureId), [availableFeatures]);
+  const has = useCallback(
+    (featureId: string) => {
+      return availableFeatures.has(featureId);
+    },
+    [availableFeatures],
+  );
 
   return { has, enabledExperimentalFeatures: [...availableFeatureIds], isLoading };
 }

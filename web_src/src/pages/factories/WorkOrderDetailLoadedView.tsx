@@ -25,6 +25,7 @@ import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
+  factoryId?: string;
   factoryKey: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
@@ -118,6 +119,7 @@ function WorkOrderDetailBody(props: WorkOrderDetailLoadedViewProps) {
 
 function WorkOrderDetailMainColumn({
   organizationId,
+  factoryId,
   factoryKey,
   order,
   events,
@@ -212,6 +214,7 @@ function WorkOrderDetailMainColumn({
             footer={
               <WorkOrderCommentComposer
                 organizationId={organizationId}
+                factoryId={factoryId}
                 canComment={canManage}
                 isSubmitting={isAddingComment}
                 onSubmit={onAddComment}

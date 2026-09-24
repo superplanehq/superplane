@@ -25,6 +25,12 @@ import { buildConfigurationDisplayModel } from "./configurationView/buildConfigu
 import { ConfigurationView } from "./configurationView/ConfigurationView";
 import { SimpleTooltip } from "./SimpleTooltip";
 import { cn } from "@/lib/utils";
+import { useFactories } from "@/hooks/useFactoryData";
+import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
+import { AgentResourcesEditor } from "@/pages/factories/pages/AgentResourcesEditor";
+import { disabledAgentResourceIds } from "@/pages/factories/pages/disabledAgentResourceIds";
+import { disabledAgentResourceTools } from "@/pages/factories/pages/PlanningReviewDisabledTools";
+import { useParams } from "react-router";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
@@ -53,6 +59,7 @@ interface SettingsTabProps {
   concurrencyMaxOnly?: boolean;
   onCancel?: () => void;
   domainId?: string;
+  blockName?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
@@ -131,6 +138,7 @@ export function SettingsTab({
   onSave,
   onCancel: _onCancel,
   domainId,
+  blockName,
   customField,
   integrationName,
   integrationRef,
@@ -176,6 +184,13 @@ export function SettingsTab({
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
+  const { factoryKey } = useParams<{ factoryKey?: string }>();
+  const { data: factories = [] } = useFactories(
+    domainId ?? "",
+    Boolean(domainId && factoryKey && isAgentHarnessComponent(blockName)),
+  );
+  const factory = factories.find((entry) => entry.key?.toLowerCase() === factoryKey?.toLowerCase());
+  const showAgentResources = Boolean(isAgentHarnessComponent(blockName) && domainId && factory?.id && factoryKey);
 
   const defaultValuesWithoutToggles = useMemo(() => {
     const filtered = { ...defaultValues };
@@ -882,6 +897,26 @@ export function SettingsTab({
             )}
           </div>
         )}
+
+        {/* Agent MCP and skills */}
+        {showAgentResources ? (
+          <div className={SETTINGS_TAB_DIVIDER_CLASS}>
+            <AgentResourcesEditor
+              organizationId={domainId}
+              factoryId={factory?.id}
+              factoryKey={factoryKey}
+              disabledIds={disabledAgentResourceIds(nodeConfiguration)}
+              disabledTools={disabledAgentResourceTools(nodeConfiguration)}
+              onDisabledIdsChange={(ids) =>
+                setNodeConfiguration((current) => ({ ...current, disabledAgentResourceIds: ids }))
+              }
+              onDisabledToolsChange={(tools) =>
+                setNodeConfiguration((current) => ({ ...current, disabledAgentResourceTools: tools }))
+              }
+              compact
+            />
+          </div>
+        ) : null}
 
         {/* Custom field section */}
         {customField && shouldShowConfiguration && (
