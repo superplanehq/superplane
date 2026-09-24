@@ -33,7 +33,7 @@ export function DropdownMenuValueSub({
         <span className="ml-auto text-[11px] text-muted-foreground">{currentLabel}</span>
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent>
+        <DropdownMenuSubContent className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-x-hidden overflow-y-auto">
           {options.map((option) => (
             <DropdownMenuItem
               key={option.value || option.label}

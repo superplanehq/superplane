@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -276,7 +276,9 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const model = within(settings).getByRole("button", { name: "Model: Auto" });
     expect(model).toHaveTextContent("Auto");
     await user.click(model);
-    await user.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.hover(screen.getByTestId("split-run-draft-model-list"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.keyboard("{Escape}");
     expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6" })).toBeInTheDocument();
     const actions = within(strip).getByTestId("split-run-draft-action-group");
     expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
