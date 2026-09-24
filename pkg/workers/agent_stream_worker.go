@@ -27,9 +27,9 @@ const (
 	agentStreamTimeout         = 15 * time.Minute
 	maxConcurrentStreams       = 10
 	maxLockedStreamReschedules = 10
-	agentStreamService      = "superplane.agent-stream-worker"
-	streamHeartbeatInterval = 30 * time.Second
-	stuckHeartbeatGrace     = 5 * time.Minute
+	agentStreamService         = "superplane.agent-stream-worker"
+	streamHeartbeatInterval    = 30 * time.Second
+	stuckHeartbeatGrace        = 5 * time.Minute
 	// Must stay above agentStreamTimeout so long-but-healthy turns
 	// without a heartbeat yet aren't force-failed mid-flight.
 	stuckLegacyGrace    = 2 * agentStreamTimeout

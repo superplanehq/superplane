@@ -118,16 +118,7 @@ export function OrganizationSettings() {
     permission?: { resource: string; action: string };
   };
 
-  const sectionIds = [
-    "profile",
-    "general",
-    "members",
-    "groups",
-    "roles",
-    "integrations",
-    "secrets",
-    "api-keys",
-  ];
+  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets", "api-keys"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
