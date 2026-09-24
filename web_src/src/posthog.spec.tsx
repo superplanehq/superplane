@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode, type ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { init, identify, capture, reset, setOnce } = vi.hoisted(() => ({
   init: vi.fn(),
@@ -22,7 +22,10 @@ vi.mock("react-router", () => ({
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({ data: { metadata: { name: "Acme Corp" } } }),
-  useOrganizationUsage: () => ({ data: null, error: null }),
+}));
+
+vi.mock("@/hooks/useAccountOrganizations", () => ({
+  useAccountOrganizations: () => ({ data: [], refetch: vi.fn() }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -37,14 +40,11 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
 }));
 
-vi.mock("@/lib/env", () => ({
-  isUsagePageForced: () => false,
-}));
-
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { initPostHog } from "@/posthog";
 
 const mockAccount = {
   id: "user-123",
@@ -69,7 +69,6 @@ describe("posthog init", () => {
     setOnce.mockClear();
     localStorage.clear();
     document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
-    vi.resetModules();
   });
 
   afterEach(() => {
@@ -79,26 +78,26 @@ describe("posthog init", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("calls init when SUPERPLANE_POSTHOG_KEY is set", async () => {
+  it("calls init when SUPERPLANE_POSTHOG_KEY is set", () => {
     (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY = "test-key";
-    await import("@/posthog");
+    expect(initPostHog()).toBe(true);
     expect(init).toHaveBeenCalledWith(
       "test-key",
       expect.objectContaining({ autocapture: false, capture_pageview: false, person_profiles: "always" }),
     );
   });
 
-  it("does not call init when SUPERPLANE_POSTHOG_KEY is not set", async () => {
+  it("does not call init when SUPERPLANE_POSTHOG_KEY is not set", () => {
     delete (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY;
-    await import("@/posthog");
+    expect(initPostHog()).toBe(false);
     expect(init).not.toHaveBeenCalled();
   });
 
-  it("sets initial UTM person properties when PostHog initializes", async () => {
+  it("sets initial UTM person properties when PostHog initializes", () => {
     (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY = "test-key";
     window.history.replaceState({}, "", "/signup?utm_source=youtube&utm_campaign=erictech_beta");
 
-    await import("@/posthog");
+    expect(initPostHog()).toBe(true);
 
     expect(setOnce).toHaveBeenCalledWith({
       $initial_utm_source: "youtube",
@@ -199,6 +198,30 @@ describe("account identification", () => {
         },
       });
     });
+    expect(window.location.search).toBe("");
+  });
+
+  it("captures implicit signup without marketing properties", async () => {
+    window.history.replaceState({}, "", "/org-123?auth_signup_result=created&view=list");
+
+    render(
+      <StrictMode>
+        <AccountProvider>
+          <div />
+        </AccountProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(capture).toHaveBeenCalledWith("auth:signup");
+    });
+    expect(identify).toHaveBeenCalledWith("user-123", {
+      email: "john@example.com",
+      name: "John Doe",
+      installation_admin: false,
+    });
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe("?view=list");
   });
 
   it("clears unconfirmed signup preference when redirect marks account as existing", async () => {
@@ -222,6 +245,7 @@ describe("account identification", () => {
     });
 
     expect(capture).not.toHaveBeenCalledWith("auth:signup", expect.anything());
+    expect(window.location.search).toBe("");
   });
 });
 

@@ -63,6 +63,13 @@ spec:
   - host: "{{ $domainName }}"
     http:
       paths:
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Release.Name }}-websocket
+            port:
+              number: 8000
       - path: /
         pathType: Prefix
         backend:
@@ -87,10 +94,29 @@ spec:
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
 metadata:
-  name: ingress-backend-config
+  name: ingress-api-backend-config
   namespace: {{ .Release.Namespace }}
 spec:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-features
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 10
+    port: 8000
+    type: HTTP
+    requestPath: /health
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: ingress-websocket-backend-config
+  namespace: {{ .Release.Namespace }}
+spec:
+  # Long-lived WebSocket connections
   timeoutSec: 3600
   connectionDraining:
     drainingTimeoutSec: 60

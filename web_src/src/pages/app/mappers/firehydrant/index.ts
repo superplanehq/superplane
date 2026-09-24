@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onIncidentTriggerRenderer } from "./on_incident";
 import { createIncidentMapper } from "./create_incident";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIncident: createIncidentMapper,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { formatStepExecutionDuration, type WorkOrderTimelineStep } from "./workOrderTimelineEvents";
 

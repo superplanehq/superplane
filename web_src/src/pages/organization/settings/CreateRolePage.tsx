@@ -387,7 +387,7 @@ const VISIBLE_ROLE_PERMISSION_KEYS = new Set(
   VISIBLE_ROLE_PERMISSIONS.map((permission) => permissionKey(permission.resource, permission.action)),
 );
 
-const DEFAULT_ROLE_NAMES = ["org_viewer", "org_admin", "org_owner"];
+const DEFAULT_ROLE_NAMES = ["org_admin", "org_maintainer", "org_operator"];
 
 const isDefaultRole = (roleName?: string | null) => {
   if (!roleName) return false;

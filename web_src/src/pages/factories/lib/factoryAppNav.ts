@@ -1,8 +1,8 @@
 import {
-  automationDetailPath,
   automationsPath,
   factoryHomePath,
   factoryLineDetailPath,
+  parseFactoryAppNavFrom,
   workOrderDetailPath,
 } from "./factoryPagePaths";
 
@@ -30,15 +30,11 @@ export function resolveFactoryAppBackNav(
     orderTitle?: string | null;
   },
 ): FactoryAppBackNav {
-  const from = options.from;
+  // Normalizes the legacy "work-order" value so back links generated before
+  // the task rename still resolve to the task branch below.
+  const from = parseFactoryAppNavFrom(options.from ?? null) ?? options.from;
 
   if (from === "automations") {
-    if (options.appId) {
-      return {
-        label: options.appName?.trim() || "Automations",
-        href: automationDetailPath(organizationId, factoryKey, options.appId),
-      };
-    }
     return { label: "Automations", href: automationsPath(organizationId, factoryKey) };
   }
 
@@ -52,7 +48,7 @@ export function resolveFactoryAppBackNav(
     return { label: "Back", href: factoryHomePath(organizationId, factoryKey) };
   }
 
-  if (from === "work-order") {
+  if (from === "task") {
     if (options.orderNumber) {
       return {
         label: "Back",

@@ -1,4 +1,6 @@
 import type { ConfigurationField } from "@/api-client";
+import { HOSTED_MODEL_ALL_PROVIDERS, hostedLLMTechnicalNameFromKey } from "@/lib/hostedLLMModels";
+import { parseSelectableLLMModelKey, selectableLLMModelLabel } from "@/lib/selectableLLMModels";
 import { isUrl } from "@/lib/utils";
 import type { ConfigurationDisplayKind } from "./types";
 
@@ -193,7 +195,32 @@ function formatPrimitiveValue(value: unknown, field: ConfigurationField): Format
 }
 
 export function formatConfigurationValue(field: ConfigurationField, value: unknown): FormattedConfigurationValue {
+  if (field.type === "hosted-model") {
+    return formatHostedModelValue(field, value);
+  }
   return formatPrimitiveValue(value, field);
+}
+
+function formatHostedModelValue(field: ConfigurationField, value: unknown): FormattedConfigurationValue {
+  if (isEmptyValue(value)) {
+    if (field.typeOptions?.hostedModel?.provider === HOSTED_MODEL_ALL_PROVIDERS) {
+      return { kind: "text", displayText: "Instance SuperPlane agent model" };
+    }
+    return { kind: "empty", displayText: EMPTY_DISPLAY_VALUE };
+  }
+
+  const raw = String(value);
+  const selectable = parseSelectableLLMModelKey(raw);
+  if (selectable.source !== "" && selectable.provider !== "") {
+    return {
+      kind: "text",
+      displayText: selectableLLMModelLabel(selectable.provider, selectable.model) || raw,
+    };
+  }
+  return {
+    kind: "text",
+    displayText: hostedLLMTechnicalNameFromKey(raw) || raw,
+  };
 }
 
 export function formatConfigurationLabel(field: ConfigurationField): string {

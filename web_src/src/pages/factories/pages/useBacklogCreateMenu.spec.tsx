@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { BacklogIntakeItemsProvider } from "./BacklogIntakeItemsContext";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";

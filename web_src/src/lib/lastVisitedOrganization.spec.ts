@@ -1,8 +1,9 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 
 import {
   LAST_VISITED_ORGANIZATION_STORAGE_KEY,
   pickAutoRedirectOrganization,
+  pickResumePath,
   readLastVisitedOrganization,
   recordLastVisitedOrganization,
 } from "./lastVisitedOrganization";
@@ -49,25 +50,54 @@ describe("lastVisitedOrganization", () => {
 });
 
 describe("pickAutoRedirectOrganization", () => {
-  it("returns the only organization even without a last visited entry", () => {
-    expect(pickAutoRedirectOrganization([{ id: "org-a" }], null)).toBe("org-a");
+  it("returns the only organization's slug even without a last visited entry", () => {
+    expect(pickAutoRedirectOrganization([{ slug: "org-a" }], null)).toBe("org-a");
   });
 
-  it("returns the last visited organization when the account still belongs to it", () => {
-    const organizations = [{ id: "org-a" }, { id: "org-b" }];
+  it("returns the last visited organization slug when the account still belongs to it", () => {
+    const organizations = [{ slug: "org-a" }, { slug: "org-b" }];
     expect(pickAutoRedirectOrganization(organizations, "org-b")).toBe("org-b");
   });
 
-  it("ignores a last visited organization the account no longer belongs to", () => {
-    const organizations = [{ id: "org-a" }, { id: "org-b" }];
-    expect(pickAutoRedirectOrganization(organizations, "org-gone")).toBeNull();
+  it("uses the first organization when the account no longer belongs to the last visited organization", () => {
+    const organizations = [{ slug: "org-a" }, { slug: "org-b" }];
+    expect(pickAutoRedirectOrganization(organizations, "org-gone")).toBe("org-a");
   });
 
-  it("returns null with multiple organizations and no last visited entry", () => {
-    expect(pickAutoRedirectOrganization([{ id: "org-a" }, { id: "org-b" }], null)).toBeNull();
+  it("returns the first organization with multiple organizations and no last visited entry", () => {
+    expect(pickAutoRedirectOrganization([{ slug: "org-a" }, { slug: "org-b" }], null)).toBe("org-a");
   });
 
   it("returns null when there are no organizations", () => {
     expect(pickAutoRedirectOrganization([], "org-a")).toBeNull();
+  });
+
+  it("picks the organization with the newest saved screen when last visited is gone", () => {
+    expect(
+      pickAutoRedirectOrganization(
+        [
+          { slug: "old-zombie" },
+          { slug: "puppies-inc", lastLocationUpdatedAt: "2026-02-20T10:00:00.000Z" },
+          { slug: "acme", lastLocationUpdatedAt: "2026-09-01T10:00:00.000Z" },
+        ],
+        "old-zombie-gone",
+      ),
+    ).toBe("acme");
+  });
+
+  it("never returns a raw UID: the single-organization branch trusts the caller's slug field", () => {
+    // Callers must map their data to `{ slug }` before calling this helper;
+    // once they do, only slugs ever come out, even for a single organization.
+    expect(pickAutoRedirectOrganization([{ slug: "acme" }], null)).toBe("acme");
+  });
+});
+
+describe("pickResumePath", () => {
+  it("prefers the first safe path that belongs to the organization", () => {
+    expect(pickResumePath("acme", "/other/apps", "/acme/apps/deploy?run=1")).toBe("/acme/apps/deploy?run=1");
+  });
+
+  it("returns null when no candidate belongs to the organization", () => {
+    expect(pickResumePath("acme", "/other/apps", "//evil.com")).toBeNull();
   });
 });

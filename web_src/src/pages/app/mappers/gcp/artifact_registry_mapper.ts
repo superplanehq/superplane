@@ -10,7 +10,13 @@ import type {
 } from "../types";
 import { baseMapper } from "./base";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getArtifactOutputPayload, getArtifactData, artifactShortName } from "./artifact_registry";
+import {
+  getArtifactOutputPayload,
+  getArtifactData,
+  artifactShortName,
+  type ArtifactVersionData,
+  type GetArtifactAnalysisData,
+} from "./artifact_registry";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 
 export const getArtifactMapper: ComponentBaseMapper = {
@@ -24,34 +30,27 @@ export const getArtifactMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
+    const data = getArtifactData<ArtifactVersionData>(context.execution);
+    const metadata = data?.metadata;
     const details: Record<string, string> = {};
 
     if (payload?.timestamp) {
       details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const dockerUri = buildDockerUri(data?.metadata?.name as string | undefined);
+    const dockerUri = buildDockerUri(metadata?.name);
     if (dockerUri) {
       details["Image"] = dockerUri;
     }
 
-    if (data?.createTime) {
-      const formatted = formatDateTime(data.createTime as string);
-      if (formatted) details["Image Created At"] = formatted;
-    }
+    Object.assign(details, artifactTimestampDetails(data));
 
-    if (data?.updateTime) {
-      const formatted = formatDateTime(data.updateTime as string);
-      if (formatted) details["Image Updated At"] = formatted;
-    }
-
-    const sizeBytes = data?.metadata?.imageSizeBytes;
+    const sizeBytes = metadata?.imageSizeBytes;
     if (sizeBytes) {
       details["Size"] = formatBytes(Number(sizeBytes));
     }
 
-    const digest = artifactShortName(data?.name as string | undefined);
+    const digest = artifactShortName(data?.name);
     if (digest) {
       details["Digest"] = digest;
     }
@@ -76,34 +75,16 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
+    const data = getArtifactData<GetArtifactAnalysisData>(context.execution);
     const details: Record<string, string> = {};
 
-    if (payload?.timestamp) {
-      details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
-    }
-
-    if (data?.resourceUri) {
-      details["Image"] = String(data.resourceUri);
-    }
-
-    if (data?.scanStatus) {
-      details["Scan Status"] = String(data.scanStatus);
-    }
-
-    if (typeof data?.vulnerabilities === "number") {
-      details["Vulnerabilities"] = String(data.vulnerabilities);
-    }
-
-    if (typeof data?.critical === "number" && data.critical > 0) {
-      details["Critical"] = String(data.critical);
-    }
-    if (typeof data?.high === "number" && data.high > 0) {
-      details["High"] = String(data.high);
-    }
-    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0) {
-      details["Fixes Available"] = String(data.fixAvailable);
-    }
+    addTimestampDetail(details, "Retrieved At", payload?.timestamp);
+    addDetail(details, "Image", data?.resourceUri);
+    addDetail(details, "Scan Status", data?.scanStatus);
+    addNumberDetail(details, "Vulnerabilities", data?.vulnerabilities);
+    addPositiveCountDetail(details, "Critical", data?.critical);
+    addPositiveCountDetail(details, "High", data?.high);
+    addPositiveCountDetail(details, "Fixes Available", data?.fixAvailable);
 
     return details;
   },
@@ -113,6 +94,44 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
+
+function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = value;
+  }
+}
+
+function addTimestampDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = new Date(value).toLocaleString();
+  }
+}
+
+function addNumberDetail(details: Record<string, string>, key: string, value: unknown) {
+  if (typeof value === "number") {
+    details[key] = String(value);
+  }
+}
+
+function addPositiveCountDetail(details: Record<string, string>, key: string, value: unknown) {
+  if (typeof value === "number" && value > 0) {
+    details[key] = String(value);
+  }
+}
+
+function artifactTimestampDetails(data: ArtifactVersionData | undefined): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (data?.createTime) {
+    const formatted = formatDateTime(data.createTime);
+    if (formatted) details["Image Created At"] = formatted;
+  }
+
+  if (data?.updateTime) {
+    const formatted = formatDateTime(data.updateTime);
+    if (formatted) details["Image Updated At"] = formatted;
+  }
+  return details;
+}
 
 function formatDateTime(value?: string): string | undefined {
   if (!value) return undefined;
@@ -139,7 +158,7 @@ function formatBytes(bytes: number): string {
 }
 
 function artifactActionMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const config = (node.configuration as Record<string, unknown> | undefined) ?? {};
   const inputMode = String(config.inputMode || "url").toLowerCase();
   const metadata: MetadataItem[] = [];
 

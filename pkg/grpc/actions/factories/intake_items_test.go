@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 )
 
 func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
@@ -124,10 +126,111 @@ func TestComposeImportedDescription(t *testing.T) {
 	})
 }
 
+func TestJiraIntakeItemSource_StaysInsideItsProject(t *testing.T) {
+	source := &jiraIntakeItemSource{projectKey: "ENG", siteURL: "https://acme.atlassian.net"}
+
+	t.Run("an origin URL of another project of the same site is not this intake's", func(t *testing.T) {
+		id, ok := source.ItemIDFromOriginURL("https://acme.atlassian.net/browse/ENG-42")
+		assert.True(t, ok)
+		assert.Equal(t, "ENG-42", id)
+
+		_, ok = source.ItemIDFromOriginURL("https://acme.atlassian.net/browse/OPS-42")
+		assert.False(t, ok)
+
+		_, ok = source.ItemIDFromOriginURL("https://other.atlassian.net/browse/ENG-42")
+		assert.False(t, ok)
+	})
+
+	t.Run("an issue reports as owned only with a matching project key", func(t *testing.T) {
+		assert.True(t, source.ownsIssue(map[string]any{"project": map[string]any{"key": "eng"}}))
+		assert.False(t, source.ownsIssue(map[string]any{"project": map[string]any{"key": "OPS"}}))
+		assert.False(t, source.ownsIssue(map[string]any{"project": map[string]any{}}))
+		assert.False(t, source.ownsIssue(nil))
+	})
+}
+
+func TestJiraIssueProjectKey(t *testing.T) {
+	assert.Equal(t, "ENG", jiraIssueProjectKey("ENG-42"))
+	assert.Equal(t, "ENG-SUB", jiraIssueProjectKey("ENG-SUB-42"))
+	assert.Equal(t, "", jiraIssueProjectKey("ENG42"))
+	assert.Equal(t, "", jiraIssueProjectKey("-42"))
+}
+
+func TestJiraIssueFromFullIssue_ReadsTheDescriptionAsText(t *testing.T) {
+	issue := &jira.Issue{
+		Key: "ENG-42",
+		Fields: map[string]any{
+			"summary": "Refund retries charge twice",
+			"description": map[string]any{
+				"type":    "doc",
+				"version": float64(1),
+				"content": []any{
+					map[string]any{
+						"type":    "paragraph",
+						"content": []any{map[string]any{"type": "text", "text": "A retried refund charges twice."}},
+					},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, IntakeItem{
+		ID:    "ENG-42",
+		Key:   "ENG-42",
+		Title: "Refund retries charge twice",
+		Body:  "A retried refund charges twice.",
+		URL:   "https://acme.atlassian.net/browse/ENG-42",
+	}, jiraIssueFromFullIssue(issue, "https://acme.atlassian.net"))
+}
+
 func TestUnsupportedIntakeItemSource_DoesNotSearch(t *testing.T) {
 	source := unsupportedIntakeItemSource{}
 	_, err := source.Search(t.Context(), "refund", 5)
 	assert.ErrorIs(t, err, errIntakeSearchUnsupported)
 	_, err = source.Get(t.Context(), "1")
 	assert.ErrorIs(t, err, errIntakeSearchUnsupported)
+}
+
+func TestSentryIssueItem_UsesShortIDAndPermalink(t *testing.T) {
+	issue := sentry.Issue{
+		ID:        "123",
+		ShortID:   "PAYMENTS-1",
+		Title:     "TypeError: boom",
+		Permalink: "https://acme.sentry.io/issues/123/",
+		WebURL:    "https://sentry.io/issues/123/",
+	}
+
+	assert.Equal(t, IntakeItem{
+		ID:    "123",
+		Key:   "PAYMENTS-1",
+		Title: "TypeError: boom",
+		URL:   "https://acme.sentry.io/issues/123/",
+	}, sentryIssueItem(issue))
+}
+
+func TestSentryIssueItem_FallsBackToWebURL(t *testing.T) {
+	issue := sentry.Issue{
+		ID:      "123",
+		ShortID: "PAYMENTS-1",
+		Title:   "TypeError: boom",
+		WebURL:  "https://sentry.io/issues/123/",
+	}
+
+	assert.Equal(t, IntakeItem{
+		ID:    "123",
+		Key:   "PAYMENTS-1",
+		Title: "TypeError: boom",
+		URL:   "https://sentry.io/issues/123/",
+	}, sentryIssueItem(issue))
+}
+
+func TestSentryIntakeItemSource_StaysInsideItsProject(t *testing.T) {
+	source := &sentryIntakeItemSource{project: "payments"}
+
+	assert.True(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "payments"}}))
+	assert.True(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "PAYMENTS"}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "billing"}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{}))
+	assert.False(t, source.ownsIssue(nil))
 }

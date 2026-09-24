@@ -14,7 +14,7 @@ import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { LinesPage } from "./LinesPage";
 
-export function LocationProbe() {
+export function LocationProbe({ navigateTo }: { navigateTo?: string } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   return (
@@ -23,6 +23,11 @@ export function LocationProbe() {
       <button type="button" data-testid="lines-test-back" onClick={() => navigate(-1)}>
         Back
       </button>
+      {navigateTo ? (
+        <button type="button" data-testid="lines-test-navigate" onClick={() => navigate(navigateTo)}>
+          Go
+        </button>
+      ) : null}
     </>
   );
 }
@@ -32,11 +37,13 @@ export function LinesBoardSpecHarness({
   openCreateWorkOrder = () => {},
   factory = REFUND_FACTORY,
   previewFlags = null,
+  navigateTo,
 }: {
   path?: string;
   openCreateWorkOrder?: () => void;
   factory?: FactoriesFactory;
   previewFlags?: FactoryPreviewFlags | null;
+  navigateTo?: string;
 }) {
   return (
     <QueryClientProvider client={new QueryClient()}>
@@ -57,9 +64,29 @@ export function LinesBoardSpecHarness({
                 <Routes>
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-                  <Route path="/org-1/workspaces/:factoryKey/work-order/:orderNumber" element={<LinesPage />} />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/comments"
+                    element={<div data-testid="discussion-pr-feedback-setup">Comments setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/checks"
+                    element={<div data-testid="checks-pr-feedback-setup">Checks setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/planning"
+                    element={<div data-testid="planning-setup">Planning setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/sentry"
+                    element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/jira"
+                    element={<div data-testid="jira-intake-setup">Jira setup page</div>}
+                  />
+                  <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
                 </Routes>
-                <LocationProbe />
+                <LocationProbe navigateTo={navigateTo} />
               </FactoriesLayoutContext.Provider>
             </FactoryPreviewFlagsContext.Provider>
           </MemoryRouter>

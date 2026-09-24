@@ -7,7 +7,7 @@ import type {
   OutputPayload,
 } from "../types";
 import { truncate } from "../safeMappers";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 import { asRecord, getFrameRowCount } from "./queryResponse";
 import type { QueryDataSourceConfiguration } from "./types";

@@ -5,8 +5,13 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
+import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
+import { WorkOrderRequestImage } from "./lib/workOrderRequestImage";
+import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
 import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
@@ -19,6 +24,32 @@ interface WorkOrderDescriptionEditorProps {
   onFocus?: () => void;
   onBlur?: () => void;
   className?: string;
+  placeholder?: string;
+  fileUrls?: Record<string, string>;
+  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
+  isUploading?: boolean;
+  canRemoveImages?: boolean;
+  autoFocus?: boolean;
+}
+
+function areUrlMapsEqual(a?: Record<string, string>, b?: Record<string, string>): boolean {
+  if (a === b) {
+    return true;
+  }
+  const keysA = Object.keys(a ?? {});
+  const keysB = Object.keys(b ?? {});
+  if (keysA.length === 0 && keysB.length === 0) {
+    return true;
+  }
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  for (const key of keysA) {
+    if ((a ?? {})[key] !== (b ?? {})[key]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function WorkOrderDescriptionEditor({
@@ -29,6 +60,12 @@ export function WorkOrderDescriptionEditor({
   onFocus,
   onBlur,
   className,
+  placeholder = "Add description…",
+  fileUrls,
+  onUploadFiles,
+  isUploading = false,
+  canRemoveImages = false,
+  autoFocus = false,
 }: WorkOrderDescriptionEditorProps) {
   const editorRef = useRef<Editor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -37,14 +74,19 @@ export function WorkOrderDescriptionEditor({
   const maxLengthRef = useRef(maxLength);
   const emittedMarkdownRef = useRef(value);
   const pasteInFlightRef = useRef(false);
+  const onUploadFilesRef = useRef(onUploadFiles);
+  const fileUrlsRef = useRef(fileUrls);
 
   onChangeRef.current = onChange;
   onFocusRef.current = onFocus;
   onBlurRef.current = onBlur;
   maxLengthRef.current = maxLength;
+  onUploadFilesRef.current = onUploadFiles;
+  fileUrlsRef.current = fileUrls;
 
   const editor = useEditor({
     immediatelyRender: false,
+    autofocus: autoFocus ? "end" : false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
@@ -52,8 +94,9 @@ export function WorkOrderDescriptionEditor({
         underline: false,
       }),
       WorkspaceUnderline,
+      canRemoveImages ? WorkOrderRequestImage : WorkOrderImage,
       Markdown,
-      Placeholder.configure({ placeholder: "Add description…" }),
+      Placeholder.configure({ placeholder }),
     ],
     content: value,
     contentType: "markdown",
@@ -68,6 +111,9 @@ export function WorkOrderDescriptionEditor({
         "data-testid": "work-order-description-input",
       },
       handlePaste: (_view, event) => {
+        if (tryUploadClipboardFiles(editorRef.current, event, onUploadFilesRef.current, disabled)) {
+          return true;
+        }
         const text = event.clipboardData?.getData("text/plain") ?? "";
         if (!text) {
           return false;
@@ -82,6 +128,14 @@ export function WorkOrderDescriptionEditor({
           return false;
         }
         return pasteMarkdownFromClipboard(current, event);
+      },
+      handleDrop: (_view, event) => {
+        return tryUploadDataTransferFiles(
+          editorRef.current,
+          event.dataTransfer?.files,
+          onUploadFilesRef.current,
+          disabled,
+        );
       },
     },
     onUpdate: ({ editor: current }) => {
@@ -112,6 +166,8 @@ export function WorkOrderDescriptionEditor({
   });
 
   editorRef.current = editor;
+  const lastFileUrlsRef = useRef<Record<string, string> | undefined>(undefined);
+  const lastEditorRef = useRef<Editor | null>(null);
 
   useEffect(() => {
     if (!editor) {
@@ -119,6 +175,51 @@ export function WorkOrderDescriptionEditor({
     }
     editor.setEditable(!disabled);
   }, [disabled, editor]);
+
+  useEffect(() => {
+    if (!autoFocus || disabled || !editor) {
+      return;
+    }
+    editor.commands.focus("end");
+  }, [autoFocus, disabled, editor]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+    const urls = fileUrls ?? {};
+    editor.storage.image = {
+      ...(editor.storage.image ?? {}),
+      downloadUrls: urls,
+    };
+    const isNewEditor = editor !== lastEditorRef.current;
+    const urlsChanged = !areUrlMapsEqual(lastFileUrlsRef.current, fileUrls);
+    if (!isNewEditor && !urlsChanged) {
+      return;
+    }
+    lastEditorRef.current = editor;
+    lastFileUrlsRef.current = fileUrls;
+    if (Object.keys(urls).length === 0 && !urlsChanged) {
+      return;
+    }
+
+    const { state, view } = editor;
+    const tr = state.tr;
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === "image") {
+        const resolved = resolveWorkOrderFileSrc(node.attrs.src as string | undefined, urls);
+        if (node.attrs.resolvedSrc !== resolved) {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            resolvedSrc: resolved,
+          });
+        }
+      }
+    });
+    if (tr.docChanged) {
+      view.dispatch(tr);
+    }
+  }, [editor, fileUrls]);
 
   useEffect(() => {
     if (!editor) {
@@ -139,18 +240,45 @@ export function WorkOrderDescriptionEditor({
           updateDelay={0}
           appendTo={() =>
             editor.view.dom.closest('[data-testid="create-work-order-dialog"]') ??
+            editor.view.dom.closest('[data-testid="create-work-order-request-dialog"]') ??
             editor.view.dom.closest('[data-testid="work-order-split-run"]') ??
             editor.view.dom.parentElement ??
             document.body
           }
           options={{ placement: "top", offset: 8, strategy: "fixed" }}
         >
-          <WorkOrderDescriptionFormatToolbar disabled={disabled} editor={editor} />
+          <WorkOrderDescriptionFormatToolbar
+            disabled={disabled || isUploading}
+            editor={editor}
+            onUploadFiles={onUploadFiles}
+          />
         </BubbleMenu>
       ) : null}
       <EditorContent editor={editor} />
     </>
   );
+}
+
+function tryUploadClipboardFiles(
+  editor: Editor | null,
+  event: ClipboardEvent,
+  onUploadFiles: WorkOrderDescriptionEditorProps["onUploadFiles"],
+  disabled: boolean,
+): boolean {
+  return tryUploadDataTransferFiles(editor, event.clipboardData?.files, onUploadFiles, disabled);
+}
+
+function tryUploadDataTransferFiles(
+  editor: Editor | null,
+  files: FileList | undefined,
+  onUploadFiles: WorkOrderDescriptionEditorProps["onUploadFiles"],
+  disabled: boolean,
+): boolean {
+  if (disabled || !onUploadFiles || !editor || !files || files.length === 0) {
+    return false;
+  }
+  void onUploadFiles(files).then((uploaded) => insertUploadedFiles(editor, uploaded));
+  return true;
 }
 
 function markdownWithinLimit(markdown: string, previous: string, limit: number, fromPaste: boolean): string {

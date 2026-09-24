@@ -122,6 +122,49 @@ func Test__ChangesetBuilder(t *testing.T) {
 		steps.assertHasConnect("node-a", "node-c", "default")
 	})
 
+	t.Run("implementation change deletes and adds the same node", func(t *testing.T) {
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
+			[]models.Node{
+				{
+					ID:   "planner-agent-no-issue",
+					Name: "Plan",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "runnerClaudeCode"},
+					},
+					Configuration: map[string]any{"model": "sonnet"},
+				},
+			},
+			nil,
+			[]models.Node{
+				{
+					ID:   "planner-agent-no-issue",
+					Name: "Plan",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "runnerSuperPlane"},
+					},
+					Configuration: map[string]any{"machineType": "e1-large-amd64"},
+				},
+			},
+			nil,
+		)
+
+		steps.assertNoError()
+		steps.assertOperationCount(2)
+		steps.assertHasDeleteNode("planner-agent-no-issue")
+		steps.assertHasAddNode(
+			"planner-agent-no-issue",
+			"Plan",
+			"runnerSuperPlane",
+			map[string]any{"machineType": "e1-large-amd64"},
+		)
+		require.Nil(t, steps.findNodeOperation(ChangeTypeUpdateNode, "planner-agent-no-issue"))
+		require.Equal(t, ChangeTypeDeleteNode, steps.changeset.Changes[0].Type)
+		require.Equal(t, ChangeTypeAddNode, steps.changeset.Changes[1].Type)
+	})
+
 	t.Run("invalid configuration for added node returns error", func(t *testing.T) {
 		steps := &ChangesetBuilderSteps{t: t}
 		steps.whenBuilding(
@@ -204,6 +247,35 @@ func Test__ChangesetBuilder(t *testing.T) {
 		op := steps.findNodeOperation(ChangeTypeAddNode, "node-a")
 		require.NotNil(t, op)
 		require.Equal(t, integrationID, op.Node.IntegrationID)
+	})
+
+	t.Run("add node keeps metadata", func(t *testing.T) {
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
+			nil,
+			nil,
+			[]models.Node{
+				{
+					ID:   "node-a",
+					Name: "Node A",
+					Type: models.NodeTypeTrigger,
+					Ref: models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "jira.onIssue"},
+					},
+					Metadata: map[string]any{
+						"jiraMoveOnComplete":   true,
+						"jiraCompletionColumn": "QA",
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.assertNoError()
+		op := steps.findNodeOperation(ChangeTypeAddNode, "node-a")
+		require.NotNil(t, op)
+		require.Equal(t, true, op.Node.Metadata["jiraMoveOnComplete"])
+		require.Equal(t, "QA", op.Node.Metadata["jiraCompletionColumn"])
 	})
 }
 

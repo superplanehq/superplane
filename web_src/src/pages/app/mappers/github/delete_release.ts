@@ -31,31 +31,38 @@ export const deleteReleaseMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const details: Record<string, string> = {};
 
-    if (outputs && outputs.default && outputs.default.length > 0) {
-      const deletedRelease = outputs.default[0].data as DeletedReleaseOutput;
-      Object.assign(details, {
-        "Deleted At": deletedRelease?.deleted_at ? new Date(deletedRelease.deleted_at).toLocaleString() : "-",
-        "Tag Deleted": deletedRelease?.tag_deleted ? "Yes" : "No",
-      });
-
-      details["Release ID"] = deletedRelease?.id?.toString() || "";
-      details["Tag Name"] = deletedRelease?.tag_name || "";
-
-      if (deletedRelease?.name) {
-        details["Release Name"] = deletedRelease.name;
-      }
-
-      if (deletedRelease?.draft) {
-        details["Was Draft"] = "Yes";
-      }
-
-      if (deletedRelease?.prerelease) {
-        details["Was Prerelease"] = "Yes";
-      }
+    if (!outputs?.default?.length) {
+      return {};
     }
 
-    return details;
+    return detailsFromDeletedRelease(outputs.default[0].data as DeletedReleaseOutput);
   },
 };
+
+function detailsFromDeletedRelease(deletedRelease: DeletedReleaseOutput): Record<string, string> {
+  const details = alwaysSetDeletedReleaseDetails(deletedRelease);
+
+  if (deletedRelease?.name) {
+    details["Release Name"] = deletedRelease.name;
+  }
+
+  if (deletedRelease?.draft) {
+    details["Was Draft"] = "Yes";
+  }
+
+  if (deletedRelease?.prerelease) {
+    details["Was Prerelease"] = "Yes";
+  }
+
+  return details;
+}
+
+function alwaysSetDeletedReleaseDetails(deletedRelease: DeletedReleaseOutput): Record<string, string> {
+  return {
+    "Deleted At": deletedRelease?.deleted_at ? new Date(deletedRelease.deleted_at).toLocaleString() : "-",
+    "Tag Deleted": deletedRelease?.tag_deleted ? "Yes" : "No",
+    "Release ID": deletedRelease?.id?.toString() || "",
+    "Tag Name": deletedRelease?.tag_name || "",
+  };
+}

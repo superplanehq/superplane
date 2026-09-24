@@ -34,7 +34,7 @@ metadata:
 spec:
   displayName: Engineers
   description: Engineering team
-  role: org_viewer
+  role: org_operator
 `
 
 func newCreateServer(t *testing.T, seen *createBody) *httptest.Server {
@@ -90,7 +90,7 @@ func TestCreateFromFileOverridesPositional(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/group.yaml"
-	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: from-file\nspec:\n  displayName: FromFile\n  role: org_viewer\n")
+	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: from-file\nspec:\n  displayName: FromFile\n  role: org_operator\n")
 	require.NoError(t, os.WriteFile(path, content, 0644))
 
 	displayEmpty := ""
@@ -126,7 +126,7 @@ func TestCreateFromStdin(t *testing.T) {
 	require.Equal(t, "engineers", seen.Group.Metadata.Name)
 	require.Equal(t, "Engineers", seen.Group.Spec.DisplayName)
 	require.Equal(t, "Engineering team", seen.Group.Spec.Description)
-	require.Equal(t, "org_viewer", seen.Group.Spec.Role)
+	require.Equal(t, "org_operator", seen.Group.Spec.Role)
 	require.Contains(t, stdout.String(), "Name: engineers")
 }
 
@@ -185,7 +185,7 @@ func TestCreateFromFileRejectsUnknownFields(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/group.yaml"
-	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: from-file\nspec:\n  displayName: FromFile\n  role: org_viewer\n  unknown: true\n")
+	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: from-file\nspec:\n  displayName: FromFile\n  role: org_operator\n  unknown: true\n")
 	require.NoError(t, os.WriteFile(path, content, 0644))
 
 	empty := ""

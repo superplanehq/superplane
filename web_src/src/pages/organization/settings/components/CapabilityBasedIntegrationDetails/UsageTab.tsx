@@ -26,42 +26,42 @@ function workflowComponentDisplayName(nodeName: string): string {
 
 function UsesSummary({ labels }: { labels: string[] }) {
   if (labels.length === 0) {
-    return <span className="text-sm text-gray-500 dark:text-gray-400">—</span>;
+    return <span className="text-sm text-muted-foreground">—</span>;
   }
 
   const shown = labels.slice(0, MAX_COMPONENT_LABELS_SHOWN);
   const restCount = labels.length - shown.length;
 
   return (
-    <span className="inline leading-relaxed text-sm text-gray-800 dark:text-gray-200">
+    <span className="inline text-sm leading-relaxed text-foreground">
       {shown.map((label, index) => (
         <Fragment key={label}>
-          {index > 0 ? <span className="text-gray-500 dark:text-gray-400">, </span> : null}
+          {index > 0 ? <span className="text-muted-foreground">, </span> : null}
           <code className={INTEGRATION_INLINE_CODE_CLASSES}>{label}</code>
         </Fragment>
       ))}
-      {restCount > 0 ? <span className="text-gray-600 dark:text-gray-400"> + {restCount}</span> : null}
+      {restCount > 0 ? <span className="text-muted-foreground"> + {restCount}</span> : null}
     </span>
   );
 }
 
 export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
   return (
-    <div className="rounded-lg border border-gray-300 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-lg border border-border bg-card p-6 text-card-foreground">
       {workflowGroups.length > 0 ? (
         <>
-          <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mb-3 text-sm text-muted-foreground">
             This integration is currently used in the following canvases:
           </p>
-          <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-600">
+          <div className="overflow-hidden rounded-md border border-border">
             <div className="overflow-x-auto">
-              <table className="table-fixed w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
+              <table className="w-full min-w-[520px] table-fixed divide-y divide-border">
                 <colgroup>
                   <col className="w-48 min-w-0" />
                   <col className="min-w-0" />
                   <col className="w-12 min-w-0" />
                 </colgroup>
-                <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+                <tbody className="divide-y divide-border bg-card">
                   {workflowGroups.map((group) => {
                     const uniqueNames = Array.from(
                       new Set(group.nodes.map((node) => workflowComponentDisplayName(node.nodeName))),
@@ -70,7 +70,7 @@ export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
                     return (
                       <tr
                         key={group.canvasId}
-                        className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        className="cursor-pointer transition-colors hover:bg-muted/50"
                         onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
                         onKeyDown={(event) => {
                           if (event.key !== "Enter" && event.key !== " ") return;
@@ -80,7 +80,7 @@ export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
                         tabIndex={0}
                         role="link"
                       >
-                        <td className="max-w-48 min-w-0 px-4 py-3 align-middle text-sm font-medium text-gray-800 dark:text-gray-100">
+                        <td className="max-w-48 min-w-0 px-4 py-3 align-middle text-sm font-medium text-foreground">
                           <span className="line-clamp-2">{group.canvasName}</span>
                         </td>
                         <td className="min-w-0 px-4 py-3 align-middle">
@@ -89,10 +89,7 @@ export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
                           </div>
                         </td>
                         <td className="align-middle px-2 py-3">
-                          <ExternalLink
-                            className="mx-auto h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
-                            aria-hidden
-                          />
+                          <ExternalLink className="mx-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                         </td>
                       </tr>
                     );
@@ -103,7 +100,7 @@ export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
           </div>
         </>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">This integration is not used in any workflow yet.</p>
+        <p className="text-sm text-muted-foreground">This integration is not used in any workflow yet.</p>
       )}
     </div>
   );

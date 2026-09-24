@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { getStateMap } from "..";
+import { getStateMap } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type {
   ComponentBaseContext,
@@ -10,7 +10,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { buildGrafanaEventSections } from "./base";
 import { buildDashboardMetadata } from "./dashboard_shared";
 import type { DashboardDetails, GetDashboardConfiguration } from "./types";
@@ -56,7 +56,7 @@ export const getDashboardMapper: ComponentBaseMapper = {
       }
     }
 
-    const dashboard: DashboardDetails | undefined = payload.data;
+    const dashboard = payload.data as DashboardDetails | undefined;
     if (!dashboard) {
       details.Response = "No data returned";
       return details;

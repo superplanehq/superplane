@@ -10,8 +10,8 @@ import type {
   SubtitleContext,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
+import { getTriggerRenderer, getState, getStateMap } from "./mapperLookup";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -110,9 +110,9 @@ export const filterMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const configuration = context.execution.configuration as FilterConfiguration;
-    const details: Record<string, any> = {
+    const details: Record<string, string> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       Expression: configuration.expression,
     };
@@ -123,7 +123,7 @@ export const filterMapper: ComponentBaseMapper = {
 
 function getfilterEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const eventSection: EventSection = {

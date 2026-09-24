@@ -11,10 +11,6 @@ export function isVelocityPath(pathname: string): boolean {
   return pathname.includes("/velocity");
 }
 
-export function isSettingsPath(pathname: string): boolean {
-  return pathname.includes("/settings");
-}
-
 /** One or two letters from a display name, for the icon rail. */
 export function initialsForName(name: string): string {
   return getNameInitials(name) || "?";

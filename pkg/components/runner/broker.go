@@ -77,17 +77,16 @@ func (b *BrokerClient) do(req *http.Request) (*http.Response, error) {
 // The component HTTP client blocks RFC1918, including Docker Desktop
 // host.docker.internal (192.168.65.254). Use a plain client for those origins.
 func brokerUsesUnrestrictedHTTP(baseURL string) bool {
+	if isLocalTaskBrokerURL(baseURL) {
+		return true
+	}
+
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
 		return false
 	}
 
-	host := strings.ToLower(parsed.Hostname())
-	if host == "host.docker.internal" || host == "localhost" {
-		return true
-	}
-
-	ip := net.ParseIP(host)
+	ip := net.ParseIP(parsed.Hostname())
 	if ip == nil {
 		return false
 	}
@@ -193,7 +192,7 @@ func BrokerCommandsFromLines(lines []string) []BrokerCommand {
 		out = append(out, BrokerCommand{
 			Command: line,
 			Kind:    LiveLogKindBash,
-			Preview: LiveLogPreview(line),
+			Preview: LiveLogText(line),
 		})
 	}
 	return out

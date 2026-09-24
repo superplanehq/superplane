@@ -1,5 +1,5 @@
 import type { CanvasesCanvasRun } from "@/api-client";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import {
   analyzingWorkOrderIds,
@@ -9,8 +9,10 @@ import {
   findBacklogAnalyzerCanvasId,
   hasActiveBacklogAnalysisRun,
   markBacklogAnalysisPending,
+  mergeBacklogAnalysisRunSnapshots,
   pendingBacklogAnalysisIds,
   subscribeBacklogAnalysisPending,
+  upsertBacklogAnalysisRun,
 } from "./backlogAnalysis";
 
 function analysisRun(overrides: {
@@ -58,6 +60,47 @@ describe("backlogAnalysisRuns", () => {
 
   it("drops runs without a task", () => {
     expect(backlogAnalysisRuns("app-analyzer", [analysisRun({ id: "run-1" })])).toEqual([]);
+  });
+
+  it("adds and updates a run from websocket events", () => {
+    const started = analysisRun({ id: "run-1", workOrderId: "wo-1", state: "STATE_STARTED" });
+    const current = upsertBacklogAnalysisRun([], "app-analyzer", started);
+
+    const finished = upsertBacklogAnalysisRun(current, "app-analyzer", {
+      ...started,
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-08-28T10:01:00Z",
+    });
+
+    expect(finished).toHaveLength(1);
+    expect(finished[0].run).toMatchObject({
+      id: "run-1",
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+    });
+  });
+
+  it("keeps a websocket event that arrives before an older REST snapshot", () => {
+    const finished = {
+      ...analysisRun({ id: "run-1", workOrderId: "wo-1", state: "STATE_FINISHED" }),
+      result: "RESULT_PASSED" as const,
+      updatedAt: "2026-08-28T10:01:00Z",
+    };
+    const live = upsertBacklogAnalysisRun(undefined, "app-analyzer", finished);
+    const staleSnapshot = backlogAnalysisRuns("app-analyzer", [
+      {
+        ...finished,
+        state: "STATE_STARTED",
+        result: undefined,
+        updatedAt: "2026-08-28T10:00:00Z",
+      },
+    ]);
+
+    const merged = mergeBacklogAnalysisRunSnapshots(live, staleSnapshot, "app-analyzer");
+
+    expect(merged[0]?.run.state).toBe("STATE_FINISHED");
+    expect(merged[0]?.run.result).toBe("RESULT_PASSED");
   });
 });
 

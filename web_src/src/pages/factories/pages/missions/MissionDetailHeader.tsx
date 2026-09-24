@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showSuccessToast } from "@/lib/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Check, Ellipsis, Link2 } from "lucide-react";
-import { useState } from "react";
+import { Ellipsis } from "lucide-react";
 
+import { CopyLinkButton } from "../../CopyLinkButton";
 import { type MissionCloseReason, type MissionDisplayStatus } from "./missionListModel";
 
 interface MissionDetailHeaderProps {
@@ -26,7 +26,12 @@ export function MissionDetailHeader({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <h1 className="workspace-page-title min-w-0 flex-1">{missionName}</h1>
         <div className="flex flex-wrap items-center gap-1">
-          <CopyLinkButton />
+          <CopyLinkButton
+            className="size-7 rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            iconClassName="h-4 w-4"
+            ariaLabel="Copy link to mission"
+            testId="mission-copy-link-button"
+          />
           <HeaderOverflowMenu
             status={status}
             isManuallyClosed={isManuallyClosed}
@@ -36,35 +41,6 @@ export function MissionDetailHeader({
         </div>
       </div>
     </header>
-  );
-}
-
-function CopyLinkButton() {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      showSuccessToast("Link copied to clipboard.");
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      showErrorToast("Failed to copy link.");
-    }
-  };
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      onClick={() => void handleCopy()}
-      className="size-7 text-muted-foreground hover:bg-accent hover:text-foreground"
-      aria-label="Copy link to mission"
-      data-testid="mission-copy-link-button"
-    >
-      {copied ? <Check className="h-4 w-4" aria-hidden /> : <Link2 className="h-4 w-4" aria-hidden />}
-    </Button>
   );
 }
 

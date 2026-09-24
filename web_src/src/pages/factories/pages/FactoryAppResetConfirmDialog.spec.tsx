@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { FactoryAppResetConfirmDialog } from "./FactoryAppResetConfirmDialog";
 
@@ -26,6 +26,12 @@ describe("FactoryAppResetConfirmDialog", () => {
     await user.click(screen.getByTestId("factory-app-reset-defaults-cancel"));
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("explains SuperPlane reset and that Save is still required", () => {
+    render(<FactoryAppResetConfirmDialog open onOpenChange={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByTestId("factory-app-reset-defaults-dialog")).toHaveTextContent("Run SuperPlane Agent");
+    expect(screen.getByTestId("factory-app-reset-defaults-dialog")).toHaveTextContent("Save");
   });
 
   it("renders nothing when closed", () => {

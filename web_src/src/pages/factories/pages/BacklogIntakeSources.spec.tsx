@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS } from "./intakeSourceSettingsModel";
@@ -11,6 +11,7 @@ function configuredIntake(overrides: Partial<ConfiguredLineIntakeSource> = {}): 
     intakeId: "intake-github",
     appId: "app-github-issues-intake",
     healthy: true,
+    paused: false,
     settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS },
     source: lineIntakeSourceById("github-issues")!,
     ...overrides,
@@ -71,13 +72,47 @@ describe("BacklogIntakeSources", () => {
     expect(screen.queryByTestId("line-intake-source-intake-sentry")).not.toBeInTheDocument();
   });
 
-  it("marks an intake whose automation can no longer create tasks", () => {
+  it("does not warn when an intake is unhealthy on the server", () => {
     renderSources({ intakes: [configuredIntake({ healthy: false })] });
 
     const intake = screen.getByTestId("line-intake-source-intake-github");
-    expect(within(intake).getByTestId("line-intake-source-intake-github-needs-repair")).toHaveTextContent(
-      "Needs repair",
-    );
+    expect(within(intake).queryByTestId("line-intake-source-intake-github-needs-repair")).not.toBeInTheDocument();
+  });
+
+  it("says listening is paused and keeps the needs-repair state separate", () => {
+    renderSources({
+      intakes: [
+        configuredIntake({
+          intakeId: "intake-sentry",
+          paused: true,
+          source: lineIntakeSourceById("sentry-exceptions")!,
+        }),
+      ],
+    });
+
+    const intake = screen.getByTestId("line-intake-source-intake-sentry");
+    expect(intake).toHaveTextContent("Listening to Sentry exceptions is paused");
+    expect(within(intake).getByTestId("line-intake-source-intake-sentry-paused")).toHaveTextContent("Paused");
+    expect(within(intake).queryByTestId("line-intake-source-intake-sentry-needs-repair")).not.toBeInTheDocument();
+    expect(intake.querySelector("[data-paused='true']")).not.toBeNull();
+  });
+
+  it("shows paused when a paused intake is also unhealthy on the server", () => {
+    renderSources({
+      intakes: [
+        configuredIntake({
+          intakeId: "intake-sentry",
+          healthy: false,
+          paused: true,
+          source: lineIntakeSourceById("sentry-exceptions")!,
+        }),
+      ],
+    });
+
+    const intake = screen.getByTestId("line-intake-source-intake-sentry");
+    expect(intake).toHaveTextContent("Listening to Sentry exceptions is paused");
+    expect(within(intake).queryByTestId("line-intake-source-intake-sentry-needs-repair")).not.toBeInTheDocument();
+    expect(within(intake).getByTestId("line-intake-source-intake-sentry-paused")).toHaveTextContent("Paused");
   });
 
   it("opens the settings of the intake the user clicked", async () => {

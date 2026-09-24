@@ -34,12 +34,12 @@ spec:
         'y': 618
       isCollapsed: false
     - id: create-work-order
-      name: Create Work Order
+      name: Create Task
       type: TYPE_ACTION
       component: createWorkOrder
       configuration:
         title: '{{ root().data.issue.title }}'
-        description: '{{ root().data.issue.permalink }}'
+        description: '{{ root().data.description }}'
       position:
         x: 576
         'y': 978

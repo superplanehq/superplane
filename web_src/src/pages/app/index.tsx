@@ -1,5 +1,4 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
@@ -92,8 +91,7 @@ import { useConsoleModeActions } from "./console/useConsoleModeActions";
 import { useConsoleTriggerNode } from "./console/useConsoleTriggerNode";
 import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
-import { useFilesModeActions } from "./files/useFilesModeActions";
-import { useFilesHeaderState } from "./files/useFilesHeaderState";
+import { CanvasSpecYamlModal } from "./CanvasSpecYamlModal";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
@@ -139,10 +137,11 @@ import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
-import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
+import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./lib/workflow-spec-paths";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import { usePreparedCanvasData } from "./usePreparedCanvasData";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useVisibleNodeRuntimeMaps } from "./useVisibleNodeRuntimeMaps";
 import { useGetSidebarData } from "./useGetSidebarData";
@@ -185,7 +184,6 @@ import {
   isCanvasPrepLoading,
   isValidRunId,
   prepareCanvasLogNodes,
-  prepareData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
@@ -345,7 +343,7 @@ export function AppPage({
     onBackToRunList: clearRunDetailNodeSearch,
   });
   const rawUrlViewFlags = useWorkflowUrlViewFlags(searchParams);
-  const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
+  const [isSpecYamlOpen, setIsSpecYamlOpen] = useState(false);
   const currentUserId = me?.id;
   useEffect(() => {
     setCanvasStagingEchoUserId(currentUserId);
@@ -369,12 +367,9 @@ export function AppPage({
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
-  const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
+  const [_isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
   const [stagingResetNonce, setStagingResetNonce] = useState(0);
   const flushRepositoryFileStagingRef = useRef<(() => Promise<void>) | null>(null);
-  const handleFlushRepositoryFileStagingReady = useCallback((flush: (() => Promise<void>) | null) => {
-    flushRepositoryFileStagingRef.current = flush;
-  }, []);
   const flushRepositoryFileStaging = useCallback(async () => {
     await flushRepositoryFileStagingRef.current?.();
   }, []);
@@ -1032,14 +1027,11 @@ export function AppPage({
     draftChangeIndicators,
     canvasConsoleVersionDiff,
     handleEffectiveConsoleChange,
-    handleLocalFilesStagingChange,
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
     hasUncommittedConsoleDraftChanges,
-    hasUncommittedFilesDraftChanges,
     hasCommittedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges,
-    hasFilesStagingChanges,
   } = useAppDraftStagingData({
     canvasId: canvasId!,
     activeCanvasVersionId,
@@ -1470,38 +1462,21 @@ export function AppPage({
     componentsLoading,
     integrationsLoading,
   );
-  const { nodes: preparedNodes, edges: preparedEdges } = useMemo(() => {
-    if (dataLoading || !canvasForPrep) {
-      return { nodes: [], edges: [] };
-    }
-
-    return prepareData(
-      canvasForPrep,
-      allTriggers,
-      allComponents,
-      visibleNodeEventsMap,
-      visibleNodeExecutionsMap,
-      visibleNodeQueueItemsMap,
-      canvasId!,
-      queryClient,
-      me,
-      canvasMode,
-      openTriggerModal,
-    );
-  }, [
-    canvasForPrep,
-    allTriggers,
-    allComponents,
-    visibleNodeEventsMap,
-    visibleNodeExecutionsMap,
-    visibleNodeQueueItemsMap,
+  const { nodes: preparedNodes, edges: preparedEdges } = usePreparedCanvasData({
+    canvas: canvasForPrep,
+    triggers: allTriggers,
+    components: allComponents,
+    nodeEventsMap: visibleNodeEventsMap,
+    nodeExecutionsMap: visibleNodeExecutionsMap,
+    nodeQueueItemsMap: visibleNodeQueueItemsMap,
     canvasId,
     queryClient,
-    dataLoading,
-    me,
+    user: me,
     canvasMode,
-    openTriggerModal,
-  ]);
+    openModal: openTriggerModal,
+    organizationId,
+    enabled: !dataLoading,
+  });
 
   const draftVisualDiff = useDraftVisualDiff({
     isViewingDraftVersion: isEditing && isEditBootstrapReady,
@@ -1726,18 +1701,16 @@ export function AppPage({
       setRemoteCanvasUpdatePending,
     });
 
-  useCanvasWebsocket(
-    canvasId!,
-    organizationId!,
-    handleNodeWebsocketEvent,
-    undefined,
-    undefined,
-    handleCanvasLifecycleEvent,
+  useCanvasWebsocket({
+    canvasId: canvasId!,
+    organizationId: organizationId!,
+    onNodeEvent: handleNodeWebsocketEvent,
+    onCanvasLifecycleEvent: handleCanvasLifecycleEvent,
     shouldApplyCanvasUpdate,
-    isViewingLiveVersion,
-    true,
-    handleCanvasStagingEvent,
-  );
+    processRuntimeEvents: isViewingLiveVersion,
+    enabled: true,
+    onCanvasStagingEvent: handleCanvasStagingEvent,
+  });
   const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents, !dataLoading);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
   const logNodesRef = useRef<{ signature: string; nodes: ComponentsNode[] }>({ signature: "", nodes: [] });
@@ -1937,10 +1910,9 @@ export function AppPage({
         setLastSavedWorkflowSnapshot(targetWorkflow);
 
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
-        const displayMessage = getUsageLimitToastMessage(error, errorMessage);
-        showErrorToast(displayMessage);
+        showErrorToast(errorMessage);
         return undefined;
       } finally {
         if (focusedNoteId) {
@@ -2205,7 +2177,7 @@ export function AppPage({
   const handleNodeConfigurationSave = useCallback(
     async (
       nodeId: string,
-      updatedConfiguration: Record<string, any>,
+      updatedConfiguration: Record<string, unknown>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
       concurrency?: ComponentsConcurrencySpec,
@@ -3391,12 +3363,6 @@ export function AppPage({
     setSearchParams,
   });
 
-  const { handleSelectFilesMode, handleExitFilesMode } = useFilesModeActions({
-    setIsConsoleAddPanelOpen,
-    setIsConsoleYamlOpen,
-    setSearchParams,
-  });
-
   const {
     handleSelectCanvasView,
     handleConsoleAddPanelDialogOpenChange,
@@ -3410,7 +3376,6 @@ export function AppPage({
     canvasDeletedRemotely,
     handleExitConsoleMode,
     handleExitMemoryMode,
-    handleExitFilesMode,
     handleClearRunInspection,
     handleToggleEditMode,
     setIsConsoleAddPanelOpen,
@@ -3604,14 +3569,8 @@ export function AppPage({
       consoleQuery.error,
     ],
   );
-  const { onSpecFileChange } = useSpecFileAutosave({
-    canvas,
-    isReadOnly,
-    applyLocalWorkflowUpdate,
-    handleSaveWorkflow,
-    updateConsoleMutation,
-    onEffectiveConsoleChange: handleEffectiveConsoleChange,
-  });
+  const canvasYaml = appFiles.find((file) => file.path === CANVAS_YAML_PATH)?.content ?? "";
+  const consoleYaml = appFiles.find((file) => file.path === CONSOLE_YAML_PATH)?.content ?? "";
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: hasStagingChanges,
     liveCanvas,
@@ -3728,7 +3687,6 @@ export function AppPage({
     headerModeAllowsRuns: allowsRunsSidebar(headerMode),
     editSessionActive,
     isMemoryMode: urlViewFlags.isMemoryMode,
-    isFilesMode: urlViewFlags.isFilesMode,
     runInspectionChromeActive,
   });
   const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
@@ -3747,12 +3705,10 @@ export function AppPage({
     runInspectionChromeActive,
     handleSelectMemoryMode,
     handleSelectConsoleMode,
-    handleSelectFilesMode,
     handleEnterEditModeFromHeader,
     handleExitEditSession,
     handleSelectLiveCanvas,
     handleBackToRunList,
-    filesHeaderActionsSlotId,
     runsHasFitToViewRef,
     hasFitToViewRef,
     runsViewportRef,
@@ -3854,20 +3810,6 @@ export function AppPage({
             createCanvasMemoryNamespace,
             updateCanvasMemoryNamespace,
           }}
-          files={{
-            isEditing,
-            canvasId: canvasId || undefined,
-            organizationId,
-            versionId: activeCanvasVersionId || undefined,
-            canWrite: canStageCanvasVersion,
-            files: appFiles,
-            headerActionsSlotId: filesHeaderActionsSlotId,
-            stagingResetNonce,
-            suspendRepositoryFileStaging: isPreparingVersionAction,
-            onSpecFileChange,
-            onLocalFilesStagingChange: handleLocalFilesStagingChange,
-            onFlushRepositoryFileStagingReady: handleFlushRepositoryFileStagingReady,
-          }}
         />
         <CanvasPage
           key={canvasRenderKey}
@@ -3951,6 +3893,7 @@ export function AppPage({
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           headerMode={headerMode}
+          onOpenSpecYaml={() => setIsSpecYamlOpen(true)}
           onSelectCanvasView={handleSelectCanvasView}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -3961,10 +3904,8 @@ export function AppPage({
           stagingStale={isEditing && stagingStale}
           hasUncommittedCanvasDraftChanges={isEditSessionUiReady && hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={isEditSessionUiReady && hasUncommittedConsoleDraftChanges}
-          hasUncommittedFilesDraftChanges={isEditSessionUiReady && hasUncommittedFilesDraftChanges}
           hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
-          hasFilesStagingChanges={isEditSessionUiReady && hasFilesStagingChanges}
           onCommitStaging={whenAllowed(canUpdateCanvas, handleOpenCommitDialog)}
           commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}
@@ -4016,6 +3957,12 @@ export function AppPage({
       </div>
       {yamlDiffModal}
       {canvasConsoleVersionDiff.consoleYamlDiffModal}
+      <CanvasSpecYamlModal
+        open={isSpecYamlOpen}
+        onOpenChange={setIsSpecYamlOpen}
+        canvasYaml={canvasYaml}
+        consoleYaml={consoleYaml}
+      />
       <CanvasPageModals
         canvasDeletedRemotely={canvasDeletedRemotely}
         onGoToCanvases={() => {

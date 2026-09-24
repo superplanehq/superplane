@@ -2,8 +2,8 @@ import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
-import type { Predicate } from "../utils";
-import { formatPredicate, buildSubtitle } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate, buildSubtitle } from "../eventDisplay";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 
 const eventLabels: Record<string, string> = {
@@ -45,6 +45,13 @@ interface OnFeatureFlagChangeEventData {
   flagKey?: string;
 }
 
+function featureFlagUrl(eventData: OnFeatureFlagChangeEventData | undefined): string | undefined {
+  if (eventData?.projectKey && eventData?.flagKey) {
+    return `https://app.launchdarkly.com/projects/${eventData.projectKey}/flags/${eventData.flagKey}`;
+  }
+  return undefined;
+}
+
 function getEventTitleAndSubtitle(
   eventData: OnFeatureFlagChangeEventData | undefined,
   createdAt?: string,
@@ -71,8 +78,9 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
     if (eventData?.flagKey) details["Flag Key"] = eventData.flagKey;
     if (eventData?.name) details["Flag Name"] = eventData.name;
     if (eventData?.titleVerb) details["Action"] = eventData.titleVerb;
-    if (eventData?.projectKey && eventData?.flagKey) {
-      details["URL"] = `https://app.launchdarkly.com/projects/${eventData.projectKey}/flags/${eventData.flagKey}`;
+    const url = featureFlagUrl(eventData);
+    if (url) {
+      details["URL"] = url;
     }
     return details;
   },

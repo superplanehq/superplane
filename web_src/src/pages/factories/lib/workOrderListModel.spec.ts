@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type {
   FactoriesFactory,
+  FactoriesFactoryPullRequest,
   FactoriesLineRef,
   FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
@@ -10,6 +11,7 @@ import type {
 
 import {
   EMPTY_WORK_ORDER_FILTERS,
+  MANUAL_FILTER_VALUE,
   UNASSIGNED_FILTER_VALUE,
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
@@ -18,6 +20,9 @@ import {
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
+  countWorkOrderFilters,
+  visibleWorkOrderFilterLabels,
+  visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -45,6 +50,21 @@ function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
     updatedAt: "2024-06-02T00:00:00Z",
     lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
     ...rest,
+  };
+}
+
+function pullRequest(
+  workOrderId: string,
+  overrides: Partial<FactoriesFactoryPullRequest> = {},
+): FactoriesFactoryPullRequest {
+  return {
+    id: `pr-${workOrderId}`,
+    workOrderId,
+    number: "12",
+    url: `https://github.com/acme/payments/pull/12`,
+    title: "Ship refund retries",
+    state: "STATE_OPEN",
+    ...overrides,
   };
 }
 
@@ -88,7 +108,23 @@ describe("buildWorkOrderListEntry", () => {
     expect(entry.searchHaystack).toContain("rf-42");
     expect(entry.searchHaystack).toContain("reconcile refunds");
     expect(entry.searchHaystack).toContain("alex reviewer");
+    expect(entry.searchHaystack).toContain("created manually");
+    expect(entry.sourceId).toBe(MANUAL_FILTER_VALUE);
+    expect(entry.sourceLabel).toBe("Created manually");
     expect(entry.isDispatchable).toBe(true);
+  });
+
+  it("uses the intake kind as the source id for an origin link", () => {
+    const entry = buildWorkOrderListEntry(
+      order({
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+      }),
+      factory,
+    );
+
+    expect(entry.sourceId).toBe("github-issues");
+    expect(entry.sourceLabel).toBe("GitHub issues");
+    expect(entry.searchHaystack).toContain("github issues");
   });
 
   it("keeps only the first assignee as the owner", () => {
@@ -272,17 +308,24 @@ describe("scope + filter + search + ordering", () => {
 
   const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, running, draft, failed, closed], factory);
 
-  it("labels the attention scope and describes My as work you started", () => {
+  it("labels the active scope and describes My as work you started", () => {
     const attention = WORK_ORDER_SCOPES.find((scope) => scope.id === "active");
-    expect(attention?.label).toBe("Needs attention");
-    expect(attention?.tooltip).toBe("Tasks that need your attention.");
+    expect(attention?.label).toBe("Active");
+    expect(attention?.tooltip).toBe("Draft, waiting, and failed tasks.");
     expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
       "Tasks you created or started. SuperPlane assigns those to you.",
     );
   });
 
-  it("scope=my only keeps orders assigned to the current user", () => {
-    expect(applyWorkOrderScope(entries, "my", "me").map((e) => e.id)).toEqual(["mine-1"]);
+  it("scope=my keeps orders assigned to the current user or created by them", () => {
+    const createdByMe = order({
+      id: "created-1",
+      assignees: [],
+      createdBy: { user: { id: "me", name: "You" } },
+      updatedAt: "2024-06-04T00:00:00Z",
+    });
+    const withCreated = buildWorkOrderListEntries([meAssigned, createdByMe, others], factory);
+    expect(applyWorkOrderScope(withCreated, "my", "me").map((e) => e.id)).toEqual(["mine-1", "created-1"]);
   });
 
   it("scope=active keeps drafts, waiting, and failed orders and drops running work", () => {
@@ -312,6 +355,41 @@ describe("scope + filter + search + ordering", () => {
     expect(nobody.map((e) => e.id)).toEqual(["u-1", "c-1"]);
   });
 
+  it("source filter keeps orders from any selected source", () => {
+    const withSources = buildWorkOrderListEntries(
+      [
+        order({ id: "from-github", origin: { url: "https://github.com/acme/payments/issues/12" } }),
+        order({ id: "from-jira", origin: { url: "https://acme.atlassian.net/browse/DEV-3" } }),
+        order({ id: "by-hand" }),
+      ],
+      factory,
+    );
+
+    const githubOnly = applyWorkOrderFilters(withSources, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      sourceIds: ["github-issues"],
+    });
+    expect(githubOnly.map((e) => e.id)).toEqual(["from-github"]);
+
+    const emptySource = applyWorkOrderFilters(withSources, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      sourceIds: ["sentry-exceptions"],
+    });
+    expect(emptySource).toEqual([]);
+
+    const either = applyWorkOrderFilters(withSources, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      sourceIds: ["github-issues", "jira-issues"],
+    });
+    expect(either.map((e) => e.id)).toEqual(["from-github", "from-jira"]);
+
+    const manual = applyWorkOrderFilters(withSources, {
+      ...EMPTY_WORK_ORDER_FILTERS,
+      sourceIds: [MANUAL_FILTER_VALUE],
+    });
+    expect(manual.map((e) => e.id)).toEqual(["by-hand"]);
+  });
+
   it("line filter keeps orders that ran on any selected line", () => {
     const withLines = buildWorkOrderListEntries(
       [
@@ -331,6 +409,53 @@ describe("scope + filter + search + ordering", () => {
       assigneeIds: ["nobody-here"],
     });
     expect(none).toEqual([]);
+
+    const githubWaiting = applyWorkOrderFilters(
+      buildWorkOrderListEntries(
+        [
+          order({ id: "github-wait", origin: { url: "https://github.com/acme/payments/issues/1" } }),
+          order({
+            id: "github-done",
+            state: "STATE_CLOSED",
+            result: "RESULT_COMPLETED",
+            origin: { url: "https://github.com/acme/payments/issues/2" },
+          }),
+          order({ id: "manual-wait" }),
+        ],
+        factory,
+      ),
+      { ...EMPTY_WORK_ORDER_FILTERS, statuses: ["waiting"], sourceIds: ["github-issues"] },
+    );
+    expect(githubWaiting.map((e) => e.id)).toEqual(["github-wait"]);
+  });
+
+  it("label filter keeps Review, and Mergeable only when that pill is on", () => {
+    const withPullRequests = buildWorkOrderListEntries(
+      [
+        order({ id: "open-review", pullRequests: [pullRequest("open-review")] }),
+        order({ id: "open-mergeable", pullRequests: [pullRequest("open-mergeable", { mergeable: true })] }),
+        order({ id: "draft-pr", pullRequests: [pullRequest("draft-pr", { state: "STATE_DRAFT" })] }),
+        order({ id: "idle-wait" }),
+      ],
+      factory,
+    );
+    const ids = (labels: Array<"review" | "mergeable">, showPullRequestMerge?: boolean) =>
+      applyWorkOrderFilters(withPullRequests, { ...EMPTY_WORK_ORDER_FILTERS, labels }, { showPullRequestMerge }).map(
+        (entry) => entry.id,
+      );
+
+    expect(ids(["review"])).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["mergeable"], true)).toEqual(["open-mergeable"]);
+    expect(ids(["review", "mergeable"], true)).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["mergeable"])).toEqual(["open-review", "open-mergeable", "draft-pr", "idle-wait"]);
+    expect(visibleWorkOrderFilterLabels()).toEqual(["review"]);
+    expect(visibleWorkOrderFilterLabels(true)).toEqual(["review", "mergeable"]);
+    expect(countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }))).toBe(
+      0,
+    );
+    expect(
+      countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }, true)),
+    ).toBe(1);
   });
 
   it("search matches on title, description, line, and assignee names", () => {

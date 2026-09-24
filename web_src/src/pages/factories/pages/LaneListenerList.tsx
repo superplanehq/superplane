@@ -1,3 +1,4 @@
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Plus, Radio, Settings } from "lucide-react";
 
@@ -9,8 +10,12 @@ export type LaneListener = {
   iconSrc: string;
   iconAlt: string;
   healthy: boolean;
+  paused?: boolean;
   /** Text the badge shows while the automation cannot run. */
-  needsRepairLabel: string;
+  needsRepairLabel?: string;
+  /** Text the badge shows while live items are ignored. */
+  pausedLabel?: string;
+  pausedHelper?: string;
   settingsLabel: string;
   testId: string;
   onOpenSettings: () => void;
@@ -72,11 +77,9 @@ function LaneListenerRow({ listener }: { listener: LaneListener }) {
       className="group/listener flex w-full items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-left transition-colors hover:bg-background"
     >
       <Radio
-        className={cn(
-          "size-3.5 shrink-0",
-          listener.healthy ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400",
-        )}
+        className={cn("size-3.5 shrink-0", listenerSignalClass(listener))}
         aria-hidden
+        data-paused={listener.healthy && listener.paused ? "true" : undefined}
       />
       <img
         src={listener.iconSrc}
@@ -84,20 +87,41 @@ function LaneListenerRow({ listener }: { listener: LaneListener }) {
         className={cn(
           "size-3.5 shrink-0 object-contain",
           listener.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+          logoDarkInvertClass(listener.iconSrc),
         )}
       />
       <span className="min-w-0 flex-1 truncate text-[12px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors group-hover/listener:text-foreground">
         {listener.title}
       </span>
-      {listener.healthy ? null : (
+      {listener.healthy ? (
+        listener.paused && listener.pausedLabel ? (
+          <span
+            className="shrink-0 text-[11px] font-medium text-muted-foreground"
+            title={listener.pausedHelper}
+            data-testid={`${listener.testId}-paused`}
+          >
+            {listener.pausedLabel}
+          </span>
+        ) : null
+      ) : (
         <span
           className="shrink-0 text-[11px] font-medium text-amber-700 dark:text-amber-400"
           data-testid={`${listener.testId}-needs-repair`}
         >
-          {listener.needsRepairLabel}
+          {listener.needsRepairLabel ?? "Needs repair"}
         </span>
       )}
       <Settings className="size-3.5 shrink-0 text-muted-foreground group-hover/listener:text-foreground" aria-hidden />
     </button>
   );
+}
+
+function listenerSignalClass(listener: LaneListener): string {
+  if (!listener.healthy) {
+    return "text-amber-600 dark:text-amber-400";
+  }
+  if (listener.paused) {
+    return "text-muted-foreground";
+  }
+  return "text-emerald-600 dark:text-emerald-400";
 }

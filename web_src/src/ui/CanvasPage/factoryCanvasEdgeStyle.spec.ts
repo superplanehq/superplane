@@ -1,5 +1,5 @@
 import { Position, type Edge, type Node } from "@xyflow/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import {
   FACTORY_SPINE_HANDLE_ID,

@@ -46,3 +46,11 @@ func (s *MeService) DescribeNotificationSettings(ctx context.Context, req *pb.De
 func (s *MeService) UpdateNotificationSettings(ctx context.Context, req *pb.UpdateNotificationSettingsRequest) (*pb.UpdateNotificationSettingsResponse, error) {
 	return me.UpdateNotificationSettings(ctx, req)
 }
+
+func (s *MeService) DescribeLastLocation(ctx context.Context, req *pb.DescribeLastLocationRequest) (*pb.DescribeLastLocationResponse, error) {
+	return me.DescribeLastLocation(ctx)
+}
+
+func (s *MeService) SaveLastLocation(ctx context.Context, req *pb.SaveLastLocationRequest) (*pb.SaveLastLocationResponse, error) {
+	return me.SaveLastLocation(ctx, req)
+}

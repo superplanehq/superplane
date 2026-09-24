@@ -16,7 +16,9 @@ export const onVMInstanceTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    return flattenObject(context.event?.data || {});
+    return Object.fromEntries(
+      Object.entries(flattenObject(context.event?.data || {})).map(([key, value]) => [key, String(value)]),
+    );
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {

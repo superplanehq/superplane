@@ -1,5 +1,5 @@
 import type { EventState } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type { EventStateRegistry, ExecutionInfo, OutputPayload, StateFunction } from "../types";
 
 type CloudBuildGitSource = {

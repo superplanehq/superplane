@@ -8,19 +8,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 // Dependencies are backend services shared by canvas actions.
 type Dependencies struct {
 	Encryptor      crypto.Encryptor
 	Registry       *componentregistry.Registry
-	GitProvider    gitprovider.Provider
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
-	UsageService   usage.Service
 }
 
 // Action executes one superplane_app action value.
@@ -41,10 +37,8 @@ func NewDefaultRegistry(deps Dependencies) *Registry {
 		newAccessAction(deps),
 		newReadAction(deps),
 		newReadRuntimeAction(deps),
-		newListFilesAction(deps),
-		newReadFileAction(deps),
-		writeFileAction{},
-		deleteFileAction{},
+		newListFilesAction(),
+		newReadFileAction(),
 		newPatchStagingAction(deps),
 		listIntegrationsAction{},
 		newListResourcesAction(deps),

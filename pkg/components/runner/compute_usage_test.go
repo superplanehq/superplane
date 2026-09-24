@@ -15,7 +15,8 @@ type kvState struct {
 	kv map[string]string
 }
 
-func (s *kvState) IsFinished() bool { return false }
+func (s *kvState) IsFinished() bool   { return false }
+func (s *kvState) IsCancelling() bool { return false }
 func (s *kvState) SetKV(key, value string) error {
 	if s.kv == nil {
 		s.kv = map[string]string{}
@@ -37,6 +38,7 @@ func (s *kvState) Emit(string, string, []any) error            { return nil }
 func (s *kvState) EmitAndContinue(string, string, []any) error { return nil }
 func (s *kvState) Pass() error                                 { return nil }
 func (s *kvState) Fail(string, string) error                   { return errors.New("unused") }
+func (s *kvState) Cancel() error                               { return nil }
 
 type recordingComputeUsage struct {
 	computes []core.ComputeUsageRecord

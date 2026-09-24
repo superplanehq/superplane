@@ -19,14 +19,14 @@ import (
 )
 
 func TestInvitations(t *testing.T) {
-	t.Run("accepting invite link assigns viewer role", func(t *testing.T) {
+	t.Run("accepting invite link assigns operator role", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		invitee := steps.createInviteeAccount()
 		steps.loginAs(invitee)
 		steps.acceptInvite(token)
-		steps.assertInviteeViewerRole(invitee.Email)
+		steps.assertInviteeOperatorRole(invitee.Email)
 	})
 
 	t.Run("following invite link and creating password account", func(t *testing.T) {
@@ -45,7 +45,7 @@ func TestInvitations(t *testing.T) {
 		steps.fillSignupForm(firstName, lastName, email, password)
 		steps.submitSignup()
 		steps.waitForOrganizationRedirect()
-		steps.assertInviteeViewerRole(email)
+		steps.assertInviteeOperatorRole(email)
 	})
 
 	t.Run("disabled invite link no longer works", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestInvitations(t *testing.T) {
 		steps.assertInviteLinkDisabled()
 	})
 
-	t.Run("viewer sees invite link access message", func(t *testing.T) {
+	t.Run("operator sees invite link access message", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
@@ -65,7 +65,7 @@ func TestInvitations(t *testing.T) {
 		steps.loginAs(invitee)
 		steps.acceptInvite(token)
 		steps.visitMembersSettings()
-		steps.assertViewerInviteLinkMessage()
+		steps.assertOperatorInviteLinkMessage()
 	})
 }
 
@@ -168,7 +168,7 @@ func (s *invitationSteps) assertInviteLinkDisabled() {
 	s.session.AssertText("Invite link not available")
 }
 
-func (s *invitationSteps) assertViewerInviteLinkMessage() {
+func (s *invitationSteps) assertOperatorInviteLinkMessage() {
 	s.session.AssertText("Invite link to add members")
 	s.session.AssertText("You don't have permission to manage invite links.")
 
@@ -177,7 +177,7 @@ func (s *invitationSteps) assertViewerInviteLinkMessage() {
 	require.False(s.t, copyLinkVisible)
 }
 
-func (s *invitationSteps) assertInviteeViewerRole(email string) {
+func (s *invitationSteps) assertInviteeOperatorRole(email string) {
 	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), email)
 	require.NoError(s.t, err)
 
@@ -191,5 +191,5 @@ func (s *invitationSteps) assertInviteeViewerRole(email string) {
 	require.Equal(s.t, len(roles), 1)
 
 	role := roles[0]
-	assert.Equal(s.t, role.Name, models.RoleOrgViewer)
+	assert.Equal(s.t, role.Name, models.RoleOrgOperator)
 }

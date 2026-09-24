@@ -4,12 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
-	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
 func TestHomePage(t *testing.T) {
@@ -21,41 +17,22 @@ func TestHomePage(t *testing.T) {
 		steps.AssertNavigatedToCanvas()
 	})
 
-	t.Run("showing canvases in folders", func(t *testing.T) {
+	t.Run("operator cannot create canvases from empty home", func(t *testing.T) {
 		steps := &TestHomePageSteps{t: t}
 		steps.Start()
-		steps.GivenCanvasInFolder("Foldered Canvas", "Deployments")
-		steps.VisitHomePage()
-		steps.AssertCanvasFolderVisible("Deployments", "Foldered Canvas")
-	})
-
-	t.Run("viewer cannot create canvases from empty home", func(t *testing.T) {
-		steps := &TestHomePageSteps{t: t}
-		steps.Start()
-		steps.LoginAsViewer()
+		steps.LoginAsOperator()
 		steps.VisitHomePage()
 		steps.AssertEmptyHomeVisible()
 		steps.AssertNewAppDisabled()
 		steps.AssertNotRedirectedToNewApp()
 	})
 
-	t.Run("viewer cannot open new app page directly", func(t *testing.T) {
+	t.Run("operator cannot open new app page directly", func(t *testing.T) {
 		steps := &TestHomePageSteps{t: t}
 		steps.Start()
-		steps.LoginAsViewer()
+		steps.LoginAsOperator()
 		steps.VisitNewAppPage()
-		steps.AssertNewAppPageNotFound()
-	})
-
-	t.Run("canvas creator without update cannot create inside a folder", func(t *testing.T) {
-		steps := &TestHomePageSteps{t: t}
-		steps.Start()
-		folder := steps.GivenCanvasFolder("Deployments")
-		steps.LoginWithCanvasPermissions("canvas-folder-creator", canvasPermission("create"))
-		steps.VisitNewAppPageForFolder(folder.ID.String())
-		steps.ClickStartFromScratch()
-		steps.AssertUpdatePermissionToast()
-		steps.AssertCanvasCount(0)
+		steps.AssertNewAppPagePermissionDenied()
 	})
 }
 
@@ -78,11 +55,6 @@ func (steps *TestHomePageSteps) VisitNewAppPage() {
 	steps.session.Visit("/" + steps.session.OrgID.String() + "/apps/new")
 }
 
-func (steps *TestHomePageSteps) VisitNewAppPageForFolder(folderID string) {
-	steps.session.Visit("/" + steps.session.OrgID.String() + "/apps/new?folderId=" + folderID)
-	steps.session.AssertText("Create New App in Deployments Folder")
-}
-
 func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
 	url := steps.session.Page().URL()
 	assert.Regexp(steps.t, `/apps/[0-9a-f-]{36}`, url)
@@ -93,8 +65,9 @@ func (steps *TestHomePageSteps) AssertNotRedirectedToNewApp() {
 	assert.NotContains(steps.t, url, "/apps/new")
 }
 
-func (steps *TestHomePageSteps) AssertNewAppPageNotFound() {
-	steps.session.AssertText("404")
+func (steps *TestHomePageSteps) AssertNewAppPagePermissionDenied() {
+	steps.session.AssertVisible(q.TestID("permission-denied-page"))
+	steps.session.AssertText("Permission denied")
 	steps.session.AssertHidden(q.Text("Create a blank app"))
 }
 
@@ -108,46 +81,8 @@ func (steps *TestHomePageSteps) AssertNewAppDisabled() {
 	steps.session.AssertHidden(q.Text("Create a blank app"))
 }
 
-func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
-	canvas, err := models.FindCanvasByName(database.Conn(), steps.session.OrgID, nil, canvasName)
-
-	assert.NoError(steps.t, err)
-	assert.Equal(steps.t, canvasName, canvas.Name)
-}
-
-func (steps *TestHomePageSteps) AssertCanvasCount(expected int) {
-	count, err := models.CountCanvasesByOrganization(steps.session.OrgID.String())
-	require.NoError(steps.t, err)
-	assert.Equal(steps.t, int64(expected), count)
-}
-
-func (steps *TestHomePageSteps) GivenCanvasInFolder(canvasName, folderTitle string) {
-	canvas := shared.NewCanvasSteps(canvasName, steps.t, steps.session)
-	canvas.Create()
-
-	folder := steps.GivenCanvasFolder(folderTitle)
-
-	_, err := models.UpdateCanvasFolderMembership(steps.session.OrgID, canvas.WorkflowID, &folder.ID)
-	assert.NoError(steps.t, err)
-}
-
-func (steps *TestHomePageSteps) GivenCanvasFolder(folderTitle string) *models.CanvasFolder {
-	folder, err := models.CreateCanvasFolder(steps.session.OrgID, folderTitle, models.CanvasFolderColorBlue)
-	require.NoError(steps.t, err)
-	return folder
-}
-
-func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasName string) {
-	steps.session.AssertText(folderTitle)
-	steps.session.AssertText(canvasName)
-}
-
-func (steps *TestHomePageSteps) LoginAsViewer() {
-	loginAsViewer(steps.t, steps.session)
-}
-
-func (steps *TestHomePageSteps) LoginWithCanvasPermissions(roleLabel string, permissions ...*permissionSpec) {
-	loginWithCanvasPermissions(steps.t, steps.session, roleLabel, permissions...)
+func (steps *TestHomePageSteps) LoginAsOperator() {
+	loginAsOperator(steps.t, steps.session)
 }
 
 func (steps *TestHomePageSteps) ClickStartFromScratch() {
@@ -155,13 +90,9 @@ func (steps *TestHomePageSteps) ClickStartFromScratch() {
 	steps.session.Sleep(500)
 }
 
-func (steps *TestHomePageSteps) AssertUpdatePermissionToast() {
-	steps.session.AssertText("You don't have permission to update canvases.")
-}
-
 func (steps *TestHomePageSteps) ClickNewApp() {
-	steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
-	steps.session.WaitForBrowserPath("/" + steps.session.OrgID.String() + "/apps/new")
+	// An empty org opens /apps/new. The home toolbar is not on that page.
+	steps.session.WaitForBrowserPath("/" + steps.session.OrgSlug + "/apps/new")
 	steps.ClickStartFromScratch()
 	steps.session.Sleep(2500)
 }

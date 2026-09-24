@@ -3,6 +3,7 @@ package jira
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -16,13 +17,14 @@ import (
 const webhookKindAlert = "alert"
 
 // WebhookConfiguration covers two unrelated registrations: an empty Kind tracks the union of
-// native Jira event names the shared issue/comment webhook must deliver (see allProjectsJQLFilter
-// and legacyIssueEvents), while Kind "alert" is a dedicated JSM Ops alert webhook scoped by
-// TeamID - CompareConfig decides which of the two gets deduped.
+// native Jira event names and project keys the shared issue/comment webhook must deliver
+// (see issueWebhookJQLFilter and legacyIssueEvents), while Kind "alert" is a dedicated
+// JSM Ops alert webhook scoped by TeamID - CompareConfig decides which of the two gets deduped.
 type WebhookConfiguration struct {
-	Kind   string   `json:"kind,omitempty" mapstructure:"kind,omitempty"`
-	TeamID string   `json:"teamId,omitempty" mapstructure:"teamId,omitempty"`
-	Events []string `json:"events,omitempty" mapstructure:"events,omitempty"`
+	Kind     string   `json:"kind,omitempty" mapstructure:"kind,omitempty"`
+	TeamID   string   `json:"teamId,omitempty" mapstructure:"teamId,omitempty"`
+	Events   []string `json:"events,omitempty" mapstructure:"events,omitempty"`
+	Projects []string `json:"projects,omitempty" mapstructure:"projects,omitempty"`
 }
 
 type WebhookMetadata struct {
@@ -33,13 +35,6 @@ type WebhookMetadata struct {
 type AlertWebhookMetadata struct {
 	IntegrationID string `json:"integrationId,omitempty" mapstructure:"integrationId,omitempty"`
 }
-
-// allProjectsJQLFilter matches every issue in every project. An empty jqlFilter is rejected
-// outright by Atlassian ("Empty JQL search not supported") even though the key itself must be
-// present - this is the simplest clause confirmed (live, against a real site) to both be accepted
-// and match unconditionally, needed since this single registration is shared by every
-// jira.onIssue trigger on the integration regardless of project.
-const allProjectsJQLFilter = "project != EMPTY"
 
 // legacyIssueEvents is what every shared Jira webhook registered before WebhookConfiguration
 // tracked Events explicitly - an empty stored Events list means a row predates that change, not
@@ -74,24 +69,58 @@ func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
 		baseline = legacyIssueEvents
 	}
 
-	merged := mergeEvents(baseline, requestedConfig.Events)
-	if len(merged) == len(baseline) {
+	mergedEvents := mergeUniqueStrings(baseline, requestedConfig.Events)
+	mergedProjects := mergeUniqueStrings(currentConfig.Projects, requestedConfig.Projects)
+	if len(mergedEvents) == len(baseline) && len(mergedProjects) == len(currentConfig.Projects) {
 		return current, false, nil
 	}
 
-	return WebhookConfiguration{Events: merged}, true, nil
+	merged := WebhookConfiguration{Events: mergedEvents}
+	if len(mergedProjects) > 0 {
+		merged.Projects = mergedProjects
+	}
+	return merged, true, nil
 }
 
-// mergeEvents returns the union of current and additional, preserving current's order so an
-// unrelated Merge call doesn't reorder (and thus needlessly re-provision) an unchanged webhook.
-func mergeEvents(current, additional []string) []string {
+// mergeUniqueStrings returns the union of current and additional, preserving current's order
+// so an unrelated Merge call doesn't reorder (and thus needlessly re-provision) an unchanged
+// webhook.
+func mergeUniqueStrings(current, additional []string) []string {
 	merged := append([]string{}, current...)
-	for _, event := range additional {
-		if !slices.Contains(merged, event) {
-			merged = append(merged, event)
+	for _, value := range additional {
+		value = strings.TrimSpace(value)
+		if value == "" || slices.Contains(merged, value) {
+			continue
 		}
+		merged = append(merged, value)
 	}
 	return merged
+}
+
+// issueWebhookJQLFilter builds the dynamic-webhook JQL Atlassian accepts: only the project
+// field, and only =, !=, IN, or NOT IN. project != EMPTY can register and still match
+// nothing, so this lists the projects of every trigger that shares the webhook.
+func issueWebhookJQLFilter(projects []string) (string, error) {
+	keys := make([]string, 0, len(projects))
+	for _, project := range projects {
+		project = strings.TrimSpace(project)
+		if project == "" {
+			continue
+		}
+		keys = append(keys, project)
+	}
+	if len(keys) == 0 {
+		return "", fmt.Errorf("at least one project is required to register the Jira issue webhook")
+	}
+
+	quoted := make([]string, len(keys))
+	for i, project := range keys {
+		quoted[i] = `"` + jqlQuotedProjectKey(project) + `"`
+	}
+	if len(quoted) == 1 {
+		return "project = " + quoted[0], nil
+	}
+	return "project IN (" + strings.Join(quoted, ",") + ")", nil
 }
 
 func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -131,6 +160,11 @@ func (h *JiraWebhookHandler) setupIssueWebhook(ctx core.WebhookHandlerContext, c
 		events = legacyIssueEvents
 	}
 
+	jqlFilter, err := issueWebhookJQLFilter(config.Projects)
+	if err != nil {
+		return nil, err
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
@@ -145,7 +179,7 @@ func (h *JiraWebhookHandler) setupIssueWebhook(ctx core.WebhookHandlerContext, c
 	var webhookID int64
 	createWebhook := func() error {
 		var createErr error
-		webhookID, createErr = client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, events)
+		webhookID, createErr = h.createIssueWebhookRecoveringURLConflict(client, ctx, jqlFilter, events)
 		return createErr
 	}
 

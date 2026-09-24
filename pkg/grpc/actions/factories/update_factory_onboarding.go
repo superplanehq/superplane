@@ -13,6 +13,7 @@ import (
 
 func UpdateFactoryOnboarding(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.UpdateFactoryOnboardingRequest,
 ) (*pb.UpdateFactoryOnboardingResponse, error) {
@@ -21,13 +22,8 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
-	id, err := parseFactoryID(req.GetId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, id)
+	factory, err := findFactory(db, orgID, req.GetId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
@@ -50,6 +46,10 @@ func UpdateFactoryOnboarding(
 		err = factory.UpdateOnboarding(db, patch)
 	}
 	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+
+	if err := ensureFactoryMergeabilityWebhook(ctx, db, deps, factory); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
@@ -98,18 +98,21 @@ func validateFactoryOnboardingResources(
 			return invalidArgument("coding agent integration does not match the selected agent")
 		}
 	} else {
-		credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
-		if err != nil {
-			return err
-		}
-		if credit.RemainingMicros <= 0 {
-			return models.ErrFactoryOnboardingAgentIntegrationRequired
-		}
 		offered, hostedErr := models.HasOfferedHostedLLMProvider(db)
 		if hostedErr != nil {
 			return hostedErr
 		}
 		if !offered {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
+		defaultModel, modelErr := models.GetInstallationDefaultHostedLLMModel(db)
+		if modelErr != nil {
+			return modelErr
+		}
+		if !defaultModel.IsSet() {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
+		if err := models.AssertDefaultHostedLLMModelAllowed(db, defaultModel); err != nil {
 			return models.ErrFactoryOnboardingHostedAgentUnavailable
 		}
 	}
@@ -224,6 +227,8 @@ func factoryOnboardingAgentHarnessFromProto(harness pb.FactoryOnboarding_AgentHa
 		return models.FactoryOnboardingAgentHarnessCursor, nil
 	case pb.FactoryOnboarding_AGENT_HARNESS_CODEX:
 		return models.FactoryOnboardingAgentHarnessCodex, nil
+	case pb.FactoryOnboarding_AGENT_HARNESS_SUPERPLANE:
+		return models.FactoryOnboardingAgentHarnessSuperPlane, nil
 	default:
 		return "", invalidArgument("invalid agent harness")
 	}

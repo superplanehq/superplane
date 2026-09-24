@@ -140,6 +140,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &pulls.MarkPullRequestReadyForReview{}},
 					{ReadOnly: false, Action: &pulls.AddPullRequestReviewers{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequest{}},
+					{ReadOnly: true, Action: &pulls.FindPullRequest{}},
 				},
 			},
 		},

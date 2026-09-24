@@ -1,11 +1,21 @@
 export const LAST_VISITED_APP_TAB_STORAGE_KEY = "superplane:last-visited-app-tab";
 
-export const APP_TAB_VALUES = ["canvas", "console", "memory", "files"] as const;
+export const APP_TAB_VALUES = ["canvas", "console", "memory"] as const;
 
 export type AppTabId = (typeof APP_TAB_VALUES)[number];
 
 export function isAppTabId(value: unknown): value is AppTabId {
   return typeof value === "string" && (APP_TAB_VALUES as readonly string[]).includes(value);
+}
+
+function normalizeStoredTab(value: unknown): AppTabId | null {
+  if (value === "files") {
+    return "canvas";
+  }
+  if (isAppTabId(value)) {
+    return value;
+  }
+  return null;
 }
 
 type LastVisitedAppTabByCanvas = Record<string, AppTabId>;
@@ -28,8 +38,9 @@ function readAllLastVisitedAppTabs(): LastVisitedAppTabByCanvas {
 
     const result: LastVisitedAppTabByCanvas = {};
     for (const [canvasId, tab] of Object.entries(parsed as Record<string, unknown>)) {
-      if (isAppTabId(tab)) {
-        result[canvasId] = tab;
+      const normalized = normalizeStoredTab(tab);
+      if (normalized) {
+        result[canvasId] = normalized;
       }
     }
 

@@ -30,7 +30,6 @@ const (
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"
 	FieldTypeIntegrationResource = "integration-resource"
-	FieldTypeRepositoryFile      = "repository-file"
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
@@ -41,6 +40,9 @@ const (
 	FieldTypeRunParameters       = "run-parameters"
 	FieldTypeHostedModel         = "hosted-model"
 )
+
+// HostedModelAllProviders lists every SuperPlane-hosted allowlist in one picker.
+const HostedModelAllProviders = "all"
 
 type Field struct {
 	/*

@@ -1,6 +1,6 @@
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ExecutionDetailsContext, NodeInfo, OutputPayload } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import type {
   AlertRuleNodeMetadata,
   CreateAlertRuleConfiguration,

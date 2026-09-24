@@ -137,6 +137,8 @@ func (n *Node) NodeTypeForModel() string {
 }
 
 func (n *Node) Model() models.Node {
+	n.canonicalizeHostedProviderRunner()
+
 	model := models.Node{
 		ID:             n.ID,
 		Name:           n.Name,
@@ -182,6 +184,23 @@ func (n *Node) Model() models.Node {
 	}
 
 	return model
+}
+
+func (n *Node) canonicalizeHostedProviderRunner() {
+	if n.Type != NodeTypeAction {
+		return
+	}
+	dummy := models.Node{
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: n.Component},
+		},
+		Configuration: n.Configuration,
+	}
+	if !models.RewriteHostedProviderRunnerToSuperPlane(&dummy) {
+		return
+	}
+	n.Component = dummy.ComponentName()
+	n.Configuration = dummy.Configuration
 }
 
 type Position struct {
@@ -240,6 +259,10 @@ func CanvasFromYAML(raw []byte) (*Canvas, error) {
 
 	if resource.Metadata == nil {
 		return nil, errors.New("canvas yaml must include a metadata block")
+	}
+
+	for i := range resource.Spec.Nodes {
+		resource.Spec.Nodes[i].canonicalizeHostedProviderRunner()
 	}
 
 	return &resource, nil

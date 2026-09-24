@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import { useQueries } from "@tanstack/react-query";
 import type { ConfigurationField, SuperplaneSecretsSecret } from "@/api-client";
 import { useSecrets } from "@/hooks/useSecrets";

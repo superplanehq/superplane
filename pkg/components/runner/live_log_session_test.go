@@ -51,7 +51,7 @@ func TestLiveLogStreamURLFallsBackToBaseURL(t *testing.T) {
 
 	got, err := LiveLogStreamURL("task-1")
 	require.NoError(t, err)
-	assert.Equal(t, "http://task-broker:8081/v1/tasks/task-1/live-logs", got)
+	assert.Equal(t, "http://localhost:8091/v1/tasks/task-1/live-logs", got)
 }
 
 func TestLiveLogStreamURLRewritesDockerInternalHost(t *testing.T) {

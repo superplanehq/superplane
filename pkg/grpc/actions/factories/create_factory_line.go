@@ -5,17 +5,11 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
 func CreateFactoryLine(ctx context.Context, organizationID string, req *pb.CreateFactoryLineRequest) (*pb.CreateFactoryLineResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory line")
-	}
-
-	factoryID, err := parseFactoryID(req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}
@@ -26,10 +20,11 @@ func CreateFactoryLine(ctx context.Context, organizationID string, req *pb.Creat
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}
+	factoryID := factory.ID
 
 	steps, err := parseLineSteps(db, orgID, factoryID, req.GetSteps())
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -53,6 +54,7 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 	if err != nil {
 		return nil, err
 	}
+	attachCanvasRunUsage(db, serialized)
 
 	return &pb.ListRunsResponse{
 		Runs:          serialized,
@@ -220,6 +222,10 @@ func serializeCanvasRunWithQueueItemInputs(
 
 	if run.CancelledAt != nil {
 		serialized.CancelledAt = timestamppb.New(*run.CancelledAt)
+	}
+
+	if run.CancelledBy != nil {
+		serialized.CancelledBy = cancelledByRef(run.CancelledBy, map[uuid.UUID]models.User{})
 	}
 
 	return serialized, nil
@@ -402,6 +408,38 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 	}
 
 	return nil
+}
+
+func attachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
+	ids := make([]uuid.UUID, 0, len(runs))
+	for _, run := range runs {
+		id, err := uuid.Parse(run.GetId())
+		if err != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+
+	usageByRun, modelsByRun, err := models.SumUsageAndModelsForRunTrees(db, ids)
+	if err != nil {
+		log.WithError(err).Warnf(
+			"canvas run listing: usage rollup unavailable for %d run(s), returning zero usage",
+			len(ids),
+		)
+		usageByRun = map[uuid.UUID]models.UsageTotals{}
+		modelsByRun = map[uuid.UUID][]string{}
+	}
+
+	for _, run := range runs {
+		id, err := uuid.Parse(run.GetId())
+		if err != nil {
+			continue
+		}
+		usage := usageByRun[id]
+		run.TotalTokens = usage.TotalTokens
+		run.CostCents = usage.CostCents()
+		run.Models = modelsByRun[id]
+	}
 }
 
 func serializeCanvasRuns(

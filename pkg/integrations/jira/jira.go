@@ -61,12 +61,31 @@ type Metadata struct {
 	// OpsScopesPending records whether the authorize URL currently outstanding includes JSM Ops
 	// scopes. Copied into OpsScopesRequested (and cleared) only after a successful OAuth callback.
 	OpsScopesPending bool `json:"opsScopesPending,omitempty" mapstructure:"opsScopesPending,omitempty"`
+
+	// IssueWebhookScopesRequested records whether the currently stored OAuth token was granted
+	// with read:issue-details:jira. Atlassian will not deliver jira:issue_* webhooks without
+	// that scope, even when manage:jira-webhook lets SuperPlane register the callback. Existing
+	// connections that predate this flag stay Ready and get a reconnect prompt until a
+	// successful callback sets it.
+	IssueWebhookScopesRequested bool `json:"issueWebhookScopesRequested,omitempty" mapstructure:"issueWebhookScopesRequested,omitempty"`
+
+	// HostedOAuth is true when this connection uses SuperPlane's Atlassian OAuth app.
+	HostedOAuth bool `json:"hostedOAuth,omitempty" mapstructure:"hostedOAuth,omitempty"`
+
+	// SetupReturnPath is the in-app path to open after Atlassian authorization.
+	SetupReturnPath string `json:"setupReturnPath,omitempty" mapstructure:"setupReturnPath,omitempty"`
 }
 
 const installationInstructions = `
 SuperPlane connects to Jira with OAuth.
 
 1. Click the **Connect** button with Client ID and Client Secret empty to see the steps for creating an Atlassian OAuth app.
+`
+
+const hostedInstallationInstructions = `
+SuperPlane connects to Jira with OAuth.
+
+Click **Connect**. SuperPlane opens Atlassian so you can authorize access to your site.
 `
 
 func (j *Jira) Name() string {
@@ -86,6 +105,9 @@ func (j *Jira) Description() string {
 }
 
 func (j *Jira) Instructions() string {
+	if UseHostedOAuth() {
+		return hostedInstallationInstructions
+	}
 	return installationInstructions
 }
 
@@ -151,23 +173,17 @@ func (j *Jira) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (j *Jira) Sync(ctx core.SyncContext) error {
-	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
-
-	//
-	// Sensitive configuration values are stored encrypted, and only
-	// GetConfig decrypts them - never read the client secret from
-	// ctx.Configuration directly.
-	//
-	clientID, _ := ctx.Integration.GetConfig("clientId")
-	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
+	app := resolveOAuthApp(ctx.Integration)
+	callbackURL := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
 
 	//
 	// Without app credentials, walk the user through creating the OAuth app.
 	// Unlike Linear, Atlassian's app creation form can't be pre-filled via a
 	// manifest URL, so the steps are shown as plain instructions instead of a
-	// one-click "Continue".
+	// one-click "Continue". Hosted OAuth uses SuperPlane's app from the process
+	// environment, so new connections do not paste a Client ID or Client Secret.
 	//
-	if len(clientID) == 0 || len(clientSecret) == 0 {
+	if app.ClientID == "" || app.ClientSecret == "" {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appSetupInstructions(callbackURL, jsmOpsFeaturesEnabled(ctx.Configuration)),
 		})
@@ -188,7 +204,7 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	//
 	accessToken, _ := findSecret(ctx.Integration, SecretOAuthAccessToken)
 	if accessToken == "" {
-		return j.requestAuthorization(ctx, string(clientID), callbackURL)
+		return j.requestAuthorization(ctx, app, callbackURL)
 	}
 
 	if err := j.refreshAccessToken(ctx); err != nil {
@@ -207,13 +223,17 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	// Ops features were turned on after this connection's token was granted without those scopes.
-	// Atlassian has no incremental-consent mechanism to add them to an existing grant, so this
-	// stays Ready with its current (narrower) scope in the meantime, and a reconnect prompt is
-	// attached on top rather than blocking the rest of Sync - requestAuthorization only replaces
-	// the browser action just cleared above, it doesn't touch the secrets or state set by Ready().
-	if metadata := readMetadata(ctx.Integration); jsmOpsFeaturesEnabled(ctx.Configuration) && !metadata.OpsScopesRequested {
-		return j.requestAuthorization(ctx, string(clientID), callbackURL)
+	// Ops features were turned on after this connection's token was granted without those scopes,
+	// or the token predates read:issue-details:jira. Atlassian has no incremental-consent
+	// mechanism to add them to an existing grant, so this stays Ready with its current
+	// (narrower) scope in the meantime, and a reconnect prompt is attached on top rather than
+	// blocking the rest of Sync - requestAuthorization only replaces the browser action just
+	// cleared above, it doesn't touch the secrets or state set by Ready().
+	metadata := readMetadata(ctx.Integration)
+	needsReconnect := !metadata.IssueWebhookScopesRequested ||
+		(jsmOpsFeaturesEnabled(ctx.Configuration) && !metadata.OpsScopesRequested)
+	if needsReconnect {
+		return j.requestAuthorization(ctx, app, callbackURL)
 	}
 
 	return nil
@@ -302,7 +322,7 @@ func accessTokenValidity(integration core.IntegrationContext) (time.Duration, bo
 // authorize URL too (see scopeList in client.go) but omitted here since it isn't selectable in
 // the Permissions tab at all.
 const (
-	coreJiraScopesForInstructions    = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`"
+	coreJiraScopesForInstructions    = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`, `read:issue-details:jira`"
 	jsmRequestScopesForInstructions  = "`read:servicedesk-request`, `write:servicedesk-request`"
 	jsmIncidentScopesForInstructions = "`read:incident:jira-service-management`, `write:incident:jira-service-management`"
 	jsmOpsScopesForInstructions      = "`read:ops-alert:jira-service-management`, `write:ops-alert:jira-service-management`, `delete:ops-alert:jira-service-management`, " +
@@ -351,10 +371,12 @@ Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**
 `, apis, callbackURL)
 }
 
-// requestAuthorization sends the user to Atlassian to approve the OAuth app, using a CSRF state
-// that persists across Syncs until the callback consumes it.
-func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL string) error {
+// requestAuthorization sends the user to Atlassian to approve the OAuth app.
+// The CSRF state is reused across Syncs until a callback consumes it. A failed
+// or denied callback also consumes it, so the next Sync issues a new state.
+func (j *Jira) requestAuthorization(ctx core.SyncContext, app oauthApp, callbackURL string) error {
 	metadata := readMetadata(ctx.Integration)
+	rememberSetupReturnPath(ctx, &metadata)
 
 	if metadata.State == nil {
 		state, err := crypto.Base64String(32)
@@ -370,6 +392,7 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 	// token still lacked the scopes.
 	opsEnabled := jsmOpsFeaturesEnabled(ctx.Configuration)
 	metadata.OpsScopesPending = opsEnabled
+	metadata.HostedOAuth = app.Hosted
 	ctx.Integration.SetMetadata(metadata)
 
 	scope := coreScopeList
@@ -380,14 +403,19 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 	authorizeURL := fmt.Sprintf(
 		"%s?audience=api.atlassian.com&client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&prompt=consent",
 		AuthorizeURL,
-		url.QueryEscape(clientID),
+		url.QueryEscape(app.ClientID),
 		url.QueryEscape(callbackURL),
 		url.QueryEscape(scope),
 		url.QueryEscape(*metadata.State),
 	)
 
+	description := "Click **Continue** to authorize SuperPlane to access your Jira site."
+	if accessToken, _ := findSecret(ctx.Integration, SecretOAuthAccessToken); accessToken != "" && !metadata.IssueWebhookScopesRequested {
+		description = "Click **Continue** to reconnect Jira. SuperPlane needs extra permission to receive issue events."
+	}
+
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: "Click **Continue** to authorize SuperPlane to access your Jira site.",
+		Description: description,
 		URL:         authorizeURL,
 		Method:      "GET",
 	})
@@ -425,32 +453,24 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	clientID, err := ctx.Integration.GetConfig("clientId")
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	expectedState := consumeMatchingOAuthState(ctx.Integration, ctx.Request.URL.Query().Get("state"))
 
-	clientSecret, err := ctx.Integration.GetConfig("clientSecret")
-	if err != nil {
+	app := resolveOAuthApp(ctx.Integration)
+	if app.ClientID == "" || app.ClientSecret == "" {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	metadata := readMetadata(ctx.Integration)
-	expectedState := ""
-	if metadata.State != nil {
-		expectedState = *metadata.State
-	}
-
 	settingsURL := fmt.Sprintf("%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID())
-	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
+	redirectURL := callbackRedirectURL(ctx, settingsURL)
+	redirectURI := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
 
 	auth := NewAuth(ctx.HTTP)
-	token, err := auth.HandleCallback(ctx.Request, string(clientID), string(clientSecret), expectedState, redirectURI)
+	token, err := auth.HandleCallback(ctx.Request, app.ClientID, app.ClientSecret, expectedState, redirectURI)
 	if err != nil {
 		ctx.Logger.Errorf("Callback error: %v", err)
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -462,7 +482,7 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	if err != nil {
 		ctx.Logger.Errorf("Callback error: failed to fetch accessible resources: %v", err)
 		ctx.Integration.Error(fmt.Sprintf("failed to resolve Jira site: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -475,20 +495,20 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	if token.RefreshToken == "" {
 		ctx.Logger.Errorf("Callback error: token response did not include a refresh token")
 		ctx.Integration.Error("connected to Atlassian, but no refresh token was returned - reconnect and make sure the offline_access scope is granted")
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
 	if err := ctx.Integration.SetSecret(SecretOAuthAccessToken, []byte(token.AccessToken)); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to store access token: %v", err)
 		ctx.Integration.Error(fmt.Sprintf("failed to store access token: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 	if err := ctx.Integration.SetSecret(SecretOAuthRefreshToken, []byte(token.RefreshToken)); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to store refresh token: %v", err)
 		ctx.Integration.Error(fmt.Sprintf("failed to store refresh token: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -503,12 +523,13 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	// Commit the scopes that were actually on the authorize URL that produced this token.
 	metadata.OpsScopesRequested = metadata.OpsScopesPending
 	metadata.OpsScopesPending = false
+	metadata.IssueWebhookScopesRequested = true
 	ctx.Integration.SetMetadata(metadata)
 
 	if err := ctx.Integration.ScheduleResync(token.GetExpiration()); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to schedule resync: %v", err)
 		ctx.Integration.Error(fmt.Sprintf("failed to schedule token refresh: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -526,14 +547,14 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		// the metadata reload failed, so there's nothing left for the user to authorize.
 		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.Error(fmt.Sprintf("connected, but failed to load workspace data: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+	http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 }
 
 // hasLegacyBasicAuthConfig reports whether the raw stored configuration still carries keys from
@@ -553,6 +574,26 @@ func readMetadata(integration core.IntegrationContext) Metadata {
 	metadata := Metadata{}
 	_ = mapstructure.Decode(integration.GetMetadata(), &metadata)
 	return metadata
+}
+
+// consumeMatchingOAuthState clears the stored CSRF state when this callback
+// carries it, including denied or failed attempts. A mismatched state is left
+// in place so a probe cannot force a reconnect. The returned value is the
+// state that was stored before this call, so HandleCallback can still
+// validate the request.
+func consumeMatchingOAuthState(integration core.IntegrationContext, incomingState string) string {
+	metadata := readMetadata(integration)
+	expectedState := ""
+	if metadata.State != nil {
+		expectedState = *metadata.State
+	}
+	if expectedState == "" || incomingState != expectedState {
+		return expectedState
+	}
+
+	metadata.State = nil
+	integration.SetMetadata(metadata)
+	return expectedState
 }
 
 func findSecret(integration core.IntegrationContext, name string) (string, error) {

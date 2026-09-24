@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"io"
 	"strings"
 	"testing"
 
@@ -13,7 +12,6 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/services/files"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 )
@@ -30,7 +28,7 @@ func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 	require.NotNil(t, resp.GetVersion().GetMetadata())
@@ -66,7 +64,7 @@ func Test__CommitCanvasStaging__IgnoresRenamedCanvasInYAML(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Rename attempt", "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Rename attempt", "", r.AuthService)
 	require.NoError(t, err)
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvas.ID)
@@ -82,7 +80,7 @@ func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Bad console", "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Bad console", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
@@ -92,46 +90,68 @@ func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
 func Test__CommitCanvasStaging__RequiresStagedChanges(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
 
-	_, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Nothing to commit", "", r.AuthService)
+	_, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Nothing to commit", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
 	assert.Contains(t, msg, "no staged changes")
 }
 
-func Test__CommitCanvasStaging__StageArbitraryRepositoryFileCommitsToGit(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+func Test__CommitCanvasStaging__IgnoresLeftoverNonSpecFiles(t *testing.T) {
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
 
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	staged := baseline + "\n# staged edit\n"
 
-	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
-		{Path: "README.md", Content: []byte("staged readme")},
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(staged)},
 	})
 	require.NoError(t, err)
 
-	fileReader := files.NewAppFileReader(database.DB(ctx), r.GitProvider, canvas, r.User)
-	reader, err := fileReader.ReadFromStaging(ctx, "README.md")
+	_, err = models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		version.ID,
+		canvas.OrganizationID,
+		"README.md",
+		"leftover readme",
+	)
 	require.NoError(t, err)
-	content, err := io.ReadAll(reader)
-	require.NoError(t, err)
-	require.NoError(t, reader.Close())
-	assert.Equal(t, "staged readme", string(content))
 
-	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Add readme", "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Update canvas", "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
-	reader, err = r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", "")
+	committedVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
-	committed, err := io.ReadAll(reader)
-	require.NoError(t, err)
-	require.NoError(t, reader.Close())
-	assert.Equal(t, "staged readme", string(committed))
+	assert.NotEqual(t, version.ID, committedVersion.ID)
 
 	hasStaging, err := models.HasStagedFilesForUser(database.DB(ctx), canvas.ID, r.User)
 	require.NoError(t, err)
 	assert.False(t, hasStaging)
+}
+
+func Test__CommitCanvasStaging__RejectsNonSpecOnlyStaging(t *testing.T) {
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
+
+	_, err := models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		version.ID,
+		canvas.OrganizationID,
+		"README.md",
+		"leftover readme",
+	)
+	require.NoError(t, err)
+
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Add readme", "", r.AuthService)
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Contains(t, msg, "no staged changes")
 }
 
 func Test__CommitCanvasStaging__RejectsStaleStaging(t *testing.T) {
@@ -158,10 +178,10 @@ func Test__CommitCanvasStaging__RejectsStaleStaging(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(otherCtx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Promote live", "", r.AuthService)
+	_, err = CommitCanvasStaging(otherCtx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Promote live", "", r.AuthService)
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ownerCtx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Stale commit", "", r.AuthService)
+	_, err = CommitCanvasStaging(ownerCtx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Stale commit", "", r.AuthService)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)

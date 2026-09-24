@@ -26,7 +26,7 @@ export function CreateGroupPage() {
   useReportPageReady(!loadingRoles);
 
   const sortedRoles = useMemo(() => {
-    const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);
+    const defaultRoles = new Set(["org_admin", "org_maintainer", "org_operator"]);
     const customRoles = roles
       .filter((role) => !defaultRoles.has(role.metadata?.name || ""))
       .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));

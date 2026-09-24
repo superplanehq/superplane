@@ -28,17 +28,17 @@ func (c *UpdateWorkOrderStatus) Name() string {
 }
 
 func (c *UpdateWorkOrderStatus) Label() string {
-	return "Update Work Order Status"
+	return "Update Task Status"
 }
 
 func (c *UpdateWorkOrderStatus) Description() string {
-	return "Transition a work order between lifecycle states"
+	return "Transition a task between lifecycle states"
 }
 
 func (c *UpdateWorkOrderStatus) Documentation() string {
-	return `The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran).
+	return `The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened task never ran).
 
-` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
 
 func (c *UpdateWorkOrderStatus) Icon() string {
@@ -56,7 +56,7 @@ func (c *UpdateWorkOrderStatus) ExampleOutput() map[string]any {
 		"data": map[string]any{
 			"workOrder": map[string]any{
 				"id":     "wo-123",
-				"title":  "Work Order 1",
+				"title":  "Task 1",
 				"state":  "closed",
 				"result": "completed",
 			},
@@ -72,8 +72,8 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "orderId",
-			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
+			Label:       "Task ID",
+			Description: "Task to target. Defaults to the task driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",
@@ -81,7 +81,7 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 		{
 			Name:        "status",
 			Label:       "Status",
-			Description: "The new lifecycle state for the work order",
+			Description: "The new lifecycle state for the task",
 			Type:        configuration.FieldTypeSelect,
 			Required:    true,
 			TypeOptions: &configuration.TypeOptions{
@@ -97,7 +97,7 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 		{
 			Name:        "result",
 			Label:       "Result",
-			Description: "Required when closing the work order",
+			Description: "Required when closing the task",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -134,7 +134,7 @@ func (c *UpdateWorkOrderStatus) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Re-runs land here with the work order already in the target state;
+	// Re-runs land here with the task already in the target state;
 	// emitting `workOrder.statusUpdated` on a no-op would trick downstream
 	// nodes into treating a replay as a fresh transition.
 	if !changed {

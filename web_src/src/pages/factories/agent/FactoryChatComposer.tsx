@@ -1,7 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { MentionDropdown } from "@/components/AgentSidebar/MentionDropdown";
 import { useFlushAgentComposerSend } from "@/components/AgentSidebar/useFlushAgentComposerSend";
 import { useMentionCandidates } from "@/components/AgentSidebar/useMentionCandidates";
@@ -26,17 +25,11 @@ type ChatComposerProps = {
   sendPending: boolean;
   stopping?: boolean;
   statusLabel: string;
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
-  modeDisabled?: boolean;
   nodes?: SuperplaneComponentsNode[];
   runs?: CanvasesCanvasRun[];
 };
 
-const modePlaceholder = {
-  builder: "Describe the change to build...",
-  operator: "Ask the agent…",
-} as const;
+const COMPOSER_PLACEHOLDER = "Describe the change to build...";
 
 export function FactoryChatComposer({
   canvasId,
@@ -48,9 +41,6 @@ export function FactoryChatComposer({
   sendPending,
   stopping,
   statusLabel,
-  agentMode,
-  onModeSwitch,
-  modeDisabled,
   nodes,
   runs,
 }: ChatComposerProps) {
@@ -70,14 +60,11 @@ export function FactoryChatComposer({
           setCursorPos={c.setCursorPos}
           onKeyDown={c.handleKeyDown}
           onPaste={c.handlePaste}
-          placeholder={modePlaceholder[agentMode]}
+          placeholder={COMPOSER_PLACEHOLDER}
           textareaRef={c.textareaRef}
           backdropRef={c.backdropRef}
         />
         <FactoryComposerToolbar
-          agentMode={agentMode}
-          onModeSwitch={onModeSwitch}
-          modeDisabled={modeDisabled}
           onClearChat={onClearChat}
           clearing={clearing}
           sending={sending}

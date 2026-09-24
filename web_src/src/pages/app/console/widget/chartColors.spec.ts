@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { CHART_COLOR, DEFAULT_CHART_PALETTE, DEFAULT_DARK_CHART_PALETTE, resolveChartColor } from "./chartColors";
 

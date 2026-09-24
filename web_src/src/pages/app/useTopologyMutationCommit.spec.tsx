@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
 import { DefaultLayoutEngine } from "@/lib/layout";

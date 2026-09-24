@@ -1,7 +1,7 @@
 import type { OrganizationsIntegration } from "@/api-client";
 import { render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { SetupSections } from "./SetupSections";

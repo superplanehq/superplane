@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvasRun } from "@/api-client";
 import type { RunInspectorNodeSection } from "./types";
 import { useRunInspectorActions } from "./useRunInspectorActions";

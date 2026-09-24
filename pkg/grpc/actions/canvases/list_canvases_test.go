@@ -325,7 +325,6 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	assert.NotNil(t, listedCanvas.UpdatedAt)
 	assert.NotNil(t, listedCanvas.CreatedBy.Id)
 	assert.NotNil(t, listedCanvas.CreatedBy.Name)
-	assert.NotNil(t, listedCanvas.FolderId)
 }
 
 func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {

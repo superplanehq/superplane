@@ -1,7 +1,8 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { createWorkOrderPath, factoryHomePath } from "../lib/factoryPagePaths";
+import { createWorkOrderPath, factoryHomePath, workOrderDetailPath } from "../lib/factoryPagePaths";
 
 export function useCreateWorkOrderDialogState(
   organizationId: string,
@@ -33,14 +34,25 @@ export function useCreateWorkOrderDialogState(
   }, [factoryKey, firstLineId, isCreateWorkOrderRoute, navigate, organizationId]);
 
   const completeCreateWorkOrder = useCallback(
-    (_orderNumber: string) => {
+    (orderNumber: string, order?: FactoriesWorkOrder) => {
       setCreateWorkOrderOpen(false);
-      navigate(factoryHomePath(organizationId, factoryKey, firstLineId), {
+      const lineId = lineIdFromPathname(location.pathname) ?? firstLineId;
+      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId), {
         replace: isCreateWorkOrderRoute,
+        state: order?.id ? { peekOrder: order } : undefined,
       });
     },
-    [factoryKey, firstLineId, isCreateWorkOrderRoute, navigate, organizationId],
+    [factoryKey, firstLineId, isCreateWorkOrderRoute, location.pathname, navigate, organizationId],
   );
 
   return { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder };
+}
+
+function lineIdFromPathname(pathname: string): string | undefined {
+  const match = /\/lines\/([^/]+)/.exec(pathname);
+  const lineId = match?.[1];
+  if (!lineId || lineId === "new") {
+    return undefined;
+  }
+  return lineId;
 }

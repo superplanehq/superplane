@@ -32,6 +32,12 @@ func TestParseLiveLogRecordKeepsKindPreviewAndTools(t *testing.T) {
 	require.Equal(t, "toolu_a", tool.ID)
 	require.Equal(t, "read", tool.Kind)
 	require.Equal(t, "pkg/foo.go", tool.Text)
+
+	turn, ok := parseLiveLogRecord(`{"type":"turn","turn":3,"usage":{"input_tokens":100,"output_tokens":20}}`)
+	require.True(t, ok)
+	require.Equal(t, "turn", turn.Type)
+	require.NotNil(t, turn.Turn)
+	require.Equal(t, 3, *turn.Turn)
 }
 
 func TestReadLiveLogRecordsReturnsAfterLimitOnOpenStream(t *testing.T) {

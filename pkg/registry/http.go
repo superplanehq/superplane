@@ -40,6 +40,16 @@ type HTTPContext struct {
 	policyMu                    sync.RWMutex
 	policy                      compiledHTTPPolicy
 	policyExpiresAt             time.Time
+	txPoliciesMu                sync.Mutex
+	txPolicies                  map[*gorm.DB]*txPolicyState
+}
+
+type txPolicyState struct {
+	mu      sync.Mutex
+	waiters int
+	policy  compiledHTTPPolicy
+	err     error
+	loaded  bool
 }
 
 type HTTPOptions struct {
@@ -380,12 +390,7 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 	}
 
 	if tx != nil && c.policyResolverInTransaction != nil {
-		policy, err := c.policyResolverInTransaction(tx)
-		if err != nil {
-			return compiledHTTPPolicy{}, err
-		}
-
-		return compileHTTPPolicy(policy)
+		return c.policyForTransaction(tx)
 	}
 
 	now := time.Now()
@@ -428,6 +433,62 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 	}
 
 	return c.policy, nil
+}
+
+// policyForTransaction resolves SSRF policy through the caller's GORM
+// transaction. GORM transactions are not goroutine-safe, so concurrent HTTP
+// on the same tx shares one lookup. Other transactions do not wait.
+func (c *HTTPContext) policyForTransaction(tx *gorm.DB) (compiledHTTPPolicy, error) {
+	state := c.beginTxPolicyLookup(tx)
+	defer c.finishTxPolicyLookup(tx, state)
+
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
+	if state.loaded {
+		return state.policy, state.err
+	}
+
+	policy, err := c.policyResolverInTransaction(tx)
+	if err != nil {
+		state.policy = compiledHTTPPolicy{}
+		state.err = err
+		state.loaded = true
+		return compiledHTTPPolicy{}, err
+	}
+
+	compiledPolicy, err := compileHTTPPolicy(policy)
+	state.policy = compiledPolicy
+	state.err = err
+	state.loaded = true
+	return compiledPolicy, err
+}
+
+func (c *HTTPContext) beginTxPolicyLookup(tx *gorm.DB) *txPolicyState {
+	c.txPoliciesMu.Lock()
+	defer c.txPoliciesMu.Unlock()
+
+	if c.txPolicies == nil {
+		c.txPolicies = make(map[*gorm.DB]*txPolicyState)
+	}
+
+	state, ok := c.txPolicies[tx]
+	if !ok {
+		state = &txPolicyState{}
+		c.txPolicies[tx] = state
+	}
+	state.waiters++
+	return state
+}
+
+func (c *HTTPContext) finishTxPolicyLookup(tx *gorm.DB, state *txPolicyState) {
+	c.txPoliciesMu.Lock()
+	defer c.txPoliciesMu.Unlock()
+
+	state.waiters--
+	if state.waiters == 0 && c.txPolicies[tx] == state {
+		delete(c.txPolicies, tx)
+	}
 }
 
 func compileHTTPPolicy(policy HTTPPolicy) (compiledHTTPPolicy, error) {

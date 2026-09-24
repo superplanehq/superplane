@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { ConfigurationField } from "@/api-client";
 
@@ -132,5 +132,19 @@ describe("ListFieldRenderer", () => {
     fireEvent.click(screen.getByLabelText("Remove Label 1"));
 
     expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it("renders accordion item titles with a legible color in dark mode", () => {
+    render(
+      <ListFieldRenderer
+        field={parameterListField()}
+        value={[{ name: "Clone Repo", type: "bash" }]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByText("Clone Repo");
+    expect(title).toHaveClass("text-gray-800");
+    expect(title).toHaveClass("dark:text-gray-100");
   });
 });

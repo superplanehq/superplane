@@ -1,18 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake } from "@/api-client";
 
 import {
   DEFAULT_LINE_NAME,
   GITHUB_INTAKE_SOURCE,
+  JIRA_INTAKE_SOURCE,
   provisionEventApps,
   provisionGithubIntake,
+  provisionJiraIntake,
   provisionLine,
-  provisionPRFeedbackHandler,
+  provisionOnboardingIntake,
 } from "./onboardingProvision";
 
+function boundJiraIntake(id: string, integrationId: string, resourceId: string): FactoriesFactoryIntake {
+  return { id, source: JIRA_INTAKE_SOURCE, integrationId, resourceId } as FactoriesFactoryIntake;
+}
+
+beforeEach(() => {
+  sessionStorage.clear();
+});
+
 describe("provisionLine", () => {
-  it("reuses a line that already has the planning entrypoint", async () => {
+  it("reuses a line that already has the implementation entrypoint", async () => {
     const createLine = vi.fn();
     const updateOnboarding = vi.fn();
     const installFactory = vi.fn();
@@ -21,7 +31,7 @@ describe("provisionLine", () => {
       lines: [
         {
           id: "line-1",
-          steps: [{ app: { app: "app-1", entrypoint: "onrun-create-plan" } }],
+          steps: [{ app: { app: "app-1", entrypoint: "onrun-implement" } }],
         },
       ],
     } as FactoriesFactory;
@@ -42,7 +52,7 @@ describe("provisionLine", () => {
     expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("installs plan and implement, and creates a line that runs both", async () => {
+  it("installs implement and creates a line that runs it", async () => {
     const createLine = vi.fn().mockResolvedValue({ id: "line-new" });
     const updateOnboarding = vi.fn().mockResolvedValue({});
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
@@ -61,21 +71,13 @@ describe("provisionLine", () => {
       updateOnboarding,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
-      "line-planning",
-      "line-implementation",
-    ]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["line-implementation"]);
     expect(installFactory.mock.calls.map(([input]) => input.installParams)).toEqual([
-      { appRepository: "acme/app", backlogRepository: "acme/backlog", defaultBranch: "master" },
       { appRepository: "acme/app", backlogRepository: "acme/backlog", defaultBranch: "master" },
     ]);
     expect(createLine).toHaveBeenCalledWith({
       name: DEFAULT_LINE_NAME,
       steps: [
-        {
-          type: "runApp",
-          app: { app: "canvas-line-planning", entrypoint: "onrun-create-plan" },
-        },
         {
           type: "runApp",
           app: { app: "canvas-line-implementation", entrypoint: "onrun-implement" },
@@ -91,7 +93,7 @@ describe("provisionLine", () => {
 });
 
 describe("provisionEventApps", () => {
-  it("installs PR closure for the workspace that has none", async () => {
+  it("installs PR closure for the workspace", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
@@ -108,7 +110,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
     expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
         factoryId: "pr-closure",
@@ -123,7 +125,10 @@ describe("provisionEventApps", () => {
   });
 
   it("does not install PR closure when the workspace already has it", async () => {
-    const installFactory = vi.fn();
+    const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
+      canvasId: `canvas-${factoryId}`,
+      canvasName: factoryId,
+    }));
     const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "PR Closure" }]);
 
     await provisionEventApps({
@@ -140,8 +145,28 @@ describe("provisionEventApps", () => {
   });
 
   it("does not install PR closure when it was renamed to PR Closure (2)", async () => {
-    const installFactory = vi.fn();
+    const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
+      canvasId: `canvas-${factoryId}`,
+      canvasName: factoryId,
+    }));
     const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "PR Closure (2)" }]);
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      defaultBranch: "staging",
+      installFactory,
+      listApps,
+    });
+
+    expect(installFactory).not.toHaveBeenCalled();
+  });
+
+  it("does not install PR closure when the workspace already has it", async () => {
+    const installFactory = vi.fn();
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "PR Closure" }]);
 
     await provisionEventApps({
       factoryId: "factory-1",
@@ -173,8 +198,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
-    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "pr-closure" }));
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
   });
 });
 
@@ -210,50 +234,194 @@ describe("provisionGithubIntake", () => {
   });
 });
 
-describe("provisionPRFeedbackHandler", () => {
-  it("creates a handler for a workspace that has none", async () => {
-    const listHandlers = vi.fn().mockResolvedValue([]);
-    const createHandler = vi.fn().mockResolvedValue({ id: "handler-1" } as FactoriesFactoryPrFeedbackHandler);
+describe("provisionJiraIntake", () => {
+  it("creates the Jira intake with the selected connection and project", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
 
-    const handler = await provisionPRFeedbackHandler({
-      listHandlers,
-      createHandler,
-      repository: "acme/app",
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
     });
 
-    expect(createHandler).toHaveBeenCalledWith({ repository: "acme/app" });
-    expect(handler.id).toBe("handler-1");
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+    expect(deleteIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-jira");
   });
 
-  it("leaves a handler for the same repository alone so a retry adds no second copy", async () => {
-    const listHandlers = vi
-      .fn()
-      .mockResolvedValue([{ id: "handler-1", settings: { subject: { repository: "acme/app" } } }]);
-    const createHandler = vi.fn();
+  it("creates the Jira intake with the chosen completion column", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
 
-    const handler = await provisionPRFeedbackHandler({
-      listHandlers,
-      createHandler,
-      repository: "acme/app",
+    await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+      settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
     });
 
-    expect(createHandler).not.toHaveBeenCalled();
-    expect(handler.id).toBe("handler-1");
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+      settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+    });
   });
 
-  it("creates a handler next to one that watches a different repository", async () => {
-    const listHandlers = vi
-      .fn()
-      .mockResolvedValue([{ id: "handler-1", settings: { subject: { repository: "acme/other" } } }]);
-    const createHandler = vi.fn().mockResolvedValue({ id: "handler-2" } as FactoriesFactoryPrFeedbackHandler);
+  it("reuses a Jira intake whose connection and project still match", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([boundJiraIntake("intake-1", "jira-1", "PAY")]);
+    const createIntake = vi.fn();
+    const deleteIntake = vi.fn();
 
-    const handler = await provisionPRFeedbackHandler({
-      listHandlers,
-      createHandler,
-      repository: "acme/app",
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
     });
 
-    expect(createHandler).toHaveBeenCalledWith({ repository: "acme/app" });
-    expect(handler.id).toBe("handler-2");
+    expect(createIntake).not.toHaveBeenCalled();
+    expect(deleteIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-1");
+  });
+
+  it("reuses a Jira intake created earlier in this session when the project is unchanged", async () => {
+    const created = { id: "intake-1", source: JIRA_INTAKE_SOURCE } as FactoriesFactoryIntake;
+    const listIntakes = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ id: "intake-1", source: JIRA_INTAKE_SOURCE }]);
+    const createIntake = vi.fn().mockResolvedValue(created);
+    const deleteIntake = vi.fn();
+
+    await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+
+    expect(createIntake).toHaveBeenCalledTimes(1);
+    expect(deleteIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-1");
+  });
+
+  it("replaces a Jira intake when the project changed after a failed finish", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([boundJiraIntake("intake-old", "jira-1", "PAY")]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-new" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn().mockResolvedValue({});
+
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      integrationId: "jira-1",
+      resourceId: "CORE",
+    });
+
+    expect(deleteIntake).toHaveBeenCalledWith("intake-old");
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "CORE",
+    });
+    expect(intake.id).toBe("intake-new");
+  });
+});
+
+describe("provisionOnboardingIntake", () => {
+  it("creates the GitHub intake when the ticket source is GitHub", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
+
+    const intake = await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      issuesChoice: "vcs",
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+    expect(deleteIntake).not.toHaveBeenCalled();
+    expect(intake?.id).toBe("intake-1");
+  });
+
+  it("creates a Jira intake when the ticket source is Jira", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
+
+    const intake = await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      issuesChoice: "jira",
+      jira: { integrationId: "jira-1", projectId: "PAY" },
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+    expect(intake?.id).toBe("intake-jira");
+  });
+
+  it("removes a leftover GitHub intake when the retry selects Jira", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-github", source: GITHUB_INTAKE_SOURCE }]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn().mockResolvedValue({});
+
+    await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      issuesChoice: "jira",
+      jira: { integrationId: "jira-1", projectId: "PAY" },
+    });
+
+    expect(deleteIntake).toHaveBeenCalledWith("intake-github");
+    expect(createIntake).toHaveBeenCalledWith({
+      source: JIRA_INTAKE_SOURCE,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+  });
+
+  it("removes a leftover Jira intake when the retry selects GitHub", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-jira", source: JIRA_INTAKE_SOURCE }]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-github" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn().mockResolvedValue({});
+
+    await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      issuesChoice: "vcs",
+    });
+
+    expect(deleteIntake).toHaveBeenCalledWith("intake-jira");
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
   });
 });

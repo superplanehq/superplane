@@ -85,7 +85,7 @@ const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
 const EXAMPLE_ORDER_NUMBER = 12;
 
 // Task permalinks are workspace-scoped
-// (`/{org}/workspaces/{workspaceKey}/work-order/{number}`), so the example is
+// (`/{org}/workspaces/{workspaceKey}/task/{number}`), so the example is
 // only meaningful on a workspace app page, where order() also resolves.
 function exampleOrderUrl(): string {
   if (typeof window === "undefined") {
@@ -94,7 +94,7 @@ function exampleOrderUrl(): string {
 
   const { origin, pathname } = window.location;
   const workspacePath = pathname.match(/^\/[^/]+\/workspaces\/[^/]+/)?.[0];
-  return workspacePath ? `${origin}${workspacePath}/work-order/${EXAMPLE_ORDER_NUMBER}` : "";
+  return workspacePath ? `${origin}${workspacePath}/task/${EXAMPLE_ORDER_NUMBER}` : "";
 }
 
 function buildOrderExample(): Record<string, unknown> {

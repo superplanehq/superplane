@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { resyncPackageMapper } from "./resync_package";
 import { buildDetailsCtx, buildPackageData, buildPackageOutput } from "./test_helpers";
 

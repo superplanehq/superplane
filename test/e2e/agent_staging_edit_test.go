@@ -37,7 +37,6 @@ func TestAgentStagingEditTransition(t *testing.T) {
 		steps.start()
 		steps.warmLiveViewStagingCaches()
 		steps.openAgent()
-		steps.switchToBuildMode()
 		steps.sendMessage("Add a noop node to the canvas")
 		steps.assertAssistantMessage("Added agent noop node")
 		steps.assertAutoEnteredEditModeWithoutManualEdit()
@@ -140,11 +139,6 @@ func (s *agentStagingEditSteps) waitForAgentInput() {
 		visible, err := input.IsVisible()
 		return err == nil && visible
 	}, agentWaitTimeout, agentPollInterval)
-}
-
-func (s *agentStagingEditSteps) switchToBuildMode() {
-	s.session.Click(q.TestID("agent-mode-builder"))
-	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
 }
 
 func (s *agentStagingEditSteps) sendMessage(message string) {

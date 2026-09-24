@@ -147,6 +147,26 @@ func TestCountPendingEvents_DeletedWorkflowIsNotCounted(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountPendingEvents_DeletedOrganizationIsNotCounted(t *testing.T) {
+	database.TruncateTables()
+
+	activeSteps := stuckQueueItemsTestSteps{t: t}
+	activeSteps.CreateWorkflow()
+	activeSteps.CreateWorkflowNode()
+	activeSteps.CreateRootEvent()
+
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+	deletedSteps.CreateWorkflowNode()
+	deletedSteps.CreateRootEvent()
+
+	require.NoError(t, models.SoftDeleteOrganization(deletedSteps.organization.ID.String()))
+
+	count, err := countPendingEvents()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
 func TestCountPendingExecutions(t *testing.T) {
 	database.TruncateTables()
 
@@ -218,19 +238,65 @@ func TestCountPendingExecutions_DeletedWorkflowIsNotCounted(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountPendingExecutions_DeletedOrganizationIsNotCounted(t *testing.T) {
+	database.TruncateTables()
+
+	activeSteps := stuckQueueItemsTestSteps{t: t}
+	activeSteps.CreateWorkflow()
+	activeSteps.CreateWorkflowNode()
+	activeSteps.CreateRootEvent()
+
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+	deletedSteps.CreateWorkflowNode()
+	deletedSteps.CreateRootEvent()
+
+	activeExecution := &models.CanvasNodeExecution{
+		WorkflowID:  activeSteps.workflow.ID,
+		NodeID:      activeSteps.node.NodeID,
+		RootEventID: activeSteps.rootEvent.ID,
+		EventID:     activeSteps.rootEvent.ID,
+		State:       models.CanvasNodeExecutionStatePending,
+	}
+	require.NoError(t, database.Conn().Create(activeExecution).Error)
+
+	deletedExecution := &models.CanvasNodeExecution{
+		WorkflowID:  deletedSteps.workflow.ID,
+		NodeID:      deletedSteps.node.NodeID,
+		RootEventID: deletedSteps.rootEvent.ID,
+		EventID:     deletedSteps.rootEvent.ID,
+		State:       models.CanvasNodeExecutionStatePending,
+	}
+	require.NoError(t, database.Conn().Create(deletedExecution).Error)
+
+	require.NoError(t, models.SoftDeleteOrganization(deletedSteps.organization.ID.String()))
+
+	count, err := countPendingExecutions()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
 type stuckQueueItemsTestSteps struct {
-	t         *testing.T
-	workflow  *models.Canvas
-	node      *models.CanvasNode
-	rootEvent *models.CanvasEvent
+	t            *testing.T
+	organization *models.Organization
+	workflow     *models.Canvas
+	node         *models.CanvasNode
+	rootEvent    *models.CanvasEvent
 }
 
 func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 	now := time.Now()
 	liveVersionID := uuid.New()
+	organization := &models.Organization{
+		ID:        uuid.New(),
+		Name:      "Test Organization",
+		Slug:      uuid.NewString(),
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
 	workflow := &models.Canvas{
 		ID:             uuid.New(),
-		OrganizationID: uuid.New(),
+		OrganizationID: organization.ID,
 		LiveVersionID:  &liveVersionID,
 		Name:           "Test Workflow",
 		Description:    "This is a test workflow",
@@ -239,6 +305,9 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 	}
 
 	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(organization).Error; err != nil {
+			return err
+		}
 		if err := tx.Create(workflow).Error; err != nil {
 			return err
 		}
@@ -252,6 +321,7 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 		}).Error
 	}))
 
+	s.organization = organization
 	s.workflow = workflow
 }
 

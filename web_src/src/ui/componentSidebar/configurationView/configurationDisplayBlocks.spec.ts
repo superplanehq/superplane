@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { isNestedGroupHeader, parseConfigurationDisplayBlocks } from "./configurationDisplayBlocks";
 import type { ConfigurationDisplayRow } from "./types";
 

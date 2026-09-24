@@ -4,7 +4,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -29,9 +29,9 @@ export const queryRangeMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const details: Record<string, any> = {};
+    const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
       details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
@@ -41,36 +41,39 @@ export const queryRangeMapper: ComponentBaseMapper = {
       return details;
     }
 
-    const queryResult = outputs.default[0].data as PrometheusQueryPayload;
-
-    const configuration = context.node?.configuration as QueryRangeConfiguration | undefined;
-    if (configuration?.query) {
-      details["Query"] = configuration.query;
-    }
-
-    if (configuration?.start) {
-      details["Start"] = configuration.start;
-    }
-
-    if (configuration?.end) {
-      details["End"] = configuration.end;
-    }
-
-    if (configuration?.step) {
-      details["Step"] = configuration.step;
-    }
-
-    if (queryResult?.resultType) {
-      details["Result Type"] = queryResult.resultType;
-    }
-
-    if (queryResult?.result !== undefined) {
-      details["Results"] = String(Array.isArray(queryResult.result) ? queryResult.result.length : 0);
-    }
+    addQueryRangeOutputDetails(
+      details,
+      outputs.default[0].data as PrometheusQueryPayload,
+      context.node?.configuration as QueryRangeConfiguration | undefined,
+    );
 
     return details;
   },
 };
+
+function addQueryRangeOutputDetails(
+  details: Record<string, string>,
+  queryResult: PrometheusQueryPayload,
+  configuration: QueryRangeConfiguration | undefined,
+) {
+  const fields: Array<[string, string | undefined]> = [
+    ["Query", configuration?.query],
+    ["Start", configuration?.start],
+    ["End", configuration?.end],
+    ["Step", configuration?.step],
+    ["Result Type", queryResult?.resultType],
+  ];
+
+  for (const [label, value] of fields) {
+    if (value) {
+      details[label] = value;
+    }
+  }
+
+  if (queryResult?.result !== undefined) {
+    details["Results"] = String(Array.isArray(queryResult.result) ? queryResult.result.length : 0);
+  }
+}
 
 function buildQueryRangeProps(
   nodes: NodeInfo[],
@@ -117,7 +120,7 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
 
 function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

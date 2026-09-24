@@ -61,6 +61,9 @@ var exampleOutputMarkPullRequestReadyForReview map[string]any
 var exampleOutputUpdatePullRequestOnce sync.Once
 var exampleOutputUpdatePullRequest map[string]any
 
+var exampleOutputFindPullRequestOnce sync.Once
+var exampleOutputFindPullRequest map[string]any
+
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
 
@@ -150,5 +153,13 @@ func (c *UpdatePullRequest) ExampleOutput() map[string]any {
 		&exampleOutputUpdatePullRequestOnce,
 		exampleOutputUpdatePullRequestBytes,
 		&exampleOutputUpdatePullRequest,
+	)
+}
+
+func (c *FindPullRequest) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputFindPullRequestOnce,
+		exampleOutputCreatePullRequestBytes,
+		&exampleOutputFindPullRequest,
 	)
 }

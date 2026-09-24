@@ -25,6 +25,9 @@ CLAUDE.local.md
 .superpowers/
 docs/superpowers/
 coverage-go.out
+.local/
+wrk3.yml
+.wrk3-compose.lock
 
 # Generated protobuf and OpenAPI artifacts
 /pkg/protos/

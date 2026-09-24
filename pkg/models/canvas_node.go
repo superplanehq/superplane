@@ -2,7 +2,6 @@ package models
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -282,27 +281,7 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 		return result, nil
 	}
 
-	//
-	// Delete the webhook associated with the node,
-	// only if it does not have any other nodes associated with it.
-	//
-	webhook, err := FindWebhookInTransaction(tx, *node.WebhookID)
-	if err != nil {
-		return DeleteCanvasNodeResult{}, err
-	}
-
-	nodes, err := FindWebhookNodesInTransaction(tx, *node.WebhookID)
-	if err != nil {
-		return DeleteCanvasNodeResult{}, err
-	}
-
-	if len(nodes) > 0 {
-		log.Printf("Webhook %s has %d other nodes associated with it", webhook.ID.String(), len(nodes))
-		return result, nil
-	}
-
-	log.Printf("Deleting webhook %s", webhook.ID.String())
-	return result, tx.Delete(&webhook).Error
+	return result, SoftDeleteWebhookIfUnreferenced(tx, *node.WebhookID)
 }
 
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {

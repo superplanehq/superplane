@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,70 +9,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/usage"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
 
-type fakeEventRetentionUsageService struct {
-	enabled bool
-}
-
-func (s *fakeEventRetentionUsageService) Enabled() bool {
-	return s.enabled
-}
-
-func (s *fakeEventRetentionUsageService) SetupAccount(context.Context, string) (*pb.SetupAccountResponse, error) {
-	return &pb.SetupAccountResponse{}, nil
-}
-
-func (s *fakeEventRetentionUsageService) SetupOrganization(context.Context, string, string, usage.SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error) {
-	return &pb.SetupOrganizationResponse{}, nil
-}
-
-func (s *fakeEventRetentionUsageService) DescribeAccountLimits(context.Context, string) (*pb.DescribeAccountLimitsResponse, error) {
-	return &pb.DescribeAccountLimitsResponse{}, nil
-}
-
-func (s *fakeEventRetentionUsageService) DescribeOrganizationLimits(context.Context, string) (*pb.DescribeOrganizationLimitsResponse, error) {
-	return &pb.DescribeOrganizationLimitsResponse{}, nil
-}
-
-func (s *fakeEventRetentionUsageService) DescribeOrganizationUsage(context.Context, string) (*pb.DescribeOrganizationUsageResponse, error) {
-	return &pb.DescribeOrganizationUsageResponse{}, nil
-}
-
-func (s *fakeEventRetentionUsageService) CheckAccountLimits(context.Context, string, *pb.AccountState) (*pb.CheckAccountLimitsResponse, error) {
-	return &pb.CheckAccountLimitsResponse{Allowed: true}, nil
-}
-
-func (s *fakeEventRetentionUsageService) CheckOrganizationLimits(
-	context.Context,
-	string,
-	*pb.OrganizationState,
-	*pb.CanvasState,
-) (*pb.CheckOrganizationLimitsResponse, error) {
-	return &pb.CheckOrganizationLimitsResponse{Allowed: true}, nil
-}
-
-var _ usage.Service = (*fakeEventRetentionUsageService)(nil)
-
-func cacheOrganizationRetentionWindowDays(t *testing.T, orgID uuid.UUID, retentionWindowDays int32) {
+func setOrganizationRetentionWindowDays(t *testing.T, orgID uuid.UUID, days int32) {
 	t.Helper()
-
-	require.NoError(
-		t,
-		models.MarkOrganizationUsageLimitsSynced(orgID.String(), &retentionWindowDays, time.Now()),
-	)
+	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", orgID).Update("usage_retention_window_days", days).Error)
 }
 
 func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -96,6 +46,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T
 		"state":      models.CanvasEventStateRouted,
 		"created_at": time.Now().AddDate(0, 0, -29),
 	}).Error)
+	markRunFinishedForRetention(t, rootEventRecord.ID, 29)
 
 	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
@@ -104,11 +55,11 @@ func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 }
 
-func Test__EventRetentionWorker_SkipsRootEventWithoutCachedRetentionWindow(t *testing.T) {
+func Test__EventRetentionWorker_SkipsWhenRetentionWindowDisabled(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
+	worker := NewEventRetentionWorker()
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -131,6 +82,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithoutCachedRetentionWindow(t *te
 		"state":      models.CanvasEventStateRouted,
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
+	markRunFinishedForRetention(t, rootEventRecord.ID, 31)
 
 	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
@@ -143,8 +95,8 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -223,8 +175,8 @@ func Test__EventRetentionWorker_CleansMultipleExpiredCompletedRootEventChains(t 
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -266,8 +218,8 @@ func Test__EventRetentionWorker_DoesNotDeleteUnrelatedCanvasData(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	eligibleCanvas, _ := support.CreateCanvas(
 		t,
@@ -337,8 +289,8 @@ func Test__EventRetentionWorker_RespectsMaxRunsPerTick(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -369,8 +321,8 @@ func Test__EventRetentionWorker_SkipsRootEventWithQueuedWork(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -415,8 +367,8 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -486,8 +438,8 @@ func Test__EventRetentionWorker_DoesNotStarveEligibleRunsWhenBlockedRunsAreOlder
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -533,8 +485,8 @@ func Test__EventRetentionWorker_KeepsFactoryWorkOrderExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
-	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := NewEventRetentionWorker()
+	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,

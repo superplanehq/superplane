@@ -21,9 +21,9 @@ func Test_ListUserPermissions(t *testing.T) {
 	orgID := r.Organization.ID.String()
 
 	//
-	// Assign viewer role to user, and prepare context with user ID and organization ID
+	// Assign operator role to user, and prepare context with user ID and organization ID
 	//
-	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization))
+	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgOperator, orgID, models.DomainTypeOrganization))
 	ctx := metadata.NewIncomingContext(
 		context.Background(),
 		metadata.Pairs(
@@ -43,6 +43,7 @@ func Test_ListUserPermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp.User)
 		assert.Empty(t, resp.User.Permissions)
+		assert.True(t, resp.User.IsOwner)
 	})
 
 	t.Run("includes permissions", func(t *testing.T) {
@@ -62,11 +63,23 @@ func Test_ListUserPermissions(t *testing.T) {
 			"agents",
 			"notifications",
 		})
-		expected = append(expected, &pbAuth.Permission{
-			Resource:   "notifications",
-			Action:     "update",
-			DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
-		})
+		expected = append(expected,
+			&pbAuth.Permission{
+				Resource:   "work_orders",
+				Action:     "create",
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			},
+			&pbAuth.Permission{
+				Resource:   "work_orders",
+				Action:     "update",
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			},
+			&pbAuth.Permission{
+				Resource:   "notifications",
+				Action:     "update",
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			},
+		)
 		assert.ElementsMatch(t, resp.User.Permissions, expected)
 	})
 
@@ -100,6 +113,46 @@ func Test_GetUser_HasToken(t *testing.T) {
 	resp, err = GetUser(ctx, r.AuthService, false)
 	require.NoError(t, err)
 	assert.True(t, resp.User.HasToken, "a user with a personal token should report has_token=true")
+}
+
+func Test_GetUser_BrowserNotificationPreferences(t *testing.T) {
+	r := support.Setup(t)
+	ctx := metadata.NewIncomingContext(
+		context.Background(),
+		metadata.Pairs(
+			"x-organization-id", r.Organization.ID.String(),
+			"x-user-id", r.User.String(),
+		),
+	)
+
+	t.Run("uses defaults when settings do not exist", func(t *testing.T) {
+		resp, err := GetUser(ctx, r.AuthService, false)
+		require.NoError(t, err)
+		require.NotNil(t, resp.User.BrowserNotificationPreferences)
+		assert.False(t, resp.User.BrowserNotificationPreferences.Enabled)
+		assert.True(t, resp.User.BrowserNotificationPreferences.ShowWhileViewing)
+	})
+
+	t.Run("returns saved browser settings", func(t *testing.T) {
+		showWhileViewing := false
+		_, err := models.UpsertUserNotificationSettings(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			r.User,
+			models.UserNotificationSettingsParams{
+				WorkspaceScope:          models.NotificationWorkspaceScopeAll,
+				BrowserWorkspaceScope:   models.NotificationWorkspaceScopeFiltered,
+				BrowserShowWhileViewing: &showWhileViewing,
+			},
+		)
+		require.NoError(t, err)
+
+		resp, err := GetUser(ctx, r.AuthService, false)
+		require.NoError(t, err)
+		require.NotNil(t, resp.User.BrowserNotificationPreferences)
+		assert.True(t, resp.User.BrowserNotificationPreferences.Enabled)
+		assert.False(t, resp.User.BrowserNotificationPreferences.ShowWhileViewing)
+	})
 }
 
 func getExpectedPermissions(resources []string) []*pbAuth.Permission {

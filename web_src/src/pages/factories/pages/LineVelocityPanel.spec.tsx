@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { LineVelocityPanel } from "./LineVelocityPanel";
 import { VELOCITY_BY_PERIOD } from "./lineVelocityMockData";

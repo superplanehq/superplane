@@ -1,7 +1,7 @@
 import { fireEvent, render as testingLibraryRender, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 vi.mock("@/sentry", () => ({

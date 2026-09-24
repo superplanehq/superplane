@@ -1,0 +1,542 @@
+//go:build unix
+
+package agent
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"math/rand"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/creack/pty"
+)
+
+// usePipeShell is true when RUNNER_SHELL_USE_PIPE is set: host directives run as a single non-PTY
+// bash script bundle. Default (unset) is PTY + markers — what production EC2 runners use. The
+// env var exists for broken-PTY environments and is covered by TestHostShellPipeBundleEcho.
+func usePipeShell() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("RUNNER_SHELL_USE_PIPE")))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func runHostShellDirectives(ctx context.Context, maxOut int, workDir string, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+	return runHostShellDirectiveList(ctx, maxOut, workDir, directivesFromStrings(scripts), env, live, resultHostPath)
+}
+
+func runHostShellDirectiveList(ctx context.Context, maxOut int, workDir string, directives []shellDirective, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+	bash, err := resolveBash()
+	if err != nil {
+		return 1, "", err
+	}
+	if usePipeShell() {
+		return runHostShellDirectivesPipe(ctx, maxOut, workDir, bash, directives, env, live, resultHostPath)
+	}
+	// Plain exec.Command (not CommandContext): attaching ctx to os/exec races with creack/pty on
+	// some Darwin setups; cancellation is handled inside runShellPTYSession via ctx + Process.Kill().
+	// Apple bash 3.2 mishandles `+m` together with `--noediting` (option parsing surfaces as
+	// `/bin/bash: --: invalid option`). Keep job-control off (`+m`) for non-interactive scripts but
+	// omit `--noediting`; readline editing is irrelevant on our PTY-driven line protocol anyway.
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	cmd.Dir = workDir
+	if env != nil {
+		cmd.Env = env
+	}
+	return runShellPTYSession(ctx, maxOut, cmd, directives, live, resultHostPath)
+}
+
+type cappedShellWriter struct {
+	buf *bytes.Buffer
+	max int
+}
+
+func (w *cappedShellWriter) Write(p []byte) (int, error) {
+	if w.max <= 0 {
+		return w.buf.Write(p)
+	}
+	if w.buf.Len() >= w.max {
+		return len(p), nil
+	}
+	room := w.max - w.buf.Len()
+	if len(p) <= room {
+		return w.buf.Write(p)
+	}
+	_, _ = w.buf.Write(p[:room])
+	_, _ = w.buf.WriteString("\n…(truncated)\n")
+	return len(p), nil
+}
+
+func writeDirectiveBundle(tmpRoot, workDir string, directives []shellDirective) (metaPath string, err error) {
+	var meta strings.Builder
+	writeLiveLogNowMsHelper(&meta)
+	meta.WriteString("set +u\nset -o pipefail\n")
+	for i, dir := range directives {
+		hostPath := filepath.Join(tmpRoot, fmt.Sprintf("d%d.sh", i))
+		if err := os.WriteFile(hostPath, []byte(dir.Shell+"\n"), 0600); err != nil {
+			return "", err
+		}
+		writeLiveLogWrappedSource(&meta, i, dir, hostPath, workDir)
+	}
+	metaPath = filepath.Join(tmpRoot, "_meta.sh")
+	if err := os.WriteFile(metaPath, []byte(meta.String()), 0600); err != nil {
+		return "", err
+	}
+	return metaPath, nil
+}
+
+func writeLiveLogNowMsHelper(script *strings.Builder) {
+	script.WriteString("sp_now_ms() {\n")
+	script.WriteString("  __sp_now=\"$(date +%s%3N 2>/dev/null || true)\"\n")
+	script.WriteString("  case \"$__sp_now\" in\n")
+	script.WriteString("    ''|*[!0-9]*) __sp_now=\"$(date +%s)000\" ;;\n")
+	script.WriteString("  esac\n")
+	script.WriteString("  printf '%s\\n' \"$__sp_now\"\n")
+	script.WriteString("}\n")
+}
+
+func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDirective, hostPath, workDir string) {
+	script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
+	writeDockerCmdStart(script, index, dir)
+	script.WriteString("\n")
+	if wd := strings.TrimSpace(workDir); wd != "" {
+		script.WriteString("cd ")
+		script.WriteString(bashSingleQuotedPath(wd))
+		script.WriteString(" || exit 1\n")
+	}
+	script.WriteString("if source ")
+	script.WriteString(bashSingleQuotedPath(hostPath))
+	script.WriteString("; then\n")
+	script.WriteString("  __sp_cmd_exit=0\n")
+	script.WriteString("else\n")
+	script.WriteString("  __sp_cmd_exit=$?\n")
+	script.WriteString("fi\n")
+	script.WriteString("__sp_cmd_end=\"$(sp_now_ms)\"\n")
+	script.WriteString("__sp_cmd_duration=$((__sp_cmd_end - __sp_cmd_start))\n")
+	script.WriteString("if [ \"$__sp_cmd_duration\" -lt 0 ]; then __sp_cmd_duration=0; fi\n")
+	script.WriteString("if [ \"$__sp_cmd_exit\" -eq 0 ]; then __sp_cmd_status=passed; else __sp_cmd_status=failed; fi\n")
+	script.WriteString("printf '\\n'\n")
+	script.WriteString(`printf '{"type":"cmd_end","index":`)
+	script.WriteString(strconv.Itoa(index))
+	script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
+	script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
+}
+
+// runHostShellDirectivesPipe runs directives in one bash process without a PTY.
+// Env persists across sources. Cwd resets to workDir before each source so
+// relative paths like `git -C repo` match a fresh process (local compose).
+func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string, bash string, directives []shellDirective, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+	if len(directives) == 0 {
+		return 1, "", errEmptyCommands()
+	}
+	tmpRoot, err := os.MkdirTemp("", "runner-sh-*")
+	if err != nil {
+		return 1, "", err
+	}
+	defer func() { _ = os.RemoveAll(tmpRoot) }()
+
+	metaPath, err := writeDirectiveBundle(tmpRoot, workDir, directives)
+	if err != nil {
+		return 1, "", err
+	}
+
+	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
+	cmd.Dir = workDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
+	applyCmdEnv(cmd, env, resultHostPath)
+	max := maxOut
+	if max <= 0 {
+		max = 512 * 1024
+	}
+	var buf bytes.Buffer
+	w := &cappedShellWriter{buf: &buf, max: max}
+	if live != nil {
+		cmd.Stdout = io.MultiWriter(w, live)
+		cmd.Stderr = io.MultiWriter(w, live)
+	} else {
+		cmd.Stdout = w
+		cmd.Stderr = w
+	}
+
+	if runErr := cmd.Run(); runErr != nil {
+		outStr := truncateString(buf.String(), max)
+		var ee *exec.ExitError
+		if errors.As(runErr, &ee) {
+			c := ee.ExitCode()
+			return c, outStr, fmt.Errorf("exit code %d", c)
+		}
+		return 1, outStr, runErr
+	}
+	return 0, truncateString(buf.String(), max), nil
+}
+
+func resolveBash() (string, error) {
+	if p := strings.TrimSpace(os.Getenv("RUNNER_SHELL")); p != "" {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p, nil
+		}
+	}
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		return "", fmt.Errorf("interactive runner needs bash (set RUNNER_SHELL or install bash): %w", err)
+	}
+	return path, nil
+}
+
+func bashSingleQuotedPath(s string) string {
+	return `'` + strings.ReplaceAll(s, `'`, `'\''`) + `'`
+}
+
+type shellSession struct {
+	mu     sync.Mutex
+	raw    []byte
+	out    bytes.Buffer
+	maxOut int
+
+	master io.Writer
+	live   io.Writer
+}
+
+func (s *shellSession) appendOut(p []byte) {
+	if s.maxOut <= 0 || len(p) == 0 {
+		return
+	}
+	room := s.maxOut - s.out.Len()
+	if room <= 0 {
+		return
+	}
+	if len(p) > room {
+		s.out.Write(p[:room])
+		s.out.WriteString("\n…(truncated)")
+		if s.live != nil {
+			_, _ = s.live.Write(p[:room])
+			_, _ = s.live.Write([]byte("\n…(truncated)\n"))
+		}
+		return
+	}
+	s.out.Write(p)
+	if s.live != nil {
+		_, _ = s.live.Write(p)
+	}
+}
+
+func (s *shellSession) push(b []byte) {
+	if len(b) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.raw = append(s.raw, b...)
+}
+
+func (s *shellSession) consumePrefix(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if n <= 0 {
+		return
+	}
+	if n >= len(s.raw) {
+		s.raw = nil
+		return
+	}
+	s.raw = append([]byte(nil), s.raw[n:]...)
+}
+
+func (s *shellSession) snapshot() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]byte(nil), s.raw...)
+}
+
+func (s *shellSession) writeLine(line string) error {
+	_, err := s.master.Write(append([]byte(line), '\n'))
+	return err
+}
+
+func randomMark(prefix string) string {
+	return fmt.Sprintf("%s-%016x-%016x", prefix, rand.Uint64(), rand.Uint64())
+}
+
+func killShellProcess(shellCmd *exec.Cmd) {
+	killTaskProcessGroup(shellCmd)
+}
+
+func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []shellDirective, live io.Writer, resultHostPath string) (_ int, out string, err error) {
+	if len(directives) == 0 {
+		return 1, "", errEmptyCommands()
+	}
+
+	setResultEnv(shellCmd, resultHostPath)
+
+	bootMarker := fmt.Sprintf("bootready-%d", time.Now().UnixNano())
+
+	// github.com/creack/pty Start sets Setsid+Setctty on every non-Windows Unix. Combining that
+	// with Setpgid has produced fork/exec EPERM on Linux EC2 and on macOS (Darwin).
+	master, err := pty.Start(shellCmd)
+	if err != nil {
+		return 1, "", fmt.Errorf("pty start shell: %w", err)
+	}
+
+	ctxDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			killShellProcess(shellCmd)
+		case <-ctxDone:
+		}
+	}()
+	defer func() {
+		close(ctxDone)
+		if shellCmd.Process != nil {
+			killShellProcess(shellCmd)
+			_, _ = shellCmd.Process.Wait()
+		}
+		_ = master.Close()
+	}()
+
+	max := maxOut
+	if max <= 0 {
+		max = 512 * 1024
+	}
+
+	sess := &shellSession{master: master, maxOut: max, live: live}
+
+	// Boot synchronously (no concurrent master reader): wait for a full line equal to bootMarker so
+	// we do not treat the marker as a substring inside the echoed `echo '…'` line.
+	// Alias exit→return once for the whole session (shared across all sourced commands).
+	bootDeadline := time.Now().Add(30 * time.Second)
+	bootCmd := fmt.Sprintf(`%s; echo '%s'`, ptyExitAliasBootstrap, bootMarker)
+	if err := sess.writeLine(bootCmd); err != nil {
+		return 1, truncateString(sess.out.String(), max), err
+	}
+	buf := make([]byte, 4096)
+	var post []byte
+	for {
+		if err := ctx.Err(); err != nil {
+			return 1, truncateString(sess.out.String(), max), err
+		}
+		if time.Now().After(bootDeadline) {
+			return 1, truncateString(sess.out.String(), max), fmt.Errorf("timeout waiting for boot marker (partial: %q)", post)
+		}
+		if cut := consumeThroughFirstExactLine(post, bootMarker); cut > 0 {
+			post = post[cut:]
+			break
+		}
+		n, rerr := master.Read(buf)
+		if n > 0 {
+			post = append(post, buf[:n]...)
+		}
+		if rerr != nil {
+			if errors.Is(rerr, io.EOF) {
+				return 1, truncateString(sess.out.String(), max), fmt.Errorf("shell closed during boot (partial: %q)", post)
+			}
+			return 1, truncateString(sess.out.String(), max), rerr
+		}
+	}
+	if len(post) > 0 {
+		sess.push(post)
+	}
+
+	tmpRoot, err := os.MkdirTemp("", "runner-sh-*")
+	if err != nil {
+		return 1, truncateString(sess.out.String(), max), err
+	}
+	defer func() { _ = os.RemoveAll(tmpRoot) }()
+
+	readerErr := make(chan error, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, rerr := master.Read(buf)
+			if n > 0 {
+				sess.push(buf[:n])
+			}
+			if rerr != nil {
+				if errors.Is(rerr, io.EOF) {
+					readerErr <- io.EOF
+					return
+				}
+				readerErr <- rerr
+				return
+			}
+		}
+	}()
+
+	for i, dir := range directives {
+		dPath := filepath.Join(tmpRoot, fmt.Sprintf("d%d.sh", i))
+		if err := os.WriteFile(dPath, []byte(wrapSourcedDirective(dir.Shell)+"\n"), 0600); err != nil {
+			return 1, truncateString(sess.out.String(), max), err
+		}
+		commandStart := time.Now()
+		writeLiveLogCommandStart(sess.live, i, dir.Text, dir.Kind, dir.Preview, commandStart)
+		start := randomMark("s")
+		end := randomMark("e")
+		// ANSI-C $'…' emits SOH reliably on Bash 3.2 (macOS) and modern Linux; avoid echo -e (\001 via $').
+		// No trailing `| sh`: under PTY+interactive bash that pipeline correlated with early slave close on Darwin.
+		// set +e around source so a non-zero sourced script cannot skip the end marker
+		// if a previous command left errexit enabled.
+		instr := fmt.Sprintf(
+			`echo $'\001 %s\n'; set +e; source %s; AGENT_CMD_RESULT=$?; set +e; echo $'\001 %s '"$AGENT_CMD_RESULT"`,
+			start,
+			bashSingleQuotedPath(dPath),
+			end,
+		)
+		if err := sess.writeLine(instr); err != nil {
+			return 1, truncateString(sess.out.String(), max), err
+		}
+		if err := discardThroughStartMarker(ctx, sess, start, readerErr, 90*time.Second); err != nil {
+			return 1, truncateString(sess.out.String(), max), err
+		}
+		code, perr := readThroughEndMarker(ctx, sess, end, readerErr)
+		if perr != nil {
+			writeLiveLogCommandEnd(sess.live, i, code, time.Since(commandStart))
+			return code, truncateString(sess.out.String(), max), perr
+		}
+		writeLiveLogCommandEnd(sess.live, i, code, time.Since(commandStart))
+		if code != 0 {
+			return code, truncateString(sess.out.String(), max), fmt.Errorf("exit code %d", code)
+		}
+	}
+
+	return 0, truncateString(sess.out.String(), max), nil
+}
+
+func consumeThroughFirstExactLine(data []byte, want string) int {
+	off := 0
+	for off < len(data) {
+		nl := bytes.IndexByte(data[off:], '\n')
+		if nl < 0 {
+			return 0
+		}
+		lineStart := off
+		lineEnd := off + nl
+		body := strings.TrimRight(string(data[lineStart:lineEnd]), "\r")
+		if body == want {
+			return lineEnd + 1
+		}
+		off = lineEnd + 1
+	}
+	return 0
+}
+
+// discardThroughStartMarker drops PTY noise up to and including the start-marker line.
+// The echoed line is SOH, optional spaces, startMark, CRLF or LF (see instr). Consuming only
+// startMark+"\n" leaves a stray \x01 prefix in raw; readThroughEndMarker then matches the wrong
+// \x01 and never sees the end marker.
+func discardThroughStartMarker(ctx context.Context, sess *shellSession, startMark string, readerErr <-chan error, deadline time.Duration) error {
+	withSOH := regexp.MustCompile(`\x01\s*` + regexp.QuoteMeta(startMark) + `\r?\n`)
+	plain := regexp.MustCompile(regexp.QuoteMeta(startMark) + `\r?\n`)
+	timer := time.NewTimer(deadline)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return fmt.Errorf("timeout waiting for start marker")
+		case r := <-readerErr:
+			if r == io.EOF {
+				return fmt.Errorf("shell closed before start marker")
+			}
+			if r != nil {
+				return r
+			}
+		default:
+			data := sess.snapshot()
+			var loc []int
+			if loc = withSOH.FindIndex(data); loc == nil {
+				loc = plain.FindIndex(data)
+			}
+			if loc != nil {
+				sess.consumePrefix(loc[1])
+				return nil
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+}
+
+func readThroughEndMarker(ctx context.Context, sess *shellSession, endMark string, readerErr <-chan error) (int, error) {
+	re := regexp.MustCompile(`\x01\s*` + regexp.QuoteMeta(endMark) + `\s+(\d+)\r?\n`)
+	streamed := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return 1, ctx.Err()
+		case r := <-readerErr:
+			if r == io.EOF {
+				return 1, fmt.Errorf("shell closed before end marker")
+			}
+			if r != nil {
+				return 1, r
+			}
+		default:
+			data := sess.snapshot()
+			loc := re.FindSubmatchIndex(data)
+			if loc != nil {
+				if loc[0] > streamed {
+					sess.appendOut(data[streamed:loc[0]])
+				}
+				code, convErr := strconv.Atoi(string(data[loc[2]:loc[3]]))
+				if convErr != nil {
+					return 1, convErr
+				}
+				sess.consumePrefix(loc[1])
+				return code, nil
+			}
+			if safe := len(data) - endMarkerStreamHoldback(data, endMark); safe > streamed {
+				sess.appendOut(data[streamed:safe])
+				streamed = safe
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+}
+
+// endMarkerStreamHoldback returns how many trailing bytes in data might be an incomplete
+// end-marker line and must not be streamed yet (so protocol bytes never leak to live logs).
+func endMarkerStreamHoldback(data []byte, endMark string) int {
+	if len(data) == 0 {
+		return 0
+	}
+	maxHold := 0
+	for _, tmpl := range endMarkerLineTemplates(endMark) {
+		limit := len(tmpl)
+		if limit > len(data) {
+			limit = len(data)
+		}
+		for i := 1; i <= limit; i++ {
+			if bytes.HasPrefix([]byte(tmpl), data[len(data)-i:]) {
+				if i > maxHold {
+					maxHold = i
+				}
+			}
+		}
+	}
+	return maxHold
+}
+
+func endMarkerLineTemplates(endMark string) []string {
+	// Match readThroughEndMarker: \x01\s*endMark\s+\d+\r?\n (and plain endMark fallback).
+	withSOH := "\x01 " + endMark + " 0"
+	plain := endMark + " 0"
+	out := make([]string, 0, 8)
+	for _, base := range []string{withSOH, plain} {
+		out = append(out, base, base+"\r", base+"\n", base+"\r\n")
+	}
+	return out
+}

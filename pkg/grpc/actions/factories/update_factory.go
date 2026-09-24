@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -14,13 +13,8 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
-	id, err := parseFactoryID(req.GetId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, id)
+	factory, err := findFactory(db, orgID, req.GetId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
@@ -35,6 +29,12 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		}
 	} else if req.HostedSpendBudgetCents != nil {
 		if err := factory.UpdateHostedSpendBudget(db, req.HostedSpendBudgetCents); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	}
+
+	if req.Planning != nil {
+		if err := factory.UpdatePlanning(db, factoryPlanningFromProto(req.Planning)); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory")
 		}
 	}

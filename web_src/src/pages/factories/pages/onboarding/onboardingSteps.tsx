@@ -49,6 +49,7 @@ export function ConnectOptionRow({
   connectLabel,
   connected,
   soon,
+  disabled,
   onSelect,
   onConnect,
 }: {
@@ -61,14 +62,16 @@ export function ConnectOptionRow({
   connectLabel?: string;
   connected?: boolean;
   soon?: boolean;
+  disabled?: boolean;
   onSelect: () => void;
   onConnect?: () => void;
 }) {
-  const needsConnect = Boolean(connectLabel) && !connected && !soon;
+  const needsConnect = needsConnection(connectLabel, connected, soon);
   const rowToneClass = connectOptionRowTone(Boolean(soon), Boolean(selected));
+  const unavailable = Boolean(soon || disabled);
 
   const select = () => {
-    if (soon) return;
+    if (unavailable) return;
     onSelect();
     if (needsConnect) onConnect?.();
   };
@@ -76,16 +79,16 @@ export function ConnectOptionRow({
   return (
     <div
       className={cn("relative rounded-lg border px-4 py-3 transition-colors", rowToneClass)}
-      aria-disabled={soon || undefined}
+      aria-disabled={unavailable || undefined}
       data-soon={soon ? "true" : undefined}
     >
       {soon ? <ComingSoonRibbon /> : null}
       <div className="flex flex-wrap items-start gap-3">
         <button
           type="button"
-          className={cn("flex min-w-0 flex-1 items-start gap-3 text-left", soon && "cursor-not-allowed")}
+          className={cn("flex min-w-0 flex-1 items-start gap-3 text-left", unavailable && "cursor-not-allowed")}
           onClick={select}
-          disabled={soon}
+          disabled={unavailable}
         >
           <span className="mt-0.5 shrink-0">{icon}</span>
           <span className="min-w-0 flex-1">
@@ -110,6 +113,7 @@ export function ConnectOptionRow({
               <Button
                 type="button"
                 size="sm"
+                disabled={disabled}
                 onClick={() => {
                   onSelect();
                   onConnect?.();
@@ -123,6 +127,10 @@ export function ConnectOptionRow({
       </div>
     </div>
   );
+}
+
+function needsConnection(connectLabel?: string, connected?: boolean, soon?: boolean): boolean {
+  return Boolean(connectLabel) && !connected && !soon;
 }
 
 export function NameStep({ setup }: { setup: OnboardingSetupApi }) {
@@ -153,6 +161,7 @@ export function RepositoryPicker({
   onSelect,
   title,
   description,
+  disabled,
 }: {
   host: VcsHostId;
   repos: string[];
@@ -161,6 +170,7 @@ export function RepositoryPicker({
   /** Only for pickers that need their own heading, such as the backlog picker. */
   title?: string;
   description?: string;
+  disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
 
@@ -186,6 +196,7 @@ export function RepositoryPicker({
           placeholder="Search repositories"
           className="h-9 pl-9"
           aria-label="Search repositories"
+          disabled={disabled}
         />
       </div>
       <div
@@ -206,6 +217,7 @@ export function RepositoryPicker({
                     role="option"
                     aria-selected={selected}
                     onClick={() => onSelect(repo)}
+                    disabled={disabled}
                     className={cn(
                       "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
                       selected ? "bg-accent/50" : "hover:bg-accent/30",

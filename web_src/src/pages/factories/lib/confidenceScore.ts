@@ -3,21 +3,40 @@ import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
 export const CONFIDENCE_SCORE_MAX = 5;
 
+/** Clarity: how well the task is defined. Written by the refine session. */
+export const CLARITY_CHECK_KEY = "clarity";
+export const CLARITY_CHECK_NAME = "Clarity score";
+/** Confidence: how likely an agent finishes the task in one run. Written by refine and intake. */
+export const CONFIDENCE_CHECK_KEY = "confidence";
 export const CONFIDENCE_CHECK_NAME = "Confidence score";
 
-/** Board cards show the meter next to Start. Only drafts need the request. */
+export const SCORE_CHECK_NAMES: readonly string[] = [CLARITY_CHECK_NAME, CONFIDENCE_CHECK_NAME];
+
+export function isScoreCheckName(name: string | undefined): boolean {
+  return name != null && SCORE_CHECK_NAMES.includes(name);
+}
+
+/** Board cards show the meter next to Start. Only drafts show a score. */
 export function boardCardLoadsConfidenceChecks(displayStatus: WorkOrderDisplayStatus): boolean {
   return displayStatus === "draft";
 }
 
-export function confidenceScoreFromChecks(
-  checks: Array<{ name?: string; score?: number }> | undefined,
-): number | undefined {
-  const check = (checks ?? []).find((entry) => entry.name === CONFIDENCE_CHECK_NAME);
+type ScoreCheckLike = { name?: string; score?: number };
+
+export function scoreFromChecks(checks: ScoreCheckLike[] | undefined, name: string): number | undefined {
+  const check = (checks ?? []).find((entry) => entry.name === name);
   if (check?.score == null) {
     return undefined;
   }
   return clampConfidenceScore(check.score);
+}
+
+export function clarityScoreFromChecks(checks: ScoreCheckLike[] | undefined): number | undefined {
+  return scoreFromChecks(checks, CLARITY_CHECK_NAME);
+}
+
+export function confidenceScoreFromChecks(checks: ScoreCheckLike[] | undefined): number | undefined {
+  return scoreFromChecks(checks, CONFIDENCE_CHECK_NAME);
 }
 
 /** Intake scores arrive as a percentage. The meter shows five steps. */

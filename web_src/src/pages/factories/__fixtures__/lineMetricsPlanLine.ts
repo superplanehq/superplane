@@ -2,7 +2,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 
@@ -20,7 +20,7 @@ export function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
 export const PLAN_LINE_DONE_APP_ID = "app-refund-done";
 const PLAN_LINE_BACKLOG_APP_ID = "app-refund-backlog";
 
-export const BACKLOG_APP: FactoryApp = {
+export const BACKLOG_APP: FactoryAutomation = {
   id: PLAN_LINE_BACKLOG_APP_ID,
   name: "Ingest",
   description: "Create a task when a GitHub issue gets the factory label or is assigned to the SuperPlane agent.",
@@ -28,7 +28,7 @@ export const BACKLOG_APP: FactoryApp = {
   updatedAt: YESTERDAY,
 };
 
-export const SENTRY_INTAKE_APP: FactoryApp = {
+export const SENTRY_INTAKE_APP: FactoryAutomation = {
   id: "app-refund-sentry",
   name: "Sentry",
   description: "Create a task when Sentry opens an issue.",
@@ -36,7 +36,7 @@ export const SENTRY_INTAKE_APP: FactoryApp = {
   updatedAt: YESTERDAY,
 };
 
-export const SLACK_INTAKE_APP: FactoryApp = {
+export const SLACK_INTAKE_APP: FactoryAutomation = {
   id: "app-refund-slack",
   name: "Slack",
   description: "Create a task when someone mentions the SuperPlane agent in Slack.",
@@ -44,7 +44,7 @@ export const SLACK_INTAKE_APP: FactoryApp = {
   updatedAt: YESTERDAY,
 };
 
-export const PLAN_LINE_APPS: FactoryApp[] = [
+export const PLAN_LINE_APPS: FactoryAutomation[] = [
   BACKLOG_APP,
   SENTRY_INTAKE_APP,
   SLACK_INTAKE_APP,

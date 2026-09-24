@@ -12,12 +12,23 @@ export function useAutoLoadMoreOnScroll({
   onLoadMore?: () => void;
 }) {
   const requestedRef = useRef(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!isLoading) {
-      requestedRef.current = false;
+    if (isLoading) {
+      return;
     }
-  }, [isLoading]);
+    requestedRef.current = false;
+  }, [hasMore, isLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current == null) {
+        return;
+      }
+      clearTimeout(resetTimerRef.current);
+    };
+  }, []);
 
   return useCallback(
     (element: HTMLElement | null) => {
@@ -28,6 +39,16 @@ export function useAutoLoadMoreOnScroll({
 
       requestedRef.current = true;
       onLoadMore();
+      if (isLoading !== undefined) {
+        return;
+      }
+      if (resetTimerRef.current != null) {
+        clearTimeout(resetTimerRef.current);
+      }
+      resetTimerRef.current = setTimeout(() => {
+        requestedRef.current = false;
+        resetTimerRef.current = null;
+      }, 0);
     },
     [hasMore, isLoading, onLoadMore],
   );

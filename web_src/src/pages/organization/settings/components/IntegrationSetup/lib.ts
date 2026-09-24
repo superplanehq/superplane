@@ -54,6 +54,23 @@ export function getNextIntegrationName(baseName: string, existingNames: Set<stri
   return candidate;
 }
 
+/** Resolves github-<owner>, then github-<owner> (1), github-<owner> (2). */
+export function getNextParentheticalIntegrationName(baseName: string, existingNames: Set<string>): string {
+  const normalizedBaseName = baseName.trim() || "integration";
+  if (!existingNames.has(normalizedBaseName)) {
+    return normalizedBaseName;
+  }
+
+  let suffix = 1;
+  let candidate = `${normalizedBaseName} (${suffix})`;
+  while (existingNames.has(candidate)) {
+    suffix += 1;
+    candidate = `${normalizedBaseName} (${suffix})`;
+  }
+
+  return candidate;
+}
+
 export function getCurrentSetupStep(
   integration: OrganizationsIntegration | null,
 ): IntegrationSetupStepDefinition | null {

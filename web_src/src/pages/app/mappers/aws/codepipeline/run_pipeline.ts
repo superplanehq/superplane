@@ -10,13 +10,13 @@ import type {
   SubtitleContext,
 } from "../../types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
-import { getTriggerRenderer } from "../..";
+import { getTriggerRenderer } from "../../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import { defaultStateFunction } from "../../stateRegistry";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 

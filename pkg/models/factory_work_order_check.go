@@ -142,9 +142,24 @@ func (o *FactoryWorkOrder) ReportCheck(
 }
 
 func (o *FactoryWorkOrder) ListChecks(tx *gorm.DB) ([]FactoryWorkOrderCheck, error) {
+	grouped, err := ListChecksForWorkOrders(tx, []uuid.UUID{o.ID})
+	if err != nil {
+		return nil, err
+	}
+	return grouped[o.ID], nil
+}
+
+// ListChecksForWorkOrders loads the latest check row per key for each work
+// order. Order within an order matches ListChecks: first report first.
+func ListChecksForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID][]FactoryWorkOrderCheck, error) {
+	grouped := make(map[uuid.UUID][]FactoryWorkOrderCheck, len(workOrderIDs))
+	if len(workOrderIDs) == 0 {
+		return grouped, nil
+	}
+
 	var checks []FactoryWorkOrderCheck
 	err := tx.
-		Where("work_order_id = ?", o.ID).
+		Where("work_order_id IN ?", workOrderIDs).
 		Order("created_at ASC").
 		Order("id ASC").
 		Find(&checks).
@@ -153,7 +168,11 @@ func (o *FactoryWorkOrder) ListChecks(tx *gorm.DB) ([]FactoryWorkOrderCheck, err
 		return nil, err
 	}
 
-	return checks, nil
+	for i := range checks {
+		workOrderID := checks[i].WorkOrderID
+		grouped[workOrderID] = append(grouped[workOrderID], checks[i])
+	}
+	return grouped, nil
 }
 
 // IsValidWorkOrderCheckLevel reports whether ReportCheck accepts the level.

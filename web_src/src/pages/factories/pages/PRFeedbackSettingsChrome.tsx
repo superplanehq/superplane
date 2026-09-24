@@ -1,12 +1,10 @@
-import { Link } from "@/components/Link/link";
+import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/buttonVariants";
 
-import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
+import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  appendUniqueTrimmedString,
   normalizePRFeedbackDraft,
   prFeedbackDraftIsValid,
   type PRFeedbackDraftSettings,
@@ -14,7 +12,6 @@ import {
 
 export function PRFeedbackSettingsFooter({
   draft,
-  pendingCheckName,
   confirmDelete,
   savePending,
   deletePending,
@@ -25,7 +22,6 @@ export function PRFeedbackSettingsFooter({
   onClose,
 }: {
   draft: PRFeedbackDraftSettings;
-  pendingCheckName: string;
   confirmDelete: boolean;
   savePending?: boolean;
   deletePending?: boolean;
@@ -84,12 +80,7 @@ export function PRFeedbackSettingsFooter({
         disabled={savePending || !prFeedbackDraftIsValid(draft)}
         onClick={async () => {
           try {
-            await onSave(
-              normalizePRFeedbackDraft({
-                ...draft,
-                checkNames: appendUniqueTrimmedString(draft.checkNames, pendingCheckName),
-              }),
-            );
+            await onSave(normalizePRFeedbackDraft(draft));
             onClose();
           } catch {
             // The parent supplies the actionable error message.
@@ -105,14 +96,16 @@ export function PRFeedbackSettingsFooter({
 
 export function PRFeedbackAutomationTab({
   graph,
-  title,
+  canvasId,
+  runHrefFor,
   editHref,
   loading,
   error,
   onRetry,
 }: {
   graph?: IntakeAutomationGraph;
-  title: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
   editHref?: string;
   loading: boolean;
   error: boolean;
@@ -122,30 +115,22 @@ export function PRFeedbackAutomationTab({
     return (
       <PRFeedbackAutomationEmpty
         message={automationEmptyMessage(loading, error)}
-        editHref={editHref}
         onRetry={error ? onRetry : undefined}
+        editHref={editHref}
       />
     );
   }
 
   return (
-    <section
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
-      aria-label="Automation"
-      data-testid="pr-feedback-automation"
-    >
-      <div className="flex shrink-0 items-center justify-between gap-2 px-5 pt-3 pb-2">
-        <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground">{title}</p>
-        {editHref ? (
-          <Link href={editHref} className={buttonVariants({ size: "sm" })}>
-            {PR_FEEDBACK_SETTINGS_COPY.editAutomation}
-          </Link>
-        ) : null}
-      </div>
-      <div className="min-h-[18rem] flex-1">
-        <SettingsAutomationCanvas graph={graph} />
-      </div>
-    </section>
+    <SettingsAutomationWorkspace
+      graph={graph}
+      testId="pr-feedback-automation"
+      canvasId={canvasId}
+      runHrefFor={runHrefFor}
+      workflowNodes={graph.specNodes}
+      editHref={editHref}
+      editLabel={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
+    />
   );
 }
 
@@ -158,16 +143,16 @@ function automationEmptyMessage(loading: boolean, error: boolean): string {
 
 function PRFeedbackAutomationEmpty({
   message,
-  editHref,
   onRetry,
+  editHref,
 }: {
   message: string;
-  editHref?: string;
   onRetry?: () => void;
+  editHref?: string;
 }) {
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+      className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
       aria-label="Automation"
       data-testid="pr-feedback-automation"
     >
@@ -178,9 +163,11 @@ function PRFeedbackAutomationEmpty({
         </Button>
       ) : null}
       {editHref ? (
-        <Link href={editHref} className={buttonVariants({ size: "sm" })}>
-          {PR_FEEDBACK_SETTINGS_COPY.editAutomation}
-        </Link>
+        <SettingsAutomationCanvasEdit
+          href={editHref}
+          label={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
+          testId="settings-automation-edit"
+        />
       ) : null}
     </section>
   );

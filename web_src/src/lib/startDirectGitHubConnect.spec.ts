@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
+  hostedGitHubConnectUserGate,
+  isOnboardingSetupReturnPath,
+  pendingGitHubAccountPicker,
   pendingGitHubBrowserAction,
   pendingGitHubInstallPicker,
   startDirectGitHubConnect,
@@ -61,9 +64,61 @@ describe("pendingGitHubBrowserAction", () => {
       ),
     ).toBeUndefined();
   });
+
+  it("returns undefined when the current user is not loaded yet", () => {
+    const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
+    expect(
+      pendingGitHubBrowserAction([
+        {
+          metadata: { integrationName: "github" },
+          status: { state: "pending", browserAction: action, metadata: { startedByUserID: "user-1" } },
+        },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("does not guess between two legacy pending connections", () => {
+    const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
+    const legacy = (id: string) => ({
+      metadata: { id, integrationName: "github" },
+      status: { state: "pending", browserAction: action, metadata: {} },
+    });
+
+    expect(pendingGitHubBrowserAction([legacy("int-1"), legacy("int-2")], "user-1")).toBeUndefined();
+  });
 });
 
 describe("pendingGitHubInstallPicker", () => {
+  it("returns a pending GitHub connection with a single install", () => {
+    expect(
+      pendingGitHubAccountPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                startedByGitHubLogin: "forestileao",
+                state: "csrf",
+                githubApp: { slug: "superplane" },
+                pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
+    ).toEqual({
+      id: "int-1",
+      state: "csrf",
+      appSlug: "superplane",
+      authorizeUrl: "",
+      githubLogin: "forestileao",
+      installations: [{ id: "11", accountLogin: "acme" }],
+    });
+  });
+
   it("returns a pending GitHub connection with two or more installs", () => {
     expect(
       pendingGitHubInstallPicker(
@@ -85,6 +140,38 @@ describe("pendingGitHubInstallPicker", () => {
         "user-1",
       ),
     ).toEqual({ id: "int-1" });
+    expect(
+      pendingGitHubAccountPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                state: "csrf",
+                githubApp: { slug: "superplane" },
+                pendingInstallations: [
+                  { id: "11", accountLogin: "acme" },
+                  { id: "22", accountLogin: "octo" },
+                ],
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
+    ).toEqual({
+      id: "int-1",
+      state: "csrf",
+      appSlug: "superplane",
+      authorizeUrl: "",
+      githubLogin: "",
+      installations: [
+        { id: "11", accountLogin: "acme" },
+        { id: "22", accountLogin: "octo" },
+      ],
+    });
   });
 
   it("returns undefined when there is no picker", () => {
@@ -98,6 +185,26 @@ describe("pendingGitHubInstallPicker", () => {
         ],
         "user-1",
       ),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when the current user is not loaded yet", () => {
+    expect(
+      pendingGitHubAccountPicker([
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            metadata: {
+              startedByUserID: "user-1",
+              pendingInstallations: [
+                { id: "11", accountLogin: "acme" },
+                { id: "22", accountLogin: "octo" },
+              ],
+            },
+          },
+        },
+      ]),
     ).toBeUndefined();
   });
 
@@ -125,10 +232,93 @@ describe("pendingGitHubInstallPicker", () => {
   });
 });
 
+describe("isOnboardingSetupReturnPath", () => {
+  it("accepts onboarding and workspace setup paths", () => {
+    expect(isOnboardingSetupReturnPath("/onboarding?attempt=1&step=vcs")).toBe(true);
+    expect(isOnboardingSetupReturnPath("/org-1/workspaces/ws/setup?step=vcs")).toBe(true);
+    expect(isOnboardingSetupReturnPath("/org-1/settings/integrations")).toBe(false);
+    expect(isOnboardingSetupReturnPath(undefined)).toBe(false);
+  });
+});
+
 describe("startDirectGitHubConnect", () => {
   beforeEach(() => {
     remember.mockClear();
     follow.mockClear();
+  });
+
+  // Onboarding asks again which GitHub account to use on every Connect
+  // click. Many people stay signed in to two GitHub accounts, so the click
+  // must open GitHub authorization instead of reusing the stored picker.
+  it("opens GitHub authorization again on onboarding when a picker is pending", async () => {
+    const create = vi.fn();
+    const goTo = vi.fn();
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            metadata: {
+              startedByUserID: "user-1",
+              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
+              pendingInstallations: [
+                { id: "11", accountLogin: "acme" },
+                { id: "22", accountLogin: "octo" },
+              ],
+            },
+          },
+        },
+      ],
+      currentUserId: "user-1",
+      create,
+      goTo,
+    });
+
+    expect(started).toBe(true);
+    expect(create).not.toHaveBeenCalled();
+    expect(follow).toHaveBeenCalledWith({
+      method: "GET",
+      url: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
+    });
+    expect(goTo).not.toHaveBeenCalled();
+    expect(remember).toHaveBeenCalledWith("org-1", "/onboarding?attempt=1&step=vcs");
+  });
+
+  // A connection from before the authorize URL was stored cannot restart
+  // OAuth in place, so the click starts a fresh connect. The new connection
+  // also opens GitHub authorization.
+  it("starts a fresh connect on onboarding when the picker kept no authorize URL", async () => {
+    const action = { method: "GET", url: "https://github.com/login/oauth/authorize?client_id=new" };
+    const create = vi.fn().mockResolvedValue({ integration: { status: { browserAction: action } } });
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            metadata: {
+              startedByUserID: "user-1",
+              pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+            },
+          },
+        },
+      ],
+      currentUserId: "user-1",
+      create,
+    });
+
+    expect(started).toBe(true);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(follow).toHaveBeenCalledWith(action);
   });
 
   it("opens the picker page when pending installs exist", async () => {
@@ -202,6 +392,7 @@ describe("startDirectGitHubConnect", () => {
   it("reuses a pending browser action", async () => {
     const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
     const create = vi.fn();
+    const update = vi.fn().mockResolvedValue(undefined);
 
     await startDirectGitHubConnect({
       organizationId: "org-1",
@@ -209,17 +400,47 @@ describe("startDirectGitHubConnect", () => {
       existingNames: new Set(),
       connected: [
         {
-          metadata: { integrationName: "github" },
+          metadata: { id: "int-1", integrationName: "github" },
           status: { state: "pending", browserAction: action, metadata: { startedByUserID: "user-1" } },
         },
       ],
       currentUserId: "user-1",
       create,
+      update,
     });
 
     expect(create).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({
+      id: "int-1",
+      configuration: { setupReturnPath: "/org-1/workspaces/ws/setup?step=vcs&pick=newest" },
+    });
     expect(remember).toHaveBeenCalledWith("org-1", "/org-1/workspaces/ws/setup?step=vcs&pick=newest");
     expect(follow).toHaveBeenCalledWith(action);
+  });
+
+  it("does not resume or create when the current user is not loaded yet", async () => {
+    const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
+    const create = vi.fn();
+    const update = vi.fn();
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: { state: "pending", browserAction: action, metadata: { startedByUserID: "user-1" } },
+        },
+      ],
+      create,
+      update,
+    });
+
+    expect(started).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(follow).not.toHaveBeenCalled();
   });
 
   it("creates a new connection when forceNew is set", async () => {
@@ -288,10 +509,15 @@ describe("startDirectGitHubConnect", () => {
       returnTo: "/org-1/settings/integrations",
       existingNames: new Set(["github"]),
       connected: [],
+      currentUserId: "user-1",
       create,
     });
 
-    expect(create).toHaveBeenCalledWith({ integrationName: "github", name: "github-2" });
+    expect(create).toHaveBeenCalledWith({
+      integrationName: "github",
+      name: "github-2",
+      configuration: { setupReturnPath: "/org-1/settings/integrations" },
+    });
     expect(remember).toHaveBeenCalledWith("org-1", "/org-1/settings/integrations");
     expect(follow).toHaveBeenCalledWith(action);
   });
@@ -306,8 +532,24 @@ describe("startDirectGitHubConnect", () => {
         organizationId: "org-1",
         existingNames: new Set(),
         connected: [],
+        currentUserId: "user-1",
         create,
       }),
     ).rejects.toThrow("The GitHub App install page did not open.");
+  });
+});
+
+describe("hostedGitHubConnectUserGate", () => {
+  it("runs when the user id is present", () => {
+    expect(hostedGitHubConnectUserGate("user-1", false)).toBe("run");
+    expect(hostedGitHubConnectUserGate("user-1", true)).toBe("run");
+  });
+
+  it("queues while /me is still loading", () => {
+    expect(hostedGitHubConnectUserGate(undefined, false)).toBe("queue");
+  });
+
+  it("fails when /me settled without a user id", () => {
+    expect(hostedGitHubConnectUserGate(undefined, true)).toBe("fail");
   });
 });

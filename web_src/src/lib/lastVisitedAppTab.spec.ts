@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 
 import { LAST_VISITED_APP_TAB_STORAGE_KEY, readLastVisitedAppTab, recordLastVisitedAppTab } from "./lastVisitedAppTab";
 
@@ -13,10 +13,10 @@ describe("lastVisitedAppTab", () => {
 
   it("records and reads the last visited tab per canvas", () => {
     recordLastVisitedAppTab("canvas-1", "console");
-    recordLastVisitedAppTab("canvas-2", "files");
+    recordLastVisitedAppTab("canvas-2", "memory");
 
     expect(readLastVisitedAppTab("canvas-1")).toBe("console");
-    expect(readLastVisitedAppTab("canvas-2")).toBe("files");
+    expect(readLastVisitedAppTab("canvas-2")).toBe("memory");
   });
 
   it("overwrites the previous tab for the same canvas", () => {
@@ -52,10 +52,16 @@ describe("lastVisitedAppTab", () => {
 
   it("preserves entries for other canvases when updating one", () => {
     recordLastVisitedAppTab("canvas-1", "console");
-    recordLastVisitedAppTab("canvas-2", "files");
+    recordLastVisitedAppTab("canvas-2", "memory");
     recordLastVisitedAppTab("canvas-1", "memory");
 
     expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
-    expect(readLastVisitedAppTab("canvas-2")).toBe("files");
+    expect(readLastVisitedAppTab("canvas-2")).toBe("memory");
+  });
+
+  it("maps a stored Files tab to Canvas", () => {
+    window.localStorage.setItem(LAST_VISITED_APP_TAB_STORAGE_KEY, JSON.stringify({ "canvas-1": "files" }));
+
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
   });
 });

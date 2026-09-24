@@ -3,12 +3,10 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -24,53 +22,35 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 
 	userID := uuid.MustParse(user)
 
-	//
-	// Find the base version id for the staging update.
-	//
-	baseVersionID, err := findBaseVersionIDForStagingUpdate(db, canvas, userID)
+	validated, err := validatedStagedSpecOperations(operations)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, operation := range operations {
-		if operation == nil {
-			continue
+	err = db.Transaction(func(tx *gorm.DB) error {
+		baseVersionID, err := findBaseVersionIDForStagingUpdate(tx, canvas, userID)
+		if err != nil {
+			return err
 		}
 
-		normalized := normalizeRepositoryFilePath(operation.GetPath())
-		if normalized == "" {
-			return nil, grpcerrors.InvalidArgument(nil, "file path is required")
-		}
-		if normalized == gitprovider.ReservedSuperPlanePath ||
-			strings.HasPrefix(normalized, gitprovider.ReservedSuperPlanePath+"/") {
-			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("path %q is reserved for SuperPlane", operation.GetPath()))
-		}
-
-		if operation.GetDelete() {
-			if err := models.MarkStagedFilePathDeleted(
-				db,
+		for _, operation := range validated {
+			if _, err := models.UpsertStagedFile(
+				tx,
 				canvas.ID,
 				userID,
 				*baseVersionID,
 				canvas.OrganizationID,
-				normalized,
+				operation.path,
+				operation.content,
 			); err != nil {
-				return nil, grpcerrors.Internal(err, "failed to stage deletion")
+				return grpcerrors.Internal(err, "failed to stage")
 			}
-			continue
 		}
 
-		if _, err := models.UpsertStagedFile(
-			db,
-			canvas.ID,
-			userID,
-			*baseVersionID,
-			canvas.OrganizationID,
-			normalized,
-			string(operation.GetContent()),
-		); err != nil {
-			return nil, grpcerrors.Internal(err, "failed to stage")
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	rows, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
@@ -112,4 +92,34 @@ func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userI
 	// Otherwise, use the live version id.
 	//
 	return &liveVersion.ID, nil
+}
+
+type stagedSpecOperation struct {
+	path    string
+	content string
+}
+
+func validatedStagedSpecOperations(operations []*pb.CanvasRepositoryFileOperation) ([]stagedSpecOperation, error) {
+	validated := make([]stagedSpecOperation, 0, len(operations))
+	for _, operation := range operations {
+		if operation == nil {
+			continue
+		}
+
+		normalized, err := requireStagedSpecFilePath(operation.GetPath())
+		if err != nil {
+			return nil, err
+		}
+
+		if operation.GetDelete() {
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		}
+
+		validated = append(validated, stagedSpecOperation{
+			path:    normalized,
+			content: string(operation.GetContent()),
+		})
+	}
+
+	return validated, nil
 }

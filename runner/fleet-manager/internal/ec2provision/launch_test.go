@@ -1,0 +1,456 @@
+package ec2provision
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
+)
+
+func TestConfigFromEnvArchitecture(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want string
+	}{
+		{name: "defaults to amd64", env: "", want: "amd64"},
+		{name: "arm64", env: "arm64", want: "arm64"},
+		{name: "amd64", env: "amd64", want: "amd64"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setRequiredProvisionEnv(t)
+			t.Setenv(envArch, tt.env)
+
+			cfg, err := ConfigFromEnv()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Arch != tt.want {
+				t.Fatalf("arch: got %q want %q", cfg.Arch, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfigFromEnvRejectsInvalidArchitecture(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv(envArch, "s390x")
+
+	_, err := ConfigFromEnv()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "EC2_PROVISION_ARCH") {
+		t.Fatalf("expected arch error, got %v", err)
+	}
+}
+
+func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
+	tests := []struct {
+		name string
+		arch string
+	}{
+		{name: "amd64", arch: "amd64"},
+		{name: "arm64", arch: "arm64"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script, err := userDataScript(Config{
+				Arch:                            tt.arch,
+				RunnerS3URI:                     "s3://runner-binaries/release/runner-linux-" + tt.arch,
+				RunnerInstallAWSRegion:          "us-east-1",
+				TaskBrokerURL:                   "http://task-broker.example:8081",
+				RunnerFleetID:                   "fleet-" + tt.arch,
+				RunnerTerminateAfterEachTask:    true,
+				RunnerCloudWatchLogGroup:        "/superplane/tasks",
+				RunnerCloudWatchLogStreamPrefix: "tasks",
+				RunnerProcessLogGroup:           "/superplane/runners",
+			}, 1700000000, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Slim AMI userdata: downloads runner binary from S3 and starts pre-installed service.
+			if !strings.Contains(script, "s3://runner-binaries/release/runner-linux-"+tt.arch) {
+				t.Fatalf("user-data missing runner S3 URI for %s", tt.arch)
+			}
+			if !strings.Contains(script, "systemctl start superplane-runner.service") {
+				t.Fatalf("user-data missing systemctl start")
+			}
+			if !strings.Contains(script, "RUNNER_FLEET_ID") {
+				t.Fatalf("user-data missing RUNNER_FLEET_ID env")
+			}
+		})
+	}
+}
+
+func TestUserDataScriptIncludesLaunchRequestedAt(t *testing.T) {
+	script, err := userDataScript(Config{
+		RunnerS3URI:            "s3://bucket/runner",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}, 1700000000, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, "RUNNER_LAUNCH_REQUESTED_AT=1700000000") {
+		t.Fatalf("user-data missing launch timestamp: %s", script)
+	}
+}
+
+func TestUserDataContainsRunnerRegistrationTokenNotControlSecret(t *testing.T) {
+	script, err := userDataScript(Config{
+		RunnerS3URI:            "s3://bucket/runner",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}, 1700000000, "registration-jwt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, `RUNNER_REGISTRATION_TOKEN="registration-jwt"`) {
+		t.Fatal("user-data missing registration token")
+	}
+	if !strings.Contains(script, `RUNNER_ACCESS_TOKEN_PATH=/var/lib/superplane-runner/access_token`) {
+		t.Fatal("user-data missing access token path for restart persistence")
+	}
+	if strings.Contains(script, "\nAUTH_TOKEN=") {
+		t.Fatal("user-data must not contain broker control token")
+	}
+	if strings.Contains(script, "control-secret") || strings.Contains(script, "AUTH_TOKEN=") {
+		t.Fatal("user-data must not leak broker control credentials")
+	}
+}
+
+func TestConfigFromEnvAcceptsLegacyRegistrationSecretAlias(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv(envRegistrationSecret, "")
+	t.Setenv(envRegistrationSecretLegacy, "legacy-control-secret")
+
+	cfg, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RunnerRegistrationSecret != "legacy-control-secret" {
+		t.Fatalf("RunnerRegistrationSecret = %q", cfg.RunnerRegistrationSecret)
+	}
+}
+
+func TestManagedInstanceFiltersCanScopeByArchitecture(t *testing.T) {
+	l := &Launcher{Config: Config{Arch: "arm64"}}
+
+	filters := l.managedInstanceFilters([]string{"pending", "running"})
+	for _, filter := range filters {
+		if aws.ToString(filter.Name) == "tag:"+TagKeyArch {
+			if len(filter.Values) != 1 || filter.Values[0] != "arm64" {
+				t.Fatalf("arch filter values: %#v", filter.Values)
+			}
+			return
+		}
+	}
+
+	t.Fatal("missing architecture filter")
+}
+
+func TestManagedInstanceFiltersDefaultToAMD64Scope(t *testing.T) {
+	l := &Launcher{}
+
+	for _, filter := range l.managedInstanceFilters([]string{"pending", "running"}) {
+		if aws.ToString(filter.Name) == "tag:"+TagKeyArch {
+			if len(filter.Values) != 1 || filter.Values[0] != "amd64" {
+				t.Fatalf("arch filter values: %#v", filter.Values)
+			}
+			return
+		}
+	}
+
+	t.Fatal("missing architecture filter")
+}
+
+func TestRunInstancesInputTagsRunnerArchitecture(t *testing.T) {
+	l := &Launcher{Config: Config{
+		AMI:                "ami-1234567890abcdef0",
+		InstanceType:       "t4g.micro",
+		Arch:               "arm64",
+		SubnetIDs:          []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs:   []string{"sg-1234567890abcdef0"},
+		RunnersIAMProfName: "superplane-runner-profile",
+	}}
+
+	in := l.runInstancesInput(2, "encoded-user-data", "subnet-1234567890abcdef0")
+	if aws.ToString(in.UserData) != "encoded-user-data" {
+		t.Fatalf("user data: got %q", aws.ToString(in.UserData))
+	}
+	if aws.ToInt32(in.MinCount) != 2 || aws.ToInt32(in.MaxCount) != 2 {
+		t.Fatalf("counts: min=%d max=%d", aws.ToInt32(in.MinCount), aws.ToInt32(in.MaxCount))
+	}
+
+	for _, spec := range in.TagSpecifications {
+		for _, tag := range spec.Tags {
+			if aws.ToString(tag.Key) == TagKeyArch {
+				if aws.ToString(tag.Value) != "arm64" {
+					t.Fatalf("arch tag: got %q want arm64", aws.ToString(tag.Value))
+				}
+				return
+			}
+		}
+	}
+
+	t.Fatal("missing runner architecture tag")
+}
+
+func TestRunInstancesInputRootVolumeOmitsGp3PerformanceWhenUnset(t *testing.T) {
+	l := &Launcher{Config: Config{
+		AMI:              "ami-1234567890abcdef0",
+		InstanceType:     "t3.micro",
+		SubnetIDs:        []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs: []string{"sg-1234567890abcdef0"},
+		VolumeSizeGB:     30,
+	}}
+
+	ebs := rootEBS(t, l.runInstancesInput(1, "ud", l.Config.SubnetIDs[0]))
+	if ebs.VolumeType != types.VolumeTypeGp3 {
+		t.Fatalf("VolumeType = %q, want gp3", ebs.VolumeType)
+	}
+	if aws.ToInt32(ebs.VolumeSize) != 30 {
+		t.Fatalf("VolumeSize = %d, want 30", aws.ToInt32(ebs.VolumeSize))
+	}
+	if ebs.Iops != nil {
+		t.Fatalf("Iops = %v, want omitted (AWS gp3 default 3000)", aws.ToInt32(ebs.Iops))
+	}
+	if ebs.Throughput != nil {
+		t.Fatalf("Throughput = %v, want omitted (AWS gp3 default 125)", aws.ToInt32(ebs.Throughput))
+	}
+}
+
+func TestRunInstancesInputRootVolumeSetsGp3IopsAndThroughput(t *testing.T) {
+	l := &Launcher{Config: Config{
+		AMI:                  "ami-1234567890abcdef0",
+		InstanceType:         "m8a.2xlarge",
+		SubnetIDs:            []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs:     []string{"sg-1234567890abcdef0"},
+		VolumeSizeGB:         30,
+		VolumeIOPS:           12000,
+		VolumeThroughputMBps: 500,
+	}}
+
+	ebs := rootEBS(t, l.runInstancesInput(1, "ud", l.Config.SubnetIDs[0]))
+	if ebs.VolumeType != types.VolumeTypeGp3 {
+		t.Fatalf("VolumeType = %q, want gp3", ebs.VolumeType)
+	}
+	if aws.ToInt32(ebs.Iops) != 12000 {
+		t.Fatalf("Iops = %d, want 12000", aws.ToInt32(ebs.Iops))
+	}
+	if aws.ToInt32(ebs.Throughput) != 500 {
+		t.Fatalf("Throughput = %d, want 500", aws.ToInt32(ebs.Throughput))
+	}
+}
+
+func rootEBS(t *testing.T, in *ec2.RunInstancesInput) *types.EbsBlockDevice {
+	t.Helper()
+	if len(in.BlockDeviceMappings) != 1 {
+		t.Fatalf("BlockDeviceMappings len = %d, want 1", len(in.BlockDeviceMappings))
+	}
+	ebs := in.BlockDeviceMappings[0].Ebs
+	if ebs == nil {
+		t.Fatal("Ebs mapping is nil")
+	}
+	return ebs
+}
+
+func TestRunInstancesInputShutdownBehavior(t *testing.T) {
+	cfg := Config{
+		AMI:              "ami-1234567890abcdef0",
+		InstanceType:     "t3.micro",
+		SubnetIDs:        []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs: []string{"sg-1234567890abcdef0"},
+	}
+	oneShot := cfg
+	oneShot.RunnerTerminateAfterEachTask = true
+	if got := (&Launcher{Config: oneShot}).runInstancesInput(1, "ud", cfg.SubnetIDs[0]).InstanceInitiatedShutdownBehavior; got != types.ShutdownBehaviorTerminate {
+		t.Fatalf("one-shot: got %q want terminate", got)
+	}
+	if got := (&Launcher{Config: cfg}).runInstancesInput(1, "ud", cfg.SubnetIDs[0]).InstanceInitiatedShutdownBehavior; got != "" {
+		t.Fatalf("persistent: got %q want empty", got)
+	}
+}
+
+func TestUserDataScriptSelfTerminateDropIn(t *testing.T) {
+	base := Config{
+		RunnerS3URI:            "s3://bucket/runner-linux-amd64",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}
+	oneShot := base
+	oneShot.RunnerTerminateAfterEachTask = true
+	script, err := userDataScript(oneShot, 1700000000, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"self-terminate.conf", "poweroff", "amazon-cloudwatch-agent"} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("one-shot user-data missing %q", want)
+		}
+	}
+	script, err = userDataScript(base, 1700000000, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(script, "poweroff") {
+		t.Fatal("persistent user-data should not poweroff")
+	}
+}
+
+func TestConfigFromEnvUsesFleetID(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv(envFleetID, "my-amd64-fleet")
+
+	cfg, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FleetID != "my-amd64-fleet" {
+		t.Fatalf("fleet id: got %q want %q", cfg.FleetID, "my-amd64-fleet")
+	}
+}
+
+func TestConfigFromEnvDefaultsFleetIDToHostname(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv(envFleetID, "") // explicitly unset
+
+	cfg, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FleetID == "" {
+		t.Fatal("expected fleet id to default to hostname, got empty string")
+	}
+}
+
+func TestManagedInstanceFiltersIncludeFleetID(t *testing.T) {
+	l := &Launcher{Config: Config{Arch: "amd64", FleetID: "fleet-a"}}
+
+	for _, filter := range l.managedInstanceFilters([]string{"pending", "running"}) {
+		if aws.ToString(filter.Name) == "tag:"+TagKeyFleetID {
+			if len(filter.Values) != 1 || filter.Values[0] != "fleet-a" {
+				t.Fatalf("fleet id filter values: %#v", filter.Values)
+			}
+			return
+		}
+	}
+	t.Fatal("missing fleet id filter")
+}
+
+func TestRunInstancesInputTagsFleetID(t *testing.T) {
+	l := &Launcher{Config: Config{
+		AMI:                "ami-1234567890abcdef0",
+		InstanceType:       "t4g.micro",
+		Arch:               "arm64",
+		FleetID:            "arm64-fleet-prod",
+		SubnetIDs:          []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs:   []string{"sg-1234567890abcdef0"},
+		RunnersIAMProfName: "superplane-runner-profile",
+	}}
+
+	in := l.runInstancesInput(1, "encoded-user-data", "subnet-1234567890abcdef0")
+	for _, spec := range in.TagSpecifications {
+		for _, tag := range spec.Tags {
+			if aws.ToString(tag.Key) == TagKeyFleetID {
+				if aws.ToString(tag.Value) != "arm64-fleet-prod" {
+					t.Fatalf("fleet id tag: got %q want arm64-fleet-prod", aws.ToString(tag.Value))
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("missing fleet id tag in RunInstances input")
+}
+
+func TestConfigFromEnvRejectsDeprecatedBinaryURL(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv("EC2_PROVISION_RUNNER_BINARY_URL", "https://example.com/runner")
+
+	_, err := ConfigFromEnv()
+	if err == nil {
+		t.Fatal("expected error for deprecated EC2_PROVISION_RUNNER_BINARY_URL")
+	}
+	if !strings.Contains(err.Error(), "EC2_PROVISION_RUNNER_BINARY_URL") {
+		t.Fatalf("expected deprecation error, got %v", err)
+	}
+}
+
+func setRequiredProvisionEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv(envHotCount, "1")
+	t.Setenv(envAMI, "ami-1234567890abcdef0")
+	t.Setenv(envSubnet, "subnet-1234567890abcdef0")
+	t.Setenv(envSecurityGroups, "sg-1234567890abcdef0")
+	t.Setenv(envTaskBrokerURL, "http://task-broker.example:8081")
+	t.Setenv(envRunnerFleetID, "fleet-test")
+	t.Setenv(envRunnerS3URI, "s3://runner-binaries/release/runner-linux-amd64")
+	t.Setenv(envRunnerIAMProf, "superplane-runner-profile")
+	t.Setenv("AWS_REGION", "us-east-1")
+	t.Setenv(envFleetID, "test-fleet")
+}
+
+func TestIsInsufficientInstanceCapacity(t *testing.T) {
+	if !isInsufficientInstanceCapacity(&smithy.GenericAPIError{Code: "InsufficientInstanceCapacity"}) {
+		t.Fatal("expected true for InsufficientInstanceCapacity")
+	}
+	if isInsufficientInstanceCapacity(errors.New("boom")) {
+		t.Fatal("expected false for generic error")
+	}
+}
+
+func TestLaunch_RetriesNextSubnetOnInsufficientCapacity(t *testing.T) {
+	var tried []string
+	l := &Launcher{
+		BrokerClient: &fakeBrokerClient{},
+		Config: Config{
+			AMI:                      "ami-test",
+			InstanceType:             "t3.micro",
+			SubnetIDs:                []string{"subnet-a", "subnet-b"},
+			SecurityGroupIDs:         []string{"sg-test"},
+			RunnerS3URI:              "s3://bucket/runner-linux-amd64",
+			RunnerInstallAWSRegion:   "us-east-1",
+			TaskBrokerURL:            "http://broker:8081",
+			RunnerFleetID:            "fleet-a",
+			FleetID:                  "fleet-a",
+			RunnersIAMProfName:       "profile",
+			VolumeSizeGB:             30,
+			RunnerRegistrationSecret: "control-secret",
+		},
+		pending: make(map[string]time.Time),
+		runInstancesHook: func(_ context.Context, in *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error) {
+			subnet := aws.ToString(in.SubnetId)
+			tried = append(tried, subnet)
+			if subnet == "subnet-a" {
+				return nil, &smithy.GenericAPIError{Code: "InsufficientInstanceCapacity"}
+			}
+			return &ec2.RunInstancesOutput{
+				Instances: []types.Instance{{InstanceId: aws.String("i-new")}},
+			}, nil
+		},
+	}
+
+	ids, err := l.Launch(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "i-new" {
+		t.Fatalf("ids = %v", ids)
+	}
+	if len(tried) != 2 || tried[0] != "subnet-a" || tried[1] != "subnet-b" {
+		t.Fatalf("subnet try order = %v", tried)
+	}
+}

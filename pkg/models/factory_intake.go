@@ -15,6 +15,14 @@ const (
 	FactoryIntakeSourceGitHubIssues       = "github-issues"
 	FactoryIntakeSourceSentryExceptions   = "sentry-exceptions"
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
+	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
+	FactoryIntakeSourceJiraIssues         = "jira-issues"
+
+	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
+	FactoryIntakeInitialImportStatusPending     = "pending"
+	FactoryIntakeInitialImportStatusCompleted   = "completed"
+	FactoryIntakeInitialImportStatusFailed      = "failed"
+	FactoryIntakeInitialImportStatusSkipped     = "skipped"
 
 	factoryIntakeCanvasUniqueConstraint = "idx_factory_intakes_canvas_id"
 )
@@ -30,19 +38,24 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceGitHubIssues,
 	FactoryIntakeSourceSentryExceptions,
 	FactoryIntakeSourcePagerDutyIncidents,
+	FactoryIntakeSourceProductiveTasks,
+	FactoryIntakeSourceJiraIssues,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,
 // scores what it receives, and creates backlog work orders. The row owns
 // identity; the canvas graph owns behavior.
 type FactoryIntake struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	CanvasID       uuid.UUID
-	Source         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
+	FactoryID              uuid.UUID
+	CanvasID               uuid.UUID
+	Source                 string
+	InitialImportStatus    string
+	InitialImportItemCount *int
+	PausedAt               *time.Time
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 
 	Canvas *Canvas `gorm:"foreignKey:CanvasID"`
 }
@@ -62,6 +75,10 @@ func (i *FactoryIntake) Name() string {
 		return ""
 	}
 	return i.Canvas.Name
+}
+
+func (i *FactoryIntake) Paused() bool {
+	return i.PausedAt != nil
 }
 
 func MapFactoryIntakeCanvasUniqueConstraintError(err error) error {
@@ -87,13 +104,14 @@ func (f *Factory) CreateIntake(tx *gorm.DB, canvasID uuid.UUID, source string) (
 
 	now := time.Now()
 	intake := &FactoryIntake{
-		ID:             uuid.New(),
-		OrganizationID: f.OrganizationID,
-		FactoryID:      f.ID,
-		CanvasID:       canvasID,
-		Source:         source,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                  uuid.New(),
+		OrganizationID:      f.OrganizationID,
+		FactoryID:           f.ID,
+		CanvasID:            canvasID,
+		Source:              source,
+		InitialImportStatus: FactoryIntakeInitialImportStatusPending,
+		CreatedAt:           now,
+		UpdatedAt:           now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(intake).Error; err != nil {
@@ -101,6 +119,52 @@ func (f *Factory) CreateIntake(tx *gorm.DB, canvasID uuid.UUID, source string) (
 	}
 
 	return intake, nil
+}
+
+func (i *FactoryIntake) CompleteInitialImport(tx *gorm.DB, itemCount int) error {
+	return i.updateInitialImport(tx, FactoryIntakeInitialImportStatusCompleted, &itemCount)
+}
+
+func (i *FactoryIntake) FailInitialImport(tx *gorm.DB) error {
+	return i.updateInitialImport(tx, FactoryIntakeInitialImportStatusFailed, nil)
+}
+
+func (i *FactoryIntake) SkipInitialImport(tx *gorm.DB) error {
+	return i.updateInitialImport(tx, FactoryIntakeInitialImportStatusSkipped, nil)
+}
+
+func (i *FactoryIntake) SetPaused(tx *gorm.DB, paused bool) error {
+	now := time.Now()
+	var pausedAt *time.Time
+	if paused {
+		pausedAt = &now
+	}
+	if err := tx.Model(i).Select("paused_at", "updated_at").Updates(map[string]any{
+		"paused_at":  pausedAt,
+		"updated_at": now,
+	}).Error; err != nil {
+		return err
+	}
+
+	i.PausedAt = pausedAt
+	i.UpdatedAt = now
+	return nil
+}
+
+func (i *FactoryIntake) updateInitialImport(tx *gorm.DB, status string, itemCount *int) error {
+	now := time.Now()
+	if err := tx.Model(i).Updates(map[string]any{
+		"initial_import_status":     status,
+		"initial_import_item_count": itemCount,
+		"updated_at":                now,
+	}).Error; err != nil {
+		return err
+	}
+
+	i.InitialImportStatus = status
+	i.InitialImportItemCount = itemCount
+	i.UpdatedAt = now
+	return nil
 }
 
 func (f *Factory) FindIntake(tx *gorm.DB, intakeID uuid.UUID) (*FactoryIntake, error) {

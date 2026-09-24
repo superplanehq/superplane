@@ -9,8 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPrFeedbackActivityDescriptionExpression_MissingCommentOrReview(t *testing.T) {
-	source := templateExpressionSource(t, prFeedbackActivityDescriptionExpression())
+func TestPrFeedbackCommentActivityDescriptionExpression(t *testing.T) {
+	source := templateExpressionSource(t, prFeedbackCommentActivityDescriptionExpression())
+
+	data := map[string]any{"comment": map[string]any{"body": "please add tests"}}
+	assert.Equal(t, "please add tests", evalRootDataExpression(t, source, data))
+}
+
+func TestPrFeedbackReviewActivityDescriptionExpression(t *testing.T) {
+	source := templateExpressionSource(t, prFeedbackReviewActivityDescriptionExpression())
 
 	cases := []struct {
 		name string
@@ -18,29 +25,45 @@ func TestPrFeedbackActivityDescriptionExpression_MissingCommentOrReview(t *testi
 		want string
 	}{
 		{
-			name: "review without comment",
+			name: "review body without inline comments",
 			data: map[string]any{"review": map[string]any{"body": "LGTM"}},
 			want: "LGTM",
-		},
-		{
-			name: "comment without review",
-			data: map[string]any{"comment": map[string]any{"body": "please add tests"}},
-			want: "please add tests",
 		},
 		{
 			name: "inline review comments when review body is empty",
 			data: map[string]any{
 				"review": map[string]any{"body": nil, "state": "commented"},
 				"review_comments": []any{
-					map[string]any{"body": "@superplaneagent upgrade to Go 1.26"},
+					map[string]any{
+						"body":     "@superplaneagent upgrade to Go 1.26",
+						"path":     "go.mod",
+						"html_url": "https://github.com/acme/app/pull/42#discussion_r1",
+					},
 				},
 			},
-			want: "@superplaneagent upgrade to Go 1.26",
+			want: "· [go.mod](https://github.com/acme/app/pull/42#discussion_r1)\n" +
+				"@superplaneagent upgrade to Go 1.26",
 		},
 		{
-			name: "neither comment nor review",
-			data: map[string]any{},
-			want: "",
+			name: "review body and inline comments",
+			data: map[string]any{
+				"review": map[string]any{"body": "Review summary"},
+				"review_comments": []any{
+					map[string]any{
+						"body":     "First comment",
+						"path":     "docs/API.md",
+						"html_url": "https://github.com/acme/app/pull/42#discussion_r1",
+					},
+					map[string]any{
+						"body":     "Second comment",
+						"path":     "pkg/models/decks.go",
+						"html_url": "https://github.com/acme/app/pull/42#discussion_r2",
+					},
+				},
+			},
+			want: "Review summary\n\n" +
+				"· [docs/API.md](https://github.com/acme/app/pull/42#discussion_r1)\nFirst comment\n\n" +
+				"· [pkg/models/decks.go](https://github.com/acme/app/pull/42#discussion_r2)\nSecond comment",
 		},
 	}
 
@@ -49,6 +72,100 @@ func TestPrFeedbackActivityDescriptionExpression_MissingCommentOrReview(t *testi
 			assert.Equal(t, tc.want, evalRootDataExpression(t, source, tc.data))
 		})
 	}
+}
+
+func TestPrFeedbackCommentActivityTitleExpression(t *testing.T) {
+	source := templateExpressionSource(t, prFeedbackCommentActivityTitleExpression())
+	data := map[string]any{
+		"comment": map[string]any{
+			"body":     "please add tests",
+			"html_url": "https://github.com/acme/app/pull/42#issuecomment-1",
+			"user": map[string]any{
+				"login":    "lucaspin",
+				"html_url": "https://github.com/lucaspin",
+			},
+		},
+	}
+
+	assert.Equal(
+		t,
+		"[@lucaspin](https://github.com/lucaspin) left a [comment](https://github.com/acme/app/pull/42#issuecomment-1)",
+		evalRootDataExpression(t, source, data),
+	)
+}
+
+func TestPrFeedbackReplyActivityTitleExpression(t *testing.T) {
+	source := templateExpressionSource(t, prFeedbackReplyActivityTitleExpression())
+	data := map[string]any{
+		"comment": map[string]any{
+			"body":     "please add tests",
+			"html_url": "https://github.com/acme/app/pull/42#discussion_r1",
+			"path":     "pkg/core/integration.go",
+			"user": map[string]any{
+				"login":    "lucaspin",
+				"html_url": "https://github.com/lucaspin",
+			},
+		},
+	}
+
+	assert.Equal(
+		t,
+		"[@lucaspin](https://github.com/lucaspin) left a [comment](https://github.com/acme/app/pull/42#discussion_r1) in `pkg/core/integration.go`",
+		evalRootDataExpression(t, source, data),
+	)
+}
+
+func TestPrFeedbackReviewActivityTitleExpression(t *testing.T) {
+	source := templateExpressionSource(t, prFeedbackReviewActivityTitleExpression())
+	data := map[string]any{
+		"review": map[string]any{
+			"body":     "review summary",
+			"html_url": "https://github.com/acme/app/pull/42#pullrequestreview-1",
+			"user": map[string]any{
+				"login":    "lucaspin",
+				"html_url": "https://github.com/lucaspin",
+			},
+		},
+		"review_comments": []any{
+			map[string]any{"body": "first"},
+			map[string]any{"body": "second"},
+		},
+	}
+
+	assert.Equal(
+		t,
+		"[@lucaspin](https://github.com/lucaspin) left a [review](https://github.com/acme/app/pull/42#pullrequestreview-1)",
+		evalRootDataExpression(t, source, data),
+	)
+}
+
+func TestPrFeedbackReviewAcknowledgeCommentIDExpression(t *testing.T) {
+	requireValidTemplateExpressions(t, prFeedbackReviewAcknowledgeCommentIDExpression())
+	source := templateExpressionSource(t, prFeedbackReviewAcknowledgeCommentIDExpression())
+
+	t.Run("yields the first inline comment ID", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"review_comments": []any{
+				map[string]any{"id": 111, "body": "first"},
+				map[string]any{"id": 222, "body": "second"},
+			},
+		})
+		assert.Equal(t, 111, got)
+	})
+
+	t.Run("yields an empty string when review comments are missing", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"review": map[string]any{"body": "LGTM"},
+		})
+		assert.Equal(t, "", got)
+	})
+
+	t.Run("yields an empty string when review comments are empty", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"review_comments": []any{},
+		})
+		assert.Equal(t, "", got)
+	})
 }
 
 func TestPrFeedbackPRNumberExpression_IssueCommentPayload(t *testing.T) {

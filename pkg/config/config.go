@@ -16,10 +16,6 @@ func RabbitMQURL() (string, error) {
 	return URL, nil
 }
 
-func UsageGRPCURL() string {
-	return os.Getenv("USAGE_GRPC_URL")
-}
-
 func MaxEmitCount() int {
 	return intFromEnv("SUPERPLANE_MAX_EMIT_COUNT", 100)
 }

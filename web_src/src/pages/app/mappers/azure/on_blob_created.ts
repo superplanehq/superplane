@@ -4,7 +4,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import type { AzureBlobEvent } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 

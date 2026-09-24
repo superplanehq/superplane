@@ -1,8 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
+import { unmockedSrc } from "@/test/unmockedModule";
 
 import { syncCanvasDraftState, syncConsoleCaches } from "./sync-canvas-draft";
 import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
@@ -11,10 +12,10 @@ vi.mock("./repository-spec-files", () => ({
   fetchCanvasVersionWithSpec: vi.fn(),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<Record<string, unknown>>("hooks/useCanvasData");
   return {
-    ...(actual as Record<string, unknown>),
+    ...actual,
     fetchCanvasConsoleData: vi.fn(),
   };
 });

@@ -266,3 +266,36 @@ func TestOpenAIChatRequestJSON(t *testing.T) {
 	assert.Contains(t, string(payload), `"role":"system"`)
 	assert.NotContains(t, string(payload), `"stream":true`)
 }
+
+func TestListCatalogPrices_OpenRouter(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{jsonResponse(http.StatusOK, `{
+			"data":[
+				{
+					"id":"anthropic/claude-sonnet-4-6",
+					"pricing":{
+						"prompt":"0.000003",
+						"completion":"0.000015",
+						"input_cache_read":"0.0000003",
+						"input_cache_write":"0.00000375"
+					}
+				},
+				{"id":"bad/model","pricing":{"prompt":"nope","completion":"0.1"}}
+			]
+		}`)},
+	}
+
+	prices, err := ListCatalogPrices(context.Background(), httpCtx, ProviderOpenRouter, Credentials{APIKey: "sk-or"})
+	require.NoError(t, err)
+	require.Len(t, prices, 1)
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", prices[0].ID)
+	assert.Equal(t, int64(300), prices[0].Rate.Input)
+	assert.Equal(t, int64(1500), prices[0].Rate.Output)
+	assert.Equal(t, int64(30), prices[0].Rate.CacheRead)
+	assert.Equal(t, int64(375), prices[0].Rate.CacheWrite)
+}
+
+func TestListCatalogPrices_UnsupportedProvider(t *testing.T) {
+	_, err := ListCatalogPrices(context.Background(), &contexts.HTTPContext{}, ProviderAnthropic, Credentials{APIKey: "sk"})
+	require.ErrorIs(t, err, ErrNoCatalogPrices)
+}

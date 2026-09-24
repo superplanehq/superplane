@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { baseMapper } from "./base";
 import { buildContext, buildDetailsCtx, buildNode, buildOutput } from "./test_helpers";

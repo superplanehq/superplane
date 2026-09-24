@@ -24,26 +24,25 @@ func Test_ListRoles(t *testing.T) {
 		for i, role := range resp.Roles {
 			roleNames[i] = role.Metadata.Name
 		}
-		assert.Contains(t, roleNames, models.RoleOrgViewer)
+		assert.Contains(t, roleNames, models.RoleOrgOperator)
+		assert.Contains(t, roleNames, models.RoleOrgMaintainer)
 		assert.Contains(t, roleNames, models.RoleOrgAdmin)
-		assert.Contains(t, roleNames, models.RoleOrgOwner)
 		assert.Len(t, resp.Roles, 3)
 
-		// Test beautiful display names and descriptions for each role
 		for _, role := range resp.Roles {
 			assert.NotEmpty(t, role.Spec.DisplayName, "DisplayName should not be empty for role %s", role.Metadata.Name)
 			assert.NotEmpty(t, role.Spec.Description, "Description should not be empty for role %s", role.Metadata.Name)
 
 			switch role.Metadata.Name {
-			case models.RoleOrgOwner:
-				assert.Equal(t, "Owner", role.Spec.DisplayName)
-				assert.Contains(t, role.Spec.Description, "Full control over organization settings")
 			case models.RoleOrgAdmin:
 				assert.Equal(t, "Admin", role.Spec.DisplayName)
-				assert.Contains(t, role.Spec.Description, "Can manage canvases, users, groups, and roles")
-			case models.RoleOrgViewer:
-				assert.Equal(t, "Viewer", role.Spec.DisplayName)
-				assert.Contains(t, role.Spec.Description, "Read-only access to organization resources")
+				assert.Contains(t, role.Spec.Description, "Can manage members, billing, and organization settings")
+			case models.RoleOrgMaintainer:
+				assert.Equal(t, "Maintainer", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Can create and edit automations")
+			case models.RoleOrgOperator:
+				assert.Equal(t, "Operator", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Can create tasks and interact with them")
 			}
 		}
 	})

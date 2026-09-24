@@ -59,7 +59,7 @@ func TestUpdateCommandStagesFiles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut && r.URL.Path == stagingPath(testAppID) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml","README.md"]}}`))
+			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml"]}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -68,19 +68,34 @@ func TestUpdateCommandStagesFiles(t *testing.T) {
 
 	dir := t.TempDir()
 	canvasPath := filepath.Join(dir, "canvas.yaml")
-	readmePath := filepath.Join(dir, "README.md")
 	require.NoError(t, os.WriteFile(canvasPath, []byte(
 		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+testAppID+"\n  name: demo\nspec:\n  nodes: []\n  edges: []\n",
 	), 0o644))
-	require.NoError(t, os.WriteFile(readmePath, []byte("hello"), 0o644))
 
-	files := []string{canvasPath, readmePath}
+	files := []string{canvasPath}
 	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{ActiveApp: testAppID})
 
 	err := (&updateCommand{files: &files}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "canvas.yaml")
-	require.Contains(t, stdout.String(), "README.md")
+}
+
+func TestUpdateCommandRejectsNonSpecFiles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	readmePath := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(readmePath, []byte("hello"), 0o644))
+
+	files := []string{readmePath}
+	ctx, _ := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{ActiveApp: testAppID})
+
+	err := (&updateCommand{files: &files}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "only canvas.yaml and console.yaml")
 }
 
 func TestCommitCommandPrintsVersion(t *testing.T) {

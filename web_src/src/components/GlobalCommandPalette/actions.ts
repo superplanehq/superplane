@@ -1,5 +1,4 @@
 import {
-  ArrowRightLeft,
   BookOpen,
   CircleUser,
   LogOut,
@@ -65,14 +64,6 @@ export function buildRootActions({
       keywords: ["new", "create", "canvas", "project", "workflow"],
     },
     ...buildOrganizationRootActions(organizationId, accountEmail, goTo),
-    {
-      id: "change-organization",
-      label: "Change Organization",
-      description: "Return to organization picker",
-      icon: ArrowRightLeft,
-      onSelect: () => goTo("/?select=true"),
-      keywords: ["switch", "organization", "workspace"],
-    },
     {
       id: "docs",
       label: "Go to Docs",
@@ -167,14 +158,12 @@ export function buildOrganizationSettingsActions({
   canAct,
   goTo,
   organizationId,
-  usageEnabled,
 }: {
   canAct: (resource: string, action: string) => boolean;
   goTo: (href: string) => void;
   organizationId: string | null;
-  usageEnabled: boolean;
 }): PaletteAction[] {
-  return ORGANIZATION_SETTINGS_LINKS.filter((link) => link.id !== "usage" || usageEnabled).map((link) => ({
+  return ORGANIZATION_SETTINGS_LINKS.map((link) => ({
     id: link.id,
     label: link.label,
     description: link.description,

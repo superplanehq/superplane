@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { AnnotationComponent } from "./index";
 
 // NodeResizeControl needs a ReactFlow provider we don't set up here; stub it out.

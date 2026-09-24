@@ -18,18 +18,13 @@ func DescribeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory pull request")
-	}
-
 	prID, err := parsePullRequestID(req.GetPrId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request")
 	}
@@ -39,7 +34,7 @@ func DescribeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request")
 	}
 
-	serialized, err := serializeFactoryPullRequests(db, []models.FactoryPullRequest{*pullRequest})
+	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request")
 	}

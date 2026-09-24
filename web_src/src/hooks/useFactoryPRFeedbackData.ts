@@ -48,6 +48,7 @@ function invalidatePRFeedbackQueries(queryClient: QueryClient, organizationId: s
   void queryClient.invalidateQueries({ queryKey: factoryPRFeedbackHandlersKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+  void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId) });
 }
 
 export function useCreateFactoryPRFeedbackHandler(organizationId: string, factoryId: string) {
@@ -58,6 +59,7 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
       name?: string;
       repository?: string;
       source?: FactoriesFactoryPrFeedbackHandlerSource;
+      settings?: FactoriesFactoryPrFeedbackHandlerSettings;
     }) => {
       const response = await factoriesCreateFactoryPrFeedbackHandler(
         withOrganizationHeader({
@@ -66,7 +68,7 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
           body: {
             name: input.name,
             source: input.source,
-            settings: input.repository ? { subject: { repository: input.repository } } : undefined,
+            settings: input.settings ?? (input.repository ? { subject: { repository: input.repository } } : undefined),
           },
         }),
       );
@@ -75,7 +77,19 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
       }
       return response.data.handler;
     },
-    onSuccess: () => {
+    onSuccess: (handler) => {
+      queryClient.setQueryData<FactoriesFactoryPrFeedbackHandler[]>(
+        factoryPRFeedbackHandlersKey(organizationId, factoryId),
+        (current) => {
+          if (!current) {
+            return [handler];
+          }
+          if (current.some((item) => item.id === handler.id)) {
+            return current;
+          }
+          return [...current, handler];
+        },
+      );
       invalidatePRFeedbackQueries(queryClient, organizationId, factoryId);
     },
   });

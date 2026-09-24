@@ -38,6 +38,8 @@ export function hasFactoryAppDefaults(canvas: CanvasesCanvas | null | undefined)
   const nodeIds = new Set(nodes.map((node) => node.id));
   return (
     (nodeIds.has("trigger") && nodeIds.has("create-work-order")) ||
-    (nodeIds.has("on-issue-labeled") && nodeIds.has("create-work-order"))
+    (nodeIds.has("on-issue-labeled") && nodeIds.has("create-work-order")) ||
+    (nodeIds.has("on-pr-comment") && nodeIds.has("address-pr-feedback")) ||
+    (nodeIds.has("on-pull-request") && nodeIds.has("wait-pr-checks"))
   );
 }

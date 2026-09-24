@@ -25,12 +25,14 @@ const FactoryNotificationConnectionName = "superplane"
 const workOrderNotificationDetailMaxRunes = 280
 
 // FactoryNotificationConsumer turns work order activity messages into
-// notification emails, honoring each recipient's notification settings.
+// notification emails and live browser alerts, honoring each recipient's
+// notification settings.
 type FactoryNotificationConsumer struct {
-	Consumer     *tackle.Consumer
-	RabbitMQURL  string
-	EmailService services.EmailService
-	BaseURL      string
+	Consumer                *tackle.Consumer
+	RabbitMQURL             string
+	EmailService            services.EmailService
+	BaseURL                 string
+	publishUserNotification func(messages.UserNotificationMessage) error
 }
 
 func NewFactoryNotificationConsumer(rabbitMQURL string, emailService services.EmailService, baseURL string) *FactoryNotificationConsumer {
@@ -42,10 +44,11 @@ func NewFactoryNotificationConsumer(rabbitMQURL string, emailService services.Em
 	consumer.SetLogger(logger)
 
 	return &FactoryNotificationConsumer{
-		RabbitMQURL:  rabbitMQURL,
-		Consumer:     consumer,
-		EmailService: emailService,
-		BaseURL:      baseURL,
+		RabbitMQURL:             rabbitMQURL,
+		Consumer:                consumer,
+		EmailService:            emailService,
+		BaseURL:                 baseURL,
+		publishUserNotification: messages.PublishUserNotification,
 	}
 }
 
@@ -145,22 +148,36 @@ func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.Fact
 		return false, err
 	}
 
-	recipients, err := c.resolveRecipients(db, orgID, factoryID, order, message)
+	plan, err := c.resolveRecipients(db, orgID, factoryID, order, message)
 	if err != nil {
 		return false, err
 	}
-	if len(recipients) == 0 {
+	if len(plan.emailRecipients) == 0 && len(plan.browserRecipients) == 0 {
 		return false, nil
 	}
 
 	actorName := c.actorDisplayName(db, orgID, message)
 	executions := loadWorkOrderExecutionsForEmail(db, order.ID)
-	return c.sendWorkOrderNotificationEmails(factoryModel, order, message, actorName, executions, recipients), nil
+	c.publishBrowserNotifications(factoryModel, order, message, actorName, plan.browserRecipients)
+	if len(plan.emailRecipients) == 0 {
+		return false, nil
+	}
+	return c.sendWorkOrderNotificationEmails(factoryModel, order, message, actorName, executions, plan.emailRecipients), nil
 }
 
 type workOrderEmailRecipient struct {
 	email            string
 	notificationType string
+}
+
+type workOrderBrowserRecipient struct {
+	userID           uuid.UUID
+	notificationType string
+}
+
+type workOrderNotificationPlan struct {
+	emailRecipients   []workOrderEmailRecipient
+	browserRecipients []workOrderBrowserRecipient
 }
 
 func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
@@ -181,7 +198,6 @@ func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
 				order,
 				message,
 				actorName,
-				recipient.notificationType,
 			)
 			applyWorkOrderEmailCard(&content.Data, order, executions, time.Now())
 			content.Data.WorkOrderLink = c.BaseURL + order.URLPath(factoryModel.Key)
@@ -197,22 +213,66 @@ func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
 	return sent
 }
 
-// resolveRecipients returns the email addresses that should receive this
-// notification: candidates by event type, minus the actor, filtered by
-// each user's notification settings.
+func (c *FactoryNotificationConsumer) publishBrowserNotifications(
+	factoryModel *models.Factory,
+	order *models.FactoryWorkOrder,
+	message messages.FactoryWorkOrderNotificationMessage,
+	actorName string,
+	recipients []workOrderBrowserRecipient,
+) {
+	if c.publishUserNotification == nil {
+		return
+	}
+
+	contentByType := map[string]workOrderNotificationContent{}
+	urlPath := order.URLPath(factoryModel.Key)
+	orderKey := factoryModel.WorkOrderKey(order.Number)
+	for _, recipient := range recipients {
+		content, ok := contentByType[recipient.notificationType]
+		if !ok {
+			content = buildWorkOrderNotificationContent(
+				factoryModel,
+				order,
+				message,
+				actorName,
+			)
+			contentByType[recipient.notificationType] = content
+		}
+		err := c.publishUserNotification(messages.UserNotificationMessage{
+			UserID:         recipient.userID.String(),
+			OrganizationID: factoryModel.OrganizationID.String(),
+			FactoryID:      factoryModel.ID.String(),
+			FactoryKey:     factoryModel.Key,
+			OrderID:        order.ID.String(),
+			OrderKey:       orderKey,
+			EventType:      recipient.notificationType,
+			Title:          content.Subject,
+			Body:           content.Data.Summary,
+			URLPath:        urlPath,
+		})
+		if err != nil {
+			log.Errorf("Failed to publish browser notification for user %s: %v", recipient.userID, err)
+		}
+	}
+}
+
+// resolveRecipients returns the email and browser recipients that should
+// receive this notification: candidates by event type, minus the actor,
+// filtered by each user's channel settings.
 func (c *FactoryNotificationConsumer) resolveRecipients(
 	db *gorm.DB,
 	orgID, factoryID uuid.UUID,
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
-) ([]workOrderEmailRecipient, error) {
+) (workOrderNotificationPlan, error) {
+	plan := workOrderNotificationPlan{}
 	candidates := workOrderNotificationCandidates(order, message)
 	delete(candidates, uuid.Nil)
 	if actorID, err := uuid.Parse(message.ActorUserID); err == nil {
 		delete(candidates, actorID)
 	}
 	if len(candidates) == 0 {
-		return nil, nil
+		return plan, nil
 	}
 
 	userIDs := make([]uuid.UUID, 0, len(candidates))
@@ -222,54 +282,73 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 
 	settingsByUserID, err := models.FindUserNotificationSettingsForUsers(db, orgID, userIDs)
 	if err != nil {
-		return nil, err
+		return plan, err
 	}
 
-	allowedIDs := make([]string, 0, len(candidates))
-	allowedTypes := map[string]string{}
+	emailTypes := map[uuid.UUID]string{}
+	browserTypes := map[uuid.UUID]string{}
 	for userID, notificationType := range candidates {
 		settings, ok := settingsByUserID[userID]
 		if !ok {
 			settings = models.DefaultUserNotificationSettings()
 		}
-		if !settings.Notifies(factoryID, notificationType) {
+		if settings.NotifiesChannel(models.NotificationChannelEmail, factoryID, notificationType) {
+			emailTypes[userID] = notificationType
+		}
+		if settings.NotifiesChannel(models.NotificationChannelBrowser, factoryID, notificationType) {
+			browserTypes[userID] = notificationType
+		}
+	}
+	if len(emailTypes) == 0 && len(browserTypes) == 0 {
+		return plan, nil
+	}
+
+	lookupIDs := make([]string, 0, len(emailTypes)+len(browserTypes))
+	seenLookup := map[uuid.UUID]struct{}{}
+	for userID := range emailTypes {
+		seenLookup[userID] = struct{}{}
+		lookupIDs = append(lookupIDs, userID.String())
+	}
+	for userID := range browserTypes {
+		if _, seen := seenLookup[userID]; seen {
 			continue
 		}
-		id := userID.String()
-		allowedIDs = append(allowedIDs, id)
-		allowedTypes[id] = notificationType
-	}
-	if len(allowedIDs) == 0 {
-		return nil, nil
+		lookupIDs = append(lookupIDs, userID.String())
 	}
 
-	users, err := models.FindUsersByIDsInOrganization(db, orgID.String(), allowedIDs)
+	users, err := models.FindUsersByIDsInOrganization(db, orgID.String(), lookupIDs)
 	if err != nil {
-		return nil, err
+		return plan, err
 	}
 
-	recipients := make([]workOrderEmailRecipient, 0, len(users))
 	for i := range users {
 		if users[i].DeletedAt.Valid {
 			continue
 		}
-		email := users[i].GetEmail()
-		if email == "" {
-			continue
+		if notificationType, ok := emailTypes[users[i].ID]; ok {
+			email := users[i].GetEmail()
+			if email != "" {
+				plan.emailRecipients = append(plan.emailRecipients, workOrderEmailRecipient{
+					email:            email,
+					notificationType: notificationType,
+				})
+			}
 		}
-		recipients = append(recipients, workOrderEmailRecipient{
-			email:            email,
-			notificationType: allowedTypes[users[i].ID.String()],
-		})
+		if notificationType, ok := browserTypes[users[i].ID]; ok {
+			plan.browserRecipients = append(plan.browserRecipients, workOrderBrowserRecipient{
+				userID:           users[i].ID,
+				notificationType: notificationType,
+			})
+		}
 	}
 
-	return recipients, nil
+	return plan, nil
 }
 
 // workOrderNotificationCandidates maps candidate recipients to the
 // notification type that covers them for this event. When a user matches
-// several types (owner and creator), the owner-facing type wins so each
-// user gets at most one email per event.
+// several types, the first match wins so each user gets at most one
+// email per event.
 func workOrderNotificationCandidates(
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
@@ -286,24 +365,6 @@ func workOrderNotificationCandidates(
 	}
 
 	switch message.EventType {
-	case factory.EventTypeOrderAssigneesUpdated:
-		for _, assignedID := range message.AssignedUserIDs {
-			if userID, err := uuid.Parse(assignedID); err == nil {
-				add(userID, models.NotificationTypeWorkOrderAssigned)
-			}
-		}
-	case factory.EventTypeOrderCommentAdded:
-		for _, mentionedID := range message.MentionedUserIDs {
-			if userID, err := uuid.Parse(mentionedID); err == nil {
-				add(userID, models.NotificationTypeWorkOrderMention)
-			}
-		}
-		for _, assignee := range order.Assignees {
-			add(assignee.UserID, models.NotificationTypeWorkOrderCommentOwned)
-		}
-		if order.CreatedByID != nil {
-			add(*order.CreatedByID, models.NotificationTypeWorkOrderCommentCreated)
-		}
 	case factory.EventTypeOrderStatusUpdated:
 		// The initial `"" → draft` transition is work order creation,
 		// not a change anyone needs an email about.
@@ -316,10 +377,6 @@ func workOrderNotificationCandidates(
 		if order.CreatedByID != nil {
 			add(*order.CreatedByID, models.NotificationTypeWorkOrderStatusOwned)
 		}
-	case factory.EventTypeOrderArtifactAdded:
-		for _, assignee := range order.Assignees {
-			add(assignee.UserID, models.NotificationTypeWorkOrderArtifactOwned)
-		}
 	case factory.EventTypeOrderStatusNoteUpdated:
 		for _, assignee := range order.Assignees {
 			add(assignee.UserID, models.NotificationTypeWorkOrderStatusNoteOwned)
@@ -327,9 +384,27 @@ func workOrderNotificationCandidates(
 		if order.CreatedByID != nil {
 			add(*order.CreatedByID, models.NotificationTypeWorkOrderStatusNoteOwned)
 		}
+	case factory.EventTypeOrderAgentQuestion:
+		addCreatorAndSessionStarter(add, order, message, models.NotificationTypeWorkOrderAgentQuestion)
+	case factory.EventTypeOrderPlanReady:
+		addCreatorAndSessionStarter(add, order, message, models.NotificationTypeWorkOrderPlanReady)
 	}
 
 	return candidates
+}
+
+func addCreatorAndSessionStarter(
+	add func(uuid.UUID, string),
+	order *models.FactoryWorkOrder,
+	message messages.FactoryWorkOrderNotificationMessage,
+	notificationType string,
+) {
+	if order.CreatedByID != nil {
+		add(*order.CreatedByID, notificationType)
+	}
+	if starterID, err := uuid.Parse(message.SessionStarterUserID); err == nil {
+		add(starterID, notificationType)
+	}
 }
 
 func (c *FactoryNotificationConsumer) actorDisplayName(
@@ -361,7 +436,6 @@ func buildWorkOrderNotificationContent(
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
 	actorName string,
-	notificationType string,
 ) workOrderNotificationContent {
 	orderKey := factoryModel.WorkOrderKey(order.Number)
 
@@ -373,33 +447,25 @@ func buildWorkOrderNotificationContent(
 	}
 
 	switch message.EventType {
-	case factory.EventTypeOrderAssigneesUpdated:
-		content.Subject = fmt.Sprintf("[%s] You are now an owner", orderKey)
-		content.Data.Summary = fmt.Sprintf("%s made you an owner of %s.", actorName, orderKey)
-	case factory.EventTypeOrderCommentAdded:
-		if notificationType == models.NotificationTypeWorkOrderMention {
-			content.Subject = fmt.Sprintf("[%s] %s mentioned you", orderKey, actorName)
-			content.Data.Summary = fmt.Sprintf("%s mentioned you in a comment on %s.", actorName, orderKey)
-		} else {
-			content.Subject = fmt.Sprintf("[%s] New comment from %s", orderKey, actorName)
-			content.Data.Summary = fmt.Sprintf("%s commented on %s.", actorName, orderKey)
-		}
-		content.Data.Detail = truncateNotificationDetail(message.CommentBody)
 	case factory.EventTypeOrderStatusUpdated:
 		verb := statusChangeDescription(message)
-		content.Subject = fmt.Sprintf("[%s] Work order %s", orderKey, verb)
+		content.Subject = fmt.Sprintf("[%s] Task %s", orderKey, verb)
 		content.Data.Summary = fmt.Sprintf("%s %s %s.", actorName, verb, orderKey)
-	case factory.EventTypeOrderArtifactAdded:
-		content.Subject = fmt.Sprintf("[%s] New artifact", orderKey)
-		content.Data.Summary = fmt.Sprintf("%s added a %s artifact to %s.", actorName, artifactTypeLabel(message.ArtifactType), orderKey)
 	case factory.EventTypeOrderStatusNoteUpdated:
 		content.Subject = fmt.Sprintf("[%s] %s", orderKey, message.StatusNoteHeadline)
 		content.Data.Summary = fmt.Sprintf("%s flagged %s as waiting on you: %s.", actorName, orderKey, message.StatusNoteHeadline)
 		content.Data.Detail = truncateNotificationDetail(message.StatusNoteBody)
 		content.Data.DetailCtaLabel = message.StatusNoteCtaLabel
 		content.Data.DetailCtaURL = message.StatusNoteCtaURL
+	case factory.EventTypeOrderAgentQuestion:
+		content.Subject = fmt.Sprintf("[%s] The agent has a question", orderKey)
+		content.Data.Summary = fmt.Sprintf("The agent is waiting for an answer on %s.", orderKey)
+		content.Data.Detail = truncateNotificationDetail(message.QuestionPrompt)
+	case factory.EventTypeOrderPlanReady:
+		content.Subject = fmt.Sprintf("[%s] Plan is ready", orderKey)
+		content.Data.Summary = fmt.Sprintf("Refinement finished and the plan is ready for %s.", orderKey)
 	default:
-		content.Subject = fmt.Sprintf("[%s] Work order update", orderKey)
+		content.Subject = fmt.Sprintf("[%s] Task update", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s updated %s.", actorName, orderKey)
 	}
 
@@ -424,17 +490,6 @@ func statusChangeDescription(message messages.FactoryWorkOrderNotificationMessag
 		return "closed"
 	default:
 		return "updated"
-	}
-}
-
-func artifactTypeLabel(artifactType string) string {
-	switch artifactType {
-	case factory.ArtifactTypeMarkdown:
-		return "markdown"
-	case factory.ArtifactTypeBranch:
-		return "branch"
-	default:
-		return "new"
 	}
 }
 

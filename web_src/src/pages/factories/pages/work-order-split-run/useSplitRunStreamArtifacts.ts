@@ -1,4 +1,4 @@
-import { useFactoryPullRequests, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
+import { useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { useMemo } from "react";
 
 import { flattenWorkOrderEventsPages } from "../../lib/workOrderEventsPagination";
@@ -18,17 +18,13 @@ export function useSplitRunStreamArtifacts(
 ): StreamArtifactIndex {
   const eventsQuery = useWorkOrderEvents(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const artifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
-  const pullRequestsQuery = useFactoryPullRequests(
-    organizationId ?? "",
-    factoryId ?? "",
-    orderId ? { workOrderIds: [orderId] } : undefined,
-  );
+  const workOrderQuery = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
 
   return useMemo(() => {
     if (!organizationId || !factoryId || !orderId) {
       return EMPTY_INDEX;
     }
-    return streamArtifactIndexFromEvents(events, artifactsQuery.data, pullRequestsQuery.data);
-  }, [artifactsQuery.data, events, factoryId, orderId, organizationId, pullRequestsQuery.data]);
+    return streamArtifactIndexFromEvents(events, artifactsQuery.data, workOrderQuery.data?.pullRequests);
+  }, [artifactsQuery.data, events, factoryId, orderId, organizationId, workOrderQuery.data?.pullRequests]);
 }

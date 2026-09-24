@@ -49,6 +49,7 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	dispatch := resp.Order.LineDispatches[0]
 	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, dispatch.State)
 	assert.Equal(t, line.Name, dispatch.Line.Name)
+	assert.Empty(t, dispatch.Model)
 	require.Len(t, dispatch.Steps, 1)
 	assert.Equal(t, app.Name, dispatch.Steps[0].Name)
 	require.Len(t, dispatch.StepExecutions, 1)
@@ -61,6 +62,67 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	active, err := order.FindActiveLineDispatch(db)
 	require.NoError(t, err)
 	assert.Equal(t, dispatch.Id, active.ID.String())
+}
+
+func Test__DispatchWorkOrder__CompletesActiveAnalysisRun(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	analysisCanvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	analysisRun, err := models.CreateCanvasRunInTransaction(
+		db,
+		analysisCanvas.ID,
+		"start",
+		models.CanvasRunStateStarted,
+		"",
+	)
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    analysisCanvas.ID,
+		CanvasRunID: analysisRun.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	event := support.EmitCanvasEventForNode(t, analysisCanvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, analysisCanvas.ID, backlogRefinementNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("run_id", analysisRun.ID).Error)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	updatedSession, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+
+	updatedRun, err := models.FindUnscopedCanvasRun(db, analysisRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+	result, err := updatedRun.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
+
+	updatedExecution, err := models.FindNodeExecutionInTransaction(db, analysisCanvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
 }
 
 // Test__DispatchWorkOrder__RejectsWhenAlreadyActive covers acceptance
@@ -310,4 +372,64 @@ func Test__DispatchWorkOrder__ReturnsOwnerNameAfterStart(t *testing.T) {
 	assert.Equal(t, r.User.String(), resp.Order.Assignees[0].Id)
 	assert.Equal(t, r.UserModel.Name, resp.Order.Assignees[0].Name)
 	assert.NotEqual(t, r.User.String(), resp.Order.Assignees[0].Name)
+}
+
+func Test__DispatchWorkOrder__PersistsChosenModel(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6", "claude-opus-4-6")
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+		Model:     "claude-opus-4-6",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Order.LineDispatches, 1)
+	assert.Equal(t, "claude-opus-4-6", resp.Order.LineDispatches[0].Model)
+
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, "claude-opus-4-6", active.Model)
+}
+
+func Test__DispatchWorkOrder__RejectsModelNotOnLine(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
+	seedHostedModels(t, db, models.UsageProviderOpenAI, "gpt-5")
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+		Model:     "gpt-5",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }

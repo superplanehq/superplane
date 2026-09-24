@@ -1,5 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   aggregateFactoryVelocityFlow,
@@ -59,6 +59,14 @@ describe("aggregateFactoryVelocityFlow", () => {
     expect(flow.runningShareOfCyclePct).toBe(0);
     expect(flow.waitingShareOfCyclePct).toBe(0);
     expect(flow.timeTrend).toHaveLength(14);
+  });
+
+  it("builds a 7-day window", () => {
+    const flow = aggregateFactoryVelocityFlow([], 7, NOW);
+
+    expect(flow.days).toBe(7);
+    expect(flow.label).toBe("Last 7 days");
+    expect(flow.timeTrend).toHaveLength(7);
   });
 
   it("skips draft/open orders and orders without executions", () => {

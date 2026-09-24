@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -33,6 +34,37 @@ func Test__WebhookCleanupWorker_DeletesWebhookWhenProviderCleanupFails(t *testin
 
 	assertWebhookHardDeleted(t, webhookID)
 	assert.Equal(t, 1, cleanupCalls)
+}
+
+func Test__WebhookCleanupWorker_PersistsIntegrationMetadataClearedByCleanup(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	worker, webhookID := setupWebhookCleanupWorker(t, r, func(ctx core.WebhookHandlerContext) error {
+		ctx.Integration.SetMetadata(map[string]any{})
+		return nil
+	})
+
+	integrationID := integrationIDForWebhook(t, webhookID)
+	require.NoError(t, database.Conn().Model(&models.Integration{}).
+		Where("id = ?", integrationID).
+		Update("metadata", datatypes.NewJSONType(map[string]any{"webhookId": 34})).Error)
+
+	require.NoError(t, worker.LockAndProcessWebhook(logger, models.Webhook{ID: webhookID}))
+
+	var stored models.Integration
+	require.NoError(t, database.Conn().Where("id = ?", integrationID).First(&stored).Error)
+	assert.NotContains(t, stored.Metadata.Data(), "webhookId")
+}
+
+func integrationIDForWebhook(t *testing.T, webhookID uuid.UUID) uuid.UUID {
+	t.Helper()
+
+	var webhook models.Webhook
+	require.NoError(t, database.Conn().Unscoped().Where("id = ?", webhookID).First(&webhook).Error)
+	require.NotNil(t, webhook.AppInstallationID)
+	return *webhook.AppInstallationID
 }
 
 func setupWebhookCleanupWorker(

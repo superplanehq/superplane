@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { transitionIssueMapper } from "./transition_issue";
 import { eventStateRegistry } from "./index";

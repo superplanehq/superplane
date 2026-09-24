@@ -115,6 +115,33 @@ service Me {
       tags: "Me";
     };
   }
+
+  // Self-scoped "resume where you left off" location for the calling user.
+  // The UI saves the last meaningful screen it renders (e.g. a pending
+  // approval) so the user can return to it after closing the browser or
+  // opening a new session, even on a different device.
+  rpc DescribeLastLocation(DescribeLastLocationRequest) returns (DescribeLastLocationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/last-location"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe last location";
+      description: "Returns the last in-app screen the calling user visited, if any was saved";
+      tags: "Me";
+    };
+  }
+
+  rpc SaveLastLocation(SaveLastLocationRequest) returns (SaveLastLocationResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/last-location"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Save last location";
+      description: "Saves the last in-app screen the calling user visited";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -123,6 +150,11 @@ message MeRequest {
 
 message MeResponse {
   User user = 1;
+}
+
+message BrowserNotificationPreferences {
+  bool enabled = 1;
+  bool show_while_viewing = 2;
 }
 
 message User {
@@ -135,6 +167,8 @@ message User {
   repeated Authorization.Permission permissions = 7;
   repeated string roles = 8;
   repeated string groups = 9;
+  bool is_owner = 10;
+  BrowserNotificationPreferences browser_notification_preferences = 11;
 }
 
 message RegenerateTokenResponse {
@@ -170,18 +204,15 @@ message RevokeTokenRequest {
 message RevokeTokenResponse {}
 
 // NotificationSettings is a user's organization-wide configuration for
-// work order notification emails. A missing row defaults to all
-// workspace events. Nested `workspaces` leaves room for other levels later.
+// work order notifications. A missing row defaults to email for all
+// workspace events and keeps the browser channel off.
 message NotificationSettings {
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    TYPE_WORK_ORDER_ASSIGNED = 1;
-    TYPE_WORK_ORDER_COMMENT_OWNED = 2;
-    TYPE_WORK_ORDER_COMMENT_CREATED = 3;
-    TYPE_WORK_ORDER_STATUS_OWNED = 4;
-    TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
-    TYPE_WORK_ORDER_MENTIONED = 6;
-    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 7;
+    TYPE_WORK_ORDER_STATUS_OWNED = 1;
+    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 2;
+    TYPE_WORK_ORDER_AGENT_QUESTION = 3;
+    TYPE_WORK_ORDER_PLAN_READY = 4;
   }
 
   enum WorkspaceScope {
@@ -200,11 +231,20 @@ message NotificationSettings {
   message Workspaces {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
-    // event_types applies when scope is ALL. An empty list means every type.
+    // event_types applies when scope is ALL. An empty list means no types.
     repeated Type event_types = 3;
   }
 
+  message Browser {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means no types.
+    repeated Type event_types = 3;
+    bool show_while_viewing = 4;
+  }
+
   Workspaces workspaces = 1;
+  Browser browser = 2;
 }
 
 message DescribeNotificationSettingsRequest {}
@@ -219,4 +259,27 @@ message UpdateNotificationSettingsRequest {
 
 message UpdateNotificationSettingsResponse {
   NotificationSettings settings = 1;
+}
+
+// LastLocation is a saved in-app path (e.g. "/acme/apps/deploy?run=42") that
+// the UI can navigate back to. It is opaque to the backend beyond being a
+// safe, relative, same-origin path.
+message LastLocation {
+  string path = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
+
+message DescribeLastLocationRequest {}
+
+message DescribeLastLocationResponse {
+  // Unset when the calling user has no saved location yet.
+  LastLocation last_location = 1;
+}
+
+message SaveLastLocationRequest {
+  string path = 1;
+}
+
+message SaveLastLocationResponse {
+  LastLocation last_location = 1;
 }

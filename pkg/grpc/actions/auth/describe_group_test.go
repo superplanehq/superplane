@@ -65,33 +65,31 @@ func Test_DescribeGroup(t *testing.T) {
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
-	t.Run("get group with viewer role", func(t *testing.T) {
-		// Create a group with viewer role
-		err = r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "viewer-group", models.RoleOrgViewer, "Viewer Group", "Viewer group description")
+	t.Run("get group with operator role", func(t *testing.T) {
+		err = r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "operator-group", models.RoleOrgOperator, "Operator Group", "Operator group description")
 		require.NoError(t, err)
 
-		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "viewer-group", r.AuthService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "operator-group", r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "viewer-group", resp.Group.Metadata.Name)
+		assert.Equal(t, "operator-group", resp.Group.Metadata.Name)
 		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.Metadata.DomainType)
 		assert.Equal(t, orgID, resp.Group.Metadata.DomainId)
-		assert.Equal(t, "org_viewer", resp.Group.Spec.Role)
+		assert.Equal(t, "org_operator", resp.Group.Spec.Role)
 	})
 
-	t.Run("get group with owner role", func(t *testing.T) {
-		// Create a group with owner role
-		err = r.AuthService.CreateGroup(orgID, "org", "owner-group", models.RoleOrgOwner, "Owner Group", "Owner group description")
+	t.Run("get group with maintainer role", func(t *testing.T) {
+		err = r.AuthService.CreateGroup(orgID, "org", "maintainer-group", models.RoleOrgMaintainer, "Maintainer Group", "Maintainer group description")
 		require.NoError(t, err)
 
-		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "owner-group", r.AuthService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "maintainer-group", r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "owner-group", resp.Group.Metadata.Name)
+		assert.Equal(t, "maintainer-group", resp.Group.Metadata.Name)
 		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.Metadata.DomainType)
 		assert.Equal(t, orgID, resp.Group.Metadata.DomainId)
-		assert.Equal(t, "org_owner", resp.Group.Spec.Role)
+		assert.Equal(t, "org_maintainer", resp.Group.Spec.Role)
 	})
 }

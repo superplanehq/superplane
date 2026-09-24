@@ -16,6 +16,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -30,8 +31,13 @@ const (
 	ResourceTypeAlertTarget       = "alert-target"
 	ResourceTypeRelease           = "release"
 	ResourceTypeGitHubIntegration = "github-integration"
+	ResourceTypeUnresolvedIssue   = "unresolved-issue"
 
 	SentryPersonalTokensURL = "https://sentry.io/settings/account/api/auth-tokens/"
+
+	hostedInstallDescription = `
+Install the SuperPlane Sentry app on the Sentry organization that SuperPlane should read.
+`
 )
 
 const (
@@ -86,13 +92,28 @@ type Configuration struct {
 	IntegrationName string `json:"integrationName" mapstructure:"integrationName"`
 	UserToken       string `json:"userToken" mapstructure:"userToken"`
 	ClientSecret    string `json:"clientSecret" mapstructure:"clientSecret"`
+	PrivateApp      bool   `json:"privateApp" mapstructure:"privateApp"`
+	SetupReturnPath string `json:"setupReturnPath" mapstructure:"setupReturnPath"`
 }
 
 type Metadata struct {
-	AppSlug      string               `json:"appSlug" mapstructure:"appSlug"`
-	Organization *OrganizationSummary `json:"organization,omitempty" mapstructure:"organization,omitempty"`
-	Projects     []ProjectSummary     `json:"projects" mapstructure:"projects"`
-	Teams        []TeamSummary        `json:"teams" mapstructure:"teams"`
+	AppSlug          string               `json:"appSlug" mapstructure:"appSlug"`
+	Organization     *OrganizationSummary `json:"organization,omitempty" mapstructure:"organization,omitempty"`
+	Projects         []ProjectSummary     `json:"projects" mapstructure:"projects"`
+	Teams            []TeamSummary        `json:"teams" mapstructure:"teams"`
+	HostedApp        bool                 `json:"hostedApp,omitempty" mapstructure:"hostedApp,omitempty"`
+	State            string               `json:"state,omitempty" mapstructure:"state,omitempty"`
+	InstallationUUID string               `json:"installationUUID,omitempty" mapstructure:"installationUUID,omitempty"`
+	StartedByUserID  string               `json:"startedByUserID,omitempty" mapstructure:"startedByUserID,omitempty"`
+	SetupReturnPath  string               `json:"setupReturnPath,omitempty" mapstructure:"setupReturnPath,omitempty"`
+	TokenExpiresAt   string               `json:"tokenExpiresAt,omitempty" mapstructure:"tokenExpiresAt,omitempty"`
+}
+
+func (m Metadata) AllowsStartedBy(userID string) bool {
+	if m.StartedByUserID == "" {
+		return true
+	}
+	return m.StartedByUserID == userID
 }
 
 type OrganizationSummary struct {
@@ -177,8 +198,8 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Label:       "User Token",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Personal auth token from Sentry. Include `project:releases` if you use release actions.",
-			Required:    true,
+			Description: "Personal auth token from Sentry. Include `project:releases` if you use release actions. Leave empty when SuperPlane installs the public Sentry app.",
+			Required:    false,
 		},
 		{
 			Name:        "integrationName",
@@ -193,8 +214,8 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Label:       "Client Secret",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Client secret from your Sentry internal integration, used to verify incoming webhooks.",
-			Required:    true,
+			Description: "Client secret from your Sentry internal integration, used to verify incoming webhooks. Leave empty when SuperPlane installs the public Sentry app.",
+			Required:    false,
 		},
 	}
 }
@@ -224,6 +245,13 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 	config, err := s.loadConfiguration(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
+	}
+	overlayCreateConfiguration(&config, ctx.Configuration)
+
+	metadata := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if usesHostedSync(config, metadata) {
+		return s.syncHostedApp(ctx, config)
 	}
 
 	if strings.TrimSpace(config.UserToken) == "" || strings.TrimSpace(config.ClientSecret) == "" {
@@ -277,6 +305,113 @@ func (s *Sentry) createSetupPrompt(ctx core.SyncContext, config Configuration) e
 	})
 	ctx.Integration.Error(missingCredentialsMessage(config))
 	return nil
+}
+
+// usesHostedSync is the Cloud public-app path. A hosted install already
+// recorded on the integration stays there. A new install with no personal
+// token also uses it. A personal token or client secret is a legacy Internal
+// Integration and keeps that authentication flow.
+func usesHostedSync(config Configuration, metadata Metadata) bool {
+	if !UseHostedApp() || config.PrivateApp {
+		return false
+	}
+	if metadata.HostedApp {
+		return true
+	}
+	hasPersonalCredential := strings.TrimSpace(config.UserToken) != "" || strings.TrimSpace(config.ClientSecret) != ""
+	return !hasPersonalCredential
+}
+
+func overlayCreateConfiguration(config *Configuration, raw any) {
+	if config == nil || raw == nil {
+		return
+	}
+
+	var overlay Configuration
+	if err := mapstructure.Decode(raw, &overlay); err != nil {
+		return
+	}
+	if overlay.PrivateApp {
+		config.PrivateApp = true
+	}
+	if strings.TrimSpace(overlay.SetupReturnPath) != "" {
+		config.SetupReturnPath = strings.TrimSpace(overlay.SetupReturnPath)
+	}
+}
+
+func (s *Sentry) syncHostedApp(ctx core.SyncContext, config Configuration) error {
+	if !HostedAppConfigured() {
+		return fmt.Errorf("hosted Sentry app is not configured")
+	}
+
+	existing := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &existing)
+	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
+
+	if existing.HostedApp && existing.InstallationUUID != "" {
+		existing.SetupReturnPath = returnPath
+		if err := s.refreshHostedMetadata(ctx, existing); err != nil {
+			ctx.Integration.Error(err.Error())
+			return nil
+		}
+		ctx.Integration.RemoveBrowserAction()
+		ctx.Integration.Ready()
+		return nil
+	}
+
+	existing.SetupReturnPath = returnPath
+	bound, err := s.bindReadyHostedInstallIfPresent(ctx, existing)
+	if err != nil {
+		return err
+	}
+	if bound {
+		return nil
+	}
+
+	if existing.HostedApp && existing.State != "" {
+		s.refreshHostedPendingAction(ctx, existing)
+		return nil
+	}
+
+	state, err := crypto.Base64String(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate Sentry app state: %w", err)
+	}
+
+	startedBy := ctx.ActorUserID
+	if existing.StartedByUserID != "" {
+		startedBy = existing.StartedByUserID
+	}
+
+	s.refreshHostedPendingAction(ctx, Metadata{
+		State:           state,
+		HostedApp:       true,
+		StartedByUserID: startedBy,
+		SetupReturnPath: returnPath,
+	})
+	return nil
+}
+
+func (s *Sentry) refreshHostedPendingAction(ctx core.SyncContext, metadata Metadata) {
+	if metadata.InstallationUUID != "" {
+		ctx.Integration.SetMetadata(metadata)
+		return
+	}
+
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: hostedInstallDescription,
+		URL:         HostedAppInstallURL(ctx.BaseURL, metadata.State),
+		Method:      http.MethodGet,
+	})
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func (s *Sentry) refreshHostedMetadata(ctx core.SyncContext, metadata Metadata) error {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+	return s.populateMetadataFromOrg(ctx, client)
 }
 
 func (s *Sentry) reconcileWebhook(ctx core.SyncContext, config Configuration) (string, error) {
@@ -449,12 +584,16 @@ func (s *Sentry) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {
-	if !strings.HasSuffix(ctx.Request.URL.Path, "/events") {
+	switch {
+	case strings.HasSuffix(ctx.Request.URL.Path, "/setup"):
+		s.afterHostedAppSetup(ctx)
+	case strings.HasSuffix(ctx.Request.URL.Path, "/install"):
+		s.redirectHostedAppInstall(ctx)
+	case strings.HasSuffix(ctx.Request.URL.Path, "/events"), strings.HasSuffix(ctx.Request.URL.Path, "/webhook"):
+		s.handleWebhook(ctx)
+	default:
 		ctx.Response.WriteHeader(http.StatusNotFound)
-		return
 	}
-
-	s.handleWebhook(ctx)
 }
 
 func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
@@ -472,13 +611,14 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if strings.TrimSpace(config.ClientSecret) == "" {
+	webhookSecret := webhookSecretFor(ctx.Integration, config)
+	if strings.TrimSpace(webhookSecret) == "" {
 		ctx.Logger.Warn("missing sentry client secret for webhook signature verification")
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	if err := verifyWebhookSignature(ctx.Request.Header.Get("Sentry-Hook-Signature"), body, []byte(config.ClientSecret)); err != nil {
+	if err := verifyWebhookSignature(ctx.Request.Header.Get("Sentry-Hook-Signature"), body, []byte(webhookSecret)); err != nil {
 		ctx.Logger.Warnf("invalid sentry webhook signature: %v", err)
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
@@ -500,6 +640,12 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 	if err := json.Unmarshal(body, &payload); err != nil {
 		ctx.Logger.Errorf("failed to decode sentry webhook: %v", err)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !hostedWebhookInstallationAllowed(ctx.Integration, payload.Installation.UUID) {
+		ctx.Logger.Warn("sentry webhook installation does not match this connection")
+		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
 
@@ -527,6 +673,7 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 		return fmt.Errorf("failed to list sentry subscriptions: %w", err)
 	}
 
+	sendErrors := []error{}
 	for _, subscription := range subscriptions {
 		config := SubscriptionConfiguration{}
 		if err := mapstructure.Decode(subscription.Configuration(), &config); err != nil {
@@ -540,10 +687,11 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 
 		if err := subscription.SendMessage(message); err != nil {
 			ctx.Logger.Errorf("failed to send sentry message to subscription: %v", err)
+			sendErrors = append(sendErrors, err)
 		}
 	}
 
-	return nil
+	return errors.Join(sendErrors...)
 }
 
 func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -596,6 +744,9 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 
 		return resources, nil
+
+	case ResourceTypeUnresolvedIssue:
+		return s.listUnresolvedIssueResources(ctx)
 
 	case ResourceTypeAssignee:
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -912,6 +1063,57 @@ func (s *Sentry) populateMetadataFromOrg(ctx core.SyncContext, client *Client) e
 	return nil
 }
 
+const newestUnresolvedIssueLimit = 10
+
+func (s *Sentry) listUnresolvedIssueResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sentry client: %w", err)
+	}
+
+	issues, err := client.ListNewestUnresolvedIssues(strings.TrimSpace(ctx.Parameters["project"]), newestUnresolvedIssueLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list unresolved issues: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(issues))
+	for _, issue := range issues {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeUnresolvedIssue,
+			ID:   issue.ID,
+			Name: displayIssueLabel(issue.ShortID, issue.Title),
+		})
+	}
+	return resources, nil
+}
+
+func webhookSecretFor(integration core.IntegrationContext, config Configuration) string {
+	metadata := Metadata{}
+	_ = mapstructure.Decode(integration.GetMetadata(), &metadata)
+	if metadata.HostedApp {
+		if app, ok := HostedAppFromEnv(); ok {
+			return app.ClientSecret
+		}
+	}
+	return config.ClientSecret
+}
+
+func hostedWebhookInstallationAllowed(integration core.IntegrationContext, payloadUUID string) bool {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+	if !metadata.HostedApp {
+		return true
+	}
+
+	expected := strings.TrimSpace(metadata.InstallationUUID)
+	if expected == "" {
+		return false
+	}
+	return strings.TrimSpace(payloadUUID) == expected
+}
+
 func (s *Sentry) loadConfiguration(integration core.IntegrationContext) (Configuration, error) {
 	clientSecret := optionalConfig(integration, "clientSecret")
 
@@ -1016,6 +1218,10 @@ func eventsURL(ctx core.SyncContext) string {
 		baseURL = strings.TrimSuffix(ctx.WebhooksBaseURL, "/")
 	}
 	return fmt.Sprintf("%s/api/v1/integrations/%s/events", baseURL, ctx.Integration.ID().String())
+}
+
+func VerifyWebhookSignature(signature string, body, secret []byte) error {
+	return verifyWebhookSignature(signature, body, secret)
 }
 
 func verifyWebhookSignature(signature string, body, secret []byte) error {

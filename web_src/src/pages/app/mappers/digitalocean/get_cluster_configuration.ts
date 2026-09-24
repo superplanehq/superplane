@@ -4,7 +4,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/lib/colors";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
-import { getStateMap } from "..";
+import { getStateMap } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

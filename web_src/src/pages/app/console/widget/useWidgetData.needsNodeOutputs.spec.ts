@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 
 import { renderNeedsRunNodeOutputs } from "./useWidgetData";
 import type { WidgetChartRender, WidgetNumberRender, WidgetTableRender } from "./types";

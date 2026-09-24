@@ -1,10 +1,11 @@
 import type { AppTabId } from "@/lib/lastVisitedAppTab";
+import type { ClassicAppRouteRedirect } from "./classicAppRouteRedirect";
 import type { DefaultTabResolution } from "./defaultAppTab";
 
 export type AppDefaultTabGateDecision =
   | { kind: "commit" }
   | { kind: "skeleton" }
-  | { kind: "factory-canvas" }
+  | { kind: "redirect"; to: string }
   | { kind: "stored-tab"; tab: AppTabId }
   | { kind: "resolution"; resolution: DefaultTabResolution };
 
@@ -12,14 +13,13 @@ type DecideArgs = {
   alreadyCommitted: boolean;
   canvasId: string;
   pinned: boolean;
-  viewParam: string;
   isNonCanvasView: boolean;
   canvasQueryEnabled: boolean;
   canvasLoading: boolean;
   canvasUndefined: boolean;
-  factoryOwnedApp: boolean;
   storedTab: AppTabId | null;
   resolution: DefaultTabResolution;
+  classicSurface: ClassicAppRouteRedirect;
 };
 
 export function decideAppDefaultTabGate({
@@ -30,17 +30,11 @@ export function decideAppDefaultTabGate({
   canvasQueryEnabled,
   canvasLoading,
   canvasUndefined,
-  factoryOwnedApp,
   storedTab,
   resolution,
+  classicSurface,
 }: DecideArgs): AppDefaultTabGateDecision {
   if (alreadyCommitted || !canvasId) {
-    return { kind: "commit" };
-  }
-
-  // Deep links that are already on the canvas surface (run/edit/version/…) can
-  // commit immediately. Console/Memory/Files pins must wait for the factory check.
-  if (pinned && !isNonCanvasView) {
     return { kind: "commit" };
   }
 
@@ -48,10 +42,18 @@ export function decideAppDefaultTabGate({
     return { kind: "skeleton" };
   }
 
-  if (factoryOwnedApp) {
-    if (isNonCanvasView) {
-      return { kind: "factory-canvas" };
-    }
+  if (classicSurface.kind === "wait") {
+    return { kind: "skeleton" };
+  }
+
+  if (classicSurface.kind === "redirect") {
+    return { kind: "redirect", to: classicSurface.to };
+  }
+
+  // Deep links that are already on the canvas surface (run/edit/version/…) can
+  // commit immediately. Console/Memory/Files pins wait for the factory check
+  // above so factory-owned apps never stay on the classic URL.
+  if (pinned && !isNonCanvasView) {
     return { kind: "commit" };
   }
 

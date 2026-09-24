@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 
 function makeSearchParams(params: Record<string, string> = {}) {
@@ -32,6 +32,20 @@ describe("useWorkflowViewSearchParams", () => {
 
     expect(next.get("view")).toBeNull();
     expect(next.get("run")).toBe("run-42");
+  });
+
+  it("migrates legacy files view params", async () => {
+    const setSearchParams = vi.fn();
+    renderHook(() =>
+      useWorkflowViewSearchParams(makeSearchParams({ view: "files", file: "canvas.yaml" }), setSearchParams),
+    );
+
+    await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+
+    const next = setSearchParams.mock.calls[0]?.[0] as URLSearchParams;
+
+    expect(next.get("view")).toBeNull();
+    expect(next.get("file")).toBeNull();
   });
 
   it("migrates legacy versions view params", async () => {

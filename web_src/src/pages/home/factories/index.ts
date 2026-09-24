@@ -1,14 +1,13 @@
-import type { InstallParam } from "@/pages/install/types";
-
-import type { FactoryDefinition } from "./types";
+import type { FactoryDefinition, InstallParam } from "./types";
 import factoryMeta from "./software-factory/factory.json";
 import factoryParams from "./software-factory/params.json";
 import softwareFactoryCanvasYaml from "./software-factory/canvas.yaml?raw";
 import softwareFactoryConsoleYaml from "./software-factory/console.yaml?raw";
 
-export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
+export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition, InstallParam } from "./types";
 export {
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   normalizeFactoryInstallParams,
@@ -34,9 +33,9 @@ function buildSoftwareFactory(): FactoryDefinition {
   };
 }
 
-// Onboarding provisions a factory line as separate, focused apps — one per
-// phase — mirroring the production setup. Each app exposes a single onRun
-// entrypoint that the line calls in order, passing the task through.
+// Onboarding provisions a factory line as focused apps. Each app exposes a
+// single onRun entrypoint that the line calls in order, passing the task
+// through.
 const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
   "github.createIssueComment": "github",
   "github.createPullRequest": "github",
@@ -114,7 +113,6 @@ export interface OnboardingLineApp {
 }
 
 export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
-  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
   { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
 ];
 
@@ -125,16 +123,10 @@ export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
-  "line-planning": buildLineApp({
-    id: "line-planning",
-    title: "Plan",
-    description: "Read the task and write an implementation plan.",
-    entrypointNodeId: "onrun-create-plan",
-  }),
   "line-implementation": buildLineApp({
     id: "line-implementation",
     title: "Implement",
-    description: "Create a branch, implement the plan, and open a pull request.",
+    description: "Create a branch, implement the task, and open a pull request.",
     entrypointNodeId: "onrun-implement",
   }),
   "pr-closure": buildEventApp({
