@@ -81,13 +81,13 @@ describe("SentryIntakeSetupDialog", () => {
     expect(
       await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject }),
     ).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
-      "adds the newest unresolved issues",
-    );
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
       "listens for new issues",
     );
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent(
+      "adds the newest unresolved issues",
+    );
+    expect(screen.getByTestId("sentry-skip-initial-import")).toBeChecked();
     expect(screen.getByTestId("sentry-intake-setup-stepper")).toBeInTheDocument();
     expect(screen.getByTestId("sentry-intake-setup-sphere")).toBeInTheDocument();
     expect(screen.queryByTestId("sentry-setup-preview")).not.toBeInTheDocument();
@@ -119,9 +119,9 @@ describe("SentryIntakeSetupDialog", () => {
 
     await screen.findByTestId("sentry-project-payments");
     expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
-    expect(screen.getByTestId("sentry-skip-initial-import")).not.toBeChecked();
+    expect(screen.getByTestId("sentry-skip-initial-import")).toBeChecked();
     await user.click(screen.getByTestId("sentry-skip-initial-import"));
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip)).toBeInTheDocument();
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.importExistingHelperOff)).toBeInTheDocument();
     await user.click(screen.getByTestId("sentry-project-payments"));
     await user.click(screen.getByTestId("sentry-setup-finish"));
 
