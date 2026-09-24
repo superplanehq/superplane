@@ -12,12 +12,14 @@ export type ClaudeCodeLogStep = {
   type: string;
   status: ClaudeCodeLogStatus;
   output?: string;
+  duration?: string;
   commands: ClaudeCodeLogCommand[];
 };
 
-const HIDDEN_STEP_NAMES = new Set(["Prepare Claude Code"]);
+const HIDDEN_STEP_NAMES = new Set(["Prepare Claude Code", "Fetch task attachments", "Set up GitHub"]);
 const COMMAND_DETAIL_MAX = 72;
 const STEP_LINE = /^\$ (.+)$/;
+const DURATION_LINE = /^~ (.+)$/;
 const TOOL_LINE = /^-> \[([^\]]+)\]\s*(.*)$/;
 const RUNNER_NOISE = /^(Claude Code (ready|started)\b|claude=|node=v|cwd=|Thinking$)/;
 const STEP_PASSED = /^✓ /;
@@ -50,6 +52,7 @@ export function parseClaudeCodeLog(
       type: typeForStep(step, configured),
       status: step.status,
       output: step.output,
+      duration: step.duration,
       commands: step.commands,
     }));
 }
@@ -66,7 +69,19 @@ function consumeStepLine(current: OpenStep, rawLine: string) {
     return;
   }
 
+  const duration = rawLine.match(DURATION_LINE)?.[1]?.trim();
+  if (duration) {
+    current.duration = duration;
+    return;
+  }
   if (!rawLine.trim()) {
+    return;
+  }
+  if (rawLine === "✗ tool failed") {
+    const command = lastCommand(current);
+    if (command && command.type !== "note") {
+      command.status = "failed";
+    }
     return;
   }
   if (STEP_FAILED.test(rawLine)) {
