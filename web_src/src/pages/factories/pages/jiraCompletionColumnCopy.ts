@@ -1,8 +1,7 @@
 export const JIRA_COMPLETION_COLUMN_COPY = {
-  section: "When SuperPlane completes the task",
-  move: "Move the Jira issue to this column",
-  column: "Column",
-  helper: "SuperPlane moves the issue here when the task completes.",
+  section: "When the SuperPlane task completes",
+  move: "Move Jira ticket to",
+  column: "Jira column",
   loading: "Loading columns...",
   empty: "This project has no columns SuperPlane can move the issue to.",
 } as const;

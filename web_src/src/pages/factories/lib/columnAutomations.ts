@@ -188,7 +188,7 @@ function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: Factor
         action: source.accept.label,
         iconSrc: source.iconSrc,
         iconAlt: source.iconAlt,
-        health: intake.healthy === false ? "needs-repair" : "healthy",
+        health: "healthy",
         runningCount: runningCountForApp(intake.canvasId, workOrders),
         catalogId: source.id,
         canvasId: intake.canvasId?.trim() || undefined,

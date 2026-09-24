@@ -10,8 +10,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { INTAKE_CONNECTION_COPY } from "./intakeConnectionModel";
-import { IntakeSourceSettingsPopup, type IntakeSettingsConnection } from "./IntakeSourceSettingsPopup";
+import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
@@ -138,16 +137,11 @@ function renderPopup(
     labelOptions?: string[];
     labelOptionsLoading?: boolean;
     sourceId?: LineIntakeSourceId;
-    connection?: IntakeSettingsConnection;
     settings?: typeof DEFAULT_GITHUB_INTAKE_SETTINGS;
     organizationId?: string;
     integrationId?: string;
     resourceId?: string;
-    paused?: boolean;
-    pauseError?: string;
     deleteError?: string;
-    onPause?: () => void | Promise<void>;
-    onResume?: () => void | Promise<void>;
     onDelete?: () => void | Promise<void>;
   } = {},
 ) {
@@ -166,7 +160,6 @@ function renderPopup(
                     : DEFAULT_GITHUB_INTAKE_SETTINGS)
               }
               sourceId={props.sourceId}
-              connection={props.connection}
               organizationId={props.organizationId}
               integrationId={props.integrationId}
               resourceId={props.resourceId}
@@ -174,11 +167,7 @@ function renderPopup(
               labelOptionsLoading={props.labelOptionsLoading}
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
-              paused={props.paused}
-              pauseError={props.pauseError}
               deleteError={props.deleteError}
-              onPause={props.onPause}
-              onResume={props.onResume}
               onDelete={props.onDelete}
               editAutomationHref={props.editAutomationHref}
               canvasId={props.canvasId}
@@ -193,22 +182,6 @@ function renderPopup(
       </MemoryRouter>
     </QueryClientProvider>,
   );
-}
-
-function intakeConnection(overrides: Partial<IntakeSettingsConnection> = {}): IntakeSettingsConnection {
-  return {
-    binding: { integrationId: "", resourceId: "" },
-    integrations: [
-      {
-        metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
-        status: { state: "ready" },
-      },
-    ],
-    projects: [],
-    onBindingChange: vi.fn(),
-    onConnect: vi.fn(),
-    ...overrides,
-  };
 }
 
 afterEach(() => {
@@ -391,94 +364,25 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the Connection section for a GitHub intake", () => {
-    renderPopup();
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+    "hides connection, project, and pause controls for a %s intake",
+    (sourceId) => {
+      renderPopup({ sourceId });
 
-    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-  });
-
-  it("shows Connection fields for a Jira intake that needs a live connection", () => {
-    renderPopup({
-      sourceId: "jira-issues",
-      connection: intakeConnection({ health: "HEALTH_MISSING_INTEGRATION" }),
-    });
-
-    expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: INTAKE_CONNECTION_COPY.section })).toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent(INTAKE_CONNECTION_COPY.missing);
-    expect(screen.getByText("Choose the Jira site that SuperPlane will monitor.")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-jira-1")).toHaveTextContent("Atlassian");
-  });
-
-  it("hides Connect when a Jira intake already has an account", () => {
-    renderPopup({
-      sourceId: "jira-issues",
-      connection: intakeConnection({
-        binding: { integrationId: "jira-1", resourceId: "ENG" },
-        projects: [{ id: "ENG", name: "Engineering" }],
-      }),
-    });
-
-    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-jira-1")).toBeInTheDocument();
-  });
-
-  it("shows Connect Jira when the intake has no account", () => {
-    renderPopup({
-      sourceId: "jira-issues",
-      connection: intakeConnection({ integrations: [] }),
-    });
-
-    expect(screen.getByTestId("intake-connection-connect")).toHaveTextContent("Connect Jira");
-  });
-
-  it("hides Connect when a Sentry intake already has an account", () => {
-    renderPopup({
-      sourceId: "sentry-exceptions",
-      connection: intakeConnection({
-        binding: { integrationId: "sentry-1", resourceId: "proj-1" },
-        integrations: [
-          {
-            metadata: { id: "sentry-1", name: "Sentry org", integrationName: "sentry" },
-            status: { state: "ready" },
-          },
-        ],
-        projects: [{ id: "proj-1", name: "Frontend" }],
-      }),
-    });
-
-    expect(screen.queryByTestId("intake-connection-connect")).not.toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-sentry-1")).toBeInTheDocument();
-  });
-
-  it("keeps Save disabled until the Jira project is chosen", () => {
-    renderPopup({
-      sourceId: "jira-issues",
-      connection: intakeConnection({
-        health: "HEALTH_MISSING_INTEGRATION",
-        binding: { integrationId: "jira-1", resourceId: "" },
-        projects: [{ id: "ENG", name: "Engineering" }],
-        saveDisabled: true,
-      }),
-    });
-
-    expect(screen.getByTestId("intake-source-settings-save")).toBeDisabled();
-  });
+      expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
+    },
+  );
 
   it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "pauses, resumes, and deletes a %s intake after confirmation",
+    "deletes a %s intake after confirmation",
     async (sourceId) => {
-      const onPause = vi.fn();
-      const onResume = vi.fn();
       const onDelete = vi.fn();
       const user = userEvent.setup();
-      renderPopup({ sourceId, onPause, onResume, onDelete });
+      renderPopup({ sourceId, onDelete });
 
-      expect(screen.getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
       expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
-
-      await user.click(screen.getByTestId("intake-source-settings-pause"));
-      expect(onPause).toHaveBeenCalledTimes(1);
 
       await user.click(screen.getByTestId("intake-source-settings-delete"));
       expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
@@ -492,34 +396,6 @@ describe("IntakeSourceSettingsPopup", () => {
       expect(onDelete).toHaveBeenCalledTimes(1);
     },
   );
-
-  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "offers resume for a paused %s intake",
-    async (sourceId) => {
-      const onResume = vi.fn();
-      const user = userEvent.setup();
-      renderPopup({ sourceId, paused: true, onResume });
-
-      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-      await user.click(screen.getByTestId("intake-source-settings-resume"));
-      expect(onResume).toHaveBeenCalledTimes(1);
-    },
-  );
-
-  it("keeps a failed pause from rejecting and shows the error", async () => {
-    const onPause = vi.fn().mockRejectedValue(new Error("pause failed"));
-    const user = userEvent.setup();
-    renderPopup({
-      sourceId: "sentry-exceptions",
-      onPause,
-      pauseError: INTAKE_SETTINGS_COPY.pauseError,
-    });
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-
-    expect(onPause).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("alert")).toHaveTextContent(INTAKE_SETTINGS_COPY.pauseError);
-  });
 
   it("shows a delete error in the confirmation dialog", async () => {
     const user = userEvent.setup();
