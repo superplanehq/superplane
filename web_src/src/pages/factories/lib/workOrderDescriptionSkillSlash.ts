@@ -2,19 +2,29 @@ import type { Editor } from "@tiptap/react";
 
 import { skillSlashQueryAtCursor, type SkillSlashQuery } from "@/lib/skillSlash";
 
-export function skillSlashQueryInEditor(editor: Editor): SkillSlashQuery | null {
+export type EditorSkillSlashQuery = SkillSlashQuery & { from: number };
+
+export function skillSlashQueryInBlock(before: string, parentStart: number): EditorSkillSlashQuery | null {
+  const query = skillSlashQueryAtCursor(before, before.length);
+  if (!query) {
+    return null;
+  }
+  return { ...query, from: parentStart + query.start };
+}
+
+export function skillSlashQueryInEditor(editor: Editor): EditorSkillSlashQuery | null {
   if (!editor.state.selection.empty) {
     return null;
   }
-  const [before] = skillSlashEditorBefore(editor);
-  return skillSlashQueryAtCursor(before, before.length);
+  const [before, parentStart] = skillSlashEditorBefore(editor);
+  return skillSlashQueryInBlock(before, parentStart);
 }
 
 export function insertSkillCommandInEditor(editor: Editor, command: string): void {
   const { from } = editor.state.selection;
   const [before, parentStart] = skillSlashEditorBefore(editor);
-  const query = skillSlashQueryAtCursor(before, before.length);
-  const start = query ? parentStart + query.start : from;
+  const query = skillSlashQueryInBlock(before, parentStart);
+  const start = query ? query.from : from;
   editor.chain().focus().deleteRange({ from: start, to: from }).insertContent(`/${command} `).run();
 }
 

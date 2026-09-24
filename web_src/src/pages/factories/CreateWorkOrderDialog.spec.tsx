@@ -148,6 +148,13 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.queryByText("Dialog")).not.toBeInTheDocument();
   });
 
+  it("passes the workspace to the description editor when Planning is off", () => {
+    renderDialog();
+
+    expect(screen.getByTestId("create-work-order-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-description-input")).toHaveAttribute("data-factory-id", PRIMARY_FACTORY_ID);
+  });
+
   it("keeps only expand and close controls in the header", () => {
     renderDialog();
 

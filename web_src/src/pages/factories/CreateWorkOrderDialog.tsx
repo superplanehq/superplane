@@ -151,6 +151,8 @@ function CreateWorkOrderDialogSession({
               value={composer.description}
               maxLength={composer.maxDescriptionLength}
               disabled={composer.isCreating || fileUpload.isUploading}
+              organizationId={organizationId}
+              factoryId={factoryId}
               onChange={composer.updateDescription}
               onFocus={dictation.rememberDescription}
               onUploadFiles={fileUpload.uploadFiles}
