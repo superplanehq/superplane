@@ -56,18 +56,14 @@ import (
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 )
@@ -79,8 +75,6 @@ const (
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
 )
-
-var errUsageServiceUnavailable = errors.New("usage service unavailable")
 
 type Server struct {
 	httpServer            *http.Server
@@ -98,7 +92,6 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
-	usageService          usage.Service
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -180,7 +173,6 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
-	usageService usage.Service,
 	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
@@ -202,7 +194,6 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
-		usageService:          usageService,
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
@@ -914,9 +905,7 @@ type initialWorkspaceResponse struct {
 
 type organizationCreationStatusResponse struct {
 	Allowed              bool   `json:"allowed"`
-	UsageEnabled         bool   `json:"usageEnabled"`
 	CurrentOrganizations int32  `json:"currentOrganizations"`
-	MaxOrganizations     int32  `json:"maxOrganizations"`
 	Message              string `json:"message,omitempty"`
 }
 
@@ -927,7 +916,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response, err := s.describeOrganizationCreationStatus(r.Context(), database.DB(r.Context()), account.ID.String())
+	response, err := s.describeOrganizationCreationStatus(database.DB(r.Context()), account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields, so we don't repeat
@@ -943,7 +932,6 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) describeOrganizationCreationStatus(
-	ctx context.Context,
 	tx *gorm.DB,
 	accountID string,
 ) (*organizationCreationStatusResponse, error) {
@@ -956,100 +944,13 @@ func (s *Server) describeOrganizationCreationStatus(
 		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
 	}
 
-	response := &organizationCreationStatusResponse{
+	return &organizationCreationStatusResponse{
 		Allowed:              true,
-		UsageEnabled:         s.usageService != nil && s.usageService.Enabled(),
 		CurrentOrganizations: int32(organizationCount),
-	}
-
-	if !response.UsageEnabled {
-		return response, nil
-	}
-
-	checkResponse, err := s.checkAccountOrganizationCreationLimits(
-		ctx,
-		accountID,
-		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
-	)
-	if err != nil {
-		log.WithError(err).
-			WithField("account_id", accountID).
-			WithField("stage", "check_account_limits").
-			WithField("grpc_code", status.Code(err).String()).
-			Error("failed to check account organization creation limits")
-		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
-	}
-
-	response.MaxOrganizations = checkResponse.GetLimits().GetMaxOrganizations()
-
-	if violationErr := usage.LimitViolationError(checkResponse.GetViolations()); violationErr != nil {
-		response.Allowed = false
-		response.Message = status.Convert(violationErr).Message()
-	}
-
-	return response, nil
-}
-
-func (s *Server) checkAccountOrganizationCreationLimits(
-	ctx context.Context,
-	accountID string,
-	state *usagepb.AccountState,
-) (*usagepb.CheckAccountLimitsResponse, error) {
-	if s.usageService == nil || !s.usageService.Enabled() {
-		return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
-	}
-
-	response, err := s.usageService.CheckAccountLimits(ctx, accountID, state)
-	if err == nil {
-		return response, nil
-	}
-
-	if isTransientUsageServiceError(err) {
-		return nil, fmt.Errorf("%w: check account limits: %w", errUsageServiceUnavailable, err)
-	}
-
-	if status.Code(err) != codes.NotFound {
-		return nil, err
-	}
-
-	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
-		log.WithError(setupErr).
-			WithField("account_id", accountID).
-			WithField("grpc_code", status.Code(setupErr).String()).
-			Error("failed to lazily provision account in usage service")
-		return nil, setupErr
-	}
-
-	response, err = s.usageService.CheckAccountLimits(ctx, accountID, state)
-	if err != nil {
-		log.WithError(err).
-			WithField("account_id", accountID).
-			WithField("grpc_code", status.Code(err).String()).
-			Error("failed to check account limits after lazy provisioning")
-		if isTransientUsageServiceError(err) {
-			return nil, fmt.Errorf("%w: check account limits after lazy provisioning: %w", errUsageServiceUnavailable, err)
-		}
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func isTransientUsageServiceError(err error) bool {
-	switch status.Code(err) {
-	case codes.Unavailable, codes.DeadlineExceeded:
-		return true
-	default:
-		return false
-	}
+	}, nil
 }
 
 func writeOrganizationCreationStatusError(w http.ResponseWriter, fallbackMessage string, err error) {
-	if errors.Is(err, errUsageServiceUnavailable) {
-		http.Error(w, "Usage service unavailable", http.StatusServiceUnavailable)
-		return
-	}
-
 	http.Error(w, fallbackMessage, http.StatusInternalServerError)
 }
 
@@ -1086,7 +987,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), tx, account.ID.String())
+	creationStatus, err := s.describeOrganizationCreationStatus(tx, account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields.
@@ -1169,11 +1070,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
-	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
-	if err := organizationCreatedMessage.Publish(); err != nil {
-		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
-	}
-
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
 	response["slug"] = organization.Slug
@@ -1248,7 +1144,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), creationLock, account.ID.String())
+	creationStatus, err := s.describeOrganizationCreationStatus(creationLock, account.ID.String())
 	if err != nil {
 		writeOrganizationCreationStatusError(w, "Failed to create workspace", err)
 		return
@@ -1269,10 +1165,6 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace creation")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
-	}
-
-	if err := messages.NewOrganizationCreatedMessage(organization.ID.String()).Publish(); err != nil {
-		log.WithError(err).WithField("organization_id", organization.ID).Error("failed to publish organization created message")
 	}
 
 	writeInitialWorkspaceResponse(w, organization, workspace)

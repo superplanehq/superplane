@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 const AppAgentToolName = "superplane_app"
@@ -23,7 +22,6 @@ func init() {
 			Registry:       deps.ComponentRegistry,
 			WebhookBaseURL: deps.WebhookBaseURL,
 			AuthService:    deps.AuthService,
-			UsageService:   deps.UsageService,
 		})
 	})
 }
@@ -39,7 +37,6 @@ type AppAgentToolOptions struct {
 	Registry       *registry.Registry
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
-	UsageService   usage.Service
 }
 
 func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
@@ -49,7 +46,6 @@ func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
 			Registry:       opts.Registry,
 			WebhookBaseURL: opts.WebhookBaseURL,
 			AuthService:    opts.AuthService,
-			UsageService:   opts.UsageService,
 		}),
 	}
 }
