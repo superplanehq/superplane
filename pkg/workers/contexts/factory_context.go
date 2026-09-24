@@ -49,6 +49,9 @@ type FactoryContext struct {
 	registry  *registry.Registry
 	// remoteImageFetch, when set, copies remote images without a GitHub client.
 	remoteImageFetch storedfiles.FetchFunc
+	// readProductiveTaskFiles, when set, supplies Productive.io files without
+	// calling the Productive.io API.
+	readProductiveTaskFiles productiveFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -276,6 +279,7 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 
 func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
 	c.ingestGitHubImages(order)
+	c.ingestProductiveFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 
