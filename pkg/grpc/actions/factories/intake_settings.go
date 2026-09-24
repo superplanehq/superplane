@@ -108,7 +108,7 @@ func defaultJiraIntakeSettings() intakeSettings {
 func defaultSentryIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.SentryNewIssues = true
-	settings.SentryRegressedIssues = true
+	settings.SentryRegressedIssues = false
 	settings.SentryAssignedIssues = false
 	settings.SentryLevels = []string{}
 	return settings
