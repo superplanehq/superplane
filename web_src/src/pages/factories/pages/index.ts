@@ -13,6 +13,7 @@ export { OnboardingPage } from "./onboarding/OnboardingPage";
 export { NewWorkspacePage } from "./onboarding/NewWorkspacePage";
 export { WorkspaceOverviewPage } from "./onboarding/WorkspaceOverviewPage";
 export { ChecksPRFeedbackSetupPage, DiscussionPRFeedbackSetupPage } from "./PRFeedbackSetupPage";
+export { GitHubIntakeSetupPage } from "./GitHubIntakeSetupPage";
 export { JiraIntakeSetupPage } from "./JiraIntakeSetupPage";
 export { ProductiveIntakeSetupPage } from "./ProductiveIntakeSetupPage";
 export { PlanningSetupPage } from "./PlanningSetupPage";

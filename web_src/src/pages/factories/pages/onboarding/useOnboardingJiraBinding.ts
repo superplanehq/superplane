@@ -1,9 +1,16 @@
 import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
+import { preferredJiraCompletionColumn } from "../jiraCompletionColumn";
 import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../intakeSourceSettingsModel";
 import { readOnboardingJiraProject, writeOnboardingJiraProject } from "./onboardingJiraProject";
+
+function jiraStatusColumnNames(statuses: Array<{ name?: string; id?: string }> | undefined): string[] {
+  return (statuses ?? [])
+    .map((resource) => resource.name?.trim() || resource.id?.trim() || "")
+    .filter((name) => name.length > 0);
+}
 
 export function useOnboardingJiraBinding(
   organizationId: string,
@@ -20,11 +27,38 @@ export function useOnboardingJiraBinding(
   const jiraProjectsQuery = useIntegrationResources(organizationId, jiraIntegrationId, "project", undefined, {
     enabled: Boolean(jiraIntegrationId),
   });
+  const jiraStatusesQuery = useIntegrationResources(
+    organizationId,
+    jiraIntegrationId,
+    "issueStatus",
+    jiraProjectId ? { project: jiraProjectId } : undefined,
+    { enabled: Boolean(jiraIntegrationId && jiraProjectId) },
+  );
+  const jiraStatusColumns = useMemo(() => jiraStatusColumnNames(jiraStatusesQuery.data), [jiraStatusesQuery.data]);
+  const jiraCompletionNeedsManualColumn = useMemo(() => {
+    if (!jiraProjectId || jiraStatusesQuery.isPending || jiraStatusesQuery.isError) {
+      return false;
+    }
+    if (jiraStatusColumns.length === 0) {
+      return false;
+    }
+    return preferredJiraCompletionColumn(jiraStatusColumns, "") === "";
+  }, [jiraProjectId, jiraStatusColumns, jiraStatusesQuery.isError, jiraStatusesQuery.isPending]);
 
   useEffect(() => {
     setJiraProjectIdState(readOnboardingJiraProject(factoryId, jiraIntegrationId));
     setJiraCompletionState({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
   }, [factoryId, jiraIntegrationId]);
+
+  useEffect(() => {
+    if (!jiraProjectId || !jiraCompletion.jiraMoveOnComplete) {
+      return;
+    }
+    const preferred = preferredJiraCompletionColumn(jiraStatusColumns, jiraCompletion.jiraCompletionColumn);
+    if (preferred && preferred !== jiraCompletion.jiraCompletionColumn) {
+      setJiraCompletionState((current) => ({ ...current, jiraCompletionColumn: preferred }));
+    }
+  }, [jiraCompletion.jiraCompletionColumn, jiraCompletion.jiraMoveOnComplete, jiraProjectId, jiraStatusColumns]);
 
   const setJiraProjectId = useCallback(
     (projectId: string) => {
@@ -45,6 +79,7 @@ export function useOnboardingJiraBinding(
     setJiraProjectId,
     jiraCompletion,
     setJiraCompletion,
+    jiraCompletionNeedsManualColumn,
     jiraProjects: jiraProjectsQuery.data ?? [],
     jiraProjectsLoading: jiraProjectsQuery.isPending,
     jiraProjectsError: jiraProjectsQuery.isError,

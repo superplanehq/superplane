@@ -175,6 +175,7 @@ function TicketsScreenHost({
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
       jiraCompletion={model.jiraCompletion}
+      jiraCompletionNeedsManualColumn={model.jiraCompletionNeedsManualColumn}
       organizationId={organizationId}
       jiraIntegrationId={model.jiraIntegrationId}
       onSelectTicketSource={flow.selectTicketSource}

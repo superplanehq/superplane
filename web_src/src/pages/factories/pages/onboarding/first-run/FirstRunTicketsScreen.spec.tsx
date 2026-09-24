@@ -106,8 +106,6 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId=""
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -126,8 +124,6 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -169,8 +165,6 @@ describe("FirstRunTicketsScreen", () => {
           { id: "CORE", name: "Core" },
         ]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
         onSelectJiraProject={onSelectJiraProject}
@@ -194,7 +188,22 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
   });
 
-  it("shows the completion column after a Jira project is chosen", async () => {
+  it("hides completion column settings when Jira has a Done status", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraConnected
+        jiraProjects={[{ id: "PAY", name: "Payments" }]}
+        jiraProjectId="PAY"
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
+  });
+
+  it("shows completion column settings when Jira has no Done status", async () => {
     const user = userEvent.setup();
     const onJiraCompletionChange = vi.fn();
 
@@ -206,6 +215,7 @@ describe("FirstRunTicketsScreen", () => {
         jiraIntegrationId="jira-1"
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
+        jiraCompletionNeedsManualColumn
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
         onJiraCompletionChange={onJiraCompletionChange}
