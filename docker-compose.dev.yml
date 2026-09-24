@@ -232,9 +232,27 @@ services:
       retries: 5
 
   # Local runner stack. Profile local-runner keeps these off in CI.
-  # The broker uses database `broker` on the dev Postgres (`db`).
-  # `make dev.setup` creates that database and starts task-broker.
+  # broker-db is the task-broker Postgres. It is not the app database.
+  # `make dev.runners` starts broker-db, task-broker, and the workers.
+  # `make dev.up` starts broker-db. `make dev.setup` starts task-broker.
   # `make dev.server` starts the workers.
+  broker-db:
+    image: postgres:16-alpine
+    profiles: [local-runner]
+    environment:
+      POSTGRES_USER: broker
+      POSTGRES_PASSWORD: broker
+      POSTGRES_DB: broker
+    ports:
+      - "127.0.0.1:${BROKER_DB_PORT:-5432}:5432"
+    volumes:
+      - broker-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U broker"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
   task-broker:
     profiles: [local-runner]
     build:
@@ -245,12 +263,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      DATABASE_URL: postgres://postgres:the-cake-is-a-lie@db:5432/broker?sslmode=disable
+      DATABASE_URL: postgres://broker:broker@broker-db:5432/broker?sslmode=disable
       AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
       LISTEN_ADDR: :8081
       TASK_BROKER_LIVE_LOGS_CORS_ORIGINS: ${TASK_BROKER_LIVE_LOGS_CORS_ORIGINS:-http://localhost:8000,http://localhost:5173}
     depends_on:
-      db:
+      broker-db:
         condition: service_healthy
 
   task-broker-init:
@@ -308,4 +326,7 @@ volumes:
     driver: local
 
   blob-data:
+    driver: local
+
+  broker-postgres-data:
     driver: local

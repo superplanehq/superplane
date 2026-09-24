@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.no.runners dev.no.runners.up dev.no.runners.setup dev.no.runners.server dev.no.runners.down doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -139,7 +139,8 @@ dev.up:
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
 ifeq ($(strip $(CI)),)
 	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) build task-broker runner
-	@echo "Runner images built."
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait broker-db
+	@echo "Runner images built. broker-db is ready."
 endif
 	@echo "Development containers are ready."
 
@@ -153,7 +154,6 @@ dev.setup:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 ifeq ($(strip $(CI)),)
-	$(MAKE) db.create DB_NAME=broker
 	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build task-broker
 	$(COMPOSE_RUNNER) run --rm -T --no-deps task-broker-init
 	@echo "Task broker ready at http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
@@ -195,6 +195,47 @@ ifeq ($(strip $(CI)),)
 	$(COMPOSE_RUNNER) up -d --no-build --scale runner=$(N) runner
 endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
+
+# Runner Postgres (broker-db), task-broker, fleet registration, and
+# runner workers. Does not start the app database or RabbitMQ.
+# Scale workers with N (default 10): N=1 make dev.runners
+dev.runners:
+	@echo "Starting the runner database, task broker, and $(N) runner workers..."
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build --scale runner=$(N) broker-db task-broker runner
+	@echo "Task broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
+	@echo "Runner workers: $(N)"
+
+# App stack only. Does not start broker-db, task-broker, or runner workers.
+dev.no.runners.up:
+	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
+	@echo "Starting development containers..."
+	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
+	@echo "Development containers are ready."
+
+dev.no.runners.setup:
+	@$(MAKE) dev.test.is.running
+	$(MAKE) dev.setup.npm
+	$(MAKE) pb.gen
+	$(MAKE) dev.setup.go
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
+
+dev.no.runners.server:
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.no.runners.up\` first (app container is not running)." >&2; exit 1; }
+	$(COMPOSE) exec -d app bash /app/docker-entrypoint.dev.sh
+	@bash ./scripts/wait-for-app
+
+dev.no.runners:
+	$(MAKE) dev.no.runners.up
+	$(MAKE) dev.no.runners.setup
+	$(MAKE) dev.no.runners.server
+
+# Stop the app stack started by dev.no.runners.
+# Leaves broker-db, task-broker, and runner workers running.
+dev.no.runners.down:
+	$(COMPOSE) down app db rabbitmq
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
