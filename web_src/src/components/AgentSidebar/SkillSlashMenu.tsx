@@ -18,12 +18,19 @@ export function SkillSlashMenu({
   onSelect: (candidate: SkillSlashCandidate) => void;
   portal?: SkillSlashMenuPortal;
 }) {
+  const listRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    listRef.current?.querySelector(`[data-index="${highlightIndex}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [candidates, highlightIndex]);
+
   if (candidates.length === 0) {
     return null;
   }
 
   const list = (
     <ul
+      ref={listRef}
       role="listbox"
       aria-label="Insert a skill command"
       data-testid={SKILL_SLASH_MENU_TEST_ID}
@@ -45,6 +52,7 @@ export function SkillSlashMenu({
           <li key={candidate.id} role="option" aria-selected={highlighted}>
             <button
               type="button"
+              data-index={index}
               data-testid={`skill-slash-option-${candidate.command}`}
               className={cn(
                 "flex w-full flex-col px-2 py-1.5 text-left",
