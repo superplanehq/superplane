@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,11 +25,14 @@ func TestPutGetAndSignedGetURL(t *testing.T) {
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 
 	const payload = "artifact-bytes"
+	var mu sync.Mutex
 	var sawPut bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPut:
+			mu.Lock()
 			sawPut = true
+			mu.Unlock()
 			body, err := io.ReadAll(r.Body)
 			if err != nil || string(body) != payload {
 				http.Error(w, "bad body", http.StatusBadRequest)
@@ -62,7 +66,10 @@ func TestPutGetAndSignedGetURL(t *testing.T) {
 
 	err = store.Put(context.Background(), "runs/1", strings.NewReader(payload), blob.PutOptions{ContentType: "text/plain"})
 	require.NoError(t, err)
-	assert.True(t, sawPut)
+	mu.Lock()
+	putSeen := sawPut
+	mu.Unlock()
+	assert.True(t, putSeen)
 
 	rc, err := store.Get(context.Background(), "runs/1")
 	require.NoError(t, err)

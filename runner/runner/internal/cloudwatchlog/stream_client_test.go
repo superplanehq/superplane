@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 )
 
@@ -15,6 +16,7 @@ func TestStreamWriterPutLogEvents(t *testing.T) {
 	t.Setenv("AWS_REGION", "us-east-1")
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 
+	var mu sync.Mutex
 	var messages []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
@@ -32,9 +34,11 @@ func TestStreamWriterPutLogEvents(t *testing.T) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+			mu.Lock()
 			for _, ev := range in.LogEvents {
 				messages = append(messages, ev.Message)
 			}
+			mu.Unlock()
 			_, _ = w.Write([]byte(`{"nextSequenceToken":"2"}`))
 		default:
 			http.Error(w, "unexpected target "+r.Header.Get("X-Amz-Target"), http.StatusBadRequest)
@@ -57,7 +61,10 @@ func TestStreamWriterPutLogEvents(t *testing.T) {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if len(messages) != 1 || messages[0] != "hello from runner" {
-		t.Fatalf("messages = %#v", messages)
+	mu.Lock()
+	got := append([]string(nil), messages...)
+	mu.Unlock()
+	if len(got) != 1 || got[0] != "hello from runner" {
+		t.Fatalf("messages = %#v", got)
 	}
 }

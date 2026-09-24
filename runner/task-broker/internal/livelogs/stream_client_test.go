@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -18,6 +19,7 @@ func TestStreamCloudWatchLogPagesEvents(t *testing.T) {
 	t.Setenv("AWS_REGION", "us-east-1")
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 
+	var mu sync.Mutex
 	var calls int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
@@ -26,8 +28,11 @@ func TestStreamCloudWatchLogPagesEvents(t *testing.T) {
 			http.Error(w, "unexpected target "+r.Header.Get("X-Amz-Target"), http.StatusBadRequest)
 			return
 		}
+		mu.Lock()
 		calls++
-		if calls == 1 {
+		call := calls
+		mu.Unlock()
+		if call == 1 {
 			_, _ = w.Write([]byte(`{"events":[{"message":"paged line","timestamp":1}],"nextForwardToken":"page-2","nextBackwardToken":"start"}`))
 			return
 		}
@@ -46,7 +51,10 @@ func TestStreamCloudWatchLogPagesEvents(t *testing.T) {
 	if !strings.Contains(buf.String(), `"text":"paged line"`) {
 		t.Fatalf("output = %s", buf.String())
 	}
-	if calls < 1 {
+	mu.Lock()
+	gotCalls := calls
+	mu.Unlock()
+	if gotCalls < 1 {
 		t.Fatal("expected GetLogEvents")
 	}
 }
