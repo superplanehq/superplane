@@ -44,14 +44,21 @@ type AnalysisPlanningSessionArgs = {
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
 };
 
+const LIVE_SESSION_REFETCH_INTERVAL_MS = 15_000;
+
+function planningSessionIsLive(session: PlanningSessionPayload | null | undefined): boolean {
+  return Boolean(session?.id && session.state !== "ended");
+}
+
 function usePlanningSessionLookup(
   args: Required<Pick<AnalysisPlanningSessionArgs, "enabled">> & {
     organizationId: string;
     factoryId: string;
     workOrderId: string;
+    isLive: boolean;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled } = args;
+  const { organizationId, factoryId, workOrderId, enabled, isLive } = args;
   return useQuery<PlanningSessionPayload | null>({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -62,6 +69,7 @@ function usePlanningSessionLookup(
         next as PlanningSessionPayload | null,
       ),
     refetchOnWindowFocus: false,
+    refetchInterval: isLive ? LIVE_SESSION_REFETCH_INTERVAL_MS : undefined,
   });
 }
 
@@ -166,6 +174,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
+    isLive: planningSessionIsLive(queryClient.getQueryData<PlanningSessionPayload | null>(queryKey)),
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({
