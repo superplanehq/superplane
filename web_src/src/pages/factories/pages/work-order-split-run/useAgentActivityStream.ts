@@ -11,6 +11,11 @@ import {
 } from "./agentActivity";
 
 const RECONNECT_DELAY_MS = 2000;
+const QUIET_ABORT_MS = 15_000;
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
 
 type AgentActivityStreamResult = {
   activities: AgentActivity[];
@@ -63,6 +68,27 @@ export function useAgentActivityStream({
     const pendingRecords: AgentActivityRecord[] = [];
     let stream: LiveLogStream | undefined;
     let animationFrame: number | undefined;
+    let quietTimer: number | undefined;
+    let stoppedForQuiet = false;
+
+    const clearQuietTimer = () => {
+      if (quietTimer === undefined) {
+        return;
+      }
+      window.clearTimeout(quietTimer);
+      quietTimer = undefined;
+    };
+    const armQuietTimer = () => {
+      stoppedForQuiet = false;
+      clearQuietTimer();
+      quietTimer = window.setTimeout(() => {
+        if (stoppedForQuiet || abortController.signal.aborted) {
+          return;
+        }
+        stoppedForQuiet = true;
+        stream?.stop();
+      }, QUIET_ABORT_MS);
+    };
 
     const flushRecords = () => {
       animationFrame = undefined;
@@ -105,14 +131,18 @@ export function useAgentActivityStream({
           await currentStream.pump({
             onOpen: () => {
               setConnection({ executionId, isConnected: true, hasConnectedOnce: true });
+              armQuietTimer();
             },
-            onRecord: queueRecord,
+            onRecord: (record) => {
+              armQuietTimer();
+              queueRecord(record);
+            },
             onLogLine: () => undefined,
             onStreamError: (message) =>
               setConnection((current) => disconnectedConnection(current, executionId, message)),
           });
         } catch (streamError) {
-          if (!abortController.signal.aborted) {
+          if (!abortController.signal.aborted && !isAbortError(streamError)) {
             const message = streamError instanceof Error ? streamError.message : String(streamError);
             setConnection((current) => disconnectedConnection(current, executionId, message));
           }
@@ -136,6 +166,7 @@ export function useAgentActivityStream({
     void run();
     return () => {
       abortController.abort();
+      clearQuietTimer();
       stream?.stop();
       if (animationFrame !== undefined) {
         window.cancelAnimationFrame(animationFrame);

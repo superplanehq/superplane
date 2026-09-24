@@ -77,6 +77,34 @@ describe("useAnalysisPlanningSession", () => {
     expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
   });
 
+  it("refetches the planning session every 15 seconds while the session is live", async () => {
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue({
+      id: "session-1",
+      state: "running",
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisPlanningSession({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          workOrderId: "order-1",
+          enabled: true,
+          canUpdate: true,
+        }),
+      { wrapper: wrapperWithClient(queryClient) },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLive).toBe(true);
+    });
+    const query = queryClient.getQueryCache().find({
+      queryKey: workOrderPlanningSessionQueryKey("org-1", "factory-1", "order-1"),
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBe(15_000);
+  });
+
   it("surfaces failures that are not a missing session", async () => {
     const failure = new Error("server unavailable");
     vi.mocked(findPlanningSessionByWorkOrder).mockRejectedValue(failure);
