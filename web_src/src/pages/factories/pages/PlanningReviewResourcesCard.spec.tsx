@@ -4,17 +4,19 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 
 const useFactoryAgentResources = vi.hoisted(() => vi.fn());
+const useFactoryAgentResourceTools = vi.hoisted(() => vi.fn());
 const useExperimentalFeature = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useFactoryAgentResources", () => ({
   useFactoryAgentResources,
+  useFactoryAgentResourceTools,
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -45,10 +47,11 @@ function renderCard(
 describe("PlanningReviewResourcesCard", () => {
   beforeEach(() => {
     useExperimentalFeature.mockReturnValue({
-      has: (feature: string) => feature === FEATURE_WORKSPACE_AGENT_RESOURCES,
-      enabledExperimentalFeatures: [FEATURE_WORKSPACE_AGENT_RESOURCES],
+      has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
     });
+    useFactoryAgentResourceTools.mockReturnValue({ data: [], isLoading: false, isError: false });
     useFactoryAgentResources.mockImplementation((_org: string, _factory: string, kind: string) => {
       if (kind === "KIND_SKILL") {
         return { data: [INLINE_SKILL], isLoading: false, isError: false };
@@ -71,12 +74,12 @@ describe("PlanningReviewResourcesCard", () => {
     useFactoryAgentResources.mockReturnValue({ data: [], isLoading: false, isError: false });
     renderCard();
 
-    expect(screen.getByTestId("planning-review-resources-empty")).toHaveTextContent(
-      "Add MCP servers and skills on the workspace settings page.",
+    expect(screen.getByTestId("planning-review-resources-empty-mcp")).toHaveTextContent(
+      "Add MCP servers on the workspace settings page.",
     );
-    expect(screen.getByTestId("planning-review-resources-settings")).toHaveAttribute(
+    expect(screen.getAllByTestId("planning-review-resources-settings")[0]).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/agent-resources`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/mcp`,
     );
   });
 
@@ -89,13 +92,31 @@ describe("PlanningReviewResourcesCard", () => {
     expect(screen.getByText("MCP server")).toBeInTheDocument();
     expect(screen.getByText("review-copy")).toBeInTheDocument();
     expect(screen.getByText("Skill")).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-resources-manage")).toHaveAttribute(
+    expect(screen.getAllByTestId("planning-review-resources-manage")[0]).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/agent-resources`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/mcp`,
     );
 
     await user.click(screen.getByTestId(`planning-review-resource-${HEADER_MCP_RESOURCE.id}`));
     expect(onDisabledIdsChange).toHaveBeenCalledWith([HEADER_MCP_RESOURCE.id]);
+  });
+
+  it("shows the enabled tool count on the collapsed MCP row", () => {
+    useFactoryAgentResourceTools.mockReturnValue({
+      data: [
+        { name: "search", readOnly: true },
+        { name: "list_issues", readOnly: true },
+        { name: "create_issue", readOnly: false },
+        { name: "update_issue", readOnly: false },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    renderCard({
+      disabledTools: { [HEADER_MCP_RESOURCE.id ?? ""]: ["create_issue"] },
+    });
+
+    expect(screen.getByTestId(`mcp-tools-count-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("3/4");
   });
 
   it("keeps a workspace-disabled resource listed and locked", () => {

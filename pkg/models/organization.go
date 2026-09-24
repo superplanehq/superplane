@@ -48,7 +48,18 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 	if features.IsReleased(id) {
 		return true
 	}
-	return slices.Contains(o.EnabledExperimentalFeatures, id)
+	if slices.Contains(o.EnabledExperimentalFeatures, id) {
+		return true
+	}
+	switch id {
+	case features.FeatureWorkspaceMCP, features.FeatureWorkspaceSkills:
+		return slices.Contains(o.EnabledExperimentalFeatures, features.FeatureWorkspaceAgentResources)
+	case features.FeatureWorkspaceAgentResources:
+		return slices.Contains(o.EnabledExperimentalFeatures, features.FeatureWorkspaceMCP) ||
+			slices.Contains(o.EnabledExperimentalFeatures, features.FeatureWorkspaceSkills)
+	default:
+		return false
+	}
 }
 
 type OrganizationWithCounts struct {

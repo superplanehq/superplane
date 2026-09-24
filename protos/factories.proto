@@ -2461,6 +2461,7 @@ message FactoryAgentResource {
   string ref = 16;
   string path = 17;
   string markdown = 18;
+  repeated string disabled_tools = 19;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2496,6 +2497,8 @@ message UpdateFactoryAgentResourceRequest {
   optional FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
   optional string markdown = 8;
+  repeated string disabled_tools = 9;
+  optional bool set_disabled_tools = 10;
 }
 
 message UpdateFactoryAgentResourceResponse {
@@ -2531,6 +2534,7 @@ message DisconnectFactoryAgentResourceOAuthResponse {
 message FactoryAgentResourceTool {
   string name = 1;
   string description = 2;
+  bool read_only = 3;
 }
 
 message ListFactoryAgentResourceToolsRequest {

@@ -91,6 +91,15 @@ func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 }
 
+func TestDisallowedClaudeToolsIncludesWorkspaceMCPTools(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","disabledTools":["create_issue"]}]}`), 0o644))
+	tools := disallowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	assert.Equal(t, "mcp__docs__create_issue", tools)
+}
+
 func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 	taskDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
@@ -646,6 +655,18 @@ func allowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
 	payload, err := json.Marshal(env)
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { allowedClaudeTools } = require(process.argv[1]); process.stdout.write(allowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func disallowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { disallowedClaudeTools } = require(process.argv[1]); process.stdout.write(disallowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)

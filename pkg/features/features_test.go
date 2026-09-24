@@ -69,7 +69,23 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureWorkspaceAgentResources, f.ID)
 		assert.Equal(t, "Agent Resources", f.Label)
+		assert.Equal(t, "Legacy alias that enables workspace MCP servers and skills", f.Description)
+	})
+
+	t.Run("known id returns workspace MCP feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceMCP)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceMCP, f.ID)
+		assert.Equal(t, "Workspace MCP", f.Label)
 		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
+	})
+
+	t.Run("known id returns workspace skills feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceSkills)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceSkills, f.ID)
+		assert.Equal(t, "Workspace Skills", f.Label)
+		assert.Equal(t, "Add skills for workspace agents", f.Description)
 	})
 
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
@@ -93,6 +109,26 @@ func Test__Get(t *testing.T) {
 	})
 }
 
+func Test__WorkspaceFeatureAliases(t *testing.T) {
+	has := func(enabled ...string) func(string) bool {
+		set := map[string]struct{}{}
+		for _, id := range enabled {
+			set[id] = struct{}{}
+		}
+		return func(id string) bool {
+			_, ok := set[id]
+			return ok
+		}
+	}
+
+	assert.True(t, WorkspaceMCPEnabled(has(FeatureWorkspaceMCP)))
+	assert.True(t, WorkspaceMCPEnabled(has(FeatureWorkspaceAgentResources)))
+	assert.False(t, WorkspaceMCPEnabled(has(FeatureWorkspaceSkills)))
+	assert.True(t, WorkspaceSkillsEnabled(has(FeatureWorkspaceSkills)))
+	assert.True(t, WorkspaceSkillsEnabled(has(FeatureWorkspaceAgentResources)))
+	assert.False(t, WorkspaceSkillsEnabled(has(FeatureWorkspaceMCP)))
+}
+
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
@@ -103,6 +139,8 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceAgentResources))
+	assert.True(t, Exists(FeatureWorkspaceMCP))
+	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))

@@ -81,15 +81,16 @@ type FactoryAgentResource struct {
 }
 
 type FactoryAgentResourceConfig struct {
-	Transport  string                       `json:"transport,omitempty"`
-	URL        string                       `json:"url,omitempty"`
-	Auth       string                       `json:"auth,omitempty"`
-	Headers    []FactoryAgentResourceHeader `json:"headers,omitempty"`
-	Source     string                       `json:"source,omitempty"`
-	Repository string                       `json:"repository,omitempty"`
-	Ref        string                       `json:"ref,omitempty"`
-	Path       string                       `json:"path,omitempty"`
-	Markdown   string                       `json:"markdown,omitempty"`
+	Transport     string                       `json:"transport,omitempty"`
+	URL           string                       `json:"url,omitempty"`
+	Auth          string                       `json:"auth,omitempty"`
+	Headers       []FactoryAgentResourceHeader `json:"headers,omitempty"`
+	Source        string                       `json:"source,omitempty"`
+	Repository    string                       `json:"repository,omitempty"`
+	Ref           string                       `json:"ref,omitempty"`
+	Path          string                       `json:"path,omitempty"`
+	Markdown      string                       `json:"markdown,omitempty"`
+	DisabledTools []string                     `json:"disabledTools,omitempty"`
 }
 
 type FactoryAgentResourceHeader struct {
@@ -208,7 +209,36 @@ func (c FactoryAgentResourceConfig) NormalizedSkill() FactoryAgentResourceConfig
 	c.URL = ""
 	c.Auth = ""
 	c.Headers = nil
+	c.DisabledTools = nil
 	return c
+}
+
+func (c FactoryAgentResourceConfig) NormalizedMCP() FactoryAgentResourceConfig {
+	c.DisabledTools = NormalizeDisabledTools(c.DisabledTools)
+	return c
+}
+
+func NormalizeDisabledTools(names []string) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (r *FactoryAgentResource) OAuthState() string {
@@ -250,6 +280,7 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 		if err := config.ValidateMCP(); err != nil {
 			return nil, err
 		}
+		config = config.NormalizedMCP()
 	}
 	now := time.Now()
 	resource := &FactoryAgentResource{
@@ -370,6 +401,9 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 				config = &normalized
 			} else if err := config.ValidateMCP(); err != nil {
 				return err
+			} else {
+				normalized := config.NormalizedMCP()
+				config = &normalized
 			}
 			if r.Kind == FactoryAgentResourceKindMCPServer && r.Config.Data().InvalidatesOAuth(*config) {
 				if err := r.DeleteSecrets(inner); err != nil {

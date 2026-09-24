@@ -3,38 +3,40 @@
 > Status: Implemented for MCP connections and inline SKILL.md skills.
 > Audience: Product and engineering
 
-This playbook is the source for workspace agent resources. One catalog
-serves MCP connections and skills. One settings page and one runner
-attach path serve both kinds.
+This playbook is the source for workspace MCP servers and skills. One
+catalog table stores both kinds. Settings, flags, and automation
+sections are separate. One attach function still injects enabled rows.
 
 ## Locked decisions
 
 1. **One workspace catalog.** Store rows in `factory_agent_resources`.
    Kinds are `mcp_server` and `skill`. One attach function injects enabled
-   rows. Do not add a second table or settings page for skills later.
-2. **One settings page named Agent resources.** The page lives under
-   Workspace settings. Permission is `factories:update`. Tabs are
-   **MCP servers** and **Skills**. They do not add a new route family.
+   rows. Do not add a second table.
+2. **Separate MCP and Skills settings pages.** The pages live under
+   Workspace settings. Permission is `factories:update`. Experimental
+   flags are `workspace_mcp` and `workspace_skills`. The legacy flag
+   `workspace_agent_resources` enables both. The old
+   `workspace/agent-resources` route redirects to the new pages.
 3. **MCP v1 auth is headers or OAuth.** SuperPlane completes OAuth in the
    browser. The runner receives only a Bearer access token. Do not write
    refresh tokens to the runner.
 4. **Inject at task build**, not in canvas YAML. Merge workspace MCP beside
    the first-party `planning_session_mcp.js` server. The name `superplane`
    is reserved.
-5. **Skills v1 is one SKILL.md file.** The admin pastes markdown. SuperPlane
-   stores `{ "source": "inline", "markdown": "..." }` and writes that file
-   onto the runner. GitHub packages (`repository`, `ref`, `path`) stay the
-   follow-on source for third-party skills such as ui-ux-pro-max. Do not
-   add `npx skills` install.
+5. **Skills v1 is one SKILL.md file.** The admin pastes markdown on a
+   full-page editor. SuperPlane stores `{ "source": "inline", "markdown": "..." }`
+   and writes that file onto the runner. GitHub packages (`repository`,
+   `ref`, `path`) stay the follow-on source for third-party skills such as
+   ui-ux-pro-max. Do not add `npx skills` install.
 6. **Storybook is the visual spec.** Every page state in this playbook has
    a named story before the page is done.
 
 ## Goal
 
-A workspace admin adds MCP connections and inline skills once. Every
+A workspace admin adds MCP servers and inline skills once. Every
 factory runner step, including task refinement, can use those resources.
 GitHub skill packages fill the same catalog later without a second
-product surface.
+table.
 
 ## What exists today
 
@@ -64,10 +66,12 @@ Do not reinvent these pieces:
 | OAuth | SuperPlane is the MCP OAuth client. Inject Bearer at task start. |
 | Cap | At most 20 enabled MCP servers per workspace. |
 | Skills v1 | Inline SKILL.md only. Extra files and scripts are not included. |
-| Settings page | Workspace / Agent resources. Tabs: MCP servers, Skills. |
-| Route | `.../settings/workspace/agent-resources`. Skills use `?tab=skills`. |
-| Inject | `AttachWorkspaceAgentResources` at broker-task build. |
-| Storybook | `Factories/Pages/Settings/Agent resources` lists every state. |
+| Flags | `workspace_mcp` and `workspace_skills`. `workspace_agent_resources` is a legacy alias. |
+| Settings pages | Workspace / MCP servers and Workspace / Skills. |
+| Routes | `.../settings/workspace/mcp` and `.../settings/workspace/skills`. Skill create and edit use `/new` and `/:resourceId`. |
+| Tools | Workspace `disabledTools` plus node `disabledAgentResourceTools`. New tools stay on. |
+| Inject | `AttachWorkspaceAgentResources` at broker-task build. Attaches each kind only when its flag is on. |
+| Storybook | `Factories/Pages/Settings/MCP and skills` lists every page state. |
 
 ## Domain model
 
@@ -100,7 +104,8 @@ MCP `config` for headers:
   "auth": "headers",
   "headers": [
     { "name": "Authorization", "secretName": "vendor-mcp", "secretKey": "token" }
-  ]
+  ],
+  "disabledTools": ["create_issue"]
 }
 ```
 
@@ -138,28 +143,33 @@ OAuth connection status on the row:
 - `needs_reconnect` — refresh failed
 - `vendor_rejected` — discovery, DCR, or allowlist failed
 
-## Settings page
+## Settings pages
 
-Follow factory settings chrome. Page title: **Agent resources**.
+Follow factory settings chrome. Page titles: **MCP servers** and **Skills**.
 
 ```
 Workspace settings
-  Agent resources
-    [ MCP servers ] [ Skills ]
-    helper text
+  MCP servers
+    catalog picker or Custom
     list OR empty state
-    primary action: Add MCP server | Add skill
+    primary action: Add MCP server
+  Skills
+    list OR empty state
+    primary action: Add skill
+    full-page editor at /skills/new and /skills/:id
 ```
 
-Helper text: Agents on every run in this workspace can use these
-resources. One signed-in account is shared by every agent.
+MCP server row: green status dot when connected, name, URL, auth
+(Header or Sign-in), status (Connected / Not connected / Reconnect),
+enable switch, expandable tools, menu (Edit, Disconnect, Delete).
 
-MCP server row: name, URL, auth (Header or Sign-in), status
-(Connected / Not connected / Reconnect), enable switch, menu (Edit,
-Disconnect, Delete).
+Tool rows: name and Read or Write. Sort by name, read first, or write
+first. Do not show the description. A tool that is off here is off for
+every automation.
 
 Skills row: name, source (`SKILL.md` for inline), enable switch, menu
-(Edit, Delete). Add skill form: name and SKILL.md markdown.
+(Edit, Delete). The editor has a name field, a `/command` recommendation,
+and a full-page markdown editor.
 
 Empty MCP servers: No MCP servers yet. Add an MCP server so agents can
 use it on every run.
@@ -168,7 +178,7 @@ Empty Skills: No skills yet. Add a SKILL.md so agents can use it on
 every run.
 
 Copy uses SuperPlane, workspace, MCP server, skill, and agent as stable
-nouns. Do not put MCP-only words in the nav label.
+nouns.
 
 ## OAuth
 
@@ -215,9 +225,9 @@ Each runner component already calls `ResolveEnvironment` and
 
 | CLI | Merge |
 | --- | --- |
-| Claude Code | `mcp.runtime.json` with `{ type: "http", url, headers }`. Write this file on every run when workspace MCP exists. Planning allowlists include `mcp__<name>`. Skills load from `.claude/skills`. |
-| Codex | TOML `mcp_servers.<name>` url and headers. Skills load from `.agents/skills`. |
-| OpenCode | `config.mcp.<name>` as `type: "remote"`. Skills load from `.agents/skills`. |
+| Claude Code | `mcp.runtime.json` with `{ type: "http", url, headers }`. Write this file on every run when workspace MCP exists. Planning allowlists include `mcp__<name>`. Pass disabled tools as `mcp__<server>__<tool>` on `--disallowedTools`. Skills load from `.claude/skills`. |
+| Codex | TOML `mcp_servers.<name>` url, headers, and `disabled_tools`. Skills load from `.agents/skills`. |
+| OpenCode | `config.mcp.<name>` as `type: "remote"`. Deny disabled tools with `permission.<server>_<tool>`. Skills load from `.agents/skills`. |
 
 Custom HTTP MCP tools can change external systems during refinement. The
 repo stays read-only. State that in helper text.
@@ -254,52 +264,57 @@ workspace VCS token later.
 
 ## Test plan
 
-- [ ] Create a header MCP connection and list it on Agent resources.
+- [ ] Create a header MCP connection and list it on MCP servers.
 - [ ] Enable the connection and confirm a runner task ships `workspace_mcp.json`.
 - [ ] Confirm Claude, Codex, and OpenCode merge the remote server.
+- [ ] Confirm disabled tools appear in `workspace_mcp.json` and in Claude, Codex, and OpenCode denylists.
 - [ ] Confirm planning sessions still attach the SuperPlane stdio MCP.
 - [ ] Start OAuth Connect and complete the callback with a mock auth server.
 - [ ] Confirm a failed vendor allowlist shows Reconnect and the error text.
 - [ ] Confirm private MCP URLs and `http` URLs are rejected.
-- [ ] Create an inline skill and list it on the Skills tab.
+- [ ] Create an inline skill on the full-page editor and list it on Skills.
 - [ ] Confirm a runner task ships `.claude/skills/<name>/SKILL.md` and `.agents/skills/<name>/SKILL.md`.
 - [ ] Confirm empty markdown and GitHub skill sources are rejected.
-- [ ] Open Storybook `Factories/Pages/Settings/Agent resources`.
+- [ ] Open Storybook `Factories/Pages/Settings/MCP and skills`.
 - [ ] Review every named story in the list below.
 
 ## Storybook
 
 File: `web_src/src/pages/factories/pages/settings/FactorySettingsAgentResources.stories.tsx`
 
-Title: `Factories/Pages/Settings/Agent resources`
+Title: `Factories/Pages/Settings/MCP and skills`
 
-MCP servers tab:
+MCP servers page:
 
-- `Empty`
+- `MCPEmpty`
+- `MCPCatalog`
 - `HeaderAuth`
 - `OAuthNotConnected`
-- `OAuthConnected`
+- `ConnectedGreenDot`
 - `OAuthNeedsReconnect`
 - `OAuthVendorRejected`
 - `Mixed`
-- `AddConnectionDialog`
 
-Skills tab:
+Skills page:
 
 - `SkillsEmpty`
 - `SkillsInline`
 - `SkillsGitHub` (mocked `nextlevelbuilder/ui-ux-pro-max-skill`)
-- `AddSkillDialog`
+- `SkillEditor`
 
-Keep the page reachable from `Settings.stories.tsx` chrome through the
+Also keep `Factories/Pages/Settings/MCP catalog`, `MCP status`, and `MCP tools` for the picker, green dot, tool sort, and `8/12` count.
+
+Keep the pages reachable from `Settings.stories.tsx` chrome through the
 sidebar.
 
 ## Maintenance notes
 
 Shipped surfaces:
 
-- Settings page: `web_src/src/pages/factories/pages/settings/FactorySettingsAgentResourcesPage.tsx`
-- Route: `/{org}/workspaces/{key}/settings/workspace/agent-resources`
+- MCP page: `web_src/src/pages/factories/pages/settings/FactorySettingsMCPPage.tsx`
+- Skills page: `web_src/src/pages/factories/pages/settings/FactorySettingsSkillsPage.tsx`
+- Skill editor: `web_src/src/pages/factories/pages/settings/FactorySettingsSkillEditorPage.tsx`
+- Routes: `/{org}/workspaces/{key}/settings/workspace/mcp` and `.../skills`
 - Stories: `web_src/src/pages/factories/pages/settings/FactorySettingsAgentResources.stories.tsx`
 - Catalog RPCs: `List/Create/Update/DeleteFactoryAgentResource` in `protos/factories.proto`
 - OAuth: `StartFactoryAgentResourceOAuth`, `/api/v1/mcp-oauth/callback`
@@ -307,8 +322,8 @@ Shipped surfaces:
 
 When you add GitHub `kind=skill` packages:
 
-1. Update this playbook. Keep locked decisions 1, 2, and 5.
-2. Keep the Skills tab. Do not add a second settings page.
+1. Update this playbook. Keep locked decisions 1, 3, and 5.
+2. Keep the Skills page. Do not add a second catalog table.
 3. Extend `AttachWorkspaceAgentResources` only. Do not add a second
    inject path.
 4. Add stories for fetch failure and ready GitHub skill rows. Keep

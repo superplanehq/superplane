@@ -19,8 +19,14 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: in-progress workspace Models settings page. */
 export const FEATURE_WORKSPACE_MODELS = "workspace_models";
 
-/** Organization experimental feature: workspace Agent resources (MCP connections). */
+/** Organization experimental feature: workspace Agent resources (legacy alias for MCP and skills). */
 export const FEATURE_WORKSPACE_AGENT_RESOURCES = "workspace_agent_resources";
+
+/** Organization experimental feature: workspace MCP servers. */
+export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
+
+/** Organization experimental feature: workspace skills. */
+export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
 /** Organization experimental feature: organization LLM Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";

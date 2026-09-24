@@ -457,15 +457,45 @@ function requestedAgentResourceKind(url: URL): FactoriesFactoryAgentResource["ki
 }
 
 const DEFAULT_MCP_TOOLS = [
-  { name: "search", description: "Search the catalog." },
-  { name: "create_issue", description: "Create an issue." },
+  { name: "search", description: "Search the catalog.", readOnly: true },
+  { name: "create_issue", description: "Create an issue.", readOnly: false },
 ];
 
 function toolsForAgentResource(
   fixture: FactoriesFixture,
   resourceId: string,
-): Array<{ name: string; description?: string }> {
+): Array<{ name: string; description?: string; readOnly?: boolean }> {
   return fixture.agentResourceToolsById?.[resourceId] ?? DEFAULT_MCP_TOOLS;
+}
+
+function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
+  const request = (body ?? {}) as FactoriesFactoryAgentResource & {
+    disabledTools?: string[];
+    setDisabledTools?: boolean;
+  };
+  if (typeof request.name === "string" && request.name.trim()) {
+    resource.name = request.name.trim();
+  }
+  if (typeof request.enabled === "boolean") {
+    resource.enabled = request.enabled;
+  }
+  if (typeof request.url === "string") {
+    resource.url = request.url;
+  }
+  if (request.auth) {
+    resource.auth = request.auth;
+  }
+  if (Array.isArray(request.headers)) {
+    resource.headers = request.headers;
+  }
+  if (typeof request.markdown === "string") {
+    resource.markdown = request.markdown;
+  }
+  if (request.setDisabledTools) {
+    resource.disabledTools = Array.isArray(request.disabledTools) ? request.disabledTools : [];
+  }
+  resource.updatedAt = new Date().toISOString();
+  return resource;
 }
 
 function factoryAgentResourceToolsRoute(fixture: FactoriesFixture): FactoriesRoute {
@@ -483,121 +513,112 @@ function factoryAgentResourceToolsRoute(fixture: FactoriesFixture): FactoriesRou
   };
 }
 
+function factoryAgentResourceOAuthStartRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:start"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      const resource = ensureAgentResources(fixture, match[1]).find((entry) => entry.id === match[2]);
+      if (!resource) return { json: {} };
+      return { json: { authorizationUrl: "https://auth.example.com/authorize?client_id=storybook", resource } };
+    },
+  };
+}
+
+function factoryAgentResourceOAuthDisconnectRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:disconnect"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      const resource = ensureAgentResources(fixture, match[1]).find((entry) => entry.id === match[2]);
+      if (!resource) return { json: {} };
+      resource.oauthStatus = "OAUTH_STATUS_NOT_CONNECTED";
+      resource.oauthError = undefined;
+      resource.oauthConnectedAt = undefined;
+      resource.oauthConnectedByUserId = undefined;
+      return { json: { resource } };
+    },
+  };
+}
+
+function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)"),
+    resolve: (match, method, body) => {
+      const resources = ensureAgentResources(fixture, match[1]);
+      const index = resources.findIndex((entry) => entry.id === match[2]);
+      const resource = index >= 0 ? resources[index] : undefined;
+      if (method === "DELETE") {
+        if (index >= 0) {
+          resources.splice(index, 1);
+        }
+        return { json: {} };
+      }
+      if (method === "PATCH") {
+        if (!resource) return { json: {} };
+        return { json: { resource: patchAgentResource(resource, body) } };
+      }
+      return resource ? { json: { resource } } : { json: {} };
+    },
+  };
+}
+
+function createPostedAgentResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource) {
+  const now = new Date().toISOString();
+  if (request.kind === "KIND_SKILL") {
+    return {
+      id,
+      factoryId,
+      kind: "KIND_SKILL" as const,
+      name: typeof request.name === "string" ? request.name.trim() : "skill",
+      enabled: request.enabled !== false,
+      markdown: typeof request.markdown === "string" ? request.markdown : "",
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+  return {
+    id,
+    factoryId,
+    kind: "KIND_MCP_SERVER" as const,
+    name: typeof request.name === "string" ? request.name.trim() : "connection",
+    enabled: request.enabled !== false,
+    url: typeof request.url === "string" ? request.url : "",
+    auth: request.auth === "AUTH_OAUTH" ? ("AUTH_OAUTH" as const) : ("AUTH_HEADERS" as const),
+    headers: request.headers ?? [],
+    oauthStatus: request.auth === "AUTH_OAUTH" ? ("OAUTH_STATUS_NOT_CONNECTED" as const) : undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function factoryAgentResourceListRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources"),
+    resolve: (match, method, body, url) => {
+      const resources = ensureAgentResources(fixture, match[1]);
+      if (method === "POST") {
+        const resource = createPostedAgentResource(
+          match[1],
+          `resource-${resources.length + 1}`,
+          (body ?? {}) as FactoriesFactoryAgentResource,
+        );
+        resources.push(resource);
+        return { json: { resource } };
+      }
+      const kind = requestedAgentResourceKind(url);
+      return { json: { resources: resources.filter((entry) => (entry.kind ?? "KIND_MCP_SERVER") === kind) } };
+    },
+  };
+}
+
 function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoryAgentResourceToolsRoute(fixture),
-    {
-      pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:start"),
-      resolve: (match, method) => {
-        if (method !== "POST") return { json: {} };
-        const resources = ensureAgentResources(fixture, match[1]);
-        const resource = resources.find((entry) => entry.id === match[2]);
-        if (!resource) return { json: {} };
-        return {
-          json: {
-            authorizationUrl: "https://auth.example.com/authorize?client_id=storybook",
-            resource,
-          },
-        };
-      },
-    },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:disconnect"),
-      resolve: (match, method) => {
-        if (method !== "POST") return { json: {} };
-        const resources = ensureAgentResources(fixture, match[1]);
-        const resource = resources.find((entry) => entry.id === match[2]);
-        if (!resource) return { json: {} };
-        resource.oauthStatus = "OAUTH_STATUS_NOT_CONNECTED";
-        resource.oauthError = undefined;
-        resource.oauthConnectedAt = undefined;
-        resource.oauthConnectedByUserId = undefined;
-        return { json: { resource } };
-      },
-    },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)"),
-      resolve: (match, method, body) => {
-        const resources = ensureAgentResources(fixture, match[1]);
-        const index = resources.findIndex((entry) => entry.id === match[2]);
-        const resource = index >= 0 ? resources[index] : undefined;
-        if (method === "DELETE") {
-          if (index >= 0) {
-            resources.splice(index, 1);
-          }
-          return { json: {} };
-        }
-        if (method === "PATCH") {
-          if (!resource) return { json: {} };
-          const request = (body ?? {}) as FactoriesFactoryAgentResource;
-          if (typeof request.name === "string" && request.name.trim()) {
-            resource.name = request.name.trim();
-          }
-          if (typeof request.enabled === "boolean") {
-            resource.enabled = request.enabled;
-          }
-          if (typeof request.url === "string") {
-            resource.url = request.url;
-          }
-          if (request.auth) {
-            resource.auth = request.auth;
-          }
-          if (Array.isArray(request.headers)) {
-            resource.headers = request.headers;
-          }
-          if (typeof request.markdown === "string") {
-            resource.markdown = request.markdown;
-          }
-          resource.updatedAt = new Date().toISOString();
-          return { json: { resource } };
-        }
-        return resource ? { json: { resource } } : { json: {} };
-      },
-    },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/agent-resources"),
-      resolve: (match, method, body, url) => {
-        const resources = ensureAgentResources(fixture, match[1]);
-        if (method === "POST") {
-          const request = (body ?? {}) as FactoriesFactoryAgentResource;
-          if (request.kind === "KIND_SKILL") {
-            const resource: FactoriesFactoryAgentResource = {
-              id: `resource-${resources.length + 1}`,
-              factoryId: match[1],
-              kind: "KIND_SKILL",
-              name: typeof request.name === "string" ? request.name.trim() : "skill",
-              enabled: request.enabled !== false,
-              markdown: typeof request.markdown === "string" ? request.markdown : "",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            resources.push(resource);
-            return { json: { resource } };
-          }
-          const resource: FactoriesFactoryAgentResource = {
-            id: `resource-${resources.length + 1}`,
-            factoryId: match[1],
-            kind: "KIND_MCP_SERVER",
-            name: typeof request.name === "string" ? request.name.trim() : "connection",
-            enabled: request.enabled !== false,
-            url: typeof request.url === "string" ? request.url : "",
-            auth: request.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS",
-            headers: request.headers ?? [],
-            oauthStatus: request.auth === "AUTH_OAUTH" ? "OAUTH_STATUS_NOT_CONNECTED" : undefined,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          resources.push(resource);
-          return { json: { resource } };
-        }
-        const kind = requestedAgentResourceKind(url);
-        return {
-          json: {
-            resources: resources.filter((entry) => (entry.kind ?? "KIND_MCP_SERVER") === kind),
-          },
-        };
-      },
-    },
+    factoryAgentResourceOAuthStartRoute(fixture),
+    factoryAgentResourceOAuthDisconnectRoute(fixture),
+    factoryAgentResourceItemRoute(fixture),
+    factoryAgentResourceListRoute(fixture),
   ];
 }
 

@@ -170,7 +170,17 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
             {
               id: "workspace_agent_resources",
               label: "Agent Resources",
+              description: "Legacy alias that enables workspace MCP servers and skills",
+            },
+            {
+              id: "workspace_mcp",
+              label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",
+            },
+            {
+              id: "workspace_skills",
+              label: "Workspace Skills",
+              description: "Add skills for workspace agents",
             },
           ],
         },
