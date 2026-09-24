@@ -480,6 +480,7 @@ describe("WorkOrderDescriptionEditor", () => {
     await user.keyboard("/oy");
 
     expect(await screen.findByTestId("skill-slash-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("skill-slash-menu")).toHaveClass("fixed", "z-[70]");
     await user.click(screen.getByTestId("skill-slash-option-oypirate"));
 
     await waitFor(() => {

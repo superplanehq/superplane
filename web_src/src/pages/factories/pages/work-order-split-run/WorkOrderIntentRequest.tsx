@@ -320,7 +320,7 @@ function AnalysisComposerField({
         <SkillSlashFieldOverlay
           organizationId={analysis.organizationId}
           factoryId={analysis.factoryId}
-          value={analysis.composer}
+          value={analysis.composer ?? ""}
           cursor={cursor}
           onInsert={insertSkill}
           keyboardRef={skillKeyboardRef}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 import { SkillSlashMenu } from "@/components/AgentSidebar/SkillSlashMenu";
 import { useSkillSlashCandidates } from "@/hooks/useSkillSlashCandidates";
 import type { SkillSlashCandidate } from "@/lib/skillSlash";
+import { skillSlashMenuHost, skillSlashMenuPortalFromRects } from "@/lib/skillSlashMenu";
 
 import {
   applySkillSlashMenuKeyDown,
@@ -63,12 +64,21 @@ export function WorkOrderDescriptionSkillSlash({
     };
   }, [candidates, handleSelect, highlightIndex, keyDownRef, open]);
 
+  const host = skillSlashMenuHost(editor.view.dom);
   return (
     <SkillSlashMenu
       candidates={open ? candidates : []}
       highlightIndex={highlightIndex}
       onHighlight={setHighlightIndex}
       onSelect={handleSelect}
+      portal={{
+        root: host,
+        ...skillSlashMenuPortalFromRects(
+          editor.view.dom.getBoundingClientRect(),
+          editor.view.coordsAtPos(editor.state.selection.from),
+          host.getBoundingClientRect(),
+        ),
+      }}
     />
   );
 }

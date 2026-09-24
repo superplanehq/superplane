@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SkillSlashCandidate } from "@/lib/skillSlash";
+import { SKILL_SLASH_MENU_TEST_ID, type SkillSlashMenuPortal } from "@/lib/skillSlashMenu";
 import { cn } from "@/lib/utils";
 
 export function SkillSlashMenu({
@@ -9,22 +10,32 @@ export function SkillSlashMenu({
   highlightIndex,
   onHighlight,
   onSelect,
+  portal,
 }: {
   candidates: SkillSlashCandidate[];
   highlightIndex: number;
   onHighlight: (index: number) => void;
   onSelect: (candidate: SkillSlashCandidate) => void;
+  portal?: SkillSlashMenuPortal;
 }) {
   if (candidates.length === 0) {
     return null;
   }
 
-  return (
+  const list = (
     <ul
       role="listbox"
       aria-label="Insert a skill command"
-      data-testid="skill-slash-menu"
-      className="absolute inset-x-0 bottom-full z-20 mb-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-md"
+      data-testid={SKILL_SLASH_MENU_TEST_ID}
+      className={cn(
+        "max-h-56 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-md",
+        portal
+          ? portal.root === document.body
+            ? "fixed z-[70]"
+            : "absolute z-30"
+          : "absolute inset-x-0 bottom-full z-20 mb-1",
+      )}
+      style={portal ? { left: portal.left, width: portal.width, top: portal.top } : undefined}
     >
       {candidates.map((candidate, index) => {
         const highlighted = index === highlightIndex;
@@ -55,6 +66,8 @@ export function SkillSlashMenu({
       })}
     </ul>
   );
+
+  return portal ? createPortal(list, portal.root) : list;
 }
 
 export function SkillSlashDropdown({

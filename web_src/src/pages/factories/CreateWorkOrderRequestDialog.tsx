@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
+import { isSkillSlashMenuTarget } from "@/lib/skillSlashMenu";
 import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
@@ -112,6 +113,9 @@ export function CreateWorkOrderRequestDialog({
             : "h-auto max-h-[min(36rem,calc(100dvh-2rem))] w-[min(32rem,calc(100%-2rem))] max-w-[32rem] sm:max-w-[32rem]",
         )}
         data-testid="create-work-order-request-dialog"
+        onPointerDownOutside={preventSkillSlashMenuOutside}
+        onFocusOutside={preventSkillSlashMenuOutside}
+        onInteractOutside={preventSkillSlashMenuOutside}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           const description = contentRef.current?.querySelector<HTMLElement>("#work-order-description-input");
@@ -138,6 +142,12 @@ export function CreateWorkOrderRequestDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function preventSkillSlashMenuOutside(event: { target: EventTarget | null; preventDefault: () => void }) {
+  if (isSkillSlashMenuTarget(event.target)) {
+    event.preventDefault();
+  }
 }
 
 function RequestDialogForm({
