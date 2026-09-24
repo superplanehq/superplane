@@ -405,6 +405,72 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		require.ErrorContains(t, err, "missing task data")
 	})
 
+	t.Run("task list fetch failure returns error so the webhook retries", func(t *testing.T) {
+		body := taskWebhookBody("91", "1", "Fix payment retries")
+		events := &contexts.EventContext{}
+		unavailable := &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Unavailable"}]}`)),
+		}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			unavailable, unavailable, unavailable,
+		}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: createdTaskConfiguration(),
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+			HTTP:          httpContext,
+			Integration:   integrationWithProject(),
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, code)
+		require.ErrorContains(t, err, "task list unavailable")
+		assert.Zero(t, events.Count())
+		require.Len(t, httpContext.Requests, taskListFetchAttempts)
+	})
+
+	t.Run("task list fetch succeeds on retry", func(t *testing.T) {
+		body := taskWebhookBody("91", "1", "Fix payment retries")
+		events := &contexts.EventContext{}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusServiceUnavailable,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Unavailable"}]}`)),
+			},
+			jsonResponse(`{"data":{
+				"id":"91",
+				"type":"tasks",
+				"attributes":{"task_number":512,"title":"Fix payment retries"},
+				"relationships":{
+					"project":{"data":{"type":"projects","id":"1"}},
+					"task_list":{"data":{"type":"task_lists","id":"list-bugs"}}
+				}
+			}}`),
+		}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: createdTaskConfiguration(),
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+			HTTP:          httpContext,
+			Integration:   integrationWithProject(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		envelope, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		document, ok := envelope["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "list-bugs", taskListID(document))
+	})
+
 	t.Run("delivery for another project -> ignored", func(t *testing.T) {
 		body := taskWebhookBody("91", "other-project", "Fix payment retries")
 		events := &contexts.EventContext{}
