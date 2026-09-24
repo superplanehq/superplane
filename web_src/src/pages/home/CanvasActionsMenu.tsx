@@ -18,6 +18,123 @@ interface CanvasActionsMenuProps {
   permissionsLoading: boolean;
 }
 
+function CanvasDeleteDialog({
+  canvasName,
+  isOpen,
+  isPending,
+  canDelete,
+  onClose,
+  onDelete,
+}: {
+  canvasName: string;
+  isOpen: boolean;
+  isPending: boolean;
+  canDelete: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Dialog open={isOpen} onClose={onClose} size="lg" className="text-left">
+      <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{canvasName}"?</DialogTitle>
+      <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+        This cannot be undone. Are you sure you want to continue?
+      </DialogDescription>
+      <DialogActions>
+        <LoadingButton
+          variant="destructive"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          disabled={!canDelete}
+          loading={isPending}
+          loadingText="Deleting..."
+          className="flex items-center gap-2"
+        >
+          <Trash2 size={16} />
+          Delete
+        </LoadingButton>
+        <Button
+          variant="outline"
+          onClick={(event) => {
+            event.stopPropagation();
+            onClose();
+          }}
+        >
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function CanvasActionsTrigger({
+  canManage,
+  permissionsLoading,
+  canUpdateCanvases,
+  canDeleteCanvases,
+  isPending,
+  onRename,
+  onOpenDelete,
+}: {
+  canManage: boolean;
+  permissionsLoading: boolean;
+  canUpdateCanvases: boolean;
+  canDeleteCanvases: boolean;
+  isPending: boolean;
+  onRename: (event: MouseEvent<HTMLElement>) => void;
+  onOpenDelete: (event: MouseEvent<HTMLElement>) => void;
+}) {
+  if (!canManage) {
+    return (
+      <PermissionTooltip allowed={permissionsLoading} message="You don't have permission to manage this canvas.">
+        <button
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Canvas actions"
+          disabled
+        >
+          <MoreVertical size={16} />
+        </button>
+      </PermissionTooltip>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        asChild
+        onClick={(event: MouseEvent<HTMLButtonElement>) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
+        <button
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Canvas actions"
+          disabled={isPending}
+        >
+          <MoreVertical size={16} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <PermissionTooltip allowed={canUpdateCanvases} message="You don't have permission to update canvases.">
+          <DropdownMenuItem onClick={onRename} disabled={!canUpdateCanvases}>
+            <Pencil size={16} />
+            Rename
+          </DropdownMenuItem>
+        </PermissionTooltip>
+
+        <PermissionTooltip allowed={canDeleteCanvases} message="You don't have permission to delete canvases.">
+          <DropdownMenuItem onClick={onOpenDelete} disabled={!canDeleteCanvases}>
+            <Trash2 size={16} />
+            Delete App
+          </DropdownMenuItem>
+        </PermissionTooltip>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function CanvasActionsMenu({
   canvas,
   organizationId,
@@ -68,83 +185,24 @@ export function CanvasActionsMenu({
           event.stopPropagation();
         }}
       >
-        {!canManage ? (
-          <PermissionTooltip allowed={permissionsLoading} message="You don't have permission to manage this canvas.">
-            <button
-              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Canvas actions"
-              disabled
-            >
-              <MoreVertical size={16} />
-            </button>
-          </PermissionTooltip>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              asChild
-              onClick={(event: MouseEvent<HTMLButtonElement>) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              <button
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Canvas actions"
-                disabled={deleteCanvasMutation.isPending}
-              >
-                <MoreVertical size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <PermissionTooltip allowed={canUpdateCanvases} message="You don't have permission to update canvases.">
-                <DropdownMenuItem onClick={handleChangeName} disabled={!canUpdateCanvases}>
-                  <Pencil size={16} />
-                  Rename
-                </DropdownMenuItem>
-              </PermissionTooltip>
-
-              <PermissionTooltip allowed={canDeleteCanvases} message="You don't have permission to delete canvases.">
-                <DropdownMenuItem onClick={openDialog} disabled={!canDeleteCanvases}>
-                  <Trash2 size={16} />
-                  Delete App
-                </DropdownMenuItem>
-              </PermissionTooltip>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <CanvasActionsTrigger
+          canManage={canManage}
+          permissionsLoading={permissionsLoading}
+          canUpdateCanvases={canUpdateCanvases}
+          canDeleteCanvases={canDeleteCanvases}
+          isPending={deleteCanvasMutation.isPending}
+          onRename={handleChangeName}
+          onOpenDelete={openDialog}
+        />
       </div>
-
-      <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
-        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{canvas.name}"?</DialogTitle>
-        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
-          This cannot be undone. Are you sure you want to continue?
-        </DialogDescription>
-        <DialogActions>
-          <LoadingButton
-            variant="destructive"
-            onClick={(event) => {
-              event.stopPropagation();
-              handleDelete();
-            }}
-            disabled={!canDeleteCanvases}
-            loading={deleteCanvasMutation.isPending}
-            loadingText="Deleting..."
-            className="flex items-center gap-2"
-          >
-            <Trash2 size={16} />
-            Delete
-          </LoadingButton>
-          <Button
-            variant="outline"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeDialog();
-            }}
-          >
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CanvasDeleteDialog
+        canvasName={canvas.name}
+        isOpen={isDialogOpen}
+        isPending={deleteCanvasMutation.isPending}
+        canDelete={canDeleteCanvases}
+        onClose={closeDialog}
+        onDelete={handleDelete}
+      />
     </>
   );
 }
