@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -98,6 +98,11 @@ function mockWorkspaceUsage(value: {
   );
 }
 
+async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, parentTestId: string, optionName: string) {
+  await user.hover(screen.getByTestId(parentTestId));
+  fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
+}
+
 function renderField(ui: ReactElement, path = "/") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -148,10 +153,11 @@ describe("HostedModelFieldRenderer", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "openai/gpt-5" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("field-model-hosted-model-list")).toHaveTextContent("Model");
+    expect(screen.getByTestId("field-model-hosted-thinking")).toHaveTextContent("Thinking");
+    expect(screen.queryByRole("menuitem", { name: "openai/gpt-5" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" }));
+    await selectFlyoutOption(user, "field-model-hosted-model-list", "anthropic/claude-sonnet-4-6");
     expect(onChange).toHaveBeenCalledWith("claude-sonnet-4-6");
   });
 
@@ -225,9 +231,10 @@ describe("HostedModelFieldRenderer", () => {
       enabled: true,
     });
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "openai/gpt-5" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "openai/gpt-5" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
   });
 
   it("selects the instance SuperPlane agent model by default", () => {
@@ -258,5 +265,68 @@ describe("HostedModelFieldRenderer", () => {
       sources: ["hosted"],
       enabled: true,
     });
+  });
+
+  it("keeps an unset SuperPlane model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createSuperPlaneField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+    expect(screen.getByTestId("field-model-hosted-model-list")).toBeInTheDocument();
+  });
+
+  it("writes thinkingLevel next to the model", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6" }}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
+  });
+
+  it("clears thinkingLevel when Default is selected", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6", thinkingLevel: "high" }}
+        organizationId="org-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "Default");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: undefined });
   });
 });
