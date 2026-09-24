@@ -16,8 +16,11 @@ export const FEATURE_FACTORY_JIRA_INTAKE = "factory_jira_intake";
 /** Organization experimental feature: manual "Add intake" entry for Productive.io in the Backlog column menu. */
 export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 
-/** Organization experimental feature: workspace Agent resources (MCP connections). */
-export const FEATURE_WORKSPACE_AGENT_RESOURCES = "workspace_agent_resources";
+/** Organization experimental feature: workspace MCP servers. */
+export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
+
+/** Organization experimental feature: workspace skills. */
+export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
 /** Organization experimental feature: organization LLM Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";

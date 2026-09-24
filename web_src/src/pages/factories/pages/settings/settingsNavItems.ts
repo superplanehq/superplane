@@ -3,7 +3,7 @@ import {
   BarChart3,
   Bell,
   Blocks,
-  Bot,
+  BookOpen,
   CircleDollarSign,
   CircleUser,
   Cpu,
@@ -24,7 +24,8 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
-  | "agent-resources"
+  | "mcp"
+  | "skills"
   | "models"
   | "spending"
   | "usage"
@@ -161,13 +162,22 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         ],
       },
       {
-        id: "workspace-agent-resources",
-        label: "Agent resources",
-        Icon: Bot,
+        id: "workspace-mcp",
+        label: "MCP servers",
+        Icon: Plug,
         scope: "workspace",
-        section: "agent-resources",
+        section: "mcp",
         permission: { resource: "factories", action: "update" },
-        keywords: ["mcp server", "mcp", "skill", "oauth", "header", "agent", "sign-in", "github package"],
+        keywords: ["mcp server", "mcp", "oauth", "header", "agent", "sign-in", "tools"],
+      },
+      {
+        id: "workspace-skills",
+        label: "Skills",
+        Icon: BookOpen,
+        scope: "workspace",
+        section: "skills",
+        permission: { resource: "factories", action: "update" },
+        keywords: ["skill", "skill.md", "agent", "github package"],
       },
       {
         id: "workspace-usage",

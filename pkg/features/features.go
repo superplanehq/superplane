@@ -49,9 +49,11 @@ const FeatureOrganizationBYOK = "organization_byok"
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
-// FeatureWorkspaceAgentResources gates the workspace Agent resources settings
-// page until MCP servers are ready for general use.
-const FeatureWorkspaceAgentResources = "workspace_agent_resources"
+// FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
+const FeatureWorkspaceMCP = "workspace_mcp"
+
+// FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
+const FeatureWorkspaceSkills = "workspace_skills"
 
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
@@ -73,7 +75,8 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
-	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 }
 

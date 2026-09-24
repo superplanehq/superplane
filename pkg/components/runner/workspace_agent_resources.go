@@ -26,9 +26,10 @@ const (
 )
 
 type workspaceMCPServer struct {
-	Name    string            `json:"name"`
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers,omitempty"`
+	Name          string            `json:"name"`
+	URL           string            `json:"url"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	DisabledTools []string          `json:"disabledTools,omitempty"`
 }
 
 type workspaceMCPFile struct {
@@ -48,12 +49,17 @@ func AttachWorkspaceAgentResources(
 	if err != nil {
 		return environment, files
 	}
-	enabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgentResources)
+	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
 	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: feature check failed")
+		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
 		return environment, files
 	}
-	if !enabled {
+	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
+		return environment, files
+	}
+	if !mcpEnabled && !skillsEnabled {
 		return environment, files
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))
@@ -73,23 +79,30 @@ func AttachWorkspaceAgentResources(
 		return environment, files
 	}
 
-	mcpServers, err := factory.ListEnabledMCPServers(db)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: list MCP failed")
-		return environment, files
+	var mcpServers []models.FactoryAgentResource
+	if mcpEnabled {
+		mcpServers, err = factory.ListEnabledMCPServers(db)
+		if err != nil {
+			logger.WithError(err).Warn("skip workspace agent resources: list MCP failed")
+			return environment, files
+		}
 	}
-	skills, err := factory.ListEnabledSkills(db)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: list skills failed")
-		return environment, files
+	var skills []models.FactoryAgentResource
+	if skillsEnabled {
+		skills, err = factory.ListEnabledSkills(db)
+		if err != nil {
+			logger.WithError(err).Warn("skip workspace agent resources: list skills failed")
+			return environment, files
+		}
 	}
 
 	disabled := disabledAgentResourceIDs(ctx.Configuration)
+	disabledTools := disabledAgentResourceTools(ctx.Configuration)
 	mcpServers = rejectDisabledAgentResources(mcpServers, disabled)
 	skills = rejectDisabledAgentResources(skills, disabled)
 
 	var mcpNames []string
-	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, environment, files)
+	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, environment, files)
 	var skillNames []string
 	files, skillNames = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, skillNames)
@@ -100,6 +113,7 @@ func attachWorkspaceMCPServers(
 	ctx core.ExecutionContext,
 	db *gorm.DB,
 	resources []models.FactoryAgentResource,
+	disabledTools map[string][]string,
 	environment []BrokerEnvironmentVariable,
 	files []BrokerTaskFile,
 ) ([]BrokerEnvironmentVariable, []BrokerTaskFile, []string) {
@@ -111,7 +125,7 @@ func attachWorkspaceMCPServers(
 	httpClient := mcp.DoerFromCore(ctx.HTTP)
 	servers := make([]workspaceMCPServer, 0, len(resources))
 	for i := range resources {
-		server, ok := assembleWorkspaceMCPServer(ctx, encryptor, httpClient, db, &resources[i])
+		server, ok := assembleWorkspaceMCPServer(ctx, encryptor, httpClient, db, &resources[i], disabledTools[resources[i].ID.String()])
 		if !ok {
 			continue
 		}
@@ -176,6 +190,7 @@ func assembleWorkspaceMCPServer(
 	httpClient mcp.HTTPDoer,
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
+	automationDisabledTools []string,
 ) (workspaceMCPServer, bool) {
 	logger := workspaceAgentResourcesLogger(ctx)
 	config := resource.Config.Data()
@@ -215,9 +230,10 @@ func assembleWorkspaceMCPServer(
 	}
 
 	return workspaceMCPServer{
-		Name:    resource.Name,
-		URL:     config.URL,
-		Headers: headers,
+		Name:          resource.Name,
+		URL:           config.URL,
+		Headers:       headers,
+		DisabledTools: models.NormalizeDisabledTools(append(append([]string{}, config.DisabledTools...), automationDisabledTools...)),
 	}, true
 }
 
@@ -250,6 +266,56 @@ func disabledAgentResourceIDs(configuration any) map[string]struct{} {
 		}
 	}
 	return ids
+}
+
+func disabledAgentResourceTools(configuration any) map[string][]string {
+	out := map[string][]string{}
+	config, ok := configuration.(map[string]any)
+	if !ok {
+		return out
+	}
+	raw, ok := config["disabledAgentResourceTools"]
+	if !ok {
+		return out
+	}
+	switch values := raw.(type) {
+	case map[string][]string:
+		for id, names := range values {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			out[id] = models.NormalizeDisabledTools(names)
+		}
+	case map[string]any:
+		for id, value := range values {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			out[id] = models.NormalizeDisabledTools(stringSlice(value))
+		}
+	}
+	return out
+}
+
+func stringSlice(value any) []string {
+	switch names := value.(type) {
+	case []string:
+		return names
+	case []any:
+		out := make([]string, 0, len(names))
+		for _, entry := range names {
+			name, ok := entry.(string)
+			if !ok {
+				continue
+			}
+			out = append(out, name)
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 func rejectDisabledAgentResources(resources []models.FactoryAgentResource, disabled map[string]struct{}) []models.FactoryAgentResource {

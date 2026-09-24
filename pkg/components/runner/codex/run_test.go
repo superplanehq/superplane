@@ -87,6 +87,16 @@ func TestCodexExecArgsMergesWorkspaceMCP(t *testing.T) {
 	assert.Contains(t, joined, `mcp_servers.docs.http_headers.Authorization="Bearer tok"`)
 }
 
+func TestCodexExecArgsDisablesWorkspaceMCPTools(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","disabledTools":["create_issue","search"]}]}`), 0o644))
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	}, "gpt-5", "/task/planning_session_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `mcp_servers.docs.disabled_tools=["create_issue", "search"]`)
+}
+
 func TestCodexExecArgsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 	taskDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))

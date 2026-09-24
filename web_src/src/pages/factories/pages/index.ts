@@ -33,7 +33,9 @@ export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePag
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
 export { FactorySettingsRepositoryPage } from "./settings/FactorySettingsRepositoryPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
-export { FactorySettingsAgentResourcesPage } from "./settings/FactorySettingsAgentResourcesPage";
+export { FactorySettingsMCPPage } from "./settings/FactorySettingsMCPPage";
+export { FactorySettingsSkillsPage } from "./settings/FactorySettingsSkillsPage";
+export { FactorySettingsSkillEditorPage } from "./settings/FactorySettingsSkillEditorPage";
 export { FACTORY_SETTINGS_NAV_GROUPS, FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";
 export { OrganizationSettingsLayout } from "./organizationSettings/OrganizationSettingsLayout";
 export { OrganizationSettingsOverviewPage } from "./organizationSettings/OrganizationSettingsOverviewPage";
