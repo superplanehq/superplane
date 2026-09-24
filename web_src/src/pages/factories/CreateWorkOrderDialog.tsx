@@ -56,6 +56,8 @@ function CreateWorkOrderRequestSession({
       maxLength={composer.maxDescriptionLength}
       isCreating={composer.isCreating}
       isUploading={fileUpload.isUploading}
+      organizationId={organizationId}
+      factoryId={factoryId}
       onClose={() => {
         if (!composer.isCreating && !fileUpload.isUploading) {
           onClose();
