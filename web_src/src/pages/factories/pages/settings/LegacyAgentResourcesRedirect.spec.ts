@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { legacyAgentResourcesPath } from "./LegacyAgentResourcesRedirect";
+import { legacyAgentResourcesPath } from "./legacyAgentResourcesPath";
 
 describe("legacyAgentResourcesPath", () => {
   it("sends the default route to MCP", () => {

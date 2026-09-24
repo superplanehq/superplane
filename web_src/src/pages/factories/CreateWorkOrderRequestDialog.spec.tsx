@@ -19,12 +19,14 @@ vi.mock("./WorkOrderDescriptionEditor", () => ({
   WorkOrderDescriptionEditor: ({
     autoFocus,
     className,
+    factoryId,
     value,
     onChange,
     onFocus,
   }: {
     autoFocus?: boolean;
     className?: string;
+    factoryId?: string;
     value?: string;
     onChange?: (next: string) => void;
     onFocus?: () => void;
@@ -32,6 +34,7 @@ vi.mock("./WorkOrderDescriptionEditor", () => ({
     <textarea
       id="work-order-description-input"
       data-testid="work-order-description-input"
+      data-factory-id={factoryId}
       className={className}
       autoFocus={autoFocus}
       value={value}
@@ -121,6 +124,12 @@ describe("CreateWorkOrderRequestDialog", () => {
 
     expect(screen.getByTestId("work-order-description-input")).toHaveFocus();
     expect(screen.getByTestId("create-work-order-request-title")).not.toHaveFocus();
+  });
+
+  it("passes the workspace to the description editor for skill slash", () => {
+    renderRequestDialog({ organizationId: "org-1", factoryId: "factory-1" });
+
+    expect(screen.getByTestId("work-order-description-input")).toHaveAttribute("data-factory-id", "factory-1");
   });
 
   it("keeps the title optional and disables create when the message is empty", () => {
