@@ -24,10 +24,10 @@ func TestAgentChatMessageImage(t *testing.T) {
 	signer := jwt.NewSigner("test")
 	server, err := NewServer(
 		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "http://localhost", "http://localhost", "test", "/app/templates", r.AuthService, nil, false,
+		"", "http://localhost", "http://localhost", "test", "/app/templates", r.AuthService, false,
 	)
 	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), nil)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 
 	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)

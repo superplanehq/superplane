@@ -184,10 +184,11 @@ describe("PlanningReviewForm model options", () => {
 
     expect(screen.getByText("Model used")).toBeInTheDocument();
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("option", { name: "qwen/qwen3.7-max" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "anthropic/claude-opus-5" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Claude Sonnet" })).not.toBeInTheDocument();
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "qwen/qwen3.7-max" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "anthropic/claude-opus-5" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Claude Sonnet" })).not.toBeInTheDocument();
   });
 
   it("lists hosted SuperPlane models from the runner fallback when the catalog is empty", async () => {
@@ -196,8 +197,9 @@ describe("PlanningReviewForm model options", () => {
     renderForm(superPlaneDraft());
 
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("option", { name: "qwen/qwen3.7-max" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Claude Sonnet" })).not.toBeInTheDocument();
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "qwen/qwen3.7-max" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Claude Sonnet" })).not.toBeInTheDocument();
   });
 
   it("keeps Claude aliases when the agent is not Run SuperPlane Agent", async () => {

@@ -17,9 +17,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
@@ -29,7 +27,6 @@ import (
 func CommitCanvasStaging(
 	ctx context.Context,
 	db *gorm.DB,
-	usageService usage.Service,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	canvas *models.Canvas,
@@ -82,9 +79,7 @@ func CommitCanvasStaging(
 		// and applying the spec operations on it.
 		//
 		nextVersion, err := createNewCanvasVersionFromLive(
-			ctx,
 			tx,
-			usageService,
 			registry,
 			canvas.OrganizationID.String(),
 			canvas,
@@ -203,9 +198,7 @@ func stagedSpecOperations(rows []models.WorkflowStagedFile) []*pb.CanvasReposito
 }
 
 func createNewCanvasVersionFromLive(
-	ctx context.Context,
 	tx *gorm.DB,
-	usageService usage.Service,
 	registry *registry.Registry,
 	organizationID string,
 	canvas *models.Canvas,
@@ -257,20 +250,6 @@ func createNewCanvasVersionFromLive(
 			nodes, edges, err := canvas.Parse(registry, organizationID)
 			if err != nil {
 				return nil, grpcerrors.InvalidArgument(err, "invalid canvas yaml")
-			}
-
-			err = usage.EnsureOrganizationWithinLimits(
-				ctx,
-				usageService,
-				organizationID,
-				&usagepb.OrganizationState{},
-				&usagepb.CanvasState{
-					Nodes: int32(len(nodes)),
-				},
-			)
-
-			if err != nil {
-				return nil, err
 			}
 
 			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, nodes)

@@ -32,6 +32,10 @@ const (
 	// as, both for the onTask trigger's project field and ListResources.
 	ResourceTypeProject = "project"
 
+	// ResourceTypeTaskList is a task list inside one project. ListResources
+	// requires a "project" parameter with that project's id.
+	ResourceTypeTaskList = "task_list"
+
 	// TaskCreatedEvent and TaskUpdatedEvent name the change a task event
 	// carries, in the "meta" object of the emitted envelope.
 	TaskCreatedEvent = "task.created"
@@ -231,6 +235,34 @@ func parseProductiveSignature(header string) (timestamp, signature string, ok bo
 		}
 	}
 	return timestamp, signature, timestamp != "" && signature != ""
+}
+
+// taskListID reads the task list relationship id from a JSON:API task.
+// Productive.io omits the id until the relationship is included, so a
+// missing id is empty rather than an error.
+func taskListID(document map[string]any) string {
+	relationships, _ := document["relationships"].(map[string]any)
+	taskList, _ := relationships["task_list"].(map[string]any)
+	data, _ := taskList["data"].(map[string]any)
+	id, _ := data["id"].(string)
+	return strings.TrimSpace(id)
+}
+
+// setTaskListID writes the task list relationship the intake filter reads.
+func setTaskListID(document map[string]any, id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+
+	relationships, _ := document["relationships"].(map[string]any)
+	if relationships == nil {
+		relationships = map[string]any{}
+		document["relationships"] = relationships
+	}
+	relationships["task_list"] = map[string]any{
+		"data": map[string]any{"type": "task_lists", "id": id},
+	}
 }
 
 // taskProjectID reads the project relationship id from a JSON:API task.

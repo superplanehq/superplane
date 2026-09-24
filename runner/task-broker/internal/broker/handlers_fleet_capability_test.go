@@ -11,9 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/superplane/runner/shared/api"
-	"github.com/superplane/runner/task-broker/internal/dispatch"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
@@ -23,8 +21,8 @@ func TestCreateTaskRejectsDockerOnFleetWithoutDockerSupport(t *testing.T) {
 	defer cleanup()
 	noDocker := false
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
-		ID: "fleet-no-docker", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), DispatchTarget: "fn", SupportsDocker: &noDocker,
+		ID: "fleet-no-docker", Provisioner: "aws", Arch: "amd64", Size: "small",
+		CreatedAt: time.Now().UTC(), SupportsDocker: &noDocker,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -53,8 +51,8 @@ func TestCreateTaskRejectsExecutionTimeoutAboveFleetCap(t *testing.T) {
 	defer cleanup()
 	capSeconds := 900
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
-		ID: "fleet-capped", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), DispatchTarget: "fn", MaxExecutionTimeoutSeconds: &capSeconds,
+		ID: "fleet-capped", Provisioner: "aws", Arch: "amd64", Size: "small",
+		CreatedAt: time.Now().UTC(), MaxExecutionTimeoutSeconds: &capSeconds,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +80,8 @@ func TestCreateTaskClampsOmittedTimeoutToFleetCap(t *testing.T) {
 	defer cleanup()
 	capSeconds := 900
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
-		ID: "fleet-capped-2", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), DispatchTarget: "fn", MaxExecutionTimeoutSeconds: &capSeconds,
+		ID: "fleet-capped-2", Provisioner: "aws", Arch: "amd64", Size: "small",
+		CreatedAt: time.Now().UTC(), MaxExecutionTimeoutSeconds: &capSeconds,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -111,59 +109,6 @@ func TestCreateTaskClampsOmittedTimeoutToFleetCap(t *testing.T) {
 	if task.ExecutionTimeoutSeconds == nil || *task.ExecutionTimeoutSeconds != capSeconds {
 		t.Fatalf("expected timeout clamped to %d, got %#v", capSeconds, task.ExecutionTimeoutSeconds)
 	}
-}
-
-func TestCreateTaskDispatchesToLambdaFleet(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
-		ID: "fleet-lambda-dispatch", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), DispatchTarget: "runner-lambda-fn",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	invoked := make(chan string, 1)
-	fake := fakeLambdaInvoker(func(_ context.Context, in *lambda.InvokeInput, _ ...func(*lambda.Options)) (*lambda.InvokeOutput, error) {
-		invoked <- *in.FunctionName
-		return &lambda.InvokeOutput{}, nil
-	})
-
-	srv := &Server{Store: st, Dispatch: &dispatch.Resolver{LambdaClient: fake}}
-	ts := httptest.NewServer(NewRouter(srv, RouterOptions{AuthToken: "token"}))
-	defer ts.Close()
-
-	status, body := postTask(t, ts, `{
-		"fleet_id": "fleet-lambda-dispatch",
-		"webhook_url": "https://example.com/hook",
-		"commands": [{"command": "echo hi"}]
-	}`)
-	if status != http.StatusCreated {
-		t.Fatalf("status=%d body=%s", status, body)
-	}
-
-	select {
-	case gotFunctionName := <-invoked:
-		if gotFunctionName != "runner-lambda-fn" {
-			t.Fatalf("function name = %q", gotFunctionName)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for lambda invoke")
-	}
-
-	candidates, err := st.ClaimDispatchCandidates(context.Background(), dispatch.ProvisionerAWSLambda, time.Minute, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(candidates) != 0 {
-		t.Fatalf("expected no sweep candidates after successful dispatch: %#v", candidates)
-	}
-}
-
-type fakeLambdaInvoker func(ctx context.Context, in *lambda.InvokeInput, optFns ...func(*lambda.Options)) (*lambda.InvokeOutput, error)
-
-func (f fakeLambdaInvoker) Invoke(ctx context.Context, in *lambda.InvokeInput, optFns ...func(*lambda.Options)) (*lambda.InvokeOutput, error) {
-	return f(ctx, in, optFns...)
 }
 
 func postTask(t *testing.T, ts *httptest.Server, body string) (int, string) {

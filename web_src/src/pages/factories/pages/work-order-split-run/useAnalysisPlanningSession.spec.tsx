@@ -77,6 +77,66 @@ describe("useAnalysisPlanningSession", () => {
     expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
   });
 
+  it("refetches the planning session every 15 seconds while the session is live", async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    vi.mocked(findPlanningSessionByWorkOrder)
+      .mockResolvedValueOnce({
+        id: "session-1",
+        state: "running",
+      })
+      .mockResolvedValueOnce({
+        id: "session-1",
+        state: "running",
+        activities: [
+          {
+            id: "activity-1",
+            schemaVersion: 2,
+            provider: "claude",
+            status: "running",
+            lastSequence: "1",
+            items: [{ type: "text", text: "Reading the repository." }],
+          },
+        ],
+      });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    try {
+      const { result } = renderHook(
+        () =>
+          useAnalysisPlanningSession({
+            organizationId: "org-1",
+            factoryId: "factory-1",
+            workOrderId: "order-1",
+            enabled: true,
+            canUpdate: true,
+          }),
+        { wrapper: wrapperWithClient(queryClient) },
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLive).toBe(true);
+      });
+      expect(result.current.session?.activities).toBeUndefined();
+      expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(1);
+      const query = queryClient.getQueryCache().find({
+        queryKey: workOrderPlanningSessionQueryKey("org-1", "factory-1", "order-1"),
+      });
+      expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBe(15_000);
+      const scheduled = setIntervalSpy.mock.calls.find(([, delay]) => delay === 15_000);
+      expect(scheduled).toBeDefined();
+
+      await act(async () => {
+        (scheduled?.[0] as () => void)();
+      });
+      await waitFor(() => {
+        expect(result.current.session?.activities).toMatchObject([{ id: "activity-1" }]);
+      });
+      expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(2);
+    } finally {
+      setIntervalSpy.mockRestore();
+    }
+  });
+
   it("surfaces failures that are not a missing session", async () => {
     const failure = new Error("server unavailable");
     vi.mocked(findPlanningSessionByWorkOrder).mockRejectedValue(failure);

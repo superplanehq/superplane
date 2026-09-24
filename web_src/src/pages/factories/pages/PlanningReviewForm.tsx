@@ -139,6 +139,13 @@ function AgentPanel({
             field={modelUsedField}
             value={byokModelDefault ?? component.configuration.model}
             onChange={(value) => setConfigurationField("model", value)}
+            onValuesChange={(patch) => {
+              const configuration = { ...component.configuration, ...patch };
+              if (!patch.thinkingLevel) {
+                delete configuration.thinkingLevel;
+              }
+              onChange({ ...component, configuration });
+            }}
             allValues={component.configuration}
             organizationId={organizationId}
             allowExpressions

@@ -16,6 +16,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
@@ -103,7 +104,7 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 		return nil, err
 	}
 
-	return b.applyLineDispatchModel(resolved)
+	return b.applyLineDispatchOverrides(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -2274,11 +2275,22 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 	return executions, nil
 }
 
-func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]any) (map[string]any, error) {
+func (b *NodeConfigurationBuilder) applyLineDispatchOverrides(resolved map[string]any) (map[string]any, error) {
 	dispatch, err := b.lineDispatch()
 	if err != nil || dispatch == nil {
 		return resolved, err
 	}
+	resolved, err = b.applyLineDispatchModel(resolved, dispatch)
+	if err != nil {
+		return resolved, err
+	}
+	return applyLineDispatchThinking(resolved, dispatch.ThinkingLevel), nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchModel(
+	resolved map[string]any,
+	dispatch *models.FactoryWorkOrderLineDispatch,
+) (map[string]any, error) {
 	override := strings.TrimSpace(dispatch.Model)
 	if override == "" {
 		return resolved, nil
@@ -2291,6 +2303,16 @@ func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]an
 
 	resolved["model"] = override
 	return resolved, nil
+}
+
+func applyLineDispatchThinking(resolved map[string]any, dispatchThinking string) map[string]any {
+	agent, _ := resolved["thinkingLevel"].(string)
+	thinking, ok := runner.OverlayThinkingLevel(agent, dispatchThinking)
+	if !ok {
+		return resolved
+	}
+	resolved["thinkingLevel"] = thinking
+	return resolved
 }
 
 func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineDispatch, error) {

@@ -4,7 +4,7 @@
 /**
  * Run Codex CLI and emit typed live-log records.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [thinking]
  */
 
 const fs = require("fs");
@@ -113,11 +113,22 @@ function planningSystemPrompt(env = process.env) {
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
 // --sandbox flag. Config overrides keep both new and resumed analysis turns
 // read-only without disabling shell commands and file reads.
+function thinkingArgs(thinking) {
+  const level = String(thinking || "")
+    .trim()
+    .toLowerCase();
+  if (level === "low" || level === "medium" || level === "high") {
+    return ["-c", `model_reasoning_effort=${tomlString(level)}`];
+  }
+  return [];
+}
+
 function codexExecArgs(
   env = process.env,
   model,
   mcpScriptPath,
   sessionID = "",
+  thinking = "",
 ) {
   const args = ["exec"];
   if (sessionID) {
@@ -147,6 +158,7 @@ function codexExecArgs(
   if (model) {
     args.push("-m", model);
   }
+  args.push(...thinkingArgs(thinking));
   return args;
 }
 
@@ -272,10 +284,10 @@ function tomlStringArray(values) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    writeStderr("usage: node run.js <prompt-file> [model]\n");
+    writeStderr("usage: node run.js <prompt-file> [model] [thinking]\n");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", args[2] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
       writeStderr(`${err && err.message ? err.message : err}\n`);
@@ -283,7 +295,7 @@ function main() {
     });
 }
 
-async function runPrompt(promptFile, model) {
+async function runPrompt(promptFile, model, thinking) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
     throw new Error("SUPERPLANE_TASK_DIR is required");
@@ -324,7 +336,13 @@ async function runPrompt(promptFile, model) {
     sp,
     planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
   );
-  const codexArgs = codexExecArgs(process.env, model, mcpScript, sessionID);
+  const codexArgs = codexExecArgs(
+    process.env,
+    model,
+    mcpScript,
+    sessionID,
+    thinking,
+  );
   if (planning) {
     writeStdout("Planning session tools enabled\n");
     writeStdout("sandbox: read-only\n");
@@ -881,6 +899,7 @@ module.exports = {
   createCodexFormatter,
   normalizeCodexToolKind,
   codexExecArgs,
+  thinkingArgs,
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
