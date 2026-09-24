@@ -43,7 +43,6 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		CancelRequested:              t.CancelRequested,
 		WebhookPayloadSizeLimit:      t.WebhookPayloadSizeLimit,
 		RunnerTerminationRequestedAt: t.RunnerTerminationRequestedAt,
-		DispatchRequestedAt:          t.DispatchRequestedAt,
 		ClaimedAt:                    t.ClaimedAt,
 		LeaseUntil:                   t.LeaseUntil,
 		FinishedAt:                   t.FinishedAt,
@@ -157,7 +156,6 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		CancelRequested:              row.CancelRequested,
 		WebhookPayloadSizeLimit:      row.WebhookPayloadSizeLimit,
 		RunnerTerminationRequestedAt: row.RunnerTerminationRequestedAt,
-		DispatchRequestedAt:          row.DispatchRequestedAt,
 		ClaimedAt:                    row.ClaimedAt,
 		LeaseUntil:                   row.LeaseUntil,
 		FinishedAt:                   row.FinishedAt,
@@ -182,10 +180,6 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 	if t.RunnerTerminationRequestedAt != nil {
 		rt := t.RunnerTerminationRequestedAt.UTC()
 		t.RunnerTerminationRequestedAt = &rt
-	}
-	if t.DispatchRequestedAt != nil {
-		dt := t.DispatchRequestedAt.UTC()
-		t.DispatchRequestedAt = &dt
 	}
 	return t, nil
 }
