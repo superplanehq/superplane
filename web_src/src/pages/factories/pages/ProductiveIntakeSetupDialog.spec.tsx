@@ -81,7 +81,7 @@ describe("ProductiveIntakeSetupDialog", () => {
     expect(
       await screen.findByRole("heading", { name: PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProject }),
     ).toBeInTheDocument();
-    expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("30 newest");
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("10 newest");
     expect(screen.getByTestId("productive-intake-setup-stepper")).toBeInTheDocument();
     expect(screen.getByTestId("productive-intake-setup-sphere")).toBeInTheDocument();
   });

@@ -34,6 +34,10 @@ const (
 	// reads so it can drop issues that already sit on the intake.
 	intakeSentrySeedEventWindow = 200
 
+	// intakeProductiveSeedSize is how many open Productive.io tasks a new
+	// intake imports. The wizard tells the user this number.
+	intakeProductiveSeedSize = 10
+
 	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
 	// imports. The wizard tells the user this number.
 	intakeJiraSeedSize = 10
@@ -331,7 +335,7 @@ func seedProductiveTasks(
 	project, _ := binding.Configuration["project"].(string)
 	documents, err := client.ListNewestOpenTaskDocuments(
 		project,
-		intakeSeedSize,
+		intakeProductiveSeedSize,
 		productiveIntakeExcludesKeyTasks(tx, canvasID),
 	)
 	if err != nil {
