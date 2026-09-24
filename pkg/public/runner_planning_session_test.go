@@ -357,12 +357,18 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 		},
 	}
 
+	const planText = "SECRET_PLAN_BODY_DO_NOT_LEAK"
+	const bearerToken = "SECRET_BEARER_TOKEN_DO_NOT_LEAK"
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hook := logtest.NewGlobal()
 			t.Cleanup(func() { hook.Reset() })
 			transport := bindTestSentryHub(t)
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", nil)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
+				`{"body":"# Retry refunds\n\n`+planText+`\n"}`,
+			)))
+			req.Header.Set("Authorization", "Bearer "+bearerToken)
 			req.Pattern = "/api/v1/runner/planning-sessions/clarity"
 			if tt.cancelRequest {
 				ctx, cancel := context.WithCancel(req.Context())
@@ -395,6 +401,10 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 					_, present := errorEntry.Data[key]
 					assert.False(t, present, "log field %s should be omitted", key)
 				}
+				formatted, err := errorEntry.String()
+				require.NoError(t, err)
+				assert.NotContains(t, formatted, planText)
+				assert.NotContains(t, formatted, bearerToken)
 			} else {
 				assert.Zero(t, errorLogs)
 			}
@@ -409,6 +419,13 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			require.NotNil(t, event.Request)
 			assert.Equal(t, http.MethodPost, event.Request.Method)
 			assert.Contains(t, event.Request.URL, "/api/v1/runner/planning-sessions/clarity")
+			assert.Empty(t, event.Request.Data)
+			_, hasAuthorization := event.Request.Headers["Authorization"]
+			assert.False(t, hasAuthorization)
+			payload, err := json.Marshal(event)
+			require.NoError(t, err)
+			assert.NotContains(t, string(payload), planText)
+			assert.NotContains(t, string(payload), bearerToken)
 			for key, value := range tt.wantTags {
 				assert.Equal(t, value, event.Tags[key], "tag %s", key)
 			}
