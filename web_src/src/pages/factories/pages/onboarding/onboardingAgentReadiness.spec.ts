@@ -2,11 +2,14 @@ import { describe, expect, it } from "bun:test";
 
 import type { IntegrationId } from "./onboardingFixtures";
 import {
+  agentFinishReady,
   firstWorkOrderAgentError,
   hostedCreditGrantCopy,
+  hasHostedDefaultModel,
   hostedModelsQueriesLoading,
   isAgentStepReady,
   isHostedAgentReady,
+  onboardingAgentGate,
   resolveOnboardingAgent,
   shouldShowHostedCreditGrant,
 } from "./onboardingAgentReadiness";
@@ -120,6 +123,34 @@ describe("resolveOnboardingAgent", () => {
     ).toBe("openai");
   });
 
+  it("uses a connected provider key before hosted models when the organization brings its own key", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      }),
+    ).toMatchObject({
+      providerId: "claude",
+      credentialsSource: "integration",
+      model: "sonnet",
+    });
+  });
+
+  it("keeps the hosted model when bring-your-own-key is on and no provider is connected", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected(),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      })?.credentialsSource,
+    ).toBe("hosted");
+  });
+
   it("prefers hosted SuperPlane over a connected org provider when a default model is set", () => {
     expect(
       resolveOnboardingAgent({
@@ -178,6 +209,95 @@ describe("isHostedAgentReady", () => {
 
   it("is not ready without a plan", () => {
     expect(isHostedAgentReady(undefined)).toBe(false);
+  });
+});
+
+describe("hasHostedDefaultModel", () => {
+  it("is true when the installation sets a hosted provider and model", () => {
+    expect(hasHostedDefaultModel({ defaultHostedProvider: "anthropic", defaultHostedModel: "claude-sonnet-4-6" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when the hosted provider or model is missing", () => {
+    expect(hasHostedDefaultModel({ defaultHostedProvider: "anthropic", defaultHostedModel: " " })).toBe(false);
+    expect(hasHostedDefaultModel({})).toBe(false);
+  });
+});
+
+describe("onboardingAgentGate", () => {
+  it("skips the agent screen when hosted models cover the agent", () => {
+    expect(
+      onboardingAgentGate({ hostedModelsAvailable: true, bringYourOwnKey: false, bringYourOwnKeyLoading: false }),
+    ).toBe("skip");
+  });
+
+  it("puts the agent screen before the tickets when the organization can bring its own key", () => {
+    expect(
+      onboardingAgentGate({ hostedModelsAvailable: true, bringYourOwnKey: true, bringYourOwnKeyLoading: false }),
+    ).toBe("first");
+  });
+
+  it("shows the agent screen after the tickets when only a provider key can run the agent", () => {
+    expect(
+      onboardingAgentGate({ hostedModelsAvailable: false, bringYourOwnKey: true, bringYourOwnKeyLoading: false }),
+    ).toBe("show");
+  });
+
+  it("waits while the bring-your-own-key flag is still loading", () => {
+    expect(
+      onboardingAgentGate({ hostedModelsAvailable: true, bringYourOwnKey: false, bringYourOwnKeyLoading: true }),
+    ).toBe("pending");
+  });
+
+  it("shows the agent screen when no hosted model is available", () => {
+    expect(
+      onboardingAgentGate({ hostedModelsAvailable: false, bringYourOwnKey: false, bringYourOwnKeyLoading: false }),
+    ).toBe("show");
+  });
+});
+
+describe("agentFinishReady", () => {
+  const ready = {
+    modelSourceChoice: true,
+    credentialChoice: null,
+    providerConnected: true,
+    agentReady: true,
+    hostedAgentReady: true,
+  } as const;
+
+  it("waits for a model source when the organization can choose one", () => {
+    expect(agentFinishReady(ready)).toBe(false);
+  });
+
+  it("requires a connected provider when the organization chose its own key", () => {
+    expect(agentFinishReady({ ...ready, credentialChoice: "own-key", providerConnected: false })).toBe(false);
+    expect(
+      agentFinishReady({
+        ...ready,
+        credentialChoice: "own-key",
+        providerConnected: true,
+        agentReady: false,
+        hostedAgentReady: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("allows hosted models when the organization chose them", () => {
+    expect(
+      agentFinishReady({ ...ready, credentialChoice: "hosted", providerConnected: false, agentReady: false }),
+    ).toBe(true);
+  });
+
+  it("allows hosted models when no model source choice is offered", () => {
+    expect(
+      agentFinishReady({
+        ...ready,
+        modelSourceChoice: false,
+        providerConnected: false,
+        agentReady: false,
+      }),
+    ).toBe(true);
   });
 });
 
