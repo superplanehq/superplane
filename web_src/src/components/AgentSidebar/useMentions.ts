@@ -65,7 +65,8 @@ export interface UseMentionsReturn {
 
 /**
  * Detect if cursor is in a mention or skill trigger position.
- * Allows spaces in the filter so multi-word names can be matched.
+ * Mention filters allow spaces so multi-word names can be matched.
+ * Skill filters end at whitespace so `/command ` is not an active query.
  * Terminates on newline.
  */
 function detectComposerTrigger(
@@ -81,7 +82,11 @@ function detectComposerTrigger(
     }
     if (ch === "@" || ch === "/") {
       if (i === 0 || /\s/.test(before[i - 1])) {
-        return { kind: ch === "@" ? "mention" : "skill", filter: before.slice(i + 1), start: i };
+        const filter = before.slice(i + 1);
+        if (ch === "/" && /\s/.test(filter)) {
+          return { kind: null, filter: "", start: 0 };
+        }
+        return { kind: ch === "@" ? "mention" : "skill", filter, start: i };
       }
       return { kind: null, filter: "", start: 0 };
     }
@@ -184,7 +189,7 @@ export function useMentions(): UseMentionsReturn {
 
       setRawValue(newValue);
       setCursorPos(newCursorPos);
-      setDismissed(false);
+      setDismissed(true);
       return newCursorPos;
     },
     [value, cursorPos, trigger.start],

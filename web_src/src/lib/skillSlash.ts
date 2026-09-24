@@ -24,7 +24,7 @@ export function skillSlashQueryAtCursor(value: string, cursor: number): SkillSla
     return null;
   }
   const query = before.slice(slash + 1);
-  if (query.includes("\n")) {
+  if (/\s/.test(query)) {
     return null;
   }
   return { start: slash, query };

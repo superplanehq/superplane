@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { sanitizeSkillCommandName, validateSkillName } from "./useSkillEditorPage";
+import { sanitizeSkillCommandName, skillCommandForSave, validateSkillName } from "./useSkillEditorPage";
 
 describe("validateSkillName", () => {
   it("requires a command slug", () => {
@@ -13,5 +13,12 @@ describe("validateSkillName", () => {
 describe("sanitizeSkillCommandName", () => {
   it("re-exports the frontmatter sanitizer", () => {
     expect(sanitizeSkillCommandName("Oy Pirate!")).toBe("oypirate");
+  });
+});
+
+describe("skillCommandForSave", () => {
+  it("keeps the stored command until the name changes", () => {
+    expect(skillCommandForSave("Review copy", "review-copy", false)).toBe("review-copy");
+    expect(skillCommandForSave("Review copy", "review-copy", true)).toBe("reviewcopy");
   });
 });

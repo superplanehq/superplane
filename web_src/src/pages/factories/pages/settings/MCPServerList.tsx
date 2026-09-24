@@ -6,7 +6,7 @@ import { useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import {
@@ -94,7 +94,7 @@ function MCPServerRow({
     resource.oauthStatus === "OAUTH_STATUS_NEEDS_RECONNECT" || resource.oauthStatus === "OAUTH_STATUS_VENDOR_REJECTED";
   const showTools = connectionIsEstablished(resource);
   const toolsQuery = useFactoryAgentResourceTools(organizationId, factoryId, resource.id ?? "", expanded && showTools);
-  const disabledTools = workspaceDisabledTools(resource);
+  const { disabledTools, applyToolToggle } = usePendingDisabledTools(resource);
   const tools = mcpToolItems(toolsQuery.data);
   const countLabel =
     expanded && showTools && !toolsQuery.isLoading && !toolsQuery.isError && tools.length > 0
@@ -184,10 +184,33 @@ function MCPServerRow({
             isError={toolsQuery.isError}
             disabledTools={disabledTools}
             canUpdate={canUpdate && resource.enabled !== false}
-            onToggleTool={(toolName, enabled) => onToggleTools(nextDisabledTools(disabledTools, toolName, enabled))}
+            onToggleTool={(toolName, enabled) => onToggleTools(applyToolToggle(toolName, enabled))}
           />
         </div>
       ) : null}
     </li>
   );
+}
+
+function usePendingDisabledTools(resource: FactoriesFactoryAgentResource) {
+  const serverDisabled = workspaceDisabledTools(resource);
+  const serverKey = serverDisabled.join("\0");
+  const [pending, setPending] = useState<string[] | undefined>();
+  const disabledRef = useRef(serverDisabled);
+
+  useEffect(() => {
+    setPending((current) => (current && current.join("\0") === serverKey ? undefined : current));
+  }, [resource.id, serverKey]);
+
+  const disabledTools = pending ?? serverDisabled;
+  disabledRef.current = disabledTools;
+  return {
+    disabledTools,
+    applyToolToggle: (toolName: string, enabled: boolean) => {
+      const next = nextDisabledTools(disabledRef.current, toolName, enabled);
+      disabledRef.current = next;
+      setPending(next);
+      return next;
+    },
+  };
 }

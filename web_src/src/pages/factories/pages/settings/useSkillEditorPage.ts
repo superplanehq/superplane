@@ -22,6 +22,13 @@ const EMPTY_SKILL_MARKDOWN = "---\nname: \ntitle: \ndescription: \n---\n\n";
 
 export { sanitizeSkillCommandName };
 
+export function skillCommandForSave(title: string, storedName: string, nameTouched: boolean): string {
+  if (!nameTouched && storedName.trim()) {
+    return storedName.trim();
+  }
+  return sanitizeSkillCommandName(title);
+}
+
 export function validateSkillName(name: string): string {
   if (!name) {
     return AGENT_RESOURCES_COPY.nameRequired;
@@ -49,25 +56,41 @@ export function useSkillEditorPage() {
   const deleteResource = useDeleteFactoryAgentResource(organizationId, factoryId);
   const [name, setName] = useState("");
   const [markdown, setMarkdown] = useState("");
+  const [storedCommand, setStoredCommand] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
+  const [draftKey, setDraftKey] = useState("");
   const [nameError, setNameError] = useState("");
   const [markdownError, setMarkdownError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(false);
   const listPath = factorySettingsSectionPath(organizationId, factory.key ?? "", "workspace", "skills");
+  const nextDraftKey = isCreate ? "new" : (resource?.id ?? "");
 
   useEffect(() => {
+    if (!isCreate && !resource) {
+      return;
+    }
+    if (!nextDraftKey || draftKey === nextDraftKey) {
+      return;
+    }
     if (isCreate) {
       setName("");
+      setStoredCommand("");
+      setNameTouched(false);
       setMarkdown(EMPTY_SKILL_MARKDOWN);
+      setDraftKey("new");
       return;
     }
     if (!resource) {
       return;
     }
     setName(skillDisplayTitle(resource));
+    setStoredCommand((resource.name ?? "").trim());
+    setNameTouched(false);
     setMarkdown(resource.markdown ?? "");
-  }, [isCreate, resource]);
+    setDraftKey(nextDraftKey);
+  }, [isCreate, resource, nextDraftKey, draftKey]);
 
-  const commandName = sanitizeSkillCommandName(name);
+  const commandName = skillCommandForSave(name, storedCommand, nameTouched);
   const taken = Boolean(
     commandName && skills.data?.some((entry) => entry.id !== resource?.id && entry.name === commandName),
   );
@@ -88,7 +111,10 @@ export function useSkillEditorPage() {
     command: commandName ? `/${commandName}` : "/",
     isSaving: createResource.isPending || updateResource.isPending,
     isDeleting: deleteResource.isPending,
-    setName: (value: string) => setNameAndFrontmatter(value, setName, setMarkdown),
+    setName: (value: string) => {
+      setNameTouched(true);
+      setNameAndFrontmatter(value, setName, setMarkdown);
+    },
     setMarkdown,
     setPendingDelete,
     navigateToList: () => navigate(listPath),

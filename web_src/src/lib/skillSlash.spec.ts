@@ -24,6 +24,11 @@ describe("skillSlashQueryAtCursor", () => {
   it("ignores a slash in the middle of a token", () => {
     expect(skillSlashQueryAtCursor("https://example.com", 19)).toBeNull();
   });
+
+  it("closes the query after whitespace", () => {
+    expect(skillSlashQueryAtCursor("/oypirate ", 10)).toBeNull();
+    expect(skillSlashQueryAtCursor("use /oypirate now", 17)).toBeNull();
+  });
 });
 
 describe("filterSkillSlashCandidates", () => {

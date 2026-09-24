@@ -185,15 +185,22 @@ function toggleEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentR
   });
 }
 
+const mcpToolUpdateQueues = new Map<string, Promise<unknown>>();
+
 function toggleTools(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, disabledTools: string[]) {
   if (!resource.id) {
     return;
   }
-  void mutations.updateResource
-    .mutateAsync({ resourceId: resource.id, disabledTools, replaceDisabledTools: true })
-    .catch((error) => {
-      showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.updateFailed));
-    });
+  const resourceId = resource.id;
+  const previous = mcpToolUpdateQueues.get(resourceId) ?? Promise.resolve();
+  const next = previous
+    .catch(() => undefined)
+    .then(() =>
+      mutations.updateResource.mutateAsync({ resourceId, disabledTools, replaceDisabledTools: true }).catch((error) => {
+        showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.updateFailed));
+      }),
+    );
+  mcpToolUpdateQueues.set(resourceId, next);
 }
 
 async function confirmDelete(mutations: MCPMutations, pendingDelete?: FactoriesFactoryAgentResource) {

@@ -334,6 +334,16 @@ describe("useMentions", () => {
       });
       expect(result.current.value).toBe("/oypirate ");
       expect(result.current.getMarkdown()).toBe("/oypirate ");
+      expect(result.current.showSkillDropdown).toBe(false);
+    });
+
+    it("closes the skill dropdown after a trailing space", () => {
+      const { result } = renderHook(() => useMentions());
+      act(() => {
+        result.current.setValue("/oypirate ");
+        result.current.setCursorPos(10);
+      });
+      expect(result.current.showSkillDropdown).toBe(false);
     });
   });
 });
