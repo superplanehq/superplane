@@ -120,7 +120,7 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.superplaneLabelAdded).toBe(true);
   });
 
-  it("round-trips Sentry events and levels through the API shape", () => {
+  it("round-trips Sentry new-issue and level fields and turns off hidden triggers", () => {
     const settings = intakeSettingsFromApi("Sentry exceptions", {
       sentryNewIssues: false,
       sentryRegressedIssues: true,
@@ -134,13 +134,13 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.sentryLevels).toEqual(["fatal", "error"]);
     expect(intakeSettingsToApi(settings)).toMatchObject({
       sentryNewIssues: false,
-      sentryRegressedIssues: true,
-      sentryAssignedIssues: true,
+      sentryRegressedIssues: false,
+      sentryAssignedIssues: false,
       sentryLevels: ["fatal", "error"],
     });
   });
 
-  it("defaults Sentry events on when the API omits them", () => {
+  it("defaults omitted Sentry event toggles from the Sentry intake defaults", () => {
     const settings = intakeSettingsFromApi("Sentry exceptions", {});
 
     expect(settings.sentryNewIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues);
