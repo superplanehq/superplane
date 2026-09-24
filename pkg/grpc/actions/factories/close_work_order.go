@@ -57,29 +57,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	if err := messages.PublishFactoryWorkOrderUpdated(
-		factory.ID.String(),
-		order.ID.String(),
-		factoryevents.EventTypeOrderStatusUpdated,
-	); err != nil {
-		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
-	}
-
-	if !wasClosed {
-		notification := messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID: orgID.String(),
-			FactoryID:      factory.ID.String(),
-			OrderID:        order.ID.String(),
-			EventType:      factoryevents.EventTypeOrderStatusUpdated,
-			ActorUserID:    closedBy.String(),
-			FromState:      fromState,
-			ToState:        models.FactoryWorkOrderStateClosed,
-			Result:         result,
-		}
-		if err := notification.Publish(); err != nil {
-			logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
-		}
-	}
+	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
 
 	order, err = factory.FindWorkOrder(db, orderID)
 	if err != nil {
@@ -94,4 +72,43 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	return &pb.CloseWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func publishWorkOrderClosed(
+	orgID uuid.UUID,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	closedBy *uuid.UUID,
+	fromState string,
+	result string,
+	wasClosed bool,
+) {
+	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order)
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factory.ID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeOrderStatusUpdated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if wasClosed {
+		return
+	}
+
+	notification := messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: orgID.String(),
+		FactoryID:      factory.ID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factoryevents.EventTypeOrderStatusUpdated,
+		FromState:      fromState,
+		ToState:        models.FactoryWorkOrderStateClosed,
+		Result:         result,
+	}
+	if closedBy != nil {
+		notification.ActorUserID = closedBy.String()
+	}
+	if err := notification.Publish(); err != nil {
+		logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+	}
 }

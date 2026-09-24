@@ -372,6 +372,117 @@ describe("liveLogSections", () => {
     expect(state.sections[0].lines).toEqual(["Turn 1 · 3 tokens"]);
     expect(state.sections[0].events).toEqual([{ kind: "note", text: "Turn 1 · 3 tokens" }]);
   });
+
+  it("joins a line that arrived before cmd_start to that command", () => {
+    let state = appendLineToLatestSection(emptyState(), "Cloning into 'repo'...");
+    expect(state.orphanLines).toEqual(["Cloning into 'repo'..."]);
+
+    state = startCommandSection(state, {
+      index: 0,
+      text: "Clone Repo",
+      startedAtMs: 1,
+      kind: "bash",
+      preview: "git clone",
+    });
+
+    expect(state.orphanLines).toEqual([]);
+    expect(state.pendingRecords ?? []).toEqual([]);
+    expect(state.sections[0].lines).toEqual(["Cloning into 'repo'..."]);
+  });
+
+  it("joins a tool that arrived before cmd_start and nests later lines", () => {
+    let state = startToolOnLatestSection(emptyState(), "grep", "rootTriggerRenderer", "toolu_grep");
+    state = appendLineToLatestSection(state, "Found 1 matches");
+    state = appendLineToLatestSection(state, "/home/ubuntu/repo/web_src/.eslint-budget-baseline.json:");
+    expect(state.orphanLines).toEqual(["Found 1 matches", "/home/ubuntu/repo/web_src/.eslint-budget-baseline.json:"]);
+
+    state = startCommandSection(state, {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+
+    expect(state.orphanLines).toEqual([]);
+    expect(state.pendingRecords ?? []).toEqual([]);
+    const tools = state.sections[0].events[0];
+    expect(tools?.kind).toBe("tools");
+    if (tools?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(tools.tools[0]).toMatchObject({
+      kind: "grep",
+      text: "rootTriggerRenderer",
+      sourceId: "toolu_grep",
+      lines: ["Found 1 matches", "/home/ubuntu/repo/web_src/.eslint-budget-baseline.json:"],
+    });
+  });
+
+  it("joins an indexed line to its command even if it arrived before cmd_start", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 0,
+      text: "Clone Repo",
+      startedAtMs: 1,
+      kind: "bash",
+      preview: "git clone",
+    });
+    state = appendLineToLatestSection(state, "Found 1 matches", undefined, 1);
+    expect(state.sections[0].lines).toEqual([]);
+    expect(state.orphanLines).toEqual(["Found 1 matches"]);
+
+    state = startCommandSection(state, {
+      index: 1,
+      text: "Implementation",
+      startedAtMs: 2,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+
+    expect(state.orphanLines).toEqual([]);
+    expect(state.sections[0].lines).toEqual([]);
+    expect(state.sections[1].lines).toEqual(["Found 1 matches"]);
+    expect(state.sections[1].events).toEqual([{ kind: "note", text: "Found 1 matches" }]);
+  });
+
+  it("joins unindexed tools after a finished command to the next cmd_start", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 0,
+      text: "Clone Repo",
+      startedAtMs: 1,
+      kind: "bash",
+      preview: "git clone",
+    });
+    state = appendLineToLatestSection(state, "Cloning into 'repo'...");
+    state = completeCommandSection(state, 0, "passed", 20);
+    state = startToolOnLatestSection(state, "grep", "rootTriggerRenderer", "toolu_grep");
+    state = appendLineToLatestSection(state, "Found 1 matches");
+    expect(state.sections[0].lines).toEqual(["Cloning into 'repo'..."]);
+    expect(state.orphanLines).toEqual(["Found 1 matches"]);
+
+    state = startCommandSection(state, {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 2,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+
+    expect(state.orphanLines).toEqual([]);
+    expect(state.sections[0].lines).toEqual(["Cloning into 'repo'..."]);
+    expect(state.sections[0].events).toEqual([]);
+    const tools = state.sections[1].events[0];
+    expect(tools?.kind).toBe("tools");
+    if (tools?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(tools.tools[0]).toMatchObject({
+      kind: "grep",
+      text: "rootTriggerRenderer",
+      sourceId: "toolu_grep",
+      lines: ["Found 1 matches"],
+    });
+  });
 });
 
 describe("shouldSkipUnindexedLiveLogReplay", () => {

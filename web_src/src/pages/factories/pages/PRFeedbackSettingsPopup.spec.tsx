@@ -17,7 +17,6 @@ import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
-import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 
 Element.prototype.scrollIntoView ??= () => undefined;
 
@@ -170,8 +169,8 @@ function renderChecksPopup(
 const automationGraph = prFeedbackGraph();
 
 function prFeedbackGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-pr-feedback", name: "Address PR feedback", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -190,8 +189,8 @@ function prFeedbackGraph(): IntakeAutomationGraph {
         ],
       },
     },
-    [{ name: "github.onPRComment", label: "On PR Comment" }],
-    [
+    triggers: [{ name: "github.onPRComment", label: "On PR Comment" }],
+    components: [
       {
         name: "findPullRequest",
         label: "Find Pull Request",
@@ -199,14 +198,14 @@ function prFeedbackGraph(): IntakeAutomationGraph {
       },
       { name: "runnerClaude", label: "Run Claude Code", outputChannels: [{ name: "passed" }, { name: "failed" }] },
     ],
-    {},
-    {},
-    {},
-    "app-pr-feedback",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-pr-feedback",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
 
   return {
     nodes,
@@ -241,6 +240,30 @@ function renderAutomationPopup(
             />
           </TooltipProvider>
         </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, showVisualEvidenceSetting: boolean) {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <PRFeedbackSettingsPopup
+          settings={settings}
+          healthy
+          automationGraph={automationGraph}
+          agent={{
+            draft: PLANNING_REVIEW_DRAFT,
+            organizationId: "org-1",
+            onSave: vi.fn(),
+            showVisualEvidenceSetting,
+          }}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+          initialTab="agent"
+          fixed={false}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -489,41 +512,21 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
   });
 
-  it("puts Agent between General and Automation when the canvas has an agent", async () => {
-    const user = userEvent.setup();
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>
-          <ThemeProvider>
-            <TooltipProvider>
-              <PRFeedbackSettingsPopup
-                settings={discussionDraft()}
-                healthy
-                automationGraph={automationGraph}
-                agent={
-                  {
-                    draft: PLANNING_REVIEW_DRAFT,
-                    organizationId: "org-1",
-                    onSave: vi.fn(),
-                  } satisfies PlanningReviewAgentSlot
-                }
-                onSave={vi.fn()}
-                onClose={vi.fn()}
-                initialTab="general"
-                fixed={false}
-              />
-            </TooltipProvider>
-          </ThemeProvider>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+  it("puts Agent between General and Automation when the canvas has an agent", () => {
+    renderAgentSettingsPopup(discussionDraft(), true);
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Automation"]);
 
-    await user.click(screen.getByTestId("pr-feedback-settings-tab-agent"));
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
+    expect(screen.getByRole("switch", { name: "Include visual evidence" })).not.toBeChecked();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
+  it("hides visual evidence for check-repair agents", () => {
+    renderAgentSettingsPopup(checksDraft(), false);
+
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
   });
 
   it("shows the automation in display mode at native zoom", () => {

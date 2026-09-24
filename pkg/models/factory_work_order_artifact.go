@@ -20,6 +20,7 @@ const (
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
 	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
 	FactoryWorkOrderArtifactTypeLink     = factory.ArtifactTypeLink
+	FactoryWorkOrderArtifactTypeFile     = factory.ArtifactTypeFile
 
 	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
 	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
@@ -91,16 +92,9 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		return nil, err
 	}
 
-	dataJSON, err := encodeArtifactData(params.Data)
+	dataJSON, err := encodeGuardedArtifactData(params.Data)
 	if err != nil {
 		return nil, err
-	}
-	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
-		return nil, fmt.Errorf(
-			"%w: artifact data exceeds %d bytes",
-			ErrFactoryWorkOrderArtifactInvalid,
-			MaxFactoryWorkOrderArtifactDataBytes,
-		)
 	}
 
 	// An explicitly empty key must land as NULL, not "" — the partial
@@ -152,6 +146,62 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	return artifact, nil
 }
 
+// UpsertArtifact creates the artifact, or replaces its data when a key
+// already points at one on this work order. The bool is true when a new
+// row was inserted. An empty key always inserts.
+func (o *FactoryWorkOrder) UpsertArtifact(
+	db *gorm.DB,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, bool, error) {
+	if strings.TrimSpace(params.Key) == "" {
+		artifact, err := o.CreateArtifact(db, params)
+		return artifact, true, err
+	}
+
+	var (
+		artifact *FactoryWorkOrderArtifact
+		created  bool
+	)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		existing, findErr := o.FindArtifactByKey(tx, params.Key)
+		if findErr == nil {
+			replaced, replaceErr := o.replaceArtifactData(tx, existing, params)
+			if replaceErr != nil {
+				return replaceErr
+			}
+			artifact = replaced
+			created = false
+			return nil
+		}
+		if !errors.Is(findErr, ErrFactoryWorkOrderArtifactNotFound) {
+			return findErr
+		}
+
+		createdArtifact, createErr := o.CreateArtifact(tx, params)
+		if createErr == nil {
+			artifact = createdArtifact
+			created = true
+			return nil
+		}
+		if !errors.Is(createErr, ErrFactoryWorkOrderArtifactKeyAlreadyExists) {
+			return createErr
+		}
+
+		replaced, retryErr := o.replaceKeyedArtifactAfterConflict(tx, params)
+		if retryErr != nil {
+			return retryErr
+		}
+		artifact = replaced
+		created = false
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	return artifact, created, nil
+}
+
 // UpdateArtifactData resolves the artifact tagged with `key` under this
 // work order (the same key an earlier CreateArtifact call set via
 // FactoryWorkOrderArtifactParams.Key, typically the PR's URL), shallow-
@@ -161,11 +211,7 @@ func (o *FactoryWorkOrder) CreateArtifact(
 // merged should update the live chip, not spam the timeline with one
 // entry per transition. Callers still notify the websocket channel
 // (see FactoryContext websocket notify) so the UI refreshes.
-func (o *FactoryWorkOrder) UpdateArtifactData(
-	tx *gorm.DB,
-	key string,
-	updates map[string]any,
-) (*FactoryWorkOrderArtifact, error) {
+func (o *FactoryWorkOrder) FindArtifactByKey(tx *gorm.DB, key string) (*FactoryWorkOrderArtifact, error) {
 	trimmedKey := strings.TrimSpace(key)
 	if trimmedKey == "" {
 		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
@@ -180,6 +226,18 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderArtifactNotFound
 		}
+		return nil, err
+	}
+	return &artifact, nil
+}
+
+func (o *FactoryWorkOrder) UpdateArtifactData(
+	tx *gorm.DB,
+	key string,
+	updates map[string]any,
+) (*FactoryWorkOrderArtifact, error) {
+	artifact, err := o.FindArtifactByKey(tx, key)
+	if err != nil {
 		return nil, err
 	}
 
@@ -197,24 +255,17 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		return nil, err
 	}
 
-	dataJSON, err := encodeArtifactData(merged)
+	dataJSON, err := encodeGuardedArtifactData(merged)
 	if err != nil {
 		return nil, err
 	}
-	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
-		return nil, fmt.Errorf(
-			"%w: artifact data exceeds %d bytes",
-			ErrFactoryWorkOrderArtifactInvalid,
-			MaxFactoryWorkOrderArtifactDataBytes,
-		)
-	}
 
-	if err := tx.Model(&artifact).Update("data", dataJSON).Error; err != nil {
+	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
 		return nil, err
 	}
 	artifact.Data = dataJSON
 
-	return &artifact, nil
+	return artifact, nil
 }
 
 func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifact, error) {
@@ -242,6 +293,81 @@ func IsValidWorkOrderArtifactType(t string) bool {
 	return false
 }
 
+func (o *FactoryWorkOrder) replaceKeyedArtifactAfterConflict(
+	tx *gorm.DB,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, error) {
+	existing, err := findFactoryWorkOrderArtifactByKey(tx, o.OrganizationID, o.FactoryID, params.Key)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
+		}
+		return nil, err
+	}
+	if existing.WorkOrderID != o.ID {
+		return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
+	}
+
+	return o.replaceArtifactData(tx, existing, params)
+}
+
+func (o *FactoryWorkOrder) replaceArtifactData(
+	tx *gorm.DB,
+	artifact *FactoryWorkOrderArtifact,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, error) {
+	requestedType := strings.TrimSpace(params.Type)
+	if artifact.Type != requestedType {
+		return nil, fmt.Errorf(
+			"%w: stored type is %q, requested type is %q",
+			ErrFactoryWorkOrderArtifactInvalid,
+			artifact.Type,
+			requestedType,
+		)
+	}
+
+	if err := validateArtifactData(artifact.Type, params.Data); err != nil {
+		return nil, err
+	}
+
+	dataJSON, err := encodeGuardedArtifactData(params.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
+		return nil, err
+	}
+	artifact.Data = dataJSON
+
+	return artifact, nil
+}
+
+func findFactoryWorkOrderArtifactByKey(
+	tx *gorm.DB,
+	organizationID, factoryID uuid.UUID,
+	key string,
+) (*FactoryWorkOrderArtifact, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	var artifact FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key = ?", organizationID, factoryID, trimmedKey).
+		First(&artifact).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactNotFound
+		}
+		return nil, err
+	}
+
+	return &artifact, nil
+}
+
 // validateArtifactData enforces the required-field rules for each
 // artifact type (shared by CreateArtifact and UpdateArtifactData so a
 // later merge can't drift from what a fresh attach requires) plus the
@@ -259,6 +385,23 @@ func validateArtifactData(artifactType string, data map[string]any) error {
 	case FactoryWorkOrderArtifactTypeLink:
 		if extractArtifactString(data, "url") == "" {
 			return fmt.Errorf("%w: link artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeFile:
+		if extractArtifactString(data, "fileId") == "" ||
+			extractArtifactString(data, "filename") == "" ||
+			extractArtifactString(data, "contentType") == "" ||
+			extractArtifactString(data, "title") == "" ||
+			extractArtifactString(data, "url") == "" {
+			return fmt.Errorf("%w: file artifacts require fileId, filename, contentType, title, and url", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if _, err := uuid.Parse(extractArtifactString(data, "fileId")); err != nil {
+			return fmt.Errorf("%w: file artifacts require a valid fileId", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if !IsAllowedArtifactContentType(extractArtifactString(data, "contentType")) {
+			return fmt.Errorf("%w: file artifact content type is not supported", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if size, ok := extractArtifactSize(data); !ok || size <= 0 || size > int64(MaxArtifactFileBytes) {
+			return fmt.Errorf("%w: file artifacts require a valid sizeBytes", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	default:
 		return fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, artifactType)
@@ -295,6 +438,22 @@ func isSafeArtifactURL(raw string) bool {
 	return parsed.Host != ""
 }
 
+func encodeGuardedArtifactData(data map[string]any) (datatypes.JSON, error) {
+	dataJSON, err := encodeArtifactData(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
+		return nil, fmt.Errorf(
+			"%w: artifact data exceeds %d bytes",
+			ErrFactoryWorkOrderArtifactInvalid,
+			MaxFactoryWorkOrderArtifactDataBytes,
+		)
+	}
+
+	return dataJSON, nil
+}
+
 func encodeArtifactData(data map[string]any) (datatypes.JSON, error) {
 	if len(data) == 0 {
 		return datatypes.JSON([]byte("{}")), nil
@@ -324,6 +483,27 @@ func extractArtifactString(data map[string]any, key string) string {
 	}
 
 	return strings.TrimSpace(value)
+}
+
+func extractArtifactSize(data map[string]any) (int64, bool) {
+	switch value := data["sizeBytes"].(type) {
+	case int:
+		return int64(value), true
+	case int32:
+		return int64(value), true
+	case int64:
+		return value, true
+	case float64:
+		if value != float64(int64(value)) {
+			return 0, false
+		}
+		return int64(value), true
+	case json.Number:
+		size, err := value.Int64()
+		return size, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func validateOptionalTimestamp(data map[string]any, key string) error {

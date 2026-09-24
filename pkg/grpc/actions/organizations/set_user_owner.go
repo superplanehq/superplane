@@ -20,6 +20,10 @@ func SetUserOwner(ctx context.Context, orgID, userID string, isOwner bool) (*pb.
 	}
 
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockOrganization(tx, orgUUID); err != nil {
+			return err
+		}
+
 		user, err := models.FindActiveUserByIDInTransaction(tx, orgID, userID)
 		if err != nil {
 			return err

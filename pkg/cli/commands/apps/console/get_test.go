@@ -14,7 +14,7 @@ const (
 )
 
 func repositoryConsoleFilePath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/repository/file"
+	return "/api/v1/canvases/" + canvasID + "/file"
 }
 
 const sampleConsoleYAMLBody = "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: " + testCanvasID + "\n  name: " + testCanvasName + "\nspec:\n  panels:\n    - id: notes\n      type: markdown\n      content:\n        body: Hello\n  layout:\n    - i: notes\n      x: 0\n      y: 0\n      w: 4\n      h: 2\n"

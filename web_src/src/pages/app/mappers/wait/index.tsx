@@ -12,7 +12,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getTriggerRenderer, getState, getStateMap } from "../mapperLookup";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
 import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
@@ -63,12 +63,12 @@ export const waitMapper: ComponentBaseMapper = {
     return subtitle || "";
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, unknown> = {};
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
-    const data = payload?.data as Record<string, any> | undefined;
-    const actor = data?.actor as { email?: string; display_name?: string } | undefined;
+    const data = payload?.data as WaitOutputData | undefined;
+    const actor = data?.actor;
     const metadata = context.execution.metadata as { interval_duration?: number; start_time?: string } | undefined;
 
     const startedAt = formatDateValue(data?.started_at) || formatDateValue(metadata?.start_time);
@@ -279,6 +279,17 @@ function getWaitEventSections(
   return [eventSection];
 }
 
+type WaitOutputData = {
+  started_at?: string;
+  finished_at?: string;
+  result?: unknown;
+  reason?: unknown;
+  actor?: {
+    email?: string;
+    display_name?: string;
+  };
+};
+
 type WaitConfiguration = {
   mode: "interval" | "countdown";
   unit?: "seconds" | "minutes" | "hours";
@@ -326,24 +337,7 @@ function getWaitEventSubtitle(
         expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
       }
     } else if (configuration?.mode === "countdown") {
-      const waitUntil = configuration.waitUntil as string;
-
-      // Try to parse countdown target date
-      if (waitUntil && execution.createdAt) {
-        try {
-          // For simple string dates, extract the date without evaluating expressions
-          const dateMatch = waitUntil.match(/["']([^"']+)["']/);
-          if (dateMatch) {
-            const targetDate = new Date(dateMatch[1]);
-            const createdDate = new Date(execution.createdAt);
-            if (!isNaN(targetDate.getTime()) && !isNaN(createdDate.getTime())) {
-              expectedDuration = targetDate.getTime() - createdDate.getTime();
-            }
-          }
-        } catch {
-          // If parsing fails, expectedDuration remains undefined
-        }
-      }
+      expectedDuration = countdownDurationFromConfig(configuration.waitUntil, execution.createdAt);
     } else if (configuration?.duration) {
       // Legacy duration format
       const duration = configuration.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
@@ -378,6 +372,29 @@ function getWaitEventSubtitle(
   }
 
   return timeAgoDate ? renderTimeAgo(timeAgoDate) : undefined;
+}
+
+function countdownDurationFromConfig(waitUntil?: string, createdAt?: string): number | undefined {
+  if (!waitUntil || !createdAt) {
+    return undefined;
+  }
+
+  try {
+    const dateMatch = waitUntil.match(/["']([^"']+)["']/);
+    if (!dateMatch) {
+      return undefined;
+    }
+
+    const targetDate = new Date(dateMatch[1]);
+    const createdDate = new Date(createdAt);
+    if (Number.isNaN(targetDate.getTime()) || Number.isNaN(createdDate.getTime())) {
+      return undefined;
+    }
+
+    return targetDate.getTime() - createdDate.getTime();
+  } catch {
+    return undefined;
+  }
 }
 
 function formatDateValue(value?: string): string | undefined {

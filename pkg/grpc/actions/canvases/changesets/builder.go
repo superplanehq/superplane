@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -227,6 +228,7 @@ func changeNodeRefForAdd(proposedNode models.Node) (*ChangeNode, error) {
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
 		},
+		Metadata: maps.Clone(proposedNode.Metadata),
 	}
 
 	if proposedNode.IntegrationID != nil {
@@ -279,6 +281,13 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 	//
 	if proposedNode.IsCollapsed != currentNode.IsCollapsed {
 		n.IsCollapsed = proto.Bool(proposedNode.IsCollapsed)
+	}
+
+	if !reflect.DeepEqual(currentNode.Metadata, proposedNode.Metadata) {
+		n.Metadata = maps.Clone(proposedNode.Metadata)
+		if n.Metadata == nil {
+			n.Metadata = map[string]any{}
+		}
 	}
 
 	return n, nil

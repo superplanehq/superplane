@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
 
@@ -16,7 +17,7 @@ beforeEach(() => {
 });
 
 describe("PhaseLogCard stream details", () => {
-  it("labels a survey reply as You (survey response)", () => {
+  it("labels a survey reply as Answer", () => {
     render(
       <PhaseLogCard
         phase={PHASE}
@@ -43,7 +44,7 @@ describe("PhaseLogCard stream details", () => {
     );
 
     const userNote = screen.getByTestId("split-run-user-note");
-    expect(userNote).toHaveTextContent("You (survey response)");
+    expect(userNote).toHaveTextContent(CREATE_WITH_AGENT_COPY.youSurvey);
     expect(userNote).toHaveTextContent("What is the priority? High");
   });
 
@@ -287,5 +288,72 @@ describe("PhaseLogCard stream details", () => {
 
     const score = screen.getByTestId("split-run-phase-score");
     expect(within(score).getByTestId("split-run-check-wo-review-pay-842-confidence")).toHaveTextContent("5/5");
+  });
+
+  it("uses the download URL for images in stream notes", () => {
+    const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "step-impl",
+            note: true,
+            componentName: "Implement",
+            componentType: "prompt",
+          }),
+          line({
+            id: "impl-preview",
+            note: true,
+            noteParentId: "step-impl",
+            componentType: "note",
+            componentName: `See ![bug](sp-file://${fileId})`,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source in stream notes without files", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "step-impl",
+            note: true,
+            componentName: "Implement",
+            componentType: "prompt",
+          }),
+          line({
+            id: "impl-preview",
+            note: true,
+            noteParentId: "step-impl",
+            componentType: "note",
+            componentName: "See ![bug](sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
   });
 });

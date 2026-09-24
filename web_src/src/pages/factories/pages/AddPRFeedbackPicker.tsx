@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 
 import {
@@ -60,7 +61,11 @@ export function AddPRFeedbackPicker({ open, onClose, onSelect, takenSourceIds = 
                     taken ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
                   )}
                 >
-                  <img src={source.iconSrc} alt="" className="size-5 shrink-0" />
+                  <img
+                    src={source.iconSrc}
+                    alt=""
+                    className={cn("size-5 shrink-0", logoDarkInvertClass(source.iconSrc))}
+                  />
                   <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
                     {source.name}
                   </span>

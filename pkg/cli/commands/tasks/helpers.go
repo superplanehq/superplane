@@ -6,7 +6,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/workspaces"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func resolveWorkspace(ctx core.CommandContext, workspaceFlag *string) (string, error) {
@@ -28,7 +27,13 @@ func resolveTaskID(raw string) (string, error) {
 	return trimmed, nil
 }
 
-func taskDisplayID(task openapi_client.FactoriesWorkOrder) string {
+type taskIdentity interface {
+	GetId() string
+	GetNumber() string
+	GetKey() string
+}
+
+func taskDisplayID(task taskIdentity) string {
 	if number := strings.TrimSpace(task.GetNumber()); number != "" {
 		return number
 	}

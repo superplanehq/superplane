@@ -1,5 +1,4 @@
 import { ChevronDown, ExternalLink, Hourglass } from "lucide-react";
-import { Fragment } from "react";
 import { Link } from "react-router";
 
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
@@ -8,13 +7,7 @@ import { Button } from "@/components/ui/button";
 import { factoryAppPath } from "./lib/factoryPagePaths";
 import { formatRelative } from "@/lib/datetime";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 import { applyWorkOrderStatusAction, type WorkOrderStatusAction } from "./lib/workOrderStatusActions";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
@@ -151,15 +144,13 @@ function ManualUpdateMenu({
       </PermissionTooltip>
       <DropdownMenuContent align="start" className="w-44">
         {actions.map((action) => (
-          <Fragment key={action.kind}>
-            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuItem
-              disabled={action.disabled}
-              onSelect={() => applyWorkOrderStatusAction(action.kind, { onClose, onStatusChange })}
-            >
-              {action.label}
-            </DropdownMenuItem>
-          </Fragment>
+          <DropdownMenuItem
+            key={action.kind}
+            disabled={action.disabled}
+            onSelect={() => applyWorkOrderStatusAction(action.kind, { onClose, onStatusChange })}
+          >
+            {action.label}
+          </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

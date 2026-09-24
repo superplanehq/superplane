@@ -40,7 +40,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		appRepo := "acme/api"
 		issuesSource := pb.FactoryOnboarding_ISSUES_SOURCE_VCS
 
-		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:               factory.ID.String(),
 			VcsIntegrationId: &vcsID,
 			AppRepository:    &appRepo,
@@ -55,7 +55,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		backlogRepo := "acme/backlog"
 		agentHarness := pb.FactoryOnboarding_AGENT_HARNESS_CLAUDE_CODE
-		response, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:                factory.ID.String(),
 			BacklogRepository: &backlogRepo,
 			AgentHarness:      &agentHarness,
@@ -78,12 +78,12 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		firstCompletedAt := response.Factory.Onboarding.CompletedAt.AsTime()
 
-		response, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:       factory.ID.String(),
 			Complete: &complete,
 		})
@@ -104,7 +104,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		req.Complete = &complete
 
 		upsertHostedOnboardingProvider(t, db)
-		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
@@ -125,7 +125,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		req.Complete = &complete
 
 		upsertHostedOnboardingProvider(t, db)
-		response, err := UpdateFactoryOnboarding(context.Background(), emptyOrg.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, emptyOrg.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
@@ -143,7 +143,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		req.Complete = &complete
 
 		clearHostedLLMProviders(t, db)
-		_, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
 		code, message, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
@@ -161,7 +161,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Equal(t, agentID, response.Factory.Onboarding.AgentIntegrationId)
@@ -180,7 +180,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Equal(t, agentID, response.Factory.Onboarding.AgentIntegrationId)
@@ -198,7 +198,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		request := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
 		request.Complete = &complete
-		_, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), request)
+		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), request)
 
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -211,7 +211,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		complete := true
 		appRepo := "acme/api"
-		_, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:            factory.ID.String(),
 			AppRepository: &appRepo,
 			Complete:      &complete,
@@ -226,7 +226,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 
 		badID := "not-a-uuid"
-		_, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:               factory.ID.String(),
 			VcsIntegrationId: &badID,
 		})
@@ -241,7 +241,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		otherOrg := support.CreateOrganization(t, r, r.User)
 		appRepo := "acme/api"
-		_, err = UpdateFactoryOnboarding(context.Background(), otherOrg.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, otherOrg.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:            factory.ID.String(),
 			AppRepository: &appRepo,
 		})
@@ -252,7 +252,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 	t.Run("not found -> error", func(t *testing.T) {
 		appRepo := "acme/api"
-		_, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:            "00000000-0000-0000-0000-000000000001",
 			AppRepository: &appRepo,
 		})

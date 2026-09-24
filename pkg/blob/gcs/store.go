@@ -99,7 +99,7 @@ func (s *Store) SignedGetURL(ctx context.Context, key string, ttl time.Duration)
 	return s.client.Bucket(s.bucket).SignedURL(key, &storage.SignedURLOptions{
 		Scheme:  storage.SigningSchemeV4,
 		Method:  "GET",
-		Expires: time.Now().Add(ttl),
+		Expires: blob.StableExpiry(ttl),
 		QueryParameters: url.Values{
 			blob.SignedURLMarkerParam: {blob.SignedURLMarkerValue},
 		},

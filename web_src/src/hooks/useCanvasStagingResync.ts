@@ -47,6 +47,34 @@ type RunStagedEditorResyncParams = {
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
 };
 
+function readVersionShell(queryClient: QueryClient, canvasId: string, versionId: string): CanvasesCanvasVersion {
+  return (
+    queryClient.getQueryData<CanvasesCanvasVersion>(canvasKeys.versionDetail(canvasId, versionId)) ??
+    queryClient.getQueryData<CanvasesCanvasVersion>(canvasKeys.versionDescribe(canvasId, versionId)) ?? {
+      metadata: { id: versionId },
+    }
+  );
+}
+
+function readFreshCachedStagedSpec(
+  queryClient: QueryClient,
+  canvasId: string,
+  versionId: string,
+  preferCachedStagedSpec: boolean,
+): CanvasSpec | undefined {
+  if (!preferCachedStagedSpec) {
+    return undefined;
+  }
+
+  const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
+  const cachedStaged = queryClient.getQueryData<CanvasesCanvasVersion>(stagedCanvasSpecKey);
+  const cachedStagedQueryState = queryClient.getQueryState(stagedCanvasSpecKey);
+  if (cachedStaged?.spec && cachedStaged.metadata?.id === versionId && cachedStagedQueryState?.isInvalidated !== true) {
+    return cachedStaged.spec;
+  }
+  return undefined;
+}
+
 async function runStagedEditorResync({
   canvasId,
   versionId,
@@ -65,24 +93,16 @@ async function runStagedEditorResync({
     return;
   }
 
-  const versionShell = queryClient.getQueryData<CanvasesCanvasVersion>(canvasKeys.versionDetail(canvasId, versionId)) ??
-    queryClient.getQueryData<CanvasesCanvasVersion>(canvasKeys.versionDescribe(canvasId, versionId)) ?? {
-      metadata: { id: versionId },
-    };
-
-  const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
-  const cachedStaged = preferCachedStagedSpec
-    ? queryClient.getQueryData<CanvasesCanvasVersion>(stagedCanvasSpecKey)
-    : undefined;
-  const cachedStagedQueryState = preferCachedStagedSpec ? queryClient.getQueryState(stagedCanvasSpecKey) : undefined;
-
-  if (cachedStaged?.spec && cachedStaged.metadata?.id === versionId && cachedStagedQueryState?.isInvalidated !== true) {
+  const cachedSpec = readFreshCachedStagedSpec(queryClient, canvasId, versionId, preferCachedStagedSpec);
+  if (cachedSpec) {
     if (shouldApplyStagedResync(signal)) {
-      applyStagedSpec(versionId, cachedStaged.spec);
+      applyStagedSpec(versionId, cachedSpec);
     }
     return;
   }
 
+  const versionShell = readVersionShell(queryClient, canvasId, versionId);
+  const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
   consoleMutationGenerationRef.current += 1;
   await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
   queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });

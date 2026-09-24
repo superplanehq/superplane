@@ -2,11 +2,13 @@ package contexts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -68,6 +70,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 
 	err = s.tx.Create(&event).Error
 	if err != nil {
+		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
+			logging.ForNode(*s.node).
+				Warnf("skipping event %s: canvas %s cannot start a run", payloadType, s.node.WorkflowID)
+			return nil
+		}
+
 		return err
 	}
 

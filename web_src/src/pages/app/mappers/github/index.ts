@@ -40,7 +40,7 @@ import { labelsMapper } from "./labels";
 import { addReactionMapper } from "./add_reaction";
 import { getCombinedCommitStatusMapper } from "./get_combined_commit_status";
 import { listCheckRunsForRefMapper } from "./list_check_runs_for_ref";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,

@@ -22,6 +22,7 @@ function FollowLog({
   return (
     <>
       <span data-testid="following">{follow.following ? "on" : "off"}</span>
+      <span data-testid="jump">{follow.showJumpToLatest ? "on" : "off"}</span>
       <button type="button" onClick={() => follow.setFollowing(false)}>
         Stop follow
       </button>
@@ -43,6 +44,25 @@ async function appendNestedLine(scroller: HTMLElement, box: { height: number; vi
   const line = document.createElement("li");
   line.textContent = "new command";
   scroller.appendChild(line);
+}
+
+function stubResizeObserver() {
+  let notifyResize = () => {};
+  const previousObserver = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class {
+    constructor(callback: ResizeObserverCallback) {
+      notifyResize = () => callback([], this as unknown as ResizeObserver);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  return {
+    notifyResize: () => notifyResize(),
+    restore: () => {
+      globalThis.ResizeObserver = previousObserver;
+    },
+  };
 }
 
 describe("useFollowLogScroll", () => {
@@ -76,6 +96,32 @@ describe("useFollowLogScroll", () => {
     expect(scroller.scrollTop).toBe(40);
   });
 
+  it("stops following on an upward scroll inside the leave band", async () => {
+    const box = { height: 400, view: 100 };
+    render(<FollowLog tick={1} resumeOnBottom />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    scroller.scrollTop = 300;
+    await settleScrollIgnore();
+
+    scroller.scrollTop = 220;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
+    expect(screen.getByTestId("jump")).toHaveTextContent("off");
+  });
+
+  it("stops following on an upward wheel at the bottom", async () => {
+    const box = { height: 400, view: 100 };
+    render(<FollowLog tick={1} resumeOnBottom />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    scroller.scrollTop = 300;
+    await settleScrollIgnore();
+
+    fireEvent.wheel(scroller, { deltaY: -40 });
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
+  });
+
   it("turns Follow back on at the bottom when resumeOnBottom is on", async () => {
     const box = { height: 400, view: 100 };
     render(<FollowLog tick={1} resumeOnBottom />);
@@ -86,10 +132,12 @@ describe("useFollowLogScroll", () => {
     scroller.scrollTop = 0;
     fireEvent.scroll(scroller);
     expect(screen.getByTestId("following")).toHaveTextContent("off");
+    expect(screen.getByTestId("jump")).toHaveTextContent("on");
 
     scroller.scrollTop = 300;
     fireEvent.scroll(scroller);
     expect(screen.getByTestId("following")).toHaveTextContent("on");
+    expect(screen.getByTestId("jump")).toHaveTextContent("off");
   });
 
   it("does not turn Follow back on at the bottom by default", async () => {
@@ -106,6 +154,71 @@ describe("useFollowLogScroll", () => {
     scroller.scrollTop = 300;
     fireEvent.scroll(scroller);
     expect(screen.getByTestId("following")).toHaveTextContent("off");
+  });
+
+  it("keeps following when the scroller box shrinks and content wraps", async () => {
+    const resize = stubResizeObserver();
+    try {
+      const box = { height: 400, view: 100 };
+      render(<FollowLog tick={1} resumeOnBottom />);
+      const scroller = screen.getByTestId("log-scroller");
+      mockOverflow(scroller, box);
+      scroller.scrollTop = 300;
+      await settleScrollIgnore();
+      expect(screen.getByTestId("following")).toHaveTextContent("on");
+
+      box.height = 700;
+      resize.notifyResize();
+      fireEvent.scroll(scroller);
+
+      expect(screen.getByTestId("following")).toHaveTextContent("on");
+      expect(scroller.scrollTop).toBe(700);
+    } finally {
+      resize.restore();
+    }
+  });
+
+  it("stops following on wheel during a layout resize", async () => {
+    const resize = stubResizeObserver();
+    try {
+      const box = { height: 400, view: 100 };
+      render(<FollowLog tick={1} resumeOnBottom />);
+      const scroller = screen.getByTestId("log-scroller");
+      mockOverflow(scroller, box);
+      scroller.scrollTop = 300;
+      await settleScrollIgnore();
+      expect(screen.getByTestId("following")).toHaveTextContent("on");
+
+      resize.notifyResize();
+      scroller.scrollTop = 155;
+      fireEvent.wheel(scroller, { deltaY: -20 });
+      expect(screen.getByTestId("following")).toHaveTextContent("off");
+    } finally {
+      resize.restore();
+    }
+  });
+
+  it("does not resume following when a resize fires while the user is up the log", async () => {
+    const resize = stubResizeObserver();
+    try {
+      const box = { height: 400, view: 100 };
+      const user = userEvent.setup();
+      render(<FollowLog tick={1} resumeOnBottom />);
+      const scroller = screen.getByTestId("log-scroller");
+      mockOverflow(scroller, box);
+      await settleScrollIgnore();
+
+      await user.click(screen.getByRole("button", { name: "Stop follow" }));
+      scroller.scrollTop = 40;
+      box.height = 700;
+      resize.notifyResize();
+      fireEvent.scroll(scroller);
+
+      expect(screen.getByTestId("following")).toHaveTextContent("off");
+      expect(scroller.scrollTop).toBe(40);
+    } finally {
+      resize.restore();
+    }
   });
 
   it("does not pin the scroller when only text inside a line changes", async () => {

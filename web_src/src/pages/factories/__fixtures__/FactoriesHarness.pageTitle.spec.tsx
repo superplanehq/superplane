@@ -119,11 +119,11 @@ describe("client-side navigation updates document.title", () => {
     expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Automations · Semaphore · SuperPlane");
 
-    await user.click(await screen.findByTestId("automations-app-app-refund-planner", {}, { timeout: 8000 }));
-    expect(await screen.findByTestId("automations-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Refund Planner · Semaphore · SuperPlane");
+    await user.click(await screen.findByTestId("automations-app-app-refund-implementer", {}, { timeout: 8000 }));
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(document.title).toBe("Refund Implementer · Semaphore · SuperPlane");
 
-    await user.click(screen.getByTestId("automations-detail-back"));
+    await user.click(screen.getByTestId("factory-app-canvas-back"));
     expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Automations · Semaphore · SuperPlane");
   }, 15000);
@@ -131,7 +131,7 @@ describe("client-side navigation updates document.title", () => {
   it("sets the tab title from the canvas name on a factory-owned app canvas", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-implementer`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/app-refund-implementer`}
         factoriesFixture={defaultFactoriesFixture}
         pageOverrides={pageOverrides}
       />,

@@ -1,4 +1,9 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryIntakeSettings,
+  FactoriesFactoryLine,
+  FactoryLineStep,
+} from "@/api-client";
 import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -10,14 +15,17 @@ import { useNavigate } from "react-router";
 import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganization";
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
+import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
+import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   provisionEventApps,
-  provisionGithubIntake,
+  provisionOnboardingIntake,
   provisionLine,
   type CreateFactoryIntake,
+  type DeleteFactoryIntake,
   type InstallOnboardingApp,
   type ListFactoryApps,
   type ListFactoryIntakes,
@@ -36,9 +44,15 @@ export function finishOnboardingError(args: {
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
+  issuesChoice?: IssuesChoiceId | null;
+  jiraReady?: boolean;
+  jiraProjectId?: string;
 }): string | null {
   if (!args.appRepository || !args.backlogRepository || !args.githubReady) {
     return "Connect GitHub, then select both repositories.";
+  }
+  if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
+    return "Connect Jira, then choose a project.";
   }
   const agentError = firstWorkOrderAgentError({
     remainingCreditCents: args.remainingCreditCents,
@@ -114,6 +128,7 @@ export async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
@@ -125,6 +140,7 @@ export async function provisionWorkspace(args: {
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
+  jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -170,9 +186,12 @@ export async function provisionWorkspace(args: {
     listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
-  await provisionGithubIntake({
+  await provisionOnboardingIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    deleteIntake: args.deleteIntake,
+    issuesChoice: args.issuesChoice,
+    jira: args.jira,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
@@ -180,6 +199,25 @@ export async function provisionWorkspace(args: {
     complete: true,
   });
   return { lineId };
+}
+
+function jiraIntakeBinding(
+  issuesChoice: IssuesChoiceId | null,
+  jiraId: string | undefined,
+  projectId: string | undefined,
+  completion?: JiraCompletionColumnValue,
+): { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings } | undefined {
+  if (issuesChoice !== "jira" || !jiraId || !projectId) return undefined;
+  return {
+    integrationId: jiraId,
+    projectId,
+    settings: jiraCompletionSettingsToApi(completion ?? { jiraMoveOnComplete: true, jiraCompletionColumn: "" }),
+  };
+}
+
+function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: IntegrationSelections): string | undefined {
+  if (plan.credentialsSource !== "integration" || !plan.integrationName) return undefined;
+  return selections[plan.integrationName]?.id;
 }
 
 export function useFinishOnboarding(args: {
@@ -196,6 +234,7 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
@@ -203,6 +242,8 @@ export function useFinishOnboarding(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
   githubOwner?: string;
+  jiraProjectId?: string;
+  jiraCompletion?: JiraCompletionColumnValue;
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
@@ -220,6 +261,7 @@ export function useFinishOnboarding(args: {
     const workspaceName = args.setup.workspaceName.trim();
     const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
     const github = args.selections.github;
+    const jira = args.selections.jira;
     const error = finishOnboardingError({
       appRepository,
       backlogRepository,
@@ -228,6 +270,9 @@ export function useFinishOnboarding(args: {
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
       plan: args.plan,
+      issuesChoice,
+      jiraReady: Boolean(jira?.ready),
+      jiraProjectId: args.jiraProjectId,
     });
     if (error) {
       showErrorToast(error);
@@ -248,10 +293,8 @@ export function useFinishOnboarding(args: {
         github,
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
-        agentIntegrationId:
-          args.plan.credentialsSource === "integration" && args.plan.integrationName
-            ? args.selections[args.plan.integrationName]?.id
-            : undefined,
+        agentIntegrationId: agentIntegrationIdForPlan(args.plan, args.selections),
+        jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
       });
       await afterWorkspaceProvisioned({
         factory: args.factory,

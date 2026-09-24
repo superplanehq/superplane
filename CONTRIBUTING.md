@@ -54,26 +54,41 @@ Once inside the cloned repository, bring up Docker, install dependencies and
 migrations, then start the development server:
 
 ```sh
-make dev.up        # Build images and start containers (Postgres, RabbitMQ, app shell, …)
-make dev.setup     # Codegen, Go + JS deps, database create/migrate (run inside the app container)
-make dev.server    # Start air + Vite (UI at http://localhost:8000)
+make dev.up        # Build app and runner images. Start db, rabbitmq, and the app shell
+make dev.setup     # Codegen, Go + JS deps, migrate superplane_dev, create database broker, start task-broker, register fleets
+make dev.server    # Start air, Vite, and runner workers (UI at http://localhost:8000)
 ```
 
-After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or migrations.
+After the first setup, run `make dev.up` when the stack is not running, then
+`make dev.server` to start air, Vite, and the workers (use
+`make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
+need a fresh `npm install`, codegen, or migrations.
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
+The task broker listens on [http://127.0.0.1:8091](http://127.0.0.1:8091).
 
-To run Runner nodes locally, start `make dev` in the runner repository.
-Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
-only for a remote broker (see `.env.example`).
+A local dump lets you create a new environment without owner setup or GitHub
+connection. This is the intended path when a script or agent creates local
+environments.
+See [Local database snapshot](docs/contributing/local-database-snapshot.md).
 
-The runner `make dev` image includes Claude Code, Codex, OpenCode, git, `gh`, and `jq`
-so factory line apps can run locally. Do not install those CLIs on the host.
-Connect GitHub and Claude integrations in the organization before you dispatch
-a factory line. Factory nodes use those integrations, not `.env`
-`ANTHROPIC_API_KEY`. After you change the runner Dockerfile, run `make dev`
-again in the runner repository. Check tools with `make doctor-local`.
-OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
+`make dev.up`, `make dev.setup`, and `make dev.server` start the local
+task-broker and runner workers. Set `TASK_BROKER_*` in `.env` only for a
+remote broker (see `.env.example`).
+
+The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
+`jq` so factory line apps can run locally. Do not install those CLIs on the
+host. Connect GitHub and Claude integrations in the organization before you
+dispatch a factory line. Factory nodes use those integrations, not `.env`
+`ANTHROPIC_API_KEY`. After you change `runner/runner/Dockerfile.local`, run
+`make dev.up` again. Check tools with `make doctor-local` after
+`make dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter
+Agent. If an old sibling `../runner` Compose project still holds port `8091`,
+stop it first.
+
+Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
+in `.env` only when you need the SuperPlane-hosted provider. See
+[Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 ## Additional Development Resources
 
@@ -90,6 +105,7 @@ OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
 - **[Running Multiple Local Instances](docs/contributing/multi-instance-dev.md)** - Run two SuperPlane repos side by side with separate ports
+- **[Local database snapshot](docs/contributing/local-database-snapshot.md)** - Restore a dump to skip owner setup in a new local environment
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 

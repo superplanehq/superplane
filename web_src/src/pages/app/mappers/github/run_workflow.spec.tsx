@@ -57,4 +57,14 @@ describe("github run_workflow mapper", () => {
     expect(values?.[0]?.badges?.[0]?.label).toBe("valid_name");
     expect(values?.[0]?.badges?.[1]?.label).toBe("valid_value");
   });
+
+  it("builds props when the component definition has no color", () => {
+    const context = makeContext({});
+    delete (context.componentDefinition as { color?: string }).color;
+
+    const props = runWorkflowMapper.props(context);
+
+    expect(props.title).toBe("Run Workflow");
+    expect(props.iconColor).toBe("text-gray-500 dark:text-gray-400");
+  });
 });

@@ -249,14 +249,13 @@ func reconcileFactoryRepository(
 				Encryptor:      deps.Encryptor,
 				AuthService:    deps.AuthService,
 				WebhookBaseURL: deps.WebhookBaseURL,
-				GitProvider:    deps.GitProvider,
 			},
 		); err != nil {
 			return fmt.Errorf("publish %q repository update: %w", canvas.Name, err)
 		}
 	}
 
-	return nil
+	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
 }
 
 func replaceTriggerRepository(nodes []models.Node, component, previousRepository, repository string) bool {

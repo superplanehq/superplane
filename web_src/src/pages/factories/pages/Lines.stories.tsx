@@ -24,6 +24,7 @@ import {
   LOW_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
 } from "../__fixtures__/usageReportFixtures";
+import { SENTRY_SETUP_INTEGRATIONS, JIRA_SETUP_INTEGRATIONS } from "../__fixtures__/setupStoryFixtures";
 import {
   columnAutomationsEmptyPhaseFixture,
   columnAutomationsFixture,
@@ -34,7 +35,7 @@ import { LinesPage } from "./LinesPage";
 
 /**
  * Line board is the workspace home: phase columns fill the pane. Cards open
- * the work-order popup. The backlog plus menu includes Create with an Agent.
+ * the work-order popup.
  */
 const meta = {
   title: "Factories/Pages/Lines",
@@ -116,6 +117,34 @@ export const LineBoardGithubAndSentry: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={githubAndSentryIntakeFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const SentryIntakeSetup: Story = {
+  name: "Sentry intake setup — connection and project steps",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/setup/sentry`}
+        factoriesFixture={githubAndSentryIntakeFactoriesFixture}
+        orgIntegrations={SENTRY_SETUP_INTEGRATIONS}
+      />
+    );
+  },
+};
+
+export const JiraIntakeSetup: Story = {
+  name: "Jira intake setup — connection and project steps",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/setup/jira`}
+        factoriesFixture={githubAndSentryIntakeFactoriesFixture}
+        orgIntegrations={JIRA_SETUP_INTEGRATIONS}
       />
     );
   },
@@ -293,7 +322,7 @@ export const LineBoardHostedCreditEmpty: Story = {
   },
 };
 
-/** Purchased hosted credit remains at or below $20. The board shows a low-credit warning. */
+/** Purchased hosted credit remains at or below $20. The amber chip shows the balance next to the title. */
 export const LineBoardHostedCreditLow: Story = {
   name: "Line board — hosted credit low",
   render: () => {

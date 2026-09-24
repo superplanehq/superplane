@@ -128,9 +128,12 @@ export function PRFeedbackSettingsPopup({
           initialDraft={agent.draft}
           onSave={agent.onSave}
           organizationId={agent.organizationId}
+          factoryId={agent.factoryId}
+          factoryKey={agent.factoryKey}
           isLoading={agent.isLoading}
           showAutomationNote={false}
           showCancel={false}
+          showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
         />
       ) : (
         <PRFeedbackGeneralTab

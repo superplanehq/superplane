@@ -40,7 +40,7 @@ func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
 		"session": "",
 	})
 	assert.Equal(t, []string{
-		"--pure", "run", "--format", "json", "--auto",
+		"--pure", "run", "--format", "json", "--thinking", "--auto",
 		"-m", "openrouter/x-ai/grok-4.6",
 		"--dir", "/tmp/repo",
 		"do the work",
@@ -62,11 +62,12 @@ func TestOpencodeRunArgsContinuesSession(t *testing.T) {
 	assert.Contains(t, args, "openrouter/anthropic/claude-sonnet-4-6")
 }
 
-func TestBuildOpenCodeConfigWritesBaseURLAndPlanningMCP(t *testing.T) {
+func TestBuildOpenCodeConfigWritesBaseURLAndAnalysisMCP(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{
-		"OPENROUTER_API_KEY":             "sk-or",
-		"OPENROUTER_BASE_URL":            "https://proxy.example/openrouter",
-		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"OPENROUTER_API_KEY":               "sk-or",
+		"OPENROUTER_BASE_URL":              "https://proxy.example/openrouter",
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	provider, _ := config["provider"].(map[string]any)
 	openrouter, _ := provider["openrouter"].(map[string]any)
@@ -84,6 +85,40 @@ func TestBuildOpenCodeConfigWritesBaseURLAndPlanningMCP(t *testing.T) {
 	require.Equal(t, 2, len(command))
 	assert.Equal(t, "node", command[0])
 	assert.Equal(t, "/task/planning_session_mcp.js", command[1])
+	assert.NotNil(t, config["instructions"])
+}
+
+func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	})
+	instructions, _ := config["instructions"].([]any)
+	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
+}
+
+func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	require.NoError(t, err)
+	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}, string(protocol)+"\n\nTask:\nFix retries.")
+	require.Equal(t, []any{"/task/analysis_protocol.md"}, config["instructions"])
+}
+
+func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "anthropic/claude-sonnet-4-6",
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
+		spawns: []spawnScript{successSpawn("I found the retry seam.")},
+	})
+
+	require.Equal(t, 0, result.exitCode, result.output)
+	assert.Equal(t, []string{"I found the retry seam."}, result.agentMessages)
 }
 
 func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
@@ -92,6 +127,47 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "allow", permission["*"])
 	assert.Nil(t, permission["edit"])
 	assert.Nil(t, config["mcp"])
+}
+
+func TestBuildOpenCodeConfigMergesWorkspaceMCP(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","headers":{"Authorization":"Bearer tok"}}]}`), 0o644))
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	docs, ok := mcp["docs"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", docs["type"])
+	assert.Equal(t, "https://mcp.example.com/mcp", docs["url"])
+}
+
+func TestBuildOpenCodeConfigReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	config := jsBuildConfig(t, taskDir, map[string]string{
+		"SUPERPLANE_TASK_DIR":             taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": "/task/workspace_mcp.json",
+	})
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	deepwiki, ok := mcp["deepwiki"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "remote", deepwiki["type"])
+	assert.Equal(t, "https://mcp.deepwiki.com/mcp", deepwiki["url"])
+}
+
+func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	command, _ := superplane["command"].([]any)
+
+	assert.Equal(t, []any{"node", "/task/task_artifact_mcp.js"}, command)
+	assert.Equal(t, true, superplane["enabled"])
 }
 
 func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
@@ -120,6 +196,83 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	assert.Equal(t, "throughput", routing["sort"])
 }
 
+func TestEnsureOpenCodeModelCatalogRefreshesOnce(t *testing.T) {
+	taskDir := t.TempDir()
+	result := jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", true, true)
+
+	assert.Equal(t, "refreshed", result.Source)
+	assert.Equal(t, 1, result.Calls)
+	assert.Equal(t, []string{"models", "openrouter", "--refresh", "--pure"}, result.Args)
+	assert.False(t, result.FetchDisabled)
+
+	result = jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", true, true)
+	assert.Equal(t, "cache", result.Source)
+	assert.Equal(t, 0, result.Calls)
+}
+
+func TestEnsureOpenCodeModelCatalogRejectsUnknownModelWithoutFreshCatalog(t *testing.T) {
+	result := jsEnsureOpenCodeModelCatalog(t, t.TempDir(), "x-ai/grok-4.6", false, false)
+
+	assert.Contains(t, result.Error, "could not refresh metadata for x-ai/grok-4.6")
+	assert.Empty(t, result.Source)
+}
+
+func TestEnsureOpenCodeModelCatalogUsesBundledMetadataWhenRefreshFails(t *testing.T) {
+	taskDir := t.TempDir()
+	result := jsEnsureOpenCodeModelCatalog(t, taskDir, "x-ai/grok-4.6", false, true)
+
+	assert.Equal(t, "bundled", result.Source)
+	assert.Equal(t, 2, result.Calls)
+	assert.Equal(t, []string{"models", "openrouter", "--pure", "--verbose"}, result.Args)
+	assert.NotEqual(t, taskDir, result.WorkingDirectory)
+	assert.False(t, result.ConfigProvided)
+}
+
+func TestEnsureOpenCodeModelCatalogContinuesWhenRefreshUnavailable(t *testing.T) {
+	cases := []struct {
+		name          string
+		refreshStatus int
+		refreshError  string
+	}{
+		{name: "timeout", refreshError: "ETIMEDOUT"},
+		{name: "spawn error", refreshError: "ENOENT"},
+		{name: "nonzero status", refreshStatus: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			model := "x-ai/grok-4.6"
+			result := jsEnsureOpenCodeModelCatalogWithRefresh(
+				t,
+				taskDir,
+				model,
+				false,
+				false,
+				tc.refreshStatus,
+				tc.refreshError,
+			)
+
+			assert.Equal(t, "unavailable", result.Source)
+			assert.Empty(t, result.Error)
+			assert.Equal(t, 2, result.Calls)
+
+			_, err := os.Stat(filepath.Join(taskDir, "xdg", "cache", "opencode", "models.json"))
+			assert.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
+func TestRunPromptLogsUnavailableCatalogFallback(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:         "x-ai/grok-4.6",
+		catalogSource: "unavailable",
+		spawns:        []spawnScript{successSpawn("ok")},
+	})
+
+	assert.Equal(t, 0, result.exitCode)
+	requireStdoutLine(t, result.output, "Model catalog refresh unavailable. Continuing with OpenCode configuration for x-ai/grok-4.6.")
+}
+
 func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {
 	output := runOpenCodeFormatter(t, []string{
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
@@ -146,6 +299,102 @@ func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "tool_end", end["type"])
 	assert.Equal(t, "passed", end["status"])
 	assert.Contains(t, output, `"type":"turn"`)
+}
+
+func TestFormatOpenCodeJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-openrouter-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("c", 2048)
+	imageResult := fmt.Sprintf(`{"content":[{"type":"image","data":%q,"mimeType":"image/png"}]}`, image)
+	output := runOpenCodeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
+		fmt.Sprintf(`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"completed","input":{"command":%q},"output":%q}}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git", imageResult),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "image content omitted from logs")
+}
+
+func TestRunPromptRedactsSecretsFromStderrAndResult(t *testing.T) {
+	token := "github-token-from-openrouter-process"
+	result := runOpenRouterPrompt(t, promptHarness{
+		env: map[string]string{"GITHUB_TOKEN": token},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stderr:   "Bearer " + token,
+			Stdout: []string{
+				fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
+				`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+
+	assert.NotContains(t, result.output, token)
+	assert.NotContains(t, result.stderr, token)
+	assert.Contains(t, result.stderr, "Bearer [REDACTED]")
+	assert.NotContains(t, fmt.Sprint(resultPayload(t, result.resultFile)), token)
+}
+
+func TestFormatOpenCodeJsonLinesEmitsReasoningAndToolActivity(t *testing.T) {
+	output := runOpenCodeFormatterWithActivity(t, []string{
+		`{"type":"reasoning","sessionID":"ses_1","part":{"id":"reasoning-1","type":"reasoning","text":"Inspect the repository.","time":{"start":1000,"end":13500}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"running","input":{"command":"printf first\nprintf second"},"output":"fir"}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"completed","input":{"command":"printf first\nprintf second"},"output":"first"}}}`,
+	})
+
+	records := activityRecords(t, output)
+	require.NotEmpty(t, records)
+	assert.Equal(t, "activity_start", records[0]["type"])
+	assert.Equal(t, "reasoning", records[1]["channel"])
+	reasoningEnd := findActivityRecord(t, records, "content_end")
+	assert.Equal(t, float64(12500), reasoningEnd["duration_ms"])
+	toolStart := findActivityRecord(t, records, "activity_tool_start")
+	assert.Equal(t, "activity_tool_start", toolStart["type"])
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "activity_tool_start"))
+	assert.Equal(t, "printf first\nprintf second", toolStart["input"])
+	var outputText string
+	for _, record := range records {
+		if record["type"] == "line" && record["channel"] == "tool_output" {
+			outputText += record["text"].(string)
+		}
+	}
+	assert.Equal(t, "first", outputText)
+	assert.Equal(t, "passed", findActivityRecord(t, records, "activity_tool_end")["status"])
+}
+
+func TestFormatOpenCodeJsonLinesCompletesAssistantContentBeforeNextTool(t *testing.T) {
+	output := runOpenCodeFormatterWithActivity(t, []string{
+		`{"type":"text","sessionID":"ses_1","part":{"id":"text-1","type":"text","text":"I will inspect the repository.","time":{"start":1000,"end":1500}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"call-1","tool":"bash","state":{"status":"running","input":{"command":"find . -type f"}}}}`,
+	})
+
+	records := activityRecords(t, output)
+	assert.Less(t, activityRecordIndex(records, "content_end"), activityRecordIndex(records, "activity_tool_start"))
+}
+
+func TestFormatOpenCodeJsonLinesNormalizesCamelCaseFileInputs(t *testing.T) {
+	output := runOpenCodeFormatterWithActivity(t, []string{
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"read-1","tool":"read","state":{"status":"completed","input":{"filePath":"/repo/README.md"},"output":"contents"}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"edit-1","tool":"edit","state":{"status":"completed","input":{"filePath":"/repo/src/main.ts","oldString":"old","newString":"new"},"output":"done"}}}`,
+		`{"type":"tool_use","sessionID":"ses_1","part":{"callID":"mcp-1","tool":"superplane_propose_spec","state":{"status":"completed","input":{"body":"Plan"},"output":"saved"}}}`,
+	})
+
+	records := activityRecords(t, output)
+	var starts []map[string]any
+	for _, record := range records {
+		if record["type"] == "activity_tool_start" {
+			starts = append(starts, record)
+		}
+	}
+	require.Len(t, starts, 3)
+	assert.Equal(t, "/repo/README.md", starts[0]["input"])
+	assert.Equal(t, "/repo/src/main.ts", starts[1]["input"])
+	assert.Equal(t, "mcp", starts[2]["kind"])
+	assert.Equal(t, "superplane_propose_spec", starts[2]["name"])
 }
 
 func TestFormatOpenCodeJsonLinesEmitsUsageForEachFinishedStep(t *testing.T) {
@@ -359,7 +608,10 @@ func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "google/gemma-4-31b-it",
-		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -579,7 +831,10 @@ db.close();
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterTwoFinishedSteps(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "google/gemma-4-31b-it",
-		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -628,7 +883,10 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterReplyOnLineAutomation(t *tes
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{
 		model: "google/gemma-4-31b-it",
-		env:   map[string]string{"SUPERPLANE_PLANNING_SESSION_ID": "plan-1"},
+		env: map[string]string{
+			"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		},
 		spawns: []spawnScript{{
 			ExitCode: 1,
 			Stdout: []string{
@@ -648,6 +906,7 @@ func TestRunPromptFailsWhenOpenCodeExitsNonZeroAfterLaterPartialStep(t *testing.
 	require.True(t, ok)
 	assert.Equal(t, float64(10), usage["input_tokens"])
 	assert.Equal(t, float64(8), usage["output_tokens"])
+	assert.Equal(t, []string{"I found a few files to inspect"}, result.agentMessages)
 }
 
 func TestRunPromptFailsWhenOpenCodeExitsNonZeroWithPartialText(t *testing.T) {
@@ -730,7 +989,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil)
+	}}, nil, nil, nil, "")
 	assert.Equal(t, 0, first.exitCode)
 	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
 	require.NoError(t, err)
@@ -743,7 +1002,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil)
+	}}, nil, nil, nil, "")
 	assert.Equal(t, 0, second.exitCode)
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
@@ -884,20 +1143,23 @@ type spawnScript struct {
 }
 
 type promptHarness struct {
-	model        string
-	spawns       []spawnScript
-	env          map[string]string
-	nowValues    []int64
-	sessionUsage []map[string]any
+	model         string
+	spawns        []spawnScript
+	env           map[string]string
+	nowValues     []int64
+	sessionUsage  []map[string]any
+	catalogSource string
 }
 
 type openRouterPromptResult struct {
-	exitCode   int
-	output     string
-	resultFile string
-	taskDir    string
-	spawns     [][]string
-	sleeps     []float64
+	exitCode      int
+	output        string
+	stderr        string
+	resultFile    string
+	taskDir       string
+	spawns        [][]string
+	sleeps        []float64
+	agentMessages []string
 }
 
 func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptResult {
@@ -906,7 +1168,7 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	writeTaskHelpers(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("do the work"), 0o644))
-	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage)
+	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage, harness.catalogSource)
 }
 
 func rateLimitSpawn(message string) spawnScript {
@@ -927,7 +1189,7 @@ func successSpawn(text string) spawnScript {
 	}
 }
 
-func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any) openRouterPromptResult {
+func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource string) openRouterPromptResult {
 	t.Helper()
 	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
@@ -941,6 +1203,9 @@ func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnS
 	require.NoError(t, err)
 	sessionJSON, err := json.Marshal(sessionUsage)
 	require.NoError(t, err)
+	if catalogSource == "" {
+		catalogSource = "cache"
+	}
 	harnessFile := filepath.Join(dir, "harness.js")
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
@@ -949,8 +1214,10 @@ const { runPrompt } = require(%q);
 const spawns = %s;
 const nowValues = %s;
 const sessionReads = %s;
+const catalogSource = %q;
 const calls = [];
 const sleeps = [];
+const agentMessages = [];
 let index = 0;
 let nowIndex = 0;
 let sessionReadIndex = 0;
@@ -982,6 +1249,9 @@ function mockChild(spec) {
   return child;
 }
 const helpers = {
+  ensureOpenCodeModelCatalog() {
+    return catalogSource;
+  },
   spawnOpenCode(args) {
     const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
     index += 1;
@@ -999,6 +1269,10 @@ const helpers = {
     sleeps.push(ms);
     return Promise.resolve();
   },
+  recordAgentMessage(text) {
+    agentMessages.push(text);
+    return Promise.resolve();
+  },
   now: nowValues.length
     ? () => nowValues[Math.min(nowIndex++, nowValues.length - 1)]
     : undefined,
@@ -1013,15 +1287,15 @@ if (Array.isArray(sessionReads)) {
 }
 runPrompt(%q, %q, helpers)
   .then((code) => {
-    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps, agentMessages }));
     process.exit(code);
   })
   .catch((err) => {
-    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps }));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps, agentMessages }));
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, spawnsJSON, nowJSON, sessionJSON, dir, filepath.Join(dir, promptName), model)), 0o644))
+`, script, spawnsJSON, nowJSON, sessionJSON, catalogSource, dir, filepath.Join(dir, promptName), model)), 0o644))
 
 	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)
@@ -1049,19 +1323,22 @@ runPrompt(%q, %q, helpers)
 		exitCode = exitErr.ExitCode()
 	}
 	recorded := struct {
-		Calls  [][]string `json:"calls"`
-		Sleeps []float64  `json:"sleeps"`
+		Calls         [][]string `json:"calls"`
+		Sleeps        []float64  `json:"sleeps"`
+		AgentMessages []string   `json:"agentMessages"`
 	}{}
 	raw, readErr := os.ReadFile(spawnsFile)
 	require.NoError(t, readErr)
 	require.NoError(t, json.Unmarshal(raw, &recorded))
 	return openRouterPromptResult{
-		exitCode:   exitCode,
-		output:     stdout.String(),
-		resultFile: resultFile,
-		taskDir:    dir,
-		spawns:     recorded.Calls,
-		sleeps:     recorded.Sleeps,
+		exitCode:      exitCode,
+		output:        stdout.String(),
+		stderr:        stderr.String(),
+		resultFile:    resultFile,
+		taskDir:       dir,
+		spawns:        recorded.Calls,
+		sleeps:        recorded.Sleeps,
+		agentMessages: recorded.AgentMessages,
 	}
 }
 
@@ -1142,10 +1419,19 @@ func jsOpencodeArgs(t *testing.T, input map[string]any) []string {
 }
 
 func jsBuildConfig(t *testing.T, taskDir string, env map[string]string) map[string]any {
+	return jsBuildConfigWithPrompt(t, taskDir, env, "")
+}
+
+func jsBuildConfigWithPrompt(t *testing.T, taskDir string, env map[string]string, prompt string) map[string]any {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
-	payload, err := json.Marshal(map[string]any{"taskDir": taskDir, "env": env, "planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != ""})
+	payload, err := json.Marshal(map[string]any{
+		"taskDir":  taskDir,
+		"env":      env,
+		"planning": env["SUPERPLANE_PLANNING_SESSION_ID"] != "",
+		"prompt":   prompt,
+	})
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
 	out, err := cmd.CombinedOutput()
@@ -1153,6 +1439,97 @@ func jsBuildConfig(t *testing.T, taskDir string, env map[string]string) map[stri
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(out, &config))
 	return config
+}
+
+type modelCatalogResult struct {
+	Source           string   `json:"source"`
+	Calls            int      `json:"calls"`
+	Args             []string `json:"args"`
+	FetchDisabled    bool     `json:"fetchDisabled"`
+	WorkingDirectory string   `json:"workingDirectory"`
+	ConfigProvided   bool     `json:"configProvided"`
+	Error            string   `json:"error"`
+}
+
+func jsEnsureOpenCodeModelCatalog(t *testing.T, taskDir, model string, createCatalog, listModel bool) modelCatalogResult {
+	t.Helper()
+	return jsEnsureOpenCodeModelCatalogWithRefresh(t, taskDir, model, createCatalog, listModel, 0, "")
+}
+
+func jsEnsureOpenCodeModelCatalogWithRefresh(
+	t *testing.T,
+	taskDir, model string,
+	createCatalog, listModel bool,
+	refreshStatus int,
+	refreshError string,
+) modelCatalogResult {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `
+const fs = require("fs");
+const path = require("path");
+const { ensureOpenCodeModelCatalog, openCodeModelCatalogPath } = require(process.argv[1]);
+const taskDir = process.argv[2];
+const model = process.argv[3];
+const createCatalog = process.argv[4] === "true";
+const listModel = process.argv[5] === "true";
+const refreshStatus = Number(process.argv[6]);
+const refreshError = process.argv[7] || "";
+const calls = [];
+let args = [];
+let fetchDisabled = true;
+let workingDirectory = "";
+let configProvided = true;
+function refresh(command, refreshArgs, options) {
+  calls.push(command);
+  args = refreshArgs;
+  fetchDisabled = Object.prototype.hasOwnProperty.call(options.env, "OPENCODE_DISABLE_MODELS_FETCH");
+  workingDirectory = options.cwd;
+  configProvided = Object.prototype.hasOwnProperty.call(options.env, "OPENCODE_CONFIG");
+  if (refreshArgs.includes("--refresh")) {
+    if (refreshError) {
+      const error = new Error("spawnSync " + command + " " + refreshError);
+      error.code = refreshError;
+      return { error, status: null, stdout: "", stderr: "" };
+    }
+    if (refreshStatus !== 0) {
+      return { status: refreshStatus, stdout: "", stderr: "" };
+    }
+    if (createCatalog) {
+      const catalog = openCodeModelCatalogPath(taskDir);
+      fs.mkdirSync(path.dirname(catalog), { recursive: true });
+      fs.writeFileSync(catalog, JSON.stringify({
+        openrouter: { models: { [model]: { attachment: true } } },
+      }) + "\n");
+    }
+    return { status: 0, stdout: "", stderr: "" };
+  }
+  const stdout = listModel
+    ? "openrouter/" + model + "\n" + JSON.stringify({
+        id: model,
+        capabilities: { attachment: true, input: { image: true } },
+      }, null, 2) + "\n"
+    : "";
+  return { status: 0, stdout, stderr: "" };
+}
+try {
+  const source = ensureOpenCodeModelCatalog(
+    taskDir,
+    model,
+    { OPENCODE_DISABLE_MODELS_FETCH: "1" },
+    refresh,
+  );
+  process.stdout.write(JSON.stringify({ source, calls: calls.length, args, fetchDisabled, workingDirectory, configProvided }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({ error: error.message, calls: calls.length, args, fetchDisabled, workingDirectory, configProvided }));
+}
+`, script, taskDir, model, fmt.Sprint(createCatalog), fmt.Sprint(listModel), fmt.Sprint(refreshStatus), refreshError)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var result modelCatalogResult
+	require.NoError(t, json.Unmarshal(out, &result))
+	return result
 }
 
 func runOpenCodeFormatter(t *testing.T, lines []string) string {
@@ -1165,6 +1542,54 @@ func runOpenCodeFormatter(t *testing.T, lines []string) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+func runOpenCodeFormatterWithActivity(t *testing.T, lines []string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatOpenCodeJsonLines } = require(process.argv[1]); formatOpenCodeJsonLines(JSON.parse(process.argv[2]));`, script, string(payload))
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func activityRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["schema_version"] == float64(2) {
+			records = append(records, record)
+		}
+	}
+	return records
+}
+
+func findActivityRecord(t *testing.T, records []map[string]any, recordType string) map[string]any {
+	t.Helper()
+	for _, record := range records {
+		if record["type"] == recordType {
+			return record
+		}
+	}
+	require.FailNow(t, "activity record not found", recordType)
+	return nil
+}
+
+func activityRecordIndex(records []map[string]any, recordType string) int {
+	for index, record := range records {
+		if record["type"] == recordType {
+			return index
+		}
+	}
+	return -1
 }
 
 func formatOpenCodeJSONLinesFailed(t *testing.T, lines []string) bool {

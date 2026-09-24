@@ -68,8 +68,9 @@ func TestDecodeRunOpenRouterSpecIgnoresOmittedMaxTurns(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunOpenRouterSpec(map[string]any{
-		"machineType": "e1-large-amd64",
-		"model":       "anthropic/claude-sonnet-4-6",
+		"machineType":           "e1-large-amd64",
+		"model":                 "anthropic/claude-sonnet-4-6",
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Prompt", "type": "prompt", "prompt": "fix tests"},
 		},
@@ -78,6 +79,7 @@ func TestDecodeRunOpenRouterSpecIgnoresOmittedMaxTurns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, spec.MaxTurns)
 	require.Equal(t, runner.DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
+	require.True(t, spec.IncludeVisualEvidence)
 }
 
 func TestDecodeRunOpenRouterSpecKeepsExplicitMaxTurns(t *testing.T) {
@@ -111,7 +113,7 @@ func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 64
-	task := buildOpenRouterBrokerTask(spec, "", nil)
+	task := buildOpenRouterBrokerTask(spec, "", nil, nil)
 	require.GreaterOrEqual(t, len(task.Commands), 2)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6'`)
 	require.NotContains(t, task.Commands[1].Command, " 64")
@@ -120,7 +122,7 @@ func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
 func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil)
+	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	require.Contains(t, prepare, "opencode CLI not found on PATH; install OpenCode on the runner")
 	require.Contains(t, prepare, "command -v opencode")
@@ -130,7 +132,7 @@ func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
 func TestBuildOpenRouterBrokerTaskOmitsFallbackModelsFile(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil)
+	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil)
 	for _, file := range task.Files {
 		assert.NotEqual(t, "openrouter_models.json", file.Path)
 	}
@@ -140,7 +142,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("fix tests")
-	base := buildOpenRouterBrokerTask(spec, "", nil)
+	base := buildOpenRouterBrokerTask(spec, "", nil, nil)
 	got := applyPlanningFollowUp(base, nil, spec)
 	require.Len(t, got.Commands, len(base.Commands))
 	require.Len(t, got.Files, len(base.Files))
@@ -153,7 +155,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 32
 	spec.Steps[0].WorkingDirectory = "repo"
-	base := buildOpenRouterBrokerTask(spec, "", nil)
+	base := buildOpenRouterBrokerTask(spec, "", nil, nil)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
@@ -181,13 +183,15 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("greet")
-	base := buildOpenRouterBrokerTask(spec, "", nil)
+	base := buildOpenRouterBrokerTask(spec, "", nil, nil)
 	got := attachPlanningSessionFiles(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}})
 	require.Equal(t, runner.PlanningSessionMCPScript(), requireTaskFile(t, got.Files, "planning_session_mcp.js").Content)
 	require.Equal(t, runner.PlanningSessionMCPConfigJSON(), requireTaskFile(t, got.Files, "mcp.json").Content)
+	require.Equal(t, runner.PlanningSessionProtocolFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.js").Content)
+	require.Equal(t, runner.PlanningSessionProtocolMarkdownFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.md").Content)
 }
 
 func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {

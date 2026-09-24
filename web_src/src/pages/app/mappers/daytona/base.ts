@@ -40,7 +40,7 @@ export const baseMapper: ComponentBaseMapper = {
     if (!payload) {
       return { Response: "No data returned" };
     }
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as Record<string, unknown> | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };

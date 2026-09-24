@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AccountContext } from "@/contexts/accountContextState";
 import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
 import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
@@ -32,8 +32,6 @@ import { AgentSetupNotice } from "./AgentSetupState";
 import { getAgentSetupState } from "./agentSetupStateModel";
 import { useAgentChatBootKickoff } from "./useAgentChatBootKickoff";
 import { useAgentConversationHandlers } from "./useAgentConversationHandlers";
-
-const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
 
 type ChatConversationProps = {
   chatId: string;
@@ -129,8 +127,6 @@ function ChatConversation({
   useEffect(() => {
     setStatus(initialStatus || "idle");
   }, [initialStatus, chatId]);
-  useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
-
   const showThinking = useThinkingIndicator(rawMessages, status);
   useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, isAutoLayoutOnUpdateEnabled });
   const handlers = useAgentConversationHandlers({
@@ -147,9 +143,25 @@ function ChatConversation({
     setOutcomeState,
   });
 
+  const reconcileStreamingStatus = useCallback(async () => {
+    if (status !== "streaming") {
+      return;
+    }
+    try {
+      const nextStatus = await refreshChatStatus();
+      if (nextStatus && nextStatus !== "streaming") {
+        setStatus(nextStatus);
+      }
+    } catch {
+      // Live events remain authoritative. A later reconnect retries recovery.
+    }
+  }, [refreshChatStatus, status]);
   const wsCallbacks = useMemo(
-    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
-    [setOutcomeState],
+    () => ({
+      ...createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+      onConnectionOpen: () => void reconcileStreamingStatus(),
+    }),
+    [reconcileStreamingStatus, setOutcomeState],
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
@@ -216,49 +228,6 @@ function resolveComposerStatusLabel(resetPending: boolean, sendPending: boolean,
   if (resetPending) return "Clearing chat...";
   if (sendPending) return "Starting agent...";
   return statusLabel(status);
-}
-
-function useStreamingStatusReconciler(
-  status: string,
-  setStatus: (value: string) => void,
-  refreshChatStatus: () => Promise<string | undefined>,
-) {
-  const activeRef = useRef(false);
-  const inFlightRef = useRef(false);
-  const reconcile = useCallback(async () => {
-    if (inFlightRef.current) {
-      return;
-    }
-
-    inFlightRef.current = true;
-    try {
-      const nextStatus = await refreshChatStatus();
-      if (activeRef.current && nextStatus && nextStatus !== "streaming") {
-        setStatus(nextStatus);
-      }
-    } catch {
-      // Websocket events remain the primary status path; refetch only repairs missed terminal events.
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, [refreshChatStatus, setStatus]);
-
-  useEffect(() => {
-    if (status !== "streaming") {
-      return;
-    }
-
-    activeRef.current = true;
-    void reconcile();
-    const intervalId = window.setInterval(() => {
-      void reconcile();
-    }, STREAMING_STATUS_RECONCILE_INTERVAL_MS);
-
-    return () => {
-      activeRef.current = false;
-      window.clearInterval(intervalId);
-    };
-  }, [reconcile, status]);
 }
 
 function ComposerWithCanvasData({

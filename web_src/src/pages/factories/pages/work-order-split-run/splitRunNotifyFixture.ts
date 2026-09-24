@@ -284,15 +284,6 @@ function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStream
       duration: "1s",
       pullRequest: pr,
     }),
-    streamLine({
-      id: "set-pr-closure-note",
-      at: "19:52:39",
-      componentType: "setWorkOrderStatusNote",
-      componentName: "Set Closure Note",
-      action: "passed",
-      iconSlug: "box",
-      duration: "1s",
-    }),
   ];
 }
 

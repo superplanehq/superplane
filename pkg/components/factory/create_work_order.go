@@ -89,13 +89,15 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	workOrder, err := ctx.Factory.CreateWorkOrder(core.WorkOrderParams{
+	workOrder, created, err := ctx.Factory.CreateWorkOrder(core.WorkOrderParams{
 		Title:       config.Title,
 		Description: config.Description,
 	})
-
 	if err != nil {
 		return err
+	}
+	if !created {
+		return ctx.ExecutionState.Pass()
 	}
 
 	return ctx.ExecutionState.Emit(

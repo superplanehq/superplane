@@ -41,7 +41,7 @@ export const getIncidentMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const nodeMetadata = context.node.metadata as BaseNodeMetadata;
     return buildIncidentExecutionDetails(context.execution, nodeMetadata?.instanceUrl);
   },

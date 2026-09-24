@@ -14,8 +14,8 @@ export interface FactoryPreviewFlags {
    */
   columnAutomations?: boolean;
   /**
-   * Sentence rows under each column title, plus a header cog that
-   * switches back to the title icons. On by default.
+   * Sentence rows under each column title, plus Automation names /
+   * Automation icons in the header view menu. On by default.
    */
   columnAutomationRows?: boolean;
 }

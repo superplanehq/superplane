@@ -38,6 +38,15 @@ describe("errors", () => {
     ).toBe("Failed to emit event");
   });
 
+  it("uses the fallback when the API hides the failure as internal error", () => {
+    expect(
+      getApiErrorMessage(
+        { response: { data: { message: "internal error" } } },
+        "SuperPlane could not create the Sentry intake.",
+      ),
+    ).toBe("SuperPlane could not create the Sentry intake.");
+  });
+
   it("extracts a message from a JSON error response", async () => {
     const response = new Response(JSON.stringify({ message: "account organization limit exceeded" }), {
       status: 429,

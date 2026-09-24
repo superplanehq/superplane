@@ -1,5 +1,5 @@
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getState, getTriggerRenderer } from "../mapperLookup";
@@ -91,7 +91,7 @@ export const manageDropletPowerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -99,13 +99,13 @@ export const manageDropletPowerMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const action = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const action = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!action) return details;
 
-    details["Action ID"] = action.id?.toString() || "-";
-    details["Operation"] = action.type || "-";
-    details["Status"] = action.status || "-";
-    details["Droplet ID"] = action.resource_id?.toString() || "-";
+    details["Action ID"] = action.id != null ? String(action.id) : "-";
+    details["Operation"] = action.type != null ? String(action.type) : "-";
+    details["Status"] = action.status != null ? String(action.status) : "-";
+    details["Droplet ID"] = action.resource_id != null ? String(action.resource_id) : "-";
 
     return details;
   },
@@ -144,7 +144,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   // Check if there's a custom power operation event in the outputs

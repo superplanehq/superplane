@@ -10,13 +10,20 @@ import (
 
 func TestFileIDsAndRewrite(t *testing.T) {
 	id := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-	markdown := "See ![bug](" + FileRef(id) + ") and <img src=\"" + FileRef(id) + "\">"
+	markdown := "See ![bug](" + FileRef(id) + "), <img src=\"" + FileRef(id) + "\">, and <a href=\"" + FileRef(id) + "\">notes</a>"
 	ids := FileIDsInMarkdown(markdown)
 	require.Equal(t, []uuid.UUID{id}, ids)
 
 	rewritten := RewriteFileRefs(markdown, map[uuid.UUID]string{id: "https://cdn.example/x.png"})
 	assert.Contains(t, rewritten, "https://cdn.example/x.png")
 	assert.NotContains(t, rewritten, FileRefScheme)
+}
+
+func TestMarkdownLinkLabelEscapesDelimiters(t *testing.T) {
+	assert.Equal(t, "shot.png", MarkdownLinkLabel("shot.png"))
+	assert.Equal(t, "shot__evil.com", MarkdownLinkLabel("shot](evil.com"))
+	assert.Equal(t, "attachment", MarkdownLinkLabel("\n\t"))
+	assert.Equal(t, "notes.pdf", MarkdownLinkLabel("notes.pdf\x00\n"))
 }
 
 func TestGitHubImageURLDetection(t *testing.T) {
@@ -27,5 +34,14 @@ func TestGitHubImageURLDetection(t *testing.T) {
 		t,
 		[]string{"https://user-images.githubusercontent.com/1.png"},
 		HTTPImageURLs("![x](https://user-images.githubusercontent.com/1.png) and [docs](https://example.com/a.pdf)"),
+	)
+	assert.Equal(
+		t,
+		[]string{
+			"https://user-images.githubusercontent.com/1.png",
+			"https://example.com/a.pdf",
+			"https://files.productive.io/attachments/files/1/original/notes.pdf",
+		},
+		HTTPResourceURLs("![x](https://user-images.githubusercontent.com/1.png) and [docs](https://example.com/a.pdf) <a href=\"https://files.productive.io/attachments/files/1/original/notes.pdf\">notes</a>"),
 	)
 }

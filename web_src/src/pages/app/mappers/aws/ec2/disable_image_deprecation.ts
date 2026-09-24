@@ -13,7 +13,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 
 interface Configuration {
@@ -101,7 +101,7 @@ function disableImageDeprecationEventSections(
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }

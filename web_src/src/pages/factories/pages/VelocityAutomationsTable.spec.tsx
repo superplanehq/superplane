@@ -91,7 +91,7 @@ describe("VelocityAutomationsTable", () => {
 
     expect(screen.getByRole("link", { name: "Planner" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/refunds/automations/app-planner",
+      "/org-1/workspaces/refunds/automations/app-planner?from=automations",
     );
   });
 });

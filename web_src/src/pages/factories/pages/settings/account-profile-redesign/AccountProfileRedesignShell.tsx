@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   Blocks,
+  Bot,
   CircleUser,
   Cpu,
   Grid3x3,
@@ -54,6 +55,7 @@ const REDESIGN_NAV_GROUPS: RedesignNavGroup[] = [
     items: [
       { id: "workspace-general", label: "General", Icon: Grid3x3 },
       { id: "workspace-repository", label: "Repository", Icon: Blocks },
+      { id: "workspace-agent-resources", label: "Agent resources", Icon: Bot },
       { id: "workspace-models", label: "Models", Icon: Cpu },
       { id: "workspace-spending", label: "Spending", Icon: BarChart3 },
     ],

@@ -3,6 +3,8 @@ import {
   formatClockDuration,
   formatClockDurationLabel,
   formatDuration,
+  formatGoDuration,
+  formatGoDurationLabel,
   formatMinutesSecondsDuration,
 } from "@/lib/duration";
 
@@ -100,6 +102,27 @@ describe("formatClockDurationLabel", () => {
     expect(formatClockDurationLabel("—")).toBe("—");
     expect(formatClockDurationLabel("Running")).toBe("Running");
     expect(formatClockDurationLabel("")).toBe("—");
+  });
+});
+
+describe("formatGoDuration", () => {
+  it("uses compact Go units without spaces", () => {
+    expect(formatGoDuration(0)).toBe("");
+    expect(formatGoDuration(500)).toBe("<1s");
+    expect(formatGoDuration(30_000)).toBe("30s");
+    expect(formatGoDuration(62_000)).toBe("1m2s");
+    expect(formatGoDuration(60_000)).toBe("1m");
+    expect(formatGoDuration(5_400_000)).toBe("1h30m");
+  });
+});
+
+describe("formatGoDurationLabel", () => {
+  it("converts stored labels to compact Go units", () => {
+    expect(formatGoDurationLabel("30s")).toBe("30s");
+    expect(formatGoDurationLabel("1m 2s")).toBe("1m2s");
+    expect(formatGoDurationLabel("4m so far")).toBe("4m");
+    expect(formatGoDurationLabel("—")).toBe("");
+    expect(formatGoDurationLabel("")).toBe("");
   });
 });
 

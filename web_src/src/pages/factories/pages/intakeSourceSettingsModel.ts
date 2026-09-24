@@ -1,5 +1,7 @@
 import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
+import type { LineIntakeSourceId } from "./lineIntakeModel";
+
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
 export type IntakeSettingsTab = "general" | "agent" | "automation";
@@ -27,6 +29,20 @@ export interface IntakeSourceSettings {
   /** Also create a task when somebody adds the "superplane" label to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
+  /** Move the originating Jira issue when SuperPlane completes the task. */
+  jiraMoveOnComplete: boolean;
+  /** Jira status name to move the issue to. Empty means the Done column. */
+  jiraCompletionColumn: string;
+  /** Create a task when a Sentry issue is created. */
+  sentryNewIssues: boolean;
+  /** Create a task when a Sentry issue becomes unresolved. */
+  sentryRegressedIssues: boolean;
+  /** Create a task when a Sentry issue is assigned. */
+  sentryAssignedIssues: boolean;
+  /** Issue levels that still create a task. Empty means every level. */
+  sentryLevels: string[];
+  /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
+  excludeKeyTasks: boolean;
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -40,7 +56,36 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   reopenedIssues: true,
   superplaneLabelAdded: true,
   authorsWithAccess: false,
+  jiraMoveOnComplete: true,
+  jiraCompletionColumn: "",
+  sentryNewIssues: true,
+  sentryRegressedIssues: false,
+  sentryAssignedIssues: false,
+  sentryLevels: [],
+  excludeKeyTasks: true,
 };
+
+export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
+
+export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Sentry exceptions",
+  sentryNewIssues: true,
+  sentryRegressedIssues: false,
+  sentryAssignedIssues: false,
+  sentryLevels: [],
+};
+
+export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Productive.io tasks",
+  excludeKeyTasks: true,
+};
+
+export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
+  jiraMoveOnComplete: true,
+  jiraCompletionColumn: "",
+} as const;
 
 export const INTAKE_SETTINGS_COPY = {
   title: "Intake GitHub issues",
@@ -70,7 +115,23 @@ export const INTAKE_SETTINGS_COPY = {
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
+  delete: "Delete intake",
+  deleteTitle: "Delete this intake?",
+  deleteDescription:
+    "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
+  deleteCancel: "Keep intake",
+  deleteConfirm: "Delete intake",
+  deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
+
+export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
+  return (
+    sourceId === "github-issues" ||
+    sourceId === "sentry-exceptions" ||
+    sourceId === "jira-issues" ||
+    sourceId === "productive-tasks"
+  );
+}
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
@@ -83,17 +144,29 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
   }
   return [...labels, next];
 }
-export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
+export function normalizeIntakeSourceSettings(
+  draft: IntakeSourceSettings,
+  sourceId?: LineIntakeSourceId,
+): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
+  const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
+  const hiddenSentryTriggers =
+    sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
   if (!draft.filterByLabel) {
-    return { ...draft, confidencePct, labels: [], labelFilterMode: "include" };
+    return { ...draft, ...hiddenSentryTriggers, confidencePct, labels: [], labelFilterMode: "include", sentryLevels };
   }
-  return { ...draft, confidencePct };
+  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels };
 }
 
 type IntakeToggles = Pick<
   IntakeSourceSettings,
-  "newIssues" | "reopenedIssues" | "superplaneLabelAdded" | "authorsWithAccess"
+  | "newIssues"
+  | "reopenedIssues"
+  | "superplaneLabelAdded"
+  | "authorsWithAccess"
+  | "sentryNewIssues"
+  | "sentryRegressedIssues"
+  | "sentryAssignedIssues"
 >;
 
 /** A response that omits a toggle predates it, so fall back to the default. */
@@ -103,6 +176,9 @@ function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefin
     reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
     superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
     authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    sentryNewIssues: settings?.sentryNewIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues,
+    sentryRegressedIssues: settings?.sentryRegressedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues,
+    sentryAssignedIssues: settings?.sentryAssignedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues,
   };
 }
 
@@ -119,6 +195,10 @@ export function intakeSettingsFromApi(
     filterByLabel: labels.length > 0,
     assignment: assignmentFromApi(settings?.assignment),
     ...intakeTogglesFromApi(settings),
+    jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
+    jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
+    sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    excludeKeyTasks: settings?.excludeKeyTasks ?? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS.excludeKeyTasks,
   };
 }
 
@@ -138,6 +218,23 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     newIssues: settings.newIssues,
     reopenedIssues: settings.reopenedIssues,
     superplaneLabelAdded: settings.superplaneLabelAdded,
+    jiraMoveOnComplete: settings.jiraMoveOnComplete,
+    jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
+    sentryNewIssues: settings.sentryNewIssues,
+    sentryRegressedIssues: false,
+    sentryAssignedIssues: false,
+    sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
+    excludeKeyTasks: settings.excludeKeyTasks,
+  };
+}
+
+export function jiraCompletionSettingsToApi(settings: {
+  jiraMoveOnComplete: boolean;
+  jiraCompletionColumn: string;
+}): Pick<FactoriesFactoryIntakeSettings, "jiraMoveOnComplete" | "jiraCompletionColumn"> {
+  return {
+    jiraMoveOnComplete: settings.jiraMoveOnComplete,
+    jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
   };
 }
 

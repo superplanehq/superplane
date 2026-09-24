@@ -26,10 +26,6 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return { pageKey: "ownerSetup", attributes: {} };
   }
 
-  if (first === "install") {
-    return { pageKey: "install", attributes: {} };
-  }
-
   if (first === "github" && second === "approved") {
     return { pageKey: "githubInstallApproved", attributes: {} };
   }

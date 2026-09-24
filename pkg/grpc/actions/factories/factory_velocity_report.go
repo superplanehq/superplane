@@ -57,6 +57,7 @@ func (w velocityWindow) contains(t time.Time) bool {
 type velocityOrder struct {
 	id          uuid.UUID
 	createdByID *uuid.UUID
+	assigneeIDs []uuid.UUID
 	intakeKey   string
 	// Local midnight of the day the order is reported on.
 	day        time.Time
@@ -99,6 +100,7 @@ func collectVelocityOrders(rows []models.FactoryVelocityPullRequest, window velo
 			orders[row.WorkOrderID] = &velocityOrder{
 				id:          row.WorkOrderID,
 				createdByID: row.CreatedByID,
+				assigneeIDs: slices.Clone(row.AssigneeIDs),
 				intakeKey:   classifyVelocityIntake(row),
 				day:         day,
 				merged:      merged,
@@ -225,8 +227,8 @@ func (r *velocityPersonRow) totalMerged() int {
 }
 
 // velocityPeopleBuilder joins two identities of the same person: the GitHub
-// author of a merged pull request, and the SuperPlane member who opened a work
-// order. A member with a connected GitHub account is one row.
+// author of a merged pull request, and the SuperPlane member credited for a
+// work order. A member with a connected GitHub account is one row.
 type velocityPeopleBuilder struct {
 	rows        map[string]*velocityPersonRow
 	byUserID    map[uuid.UUID]*models.FactoryVelocityMember
@@ -302,14 +304,14 @@ func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRe
 	row.authoredMerged++
 }
 
-// addFactoryOrder credits a work order to the member who opened it. Orders an
-// automation opened have no member and stay out of the table.
+// addFactoryOrder credits a work order to the first loaded assignee who still
+// belongs to the organization. Loaded IDs are ordered by assignment time, then
+// by user ID when several members are assigned together. When nobody is
+// assigned, or none of the assignees resolve, it credits the member who opened
+// the order. An order with neither stays out of the table.
 func (b *velocityPeopleBuilder) addFactoryOrder(order *velocityOrder) {
-	if order.createdByID == nil {
-		return
-	}
-	member, ok := b.byUserID[*order.createdByID]
-	if !ok {
+	member := b.creditedMember(order)
+	if member == nil {
 		return
 	}
 
@@ -323,6 +325,22 @@ func (b *velocityPeopleBuilder) addFactoryOrder(order *velocityOrder) {
 	if order.cycleHours != nil {
 		row.cycleHours = append(row.cycleHours, *order.cycleHours)
 	}
+}
+
+func (b *velocityPeopleBuilder) creditedMember(order *velocityOrder) *models.FactoryVelocityMember {
+	for _, id := range order.assigneeIDs {
+		if member, ok := b.byUserID[id]; ok {
+			return member
+		}
+	}
+	if order.createdByID == nil {
+		return nil
+	}
+	member, ok := b.byUserID[*order.createdByID]
+	if !ok {
+		return nil
+	}
+	return member
 }
 
 // velocityPeopleSortKey names the column the People table is ordered by.

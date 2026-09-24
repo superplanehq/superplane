@@ -284,47 +284,59 @@ func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
 	assert.Equal(t, models.CanvasRunStateStarted, touchedRun.State)
 }
 
-func Test__RunFinalizer_FinalizesCancellingRunWithForcedCancelledResult(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
+func Test__RunFinalizer_FinalizesCancellingRunWithRequestedResult(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		complete       bool
+		expectedResult string
+	}{
+		{name: "cancellation", expectedResult: models.CanvasRunResultCancelled},
+		{name: "completion", complete: true, expectedResult: models.CanvasRunResultPassed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
 
-	amqpURL, _ := config.RabbitMQURL()
-	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+			amqpURL, _ := config.RabbitMQURL()
+			finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
-	node := "component-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{NodeID: node, Type: models.NodeTypeComponent},
-		},
-		[]models.Edge{},
-	)
+			node := "component-1"
+			canvas, _ := support.CreateCanvas(
+				t,
+				r.Organization.ID,
+				r.User,
+				[]models.CanvasNode{{NodeID: node, Type: models.NodeTypeComponent}},
+				[]models.Edge{},
+			)
 
-	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
-	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
-	require.NoError(t, err)
-	require.NoError(t, event.Routed())
+			event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+			run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+			require.NoError(t, err)
+			require.NoError(t, event.Routed())
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
-	execution.RunID = run.ID
-	require.NoError(t, database.Conn().Save(execution).Error)
-	require.NoError(t, execution.Cancel(nil))
+			execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+			execution.RunID = run.ID
+			require.NoError(t, database.Conn().Save(execution).Error)
 
-	now := time.Now()
-	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
-		"state":        models.CanvasRunStateCancelling,
-		"cancelled_at": now,
-		"cancelled_by": r.User,
-	}).Error)
+			require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+				if test.complete {
+					_, err := run.RequestCompletion(tx, &r.User)
+					return err
+				}
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerExecutionFinished))
+				_, err := run.RequestCancellation(tx, &r.User)
+				return err
+			}))
+			require.NoError(t, execution.Cancel(nil))
 
-	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+			require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerExecutionFinished))
+
+			updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+			assert.Equal(t, test.expectedResult, updatedRun.Result)
+		})
+	}
 }
 
 func Test__RunFinalizer_SweepCancellingRuns_FinalizesWhenNoOpenWork(t *testing.T) {
@@ -1328,8 +1340,9 @@ func attachPlanningSessionToRun(t *testing.T, r *support.ResourceRegistry, canva
 		ID:              uuid.New(),
 		OrganizationID:  r.Organization.ID,
 		FactoryID:       factoryModel.ID,
-		CreatedByUserID: r.User,
+		CreatedByUserID: &r.User,
 		Repository:      "acme/payments",
+		Kind:            models.PlanningSessionKindTaskCreation,
 		State:           models.PlanningSessionStateRunning,
 		CanvasID:        &canvasID,
 		CanvasRunID:     &runID,

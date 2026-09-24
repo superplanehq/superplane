@@ -9,14 +9,12 @@ import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/useAccount";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
-import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
 import { HomePageShell } from "./HomePageShell";
 import { RequireClassicAppsSurface } from "./RequireClassicAppsSurface";
 import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
-import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
-import type { CanvasCardData, CanvasFolderData } from "./types";
+import type { CanvasCardData } from "./types";
 import { useEditApp } from "./useEditApp";
 import { useHomePageCanvasList } from "./useHomePageCanvasList";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
@@ -47,7 +45,7 @@ function ClassicHomePage() {
     isOpen: isEditAppModalOpen,
   } = useEditApp();
 
-  const { canvases, canvasFolders, filteredCanvases, isLoading, isFetching, canvasError } = useHomePageCanvasList(
+  const { canvases, filteredCanvases, isLoading, isFetching, canvasError } = useHomePageCanvasList(
     organizationId,
     searchQuery,
   );
@@ -57,10 +55,9 @@ function ClassicHomePage() {
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  const isHomePageLoading = isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0);
+  const isHomePageLoading = isLoading || (isFetching && canvases.length === 0);
   useReportPageReady(!isHomePageLoading && !!account && !!organizationId, {
     canvas_count: canvases.length,
-    folder_count: canvasFolders.length,
     failed: !!canvasError,
   });
 
@@ -72,7 +69,7 @@ function ClassicHomePage() {
     return <ErrorView />;
   }
 
-  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases) {
+  if (canvases.length === 0 && !canvasError && canCreateCanvases) {
     return <Navigate to={`/${organizationId}/apps/new`} replace />;
   }
 
@@ -93,12 +90,10 @@ function ClassicHomePage() {
           <Content
             filteredCanvases={filteredCanvases}
             preferredFilteredCanvases={preferredFilteredCanvases}
-            canvasFolders={canvasFolders}
             organizationId={organizationId}
             searchQuery={searchQuery}
             onEditCanvas={openEdit}
             onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
-            canCreateCanvases={canCreateCanvases}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -121,140 +116,39 @@ function ClassicHomePage() {
 function Content({
   filteredCanvases,
   preferredFilteredCanvases,
-  canvasFolders,
   organizationId,
   searchQuery,
   onEditCanvas,
   onToggleStar,
-  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: {
   filteredCanvases: CanvasCardData[];
   preferredFilteredCanvases: CanvasCardData[];
-  canvasFolders: CanvasFolderData[];
   organizationId: string;
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
-  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }) {
-  const folderedLayout = buildFolderedLayout(
-    preferredFilteredCanvases,
-    preferredFilteredCanvases,
-    canvasFolders,
-    Boolean(searchQuery),
-  );
-
-  if (filteredCanvases.length === 0 && (searchQuery || canvasFolders.length === 0)) {
-    return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
-  }
-
-  if (folderedLayout.visibleFolders.length === 0 && folderedLayout.unfiledCanvases.length === 0) {
+  if (filteredCanvases.length === 0) {
     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
   }
 
   return (
-    <div className="space-y-6">
-      {folderedLayout.visibleFolders.map((folder) => (
-        <CanvasFolderSection
-          key={folder.id}
-          folder={folder}
-          canvases={folderedLayout.canvasesByFolderID.get(folder.id) || []}
-          canvasFolders={canvasFolders}
-          organizationId={organizationId}
-          onEditCanvas={onEditCanvas}
-          onToggleStar={onToggleStar}
-          canCreateCanvases={canCreateCanvases}
-          canUpdateCanvases={canUpdateCanvases}
-          canDeleteCanvases={canDeleteCanvases}
-          permissionsLoading={permissionsLoading}
-          canMoveUp={canvasFolders.findIndex((canvasFolder) => canvasFolder.id === folder.id) > 0}
-          canMoveDown={
-            canvasFolders.findIndex((canvasFolder) => canvasFolder.id === folder.id) < canvasFolders.length - 1
-          }
-        />
-      ))}
-
-      {folderedLayout.unfiledCanvases.length > 0 ? (
-        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5 dark:bg-white/5`}>
-          <CanvasCardsGrid
-            canvases={folderedLayout.unfiledCanvases}
-            canvasFolders={canvasFolders}
-            organizationId={organizationId}
-            onEditCanvas={onEditCanvas}
-            onToggleStar={onToggleStar}
-            canUpdateCanvases={canUpdateCanvases}
-            canDeleteCanvases={canDeleteCanvases}
-            permissionsLoading={permissionsLoading}
-          />
-        </section>
-      ) : null}
-    </div>
+    <CanvasCardsGrid
+      canvases={preferredFilteredCanvases}
+      organizationId={organizationId}
+      onEditCanvas={onEditCanvas}
+      onToggleStar={onToggleStar}
+      canUpdateCanvases={canUpdateCanvases}
+      canDeleteCanvases={canDeleteCanvases}
+      permissionsLoading={permissionsLoading}
+    />
   );
-}
-
-interface FolderedCanvasLayout {
-  canvasesByFolderID: Map<string, CanvasCardData[]>;
-  unfiledCanvases: CanvasCardData[];
-  visibleFolders: CanvasFolderData[];
-}
-
-function buildFolderedLayout(
-  sectionCanvases: CanvasCardData[],
-  matchingCanvases: CanvasCardData[],
-  canvasFolders: CanvasFolderData[],
-  hasSearchQuery: boolean,
-): FolderedCanvasLayout {
-  const folderIDs = new Set(canvasFolders.map((folder) => folder.id));
-  const canvasesByFolderID = new Map<string, CanvasCardData[]>();
-  const matchingCanvasCountsByFolderID = new Map<string, number>();
-  const unfiledCanvases: CanvasCardData[] = [];
-
-  for (const folder of canvasFolders) {
-    canvasesByFolderID.set(folder.id, []);
-    matchingCanvasCountsByFolderID.set(folder.id, 0);
-  }
-
-  for (const canvas of sectionCanvases) {
-    if (canvas.canvasFolderId && folderIDs.has(canvas.canvasFolderId)) {
-      canvasesByFolderID.get(canvas.canvasFolderId)?.push(canvas);
-      continue;
-    }
-
-    unfiledCanvases.push(canvas);
-  }
-
-  for (const canvas of matchingCanvases) {
-    if (!canvas.canvasFolderId || !folderIDs.has(canvas.canvasFolderId)) {
-      continue;
-    }
-
-    matchingCanvasCountsByFolderID.set(
-      canvas.canvasFolderId,
-      (matchingCanvasCountsByFolderID.get(canvas.canvasFolderId) || 0) + 1,
-    );
-  }
-
-  const visibleFolders = canvasFolders.filter((folder) => {
-    const visibleCanvasCount = (canvasesByFolderID.get(folder.id) || []).length;
-    const matchingCanvasCount = matchingCanvasCountsByFolderID.get(folder.id) || 0;
-    if (visibleCanvasCount > 0 || matchingCanvasCount > 0) {
-      return true;
-    }
-
-    if (hasSearchQuery) {
-      return false;
-    }
-
-    return true;
-  });
-
-  return { canvasesByFolderID, unfiledCanvases, visibleFolders };
 }
 
 function CanvasesSearchEmptyState() {

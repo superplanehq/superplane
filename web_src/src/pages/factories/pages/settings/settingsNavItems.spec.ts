@@ -19,6 +19,9 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
       "organization-models",
     );
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/agent-resources")?.id).toBe(
+      "workspace-agent-resources",
+    );
   });
 
   it("returns undefined for a non-canonical route", () => {
@@ -41,6 +44,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
+      "Agent resources",
       "Models",
       "Usage",
       "General",
@@ -79,6 +83,7 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
+      "workspace-agent-resources",
       "workspace-models",
       "workspace-usage",
     ]);

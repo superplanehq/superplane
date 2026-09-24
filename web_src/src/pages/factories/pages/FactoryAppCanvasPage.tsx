@@ -20,8 +20,9 @@ type FactoryAppCanvasPageModel = ReturnType<typeof useFactoryAppCanvasPageModel>
 
 /**
  * Factory-shell embed for a factory-owned app/canvas. Configure (`?configure=1`)
- * opens the edit workspace. Viewing a run (`?run=` without configure) stays
- * here so the factory Run inspector can open on node click.
+ * opens the edit workspace without the runs sidebar. Viewing a run (`?run=`
+ * without configure) stays here so the factory Run inspector can open on node
+ * click.
  */
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
@@ -107,9 +108,11 @@ function FactoryAppCanvasWorkspace({ model }: { model: FactoryAppCanvasPageModel
     return <p className="p-5 text-[13px] text-muted-foreground">Loading…</p>;
   }
 
+  const showRunsSidebar = Boolean(model.appId) && !model.isConfigure;
+
   return (
     <div className="flex h-full min-h-0 min-w-0">
-      {model.appId ? (
+      {showRunsSidebar ? (
         <FactoryAutomationRunsSidebar
           canvasId={model.appId}
           organizationId={model.organizationId}

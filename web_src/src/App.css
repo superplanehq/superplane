@@ -282,6 +282,15 @@
   --color-gray-800: oklch(31.3% 0.013 267.12);
   --color-gray-900: oklch(21.26% 0.007 258.37);
   --color-gray-950: oklch(17.74% 0.004 264.46);
+  --color-invert-foreground: var(--invert-foreground);
+  --color-invert: var(--invert);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-info-foreground: var(--info-foreground);
+  --color-info: var(--info);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-destructive-foreground: var(--destructive-foreground);
 }
 
 :root {
@@ -317,6 +326,19 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --stream-gap: 60ms;
+  --stream-fade: 350ms;
+  --stream-blur: 1px;
+  --stream-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --destructive-foreground: var(--color-red-800);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-900);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-900);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-900);
+  --invert: var(--color-zinc-900);
+  --invert-foreground: var(--color-zinc-50);
 }
 
 .dark {
@@ -351,10 +373,19 @@
   --sidebar-accent-foreground: theme("colors.gray.100");
   --sidebar-border: color-mix(in oklab, theme("colors.gray.800") 65%, transparent);
   --sidebar-ring: theme("colors.gray.400");
+  --destructive-foreground: var(--color-red-600);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-600);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-600);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-600);
+  --invert: var(--color-zinc-700);
+  --invert-foreground: var(--color-zinc-50);
 }
 
 .dark .sp-ai-thinking {
-  background-image: linear-gradient(90deg, #9ca3af 0%, #d1d5db 45%, #9ca3af 90%);
+  --sp-shimmer-highlight: #f3f4f6;
 }
 
 .dark-mode-disabled {
@@ -825,6 +856,20 @@
   border-radius: calc(var(--radius) - 2px);
 }
 
+.theme-factories [data-slot="button-group"] [data-slot="button"] {
+  border-radius: 0.375rem;
+}
+
+.theme-factories [data-slot="button-group"] > [data-slot="button"]:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.theme-factories [data-slot="button-group"] [data-testid="split-run-draft-model"] {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 .theme-factories .factory-sidebar,
 .theme-factories .factory-sidebar button,
 .theme-factories .factory-sidebar textarea,
@@ -921,21 +966,95 @@
 
 @keyframes sp-ai-thinking-shimmer {
   0% {
-    background-position: -200% 0;
+    background-position: 100% 0;
   }
   100% {
-    background-position: 200% 0;
+    background-position: 0 0;
   }
 }
 
 .sp-ai-thinking {
+  --sp-shimmer-highlight: #ededed;
+  position: relative;
   display: inline-block;
-  background-image: linear-gradient(90deg, #64748b 0%, #9ca3af 45%, #64748b 90%);
-  background-size: 220% 100%;
+}
+
+.sp-ai-thinking::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--sp-shimmer-highlight) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: sp-ai-thinking-shimmer 1.4s linear infinite;
+  -webkit-text-fill-color: transparent;
+  animation: sp-ai-thinking-shimmer 2s linear infinite;
+}
+
+@keyframes sp-thinking-state-enter {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes sp-thinking-state-exit {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(-8px);
+  }
+}
+
+.sp-thinking-state {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.sp-thinking-state-sizer,
+.sp-thinking-state-current,
+.sp-thinking-state-outgoing {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+.sp-thinking-state-sizer {
+  visibility: hidden;
+}
+
+.sp-thinking-state-sizer::before {
+  content: attr(data-text);
+}
+
+.sp-thinking-state-current {
+  animation: sp-thinking-state-enter 180ms ease-in-out both;
+}
+
+.sp-thinking-state-outgoing {
+  animation: sp-thinking-state-exit 180ms ease-in-out both;
 }
 
 /*
@@ -966,7 +1085,7 @@
 @keyframes sp-tool-enter {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -975,7 +1094,200 @@
 }
 
 .sp-tool-enter {
-  animation: sp-tool-enter 0.2s ease-out both;
+  animation: sp-tool-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-text-reveal {
+  animation: sp-text-reveal 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-stream-text {
+  animation: sp-stream-text 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-stream-w {
+  opacity: 0;
+  filter: blur(var(--stream-blur));
+}
+
+.sp-stream-w.is-in,
+.sp-stream-w.is-streaming {
+  opacity: 1;
+  filter: blur(0);
+}
+
+.sp-stream-w.is-streaming {
+  animation: sp-stream-word-in var(--stream-fade) var(--stream-ease) both;
+  animation-delay: var(--stream-delay, 0ms);
+}
+
+.sp-reasoning-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  overflow: hidden;
+}
+
+.sp-reasoning-stream-line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted-foreground);
+  animation: sp-reasoning-line-in 280ms ease-out both;
+}
+
+.sp-survey-enter {
+  animation: workspace-next-steps-banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * Outgoing chat turn. Quiet surface from the current theme so the bubble sits
+ * close to the thread. Markdown, chips, and links keep the normal text tokens.
+ * --sp-chat-outgoing-surface is the same mix over the thread, for fade stops.
+ */
+.sp-chat-outgoing {
+  --sp-chat-outgoing-surface: color-mix(in oklab, var(--foreground) 8%, var(--background));
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+}
+
+.sp-chat-outgoing .sp-chat-outgoing-fade {
+  background-image: linear-gradient(
+    to top,
+    var(--sp-chat-outgoing-surface),
+    color-mix(in oklab, var(--sp-chat-outgoing-surface) 90%, transparent),
+    transparent
+  );
+}
+
+/* Selected Task / Automations pill. Same violet / amber pair as the first-run sphere. */
+[data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
+  border-color: rgb(91 51 173 / 28%);
+  background: color-mix(in oklab, #f3ecff 82%, transparent);
+  color: #4c2a94;
+  box-shadow: none;
+}
+
+.dark [data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
+  border-color: rgb(246 168 33 / 34%);
+  background: color-mix(in oklab, #f6a821 10%, transparent);
+  color: #f6a821;
+}
+
+.sp-survey-page {
+  animation: sp-survey-page 220ms ease-out both;
+}
+
+.sp-survey-check {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: sp-survey-check 180ms ease-out forwards;
+}
+
+.sp-error-shake {
+  animation: sp-error-shake 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.sp-meter-bar {
+  transition: background-color 280ms ease;
+}
+
+.sp-confidence-why[data-state="open"] {
+  animation: sp-confidence-why-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sp-text-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-confidence-why-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-stream-text {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@keyframes sp-stream-word-in {
+  from {
+    opacity: 0;
+    filter: blur(var(--stream-blur));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes sp-reasoning-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes sp-survey-page {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-survey-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sp-error-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-3px);
+  }
+  40%,
+  60% {
+    transform: translateX(3px);
+  }
 }
 
 @keyframes status-blink {
@@ -1058,6 +1370,159 @@
   }
 }
 
+@keyframes workspace-loading-stroke-left {
+  0% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  12.5% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  25%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-mid-left {
+  0%,
+  25% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  37.5% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  50%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-mid-right {
+  0%,
+  50% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  62.5% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  75%,
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-stroke-right {
+  0%,
+  75% {
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  87.5% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes workspace-loading-pen {
+  0%,
+  25%,
+  50%,
+  75% {
+    left: 50%;
+    top: 8%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  12.5% {
+    left: 15.5%;
+    top: 73.8%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  37.5% {
+    left: 36.1%;
+    top: 85.7%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  62.5% {
+    left: 63.9%;
+    top: 85.7%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  87.5% {
+    left: 84.5%;
+    top: 73.8%;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  100% {
+    left: 50%;
+    top: 8%;
+  }
+}
+
+@keyframes workspace-loading-overlay-exit {
+  to {
+    opacity: 0;
+  }
+}
+
+.workspace-loading-mark {
+  --workspace-loading-cycle: 1.5s;
+  position: relative;
+  width: 5.5rem;
+  aspect-ratio: 33 / 25;
+}
+
+.workspace-loading-trace-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.workspace-loading-trace {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+}
+
+.workspace-loading-trace--left {
+  animation: workspace-loading-stroke-left var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-trace--mid-left {
+  animation: workspace-loading-stroke-mid-left var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-trace--mid-right {
+  animation: workspace-loading-stroke-mid-right var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-trace--right {
+  animation: workspace-loading-stroke-right var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-pen {
+  position: absolute;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+  translate: -50% -50%;
+  animation: workspace-loading-pen var(--workspace-loading-cycle) infinite;
+}
+
+.workspace-loading-overlay--exit {
+  pointer-events: none;
+  animation: workspace-loading-overlay-exit 0.3s ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .workspace-next-steps-progress,
   .workspace-next-steps-title,
@@ -1065,7 +1530,52 @@
     view-transition-name: none;
   }
 
-  .workspace-next-steps-reveal {
+  .workspace-next-steps-reveal,
+  .workspace-loading-trace,
+  .workspace-loading-trace--left,
+  .workspace-loading-trace--mid-left,
+  .workspace-loading-trace--mid-right,
+  .workspace-loading-trace--right,
+  .workspace-loading-pen,
+  .workspace-loading-overlay--exit,
+  .sp-text-reveal,
+  .sp-stream-text,
+  .sp-tool-enter,
+  .sp-reasoning-stream-line,
+  .sp-survey-enter,
+  .sp-survey-page,
+  .sp-survey-check,
+  .sp-error-shake,
+  .sp-thinking-state-current,
+  .sp-thinking-state-outgoing,
+  .sp-ai-thinking::before {
     animation: none;
+  }
+
+  .sp-thinking-state-outgoing {
+    display: none;
+  }
+
+  .sp-meter-bar {
+    transition: none;
+  }
+
+  .sp-stream-w {
+    animation: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+
+  .sp-confidence-why[data-state="open"] {
+    animation: none;
+  }
+
+  .workspace-loading-trace {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .workspace-loading-pen {
+    display: none;
   }
 }

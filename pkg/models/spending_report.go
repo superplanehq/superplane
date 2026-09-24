@@ -401,6 +401,7 @@ func SpendingModelDisplayName(storedModel string, versionedIDs []string) string 
 	if stored == "" {
 		return stored
 	}
+	stored = pricebook.CatalogModelID(stored)
 	alias := stored
 	if _, rest, found := strings.Cut(stored, "/"); found && rest != "" && !strings.Contains(rest, "/") {
 		alias = rest
@@ -676,7 +677,7 @@ func SpendingBreakdownLabel(id string, catalogs SpendingCatalogs, groupBy string
 		return label
 	}
 	if groupBy == SpendingGroupByModel && strings.Contains(id, "/") {
-		return strings.SplitN(id, "/", 2)[1]
+		return pricebook.CatalogModelID(strings.SplitN(id, "/", 2)[1])
 	}
 	return id
 }

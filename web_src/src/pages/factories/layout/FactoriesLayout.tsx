@@ -5,6 +5,8 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
+import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
@@ -22,6 +24,7 @@ import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatu
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesSidebar } from "./FactoriesSidebar";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
+import { WorkspaceLoadingScreen } from "./WorkspaceLoadingScreen";
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
@@ -208,11 +211,11 @@ function FactoriesLayoutContent({
 }
 
 export function FactoriesLayoutLoading() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-      <p className="text-[13px] text-muted-foreground">Loading workspace…</p>
-    </div>
-  );
+  const overlayHandles = useWorkspaceLoading(WORKSPACE_LOADING_COPY.workspace, true);
+  if (overlayHandles) {
+    return null;
+  }
+  return <WorkspaceLoadingScreen message={WORKSPACE_LOADING_COPY.workspace} />;
 }
 
 export function FactoriesLayoutError({ organizationId }: { organizationId: string }) {

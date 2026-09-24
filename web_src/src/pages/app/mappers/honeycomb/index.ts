@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 import { createEventMapper } from "./create_event";
 import { onAlertFiredTriggerRenderer } from "./on_alert_fired";

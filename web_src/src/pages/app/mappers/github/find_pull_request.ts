@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { ComponentBaseProps } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

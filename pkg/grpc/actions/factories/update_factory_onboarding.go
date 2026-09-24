@@ -13,6 +13,7 @@ import (
 
 func UpdateFactoryOnboarding(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.UpdateFactoryOnboardingRequest,
 ) (*pb.UpdateFactoryOnboardingResponse, error) {
@@ -45,6 +46,10 @@ func UpdateFactoryOnboarding(
 		err = factory.UpdateOnboarding(db, patch)
 	}
 	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+
+	if err := ensureFactoryMergeabilityWebhook(ctx, db, deps, factory); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 

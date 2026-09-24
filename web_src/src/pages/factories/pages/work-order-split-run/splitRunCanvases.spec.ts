@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { groupSplitRunStream } from "./PhaseLogCard";
+import { groupSplitRunStream } from "./phaseLogStream";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
@@ -81,7 +81,6 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.statuses["add-branch-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["create-pr"]).toBe("did_not_run");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
-    expect(canvas.statuses["set-pr-closure-note"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
   });
 
@@ -100,7 +99,6 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
     expect(canvas.statuses["create-pr"]).toBe("passed");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
-    expect(canvas.statuses["set-pr-closure-note"]).toBe("passed");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);

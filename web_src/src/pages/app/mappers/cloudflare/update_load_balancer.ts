@@ -45,6 +45,28 @@ export const updateLoadBalancerMapper: ComponentBaseMapper = {
   },
 };
 
+function loadBalancerPoolMetadata(defaultPools: string[] | undefined): MetadataItem[] {
+  if (defaultPools != null && defaultPools.length > 0) {
+    const count = defaultPools.length;
+    return [{ icon: "layers", label: `${count} pool${count === 1 ? "" : "s"}` }];
+  }
+
+  return [];
+}
+
+function loadBalancerEnabledMetadata(enabled: boolean | undefined): MetadataItem[] {
+  if (enabled != null) {
+    return [
+      {
+        icon: enabled ? "check-circle" : "circle",
+        label: enabled ? "Enabled" : "Disabled",
+      },
+    ];
+  }
+
+  return [];
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as UpdateLoadBalancerNodeMetadata | undefined;
@@ -63,17 +85,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "git-branch", label: config.steeringPolicy });
   }
 
-  if (config?.defaultPools != null && config.defaultPools.length > 0) {
-    const count = config.defaultPools.length;
-    metadata.push({ icon: "layers", label: `${count} pool${count === 1 ? "" : "s"}` });
-  }
-
-  if (config?.enabled != null) {
-    metadata.push({
-      icon: config.enabled ? "check-circle" : "circle",
-      label: config.enabled ? "Enabled" : "Disabled",
-    });
-  }
+  metadata.push(...loadBalancerPoolMetadata(config?.defaultPools));
+  metadata.push(...loadBalancerEnabledMetadata(config?.enabled));
 
   return metadata;
 }

@@ -10,6 +10,7 @@ export interface FactoryIntakeRoute {
 
 const INTAKE_NAME_BY_SOURCE: Record<string, string> = {
   SOURCE_GITHUB_ISSUES: "GitHub issues",
+  SOURCE_JIRA_ISSUES: "Jira issues",
   SOURCE_SENTRY_EXCEPTIONS: "Sentry exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "PagerDuty incidents",
 };

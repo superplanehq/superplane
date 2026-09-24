@@ -56,8 +56,8 @@ func TestDescribeFactoryVelocity_ClampsPeriodDays(t *testing.T) {
 		input    int32
 		expected int
 	}{
-		{"defaults to the page default when zero", 0, 14},
-		{"defaults to the page default when negative", -3, 14},
+		{"defaults to the page default when zero", 0, 30},
+		{"defaults to the page default when negative", -3, 30},
 		{"honors 30", 30, 30},
 		{"caps to 30", 90, 30},
 		{"honors 14", 14, 14},
@@ -697,6 +697,40 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 	assert.Equal(t, r.User.String(), resp.People[0].Id)
 	assert.Equal(t, int32(1), resp.People[0].FactoryMerged)
 	assert.Equal(t, int32(0), resp.People[0].AuthoredMerged)
+}
+
+func TestDescribeFactoryVelocity_CreditsAssigneeOnIntakeOrder(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	assignee := support.CreateUser(t, r, r.Organization.ID)
+	order, err := factoryModel.CreateWorkOrder(db, "Intake order", "", nil, []uuid.UUID{assignee.ID}, nil)
+	require.NoError(t, err)
+	mergedAt := time.Now().Add(-3 * time.Hour)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/8",
+		State:    models.FactoryPullRequestStateMerged,
+		MergedAt: &mergedAt,
+	})
+	require.NoError(t, err)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, resp.IntakeSources, 1)
+	assert.Equal(t, velocityIntakeKeyAutomation, resp.IntakeSources[0].Key,
+		"intake bands still use the opener, not the assignee")
+
+	require.Len(t, resp.People, 1)
+	assert.Equal(t, assignee.ID.String(), resp.People[0].Id)
+	assert.Equal(t, int32(1), resp.People[0].FactoryMerged)
 }
 
 // TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize covers a cohort

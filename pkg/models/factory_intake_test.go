@@ -202,4 +202,31 @@ func Test__FactoryIntake(t *testing.T) {
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeNotFound)
 		assert.NotErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
+
+	t.Run("pause sets and clears paused_at", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Sentry exceptions")
+		intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		assert.False(t, intake.Paused())
+
+		require.NoError(t, intake.SetPaused(db, true))
+		assert.True(t, intake.Paused())
+		require.NotNil(t, intake.PausedAt)
+
+		stored, err := factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.True(t, stored.Paused())
+		require.NotNil(t, stored.PausedAt)
+
+		require.NoError(t, intake.SetPaused(db, false))
+		assert.False(t, intake.Paused())
+		assert.Nil(t, intake.PausedAt)
+
+		stored, err = factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.False(t, stored.Paused())
+		assert.Nil(t, stored.PausedAt)
+	})
 }

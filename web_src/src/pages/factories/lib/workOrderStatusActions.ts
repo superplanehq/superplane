@@ -2,13 +2,12 @@ import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-cl
 
 import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
-export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "back-to-draft" | "reopen";
+export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen";
 
 export interface WorkOrderStatusAction {
   kind: WorkOrderStatusActionKind;
   label: string;
   disabled: boolean;
-  separatorBefore?: boolean;
 }
 
 export interface WorkOrderStatusActionInput {
@@ -36,15 +35,6 @@ export function buildWorkOrderStatusActions(input: WorkOrderStatusActionInput): 
     );
   }
 
-  if (input.isOpen && input.displayStatus !== "running") {
-    actions.push({
-      kind: "back-to-draft",
-      label: "Back to draft",
-      disabled: manageDisabled,
-      separatorBefore: true,
-    });
-  }
-
   if (isDraft) {
     actions.push({ kind: "reject-draft", label: "Reject", disabled: closeDisabled });
   }
@@ -70,9 +60,6 @@ export function applyWorkOrderStatusAction(
     case "reject":
     case "reject-draft":
       handlers.onClose("RESULT_REJECTED");
-      return;
-    case "back-to-draft":
-      void handlers.onStatusChange("STATE_DRAFT");
       return;
     case "reopen":
       void handlers.onStatusChange("STATE_OPEN");

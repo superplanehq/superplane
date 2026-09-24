@@ -3,6 +3,8 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -12,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
+func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 		"SUPERPLANE_RUN_TOKEN":           "token",
@@ -21,14 +23,131 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 
 	assert.Contains(t, tools, "Read")
 	assert.Contains(t, tools, "Bash")
-	assert.Contains(t, tools, "mcp__superplane")
-	assert.Contains(t, tools, "mcp__superplane__propose_draft")
-	assert.Contains(t, tools, "mcp__superplane__survey")
-	assert.NotContains(t, tools, "Edit")
-	assert.NotContains(t, tools, "Write")
+	assert.NotContains(t, tools, "mcp__superplane")
+	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
+	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
+	assert.Contains(t, tools, "Edit")
+	assert.Contains(t, tools, "Write")
 	assert.NotContains(t, tools, "mcp__superplane__say")
 	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, tools, "mcp__superplane__ask")
+}
+
+func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
+	})
+
+	assert.Contains(t, tools, "Read")
+	assert.Contains(t, tools, "Bash")
+	assert.Contains(t, tools, "mcp__superplane")
+	assert.Contains(t, tools, "mcp__superplane__propose_spec")
+	assert.Contains(t, tools, "mcp__superplane__propose_clarity")
+	assert.Contains(t, tools, "mcp__superplane__propose_confidence")
+	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
+	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.Contains(t, tools, "mcp__superplane__create_task")
+	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
+	assert.NotContains(t, tools, "Edit")
+	assert.NotContains(t, tools, "Write")
+}
+
+func TestAllowedClaudeToolsOmitsDisabledPlanningScores(t *testing.T) {
+	clarityOnly := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_PLANNING_CONFIDENCE":   "false",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
+	})
+	assert.Contains(t, clarityOnly, "mcp__superplane__propose_clarity")
+	assert.NotContains(t, clarityOnly, "mcp__superplane__propose_confidence")
+
+	confidenceOnly := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_PLANNING_CLARITY":      "false",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
+	})
+	assert.Contains(t, confidenceOnly, "mcp__superplane__propose_confidence")
+	assert.NotContains(t, confidenceOnly, "mcp__superplane__propose_clarity")
+}
+
+func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
+	})
+	assert.Contains(t, tools, "mcp__docs")
+	assert.Contains(t, tools, "mcp__superplane")
+}
+
+func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_TASK_DIR":              taskDir,
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  "/task/workspace_mcp.json",
+	})
+	assert.Contains(t, tools, "mcp__deepwiki")
+	assert.Contains(t, tools, "mcp__superplane")
+}
+
+func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
+	analysis := planningSystemPromptFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	})
+	assert.Contains(t, analysis, "propose_spec")
+	assert.Contains(t, analysis, "propose_clarity")
+	assert.Contains(t, analysis, "propose_confidence")
+	assert.NotContains(t, analysis, "propose_plan")
+	assert.Contains(t, analysis, "Follow the task prompt")
+	assert.Contains(t, analysis, "Use only the analysis tools")
+	assert.Contains(t, analysis, "call survey with 2 to 4 options")
+	assert.Contains(t, analysis, "Do not paste the specification")
+	assert.Contains(t, analysis, "does not publish the specification or the score")
+	assert.Contains(t, analysis, "Do not leave a written plan unpublished")
+	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
+	assert.Contains(t, analysis, "Do not name files")
+	assert.Contains(t, analysis, "Do not add an Open questions section")
+	assert.NotContains(t, analysis, "Talk like a colleague")
+	assert.NotContains(t, analysis, "## 1. Research")
+	assert.NotContains(t, analysis, "how suitable the work is for an agent")
+	assert.NotContains(t, analysis, "check copy")
+	assert.NotContains(t, analysis, "## Proposed outcome")
+	assert.NotContains(t, analysis, "## Workflow")
+	assert.NotContains(t, analysis, "Why not start")
+	assert.NotContains(t, analysis, "you must ask")
+	assert.NotContains(t, analysis, "## Executive summary")
+	assert.NotContains(t, analysis, "## Files and seams")
+	assert.NotContains(t, analysis, "Key architecture decisions")
+
+	unknown := planningSystemPromptFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+	})
+	assert.Empty(t, unknown)
+}
+
+func TestPlanningSystemPromptKeepsProtocolAtSystemPriority(t *testing.T) {
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	require.NoError(t, err)
+
+	analysis := planningSystemPromptFromScriptWithPrompt(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}, string(protocol)+"\n\nTask:\nFix retries.")
+	assert.Equal(t, " "+strings.TrimSpace(string(protocol)), analysis)
 }
 
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
@@ -36,11 +155,43 @@ func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
 }
 
-func TestClaudePermissionModeUsesDefaultModeWhenPlanningSessionIsAttached(t *testing.T) {
+func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+	})
+
+	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__inspect_screenshot")
+	assert.Contains(t, tools, "mcp__superplane__upload_artifact")
+	assert.Contains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+}
+
+func TestFormatStreamJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
+	token := "github-token-for-claude-redaction"
+	t.Setenv("GITHUB_TOKEN", token)
+	image := strings.Repeat("a", 2048)
+	output := runClaudeFormatter(t, []string{
+		fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"text","text":%q},{"type":"thinking","thinking":%q},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":%q}}]}}`, token, token, "git remote set-url origin https://x-access-token:"+token+"@github.com/acme/app.git"),
+		fmt.Sprintf(`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"image","data":%q,"mimeType":"image/png"},{"type":"text","text":%q}]}]}}`, image, token),
+	})
+
+	assert.NotContains(t, output, token)
+	assert.NotContains(t, output, image)
+	assert.NotContains(t, output, "x-access-token:")
+	assert.Contains(t, output, "[REDACTED]")
+	assert.Contains(t, output, "[image: image/png; content omitted from logs]")
+}
+
+func TestClaudePermissionModeUsesDefaultModeForAnalysisSession(t *testing.T) {
 	// Planning sessions must use "default" (not "plan"): plan mode blocks the
-	// planning MCP tools, breaking propose_draft/survey. Read-only is enforced
+	// planning MCP tools. Read-only is enforced
 	// by allowedClaudeTools dropping Edit/Write instead.
 	assert.Equal(t, "default", claudePermissionModeFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	}))
+	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
@@ -48,6 +199,147 @@ func TestClaudePermissionModeUsesDefaultModeWhenPlanningSessionIsAttached(t *tes
 		"SUPERPLANE_BASE_URL":  "http://localhost:8000",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{}))
+}
+
+func TestClaudeContinuationUsesExactSession(t *testing.T) {
+	assert.Empty(t, claudeContinuationArgsFromScript(t, 0, ""))
+	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 1, "session-123"))
+	assert.Equal(t, []string{"--resume", "session-123"}, claudeContinuationArgsFromScript(t, 4, "session-123"))
+}
+
+func TestClaudePlanningFollowUpDoesNotResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(4, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis",SUPERPLANE_ANALYSIS_REWIND:"yes"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Empty(t, args)
+}
+
+func TestClaudePlanningPromptStepsStillResume(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(2, "session-123", {SUPERPLANE_PLANNING_SESSION_KIND:"work_order_analysis"})));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	assert.Equal(t, []string{"--resume", "session-123"}, args)
+}
+
+func TestClaudeContinuationRejectsMissingSession(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `require(process.argv[1]).claudeContinuationArgs(1, "")`, script)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "Claude session ID is missing")
+}
+
+func TestClaudeSessionIDFromInitEvent(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeSessionIDFromEvent } = require(process.argv[1]); process.stdout.write(claudeSessionIDFromEvent({type:"system", subtype:"init", session_id:"session-123"}));`,
+		script,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "session-123", string(out))
+}
+
+func TestClaudeAnalysisRunRecordsTheAgentMessage(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	recorded := filepath.Join(taskDir, "recorded-agent-message")
+	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "planning_session_mcp.js"),
+		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
+		0o600,
+	))
+	fakeClaude := filepath.Join(taskDir, "claude")
+	require.NoError(t, os.WriteFile(
+		fakeClaude,
+		[]byte("#!/bin/sh\nprintf '%s\\n' '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"The plan is ready.\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}'\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(os.Environ(),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+		"RECORDED_AGENT_MESSAGE="+recorded,
+	)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	message, err := os.ReadFile(recorded)
+	require.NoError(t, err)
+	assert.Equal(t, "The plan is ready.", string(message))
+	_, err = os.Stat(result)
+	require.NoError(t, err)
+}
+
+func TestClaudeAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	recorded := filepath.Join(taskDir, "recorded-agent-message")
+	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "planning_session_mcp.js"),
+		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
+		0o600,
+	))
+	fakeClaude := filepath.Join(taskDir, "claude")
+	require.NoError(t, os.WriteFile(
+		fakeClaude,
+		[]byte("#!/bin/sh\nprintf '%s\\n' '{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"result\":\"I found useful context before the tool failed.\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}'\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(os.Environ(),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+		"RECORDED_AGENT_MESSAGE="+recorded,
+	)
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, string(output))
+
+	message, err := os.ReadFile(recorded)
+	require.NoError(t, err)
+	assert.Equal(t, "I found useful context before the tool failed.", string(message))
+	_, err = os.Stat(result)
+	require.NoError(t, err)
 }
 
 func TestFormatStreamJsonLinesEmitsToolRecords(t *testing.T) {
@@ -91,6 +383,69 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 	assert.Regexp(t, `(?s)"kind":"bash".*boom.*"type":"tool_end".*"kind":"read".*package a`, output)
 	assert.Equal(t, float64(1), records[0]["turn"])
 	assert.Equal(t, float64(1), records[1]["turn"])
+}
+
+func TestFormatStreamJsonLinesEmitsThinkingAndStartsToolsBeforeResults(t *testing.T) {
+	output := runClaudeFormatterWithActivity(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"message-1"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Inspect the repository."}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool-a","name":"Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"printf ok\"}"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":1}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool-a","content":"ok"}]}}`,
+	})
+
+	records := activityRecords(t, output)
+	require.NotEmpty(t, records)
+	assert.Equal(t, "activity_start", records[0]["type"])
+	assert.Equal(t, "reasoning", records[1]["channel"])
+	toolStart := typedActivityRecord(t, records, "activity_tool_start")
+	assert.Equal(t, "tool-a", toolStart["id"])
+	var input map[string]any
+	for _, record := range records {
+		if record["type"] == "tool_input_delta" && record["complete"] == true {
+			input = record
+			break
+		}
+	}
+	require.NotNil(t, input)
+	assert.Equal(t, "printf ok", input["input"])
+	assert.NotContains(t, input, "partial_json")
+	inputRecords := []map[string]any{}
+	for _, record := range records {
+		if record["type"] == "tool_input_delta" {
+			inputRecords = append(inputRecords, record)
+		}
+	}
+	assert.Len(t, inputRecords, 1)
+	toolEnd := typedActivityRecord(t, records, "activity_tool_end")
+	assert.Equal(t, "passed", toolEnd["status"])
+}
+
+func TestFormatStreamJsonLinesPreservesBufferedToolInputWhenStreamEnds(t *testing.T) {
+	output := runClaudeFormatterWithActivity(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"message-1"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-a","name":"Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"git status\"}"}}}`,
+	})
+
+	input := typedActivityRecord(t, activityRecords(t, output), "tool_input_delta")
+	assert.Equal(t, "git status", input["input"])
+	assert.Equal(t, true, input["complete"])
+}
+
+func TestFormatStreamJsonLinesReportsMalformedPartialToolInput(t *testing.T) {
+	output := runClaudeFormatterWithActivity(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"message-1"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-a","name":"Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{broken"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`,
+	})
+
+	notice := typedActivityRecord(t, activityRecords(t, output), "activity_notice")
+	assert.Equal(t, "malformed_tool_input", notice["code"])
 }
 
 func TestFormatStreamJsonLinesEmitsTurnUsageAndStampsTools(t *testing.T) {
@@ -249,6 +604,41 @@ func claudePermissionModeFromScript(t *testing.T, env map[string]string) string 
 	return string(out)
 }
 
+func claudeContinuationArgsFromScript(t *testing.T, promptCount int, sessionID string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeContinuationArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeContinuationArgs(Number(process.argv[2]), process.argv[3])));`,
+		script,
+		fmt.Sprint(promptCount),
+		sessionID,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
+func planningSystemPromptFromScript(t *testing.T, env map[string]string) string {
+	return planningSystemPromptFromScriptWithPrompt(t, env, "")
+}
+
+func planningSystemPromptFromScriptWithPrompt(t *testing.T, env map[string]string, prompt string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { planningSystemPrompt } = require(process.argv[1]); process.stdout.write(planningSystemPrompt(JSON.parse(process.argv[2]), process.argv[3]));`, script, string(payload), prompt)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
 func allowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
@@ -271,6 +661,45 @@ func runClaudeFormatter(t *testing.T, lines []string) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+func runClaudeFormatterWithActivity(t *testing.T, lines []string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatStreamJsonLines } = require(process.argv[1]); formatStreamJsonLines(JSON.parse(process.argv[2]));`, script, string(payload))
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func activityRecords(t *testing.T, output string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["schema_version"] == float64(2) {
+			records = append(records, record)
+		}
+	}
+	return records
+}
+
+func typedActivityRecord(t *testing.T, records []map[string]any, recordType string) map[string]any {
+	t.Helper()
+	for _, record := range records {
+		if record["type"] == recordType {
+			return record
+		}
+	}
+	require.FailNow(t, "activity record not found", recordType)
+	return nil
 }
 
 // formatStreamJSONLinesFailed runs the formatter and reports the "failed"

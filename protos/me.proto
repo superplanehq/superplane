@@ -152,6 +152,11 @@ message MeResponse {
   User user = 1;
 }
 
+message BrowserNotificationPreferences {
+  bool enabled = 1;
+  bool show_while_viewing = 2;
+}
+
 message User {
   string id = 1;
   string name = 2;
@@ -163,6 +168,7 @@ message User {
   repeated string roles = 8;
   repeated string groups = 9;
   bool is_owner = 10;
+  BrowserNotificationPreferences browser_notification_preferences = 11;
 }
 
 message RegenerateTokenResponse {
@@ -198,18 +204,15 @@ message RevokeTokenRequest {
 message RevokeTokenResponse {}
 
 // NotificationSettings is a user's organization-wide configuration for
-// work order notification emails. A missing row defaults to all
-// workspace events. Nested `workspaces` leaves room for other levels later.
+// work order notifications. A missing row defaults to email for all
+// workspace events and keeps the browser channel off.
 message NotificationSettings {
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    TYPE_WORK_ORDER_ASSIGNED = 1;
-    TYPE_WORK_ORDER_COMMENT_OWNED = 2;
-    TYPE_WORK_ORDER_COMMENT_CREATED = 3;
-    TYPE_WORK_ORDER_STATUS_OWNED = 4;
-    TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
-    TYPE_WORK_ORDER_MENTIONED = 6;
-    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 7;
+    TYPE_WORK_ORDER_STATUS_OWNED = 1;
+    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 2;
+    TYPE_WORK_ORDER_AGENT_QUESTION = 3;
+    TYPE_WORK_ORDER_PLAN_READY = 4;
   }
 
   enum WorkspaceScope {
@@ -228,11 +231,20 @@ message NotificationSettings {
   message Workspaces {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
-    // event_types applies when scope is ALL. An empty list means every type.
+    // event_types applies when scope is ALL. An empty list means no types.
     repeated Type event_types = 3;
   }
 
+  message Browser {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means no types.
+    repeated Type event_types = 3;
+    bool show_while_viewing = 4;
+  }
+
   Workspaces workspaces = 1;
+  Browser browser = 2;
 }
 
 message DescribeNotificationSettingsRequest {}

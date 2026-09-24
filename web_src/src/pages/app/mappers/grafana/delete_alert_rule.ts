@@ -10,7 +10,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { buildGrafanaEventSections } from "./base";
 import { buildAlertRuleMetadata } from "./alert_rule_shared";
 import type { DeleteAlertRuleOutput } from "./types";

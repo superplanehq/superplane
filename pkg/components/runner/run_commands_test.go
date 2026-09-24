@@ -613,6 +613,24 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 	}
 	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	require.Equal(t, FailedOutputChannel, state.Channel)
+	assert.False(t, state.Cancelled)
+}
+
+func TestRunnerProcessTaskStatusCanceledAnalysisCancelsExecution(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	markAnalysisSession(state)
+	exit := 130
+	task := &Task{
+		Status:   "canceled",
+		ExitCode: &exit,
+	}
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
+	assert.True(t, state.Cancelled)
+	assert.True(t, state.Finished)
+	assert.False(t, state.Passed)
+	assert.Empty(t, state.Channel)
 }
 
 func TestBrokerCancelTaskSuccess(t *testing.T) {

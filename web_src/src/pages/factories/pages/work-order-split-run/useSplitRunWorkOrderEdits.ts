@@ -7,6 +7,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SplitRunFooterKind } from "./splitRunFooter";
 
+function splitRunOwnerFields(owner: OrgUserDisplay) {
+  return {
+    ownerId: owner.id,
+    ownerName: owner.name,
+    ownerInitials: owner.initials,
+    ownerAvatarUrl: owner.avatarUrl,
+  };
+}
+
 export function canEditSplitRunContent(kind: SplitRunFooterKind, canUpdate = true): boolean {
   return canUpdate && kind !== "done";
 }
@@ -15,23 +24,13 @@ export function canEditSplitRunDescription(kind: SplitRunFooterKind, canUpdate =
   return canUpdate && kind === "draft";
 }
 
-export function useSplitRunWorkOrderEdits(args: {
-  organizationId?: string;
-  factoryId?: string;
+function useSplitRunFieldState(args: {
   orderId?: string;
-  canUpdate?: boolean;
   title: string;
   description: string;
   owner: OrgUserDisplay;
   assigneeIds: string[];
-  footerKind: SplitRunFooterKind;
 }) {
-  const live = Boolean(args.organizationId && args.factoryId && args.orderId);
-  const canEdit = canEditSplitRunContent(args.footerKind, args.canUpdate);
-  const canEditDescription = canEditSplitRunDescription(args.footerKind, args.canUpdate);
-  const updateWorkOrder = useUpdateWorkOrder(args.organizationId ?? "", args.factoryId ?? "");
-  const updateAssignees = useUpdateWorkOrderAssignees(args.organizationId ?? "", args.factoryId ?? "");
-
   const [title, setTitle] = useState(args.title);
   const [description, setDescription] = useState(args.description);
   const [owner, setOwner] = useState(args.owner);
@@ -56,10 +55,7 @@ export function useSplitRunWorkOrderEdits(args: {
     setDescription(args.description);
   }, [args.description]);
 
-  const ownerId = args.owner.id;
-  const ownerName = args.owner.name;
-  const ownerInitials = args.owner.initials;
-  const ownerAvatarUrl = args.owner.avatarUrl;
+  const { ownerId, ownerName, ownerInitials, ownerAvatarUrl } = splitRunOwnerFields(args.owner);
   const assigneeKey = args.assigneeIds.join("\0");
 
   useEffect(() => {
@@ -74,6 +70,47 @@ export function useSplitRunWorkOrderEdits(args: {
   useEffect(() => {
     setAssigneeIds(assigneeKey === "" ? [] : assigneeKey.split("\0"));
   }, [assigneeKey]);
+
+  return {
+    title,
+    setTitle,
+    description,
+    setDescription,
+    owner,
+    setOwner,
+    assigneeIds,
+    setAssigneeIds,
+    descriptionSaved,
+  };
+}
+
+export function useSplitRunWorkOrderEdits(args: {
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  canUpdate?: boolean;
+  title: string;
+  description: string;
+  owner: OrgUserDisplay;
+  assigneeIds: string[];
+  footerKind: SplitRunFooterKind;
+}) {
+  const live = Boolean(args.organizationId && args.factoryId && args.orderId);
+  const canEdit = canEditSplitRunContent(args.footerKind, args.canUpdate);
+  const canEditDescription = canEditSplitRunDescription(args.footerKind, args.canUpdate);
+  const updateWorkOrder = useUpdateWorkOrder(args.organizationId ?? "", args.factoryId ?? "");
+  const updateAssignees = useUpdateWorkOrderAssignees(args.organizationId ?? "", args.factoryId ?? "");
+  const {
+    title,
+    setTitle,
+    description,
+    setDescription,
+    owner,
+    setOwner,
+    assigneeIds,
+    setAssigneeIds,
+    descriptionSaved,
+  } = useSplitRunFieldState(args);
 
   const saveTitle = useCallback(
     async (next: string) => {
@@ -90,7 +127,7 @@ export function useSplitRunWorkOrderEdits(args: {
         showErrorToast(getApiErrorMessage(error, "Failed to update the title"));
       }
     },
-    [args.orderId, live, title, updateWorkOrder],
+    [args.orderId, live, setTitle, title, updateWorkOrder],
   );
 
   const saveDescription = useCallback(
@@ -111,7 +148,7 @@ export function useSplitRunWorkOrderEdits(args: {
         throw error;
       }
     },
-    [args.orderId, description, live, updateWorkOrder],
+    [args.orderId, description, descriptionSaved, live, setDescription, updateWorkOrder],
   );
 
   const saveOwner = useCallback(
@@ -143,7 +180,7 @@ export function useSplitRunWorkOrderEdits(args: {
         throw error;
       }
     },
-    [args.orderId, assigneeIds, live, owner, updateAssignees],
+    [args.orderId, assigneeIds, live, owner, setAssigneeIds, setOwner, updateAssignees],
   );
 
   return {

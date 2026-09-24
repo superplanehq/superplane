@@ -13,19 +13,34 @@ import {
 } from "@/ui/dropdownMenu";
 import { Check, Funnel } from "lucide-react";
 import type { WorkOrderFilterDimension, WorkOrderListState } from "../../lib/useWorkOrderListState";
-import { buildStatusFilterOptions, type WorkOrderFilterOption } from "../../lib/workOrderFilterOptions";
+import {
+  buildLabelFilterOptions,
+  buildStatusFilterOptions,
+  type WorkOrderFilterOption,
+} from "../../lib/workOrderFilterOptions";
+import { countWorkOrderFilters, visibleWorkOrderFilters } from "../../lib/workOrderListModel";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
   state: WorkOrderListState;
   /** Omit on a line board: the page is already scoped to one line. */
   lineOptions?: WorkOrderFilterOption[];
+  sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
+  /** When false, hide Mergeable so the menu matches the card pill. */
+  showPullRequestMerge?: boolean;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
-export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuProps) {
-  const filterCount = lineOptions ? state.filterCount : state.filterCount - state.filters.lineIds.length;
+export function FilterMenu({
+  state,
+  lineOptions,
+  sourceOptions,
+  assigneeOptions,
+  showPullRequestMerge = false,
+}: FilterMenuProps) {
+  const visibleFilters = visibleWorkOrderFilters(state.filters, showPullRequestMerge);
+  const filterCount = countWorkOrderFilters(visibleFilters) - (lineOptions ? 0 : visibleFilters.lineIds.length);
   return (
     <DropdownMenu open={state.filterMenuOpen} onOpenChange={state.setFilterMenuOpen}>
       <DropdownMenuTrigger asChild>
@@ -56,6 +71,14 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
           options={buildStatusFilterOptions()}
         />
 
+        <FilterSubMenu
+          label="Label"
+          resetLabel="Any label"
+          dimension="labels"
+          state={state}
+          options={buildLabelFilterOptions(showPullRequestMerge)}
+        />
+
         {lineOptions ? (
           <FilterSubMenu
             label="Line"
@@ -66,6 +89,14 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
             emptyLabel="No lines yet"
           />
         ) : null}
+
+        <FilterSubMenu
+          label="Source"
+          resetLabel="Any source"
+          dimension="sourceIds"
+          state={state}
+          options={sourceOptions}
+        />
 
         <FilterSubMenu
           label="Owner"
@@ -116,6 +147,7 @@ function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabe
             <DropdownMenuItem
               key={option.value}
               className={MENU_ITEM_CLASSNAME}
+              data-testid={`work-orders-filter-${dimension}-${option.value}`}
               onSelect={(event) => {
                 event.preventDefault();
                 state.toggleFilter(dimension, option.value);

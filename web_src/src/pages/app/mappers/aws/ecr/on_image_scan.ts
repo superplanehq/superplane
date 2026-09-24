@@ -7,7 +7,7 @@ import type { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } f
 import { buildRepositoryMetadataItems, formatTagLabel, formatTags, getRepositoryLabel } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { EcrImageScanDetail } from "./types";
-import { numberOrZero, stringOrDash } from "../../utils";
+import { numberOrZero, stringOrDash } from "../../eventDisplay";
 
 /**
  * Renderer for the "aws.ecr.onImageScan" trigger

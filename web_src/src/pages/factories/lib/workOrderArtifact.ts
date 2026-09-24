@@ -74,6 +74,14 @@ export function extractArtifactName(data: ArtifactData): string | undefined {
   return extractArtifactField(data, "name");
 }
 
+export function extractArtifactFilename(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "filename");
+}
+
+export function extractArtifactContentType(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "contentType");
+}
+
 /**
  * Returns the PR's lifecycle state as SuperPlane sees it, using both
  * the canonical `state` field and GitHub-native `merged` / `draft`

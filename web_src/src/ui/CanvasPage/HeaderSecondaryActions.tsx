@@ -18,7 +18,6 @@ export function SecondaryHeaderActions({
   draftVisualDiff,
   draftConsoleDiff,
   onToggleVisualDiff,
-  filesHeaderActionsSlotId,
   hasStagingChanges,
   stagingStale,
   onCommitStaging,
@@ -33,8 +32,6 @@ export function SecondaryHeaderActions({
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
-      <FilesHeaderActionsSlot isEditing={isEditing} mode={mode} slotId={filesHeaderActionsSlotId} />
-
       {isEditing ? (
         <>
           {onCanvasTab &&
@@ -90,22 +87,6 @@ function ConsoleDiffSummaryHoverCard({
       onShowDiff={onShowConsoleDiff}
     />
   );
-}
-
-function FilesHeaderActionsSlot({
-  isEditing,
-  mode,
-  slotId,
-}: {
-  isEditing: boolean;
-  mode: HeaderProps["mode"];
-  slotId?: string;
-}) {
-  if (!isEditing || mode !== "files" || !slotId) {
-    return null;
-  }
-
-  return <div id={slotId} className="flex shrink-0 items-center gap-2" />;
 }
 
 function EditModeStagingActions({

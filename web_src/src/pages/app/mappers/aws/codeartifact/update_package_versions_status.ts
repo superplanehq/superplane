@@ -14,7 +14,7 @@ import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 
 interface UpdatePackageVersionsStatusConfiguration {
   domain?: string;

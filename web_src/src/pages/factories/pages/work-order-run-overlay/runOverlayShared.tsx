@@ -75,6 +75,7 @@ export function RunOverlayFrame({
   canvas = false,
   fixed = false,
   fullPage = false,
+  className,
   onDismiss,
 }: {
   children: ReactNode;
@@ -85,6 +86,7 @@ export function RunOverlayFrame({
   fixed?: boolean;
   /** Fill the main pane. The factory sidebar stays visible. */
   fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
   useDismissOnEscape(onDismiss);
@@ -92,7 +94,7 @@ export function RunOverlayFrame({
   return (
     <div className={overlayLayerClassName(fixed, fullPage)} onClick={onDismiss}>
       <div
-        className={overlayDialogClassName(wide, canvas, fullPage)}
+        className={cn(overlayDialogClassName(wide, canvas, fullPage), className)}
         data-testid={testId}
         role="dialog"
         aria-modal="true"

@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+
 import { PhaseLogCard } from "./PhaseLogCard";
 import { idleLiveLogStream, line, PHASE } from "./PhaseLogCard.testHelpers";
 import type { SplitRunStreamLine } from "./splitRunMocks";
@@ -92,5 +94,26 @@ describe("PhaseLogCard node line", () => {
     expect(toggle.className).toMatch(/gap-1\.5/);
     expect(toggle.firstElementChild?.className).toMatch(/size-3/);
     expect(screen.queryByTestId("split-run-node-indent")).not.toBeInTheDocument();
+  });
+
+  it("inverts a Sentry stream-line logo in dark mode", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        stream={[
+          line({
+            id: "on-issue",
+            componentName: "On Issue",
+            iconSrc: sentryIcon,
+          }),
+        ]}
+      />,
+    );
+
+    const icon = screen.getByTestId("split-run-stream-line-on-issue").querySelector("img");
+    expect(icon).toHaveAttribute("src", sentryIcon);
+    expect(icon?.className).toContain("dark:brightness-0");
+    expect(icon?.className).toContain("dark:invert");
   });
 });

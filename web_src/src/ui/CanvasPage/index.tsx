@@ -139,10 +139,7 @@ export interface SidebarData {
   isComposite?: boolean;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type --
-   Having a specific type allows us to extend it with additional properties without breaking consumers.
- */
-export interface CanvasNode extends ReactFlowNode {}
+export type CanvasNode = ReactFlowNode;
 
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
@@ -239,7 +236,7 @@ export interface CanvasPageProps {
   /** Discard stale staging after main moved forward. */
   onDiscardStaleStaging?: () => void;
   discardStaleStagingPending?: boolean;
-  headerMode?: "default" | "version-live" | "console" | "memory" | "files";
+  headerMode?: "default" | "version-live" | "console" | "memory";
   onEnterEditMode?: () => void | Promise<void>;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -252,24 +249,18 @@ export interface CanvasPageProps {
   onSelectConsole?: () => void;
   /** Switches the canvas surface to the Memory tab. Omitted on templates. */
   onSelectMemory?: () => void;
-  /** Switches the canvas surface to the Files tab. Omitted on templates. */
-  onSelectFiles?: () => void;
+  /** Opens the read-only canvas and console YAML modal. */
+  onOpenSpecYaml?: () => void;
   /** Opens the console YAML modal when `headerMode` is `console`. */
   onConsoleOpenYaml?: () => void;
-  /** DOM slot for Files mode actions owned by the files editor overlay. */
-  filesHeaderActionsSlotId?: string;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
-  /** True when a non-spec repository file is staged; shows a dot on the Files tab. */
-  hasFilesStagingChanges?: boolean;
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
-  hasUncommittedFilesDraftChanges?: boolean;
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
-  hasCommittedFilesDraftChanges?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -1446,10 +1437,7 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        (props.headerMode === "version-live" ||
-          props.headerMode === "console" ||
-          props.headerMode === "memory" ||
-          props.headerMode === "files") &&
+        (props.headerMode === "version-live" || props.headerMode === "console" || props.headerMode === "memory") &&
           "sp-canvas-live",
         props.isRunInspectionMode && "sp-canvas-live",
         props.isEditing && "sp-canvas-editing",
@@ -1495,19 +1483,14 @@ function CanvasPage(props: CanvasPageProps) {
             exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
             onSelectConsole={props.onSelectConsole}
             onSelectMemory={props.onSelectMemory}
-            onSelectFiles={props.onSelectFiles}
-            filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
             publishVersionLabel={props.publishVersionLabel}
             hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
             hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
             hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
-            hasFilesStagingChanges={props.hasFilesStagingChanges}
             hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
             hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
-            hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
             hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
             hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
-            hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
             activeDraftBranchLabel={props.activeDraftBranchLabel}
             activeDraftBranchShortSha={props.activeDraftBranchShortSha}
             showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1542,6 +1525,7 @@ function CanvasPage(props: CanvasPageProps) {
               canvasEditControls
               onSidebarOpen={handleBuildingBlocksShortcutOpen}
               onAddNote={handleAddNote}
+              onOpenSpecYaml={props.onOpenSpecYaml}
             />
           )
         ) : (
@@ -1602,76 +1586,68 @@ function CanvasPage(props: CanvasPageProps) {
                 <RunErrorsCard errors={runErrors} className="mx-auto max-w-2xl shadow-sm" />
               </div>
             ) : null}
-            {props.headerMode === "files" ? (
-              <div
-                className="absolute inset-0 bg-slate-50 dark:bg-gray-900"
-                data-testid="canvas-files-backdrop"
-                aria-hidden
+            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+              <CanvasContent
+                state={state}
+                factoryId={props.factoryId}
+                factoryEmbed={props.factoryEmbed}
+                lockNativeZoom={props.lockNativeZoom}
+                factoryDisplayLayout={props.factoryDisplayLayout}
+                factoryConfigure={props.factoryConfigure}
+                factoryConfigureLayoutReady={props.factoryConfigureLayoutReady}
+                factoryEditWorkspace={props.factoryEditWorkspace}
+                layoutMode={props.layoutMode}
+                onNodeDelete={handleNodeDelete}
+                onNodesDelete={handleNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
+                onEdgeCreate={props.onEdgeCreate}
+                onToggleView={handleToggleView}
+                onShowNodeDiff={props.onShowNodeDiff}
+                onDuplicate={props.onDuplicate}
+                onAnnotationUpdate={props.onAnnotationUpdate}
+                onAnnotationBlur={props.onAnnotationBlur}
+                onBuildingBlockDrop={handleBuildingBlockDrop}
+                onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                onNodeClick={props.onNodeClick}
+                onZoomChange={setCanvasZoom}
+                hasFitToViewRef={hasFitToViewRef}
+                viewportRefProp={props.viewportRef}
+                fitViewContentKey={props.fitViewContentKey}
+                lastFittedContentKeyRef={props.lastFittedContentKeyRef}
+                workflowNodes={props.workflowNodes}
+                setCurrentTab={setCurrentTab}
+                showBottomStatusControls={props.showBottomStatusControls}
+                isRunInspectionMode={props.isRunInspectionMode}
+                runNodeDetailRun={props.runNodeDetailRun}
+                isEditing={props.isEditing}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                isAutoFocusEnabled={props.isAutoFocusEnabled}
+                onToggleAutoFocus={props.onToggleAutoFocus}
+                readOnly={props.readOnly}
+                logEntries={props.logEntries}
+                focusRequest={props.focusRequest}
+                initialFocusNodeId={props.initialFocusNodeId}
+                fitAllRequest={props.fitAllRequest}
+                fitAllFocusNodeIds={props.fitAllFocusNodeIds}
+                runParticipantNodeIds={props.runParticipantNodeIds}
+                runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
+                logRuns={props.logRuns}
+                runsNodes={props.runsNodes}
+                runsComponentIconMap={props.runsComponentIconMap}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
+                missingIntegrations={props.missingIntegrations}
+                onConnectIntegration={props.onConnectIntegration}
+                canCreateIntegrations={props.canCreateIntegrations}
               />
-            ) : (
-              <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-                <CanvasContent
-                  state={state}
-                  factoryId={props.factoryId}
-                  factoryEmbed={props.factoryEmbed}
-                  lockNativeZoom={props.lockNativeZoom}
-                  factoryDisplayLayout={props.factoryDisplayLayout}
-                  factoryConfigure={props.factoryConfigure}
-                  factoryConfigureLayoutReady={props.factoryConfigureLayoutReady}
-                  factoryEditWorkspace={props.factoryEditWorkspace}
-                  layoutMode={props.layoutMode}
-                  onNodeDelete={handleNodeDelete}
-                  onNodesDelete={handleNodesDelete}
-                  onDuplicateNodes={props.onDuplicateNodes}
-                  onAutoLayoutNodes={props.onAutoLayoutNodes}
-                  onEdgeCreate={props.onEdgeCreate}
-                  onToggleView={handleToggleView}
-                  onShowNodeDiff={props.onShowNodeDiff}
-                  onDuplicate={props.onDuplicate}
-                  onAnnotationUpdate={props.onAnnotationUpdate}
-                  onAnnotationBlur={props.onAnnotationBlur}
-                  onBuildingBlockDrop={handleBuildingBlockDrop}
-                  onBuildingBlocksSidebarToggle={handleSidebarToggle}
-                  onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-                  onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-                  onNodeClick={props.onNodeClick}
-                  onZoomChange={setCanvasZoom}
-                  hasFitToViewRef={hasFitToViewRef}
-                  viewportRefProp={props.viewportRef}
-                  fitViewContentKey={props.fitViewContentKey}
-                  lastFittedContentKeyRef={props.lastFittedContentKeyRef}
-                  workflowNodes={props.workflowNodes}
-                  setCurrentTab={setCurrentTab}
-                  showBottomStatusControls={props.showBottomStatusControls}
-                  isRunInspectionMode={props.isRunInspectionMode}
-                  runNodeDetailRun={props.runNodeDetailRun}
-                  isEditing={props.isEditing}
-                  isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-                  onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-                  autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-                  autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-                  isAutoFocusEnabled={props.isAutoFocusEnabled}
-                  onToggleAutoFocus={props.onToggleAutoFocus}
-                  readOnly={props.readOnly}
-                  logEntries={props.logEntries}
-                  focusRequest={props.focusRequest}
-                  initialFocusNodeId={props.initialFocusNodeId}
-                  fitAllRequest={props.fitAllRequest}
-                  fitAllFocusNodeIds={props.fitAllFocusNodeIds}
-                  runParticipantNodeIds={props.runParticipantNodeIds}
-                  runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
-                  logRuns={props.logRuns}
-                  runsNodes={props.runsNodes}
-                  runsComponentIconMap={props.runsComponentIconMap}
-                  onRunNodeSelect={props.onRunNodeSelect}
-                  onRunExecutionSelect={props.onRunExecutionSelect}
-                  onAcknowledgeErrors={props.onAcknowledgeErrors}
-                  missingIntegrations={props.missingIntegrations}
-                  onConnectIntegration={props.onConnectIntegration}
-                  canCreateIntegrations={props.canCreateIntegrations}
-                />
-              </ReactFlowProvider>
-            )}
+            </ReactFlowProvider>
             {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
               ? renderInspectorSidebar("sidebar")
               : null}
@@ -2043,19 +2019,14 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip,
   onSelectConsole,
   onSelectMemory,
-  onSelectFiles,
-  filesHeaderActionsSlotId,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
   hasUnpublishedConsoleDraftChanges,
-  hasFilesStagingChanges,
   hasUncommittedCanvasDraftChanges,
   hasUncommittedConsoleDraftChanges,
-  hasUncommittedFilesDraftChanges,
   hasCommittedCanvasDraftChanges,
   hasCommittedConsoleDraftChanges,
-  hasCommittedFilesDraftChanges,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
@@ -2111,19 +2082,14 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
   onSelectMemory?: () => void;
-  onSelectFiles?: () => void;
-  filesHeaderActionsSlotId?: string;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
-  hasFilesStagingChanges?: boolean;
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
-  hasUncommittedFilesDraftChanges?: boolean;
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
-  hasCommittedFilesDraftChanges?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
@@ -2170,19 +2136,14 @@ function CanvasContentHeader({
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectConsole={onSelectConsole}
       onSelectMemory={onSelectMemory}
-      onSelectFiles={onSelectFiles}
-      filesHeaderActionsSlotId={filesHeaderActionsSlotId}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
-      hasFilesStagingChanges={hasFilesStagingChanges}
       hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
       hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
-      hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
       hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
       hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
-      hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}

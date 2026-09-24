@@ -57,11 +57,13 @@ func (w *NodeWebhookContext) GetBaseURL() string {
 }
 
 type WebhookContext struct {
-	ID            string
-	URL           string
-	Secret        []byte
-	Metadata      any
-	Configuration any
+	ID                string
+	URL               string
+	Secret            []byte
+	Metadata          any
+	Configuration     any
+	ActiveCallbacks   map[string]bool
+	CallbackLookupErr error
 }
 
 func (w *WebhookContext) GetID() string              { return w.ID }
@@ -72,6 +74,16 @@ func (w *WebhookContext) GetConfiguration() any      { return w.Configuration }
 func (w *WebhookContext) SetSecret(secret []byte) error {
 	w.Secret = secret
 	return nil
+}
+
+func (w *WebhookContext) CallbackHasActiveNodes(webhookID string) (bool, error) {
+	if w.CallbackLookupErr != nil {
+		return false, w.CallbackLookupErr
+	}
+	if w.ActiveCallbacks == nil {
+		return false, nil
+	}
+	return w.ActiveCallbacks[webhookID], nil
 }
 
 type MetadataContext struct {
@@ -259,6 +271,7 @@ type ExecutionStateContext struct {
 	Finished       bool
 	Cancelling     bool
 	Passed         bool
+	Cancelled      bool
 	FailureReason  string
 	FailureMessage string
 	Channel        string
@@ -323,6 +336,13 @@ func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.Passed = false
 	c.FailureReason = reason
 	c.FailureMessage = message
+	return nil
+}
+
+func (c *ExecutionStateContext) Cancel() error {
+	c.Finished = true
+	c.Passed = false
+	c.Cancelled = true
 	return nil
 }
 

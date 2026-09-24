@@ -16,7 +16,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { Tag } from "./types";
-import { formatBytes, stringOrDash } from "../utils";
+import { formatBytes, stringOrDash } from "../eventDisplay";
 
 interface GetImageTagConfiguration {
   repository?: string;
@@ -92,7 +92,7 @@ function getImageTagMetadataList(node: NodeInfo): MetadataItem[] {
 
 function getImageTagEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

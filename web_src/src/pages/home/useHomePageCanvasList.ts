@@ -1,6 +1,6 @@
-import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
-import { normalizeCanvasFolderColor, useCanvasFolders, useCanvases } from "@/hooks/useCanvasData";
-import type { CanvasCardData, CanvasFolderData } from "./types";
+import type { CanvasesCanvasSummary } from "@/api-client";
+import { useCanvases } from "@/hooks/useCanvasData";
+import type { CanvasCardData } from "./types";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
 
@@ -21,27 +21,11 @@ function toCanvasCardData(canvas: CanvasesCanvasSummary): CanvasCardData | null 
     name,
     description: canvas.description,
     createdAt: formatCanvasDate(canvas.createdAt),
-    canvasFolderId: canvas.folderId || undefined,
     isStarred: canvas.starred ?? false,
     starredAt: canvas.starredAt,
     createdBy: { name: createdByName },
     nodes: canvas.nodes || [],
     edges: canvas.edges || [],
-  };
-}
-
-function toCanvasFolderData(folder: CanvasFoldersCanvasFolder): CanvasFolderData | null {
-  const id = folder.metadata?.id || "";
-  const title = folder.spec?.title || "";
-  if (!id || !title) {
-    return null;
-  }
-
-  return {
-    id,
-    title,
-    backgroundColor: normalizeCanvasFolderColor(folder.spec?.backgroundColor),
-    canvasIds: folder.spec?.canvases?.map((canvas) => canvas.id || "").filter(Boolean) || [],
   };
 }
 
@@ -61,28 +45,17 @@ export function useHomePageCanvasList(organizationId: string | undefined, search
     isFetching: canvasesFetching,
     error: canvasesApiError,
   } = useCanvases(organizationId || "");
-  const {
-    data: canvasFoldersData = [],
-    isLoading: canvasFoldersLoading,
-    isFetching: canvasFoldersFetching,
-    error: canvasFoldersApiError,
-  } = useCanvasFolders(organizationId || "");
 
   const canvases = (canvasesData || [])
     .map(toCanvasCardData)
     .filter((canvas): canvas is CanvasCardData => canvas !== null)
     .sort(compareByName);
 
-  const canvasFolders = (canvasFoldersData || [])
-    .map(toCanvasFolderData)
-    .filter((folder): folder is CanvasFolderData => folder !== null);
-
   return {
     canvases,
-    canvasFolders,
     filteredCanvases: filterCanvasesByQuery(canvases, searchQuery),
-    isLoading: canvasesLoading || canvasFoldersLoading,
-    isFetching: canvasesFetching || canvasFoldersFetching,
-    canvasError: canvasesApiError || canvasFoldersApiError ? "Failed to fetch canvases. Please try again later." : null,
+    isLoading: canvasesLoading,
+    isFetching: canvasesFetching,
+    canvasError: canvasesApiError ? "Failed to fetch canvases. Please try again later." : null,
   };
 }

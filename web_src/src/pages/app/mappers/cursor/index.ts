@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { launchAgentMapper } from "./launch_agent";
 import { getDailyUsageDataMapper } from "./get_daily_usage_data";
 

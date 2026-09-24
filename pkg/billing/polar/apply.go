@@ -164,7 +164,11 @@ func shouldGrantPurchase(data OrderData) bool {
 }
 
 // purchasedFaceValueCents uses the price Polar charged, not the first catalog price.
+// Custom (pay-what-you-want) packs grant the paid net amount, excluding tax.
 func purchasedFaceValueCents(data OrderData) int64 {
+	if orderHasCustomPrice(data) {
+		return customPaidAmountCents(data)
+	}
 	if amount := fixedPriceAmount(data.ProductPrice); amount > 0 {
 		return amount
 	}
@@ -182,8 +186,35 @@ func purchasedFaceValueCents(data OrderData) int64 {
 	return data.Product.FaceValueCents()
 }
 
+func orderHasCustomPrice(data OrderData) bool {
+	if data.ProductPrice.isCustom() {
+		return true
+	}
+	for _, item := range data.Items {
+		if item.ProductPrice.isCustom() {
+			return true
+		}
+	}
+	return false
+}
+
+func customPaidAmountCents(data OrderData) int64 {
+	if data.NetAmount > 0 {
+		return data.NetAmount
+	}
+	for _, item := range data.Items {
+		if item.Amount > 0 {
+			return item.Amount
+		}
+	}
+	if data.ProductPrice.PriceAmount > 0 {
+		return data.ProductPrice.PriceAmount
+	}
+	return 0
+}
+
 func fixedPriceAmount(price priceJSON) int64 {
-	if price.AmountType != "" && price.AmountType != "fixed" {
+	if !price.isFixed() {
 		return 0
 	}
 	if price.PriceAmount > 0 {

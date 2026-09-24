@@ -187,6 +187,18 @@ describe("useAgentSessionWebsocket", () => {
     expect(onStatus).toHaveBeenNthCalledWith(3, "failed", "boom");
   });
 
+  it("reconciles state when the WebSocket connection opens", () => {
+    const onConnectionOpen = vi.fn();
+    render({ onConnectionOpen });
+    const [, options] = lastCall();
+
+    act(() => {
+      options.onOpen();
+    });
+
+    expect(onConnectionOpen).toHaveBeenCalledTimes(1);
+  });
+
   it("forwards a session_notice to onNotice without changing status", () => {
     const onNotice = vi.fn();
     const onStatus = vi.fn();

@@ -100,7 +100,7 @@ Unrestricted project keys work by default. If you use a restricted key, grant it
 
 - **Model capabilities** → **Request** — required for Text Prompt.
 - **Responses API** → **Write** — required for Text Prompt.
-- **Files** → **Write** — required when you attach files to Text Prompt.
+- **Files** → **Write** — required when Code Interpreter generates files that SuperPlane downloads.
 
 > **Note:** Both keys are shown only once — store them somewhere safe before continuing.`
 }

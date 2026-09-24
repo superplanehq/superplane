@@ -145,6 +145,34 @@ func TestCancelBrokerTaskRecordsUsageWhenBrokerAlreadyTerminal(t *testing.T) {
 	assert.Equal(t, int64(1280), recorder.records[0].TotalTokens)
 	require.Len(t, recorder.computes, 1)
 	assert.Equal(t, FailedOutputChannel, state.Channel)
+	assert.False(t, state.Cancelled)
+}
+
+func TestCancelBrokerTaskCancelsAnalysisWhenBrokerAlreadyTerminal(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	recorder := &recordingUsage{}
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "task-1"}}
+	markAnalysisSession(state)
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+		canceledBrokerTaskWithUsageResponse(),
+	}}
+
+	err := cancelBrokerTask(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: state,
+		Usage:          recorder,
+		Configuration:  hostedClaudeConfiguration(),
+		Logger:         log.NewEntry(log.New()),
+	}, "runnerClaudeCode.finished")
+	require.NoError(t, err)
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, int64(1280), recorder.records[0].TotalTokens)
+	require.Len(t, recorder.computes, 1)
+	assert.True(t, state.Cancelled)
+	assert.Empty(t, state.Channel)
 }
 
 func TestCancelBrokerTaskSchedulesPollWhenBrokerNotTerminal(t *testing.T) {

@@ -291,7 +291,7 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	a.handleSuccessfulAuth(w, r, gothUser, wasCreated)
+	a.handleSuccessfulAuth(w, r, account, wasCreated)
 }
 
 func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request, gothUser goth.User, err error) {
@@ -314,13 +314,7 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 	http.Error(w, "Internal server error", http.StatusInternalServerError)
 }
 
-func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, wasCreated bool) {
-	account, err := models.FindAccountByEmail(gothUser.Email)
-	if err != nil {
-		http.Error(w, "Account not found", http.StatusNotFound)
-		return
-	}
-
+func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
 	if account.IsBlocked() {
 		redirectAccountBlocked(w, r)
 		return
@@ -994,7 +988,7 @@ func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Ac
 }
 
 func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) (*models.Account, bool, error) {
-	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
+	account, err := models.FindAccountByProvider(database.Conn(), gothUser.Provider, gothUser.UserID)
 
 	if err == nil {
 		if account.IsBlocked() {
@@ -1004,7 +998,6 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 		if account.Email != utils.NormalizeEmail(gothUser.Email) {
 			log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
 			err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
-
 			if err != nil {
 				log.Errorf("Failed to update account email: %v", err)
 				return nil, false, fmt.Errorf("failed to update account email: %w", err)
@@ -1023,6 +1016,10 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 			return nil, false, models.ErrAccountBlocked
 		}
 		return account, false, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, err
 	}
 
 	if !allowSignup {
@@ -1235,6 +1232,10 @@ func getRedirectURL(r *http.Request) string {
 	}
 
 	if strings.HasPrefix(redirectParam, authLinkStatePrefix) {
+		return "/"
+	}
+
+	if strings.HasPrefix(redirectParam, authConnectStatePrefix) {
 		return "/"
 	}
 

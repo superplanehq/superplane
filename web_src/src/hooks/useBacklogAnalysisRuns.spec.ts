@@ -10,20 +10,29 @@ import {
   pendingBacklogAnalysisIds,
 } from "@/pages/factories/lib/backlogAnalysis";
 
-const { canvasesListRuns, factoriesListFactoryApps, factoriesListFactoryIntakes, factoriesListWorkOrders } = vi.hoisted(
-  () => ({
-    canvasesListRuns: vi.fn(),
-    factoriesListFactoryApps: vi.fn(),
-    factoriesListFactoryIntakes: vi.fn(),
-    factoriesListWorkOrders: vi.fn(),
-  }),
-);
+const {
+  canvasesListRuns,
+  factoriesListFactoryAutomations,
+  factoriesListFactoryIntakes,
+  factoriesListWorkOrders,
+  useCanvasWebsocket,
+} = vi.hoisted(() => ({
+  canvasesListRuns: vi.fn(),
+  factoriesListFactoryAutomations: vi.fn(),
+  factoriesListFactoryIntakes: vi.fn(),
+  factoriesListWorkOrders: vi.fn(),
+  useCanvasWebsocket: vi.fn(),
+}));
 
 vi.mock("@/api-client", () => ({
   canvasesListRuns,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   factoriesListFactoryIntakes,
   factoriesListWorkOrders,
+}));
+
+vi.mock("@/hooks/useCanvasWebsocket", () => ({
+  useCanvasWebsocket,
 }));
 
 import { useBacklogAnalysisRuns, useFactoryBacklogAnalysis } from "./useBacklogAnalysisRuns";
@@ -59,18 +68,13 @@ function clearPending(...ids: string[]) {
   }
 }
 
-/** `refetchInterval` is a client-only query option, not part of the cached `QueryOptions` type. */
-function readRefetchInterval(query: { options: unknown }): (query: unknown) => number | false {
-  return (query.options as { refetchInterval: (query: unknown) => number | false }).refetchInterval;
-}
-
 describe("useBacklogAnalysisRuns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     canvasesListRuns.mockResolvedValue({ data: { runs: [] } });
   });
 
-  it("polls while a pending id is set even with an empty run cache", async () => {
+  it("does not poll while a pending id is set", async () => {
     const queryClient = new QueryClient();
     markBacklogAnalysisPending("wo-1");
 
@@ -80,21 +84,22 @@ describe("useBacklogAnalysisRuns", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const getQuery = () =>
-      queryClient.getQueryCache().find({ queryKey: ["backlog-analysis-runs", "org-1", "canvas-1"] })!;
-    const refetchIntervalOf = (query: ReturnType<typeof getQuery>) => readRefetchInterval(query)(query);
-
-    expect(refetchIntervalOf(getQuery())).toBe(4000);
+    const query = queryClient.getQueryCache().find({
+      queryKey: ["backlog-analysis-runs", "org-1", "canvas-1"],
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
+    expect(canvasesListRuns).toHaveBeenCalledTimes(1);
 
     act(() => {
       clearBacklogAnalysisPending("wo-1");
     });
-
-    await waitFor(() => expect(refetchIntervalOf(getQuery())).toBe(false));
   });
 
-  it("stops polling once no run is active and no id is pending", async () => {
+  it("does not poll when a run is active", async () => {
     const queryClient = new QueryClient();
+    canvasesListRuns.mockResolvedValue({
+      data: { runs: [analysisRun({ id: "run-1", workOrderId: "wo-1", state: "STATE_STARTED" })] },
+    });
 
     const { result } = renderHook(() => useBacklogAnalysisRuns("org-1", "canvas-1"), {
       wrapper: createWrapper(queryClient),
@@ -102,16 +107,20 @@ describe("useBacklogAnalysisRuns", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const query = queryClient.getQueryCache().find({ queryKey: ["backlog-analysis-runs", "org-1", "canvas-1"] });
-    const refetchInterval = readRefetchInterval(query!);
-    expect(refetchInterval(query!)).toBe(false);
+    const query = queryClient.getQueryCache().find({
+      queryKey: ["backlog-analysis-runs", "org-1", "canvas-1"],
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
+    expect(canvasesListRuns).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("useFactoryBacklogAnalysis", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    factoriesListFactoryApps.mockResolvedValue({ data: { apps: [{ id: "app-analyzer", name: "Backlog" }] } });
+    factoriesListFactoryAutomations.mockResolvedValue({
+      data: { automations: [{ id: "app-analyzer", name: "Backlog" }] },
+    });
     factoriesListFactoryIntakes.mockResolvedValue({ data: { intakes: [] } });
     factoriesListWorkOrders.mockResolvedValue({ data: { orders: [] } });
     canvasesListRuns.mockResolvedValue({ data: { runs: [] } });
@@ -148,18 +157,33 @@ describe("useFactoryBacklogAnalysis", () => {
     clearPending("wo-1");
   });
 
-  it("keeps polling for a recent draft with no run yet", async () => {
+  it("subscribes to the analyzer canvas and applies run events", async () => {
     const queryClient = new QueryClient();
     factoriesListWorkOrders.mockResolvedValue({ data: { orders: [draftOrder("wo-api-1")] } });
 
-    renderHook(() => useFactoryBacklogAnalysis("org-1", "factory-1"), {
+    const { result } = renderHook(() => useFactoryBacklogAnalysis("org-1", "factory-1"), {
       wrapper: createWrapper(queryClient),
     });
 
     await waitFor(() => {
-      const query = queryClient.getQueryCache().find({ queryKey: ["backlog-analysis-runs", "org-1", "app-analyzer"] });
-      expect(query).toBeDefined();
-      expect(readRefetchInterval(query!)(query!)).toBe(4000);
+      expect(useCanvasWebsocket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          canvasId: "app-analyzer",
+          organizationId: "org-1",
+          processRuntimeEvents: false,
+          enabled: true,
+        }),
+      );
     });
+
+    const websocketOptions = useCanvasWebsocket.mock.calls.at(-1)?.[0] as {
+      onRunEvent: (run: CanvasesCanvasRun) => void;
+    };
+    act(() => {
+      websocketOptions.onRunEvent(analysisRun({ id: "run-live", workOrderId: "wo-api-1", state: "STATE_STARTED" }));
+    });
+
+    await waitFor(() => expect(result.current.runsByWorkOrder.get("wo-api-1")?.[0]?.run.id).toBe("run-live"));
+    expect(canvasesListRuns).toHaveBeenCalledTimes(1);
   });
 });

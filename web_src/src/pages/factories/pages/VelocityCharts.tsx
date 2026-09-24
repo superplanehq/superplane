@@ -39,6 +39,22 @@ const AREA_CHART_HEIGHT = 220;
 /** Width assumed before the container reports its own, matching a full-row card. */
 const AREA_CHART_FALLBACK_WIDTH = 1160;
 
+/** Category axis with edge padding so the first and last day are not flush with the plot. */
+function VelocityDayAxis({ ticks }: { ticks: string[] }) {
+  return (
+    <XAxis
+      dataKey="day"
+      tickLine={false}
+      axisLine={false}
+      tickMargin={8}
+      interval={0}
+      ticks={ticks}
+      padding="gap"
+      className="text-[11px]"
+    />
+  );
+}
+
 /** Row of the delivery chart: one day, one value per visible band. */
 type DeliveryRow = Record<string, string | number>;
 
@@ -87,17 +103,9 @@ export function DeliveryChart({
       >
         <BarChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-          <XAxis
-            dataKey="day"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            interval={0}
-            ticks={ticks}
-            className="text-[11px]"
-          />
+          <VelocityDayAxis ticks={ticks} />
           <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} className="text-[11px]" />
-          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartTooltip content={<ChartTooltipContent formatter={formatDeliveryTooltip} />} />
           <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
           {series.map((item, index) => (
             <Bar
@@ -112,6 +120,20 @@ export function DeliveryChart({
           ))}
         </BarChart>
       </ChartContainer>
+    </div>
+  );
+}
+
+function formatDeliveryTooltip(value: unknown, name: unknown) {
+  const count = Array.isArray(value) ? Number(value[0]) : Number(value);
+  const label = String(name);
+
+  return (
+    <div className="flex w-full items-center justify-between gap-8">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono font-medium text-foreground tabular-nums">
+        {Number.isFinite(count) ? count.toLocaleString() : String(value)}
+      </span>
     </div>
   );
 }
@@ -148,15 +170,7 @@ export function FlowChart({ trend }: { trend: FactoryVelocityFlow["timeTrend"] }
       >
         <AreaChart data={trend} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-          <XAxis
-            dataKey="day"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            interval={0}
-            ticks={ticks}
-            className="text-[11px]"
-          />
+          <VelocityDayAxis ticks={ticks} />
           <YAxis
             tickLine={false}
             axisLine={false}
@@ -237,15 +251,7 @@ function useCostChartAxes(rows: CostRow[]) {
   const axes = (
     <>
       <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-      <XAxis
-        dataKey="day"
-        tickLine={false}
-        axisLine={false}
-        tickMargin={8}
-        interval={0}
-        ticks={ticks}
-        className="text-[11px]"
-      />
+      <VelocityDayAxis ticks={ticks} />
       <YAxis
         tickLine={false}
         axisLine={false}

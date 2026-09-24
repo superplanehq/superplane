@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 type RunAgent struct{}
@@ -150,21 +149,6 @@ func (a *RunAgent) Configuration() []configuration.Field {
 			Description: "Keep the Managed Agents session after the run finishes so its transcript stays readable in the Anthropic Console. Sessions are deleted by default.",
 		},
 		{
-			Name:        "files",
-			Label:       "Files",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "File paths from the Files tab to mount into the agent's working directory",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "File path",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeRepositoryFile,
-					},
-				},
-			},
-		},
-		{
 			Name:        "secrets",
 			Label:       "Secrets",
 			Type:        configuration.FieldTypeList,
@@ -227,31 +211,6 @@ func (a *RunAgent) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if len(spec.Files) > 0 {
-		if ctx.Files == nil {
-			return fmt.Errorf("files configured but file access is not available")
-		}
-		available, err := ctx.Files.List()
-		if err != nil {
-			return fmt.Errorf("failed to list repository files: %v", err)
-		}
-		fileSet := make(map[string]bool, len(available))
-		for _, f := range available {
-			if norm, err := gitprovider.NormalizePath(f); err == nil {
-				fileSet[norm] = true
-			}
-		}
-		for _, f := range spec.Files {
-			norm, err := gitprovider.ValidateUserPath(f)
-			if err != nil {
-				return fmt.Errorf("invalid file path %q: %v", f, err)
-			}
-			if !fileSet[norm] {
-				return fmt.Errorf("file %q not found in app repository", f)
-			}
-		}
-	}
-
 	for i, s := range spec.Secrets {
 		if strings.TrimSpace(s.EnvName) == "" {
 			return fmt.Errorf("secrets[%d].envName is required", i)
@@ -289,38 +248,11 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Upload files and prepare resources for session mounting
-	var resources []FileResource
-	if len(spec.Files) > 0 {
-		if ctx.Files == nil {
-			return fmt.Errorf("files configured but file access is not available in this execution context")
-		}
-		resources, err = uploadRepositoryFiles(client, ctx, spec.Files)
-		if err != nil {
-			return fmt.Errorf("failed to upload files: %w", err)
-		}
-	}
-
-	// Store file IDs early so cleanup works on any later error path.
-	if len(resources) > 0 {
-		fileIDs := make([]string, len(resources))
-		for i, r := range resources {
-			fileIDs[i] = r.FileID
-			ctx.Logger.Infof("Mounting file: %s (file_id: %s)", r.MountPath, r.FileID)
-		}
-		encoded, _ := json.Marshal(fileIDs)
-		if err := ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded)); err != nil {
-			cleanupFileResources(client, resources, ctx.Logger.Warnf)
-			return fmt.Errorf("failed to persist uploaded file IDs: %w", err)
-		}
-	}
-
 	// Create a temporary vault and inject secrets as environment variables.
 	vaultIDs := append([]string{}, spec.VaultIDs...)
 	if len(spec.Secrets) > 0 {
 		vaultID, vaultErr := provisionSecretsVault(client, ctx, spec.Secrets)
 		if vaultErr != nil {
-			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 			return fmt.Errorf("failed to provision secrets vault: %w", vaultErr)
 		}
@@ -329,7 +261,6 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 
 	version, err := parseAgentVersion(spec.Version)
 	if err != nil {
-		cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return err
 	}
@@ -341,12 +272,10 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		AgentVersion:  version,
 		EnvironmentID: strings.TrimSpace(spec.Environment),
 		VaultIDs:      vaultIDs,
-		Resources:     resources,
 	}
 
 	session, err := client.CreateManagedSession(createReq)
 	if err != nil {
-		cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to create managed agent session: %w", err)
 	}
@@ -390,7 +319,6 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			mergeSessionIntoMetadata(&metadata, refreshed)
 			_ = ctx.Metadata.Set(metadata)
 			reclaimSession(client, session.ID, spec.PersistSession, ctx.Logger)
-			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 			return fmt.Errorf("managed agent session failed: %s", sm.Err.Message)
 		case sm != nil && sm.Complete:
@@ -405,7 +333,6 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			mergeSessionIntoMetadata(&metadata, refreshed)
 			_ = ctx.Metadata.Set(metadata)
 			reclaimSession(client, session.ID, spec.PersistSession, ctx.Logger)
-			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 			return nil
 		default:
@@ -453,66 +380,6 @@ func persistSessionFromConfig(config any, logger *log.Entry) bool {
 		return false
 	}
 	return spec.PersistSession
-}
-
-// getUploadedFileIDs retrieves uploaded file IDs from execution state.
-func getUploadedFileIDs(state core.ExecutionStateContext) []string {
-	raw, err := state.GetKV("uploaded_file_ids")
-	if err != nil || raw == "" {
-		return nil
-	}
-	var fileIDs []string
-	if err := json.Unmarshal([]byte(raw), &fileIDs); err != nil {
-		return nil
-	}
-	return fileIDs
-}
-
-func cleanupUploadedFiles(client *Client, ctx core.ExecutionContext, logWarn func(string, ...any)) {
-	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
-}
-
-func cleanupUploadedFilesFromHook(client *Client, ctx core.ActionHookContext, logWarn func(string, ...any)) {
-	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
-}
-
-func uploadRepositoryFiles(client *Client, ctx core.ExecutionContext, files []string) ([]FileResource, error) {
-	resources := make([]FileResource, 0, len(files))
-	for _, path := range files {
-		normalized, err := gitprovider.ValidateUserPath(path)
-		if err != nil {
-			cleanupFileResources(client, resources, ctx.Logger.Warnf)
-			return nil, fmt.Errorf("invalid file path %q: %w", path, err)
-		}
-
-		reader, err := ctx.Files.Read(normalized)
-		if err != nil {
-			cleanupFileResources(client, resources, ctx.Logger.Warnf)
-			return nil, fmt.Errorf("read file %q: %w", path, err)
-		}
-
-		fileID, err := client.UploadFile(reader, normalized)
-		reader.Close()
-		if err != nil {
-			cleanupFileResources(client, resources, ctx.Logger.Warnf)
-			return nil, fmt.Errorf("upload file %q: %w", path, err)
-		}
-
-		resources = append(resources, FileResource{
-			FileID:    fileID,
-			MountPath: normalized,
-		})
-	}
-	return resources, nil
-}
-
-// cleanupFileResources deletes already-uploaded files on partial failure.
-func cleanupFileResources(client *Client, resources []FileResource, logWarn func(string, ...any)) {
-	for _, r := range resources {
-		if err := client.DeleteFile(r.FileID); err != nil && logWarn != nil {
-			logWarn("Failed to delete uploaded file %s: %v", r.FileID, err)
-		}
-	}
 }
 
 // provisionSecretsVault creates a temporary Anthropic vault and adds
@@ -589,9 +456,6 @@ func decodeSpec(config any) (Spec, error) {
 	if raw, ok := config.(map[string]any); ok {
 		if v, ok := raw["vaultIds"]; ok {
 			spec.VaultIDs = decodeStringList(v)
-		}
-		if v, ok := raw["files"]; ok {
-			spec.Files = decodeStringList(v)
 		}
 	}
 	return spec, nil

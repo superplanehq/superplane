@@ -9,20 +9,19 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
-const (
-	maxIngestBytes     = models.MaxFileBytes
-	ingestFetchTimeout = 30 * time.Second
-)
+const ingestFetchTimeout = 30 * time.Second
 
 type BindResult struct {
 	StaleKeys  []string
@@ -241,6 +240,46 @@ func deleteObjects(ctx context.Context, provider blob.Provider, keys []string) (
 	return leftover, first
 }
 
+type PendingUpload struct {
+	SizeBytes int64
+	Checksum  string
+}
+
+func StorePendingUpload(ctx context.Context, provider blob.Provider, file *models.File, body io.Reader) (*PendingUpload, error) {
+	if provider == nil {
+		return nil, blob.ErrProviderNotConfigured
+	}
+	if file.State != models.FileStatePending {
+		return nil, fmt.Errorf("%w: file is not pending", models.ErrFileInvalid)
+	}
+
+	hasher := sha256.New()
+	maxBytes := file.MaxBytes()
+	limited := &limitedReader{r: io.TeeReader(body, hasher), n: maxBytes}
+	if err := provider.Put(ctx, file.StorageKey, limited, blob.PutOptions{ContentType: file.ContentType}); err != nil {
+		_ = provider.Delete(ctx, file.StorageKey)
+		if errors.Is(err, errFileTooLarge) {
+			return nil, fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
+		}
+		return nil, err
+	}
+	if limited.exceeded {
+		_ = provider.Delete(ctx, file.StorageKey)
+		return nil, fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, maxBytes)
+	}
+
+	info, err := provider.Head(ctx, file.StorageKey)
+	if err != nil {
+		_ = provider.Delete(ctx, file.StorageKey)
+		return nil, err
+	}
+	size := info.Size
+	if size <= 0 {
+		size = limited.read
+	}
+	return &PendingUpload{SizeBytes: size, Checksum: hex.EncodeToString(hasher.Sum(nil))}, nil
+}
+
 func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, file *models.File, body io.Reader) error {
 	if provider == nil {
 		return blob.ErrProviderNotConfigured
@@ -249,32 +288,12 @@ func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, fi
 		return fmt.Errorf("%w: file is not pending", models.ErrFileInvalid)
 	}
 
-	hasher := sha256.New()
-	limited := &limitedReader{r: io.TeeReader(body, hasher), n: models.MaxFileBytes}
-	if err := provider.Put(ctx, file.StorageKey, limited, blob.PutOptions{ContentType: file.ContentType}); err != nil {
-		_ = provider.Delete(ctx, file.StorageKey)
-		_ = file.MarkFailed(tx)
-		if errors.Is(err, errFileTooLarge) {
-			return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, models.MaxFileBytes)
-		}
-		return err
-	}
-	if limited.exceeded {
-		_ = provider.Delete(ctx, file.StorageKey)
-		_ = file.MarkFailed(tx)
-		return fmt.Errorf("%w: file exceeds %d bytes", models.ErrFileQuotaExceeded, models.MaxFileBytes)
-	}
-
-	info, err := provider.Head(ctx, file.StorageKey)
+	upload, err := StorePendingUpload(ctx, provider, file, body)
 	if err != nil {
 		_ = file.MarkFailed(tx)
 		return err
 	}
-	size := info.Size
-	if size <= 0 {
-		size = limited.read
-	}
-	if err := file.MarkReady(tx, size, hex.EncodeToString(hasher.Sum(nil))); err != nil {
+	if err := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); err != nil {
 		_ = provider.Delete(ctx, file.StorageKey)
 		_ = file.MarkFailed(tx)
 		return err
@@ -336,7 +355,7 @@ func DescriptionForDispatch(
 	dispatched := make([]DispatchFile, 0, len(ids))
 	for _, id := range ids {
 		file, ok := byID[id]
-		if !ok || !dispatchableFile(file, organizationID, factoryID, workOrderID) {
+		if !ok || !file.IsDispatchable(organizationID, factoryID, workOrderID) {
 			continue
 		}
 		downloadURL, err := DownloadURL(ctx, provider, &file, ttl)
@@ -355,30 +374,12 @@ func DescriptionForDispatch(
 	return blob.RewriteFileRefs(markdown, urls), dispatched, nil
 }
 
-func dispatchableFile(file models.File, organizationID, factoryID, workOrderID uuid.UUID) bool {
-	if file.State != models.FileStateReady {
-		return false
-	}
-	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
-		return false
-	}
-	if file.FactoryID == nil || *file.FactoryID != factoryID {
-		return false
-	}
-	switch file.Scope {
-	case blob.ScopeWorkspace:
-		return true
-	case blob.ScopeTask:
-		if file.WorkOrderID == nil {
-			return false
-		}
-		if workOrderID == uuid.Nil {
-			return true
-		}
-		return *file.WorkOrderID == workOrderID
-	default:
-		return false
-	}
+func RestoreFileRefs(
+	tx *gorm.DB,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	markdown string,
+) (string, error) {
+	return models.RestoreFileRefs(tx, organizationID, factoryID, workOrderID, markdown)
 }
 
 func ContentUploadURL(fileID uuid.UUID) string {
@@ -413,6 +414,141 @@ func FetcherFromHTTP(httpCtx core.HTTPContext) FetchFunc {
 type IngestResult struct {
 	Markdown   string
 	ObjectKeys []string
+}
+
+// IncomingFile is a downloaded remote file to store on a work order.
+// ReplaceURLs are exact strings in the description that become the stored
+// file reference. When none of them occur, the file is appended.
+type IncomingFile struct {
+	Filename    string
+	ContentType string
+	Body        io.Reader
+	ReplaceURLs []string
+}
+
+func AppendTaskFiles(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	createdBy *uuid.UUID,
+	markdown string,
+	files []IncomingFile,
+) (IngestResult, error) {
+	result := IngestResult{Markdown: markdown}
+	if len(files) == 0 {
+		return result, nil
+	}
+
+	next := markdown
+	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
+	if err != nil {
+		return result, err
+	}
+
+	for _, file := range files {
+		if openCount >= models.MaxFilesPerWorkOrder {
+			break
+		}
+		stored, ingested, err := storeIncomingFile(
+			ctx,
+			tx,
+			provider,
+			organizationID,
+			factoryID,
+			workOrderID,
+			createdBy,
+			file,
+		)
+		if err != nil {
+			log.WithError(err).Warn("failed to store task file")
+			continue
+		}
+		if !ingested {
+			continue
+		}
+		result.ObjectKeys = append(result.ObjectKeys, stored.StorageKey)
+		ref := blob.FileRef(stored.ID)
+		replaced := false
+		replaceURLs := append([]string(nil), file.ReplaceURLs...)
+		slices.SortFunc(replaceURLs, func(a, b string) int {
+			return len(b) - len(a)
+		})
+		for _, rawURL := range replaceURLs {
+			if rawURL == "" || !strings.Contains(next, rawURL) {
+				continue
+			}
+			next = blob.ReplaceURL(next, rawURL, ref)
+			replaced = true
+		}
+		if !replaced {
+			next = appendFileRef(next, stored.Filename, stored.ContentType, ref)
+		}
+		openCount++
+	}
+	result.Markdown = next
+	return result, nil
+}
+
+func storeIncomingFile(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	createdBy *uuid.UUID,
+	file IncomingFile,
+) (*models.File, bool, error) {
+	if provider == nil || file.Body == nil {
+		return nil, false, nil
+	}
+	contentType := normalizeFetchedContentType(file.ContentType, file.Filename)
+	if !models.IsAllowedFileContentType(contentType) {
+		return nil, false, nil
+	}
+
+	createdByID := uuid.Nil
+	if createdBy != nil {
+		createdByID = *createdBy
+	}
+	filename := strings.TrimSpace(file.Filename)
+	if filename == "" {
+		filename = "file"
+	}
+	stored, err := models.CreatePendingFile(tx, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		Filename:       filename,
+		ContentType:    contentType,
+		CreatedByID:    createdByID,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	storeCtx, cancel := context.WithTimeout(ctx, ingestFetchTimeout)
+	defer cancel()
+	if err := CompleteUpload(storeCtx, tx, provider, stored, io.LimitReader(file.Body, models.MaxFileBytes+1)); err != nil {
+		_ = DeleteObjectAndRow(storeCtx, tx, provider, stored)
+		return nil, false, err
+	}
+	return stored, true, nil
+}
+
+func appendFileRef(markdown, filename, contentType, ref string) string {
+	label := blob.MarkdownLinkLabel(filename)
+	var link string
+	if models.IsInlineImageContentType(contentType) {
+		link = "![" + label + "](" + ref + ")"
+	} else {
+		link = "[" + label + "](" + ref + ")"
+	}
+	markdown = strings.TrimRight(markdown, "\n")
+	if markdown == "" {
+		return link
+	}
+	return markdown + "\n\n" + link
 }
 
 func IngestRemoteImages(
@@ -516,7 +652,7 @@ func ingestOneImage(
 		return nil, false, nil
 	}
 
-	if err := CompleteUpload(fetchCtx, tx, provider, file, io.LimitReader(resp.Body, maxIngestBytes+1)); err != nil {
+	if err := CompleteUpload(fetchCtx, tx, provider, file, io.LimitReader(resp.Body, models.MaxFileBytes+1)); err != nil {
 		_ = DeleteObjectAndRow(fetchCtx, tx, provider, file)
 		return nil, false, nil
 	}

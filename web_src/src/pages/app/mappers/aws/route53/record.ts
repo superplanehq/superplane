@@ -14,7 +14,7 @@ import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 
 export interface RecordConfiguration {
   hostedZoneId?: string;

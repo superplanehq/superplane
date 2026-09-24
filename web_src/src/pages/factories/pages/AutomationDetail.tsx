@@ -1,8 +1,9 @@
-import type { CanvasesCanvasRun, FactoriesFactory, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { CanvasesCanvasRun, FactoriesFactory, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -32,13 +33,14 @@ export function AutomationDetail({
 }: {
   organizationId: string;
   factoryKey: string;
-  app: FactoryApp;
+  app: FactoryAutomation;
   actions: AutomationCardActions;
   factory: FactoriesFactory | null | undefined;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const canvasId = app.id ?? "";
+  useCanvasRuntimeWebsocket(canvasId, organizationId, Boolean(canvasId));
   const {
     data: runsPages,
     isLoading: runsLoading,

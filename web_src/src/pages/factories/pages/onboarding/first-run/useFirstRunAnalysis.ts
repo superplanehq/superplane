@@ -1,10 +1,10 @@
 import { useBacklogAnalysisScoredOrderIds } from "@/hooks/useBacklogAnalysisRuns";
-import { useFactoryIntakeRuns, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useFactoryIntakeRuns, useFactoryIntakeRunsWebsocket, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 
 import { lineIntakeSourceForApiSource } from "../../lineIntakeModel";
 import {
   firstRunAnalysisProgress,
-  githubIssuesIntake,
+  firstRunBacklogIntake,
   initialImportFailed,
   type FirstRunAnalysisProgress,
 } from "./firstRunAnalysisProgress";
@@ -31,11 +31,17 @@ export function useFirstRunAnalysis(
   factoryId: string,
 ): { progress: FirstRunAnalysisProgress; sourceName?: string; failed: boolean } {
   const intakes = useFactoryIntakes(organizationId, factoryId);
-  const intake = githubIssuesIntake(intakes.data);
+  const intake = firstRunBacklogIntake(intakes.data);
   const runs = useFactoryIntakeRuns(organizationId, factoryId, intake?.id);
+  useFactoryIntakeRunsWebsocket({
+    organizationId,
+    factoryId,
+    intakeId: intake?.id,
+    canvasId: intake?.canvasId,
+  });
   const scoredOrderIds = useBacklogAnalysisScoredOrderIds(organizationId, factoryId);
   const initialImportStatus = intake?.initialImportStatus;
-  const githubIntakeMissing = intakes.isSuccess && !intake;
+  const backlogIntakeMissing = intakes.isSuccess && !intake;
   const importIsSettled = importSettled(intake?.createdAt);
   return {
     progress: firstRunAnalysisProgress(runs.data, scoredOrderIds, importIsSettled, {
@@ -46,7 +52,7 @@ export function useFirstRunAnalysis(
     failed: Boolean(
       intakes.isError ||
         runs.isError ||
-        githubIntakeMissing ||
+        backlogIntakeMissing ||
         initialImportFailed(initialImportStatus, importIsSettled),
     ),
   };

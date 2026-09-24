@@ -154,7 +154,7 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 		Entrypoint:      entrypoint,
 	})
 	require.NoError(t, err)
-	require.NoError(t, planningSession.SendUserMessage(db, "Plan the empty state."))
+	require.NoError(t, planningSession.SendUserMessage(db, "Plan the empty state.", uuid.Nil))
 
 	merge := models.NewFactoryVelocityRepositoryMerge(
 		r.Organization.ID,

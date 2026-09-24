@@ -41,6 +41,7 @@ type RunSuperPlaneSpec struct {
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
 	Model                   string                        `mapstructure:"model"`
 	HostedProvider          string                        `mapstructure:"hostedProvider"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 }
 
 func decodeRunSuperPlaneSpec(raw any) (RunSuperPlaneSpec, error) {

@@ -123,23 +123,6 @@ function Metric({
   );
 }
 
-/**
- * One line of a card split. The dot ties the number to its band in the chart
- * below, so the chart needs no legend of its own.
- *
- * There is no share column: medians of the parts do not add up to the median of
- * the whole, so a percentage here would not be true.
- */
-function SplitRow({ color, label, value }: { color: string; label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-2 py-1.5">
-      <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-      <span className="text-[13px] text-foreground">{label}</span>
-      <span className="ml-auto text-[13px] font-medium tabular-nums text-foreground">{value}</span>
-    </div>
-  );
-}
-
 /** Empty note used where a chart would otherwise draw an axis with no data. */
 function ChartEmptyNote({ children }: { children: ReactNode }) {
   return <p className="mt-5 text-[13px] text-muted-foreground">{children}</p>;
@@ -279,29 +262,27 @@ export function TaskTimeCard({
 
       {hasSample ? (
         <>
-          <div className="mt-5">
+          <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-3">
             <Metric
               label="Cycle time"
               value={formatDurationHours(flow.medianCycleHours)}
               hint={`From ${flow.sampleSize} ${flow.sampleSize === 1 ? "task" : "tasks"} closed in this period`}
             />
-          </div>
-
-          <div className="mt-4 border-t border-border pt-2">
-            <SplitRow
-              color={VELOCITY_TIME_COLORS.running}
+            <Metric
               label="Time running"
+              color={VELOCITY_TIME_COLORS.running}
               value={formatDurationHours(flow.medianRunningHours)}
             />
-            <SplitRow
-              color={VELOCITY_TIME_COLORS.waiting}
+            <Metric
               label="Time in Waiting"
+              color={VELOCITY_TIME_COLORS.waiting}
               value={formatDurationHours(flow.medianWaitingHours)}
             />
-            <p className="mt-1.5 text-[12px] text-muted-foreground">
-              Time in Waiting is review or a pause before the next dispatch, not time an agent runs.
-            </p>
           </div>
+
+          <p className="mt-5 text-[12px] text-muted-foreground">
+            Time in Waiting is review or a pause before the next dispatch, not time an agent runs.
+          </p>
 
           <div className="mt-5 border-t border-border pt-4">
             <FlowChart trend={flow.timeTrend} />

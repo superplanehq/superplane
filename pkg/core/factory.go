@@ -20,7 +20,11 @@ var ErrPullRequestNotFound = errors.New("pull request not found")
 var ErrPullRequestActivityAlreadyActive = errors.New("pull request activity already active for this handler and revision")
 
 type FactoryContext interface {
-	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
+	// CreateWorkOrder reports whether a row was inserted via the second
+	// return value; callers must skip downstream emits when `created` is
+	// false so a duplicate Sentry intake item does not leak into the
+	// timeline.
+	CreateWorkOrder(params WorkOrderParams) (order *WorkOrder, created bool, err error)
 	// FindWorkOrder resolves a work order by id or by one of its
 	// artifacts' keys, without requiring the current run to be attached
 	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
@@ -90,6 +94,11 @@ type AddWorkOrderArtifactParams struct {
 	Data    map[string]any
 	// Key optionally tags the artifact with a queryable key so a later
 	// FindWorkOrder(by: artifactKey) can resolve the work order from it.
+	// When set, AddWorkOrderArtifact creates the artifact on the first
+	// call and replaces its data on later calls. Replacement is
+	// wholesale: fields absent from the later call are cleared. The
+	// first call sets the type; a later call with a different type
+	// fails. Keys are unique per factory.
 	Key string
 }
 
@@ -208,12 +217,14 @@ const (
 
 type AddPullRequestActivityParams struct {
 	PullRequestID string
+	Title         string
 	Description   string
 	Revision      string
 	Access        string
 }
 
 type UpdatePullRequestActivityParams struct {
+	Title       *string
 	Description *string
 	Access      string
 }
@@ -224,6 +235,7 @@ type PullRequestRevision struct {
 }
 
 type PullRequestActivity struct {
+	Title        string               `json:"title,omitempty"`
 	Description  string               `json:"description,omitempty"`
 	Access       string               `json:"access"`
 	State        string               `json:"state"`

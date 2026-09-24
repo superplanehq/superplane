@@ -34,6 +34,20 @@ describe("useWorkflowViewSearchParams", () => {
     expect(next.get("run")).toBe("run-42");
   });
 
+  it("migrates legacy files view params", async () => {
+    const setSearchParams = vi.fn();
+    renderHook(() =>
+      useWorkflowViewSearchParams(makeSearchParams({ view: "files", file: "canvas.yaml" }), setSearchParams),
+    );
+
+    await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+
+    const next = setSearchParams.mock.calls[0]?.[0] as URLSearchParams;
+
+    expect(next.get("view")).toBeNull();
+    expect(next.get("file")).toBeNull();
+  });
+
   it("migrates legacy versions view params", async () => {
     const setSearchParams = vi.fn();
     renderHook(() => useWorkflowViewSearchParams(makeSearchParams({ view: "versions" }), setSearchParams));

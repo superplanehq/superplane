@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderCheck } from "@/api-client";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
@@ -43,6 +43,7 @@ export function resolveSplitRunOrder(
 export type FixtureForSplitRunPageOptions = {
   prFeedbackRuns?: PRFeedbackLogRun[];
   analysisRuns?: BacklogAnalysisRun[];
+  artifacts?: FactoriesWorkOrderArtifact[];
   /** True while the Backlog automation still scores this draft, including the
    * optimistic window before its run appears in `analysisRuns`. */
   isAnalyzing?: boolean;
@@ -65,6 +66,7 @@ export function fixtureForSplitRunPage(
     demoArtifacts: false,
     prFeedbackRuns: options?.prFeedbackRuns,
     analysisRuns: options?.analysisRuns,
+    artifacts: options?.artifacts,
     isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,
   });

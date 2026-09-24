@@ -12,7 +12,7 @@ const COMPARE_CLIENT = new QueryClient({
 
 /**
  * Storybook preview of the Description tab.
- * Description and checks on the left. Source and artifacts on the right.
+ * Request and brief on the analysis popup.
  */
 export function WorkOrderPopupTabsCompare() {
   const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);

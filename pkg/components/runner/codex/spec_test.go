@@ -14,7 +14,8 @@ func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunCodexSpec(map[string]any{
-		"machineType": "e1-large-amd64",
+		"machineType":           "e1-large-amd64",
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Clone", "type": "bash", "command": "git clone"},
 		},
@@ -24,6 +25,7 @@ func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	assert.True(t, spec.IncludeVisualEvidence)
 	err = validateRunCodexSpec(spec)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "prompt")
@@ -83,7 +85,7 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildCodexBrokerTask(spec, "", nil)
+	task := buildCodexBrokerTask(spec, "", nil, nil)
 	require.Len(t, task.Commands, 3)
 	assert.Equal(t, "Prepare Codex", task.Commands[0].Name)
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
@@ -101,7 +103,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildCodexBrokerTask(spec, "", nil)
+	base := buildCodexBrokerTask(spec, "", nil, nil)
 	got := applyPlanningFollowUp(base, nil, spec)
 	assert.Len(t, got.Commands, len(base.Commands))
 	assert.Len(t, got.Files, len(base.Files))
@@ -117,7 +119,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildCodexBrokerTask(spec, "", nil)
+	base := buildCodexBrokerTask(spec, "", nil, nil)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",

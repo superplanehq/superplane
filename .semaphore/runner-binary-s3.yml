@@ -1,0 +1,60 @@
+# Promoted when /runner is green on main.
+# runner-s3 supplies AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
+version: v1.0
+name: Publish runner binaries to S3
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+global_job_config:
+  secrets:
+    - name: runner-s3
+  prologue:
+    commands:
+      - checkout
+      - sem-version go 1.25
+      - cache restore
+      - (cd runner && go mod download)
+      - cache store
+      - aws sts get-caller-identity
+
+blocks:
+  - name: linux/amd64 runner
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: f1-standard-2
+          os_image: ubuntu2404
+
+      jobs:
+        - name: Build amd64 runner
+          commands:
+            - cd runner
+            - export CGO_ENABLED=0
+            - export GOOS=linux
+            - export GOARCH=amd64
+            - mkdir -p bin
+            - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-amd64 ./runner/cmd/runner
+            - aws s3 cp bin/runner-linux-amd64 s3://superplane-runner/latest/runner-linux-amd64 --sse AES256
+
+  - name: linux/arm64 runner
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: r1-standard-2
+          os_image: ubuntu2404
+
+      jobs:
+        - name: Build arm64 runner
+          commands:
+            - cd runner
+            - export CGO_ENABLED=0
+            - export GOOS=linux
+            - export GOARCH=arm64
+            - mkdir -p bin
+            - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-arm64 ./runner/cmd/runner
+            - aws s3 cp bin/runner-linux-arm64 s3://superplane-runner/latest/runner-linux-arm64 --sse AES256

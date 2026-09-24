@@ -9,8 +9,11 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID, STORYBOOK_ME_USER_NAME } from "../../../__fixtures__/factoryPageIds";
 import { SpendingRedesignPage } from "./SpendingRedesignPage";
 import { SPENDING_CATALOGS, SPENDING_CREDIT, SPENDING_LEDGER, SPENDING_REDESIGN_NOW } from "./spendingRedesignMocks";
+import { formatCompactTokens, formatUsdCents } from "../../../lib/workOrderUsage";
 import {
+  buildSpendingReport,
   EMPTY_SPENDING_FILTERS,
+  formatShare,
   formatSpendingRangeCaption,
   rangeForPreset,
   type SpendingReport,
@@ -413,6 +416,60 @@ describe("SpendingRedesignPage", () => {
     expect(screen.getAllByTestId("spending-empty").length).toBe(4);
     expect(screen.getAllByText("No model usage is recorded for this period.")).toHaveLength(2);
     expect(screen.getAllByText("No VM usage is recorded for this period.")).toHaveLength(2);
+  });
+
+  it("shows a model breakdown total with spend, tokens, and 100% share", () => {
+    renderPage();
+
+    const report = buildSpendingReport({
+      events: SPENDING_LEDGER,
+      range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "model",
+      catalogs: SPENDING_CATALOGS,
+      usageKind: "model",
+    });
+    const total = within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown-total");
+
+    expect(within(total).getByRole("rowheader", { name: "Total" })).toBeInTheDocument();
+    expect(total).toHaveTextContent(formatUsdCents(report.totals.costCents));
+    expect(total).toHaveTextContent(formatCompactTokens(report.totals.tokens));
+    expect(total).toHaveTextContent(formatShare(1));
+    expect(total.querySelectorAll("td")).toHaveLength(3);
+  });
+
+  it("shows a VM breakdown total with spend and 100% share, and no tokens cell", () => {
+    renderPage();
+
+    const report = buildSpendingReport({
+      events: SPENDING_LEDGER,
+      range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "machine",
+      catalogs: SPENDING_CATALOGS,
+      usageKind: "compute",
+    });
+    const total = within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-breakdown-total");
+
+    expect(within(total).getByRole("rowheader", { name: "Total" })).toBeInTheDocument();
+    expect(total).toHaveTextContent(formatUsdCents(report.totals.costCents));
+    expect(total).toHaveTextContent(formatShare(1));
+    expect(total).not.toHaveTextContent("tokens");
+    expect(total.querySelectorAll("td")).toHaveLength(2);
+  });
+
+  it("hides the breakdown total when a section is empty", () => {
+    renderPage({
+      events: [],
+      initialPeriod: "day",
+    });
+
+    expect(
+      within(screen.getByTestId("spending-model-usage")).queryByTestId("spending-model-breakdown-total"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("spending-vm-usage")).queryByTestId("spending-vm-breakdown-total"),
+    ).not.toBeInTheDocument();
   });
 
   it("opens on a custom range and user breakdown when those initials are set", () => {

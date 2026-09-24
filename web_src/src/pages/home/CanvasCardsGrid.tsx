@@ -10,7 +10,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { CanvasActionsMenu } from "./CanvasActionsMenu";
 import { CanvasCardDescription } from "./CanvasCardDescription";
-import type { CanvasCardData, CanvasFolderData } from "./types";
+import type { CanvasCardData } from "./types";
 
 type CanvasMiniMapPoint = {
   x: number;
@@ -24,7 +24,6 @@ type PositionedCanvasNode = SuperplaneComponentsNode & {
 
 interface CanvasCardsGridProps {
   canvases: CanvasCardData[];
-  canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
@@ -35,7 +34,6 @@ interface CanvasCardsGridProps {
 
 export function CanvasCardsGrid({
   canvases,
-  canvasFolders,
   organizationId,
   onEditCanvas,
   onToggleStar,
@@ -49,7 +47,6 @@ export function CanvasCardsGrid({
         <CanvasCard
           key={canvas.id}
           canvas={canvas}
-          canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEdit={onEditCanvas}
           onToggleStar={onToggleStar}
@@ -64,7 +61,6 @@ export function CanvasCardsGrid({
 
 interface CanvasCardProps {
   canvas: CanvasCardData;
-  canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
@@ -75,7 +71,6 @@ interface CanvasCardProps {
 
 function CanvasCard({
   canvas,
-  canvasFolders,
   organizationId,
   onEdit,
   onToggleStar,
@@ -119,7 +114,6 @@ function CanvasCard({
               />
               <CanvasActionsMenu
                 canvas={canvas}
-                canvasFolders={canvasFolders}
                 organizationId={organizationId}
                 onEdit={onEdit}
                 canUpdateCanvases={canUpdateCanvases}

@@ -3,6 +3,7 @@ package jira
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,7 +34,7 @@ const (
 	// required to get a refresh token, so it's requested here directly rather than shown in the
 	// setup instructions.
 	coreScopeList = "read:jira-work write:jira-work manage:jira-webhook read:jira-user " +
-		"read:servicedesk-request write:servicedesk-request offline_access"
+		"read:issue-details:jira read:servicedesk-request write:servicedesk-request offline_access"
 
 	// jsmOpsScopeList is appended to coreScopeList only when the "Enable Ops features" config
 	// option is on (see jira.go's Configuration() and jsmOpsFeaturesEnabled). Most Jira Cloud
@@ -107,10 +108,43 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 	}
 
 	if status < 200 || status >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", status, string(responseBody))
+		return nil, &APIError{StatusCode: status, Body: string(responseBody)}
 	}
 
 	return responseBody, nil
+}
+
+// APIError is a non-2xx response from Jira. Consumers use StatusCode to
+// decide whether to retry.
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, e.Body)
+}
+
+// IsRetryableAPIError reports whether the consumer should nack the message
+// so Tackle redelivers it. Rate limits, request timeouts, server errors,
+// and transport failures retry. Client errors such as 401, 403, and 404
+// do not.
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusTooManyRequests ||
+			apiErr.StatusCode == http.StatusRequestTimeout ||
+			apiErr.StatusCode >= http.StatusInternalServerError
+	}
+
+	message := err.Error()
+	return strings.Contains(message, "error executing request") ||
+		strings.Contains(message, "error reading body") ||
+		strings.Contains(message, "error reading request body")
 }
 
 // recoverFromUnauthorized refreshes the access token after a 401. Atlassian's refresh tokens are
@@ -166,13 +200,9 @@ func (c *Client) Refresh() error {
 		return fmt.Errorf("no integration context available to refresh the OAuth token")
 	}
 
-	clientID, err := c.integration.GetConfig("clientId")
-	if err != nil {
-		return fmt.Errorf("error reading OAuth client id: %w", err)
-	}
-	clientSecret, err := c.integration.GetConfig("clientSecret")
-	if err != nil {
-		return fmt.Errorf("error reading OAuth client secret: %w", err)
+	app := resolveOAuthApp(c.integration)
+	if app.ClientID == "" || app.ClientSecret == "" {
+		return fmt.Errorf("missing Jira OAuth app credentials")
 	}
 	refreshToken, err := findSecret(c.integration, SecretOAuthRefreshToken)
 	if err != nil {
@@ -182,7 +212,7 @@ func (c *Client) Refresh() error {
 		return fmt.Errorf("missing Jira OAuth refresh token; connect Jira via OAuth first")
 	}
 
-	token, err := NewAuth(c.http).RefreshToken(string(clientID), string(clientSecret), refreshToken)
+	token, err := NewAuth(c.http).RefreshToken(app.ClientID, app.ClientSecret, refreshToken)
 	if err != nil {
 		return err
 	}
@@ -460,6 +490,47 @@ type Status struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Category string `json:"-"`
+}
+
+// UnmarshalJSON reads both the flat statusCategory string from
+// /rest/api/3/statuses/search and the nested statusCategory.key object
+// returned by issue and transition payloads.
+func (s *Status) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		StatusCategory any    `json:"statusCategory"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	s.ID = raw.ID
+	s.Name = raw.Name
+	s.Category = statusCategoryFromValue(raw.StatusCategory)
+	return nil
+}
+
+func statusCategoryFromValue(value any) string {
+	switch category := value.(type) {
+	case string:
+		if normalized := normalizeStatusCategoryName(category); normalized != "UNDEFINED" {
+			return normalized
+		}
+		return normalizeStatusCategoryKey(category)
+	case map[string]any:
+		if key, _ := category["key"].(string); strings.TrimSpace(key) != "" {
+			return normalizeStatusCategoryKey(key)
+		}
+		if name, _ := category["name"].(string); strings.TrimSpace(name) != "" {
+			return normalizeStatusCategoryName(name)
+		}
+	}
+	return "UNDEFINED"
+}
+
+func isDoneCategory(category string) bool {
+	return normalizeStatusCategoryName(category) == "DONE" ||
+		normalizeStatusCategoryKey(category) == "DONE"
 }
 
 type projectStatusCategory struct {
@@ -1103,6 +1174,61 @@ func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookR
 	return nil, fmt.Errorf("unrecognized create webhook response: %s", string(responseBody))
 }
 
+// IssueWebhook is one dynamic webhook registered by this OAuth app.
+type IssueWebhook struct {
+	ID             int64    `json:"id"`
+	URL            string   `json:"url"`
+	JQLFilter      string   `json:"jqlFilter"`
+	Events         []string `json:"events"`
+	ExpirationDate string   `json:"expirationDate"`
+}
+
+type issueWebhooksPage struct {
+	Values     []IssueWebhook `json:"values"`
+	IsLast     bool           `json:"isLast"`
+	StartAt    int            `json:"startAt"`
+	MaxResults int            `json:"maxResults"`
+	Total      int            `json:"total"`
+}
+
+const issueWebhookListPageSize = 100
+const issueWebhookListPageLimit = 20
+
+// ListIssueWebhooks returns every dynamic webhook registered by this OAuth app.
+func (c *Client) ListIssueWebhooks() ([]IssueWebhook, error) {
+	var webhooks []IssueWebhook
+	startAt := 0
+
+	for range issueWebhookListPageLimit {
+		pageURL, err := url.Parse(c.apiURL("/rest/api/3/webhook"))
+		if err != nil {
+			return nil, fmt.Errorf("parse webhook list URL: %w", err)
+		}
+		query := pageURL.Query()
+		query.Set("startAt", strconv.Itoa(startAt))
+		query.Set("maxResults", strconv.Itoa(issueWebhookListPageSize))
+		pageURL.RawQuery = query.Encode()
+
+		responseBody, err := c.execRequest(http.MethodGet, pageURL.String(), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page issueWebhooksPage
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse webhook list response: %w", err)
+		}
+
+		webhooks = append(webhooks, page.Values...)
+		if page.IsLast || len(page.Values) == 0 {
+			return webhooks, nil
+		}
+		startAt += len(page.Values)
+	}
+
+	return nil, fmt.Errorf("webhook list exceeded page limit")
+}
+
 // DeleteIssueWebhooks removes previously-registered dynamic webhooks by id.
 func (c *Client) DeleteIssueWebhooks(webhookIDs []int64) error {
 	if len(webhookIDs) == 0 {
@@ -1207,7 +1333,7 @@ func (c *Client) DeleteIssue(issueKey string, opts DeleteIssueOptions) error {
 	return nil
 }
 
-// IssueSearchHit is one element from GET /rest/api/3/search.
+// IssueSearchHit is one element from POST /rest/api/3/search/jql.
 type IssueSearchHit struct {
 	ID     string         `json:"id"`
 	Key    string         `json:"key"`
@@ -1215,20 +1341,20 @@ type IssueSearchHit struct {
 }
 
 type issueSearchAPIResponse struct {
-	StartAt    int              `json:"startAt"`
-	MaxResults int              `json:"maxResults"`
-	Total      int              `json:"total"`
-	Issues     []IssueSearchHit `json:"issues"`
+	MaxResults    int              `json:"maxResults"`
+	IsLast        bool             `json:"isLast"`
+	NextPageToken string           `json:"nextPageToken"`
+	Issues        []IssueSearchHit `json:"issues"`
 }
 
 type jiraSearchPOSTBody struct {
-	JQL        string   `json:"jql"`
-	StartAt    int      `json:"startAt"`
-	MaxResults int      `json:"maxResults"`
-	Fields     []string `json:"fields"`
+	JQL           string   `json:"jql"`
+	MaxResults    int      `json:"maxResults"`
+	Fields        []string `json:"fields"`
+	NextPageToken string   `json:"nextPageToken,omitempty"`
 }
 
-func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSearchAPIResponse, error) {
+func (c *Client) searchIssuesPage(jql, nextPageToken string, maxResults int) (issueSearchAPIResponse, error) {
 	var empty issueSearchAPIResponse
 	if maxResults <= 0 {
 		maxResults = 50
@@ -1238,17 +1364,17 @@ func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSea
 	}
 
 	body := jiraSearchPOSTBody{
-		JQL:        jql,
-		StartAt:    startAt,
-		MaxResults: maxResults,
-		Fields:     []string{"summary"},
+		JQL:           jql,
+		MaxResults:    maxResults,
+		Fields:        []string{"summary"},
+		NextPageToken: nextPageToken,
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return empty, fmt.Errorf("marshal search body: %w", err)
 	}
 
-	u := c.apiURL("/rest/api/3/search")
+	u := c.apiURL("/rest/api/3/search/jql")
 	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return empty, err
@@ -1267,17 +1393,17 @@ func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSea
 
 // SearchIssues runs a JQL search and returns the first page of issues (maxResults is capped at 100).
 func (c *Client) SearchIssues(jql string, maxResults int) ([]IssueSearchHit, error) {
-	resp, err := c.searchIssuesPage(jql, 0, maxResults)
+	resp, err := c.searchIssuesPage(jql, "", maxResults)
 	if err != nil {
 		return nil, err
 	}
 	return resp.Issues, nil
 }
 
-// SearchIssuesUpTo pages through POST /rest/api/3/search until maxIssues are collected, a page is
-// short, or Jira reports no further results. Jira caps each request at 100 issues; busy service
-// projects often need more than one page so incident pickers are not dominated by recently
-// updated non-incident work.
+// SearchIssuesUpTo pages through POST /rest/api/3/search/jql until maxIssues are
+// collected or Jira reports no further results. Jira caps each request at 100
+// issues; busy service projects often need more than one page so incident
+// pickers are not dominated by recently updated non-incident work.
 func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, error) {
 	if maxIssues <= 0 {
 		maxIssues = 500
@@ -1285,7 +1411,7 @@ func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, 
 	const pageCap = 100
 
 	var out []IssueSearchHit
-	startAt := 0
+	nextPageToken := ""
 	for len(out) < maxIssues {
 		pageMax := pageCap
 		if remain := maxIssues - len(out); remain < pageMax {
@@ -1295,22 +1421,16 @@ func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, 
 			break
 		}
 
-		resp, err := c.searchIssuesPage(jql, startAt, pageMax)
+		resp, err := c.searchIssuesPage(jql, nextPageToken, pageMax)
 		if err != nil {
 			return nil, err
 		}
 
 		out = append(out, resp.Issues...)
-		if len(resp.Issues) == 0 {
+		if len(resp.Issues) == 0 || resp.IsLast || resp.NextPageToken == "" || resp.NextPageToken == nextPageToken {
 			break
 		}
-		startAt += len(resp.Issues)
-		if len(resp.Issues) < pageMax {
-			break
-		}
-		if resp.Total > 0 && startAt >= resp.Total {
-			break
-		}
+		nextPageToken = resp.NextPageToken
 	}
 
 	return out, nil

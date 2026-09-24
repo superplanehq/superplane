@@ -139,7 +139,7 @@ function getRunSortTimestamp(run: CanvasesCanvasRun): number {
   return parseTimestamp(run.createdAt) || parseTimestamp(run.updatedAt);
 }
 
-function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
+function mergeCanvasRunFields(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
   return {
     id: incoming.id ?? existing.id,
     canvasId: incoming.canvasId ?? existing.canvasId,
@@ -154,6 +154,10 @@ function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun
     versionId: incoming.versionId ?? existing.versionId,
     parent: incoming.parent ?? existing.parent,
   };
+}
+
+export function mergeCanvasRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
+  return shouldAcceptRunUpdate(existing, incoming) ? mergeCanvasRunFields(existing, incoming) : existing;
 }
 
 function bumpTotalCountOnAllPages<T extends { totalCount?: number }>(pages: T[], delta: number): void {
@@ -200,11 +204,11 @@ export function upsertRunIntoInfiniteData(
 
   if (location) {
     const existing = pages[location.pageIndex].runs![location.runIndex];
-    if (!shouldAcceptRunUpdate(existing, run)) {
+    const nextRun = mergeCanvasRunUpdate(existing, run);
+    if (nextRun === existing) {
       return old;
     }
 
-    const nextRun = mergeRunUpdate(existing, run);
     if (runMatchesFilters(nextRun, filters)) {
       pages[location.pageIndex].runs![location.runIndex] = nextRun;
       return { ...old, pages };
@@ -356,11 +360,12 @@ export function upsertRunIntoDescribeRunData(
     return { run: incoming };
   }
 
-  if (!shouldAcceptRunUpdate(current.run, incoming)) {
+  const run = mergeCanvasRunUpdate(current.run, incoming);
+  if (run === current.run) {
     return current;
   }
 
-  return { ...current, run: mergeRunUpdate(current.run, incoming) };
+  return { ...current, run };
 }
 
 export function upsertExecutionIntoDescribeRunData(

@@ -38,6 +38,7 @@ func (s *kvState) Emit(string, string, []any) error            { return nil }
 func (s *kvState) EmitAndContinue(string, string, []any) error { return nil }
 func (s *kvState) Pass() error                                 { return nil }
 func (s *kvState) Fail(string, string) error                   { return errors.New("unused") }
+func (s *kvState) Cancel() error                               { return nil }
 
 type recordingComputeUsage struct {
 	computes []core.ComputeUsageRecord

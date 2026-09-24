@@ -161,8 +161,103 @@ CI sets dummy GitHub App values so factory E2E can open workspace setup.
 Local `make test.e2e` needs the same dummy values or a real app. Without
 them, `/account/onboarding` returns 503.
 
+## Factory Sentry App (local issue intake)
+
+Factory Sentry intake installs SuperPlane's public Sentry app. The process
+must hold the app credentials. If the `SUPERPLANE_SENTRY_APP_*` variables are
+empty, SuperPlane asks for a personal token and an internal Sentry
+integration.
+
+Cloud already holds these values. Local development can create a public
+Sentry app that points at a stable public tunnel.
+
+### 1. Start a stable tunnel
+
+Use the same `BASE_URL` and `WEBHOOKS_BASE_URL` values as the GitHub App
+section above. Restart SuperPlane after you change these values.
+
+### 2. Create a public Sentry app
+
+1. Open Sentry, then **Settings**, then **Developer Settings**, then
+   **Custom Integrations**.
+2. Click **Create New Integration**, then choose **Public Integration**.
+3. Set the name to a local name, for example `SuperPlane local`.
+4. Set these callback and webhook URLs. Replace `{BASE_URL}` and
+   `{WEBHOOKS_BASE_URL}` with the same tunnel URL.
+
+   - Redirect URL: `{BASE_URL}/api/v1/sentry/app/setup`
+   - Webhook URL: `{WEBHOOKS_BASE_URL}/api/v1/sentry/app/webhook`
+   - Webhook events: `issue`
+
+5. Grant these permissions:
+
+   - Issue and Event: Read
+   - Project: Read
+   - Organization: Read
+
+6. Create the app.
+7. Copy the slug, Client ID, and Client Secret from the app page.
+
+### 3. Set the SuperPlane environment
+
+Add these values to `.env`. Do not commit real secrets.
+
+```env
+SUPERPLANE_SENTRY_APP_SLUG=superplane-local
+SUPERPLANE_SENTRY_APP_CLIENT_ID=123123
+SUPERPLANE_SENTRY_APP_CLIENT_SECRET=123123
+```
+
+Restart the server after you save `.env`.
+
+### 4. Confirm setup
+
+1. Open a factory line board.
+2. Add a **Sentry exceptions** intake.
+3. SuperPlane must open the Sentry install page, not the personal-token
+   form.
+4. After you choose a project, SuperPlane adds the 10 newest unresolved
+   issues and listens for new issues.
+
+If SuperPlane still asks for a personal token, the process has no complete
+`SUPERPLANE_SENTRY_APP_*` set. Check `.env` and restart the server.
+
+## Local hosted OpenRouter
+
+SuperPlane can seed the hosted OpenRouter provider on a local development
+server. The seed stays off until you set it. Production ignores these
+variables. The seed does not call OpenRouter at startup.
+
+Add these values to `.env`. Do not commit real secrets.
+
+```env
+SUPERPLANE_DEV_HOSTED_OPENROUTER=yes
+SUPERPLANE_DEV_OPENROUTER_API_KEY=
+SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY=
+SUPERPLANE_DEV_OPENROUTER_MODELS=openai/gpt-5,anthropic/claude-sonnet-4
+SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL=openai/gpt-5
+```
+
+`SUPERPLANE_DEV_OPENROUTER_BASE_URL` is optional.
+
+1. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER` to `yes`.
+2. Set the API key and the management key.
+3. List model ids in `SUPERPLANE_DEV_OPENROUTER_MODELS`.
+   Separate the ids with commas.
+4. If you set `SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL`, include that id in the
+   model list. SuperPlane then uses it as the installation default.
+5. If you leave the default empty and no default exists, SuperPlane uses
+   the first model. If a default already exists, SuperPlane keeps it.
+6. Run `make dev.up` after you save `.env`.
+   Compose recreates the app container and reads the new values.
+
+If the flag is `yes` and a required value is missing, SuperPlane logs an error.
+SuperPlane does not write the provider.
+
 ## Troubleshooting
 
 - **Webhooks not received:** Check `WEBHOOKS_BASE_URL`, ensure the tunnel is running, and that the third-party service uses the correct webhook URL.
 - **AWS "Could not connect":** Restart SuperPlane with the tunnel URL as base; confirm `/.well-known/openid-configuration` returns the right issuer; try the Provider URL with a trailing slash; keep the tunnel running. If trycloudflare.com is blocked, use ngrok (paid avoids interstitial) or another tunnel.
 - **Factory setup is not available:** The process has no complete GitHub App. Set `SUPERPLANE_GITHUB_APP_*` and restart. See the Factory GitHub App section above.
+- **Sentry intake asks for a personal token:** The process has no complete public Sentry app. Set `SUPERPLANE_SENTRY_APP_*` and restart. See the Factory Sentry App section above.
+- **Hosted OpenRouter is missing:** Set `SUPERPLANE_DEV_HOSTED_OPENROUTER=yes`, both keys, and the model list. Run `make dev.up`. See the Local hosted OpenRouter section above.

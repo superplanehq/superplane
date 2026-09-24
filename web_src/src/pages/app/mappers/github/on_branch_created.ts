@@ -4,7 +4,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { TriggerProps } from "@/ui/trigger";
 import type { BaseNodeMetadata, GitRef } from "./types";
 import { buildGithubSubtitle, createGithubMetadataItems } from "./utils";
-import type { Predicate } from "../utils";
+import type { Predicate } from "../eventDisplay";
 
 interface GithubConfiguration {
   repository: string;

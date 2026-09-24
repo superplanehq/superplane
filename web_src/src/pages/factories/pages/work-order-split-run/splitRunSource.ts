@@ -1,5 +1,6 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -19,6 +20,7 @@ export const CREATED_MANUALLY = "Created manually";
 
 export type SplitRunIntakeKind =
   | "github-issues"
+  | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
   | "productive-tasks"
@@ -38,6 +40,10 @@ export type SplitRunSource =
       detail: typeof CREATED_MANUALLY;
     };
 
+export function isMonochromeSourceLogo(iconAlt: string): boolean {
+  return iconAlt === "GitHub" || iconAlt === "SuperPlane";
+}
+
 const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
   name: STORYBOOK_ME_USER_NAME,
@@ -45,8 +51,9 @@ const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   avatarUrl: STORYBOOK_ME_USER_AVATAR_URL,
 };
 
-const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
+export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
   "github-issues": { name: "GitHub issues", iconSrc: githubIcon, iconAlt: "GitHub" },
+  "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
   "productive-tasks": { name: "Productive.io tasks", iconSrc: productiveIcon, iconAlt: "Productive.io" },
@@ -57,6 +64,7 @@ const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: s
 // GitHub default applies. GitHub itself needs no hint: its intake app is named
 // after its issues, and its links carry no other marker.
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
+  { pattern: /jira/i, kind: "jira-issues" },
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
 ];
@@ -69,6 +77,10 @@ export function sourceTicketLabel(url: string): string {
   const github = githubTicketLabel(parsed);
   if (github) {
     return github;
+  }
+  const jira = jiraTicketLabel(parsed);
+  if (jira) {
+    return jira;
   }
   const id = hostTicketId(parsed);
   // Productive.io links carry the organization id where other hosts carry a
@@ -166,6 +178,9 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (host.includes("slack.com")) {
     return "slack";
   }
+  if (host.includes("atlassian.net") || host.includes("jira.com")) {
+    return "jira-issues";
+  }
   return intakeKindFromLabel(host);
 }
 
@@ -206,6 +221,24 @@ function githubTicketLabel(parsed: URL): string | undefined {
     return undefined;
   }
   return `${owner}/${repo}#${number}`;
+}
+
+function jiraTicketLabel(parsed: URL): string | undefined {
+  if (!parsed.hostname.includes("atlassian.net") && !parsed.hostname.includes("jira.com")) {
+    return undefined;
+  }
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  if (parts.length === 0) {
+    return undefined;
+  }
+  if (parts[0] === "browse" && parts[1]) {
+    return parts[1];
+  }
+  const issuesAt = parts.indexOf("issues");
+  if (issuesAt >= 0 && parts[issuesAt + 1]) {
+    return parts[issuesAt + 1];
+  }
+  return parts.at(-1);
 }
 
 function hostTicketId(parsed: URL): string | undefined {

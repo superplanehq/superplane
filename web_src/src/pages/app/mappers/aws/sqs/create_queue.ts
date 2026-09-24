@@ -14,7 +14,7 @@ import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 
 interface CreateQueueConfiguration {
   region?: string;
@@ -84,7 +84,7 @@ function createQueueMetadataList(node: NodeInfo): MetadataItem[] {
 
 function createQueueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -39,6 +40,8 @@ import {
   FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsLayout,
+  LegacyFactoryAppRedirect,
+  LegacyFactoryAppSplitRunRedirect,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
@@ -54,8 +57,13 @@ import {
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
+  JiraIntakeSetupPage,
+  ProductiveIntakeSetupPage,
+  PlanningSetupPage,
+  SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
@@ -67,7 +75,6 @@ import { factorySettingsSectionRoutes } from "./pages/factories/pages/settings/f
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
-import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
@@ -77,6 +84,7 @@ import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
+import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
@@ -107,13 +115,15 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
 );
 
 const withAuthPermissionAndFactoriesFeature = (Component: React.ComponentType, resource: string, action: string) => (
-  <AuthGuard>
-    <RequirePermission resource={resource} action={action}>
-      <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
-        <Component />
-      </RequireExperimentalFeature>
-    </RequirePermission>
-  </AuthGuard>
+  <WorkspaceLoadingProvider>
+    <AuthGuard>
+      <RequirePermission resource={resource} action={action}>
+        <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+          <Component />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    </AuthGuard>
+  </WorkspaceLoadingProvider>
 );
 
 function organizationScopedRouteTree() {
@@ -155,15 +165,20 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+              <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
+              <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+              <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
+              <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
             </Route>
             <Route path="automations">
               <Route index element={<AutomationsPage />} />
               <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
-              <Route path=":appId" element={<AutomationsPage />} />
+              <Route path=":appId" element={<FactoryCanvasConfigureGate />} />
+              <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
-            <Route path="apps/:appId" element={<FactoryCanvasConfigureGate />} />
-            <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
+            <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />
+            <Route path="apps/:appId/split-run" element={<LegacyFactoryAppSplitRunRedirect />} />
           </Route>
         </Route>
         <Route
@@ -232,11 +247,11 @@ function AppRouter() {
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
+                <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
-              <Route path="install" element={withAuthOnly(InstallPage)} />
               {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
               <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
@@ -317,6 +332,7 @@ export function OrganizationScope() {
 
   return (
     <PermissionsProvider>
+      <UserNotificationsListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>
   );

@@ -12,7 +12,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { AnnotationNodeMetadata, DeleteAnnotationConfiguration, DeleteAnnotationOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { baseEventSections } from "./base";
 
 export const deleteAnnotationMapper: ComponentBaseMapper = {

@@ -48,6 +48,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 
 		repositoryPath := common.RepositoryPathFromLocalFile(trimmedPath)
+		if !common.IsRepositorySpecFilePath(repositoryPath) {
+			return fmt.Errorf("only canvas.yaml and console.yaml can be staged; %q is not supported", repositoryPath)
+		}
 		switch repositoryPath {
 		case common.CanvasYAMLRepositoryPath:
 			if _, err := yaml.CanvasFromYAML(content); err != nil {

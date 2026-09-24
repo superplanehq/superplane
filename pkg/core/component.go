@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -43,7 +42,6 @@ type ExecutionContext struct {
 	Integration    IntegrationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
-	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 	OIDC           oidc.Provider
@@ -87,7 +85,6 @@ type SetupContext struct {
 	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
-	Files         RepositoryFilesContext
 	Apps          AppContext
 }
 
@@ -95,11 +92,6 @@ type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
-}
-
-type RepositoryFilesContext interface {
-	List() ([]string, error)
-	Read(path string) (io.ReadCloser, error)
 }
 
 type CanvasMemoryRecord struct {
@@ -136,6 +128,12 @@ type ExecutionStateContext interface {
 	 * No payloads are emitted.
 	 */
 	Fail(reason, message string) error
+
+	/*
+	 * Cancels the execution.
+	 * No payloads are emitted.
+	 */
+	Cancel() error
 }
 
 /*

@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   Blocks,
+  Bot,
   CircleDollarSign,
   CircleUser,
   Cpu,
@@ -23,6 +24,7 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
+  | "agent-resources"
   | "models"
   | "spending"
   | "usage"
@@ -77,18 +79,17 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "light",
           "dark",
           "system",
-          "github for velocity",
+          "associated accounts",
+          "linked accounts",
           "velocity",
           "pull requests",
           "preferences",
           "profile",
           "security",
           "password",
-          "sso",
           "token",
           "access",
           "github",
-          "google",
           "sign in methods",
           "personal tokens",
           "cli",
@@ -158,6 +159,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "pull request automations",
           "save repository",
         ],
+      },
+      {
+        id: "workspace-agent-resources",
+        label: "Agent resources",
+        Icon: Bot,
+        scope: "workspace",
+        section: "agent-resources",
+        permission: { resource: "factories", action: "update" },
+        keywords: ["mcp server", "mcp", "skill", "oauth", "header", "agent", "sign-in", "github package"],
       },
       {
         id: "workspace-models",

@@ -43,8 +43,9 @@ func TestValidateRunSuperPlaneSpecAcceptsOptionalModel(t *testing.T) {
 
 	prompt := "fix tests"
 	cfg := map[string]any{
-		"machineType": runner.MachineTypeE1LargeAMD64,
-		"model":       "openrouter::anthropic/claude-sonnet-4-6",
+		"machineType":           runner.MachineTypeE1LargeAMD64,
+		"model":                 "openrouter::anthropic/claude-sonnet-4-6",
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Prompt", "type": "prompt", "prompt": prompt},
 		},
@@ -54,6 +55,7 @@ func TestValidateRunSuperPlaneSpecAcceptsOptionalModel(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, validateRunSuperPlaneSpec(spec))
 	assert.Equal(t, "openrouter::anthropic/claude-sonnet-4-6", spec.Model)
+	assert.True(t, spec.IncludeVisualEvidence)
 
 	cfg["model"] = "hosted::anthropic::claude-sonnet-4-6"
 	spec, err = decodeRunSuperPlaneSpec(cfg)

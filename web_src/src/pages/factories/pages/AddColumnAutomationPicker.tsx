@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Workflow } from "lucide-react";
 
@@ -77,7 +78,7 @@ export function AddColumnAutomationPicker({
 
 function CatalogGlyph({ entry }: { entry: ColumnAutomationCatalogEntry }) {
   if (entry.iconSrc) {
-    return <img src={entry.iconSrc} alt="" className="size-5 shrink-0" />;
+    return <img src={entry.iconSrc} alt="" className={cn("size-5 shrink-0", logoDarkInvertClass(entry.iconSrc))} />;
   }
   return <Workflow className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
 }

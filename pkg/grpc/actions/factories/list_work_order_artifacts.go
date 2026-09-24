@@ -93,6 +93,8 @@ func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {
 		return pb.WorkOrderArtifact_TYPE_BRANCH
 	case models.FactoryWorkOrderArtifactTypeLink:
 		return pb.WorkOrderArtifact_TYPE_LINK
+	case models.FactoryWorkOrderArtifactTypeFile:
+		return pb.WorkOrderArtifact_TYPE_FILE
 	default:
 		return pb.WorkOrderArtifact_TYPE_UNSPECIFIED
 	}
@@ -106,6 +108,9 @@ func artifactTypeFromProto(t pb.WorkOrderArtifact_Type) (string, bool) {
 		return models.FactoryWorkOrderArtifactTypeBranch, true
 	case pb.WorkOrderArtifact_TYPE_LINK:
 		return models.FactoryWorkOrderArtifactTypeLink, true
+	// File artifacts are created only by the task-scoped runner upload API.
+	case pb.WorkOrderArtifact_TYPE_FILE:
+		return "", false
 	}
 	return "", false
 }

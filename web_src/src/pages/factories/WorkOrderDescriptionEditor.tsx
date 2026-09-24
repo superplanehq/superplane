@@ -10,6 +10,7 @@ import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
 import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
+import { WorkOrderRequestImage } from "./lib/workOrderRequestImage";
 import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
@@ -23,9 +24,12 @@ interface WorkOrderDescriptionEditorProps {
   onFocus?: () => void;
   onBlur?: () => void;
   className?: string;
+  placeholder?: string;
   fileUrls?: Record<string, string>;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   isUploading?: boolean;
+  canRemoveImages?: boolean;
+  autoFocus?: boolean;
 }
 
 function areUrlMapsEqual(a?: Record<string, string>, b?: Record<string, string>): boolean {
@@ -56,9 +60,12 @@ export function WorkOrderDescriptionEditor({
   onFocus,
   onBlur,
   className,
+  placeholder = "Add description…",
   fileUrls,
   onUploadFiles,
   isUploading = false,
+  canRemoveImages = false,
+  autoFocus = false,
 }: WorkOrderDescriptionEditorProps) {
   const editorRef = useRef<Editor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -79,6 +86,7 @@ export function WorkOrderDescriptionEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
+    autofocus: autoFocus ? "end" : false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
@@ -86,9 +94,9 @@ export function WorkOrderDescriptionEditor({
         underline: false,
       }),
       WorkspaceUnderline,
-      WorkOrderImage,
+      canRemoveImages ? WorkOrderRequestImage : WorkOrderImage,
       Markdown,
-      Placeholder.configure({ placeholder: "Add description…" }),
+      Placeholder.configure({ placeholder }),
     ],
     content: value,
     contentType: "markdown",
@@ -169,6 +177,13 @@ export function WorkOrderDescriptionEditor({
   }, [disabled, editor]);
 
   useEffect(() => {
+    if (!autoFocus || disabled || !editor) {
+      return;
+    }
+    editor.commands.focus("end");
+  }, [autoFocus, disabled, editor]);
+
+  useEffect(() => {
     if (!editor) {
       return;
     }
@@ -225,6 +240,7 @@ export function WorkOrderDescriptionEditor({
           updateDelay={0}
           appendTo={() =>
             editor.view.dom.closest('[data-testid="create-work-order-dialog"]') ??
+            editor.view.dom.closest('[data-testid="create-work-order-request-dialog"]') ??
             editor.view.dom.closest('[data-testid="work-order-split-run"]') ??
             editor.view.dom.parentElement ??
             document.body

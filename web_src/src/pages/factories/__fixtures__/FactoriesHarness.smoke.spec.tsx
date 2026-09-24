@@ -101,6 +101,10 @@ describe("FactoriesHarness tasks", () => {
     expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("factory-app-more-options")).toBeInTheDocument();
     expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
+    // Header chrome can render while the workspace still shows Loading….
+    // Wait for the edit session so a missing sidebar is a real absence.
+    await waitFor(() => expect(document.querySelector(".sp-canvas-editing")).not.toBeNull(), { timeout: 8000 });
+    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
   }, 15000);
 
   it("opens an edit session in factory Configure", async () => {

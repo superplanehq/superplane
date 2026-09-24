@@ -1,7 +1,9 @@
 package productive
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,11 +22,19 @@ const (
 	// misbehaving pagination cursor cannot loop forever.
 	maxProjectPages = 20
 
-	// sortNewestCreated and sortNewestUpdated order tasks by the timestamp a
-	// caller reads them for: when they appeared, or when they last changed.
+	// sortNewestCreated orders tasks by when they appeared, newest first.
 	sortNewestCreated = "-created_at"
-	sortNewestUpdated = "-updated_at"
+
+	// webhooksLimitExceededCode is the JSON:API error code Productive.io
+	// answers webhook registration with on plans that do not include
+	// webhooks. It is used to turn a 403 into a message a user can act on,
+	// rather than a bare HTTP status.
+	webhooksLimitExceededCode = "webhooks_limit_exceeded"
 )
+
+// ErrWebhooksLimitExceeded reports that Productive.io rejected a webhook
+// registration because the organization's plan does not include webhooks.
+var ErrWebhooksLimitExceeded = errors.New("productive.io plan does not include webhooks")
 
 // Client talks to Productive.io's JSON:API v2 API using an API token and an
 // organization id, both sent as headers on every request.
@@ -33,6 +43,20 @@ type Client struct {
 	OrganizationID string
 	BaseURL        string
 	http           core.HTTPContext
+}
+
+type responseError struct {
+	statusCode int
+	body       string
+}
+
+func (e *responseError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.statusCode, e.body)
+}
+
+func IsNotFoundError(err error) bool {
+	var responseErr *responseError
+	return errors.As(err, &responseErr) && responseErr.statusCode == http.StatusNotFound
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -94,10 +118,40 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		if res.StatusCode == http.StatusForbidden && hasErrorCode(responseBody, webhooksLimitExceededCode) {
+			return nil, fmt.Errorf("%w: %s", ErrWebhooksLimitExceeded, string(responseBody))
+		}
+
+		return nil, &responseError{statusCode: res.StatusCode, body: string(responseBody)}
 	}
 
 	return responseBody, nil
+}
+
+// apiErrorResponse is the JSON:API error shape Productive.io answers a failed
+// request with, trimmed to the field that classifies the error.
+type apiErrorResponse struct {
+	Errors []struct {
+		Code string `json:"code"`
+	} `json:"errors"`
+}
+
+// hasErrorCode reports whether one of a JSON:API error response's errors
+// carries the given code. A body that cannot be parsed as such simply
+// answers false, since it then carries no code to find.
+func hasErrorCode(body []byte, code string) bool {
+	response := apiErrorResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return false
+	}
+
+	for _, apiErr := range response.Errors {
+		if apiErr.Code == code {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ValidateCredentials confirms the token and organization id are accepted by
@@ -147,6 +201,12 @@ type Task struct {
 	Title       string
 	Description string
 	ProjectID   string
+	Closed      bool
+	TypeID      int
+}
+
+func (t Task) IsKeyTask() bool {
+	return t.TypeID == TaskTypeMilestone
 }
 
 func projectFromDocument(doc resourceDocument) Project {
@@ -157,6 +217,7 @@ func projectFromDocument(doc resourceDocument) Project {
 func taskFromDocument(doc resourceDocument) Task {
 	title, _ := doc.Attributes["title"].(string)
 	description, _ := doc.Attributes["description"].(string)
+	closed, _ := doc.Attributes["closed"].(bool)
 	projectID := doc.Relationships["project"].Data.ID
 	return Task{
 		ID:          doc.ID,
@@ -164,6 +225,8 @@ func taskFromDocument(doc resourceDocument) Task {
 		Title:       title,
 		Description: description,
 		ProjectID:   projectID,
+		Closed:      closed,
+		TypeID:      numberAttribute(doc.Attributes["type_id"]),
 	}
 }
 
@@ -231,22 +294,24 @@ func (c *Client) GetProject(id string) (*Project, error) {
 
 // taskListOptions describes one page of a project's tasks.
 type taskListOptions struct {
-	projectID string
-	query     string
-	openOnly  bool
-	sort      string
-	page      int
-	pageSize  int
+	projectID   string
+	query       string
+	openOnly    bool
+	regularOnly bool
+	sort        string
+	pageSize    int
 }
 
 // ListTasks returns open tasks from one project, optionally filtered by text.
-func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
+// When regularOnly is set, key tasks (milestones) are omitted.
+func (c *Client) ListTasks(projectID, query string, limit int, regularOnly bool) ([]Task, error) {
 	url := c.taskListURL(taskListOptions{
-		projectID: projectID,
-		query:     query,
-		openOnly:  true,
-		sort:      sortNewestCreated,
-		pageSize:  limit,
+		projectID:   projectID,
+		query:       query,
+		openOnly:    true,
+		regularOnly: regularOnly,
+		sort:        sortNewestCreated,
+		pageSize:    limit,
 	})
 
 	body, err := c.execRequest(http.MethodGet, url, nil)
@@ -270,25 +335,13 @@ func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
 // open task in the project, newest first. Seeding an intake replays these
 // through the graph the trigger feeds, and that graph reads attributes Task
 // does not keep.
-func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int) ([]map[string]any, error) {
+func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int, regularOnly bool) ([]map[string]any, error) {
 	return c.listTaskDocuments(taskListOptions{
-		projectID: projectID,
-		openOnly:  true,
-		sort:      sortNewestCreated,
-		pageSize:  limit,
-	})
-}
-
-// ListChangedTaskDocuments returns one page of the project's tasks, most
-// recently changed first. The onTask trigger reads these to find what changed
-// since its last poll, so closed tasks are included: closing a task is a
-// change the trigger can be configured to report.
-func (c *Client) ListChangedTaskDocuments(projectID string, page, pageSize int) ([]map[string]any, error) {
-	return c.listTaskDocuments(taskListOptions{
-		projectID: projectID,
-		sort:      sortNewestUpdated,
-		page:      page,
-		pageSize:  pageSize,
+		projectID:   projectID,
+		openOnly:    true,
+		regularOnly: regularOnly,
+		sort:        sortNewestCreated,
+		pageSize:    limit,
 	})
 }
 
@@ -315,12 +368,12 @@ func (c *Client) taskListURL(options taskListOptions) string {
 	params.Set("page[size]", strconv.Itoa(options.pageSize))
 	params.Set("sort", options.sort)
 
-	if options.page > 0 {
-		params.Set("page[number]", strconv.Itoa(options.page))
-	}
-
 	if options.openOnly {
 		params.Set("filter[status]", "1")
+	}
+
+	if options.regularOnly {
+		params.Set("filter[type_id]", strconv.Itoa(TaskTypeRegular))
 	}
 
 	if query := strings.TrimSpace(options.query); query != "" {
@@ -347,4 +400,64 @@ func (c *Client) GetTask(id string) (*Task, error) {
 
 	task := taskFromDocument(response.Data)
 	return &task, nil
+}
+
+// Webhook is a Productive.io webhook subscription. Productive.io webhooks
+// are organization-wide and fire for one event_id each.
+type Webhook struct {
+	ID             string
+	SignatureToken string
+}
+
+// CreateWebhook registers an organization webhook that POSTs eventID
+// deliveries to webhookURL. eventName is sent back on each delivery as
+// EventHeader. Productive.io answers 403 webhooks_limit_exceeded (surfaced
+// as ErrWebhooksLimitExceeded) on plans that do not include webhooks.
+func (c *Client) CreateWebhook(webhookURL string, eventID int, eventName string) (*Webhook, error) {
+	attributes := map[string]any{
+		"name":       "SuperPlane",
+		"event_id":   eventID,
+		"target_url": webhookURL,
+		"type_id":    WebhookTypeStandard,
+	}
+	if eventName != "" {
+		attributes["custom_headers"] = map[string]string{
+			EventHeader: eventName,
+		}
+	}
+
+	payload := map[string]any{
+		"data": map[string]any{
+			"type":       "webhooks",
+			"attributes": attributes,
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error building webhook payload: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, fmt.Sprintf("%s/webhooks", c.BaseURL), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	response := resourceResponse{}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing webhook: %v", err)
+	}
+
+	if response.Data.ID == "" {
+		return nil, fmt.Errorf("productive.io did not return a webhook id")
+	}
+
+	token, _ := response.Data.Attributes["signature_token"].(string)
+	return &Webhook{ID: response.Data.ID, SignatureToken: token}, nil
+}
+
+// DeleteWebhook removes a webhook by its Productive.io resource id.
+func (c *Client) DeleteWebhook(id string) error {
+	_, err := c.execRequest(http.MethodDelete, fmt.Sprintf("%s/webhooks/%s", c.BaseURL, url.PathEscape(id)), nil)
+	return err
 }

@@ -7,9 +7,17 @@ import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
 import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
 import { analysisSphereFor } from "./firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
+import { canAnalyzeTicketSource } from "./firstRunTicketSource";
 import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
 import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
+import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
+import type { JiraCompletionColumnValue } from "../../jiraCompletionColumn";
+
+const STORY_JIRA_PROJECTS = [
+  { id: "PAY", name: "Payments" },
+  { id: "CORE", name: "Core" },
+];
 
 const STAGE_MS = 900;
 
@@ -32,6 +40,11 @@ export function FirstRunFlow({
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
+  const [jiraConnected, setJiraConnected] = useState(false);
+  const [jiraProjectId, setJiraProjectId] = useState("");
+  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>({
+    ...DEFAULT_JIRA_COMPLETION_SETTINGS,
+  });
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
 
@@ -89,9 +102,24 @@ export function FirstRunFlow({
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
         chrome={chromeFor(3, () => setScreen("choose"))}
+        jiraConnected={jiraConnected}
+        jiraProjects={STORY_JIRA_PROJECTS}
+        jiraProjectId={jiraProjectId}
+        jiraCompletion={jiraCompletion}
+        organizationId="org-1"
+        jiraIntegrationId={jiraConnected ? "jira-story" : ""}
         onSelectTicketSource={setTicketSource}
+        onConnectJira={() => {
+          setTicketSource("jira");
+          setJiraConnected(true);
+        }}
+        onSelectJiraProject={(id) => {
+          setJiraProjectId(id);
+          setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
+        }}
+        onJiraCompletionChange={setJiraCompletion}
         onAnalyzeTickets={() => {
-          if (!ticketSource) return;
+          if (!canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId })) return;
           setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
           setScreen("analysis");
         }}
@@ -103,7 +131,7 @@ export function FirstRunFlow({
     return (
       <FirstRunAnalysisScreen
         progress={progress}
-        sourceName="GitHub issues"
+        sourceName={ticketSource === "jira" ? "Jira issues" : "GitHub issues"}
         chrome={chromeFor(4)}
         sphere={analysisSphere}
         onGoToBoard={() => setScreen("board")}

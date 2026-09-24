@@ -6,8 +6,8 @@ import type { GitLabNodeMetadata } from "./types";
 import { buildGitlabSubtitle } from "./utils";
 import type { WebhookIssue } from "./issue_utils";
 import { getDetailsForWebhookIssue } from "./issue_utils";
-import type { Predicate } from "../utils";
-import { formatPredicate } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate } from "../eventDisplay";
 
 interface OnIssueConfiguration {
   actions: string[];

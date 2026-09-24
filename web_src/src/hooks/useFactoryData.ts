@@ -8,8 +8,10 @@ import {
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
+  factoriesCreateFactoryAutomation,
+  factoriesDeleteFactoryAutomation,
   factoriesListFactories,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
@@ -18,17 +20,16 @@ import {
   factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
-  factoriesListFactoryPullRequests,
 } from "@/api-client";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
-  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderSummary,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -38,39 +39,46 @@ import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
 } from "@/pages/factories/lib/workOrderEventsPagination";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
-export type FactoryPullRequestFilters = {
-  order?: number | string;
-  workOrderIds?: string[];
-};
-
-type NormalizedFactoryPullRequestFilters = {
-  order?: string;
-  workOrderIds: string[];
-};
-
-function normalizeFactoryPullRequestFilters(filters?: FactoryPullRequestFilters): NormalizedFactoryPullRequestFilters {
-  const workOrderIds = [...new Set(filters?.workOrderIds ?? [])].filter(Boolean).sort();
-  const order = filters?.order == null || String(filters.order) === "" ? undefined : String(filters.order);
-  return { order, workOrderIds };
-}
+import {
+  BOARD_BACKLOG_PAGE_SIZE,
+  BOARD_BACKLOG_STATES,
+  BOARD_DONE_PAGE_SIZE,
+  BOARD_DONE_STATES,
+  BOARD_OPEN_PAGE_SIZE,
+  BOARD_OPEN_STATES,
+  factoryWorkOrdersPageKey,
+  factoryWorkOrdersPagePrefix,
+  flattenWorkOrdersPages,
+  getWorkOrdersNextPageParam,
+  normalizeWorkOrdersPageQuery,
+  uniqueWorkOrdersById,
+  WORK_ORDER_LIST_PAGE_SIZE,
+  workOrdersPageFromResponse,
+  type WorkOrdersPageCursor,
+  type WorkOrdersPageQuery,
+} from "@/pages/factories/lib/workOrderListPagination";
+import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
   detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
   workOrders: (organizationId: string, factoryId: string) =>
     ["factories", organizationId, factoryId, "work-orders"] as const,
+  workOrdersPagePrefix: factoryWorkOrdersPagePrefix,
+  workOrdersPage: factoryWorkOrdersPageKey,
   workOrderDetail: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId] as const,
   workOrderEvents: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
-  workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
-    ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
-  pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
-    ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
+  planningSessions: (organizationId: string, factoryId: string) =>
+    ["planning-session-by-work-order", organizationId, factoryId] as const,
+  planningSession: (organizationId: string, factoryId: string, workOrderId: string) =>
+    [...factoryQueryKeys.planningSessions(organizationId, factoryId), workOrderId] as const,
+  pullRequestMergeability: (organizationId: string, factoryId: string, pullRequestId: string) =>
+    ["factories", organizationId, factoryId, "pull-requests", pullRequestId, "mergeability"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
   velocity: (
     organizationId: string,
@@ -162,14 +170,31 @@ export function useFactory(organizationId: string, factoryId: string) {
 export function useFactoryWorkOrders(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: workOrdersKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoriesWorkOrder[]> => {
-      const response = await factoriesListWorkOrders(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-        }),
-      );
-      return response.data?.orders ?? [];
+    queryFn: async (): Promise<FactoriesWorkOrderSummary[]> => {
+      const orders: FactoriesWorkOrderSummary[] = [];
+      let beforeId: string | undefined;
+      for (;;) {
+        const response = await factoriesListWorkOrders(
+          withOrganizationHeader({
+            organizationId,
+            path: { factoryId },
+            query: {
+              limit: WORK_ORDER_LIST_PAGE_SIZE,
+              ...(beforeId ? { beforeId } : {}),
+            },
+          }),
+        );
+        const page = response.data?.orders ?? [];
+        orders.push(...page);
+        if (!response.data?.hasNextPage || page.length === 0) {
+          return orders;
+        }
+        const nextId = page.at(-1)?.id;
+        if (!nextId) {
+          return orders;
+        }
+        beforeId = nextId;
+      }
     },
     enabled: Boolean(organizationId && factoryId),
     // Live via websocket; remount must refetch instead of serving 5m global stale cache.
@@ -177,30 +202,123 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
   });
 }
 
-export function factoryPullRequestsKey(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
-  return factoryQueryKeys.pullRequests(organizationId, factoryId, normalizeFactoryPullRequestFilters(filters));
+export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & { requireUser?: boolean };
+
+function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions): WorkOrdersPageQuery {
+  return normalizeWorkOrdersPageQuery({
+    userId: options?.userId,
+    unassigned: options?.unassigned,
+  });
 }
 
-export function useFactoryPullRequests(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
-  const normalized = normalizeFactoryPullRequestFilters(filters);
-  return useQuery({
-    queryKey: factoryQueryKeys.pullRequests(organizationId, factoryId, normalized),
-    queryFn: async (): Promise<FactoriesFactoryPullRequest[]> => {
-      const response = await factoriesListFactoryPullRequests(
+export function useFactoryWorkOrdersPage(
+  organizationId: string,
+  factoryId: string,
+  states: readonly FactoriesWorkOrderState[],
+  pageSize: number,
+  options?: FactoryWorkOrdersPageOptions,
+) {
+  const pageQuery = workOrdersPageQueryFromOptions(options);
+  const query = useInfiniteQuery({
+    queryKey: factoryQueryKeys.workOrdersPage(organizationId, factoryId, states, pageQuery),
+    queryFn: async ({ pageParam }: { pageParam?: WorkOrdersPageCursor }) => {
+      const response = await factoriesListWorkOrders(
         withOrganizationHeader({
           organizationId,
           path: { factoryId },
           query: {
-            order: normalized.order,
-            workOrderIds: normalized.workOrderIds.length > 0 ? normalized.workOrderIds : undefined,
+            states: [...states],
+            limit: pageSize,
+            ...(pageQuery.userId ? { userId: pageQuery.userId } : {}),
+            ...(pageQuery.unassigned ? { unassigned: true } : {}),
+            ...(pageParam ? { beforeId: pageParam.beforeId } : {}),
           },
         }),
       );
-      return response.data?.pullRequests ?? [];
+      return workOrdersPageFromResponse(response.data);
     },
-    enabled: Boolean(organizationId && factoryId),
+    getNextPageParam: getWorkOrdersNextPageParam,
+    initialPageParam: undefined as WorkOrdersPageCursor | undefined,
+    enabled: Boolean(organizationId && factoryId) && (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
+    placeholderData: keepPreviousData,
   });
+
+  return {
+    orders: flattenWorkOrdersPages(query.data?.pages),
+    isLoading: query.isLoading,
+    isPlaceholderData: query.isPlaceholderData,
+    hasNextPage: Boolean(query.hasNextPage),
+    fetchNextPage: query.fetchNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+  };
+}
+
+export type FactoryBoardColumnPage = {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => void;
+};
+
+export type FactoryBoardWorkOrders = {
+  workOrders: FactoriesWorkOrderSummary[];
+  isLoading: boolean;
+  isPlaceholderData: boolean;
+  backlog: FactoryBoardColumnPage;
+  open: FactoryBoardColumnPage;
+  done: FactoryBoardColumnPage;
+};
+
+function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): FactoryBoardColumnPage {
+  return {
+    hasNextPage: page.hasNextPage,
+    isFetchingNextPage: page.isFetchingNextPage,
+    fetchNextPage: () => {
+      void page.fetchNextPage();
+    },
+  };
+}
+
+export function mergeFactoryBoardWorkOrders(
+  backlog: FactoriesWorkOrderSummary[],
+  open: FactoriesWorkOrderSummary[],
+  done: FactoriesWorkOrderSummary[],
+): FactoriesWorkOrderSummary[] {
+  return uniqueWorkOrdersById([...backlog, ...open, ...done]);
+}
+
+export function useFactoryBoardWorkOrders(
+  organizationId: string,
+  factoryId: string,
+  options?: FactoryWorkOrdersPageOptions,
+): FactoryBoardWorkOrders {
+  const backlog = useFactoryWorkOrdersPage(
+    organizationId,
+    factoryId,
+    BOARD_BACKLOG_STATES,
+    BOARD_BACKLOG_PAGE_SIZE,
+    options,
+  );
+  const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, options);
+  const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, options);
+
+  return {
+    workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
+    isLoading: backlog.isLoading || open.isLoading || closed.isLoading,
+    isPlaceholderData: backlog.isPlaceholderData || open.isPlaceholderData || closed.isPlaceholderData,
+    backlog: boardColumnPage(backlog),
+    open: boardColumnPage(open),
+    done: boardColumnPage(closed),
+  };
+}
+
+function invalidateWorkOrderLists(
+  queryClient: ReturnType<typeof useQueryClient>,
+  organizationId: string,
+  factoryId: string,
+) {
+  void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+  void queryClient.invalidateQueries({ queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId) });
 }
 
 export function useWorkOrder(organizationId: string, factoryId: string, orderId: string) {
@@ -281,6 +399,7 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       description?: string;
       key?: string;
       hostedSpendBudgetCents?: number | null;
+      planning?: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean };
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
@@ -295,6 +414,7 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
                 ? undefined
                 : String(input.hostedSpendBudgetCents),
             clearHostedSpendBudget: input.hostedSpendBudgetCents === null ? true : undefined,
+            planning: input.planning,
           },
         }),
       );
@@ -356,10 +476,9 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
       return response.data.order;
     },
     onSuccess: (order) => {
-      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       // The Backlog run for this order is created asynchronously after this
-      // RPC returns, so show "Analyzing" optimistically and start polling
-      // for the real run right away instead of waiting for a page reload.
+      // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
       markBacklogAnalysisPending(order.id);
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
@@ -392,7 +511,7 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
       return response.data.order;
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
@@ -426,7 +545,7 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       return response.data.order;
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
@@ -472,22 +591,26 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
     // function returns, and roll the patch back if the request fails.
     onMutate: async (variables) => {
       const ordersKey = workOrdersKey(organizationId, factoryId);
+      const pagePrefix = factoryWorkOrdersPagePrefix(organizationId, factoryId);
       await queryClient.cancelQueries({ queryKey: ordersKey });
+      await queryClient.cancelQueries({ queryKey: pagePrefix });
 
       const previousOrders = queryClient.getQueryData<FactoriesWorkOrder[]>(ordersKey);
       const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
       const line = factory?.lines?.find((candidate) => candidate.name === variables.lineName);
+      const current = cachedWorkOrderFromLists(queryClient, organizationId, factoryId, variables.orderId);
 
       // Placing the card needs the line's id (and its steps, for the phase
       // label); skip the patch when the factory detail isn't cached yet.
       // Dispatch still succeeds — the card just waits for the invalidated
       // list below to move it, same as before this change.
-      if (line && previousOrders) {
-        const now = new Date().toISOString();
-        queryClient.setQueryData<FactoriesWorkOrder[]>(ordersKey, (current) =>
-          (current ?? []).map((order) =>
-            order.id === variables.orderId ? buildOptimisticDispatchedOrder(order, line, now) : order,
-          ),
+      if (line && current) {
+        applyWorkOrderToListCaches(
+          queryClient,
+          organizationId,
+          factoryId,
+          variables.orderId,
+          buildOptimisticDispatchedOrder(current, line, new Date().toISOString()),
         );
       }
 
@@ -497,16 +620,15 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       if (context?.previousOrders) {
         queryClient.setQueryData(workOrdersKey(organizationId, factoryId), context.previousOrders);
       }
+      void queryClient.invalidateQueries({ queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId) });
     },
     onSuccess: (order, variables) => {
       // Reconcile the optimistic placeholder with the real dispatch id,
       // execution id, and run refs, so the card doesn't flicker back to
       // Backlog before the invalidated queries below refetch.
-      queryClient.setQueryData<FactoriesWorkOrder[]>(workOrdersKey(organizationId, factoryId), (current) =>
-        (current ?? []).map((existing) => (existing.id === order.id ? order : existing)),
-      );
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, variables.orderId, order);
       queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
-      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
@@ -542,7 +664,7 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
       return response.data.order;
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
@@ -617,7 +739,7 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
       return response.data.order;
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
@@ -628,21 +750,65 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
-export async function fetchFactoryApps(organizationId: string, factoryId: string): Promise<FactoryApp[]> {
-  const response = await factoriesListFactoryApps(
+export async function fetchFactoryAutomations(organizationId: string, factoryId: string): Promise<FactoryAutomation[]> {
+  const response = await factoriesListFactoryAutomations(
     withOrganizationHeader({
       organizationId,
       path: { factoryId },
     }),
   );
-  return response.data?.apps ?? [];
+  return response.data?.automations ?? [];
 }
 
-export function useFactoryApps(organizationId: string, factoryId: string) {
+export function useFactoryAutomations(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: factoryAppsKey(organizationId, factoryId),
-    queryFn: () => fetchFactoryApps(organizationId, factoryId),
+    queryFn: () => fetchFactoryAutomations(organizationId, factoryId),
     enabled: Boolean(organizationId && factoryId),
+  });
+}
+
+export function useCreateFactoryAutomation(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { name?: string; columnKey?: string }) => {
+      const response = await factoriesCreateFactoryAutomation(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: {
+            name: input.name,
+            columnKey: input.columnKey,
+          },
+        }),
+      );
+      if (!response.data?.automation) {
+        throw new Error("Failed to create automation");
+      }
+      return response.data.automation;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useDeleteFactoryAutomation(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (automationId: string) => {
+      await factoriesDeleteFactoryAutomation(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, automationId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+    },
   });
 }
 
@@ -713,4 +879,4 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   });
 }
 
-export type { FactoryApp, FactoriesFactoryLine, FactoryLineStep };
+export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };

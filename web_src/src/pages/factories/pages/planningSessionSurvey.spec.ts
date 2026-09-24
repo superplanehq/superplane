@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
-import { formatPlanningSurveyReply, isPlanningSurveyReply, parsePlanningSurvey } from "./planningSessionSurvey";
+import {
+  formatPlanningSurveyReply,
+  isPlanningSurveyReply,
+  parsePlanningSurvey,
+  parsePlanningSurveyReply,
+} from "./planningSessionSurvey";
 
 describe("parsePlanningSurvey", () => {
   it("reads questions from survey JSON", () => {
@@ -37,6 +42,32 @@ describe("formatPlanningSurveyReply", () => {
 
   it("uses the skip line when every question is empty", () => {
     expect(formatPlanningSurveyReply(questions, [null, ""])).toBe(CREATE_WITH_AGENT_COPY.surveySkipped);
+  });
+});
+
+describe("parsePlanningSurveyReply", () => {
+  it("splits each line into the question and the chosen answer", () => {
+    expect(parsePlanningSurveyReply("What is the priority? High\nWhat is the scope? One file")).toEqual([
+      { question: "What is the priority?", answer: "High" },
+      { question: "What is the scope?", answer: "One file" },
+    ]);
+  });
+
+  it("keeps a long custom answer after the question mark", () => {
+    expect(
+      parsePlanningSurveyReply(
+        "What should the agent build? Custom styled modal matching the app dark theme, per the maintainer comment",
+      ),
+    ).toEqual([
+      {
+        question: "What should the agent build?",
+        answer: "Custom styled modal matching the app dark theme, per the maintainer comment",
+      },
+    ]);
+  });
+
+  it("returns no pairs for the skip line", () => {
+    expect(parsePlanningSurveyReply(CREATE_WITH_AGENT_COPY.surveySkipped)).toEqual([]);
   });
 });
 

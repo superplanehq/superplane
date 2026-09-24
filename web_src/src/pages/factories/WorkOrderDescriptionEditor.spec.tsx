@@ -59,6 +59,15 @@ afterEach(async () => {
 });
 
 describe("WorkOrderDescriptionEditor", () => {
+  it("focuses the editor when autoFocus is set", async () => {
+    render(<WorkOrderDescriptionEditor autoFocus value="" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+    });
+  });
+
   it("renders pasted markdown as a heading, paragraph, and list", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -408,5 +417,30 @@ describe("WorkOrderDescriptionEditor", () => {
     );
 
     expect(img?.getAttribute("src")).toBe(downloadUrl);
+  });
+
+  it("removes an inline image from the hover control when canRemoveImages is on", async () => {
+    const user = userEvent.setup();
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={`Refunds fail.\n\n![screenshot](sp-file://${fileId})`}
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        canRemoveImages
+        fileUrls={{ [fileId]: "https://cdn.example.com/files/shot.png" }}
+      />,
+    );
+
+    await user.click(await screen.findByTestId(`create-work-order-request-inline-image-remove-${fileId}`));
+
+    await waitFor(() => {
+      const next = onChange.mock.calls.at(-1)?.[0] as string;
+      expect(next).toContain("Refunds fail.");
+      expect(next).not.toContain(`sp-file://${fileId}`);
+    });
   });
 });

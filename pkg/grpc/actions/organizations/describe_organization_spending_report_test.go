@@ -102,6 +102,70 @@ func Test__DescribeOrganizationSpendingReport(t *testing.T) {
 	assert.NotEmpty(t, resp.Catalogs.Workspaces)
 }
 
+func Test__DescribeOrganizationSpendingReport__StripsOpenRouterModelPrefix(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factory.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	}, nil))
+
+	var execution *models.FactoryWorkOrderExecution
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, result, dispatchErr := line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		execution = result.Execution
+		return nil
+	}))
+
+	require.NotNil(t, execution.RunID)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     *execution.RunID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenRouter,
+		Model:           "x-ai/grok-4.6",
+		FundingSource:   models.UsageFundingSourceHosted,
+		InputTokens:     1000,
+		TotalTokens:     1000,
+		IdempotencyKey:  "spending-report-openrouter-prefix:" + factory.ID.String(),
+	}))
+
+	end := time.Now()
+	start := end.AddDate(0, 0, -1)
+	resp, err := DescribeOrganizationSpendingReport(
+		context.Background(),
+		r.Organization.ID.String(),
+		&pb.DescribeOrganizationSpendingReportRequest{
+			StartTime: timestamppb.New(start),
+			EndTime:   timestamppb.New(end),
+			GroupBy:   models.SpendingGroupByModel,
+			TimeGrain: models.SpendingTimeGrainDay,
+			UsageKind: models.UsageKindModel,
+		},
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Breakdown)
+	assert.Equal(t, "openrouter/x-ai/grok-4.6", resp.Breakdown[0].Id)
+	assert.Equal(t, "x-ai/grok-4.6", resp.Breakdown[0].Label)
+	require.NotEmpty(t, resp.SeriesKeys)
+	assert.Equal(t, "x-ai/grok-4.6", resp.SeriesKeys[0].Label)
+	require.NotNil(t, resp.Catalogs)
+	require.NotEmpty(t, resp.Catalogs.Models)
+	assert.Equal(t, "openrouter/x-ai/grok-4.6", resp.Catalogs.Models[0].Id)
+	assert.Equal(t, "x-ai/grok-4.6", resp.Catalogs.Models[0].Label)
+}
+
 func Test__DescribeOrganizationSpendingReport__KPITotalsIgnoreExplorerFilters(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

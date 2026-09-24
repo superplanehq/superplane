@@ -22,7 +22,6 @@ import {
   organizationsUpdateInviteLink,
   organizationsResetInviteLink,
   organizationsDeleteOrganization,
-  organizationsDescribeUsage,
   organizationsSetUserOwner,
 } from "../api-client/sdk.gen";
 import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
@@ -41,7 +40,6 @@ export const organizationKeys = {
   role: (orgId: string, roleName: string) => [...organizationKeys.all, "role", orgId, roleName] as const,
   canvases: (orgId: string) => [...organizationKeys.all, "canvases", orgId] as const,
   inviteLink: (orgId: string) => [...organizationKeys.all, "inviteLink", orgId] as const,
-  usage: (orgId: string) => [...organizationKeys.all, "usage", orgId] as const,
 };
 
 // Hooks for fetching data
@@ -190,36 +188,6 @@ export const useOrganizationInviteLink = (organizationId: string, enabled = true
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId && enabled,
-  });
-};
-
-type OrganizationUsageQueryOptions = {
-  staleTime?: number;
-  gcTime?: number;
-  refetchOnMount?: boolean | "always";
-  refetchOnWindowFocus?: boolean | "always";
-};
-
-export const useOrganizationUsage = (
-  organizationId: string,
-  enabled = true,
-  options: OrganizationUsageQueryOptions = {},
-) => {
-  return useQuery({
-    queryKey: organizationKeys.usage(organizationId),
-    queryFn: async () => {
-      const response = await organizationsDescribeUsage(
-        withOrganizationHeader({
-          path: { id: organizationId },
-        }),
-      );
-      return response.data || null;
-    },
-    staleTime: options.staleTime ?? 30 * 1000,
-    gcTime: options.gcTime ?? 5 * 60 * 1000,
-    refetchOnMount: options.refetchOnMount,
-    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     enabled: !!organizationId && enabled,
   });
 };

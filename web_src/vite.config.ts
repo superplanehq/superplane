@@ -83,7 +83,7 @@ export default defineConfig(() => {
       },
     },
     optimizeDeps: {
-      include: ["@pierre/diffs/react", "@pierre/trees/react"],
+      include: ["@pierre/diffs/react"],
     },
     build: {
       target: "es2020",

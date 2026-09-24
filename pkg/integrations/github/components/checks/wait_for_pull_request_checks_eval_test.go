@@ -32,6 +32,10 @@ func Test__NormalizePullRequestChecks(t *testing.T) {
 				Conclusion: github.Ptr("failure"),
 				DetailsURL: github.Ptr("https://example.com/dco-later"),
 				App:        &github.App{Slug: github.Ptr("dco")},
+				Output: &github.CheckRunOutput{
+					Title:   github.Ptr("DCO required"),
+					Summary: github.Ptr("The DCO check failed.\nSee the log."),
+				},
 			},
 		},
 	}
@@ -43,9 +47,10 @@ func Test__NormalizePullRequestChecks(t *testing.T) {
 				TargetURL: github.Ptr("https://example.com/ci"),
 			},
 			{
-				Context:   github.Ptr("ci/semaphore"),
-				State:     github.Ptr("success"),
-				TargetURL: github.Ptr("https://example.com/ci-later"),
+				Context:     github.Ptr("ci/semaphore"),
+				State:       github.Ptr("success"),
+				Description: github.Ptr("CI"),
+				TargetURL:   github.Ptr("https://example.com/ci-later"),
 			},
 		},
 	}
@@ -54,10 +59,14 @@ func Test__NormalizePullRequestChecks(t *testing.T) {
 	require.Len(t, checks, 3)
 	assert.Equal(t, "check-run:dco:DCO", checks[0].Key)
 	assert.Equal(t, "failure", checks[0].Conclusion)
+	assert.Equal(t, "DCO required", checks[0].Description)
+	assert.Equal(t, "The DCO check failed.", checks[0].Summary)
 	assert.Equal(t, "check-run:github-actions:lint", checks[1].Key)
 	assert.Equal(t, checkStatusPending, checks[1].Status)
 	assert.Equal(t, "status:ci/semaphore", checks[2].Key)
 	assert.Equal(t, "success", checks[2].Conclusion)
+	assert.Equal(t, "CI", checks[2].Summary)
+	assert.Equal(t, "https://example.com/ci-later", checks[2].DetailsURL)
 }
 
 func Test__EvaluatePullRequestChecks(t *testing.T) {

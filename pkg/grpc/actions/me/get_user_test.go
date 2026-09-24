@@ -115,6 +115,46 @@ func Test_GetUser_HasToken(t *testing.T) {
 	assert.True(t, resp.User.HasToken, "a user with a personal token should report has_token=true")
 }
 
+func Test_GetUser_BrowserNotificationPreferences(t *testing.T) {
+	r := support.Setup(t)
+	ctx := metadata.NewIncomingContext(
+		context.Background(),
+		metadata.Pairs(
+			"x-organization-id", r.Organization.ID.String(),
+			"x-user-id", r.User.String(),
+		),
+	)
+
+	t.Run("uses defaults when settings do not exist", func(t *testing.T) {
+		resp, err := GetUser(ctx, r.AuthService, false)
+		require.NoError(t, err)
+		require.NotNil(t, resp.User.BrowserNotificationPreferences)
+		assert.False(t, resp.User.BrowserNotificationPreferences.Enabled)
+		assert.True(t, resp.User.BrowserNotificationPreferences.ShowWhileViewing)
+	})
+
+	t.Run("returns saved browser settings", func(t *testing.T) {
+		showWhileViewing := false
+		_, err := models.UpsertUserNotificationSettings(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			r.User,
+			models.UserNotificationSettingsParams{
+				WorkspaceScope:          models.NotificationWorkspaceScopeAll,
+				BrowserWorkspaceScope:   models.NotificationWorkspaceScopeFiltered,
+				BrowserShowWhileViewing: &showWhileViewing,
+			},
+		)
+		require.NoError(t, err)
+
+		resp, err := GetUser(ctx, r.AuthService, false)
+		require.NoError(t, err)
+		require.NotNil(t, resp.User.BrowserNotificationPreferences)
+		assert.True(t, resp.User.BrowserNotificationPreferences.Enabled)
+		assert.False(t, resp.User.BrowserNotificationPreferences.ShowWhileViewing)
+	})
+}
+
 func getExpectedPermissions(resources []string) []*pbAuth.Permission {
 	permissions := make([]*pbAuth.Permission, 0, len(resources))
 	for _, resource := range resources {

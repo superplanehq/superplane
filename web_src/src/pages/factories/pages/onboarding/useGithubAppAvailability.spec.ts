@@ -11,22 +11,33 @@ describe("githubAppAvailabilityFromCatalog", () => {
     });
   });
 
-  it("blocks when GitHub has no hosted app", () => {
+  it("blocks when the process has no GitHub App", () => {
     expect(
       githubAppAvailabilityFromCatalog({
         isSuccess: true,
         isError: false,
-        githubDefinition: { name: "github", hostedAppInstall: false },
+        githubAppConfigured: false,
       }),
     ).toEqual({ resolved: true, available: false, failed: false });
   });
 
-  it("allows setup when GitHub has a hosted app", () => {
+  it("allows setup when the process holds a GitHub App", () => {
     expect(
       githubAppAvailabilityFromCatalog({
         isSuccess: true,
         isError: false,
-        githubDefinition: { name: "github", hostedAppInstall: true },
+        githubAppConfigured: true,
+      }),
+    ).toEqual({ resolved: true, available: true, failed: false });
+  });
+
+  it("allows setup when the process holds a GitHub App even if hosted install is false", () => {
+    expect(
+      githubAppAvailabilityFromCatalog({
+        isSuccess: true,
+        isError: false,
+        githubAppConfigured: true,
+        githubDefinition: { name: "github", hostedAppInstall: false },
       }),
     ).toEqual({ resolved: true, available: true, failed: false });
   });

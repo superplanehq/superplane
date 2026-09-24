@@ -24,6 +24,18 @@ export const GITHUB_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
   readyConnection("github", GITHUB_CONNECTION_ID, "acme-github"),
 ];
 
+/** Two ready Sentry connections, so the intake wizard can offer a choice. */
+export const SENTRY_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
+  readyConnection("sentry", "storybook-sentry-connection", "acme-sentry"),
+  readyConnection("sentry", "storybook-sentry-eu-connection", "acme-sentry-eu"),
+];
+
+/** Two ready Jira connections, so the intake wizard can offer a choice. */
+export const JIRA_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
+  readyConnection("jira", "storybook-jira-connection", "acme-jira"),
+  readyConnection("jira", "storybook-jira-eu-connection", "acme-jira-eu"),
+];
+
 /** GitHub and Claude both installed, the state of an organization that already ships with SuperPlane. */
 export const CONNECTED_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
   ...GITHUB_SETUP_INTEGRATIONS,

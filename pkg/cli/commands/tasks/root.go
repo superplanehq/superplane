@@ -14,10 +14,11 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	var (
 		taskListWorkspace  string
-		taskListAssignees  []string
+		taskListUser       string
 		taskListStates     []string
 		taskListResults    []string
 		taskListUnassigned bool
+		taskListAll        bool
 	)
 
 	taskListCmd := &cobra.Command{
@@ -28,7 +29,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 --workspace is a workspace key or UUID. When omitted, the active workspace
 from "superplane workspace active" is used.
 
---assignees accepts user UUIDs or emails (comma-separated or repeated).
+--user accepts a user UUID or email. It returns tasks that user created
+or is assigned to.
 --state and --result accept the proto enum tokens (e.g. STATE_OPEN,
 RESULT_COMPLETED) or short case-insensitive names (open, draft, closed /
 completed, rejected, failed).
@@ -36,24 +38,31 @@ completed, rejected, failed).
 By default, only open tasks are shown. Pass --state all to see
 draft, open, and closed tasks.
 
+The list shows the first 100 matching tasks.
+Use --user, --state, --result, or --unassigned to narrow the list.
+Pass --all to show every matching task.
+
 Examples:
   superplane tasks list --workspace super --state open
-  superplane tasks list --assignees alice@example.com --result failed
+  superplane tasks list --user alice@example.com --result failed
   superplane tasks list --unassigned
-  superplane tasks list --state all`,
+  superplane tasks list --state all
+  superplane tasks list --all`,
 		Args: cobra.NoArgs,
 	}
 	taskListCmd.Flags().StringVar(&taskListWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
-	taskListCmd.Flags().StringSliceVar(&taskListAssignees, "assignees", nil, "filter by assignee user UUID or email (repeatable)")
+	taskListCmd.Flags().StringVar(&taskListUser, "user", "", "filter by user UUID or email (creator or assignee)")
 	taskListCmd.Flags().StringSliceVar(&taskListStates, "state", nil, "filter by task state (repeatable, e.g. open or STATE_OPEN); defaults to open when omitted; pass 'all' to include every state")
 	taskListCmd.Flags().StringSliceVar(&taskListResults, "result", nil, "filter by task result (repeatable, e.g. completed or RESULT_COMPLETED)")
 	taskListCmd.Flags().BoolVar(&taskListUnassigned, "unassigned", false, "only show tasks with no assignees")
+	taskListCmd.Flags().BoolVar(&taskListAll, "all", false, "show every matching task")
 	core.Bind(taskListCmd, &taskListCommand{
 		workspace:  &taskListWorkspace,
-		assignees:  &taskListAssignees,
+		user:       &taskListUser,
 		states:     &taskListStates,
 		results:    &taskListResults,
 		unassigned: &taskListUnassigned,
+		all:        &taskListAll,
 	}, options)
 
 	var (

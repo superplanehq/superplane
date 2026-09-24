@@ -32,8 +32,13 @@ func ListFactoryIntakes(ctx context.Context, organizationID string, req *pb.List
 		return nil, factoryErrorToStatus(err, "failed to list factory intakes")
 	}
 
+	states, err := intakeIntegrationStates(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list factory intakes")
+	}
+
 	return &pb.ListFactoryIntakesResponse{
-		Intakes: serializeFactoryIntakes(intakes, specs),
+		Intakes: serializeFactoryIntakes(db, intakes, specs, states),
 	}, nil
 }
 

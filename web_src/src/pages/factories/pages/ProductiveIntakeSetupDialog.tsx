@@ -1,28 +1,84 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { integrationDetailPath } from "@/lib/integrationSettingsPaths";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { ArrowLeft } from "lucide-react";
 
-import { ProductiveCompleteStep, ProductiveConnectionStep, ProductiveProjectStep } from "./ProductiveIntakeSetupSteps";
-import {
-  type ProductiveIntakeSetupModel,
-  type ProductiveSetupStep,
-  useProductiveIntakeSetup,
-} from "./useProductiveIntakeSetup";
+import { IntakeSetupWizard } from "./IntakeSetupWizard";
+import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
+import { ProductiveConnectionStep, ProductiveProjectStep } from "./ProductiveIntakeSetupSteps";
+import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
+import { type ProductiveIntakeSetupModel, useProductiveIntakeSetup } from "./useProductiveIntakeSetup";
 
 interface ProductiveIntakeSetupDialogProps {
-  open: boolean;
   organizationId: string;
   factoryId: string;
+  /** Base path of the organization integrations settings pages. */
+  integrationsBasePath: string;
   onClose: () => void;
+  onCreated: () => void;
 }
 
 export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogProps) {
-  const setup = useProductiveIntakeSetup(props.organizationId, props.factoryId, props.open);
+  const setup = useProductiveIntakeSetup(props.organizationId, props.factoryId);
+  const title =
+    setup.step === "connection"
+      ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnect
+      : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProject;
+  const helper =
+    setup.step === "connection"
+      ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnectHelper
+      : setup.skipInitialImport
+        ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
+        : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+  const onConnectionStep = setup.step === "connection" && !setup.connectedQuery.isLoading;
+  const hasConnections = setup.productiveIntegrations.length > 0;
+  // A broken account is only replaceable while Connect stays reachable, so the
+  // action also shows next to an existing connection, not only on an empty list.
+  const showConnectAction = onConnectionStep;
+  const hideEmptyConnectionBody = onConnectionStep && !hasConnections;
+
   return (
     <>
-      <ProductiveSetupView open={props.open && !setup.connectOpen} setup={setup} onClose={props.onClose} />
+      <IntakeSetupWizard
+        testId="productive-intake-setup"
+        integrationName="Productive.io"
+        step={setup.step}
+        title={title}
+        helper={helper}
+        stepAction={
+          showConnectAction ? (
+            <Button
+              type="button"
+              variant={hasConnections ? "outline" : "default"}
+              size={hasConnections ? "sm" : "default"}
+              onClick={() => setup.setConnectOpen(true)}
+              data-testid="productive-setup-connect"
+            >
+              {hasConnections
+                ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnectAnother
+                : PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnect}
+            </Button>
+          ) : undefined
+        }
+        footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
+        onBack={() => {
+          if (setup.step === "project") {
+            setup.returnToConnection();
+            return;
+          }
+          props.onClose();
+        }}
+      >
+        {hideEmptyConnectionBody && !setup.error ? null : (
+          <div>
+            <SetupStepBody setup={setup} integrationsBasePath={props.integrationsBasePath} />
+            {setup.error ? (
+              <p className="workspace-body-text mt-4 text-destructive" role="alert">
+                {setup.error}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}
         onOpenChange={setup.setConnectOpen}
@@ -42,60 +98,13 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
   );
 }
 
-function ProductiveSetupView({
-  open,
+function SetupStepBody({
   setup,
-  onClose,
+  integrationsBasePath,
 }: {
-  open: boolean;
   setup: ProductiveIntakeSetupModel;
-  onClose: () => void;
+  integrationsBasePath: string;
 }) {
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="gap-0 p-0 sm:max-w-xl" showCloseButton data-testid="productive-intake-setup">
-        <SetupHeader step={setup.step} onBack={() => setup.setStep("connection")} />
-        <div className="max-h-[min(32rem,65vh)] overflow-y-auto px-5 py-5">
-          <SetupStepContent setup={setup} />
-          {setup.error ? (
-            <p className="workspace-body-text mt-4 text-destructive" role="alert">
-              {setup.error}
-            </p>
-          ) : null}
-        </div>
-        <SetupFooter setup={setup} onClose={onClose} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SetupHeader({ step, onBack }: { step: ProductiveSetupStep; onBack: () => void }) {
-  return (
-    <DialogHeader className="border-b border-border px-5 py-4 text-left">
-      <div className="flex items-center gap-2">
-        {step === "project" ? (
-          <button
-            type="button"
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            onClick={onBack}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
-        ) : null}
-        <IntegrationIcon integrationName="productive" className="size-6" size={24} />
-        <div>
-          <DialogTitle className="text-[15px] font-semibold">{setupTitle(step)}</DialogTitle>
-          <DialogDescription className="workspace-body-text mt-1 text-muted-foreground">
-            {setupDescription(step)}
-          </DialogDescription>
-        </div>
-      </div>
-    </DialogHeader>
-  );
-}
-
-function SetupStepContent({ setup }: { setup: ProductiveIntakeSetupModel }) {
   if (setup.step === "connection") {
     return (
       <ProductiveConnectionStep
@@ -103,67 +112,62 @@ function SetupStepContent({ setup }: { setup: ProductiveIntakeSetupModel }) {
         selectedId={setup.integrationId}
         loading={setup.connectedQuery.isLoading}
         onSelect={setup.setIntegrationId}
-        onConnect={() => setup.setConnectOpen(true)}
       />
     );
   }
-  if (setup.step === "project") {
-    return (
-      <ProductiveProjectStep
-        projects={setup.projectsQuery.data ?? []}
-        selectedId={setup.projectId}
-        loading={setup.projectsQuery.isLoading}
-        error={setup.projectsQuery.isError}
-        onSelect={setup.setProjectId}
-        onRetry={() => void setup.projectsQuery.refetch()}
-      />
-    );
-  }
-  return <ProductiveCompleteStep />;
-}
 
-function SetupFooter({ setup, onClose }: { setup: ProductiveIntakeSetupModel; onClose: () => void }) {
   return (
-    <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
-      <span className="text-[12px] text-muted-foreground">{stepProgress(setup.step)}</span>
-      <div className="flex items-center gap-2">
-        {setup.step === "connection" ? (
-          <Button type="button" disabled={!setup.integrationId} onClick={() => setup.setStep("project")}>
-            Select project
-          </Button>
-        ) : null}
-        {setup.step === "project" ? (
-          <Button
-            type="button"
-            disabled={!setup.projectId || setup.createIntake.isPending}
-            onClick={setup.createBoundIntake}
-          >
-            {setup.createIntake.isPending ? "Creating intake…" : "Finish setup"}
-          </Button>
-        ) : null}
-        {setup.step === "complete" ? (
-          <Button type="button" onClick={onClose}>
-            View backlog
-          </Button>
-        ) : null}
-      </div>
-    </footer>
+    <ProductiveProjectStep
+      projects={setup.projectsQuery.data ?? []}
+      selectedId={setup.projectId}
+      loading={setup.projectsQuery.isLoading}
+      error={setup.projectsQuery.isError}
+      repairHref={setup.integrationId ? integrationDetailPath(integrationsBasePath, setup.integrationId) : undefined}
+      onSelect={setup.setProjectId}
+      onRetry={() => void setup.projectsQuery.refetch()}
+    />
   );
 }
 
-function setupTitle(step: ProductiveSetupStep): string {
-  if (step === "connection") return "Connect Productive.io";
-  if (step === "project") return "Choose a project";
-  return "Setup complete";
-}
+function SetupFooter({ setup, onCreated }: { setup: ProductiveIntakeSetupModel; onCreated: () => void }) {
+  if (setup.step === "connection") {
+    return (
+      <Button
+        type="button"
+        className="w-full"
+        disabled={!setup.integrationId}
+        onClick={() => setup.setStep("project")}
+        data-testid="productive-setup-continue"
+      >
+        {PRODUCTIVE_INTAKE_SETUP_COPY.wizardContinue}
+      </Button>
+    );
+  }
 
-function setupDescription(step: ProductiveSetupStep): string {
-  if (step === "connection") return "Choose the Productive.io account that SuperPlane will monitor.";
-  if (step === "project") return "SuperPlane adds the newest open tasks of this project to the Backlog.";
-  return "The intake now listens for new Productive.io tasks.";
-}
-
-function stepProgress(step: ProductiveSetupStep): string {
-  if (step === "complete") return "Complete";
-  return `Step ${step === "connection" ? 1 : 2} of 2`;
+  return (
+    <div className="space-y-3">
+      <IntakeSkipInitialImportField
+        checked={setup.skipInitialImport}
+        onCheckedChange={setup.setSkipInitialImport}
+        testId="productive-skip-initial-import"
+      />
+      <Button
+        type="button"
+        className="w-full"
+        disabled={!setup.projectId || setup.createIntake.isPending}
+        onClick={() => {
+          void setup.createBoundIntake().then((created) => {
+            if (created) {
+              onCreated();
+            }
+          });
+        }}
+        data-testid="productive-setup-finish"
+      >
+        {setup.createIntake.isPending
+          ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardFinishing
+          : PRODUCTIVE_INTAKE_SETUP_COPY.wizardFinish}
+      </Button>
+    </div>
+  );
 }

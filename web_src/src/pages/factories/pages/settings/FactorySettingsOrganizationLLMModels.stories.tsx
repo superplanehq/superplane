@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
+
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
@@ -36,6 +38,7 @@ export const NoProviders: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={modelsPath}
+      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         byokConnectedProviders: [],
@@ -49,6 +52,7 @@ export const OpenRouterOnly: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={modelsPath}
+      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         byokConnectedProviders: ["openrouter"],
@@ -68,6 +72,7 @@ export const AllConnected: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={modelsPath}
+      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         byokCandidatesByProvider: {

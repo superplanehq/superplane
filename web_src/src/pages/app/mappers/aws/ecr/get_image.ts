@@ -17,7 +17,7 @@ import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { EcrImageDetail, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 import { formatTags, getRepositoryLabel } from "./utils";
-import { formatBytes, stringOrDash } from "../../utils";
+import { formatBytes, stringOrDash } from "../../eventDisplay";
 
 export const getImageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -84,7 +84,7 @@ function getImageMetadataList(node: NodeInfo): MetadataItem[] {
 
 function getImageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

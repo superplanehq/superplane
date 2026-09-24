@@ -59,8 +59,8 @@ useInfiniteCanvasRuns.mockReturnValue({
 const EDIT_HREF = "/org-1/workspaces/RF/apps/app-refund-implementer?configure=1&agent=1&from=lines&lineId=line-plan";
 
 function implementGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-refund-implementer", name: "Implement", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -70,16 +70,16 @@ function implementGraph(): IntakeAutomationGraph {
         edges: [{ channel: "default", sourceId: "on-run", targetId: "agent" }],
       },
     },
-    [{ name: "onRun", label: "On run" }],
-    [{ name: "runnerClaudeCode", label: "Claude Code" }],
-    {},
-    {},
-    {},
-    "app-refund-implementer",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    triggers: [{ name: "onRun", label: "On run" }],
+    components: [{ name: "runnerClaudeCode", label: "Claude Code" }],
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-refund-implementer",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
   return {
     nodes,
     edges,
@@ -147,6 +147,23 @@ describe("ColumnAutomationViewPopup", () => {
     );
   });
 
+  it("asks for confirmation before deleting a custom automation", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    renderPopup({ onDelete });
+
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    expect(screen.getByText("Delete this automation? This cannot be undone.")).toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-view-delete-confirm"));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides delete when the automation cannot be removed", () => {
+    renderPopup();
+
+    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
+  });
+
   it("closes from the popup chrome", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -160,6 +177,13 @@ describe("ColumnAutomationViewPopup", () => {
     renderPopup({ graph: { nodes: [], edges: [] }, loading: true, editHref: undefined });
 
     expect(screen.getByTestId("column-automation-view-canvas")).toHaveTextContent("The automation is loading.");
+  });
+
+  it("shows empty copy when the automation has no steps", () => {
+    renderPopup({ graph: { nodes: [], edges: [] }, editHref: undefined });
+
+    expect(screen.getByTestId("column-automation-view-canvas")).toHaveTextContent("This automation has no steps yet.");
+    expect(screen.getByTestId("column-automation-view-canvas")).not.toHaveTextContent("canvas");
   });
 
   it("hides tabs when the automation has no form and no agent", () => {
@@ -193,6 +217,22 @@ describe("ColumnAutomationViewPopup", () => {
     expect(
       within(screen.getByTestId("column-automation-view-canvas")).getByRole("link", { name: "Edit automation" }),
     ).toHaveAttribute("href", EDIT_HREF);
+  });
+
+  it("shows visual evidence only when the agent slot enables it", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      agent: {
+        draft: PLANNING_REVIEW_DRAFT,
+        organizationId: "org-1",
+        onSave: vi.fn(),
+        showVisualEvidenceSetting: true,
+      },
+    });
+
+    expect(screen.getByRole("switch", { name: "Include visual evidence" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
   });
 
   it("puts General first when a form and an agent exist", () => {

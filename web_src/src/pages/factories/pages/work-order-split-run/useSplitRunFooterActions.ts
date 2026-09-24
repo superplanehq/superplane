@@ -93,20 +93,6 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
 
   const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
 
-  const handleBackToDraft = useCallback(async () => {
-    if (!live || !orderId || busy) {
-      return false;
-    }
-    try {
-      await updateStatus.mutateAsync({ orderId, state: "STATE_DRAFT" });
-      showSuccessToast("Task returned to the Backlog.");
-      return true;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to return the task to the Backlog"));
-      return false;
-    }
-  }, [busy, live, orderId, updateStatus]);
-
   const closeAsRejected = useCallback(
     async (copy: RejectedCloseCopy) => {
       if (!live || !orderId || busy) {
@@ -187,7 +173,6 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     handleStopAutomation,
     handleReject,
     handleArchive,
-    handleBackToDraft,
     busy,
   };
 }

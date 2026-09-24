@@ -47,6 +47,11 @@ describe("isPlanningSessionNoise", () => {
     expect(isPlanningSessionToolPayload('{"status":"shown"}')).toBe(true);
   });
 
+  it("treats spec and confidence JSON as tool payloads", () => {
+    expect(isPlanningSessionToolPayload('{"body":"# Add breed\\n## Executive summary"}')).toBe(true);
+    expect(isPlanningSessionToolPayload('{"score":4,"summary":"The files already exist."}')).toBe(true);
+  });
+
   it("treats say and draft JSON as tool payloads", () => {
     expect(isPlanningSessionToolPayload('{"message":"Hi! I am ready to help you plan work in this repository."}')).toBe(
       true,

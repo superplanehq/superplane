@@ -1,23 +1,9 @@
-import { formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
+import { parseWorkOrderMetric } from "./workOrderUsage";
 
 export type HostedCreditBannerKind = "trial" | "trial-expired" | "low" | "empty" | "lapsed";
 
 /** At or below this remaining balance, paid organizations see a low-credit warning. */
 export const LOW_HOSTED_CREDIT_THRESHOLD_CENTS = 2000;
-
-/** Compact helper shown next to remaining credit when the balance is low. */
-export const HOSTED_CREDIT_RUNS_STOP_HINT = "Tasks stop when credit runs out.";
-
-export function isLowHostedCreditRemaining(remainingCents: number | undefined): boolean {
-  return remainingCents != null && remainingCents > 0 && remainingCents <= LOW_HOSTED_CREDIT_THRESHOLD_CENTS;
-}
-
-export function hostedCreditRunsStopHint(remainingCents: number | undefined): string | undefined {
-  if (!isLowHostedCreditRemaining(remainingCents)) {
-    return undefined;
-  }
-  return HOSTED_CREDIT_RUNS_STOP_HINT;
-}
 
 export interface HostedCreditBannerInput {
   remainingCreditCents?: string | number;
@@ -106,20 +92,30 @@ export function shouldShowHostedCreditEmptyBanner(args: HostedCreditBannerInput)
 }
 
 /** Compact header chip kinds. These sit next to the page title, not in the banner row. */
-export type HostedCreditHeaderKickerKind = "trial" | "trial-expired" | "lapsed";
+export type HostedCreditHeaderKickerKind = "trial" | "trial-expired" | "lapsed" | "low" | "empty";
 
-export function isHostedCreditHeaderKickerKind(kind: HostedCreditBannerKind): kind is HostedCreditHeaderKickerKind {
-  return kind === "trial" || kind === "trial-expired" || kind === "lapsed";
+export function isHostedCreditHeaderKickerKind(_kind: HostedCreditBannerKind): _kind is HostedCreditHeaderKickerKind {
+  return true;
 }
 
 export function hostedCreditHeaderKickerLabel(kind: HostedCreditHeaderKickerKind): string {
-  if (kind === "trial-expired") {
-    return "Trial ended";
+  switch (kind) {
+    case "trial-expired":
+      return "Trial ended";
+    case "lapsed":
+      return "No plan";
+    case "low":
+      return "Credit low";
+    case "empty":
+      return "No credit";
+    case "trial":
+      return "Trial";
   }
-  if (kind === "lapsed") {
-    return "No plan";
-  }
-  return "Trial";
+}
+
+/** Action that the header chip calls. Low and empty credit send the user to billing to add credit. */
+export function hostedCreditHeaderKickerActionLabel(kind: HostedCreditHeaderKickerKind): string {
+  return kind === "low" || kind === "empty" ? "Add credits" : "Subscribe";
 }
 
 export function organizationPlanLabel(
@@ -144,36 +140,7 @@ export function organizationPlanLabel(
   return "Trial";
 }
 
-export type HostedCreditBannerTone = "info" | "warning";
-
-export interface HostedCreditBannerCopy {
-  title: string;
-  description: string;
-  actionLabel: string;
-  remainingLabel?: string;
-  expiryLabel?: string;
-  consequenceHint?: string;
-  tone: HostedCreditBannerTone;
-  showAction?: boolean;
-  showPricingLink?: boolean;
-}
-
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-export function trialExpirySentence(expiresAt: Date, now: Date = new Date()): string {
-  const ms = expiresAt.getTime() - now.getTime();
-  if (ms <= 0) {
-    return "The trial has ended.";
-  }
-  if (ms < ONE_DAY_MS) {
-    return "The trial ends today.";
-  }
-  const days = Math.ceil(ms / ONE_DAY_MS);
-  if (days === 1) {
-    return "The trial ends in 1 day.";
-  }
-  return `The trial ends in ${days} days.`;
-}
 
 /** Duration segment in the title chip, e.g. "13 days". */
 export function welcomeCreditHeaderLabel(expiresAt: Date, now: Date = new Date()): string {
@@ -189,161 +156,6 @@ export function welcomeCreditHeaderLabel(expiresAt: Date, now: Date = new Date()
     return "1 day";
   }
   return `${days} days`;
-}
-
-/** Short expiry label for scannable trial chrome. */
-export function welcomeCreditExpiryLabel(expiresAt: Date, now: Date = new Date()): string {
-  const ms = expiresAt.getTime() - now.getTime();
-  if (ms <= 0) {
-    return "Expired";
-  }
-  if (ms < ONE_DAY_MS) {
-    return "Expires today";
-  }
-  const days = Math.ceil(ms / ONE_DAY_MS);
-  if (days === 1) {
-    return "1 day remaining";
-  }
-  return `${days} days remaining`;
-}
-
-export function hostedCreditBannerTone(
-  kind: HostedCreditBannerKind,
-  welcomeCreditExpiresAt?: Date,
-  now: Date = new Date(),
-  remainingCreditCents?: number,
-): HostedCreditBannerTone {
-  if (kind !== "trial") {
-    return "warning";
-  }
-  if (remainingCreditCents != null && remainingCreditCents <= LOW_HOSTED_CREDIT_THRESHOLD_CENTS) {
-    return "warning";
-  }
-  if (!welcomeCreditExpiresAt) {
-    return "info";
-  }
-  if (welcomeCreditExpiresAt.getTime() - now.getTime() <= ONE_DAY_MS) {
-    return "warning";
-  }
-  return "info";
-}
-
-export function hostedCreditBannerCopy(args: {
-  kind: HostedCreditBannerKind;
-  billingEnabled: boolean;
-  remainingCreditCents?: number;
-  welcomeCreditExpiresAt?: Date;
-  subscriptionCheckoutEnabled?: boolean;
-  now?: Date;
-}): HostedCreditBannerCopy {
-  const now = args.now ?? new Date();
-  const tone = hostedCreditBannerTone(args.kind, args.welcomeCreditExpiresAt, now, args.remainingCreditCents);
-  const showSubscribe = args.subscriptionCheckoutEnabled !== false && args.billingEnabled;
-
-  if (args.kind === "trial") {
-    const remaining = formatUsdCents(args.remainingCreditCents ?? 0);
-    const expirySentence = args.welcomeCreditExpiresAt
-      ? trialExpirySentence(args.welcomeCreditExpiresAt, now)
-      : "The trial ends in 14 days.";
-    const expiryLabel = args.welcomeCreditExpiresAt
-      ? welcomeCreditExpiryLabel(args.welcomeCreditExpiresAt, now)
-      : "14 days remaining";
-    return withRunsStopHint(
-      {
-        title: "Trial",
-        description: `You have a 14-day Business trial with ${remaining} for machines and managed models. ${expirySentence} Subscribe to keep hosted runs.`,
-        remainingLabel: `${remaining} remaining`,
-        expiryLabel,
-        actionLabel: "Subscribe",
-        tone,
-        showAction: showSubscribe,
-        showPricingLink: true,
-      },
-      args.remainingCreditCents,
-    );
-  }
-
-  if (args.kind === "trial-expired") {
-    return {
-      title: "Trial ended",
-      description: "Hosted runs cannot start. Subscribe to Business to continue.",
-      actionLabel: "Subscribe",
-      tone,
-      showAction: showSubscribe,
-      showPricingLink: true,
-    };
-  }
-
-  if (args.kind === "lapsed") {
-    return {
-      title: "Business subscription required",
-      description: "Hosted runs cannot start. Subscribe to Business to continue.",
-      actionLabel: "Subscribe",
-      tone,
-      showAction: showSubscribe,
-      showPricingLink: true,
-    };
-  }
-
-  if (args.kind === "low") {
-    const lowCreditBudget = formatUsdCents(LOW_HOSTED_CREDIT_THRESHOLD_CENTS);
-    const remainingLabel =
-      args.remainingCreditCents != null && args.remainingCreditCents > 0
-        ? `${formatUsdCents(args.remainingCreditCents)} remaining`
-        : undefined;
-    if (args.billingEnabled) {
-      return withRunsStopHint(
-        {
-          title: "Hosted credit is low",
-          description: `Less than ${lowCreditBudget} remains. Add hosted credit to keep SuperPlane-hosted runs.`,
-          remainingLabel,
-          actionLabel: "Add credits",
-          tone,
-          showAction: true,
-        },
-        args.remainingCreditCents,
-      );
-    }
-    return withRunsStopHint(
-      {
-        title: "Hosted credit is low",
-        description: `Less than ${lowCreditBudget} remains. Ask an installation admin to add hosted credit.`,
-        remainingLabel,
-        actionLabel: "Add credits",
-        tone,
-        showAction: false,
-      },
-      args.remainingCreditCents,
-    );
-  }
-
-  if (args.billingEnabled) {
-    return {
-      title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Add hosted credit to continue.",
-      actionLabel: "Add credits",
-      tone,
-      showAction: true,
-    };
-  }
-
-  return {
-    title: "Hosted credit is empty",
-    description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
-    actionLabel: "Add credits",
-    tone,
-    showAction: false,
-  };
-}
-
-/**
- * `canManageBilling` is ignored. Billing does not offer checkout on this page yet.
- */
-export function hostedCreditEmptyBannerCopy(
-  billingEnabled: boolean,
-  _canManageBilling: boolean = true,
-): HostedCreditBannerCopy {
-  return hostedCreditBannerCopy({ kind: "empty", billingEnabled });
 }
 
 export interface HostedCreditBillingBalanceCopy {
@@ -429,12 +241,4 @@ function emptyHostedCreditDescription(billingEnabled: boolean): string {
     return "Hosted credit is empty. Click Top up to purchase hosted credit.";
   }
   return "Hosted credit is empty. SuperPlane-hosted runs cannot start until an installation admin adds credit.";
-}
-
-function withRunsStopHint(copy: HostedCreditBannerCopy, remainingCents: number | undefined): HostedCreditBannerCopy {
-  const consequenceHint = hostedCreditRunsStopHint(remainingCents);
-  if (!consequenceHint) {
-    return copy;
-  }
-  return { ...copy, consequenceHint };
 }

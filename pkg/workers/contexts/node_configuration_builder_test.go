@@ -348,6 +348,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, repository, payload["repository"])
 		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
 		assert.Equal(t, defaultBranch, payload["default_branch"])
+		assert.Equal(t, false, payload["visual_evidence_enabled"])
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
@@ -372,6 +373,16 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.Equal(t, false, hasGitHubIssueOrigin)
+	})
+
+	t.Run("keeps the retired visual evidence expression disabled", func(t *testing.T) {
+		configuration := map[string]any{
+			"prompt": `Implement the task.{{ task().visual_evidence_enabled ? "\nCapture visual evidence." : "" }}`,
+		}
+
+		built, err := builder.Build(configuration)
+		require.NoError(t, err)
+		assert.Equal(t, "Implement the task.", built["prompt"])
 	})
 
 	t.Run("exposes origin for GitHub closing keywords", func(t *testing.T) {
@@ -673,6 +684,74 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []any{}, noComments)
 	})
+}
+
+func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.UpdatePlanning(database.Conn(), models.FactoryPlanning{Enabled: false, Clarity: true, Confidence: true}))
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Ship feature", "Implement and open PR", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Key:  models.PlanningSpecArtifactKey + ":" + order.ID.String(),
+		Data: map[string]any{
+			"name":  models.PlanningSpecArtifactTitle,
+			"title": models.PlanningSpecArtifactTitle,
+			"body":  "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n",
+		},
+	})
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&nodeExecution.RootEventID).
+		WithInput(map[string]any{})
+
+	spec, err := builder.ResolveExpression(`task().spec`)
+	require.NoError(t, err)
+	assert.Equal(t, "", spec)
+
+	payload, err := builder.ResolveExpression(`order()`)
+	require.NoError(t, err)
+	orderPayload, ok := payload.(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, orderPayload, "spec")
+
+	require.NoError(t, factoryModel.UpdatePlanning(database.Conn(), models.FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
+
+	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Key:  "notes:" + order.ID.String(),
+		Data: map[string]any{
+			"name":  models.PlanningSpecArtifactTitle,
+			"title": models.PlanningSpecArtifactTitle,
+			"body":  "# Wrong spec\n\nThis is a later markdown artifact with the same display name.\n",
+		},
+	})
+	require.NoError(t, err)
+
+	spec, err = builder.ResolveExpression(`task().spec`)
+	require.NoError(t, err)
+	assert.Equal(t, "# Retry refunds\n\n## Executive summary\n\nStop double charges.", spec)
+
+	prompt, err := builder.Build(map[string]any{
+		"body": `{{ task().description }}{{ task().spec != "" ? "\n\nSpec:\n" + task().spec : "" }}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		"Implement and open PR\n\nSpec:\n# Retry refunds\n\n## Executive summary\n\nStop double charges.",
+		prompt["body"],
+	)
+
+	aliased, err := builder.ResolveExpression(`let taskData = task(); taskData.spec`)
+	require.NoError(t, err)
+	assert.Equal(t, "# Retry refunds\n\n## Executive summary\n\nStop double charges.", aliased)
 }
 
 func Test_NodeConfigurationBuilder_PRClosureSourceIssueOrigin(t *testing.T) {

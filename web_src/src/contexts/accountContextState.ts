@@ -23,6 +23,11 @@ export interface AccountLinkedAccount {
   avatar_url?: string;
 }
 
+export interface AccountOrganizationPendingDeletion {
+  id: string;
+  name: string;
+}
+
 interface Account {
   id: string;
   name: string;
@@ -32,6 +37,7 @@ interface Account {
   has_password: boolean;
   providers?: AccountProviderMethod[];
   linked_accounts?: AccountLinkedAccount[];
+  organizations_pending_deletion?: AccountOrganizationPendingDeletion[];
   roles?: string[];
   groups?: string[];
   impersonation?: AccountImpersonation;

@@ -178,7 +178,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.stopped).toBe("Stopped");
   });
 
-  it("labels an earlier failed step as Needs attention when a later step passed", () => {
+  it("does not label an earlier failed step when a later step passed", () => {
     expect(
       getWorkOrderAttentionReason(
         order({
@@ -208,11 +208,11 @@ describe("getWorkOrderAttentionReason", () => {
           ],
         }),
       ),
-    ).toBe("stalled");
+    ).toBeNull();
   });
 
-  it("labels idle waiting work as Needs attention", () => {
-    expect(getWorkOrderAttentionReason(order())).toBe("stalled");
-    expect(WORK_ORDER_ATTENTION_LABEL.stalled).toBe("Needs attention");
+  it("does not label idle waiting work as an attention reason", () => {
+    expect(getWorkOrderAttentionReason(order())).toBeNull();
+    expect(getWorkOrderAttentionReasons(order())).toEqual([]);
   });
 });

@@ -40,7 +40,7 @@ import type {
  * Workspace Overview redesign (Storybook-only baseline).
  *
  * Layout: briefing header, a horizontal row of health scorecards, then the
- * work stream — Needs attention and In flight full width, Recently shipped
+ * work stream — Waiting and In flight full width, Recently shipped
  * and Suggested tasks paired in one row, and Workspace improvements
  * as a wide card at the bottom. Every table caps at three rows; totals stay
  * visible in the header counts. Future-capability cards carry a "Preview"
@@ -81,7 +81,7 @@ export function OverviewRedesignPage({ data }: { data: OverviewRedesignData }) {
         <HealthScorecards metrics={data.health} velocityHref={factoryVelocityPath(organizationId, factoryKey)} />
 
         <div className="mt-6 flex min-w-0 flex-col gap-6">
-          <NeedsAttentionCard
+          <WaitingCard
             items={attention}
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -127,10 +127,10 @@ function BriefingLine({
 }) {
   const attentionFragment =
     counts.attention === 0 ? (
-      <span>Nothing needs attention</span>
+      <span>Nothing is waiting</span>
     ) : (
       <span className="font-medium text-foreground">
-        {counts.attention} {counts.attention === 1 ? "task needs" : "tasks need"} attention
+        {counts.attention} {counts.attention === 1 ? "task is" : "tasks are"} waiting
       </span>
     );
 
@@ -188,7 +188,7 @@ const rowClassName =
 
 const rowContentClassName = "relative z-10 pointer-events-none";
 
-/* --------------------------- Needs attention --------------------------- */
+/* -------------------------------- Waiting -------------------------------- */
 
 const ATTENTION_META: Record<
   AttentionReason,
@@ -205,12 +205,6 @@ const ATTENTION_META: Record<
     actionLabel: "Retry",
     icon: WORK_ORDER_ATTENTION_ICON.failed,
     chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.failed,
-  },
-  stalled: {
-    label: WORK_ORDER_ATTENTION_LABEL.stalled,
-    actionLabel: "Open",
-    icon: WORK_ORDER_ATTENTION_ICON.stalled,
-    chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.stalled,
   },
 };
 
@@ -244,7 +238,7 @@ function OwnerReference({ owner, className }: { owner?: WorkOrderOwner; classNam
   );
 }
 
-function NeedsAttentionCard({
+function WaitingCard({
   items,
   organizationId,
   factoryKey,
@@ -257,7 +251,7 @@ function NeedsAttentionCard({
 }) {
   return (
     <OverviewCard
-      title="Needs attention"
+      title="Waiting"
       subtitle="Tasks that wait for a human decision."
       count={items.length}
       headerAction={<CardViewAllLink href={viewAllHref} label="View all" />}

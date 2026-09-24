@@ -1,11 +1,13 @@
 import type {
   FactoriesAutomationRef,
   FactoriesFactoryPullRequest,
+  FactoriesFactoryPullRequestRevision,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
 } from "@/api-client";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import {
   UNKNOWN_ORG_USER_NAME,
   getUserInitials,
@@ -28,16 +30,26 @@ import {
 
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
+  clarityScoreFromChecks,
   CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
+  confidenceScoreFromChecks,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
+  isScoreCheckName,
 } from "../../lib/confidenceScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import {
+  parseWorkOrderMetric,
+  type WorkOrderUsageByMachineType,
+  type WorkOrderUsageByModel,
+} from "../../lib/workOrderUsage";
+import { joinRunnerModels } from "./draftStartModel";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import { analysisResultDeliveredForRun, statusForAnalysisRun } from "../../lib/analysisOutcome";
 import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
@@ -45,7 +57,6 @@ import {
   doneFooterForStatus,
   SPLIT_RUN_DRAFT_NOTE,
   SPLIT_RUN_FAILED_NOTE_TEXT,
-  SPLIT_RUN_WAITING_NOTE,
   type SplitRunFooter,
   type SplitRunFooterKind,
   type SplitRunFooterTone,
@@ -61,6 +72,7 @@ import type {
 import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
 import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
 import { withNotifyImplementLog } from "./splitRunNotifyFixture";
+import { trackedPullRequestReviewNote } from "./splitRunPullRequestReview";
 
 export type SplitRunPhaseId = string;
 
@@ -78,6 +90,8 @@ export interface SplitRunStreamLine {
   componentName: string;
   status: SplitRunPhaseStatus;
   duration?: string;
+  /** Whether the displayed duration should keep ticking. Defaults to a running status. */
+  durationRunning?: boolean;
   detail?: string;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
@@ -110,8 +124,14 @@ export interface SplitRunStreamLine {
 export interface SplitRunPhase {
   id: SplitRunPhaseId;
   name: string;
+  /** Markdown details shown below the activity title. */
+  description?: string;
   status: SplitRunPhaseStatus;
   duration: string;
+  /** Whether the displayed duration should keep ticking. Defaults to a running status. */
+  durationRunning?: boolean;
+  /** When this automation started. */
+  startedAt?: string;
   /** Component that ran or is running in this phase. */
   componentName: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -135,6 +155,13 @@ export interface SplitRunPhase {
   totalTokens?: string;
   /** Runner model this automation used. Hidden when empty. */
   model?: string;
+  /** Pull request and revision that started this activity. */
+  pullRequestActivity?: {
+    pullRequest?: FactoriesFactoryPullRequest;
+    revision?: FactoriesFactoryPullRequestRevision;
+    startedAt?: string;
+    waitingForAccess?: boolean;
+  };
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -153,6 +180,8 @@ export interface SplitRunFixture {
   startedLabel: string;
   costUsd: string;
   tokensLabel: string;
+  usageByModel?: WorkOrderUsageByModel[];
+  usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
   currentStepIndex: number;
   lineStatus: SplitRunPhaseStatus;
@@ -212,12 +241,6 @@ function footerRun(current: FactoriesWorkOrderExecution | undefined): { appId: s
   }
   return { appId, runId };
 }
-
-const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
-  key: "waiting-person",
-  headline: SPLIT_RUN_WAITING_NOTE.headline,
-  text: SPLIT_RUN_WAITING_NOTE.text ?? "",
-};
 
 const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
 
@@ -309,7 +332,7 @@ export function phaseById(fixture: SplitRunFixture, id: SplitRunPhaseId): SplitR
 export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
   if (status === "passed") return "Completed";
   if (status === "running") return "Running";
-  if (status === "waiting") return "Needs attention";
+  if (status === "waiting") return "Waiting";
   if (status === "failed") return "Failed";
   if (status === "cancelled") return "Canceled";
   return "Pending";
@@ -329,6 +352,8 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /** Task files used to decide if a cancelled analysis already delivered a plan. */
+  artifacts?: FactoriesWorkOrderArtifact[];
   /**
    * Whether the Backlog automation is still scoring this draft. Covers the
    * optimistic window where a fresh draft is known to be analyzing before its
@@ -365,6 +390,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
+    usageByModel: order.usageByModel,
+    usageByMachineType: order.usageByMachineType,
     lineName:
       options?.lineName?.trim() ||
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
@@ -423,6 +450,8 @@ function reviewSurfaces(
         note: draftFooterNote(order),
         status: displayStatus,
         isAnalyzing: draftIsAnalyzing(input),
+        clarityScore: clarityScoreFromChecks(checks),
+        confidenceScore: confidenceScoreFromChecks(checks),
       }),
       [],
       checks,
@@ -523,10 +552,11 @@ function waitingReviewSurface(
       checks,
     );
   }
+  const note = notes[0] ?? trackedPullRequestReviewNote(order.pullRequests, order.id);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
-      note: notes[0] ?? WAITING_FALLBACK_NOTE,
+      note,
       status: displayStatus,
     }),
     notes,
@@ -559,7 +589,7 @@ function overviewChecks(
   if (presented.length === 0) {
     return phases.flatMap((phase) => phase.checks ?? []);
   }
-  const later = intake.length > 0 ? presented.filter((check) => check.name !== CONFIDENCE_CHECK_NAME) : presented;
+  const later = intake.length > 0 ? presented.filter((check) => !isScoreCheckName(check.name)) : presented;
   return [...intake, ...later];
 }
 
@@ -614,7 +644,7 @@ function phasesForOrder(
   const apiChecks = options?.checks;
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
-    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks),
+    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
@@ -622,59 +652,105 @@ function phasesForOrder(
 
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
 
-/**
- * Backlog analysis runs of this task, oldest first. Each phase keeps
- * its run, so the log panel streams the analysis while the automation
- * still works. The newest phase carries the reported score.
- */
-function phasesForAnalysisRuns(runs: BacklogAnalysisRun[], apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
+/** One task analysis can span multiple canvas runs. Present those attempts as one phase. */
+function phasesForAnalysisRuns(
+  runs: BacklogAnalysisRun[],
+  apiChecks?: FactoriesWorkOrderCheck[],
+  artifacts?: FactoriesWorkOrderArtifact[],
+): SplitRunPhase[] {
   const ordered = [...runs]
-    .filter((entry) => Boolean(entry.canvasId && entry.run.id))
+    .filter((entry) => Boolean(entry.canvasId && entry.workOrderId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
+  const latest = ordered.at(-1);
+  if (!latest) {
+    return [];
+  }
 
-  return ordered.map((entry, index) =>
-    analysisRunToPhase(entry, index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined),
-  );
+  const result = { checks: apiChecks, artifacts };
+  return [
+    analysisAttemptsToPhase(
+      ordered,
+      confidenceChecks(apiChecks),
+      analysisResultDeliveredForRun(latest.run, { ...result, isLast: true }),
+    ),
+  ];
 }
 
-function analysisRunToPhase(entry: BacklogAnalysisRun, checks?: WorkOrderCheckPresentation[]): SplitRunPhase {
-  const status = statusForCanvasRun(entry.run);
+function analysisAttemptsToPhase(
+  attempts: BacklogAnalysisRun[],
+  checks?: WorkOrderCheckPresentation[],
+  delivered = false,
+): SplitRunPhase {
+  const first = attempts[0];
+  const latest = attempts.at(-1);
+  if (!first || !latest) {
+    throw new Error("analysis phase requires at least one attempt");
+  }
+
+  const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
+  const durationRunning = latest.run.state === "STATE_STARTED";
   const componentName = CONFIDENCE_CHECK_NAME;
-  const duration = durationForExecution(
-    {
-      createdAt: entry.run.createdAt,
-      updatedAt: entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt,
-    },
-    status,
-  );
+  const latestDuration = analysisAttemptsDuration([latest], durationRunning);
   const line: SplitRunStreamLine = {
-    id: entry.run.id ?? componentName,
-    at: clockLabel(entry.run.createdAt),
+    id: latest.run.id ?? componentName,
+    at: clockLabel(latest.run.createdAt),
     componentName,
     status,
-    duration,
+    duration: latestDuration,
+    durationRunning,
     kind: "action",
     componentType: componentName,
     action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
     iconSlug: "box",
   };
   return {
-    id: `${ANALYSIS_PHASE_ID_PREFIX}${entry.run.id}`,
+    id: `${ANALYSIS_PHASE_ID_PREFIX}${latest.workOrderId}`,
     name: "Analysis",
     status,
-    duration,
+    duration: analysisAttemptsDuration(attempts, durationRunning),
+    durationRunning,
+    startedAt: first.run.createdAt,
     componentName,
     artifacts: [],
     checks,
     stream: [line],
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
-    appId: entry.canvasId,
-    runId: entry.run.id,
+    appId: latest.canvasId,
+    runId: latest.run.id,
+    costCents: sumAnalysisMetric(attempts, (attempt) => attempt.run.costCents),
+    totalTokens: sumAnalysisMetric(attempts, (attempt) => attempt.run.totalTokens),
+    model: joinRunnerModels(attempts.flatMap((attempt) => attempt.run.models ?? [])),
   };
 }
 
+function analysisAttemptsDuration(attempts: BacklogAnalysisRun[], durationRunning: boolean, now = Date.now()): string {
+  const lastIndex = attempts.length - 1;
+  const durationMs = attempts.reduce((total, attempt, index) => {
+    const startedAt = Date.parse(attempt.run.createdAt ?? "");
+    if (!Number.isFinite(startedAt)) {
+      return total;
+    }
+    const recordedEnd = Date.parse(attempt.run.finishedAt ?? attempt.run.updatedAt ?? "");
+    const isLatestRunningAttempt = index === lastIndex && durationRunning;
+    const endedAt = isLatestRunningAttempt ? now : Number.isFinite(recordedEnd) ? recordedEnd : startedAt;
+    return total + Math.max(0, endedAt - startedAt);
+  }, 0);
+  return formatMinutesSecondsDuration(durationMs) || "<1s";
+}
+
+function sumAnalysisMetric(
+  attempts: BacklogAnalysisRun[],
+  select: (attempt: BacklogAnalysisRun) => string | undefined,
+): string | undefined {
+  const values = attempts.map(select).filter((value): value is string => value != null && value !== "");
+  if (values.length === 0) {
+    return undefined;
+  }
+  return String(values.reduce((total, value) => total + parseWorkOrderMetric(value), 0));
+}
+
 function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] | undefined {
-  const reported = (apiChecks ?? []).filter((check) => (check.name ?? "") === CONFIDENCE_CHECK_NAME);
+  const reported = (apiChecks ?? []).filter((check) => isScoreCheckName(check.name));
   if (reported.length === 0) {
     return undefined;
   }
@@ -724,21 +800,75 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
   )?.id;
 }
 
-function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
-  const status = statusForCanvasRun(entry.run);
+function prFeedbackActivityBaseName(entry: PRFeedbackLogRun): string {
+  const title = entry.title?.trim();
+  if (title) {
+    return title;
+  }
   const description = entry.description?.trim();
-  const baseName = description
-    ? description
-    : entry.pullRequestNumber
-      ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
-      : "Activity on PR";
-  const name = entry.attemptLabel ? `${baseName} · ${entry.attemptLabel}` : baseName;
+  if (description) {
+    return description;
+  }
+  if (entry.pullRequestNumber) {
+    return `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`;
+  }
+  return "Activity on PR";
+}
+
+function prFeedbackActivityName(entry: PRFeedbackLogRun): string {
+  const attempt = entry.attemptLabel?.trim();
+  const baseName = prFeedbackActivityBaseName(entry);
+  return attempt ? `${baseName} ${attempt}` : baseName;
+}
+
+function prFeedbackPhaseStatus(entry: PRFeedbackLogRun): SplitRunPhaseStatus {
+  if (entry.waitingForAccess && isActiveCanvasRun(entry.run)) {
+    return "waiting";
+  }
+  return statusForCanvasRun(entry.run);
+}
+
+function prFeedbackStreamAction(status: SplitRunPhaseStatus): string {
+  if (status === "passed") {
+    return "passed";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "running") {
+    return "running";
+  }
+  return "—";
+}
+
+function prFeedbackUpdatedAt(entry: PRFeedbackLogRun) {
+  return entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt;
+}
+
+function prFeedbackAttachedPullRequest(entry: PRFeedbackLogRun) {
+  if (entry.pullRequest) {
+    return entry.pullRequest;
+  }
+  if (entry.pullRequestNumber) {
+    return { number: entry.pullRequestNumber };
+  }
+  return undefined;
+}
+
+function prFeedbackPhaseDescription(entry: PRFeedbackLogRun) {
+  const title = entry.title?.trim();
+  if (!title) {
+    return undefined;
+  }
+  return entry.description?.trim();
+}
+
+function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
+  const status = prFeedbackPhaseStatus(entry);
+  const name = prFeedbackActivityName(entry);
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
-    {
-      createdAt: entry.run.createdAt,
-      updatedAt: entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt,
-    },
+    { createdAt: entry.run.createdAt, updatedAt: prFeedbackUpdatedAt(entry) },
     status,
   );
   const line: SplitRunStreamLine = {
@@ -749,14 +879,16 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     duration,
     kind: "action",
     componentType: componentName,
-    action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    action: prFeedbackStreamAction(status),
     iconSlug: "box",
   };
   return {
     id: `pr-feedback-${entry.run.id}`,
     name,
+    description: prFeedbackPhaseDescription(entry),
     status,
     duration,
+    startedAt: entry.run.createdAt,
     componentName,
     artifacts: [],
     stream: [line],
@@ -765,6 +897,12 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     runId: entry.run.id,
     costCents: entry.costCents,
     totalTokens: entry.totalTokens,
+    pullRequestActivity: {
+      pullRequest: prFeedbackAttachedPullRequest(entry),
+      revision: entry.revision,
+      startedAt: entry.run.createdAt,
+      waitingForAccess: entry.waitingForAccess,
+    },
   };
 }
 
@@ -893,6 +1031,7 @@ function automationBacklogPhase(
     name,
     status: "passed",
     duration: "2s",
+    startedAt: order.createdAt,
     componentName,
     artifacts: [description],
     stream: [
@@ -924,6 +1063,7 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
     name: "Backlog",
     status: "passed",
     duration: "2s",
+    startedAt: order.createdAt,
     componentName: "Created manually",
     artifacts: [description],
     stream: [
@@ -996,6 +1136,7 @@ function executionToPhase(
     name,
     status,
     duration,
+    startedAt: execution.createdAt,
     componentName,
     artifacts,
     checks: checksForLineExecution(execution, apiChecks, demoArtifacts),
@@ -1006,7 +1147,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
-    model: dispatchModelForExecution(order, execution),
+    model: modelsForExecution(order, execution),
   };
 }
 
@@ -1021,7 +1162,7 @@ function checksForLineExecution(
   const source = demoArtifacts ? (apiChecks ?? VERIFY_STEP_CHECKS) : (apiChecks ?? []);
   const verifyChecks = demoArtifacts
     ? source.filter((check) => VERIFY_STEP_KEYS.has(check.key ?? ""))
-    : source.filter((check) => (check.name ?? "") !== CONFIDENCE_CHECK_NAME);
+    : source.filter((check) => !isScoreCheckName(check.name));
   return presentWorkOrderChecks(verifyChecks);
 }
 
@@ -1127,6 +1268,14 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function modelsForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): string | undefined {
+  const reported = joinRunnerModels(execution.models ?? []);
+  if (reported) {
+    return reported;
+  }
+  return dispatchModelForExecution(order, execution);
 }
 
 function dispatchModelForExecution(

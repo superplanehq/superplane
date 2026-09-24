@@ -294,4 +294,7 @@ type WebhookContext interface {
 	GetMetadata() any
 	GetConfiguration() any
 	SetSecret([]byte) error
+	// CallbackHasActiveNodes reports whether webhookID still has live canvas
+	// consumers. Jira uses this before taking over a stale remote callback.
+	CallbackHasActiveNodes(webhookID string) (bool, error)
 }

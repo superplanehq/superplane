@@ -67,6 +67,37 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 		assert.Equal(t, "prod_25", resp.Products[0].Id)
 		assert.Equal(t, int64(2500), resp.Products[0].AmountCents)
 	})
+
+	t.Run("lists custom credit packs", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/products/", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"id":   "prod_custom",
+						"name": "Hosted credit custom",
+						"metadata": map[string]any{
+							"superplane_credit_pack": true,
+						},
+						"prices": []map[string]any{
+							{"amount_type": "custom", "minimum_amount": 100},
+						},
+					},
+				},
+				"pagination": map[string]any{"max_page": 1},
+			}))
+		})
+		usePolarTestServer(t, server)
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+		require.NoError(t, err)
+
+		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
+		require.NoError(t, err)
+		assert.True(t, resp.BillingEnabled)
+		require.Len(t, resp.Products, 1)
+		assert.Equal(t, "prod_custom", resp.Products[0].Id)
+		assert.Equal(t, int64(0), resp.Products[0].AmountCents)
+	})
 }
 
 func Test__CreateHostedCreditCheckout(t *testing.T) {
@@ -114,6 +145,53 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 			"http://localhost:8000",
 		)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("creates checkout for a custom credit pack", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			switch {
+			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/products/"):
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":   "prod_custom",
+					"name": "Hosted credit custom",
+					"metadata": map[string]any{
+						"superplane_credit_pack": true,
+					},
+					"prices": []map[string]any{
+						{"amount_type": "custom", "minimum_amount": 100},
+					},
+				}))
+			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/customers/external/"):
+				http.Error(w, "missing", http.StatusNotFound)
+			case req.Method == http.MethodPost && req.URL.Path == "/customers/":
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":          "cust_custom",
+					"external_id": r.Organization.ID.String(),
+					"email":       nil,
+				}))
+			case req.Method == http.MethodPost && req.URL.Path == "/checkouts/":
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				assert.Equal(t, []any{"prod_custom"}, body["products"])
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"url":         "https://buy.example/custom",
+					"customer_id": "cust_custom",
+				}))
+			default:
+				http.NotFound(w, req)
+			}
+		})
+		usePolarTestServer(t, server)
+
+		resp, err := CreateHostedCreditCheckout(
+			context.Background(),
+			r.Organization.ID.String(),
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_custom"},
+			r.Account.ID.String(),
+			"http://localhost:8000",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "https://buy.example/custom", resp.CheckoutUrl)
 	})
 
 	t.Run("creates checkout and stores customer id", func(t *testing.T) {

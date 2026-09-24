@@ -42,18 +42,18 @@ function idsFilteredBy(orders: FactoriesWorkOrder[], statusFilter: WorkOrderStat
 }
 
 describe("getWorkOrderDisplayStatusMeta", () => {
-  it("labels the idle open state as Needs attention", () => {
+  it("labels the idle open state as Waiting", () => {
     const meta = getWorkOrderDisplayStatusMeta("waiting");
-    expect(meta.label).toBe("Needs attention");
-    expect(meta.filterLabel).toBe("Needs attention");
+    expect(meta.label).toBe("Waiting");
+    expect(meta.filterLabel).toBe("Waiting");
     expect(meta.summary).toBe("A person must act before this work can continue.");
   });
 });
 
 describe("WORK_ORDER_BOARD_LANES", () => {
-  it("names the waiting lane Needs attention", () => {
+  it("names the waiting lane Waiting", () => {
     const review = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "review");
-    expect(review?.title).toBe("Needs attention");
+    expect(review?.title).toBe("Waiting");
     expect(review?.description).toBe("Tasks that wait for a human decision.");
   });
 });

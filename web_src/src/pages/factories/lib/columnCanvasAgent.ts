@@ -8,6 +8,26 @@ export { AGENT_HARNESS_COMPONENTS };
 
 export type CanvasSpecNode = NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>[number];
 
+export const PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS = [
+  "address-pr-feedback",
+  "address-pr-review-feedback",
+  "address-pr-review-reply-feedback",
+] as const;
+
+function exposesVisualEvidenceSetting(node: CanvasSpecNode): boolean {
+  return node.configuration !== undefined && "includeVisualEvidence" in node.configuration;
+}
+
+/** Whether every PR discussion agent supports visual evidence. */
+export function supportsPRFeedbackVisualEvidence(spec: CanvasesCanvas["spec"] | null | undefined): boolean {
+  const nodes = spec?.nodes ?? [];
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  return PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.every((nodeId) => {
+    const node = nodesById.get(nodeId);
+    return Boolean(node && isAgentHarnessComponent(node.component) && exposesVisualEvidenceSetting(node));
+  });
+}
+
 /** Agent harness nodes on a column automation canvas. */
 export function findAgentNodes(spec: CanvasesCanvas["spec"] | null | undefined): CanvasSpecNode[] {
   return (spec?.nodes ?? []).filter((node) => {
@@ -21,9 +41,13 @@ export function findAgentNodes(spec: CanvasesCanvas["spec"] | null | undefined):
   });
 }
 
-/** First agent in canvas order. Extra agents stay on the full automation editor. */
-export function primaryAgentNode(spec: CanvasesCanvas["spec"] | null | undefined): CanvasSpecNode | undefined {
-  return findAgentNodes(spec)[0];
+/** Preferred agent, or the first agent in canvas order when no preference matches. */
+export function primaryAgentNode(
+  spec: CanvasesCanvas["spec"] | null | undefined,
+  preferredAgentNodeId?: string,
+): CanvasSpecNode | undefined {
+  const agentNodes = findAgentNodes(spec);
+  return agentNodes.find((node) => node.id === preferredAgentNodeId) ?? agentNodes[0];
 }
 
 export function canvasNodeToPlanningReviewComponent(node: CanvasSpecNode): PlanningReviewComponent {
@@ -84,6 +108,26 @@ export function applyPlanningReviewDraftToCanvas(
   };
 }
 
+/** Patch one logical agent that is represented by multiple canvas nodes. */
+export function applyPlanningReviewDraftToCanvasNodes(
+  canvas: CanvasesCanvas,
+  agentNodeIds: readonly string[],
+  draft: PlanningReviewDraft,
+): CanvasesCanvas {
+  const component = draft.components[0];
+  if (!component) {
+    return canvas;
+  }
+  const targetNodeIds = new Set(agentNodeIds);
+  const nodes = (canvas.spec?.nodes ?? []).map((node) =>
+    node.id && targetNodeIds.has(node.id) ? applyPlanningReviewComponentToNode(node, component) : node,
+  );
+  return {
+    ...canvas,
+    spec: { ...canvas.spec, nodes },
+  };
+}
+
 /** Patch the agent node and serialize canvas.yaml for staging. */
 export function serializeColumnAgentCanvas(
   canvas: CanvasesCanvas,
@@ -91,4 +135,12 @@ export function serializeColumnAgentCanvas(
   draft: PlanningReviewDraft,
 ): string {
   return materializeCanvasSpec(applyPlanningReviewDraftToCanvas(canvas, agentNodeId, draft));
+}
+
+export function serializeColumnAgentCanvasNodes(
+  canvas: CanvasesCanvas,
+  agentNodeIds: readonly string[],
+  draft: PlanningReviewDraft,
+): string {
+  return materializeCanvasSpec(applyPlanningReviewDraftToCanvasNodes(canvas, agentNodeIds, draft));
 }

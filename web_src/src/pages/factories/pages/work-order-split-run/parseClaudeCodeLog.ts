@@ -38,48 +38,9 @@ export function parseClaudeCodeLog(
       current = startStep(steps, stepName, configured);
       continue;
     }
-    if (!current) {
-      continue;
+    if (current) {
+      consumeStepLine(current, rawLine);
     }
-
-    const tool = rawLine.match(TOOL_LINE);
-    if (tool) {
-      current.agentStream = true;
-      current.commands.push({
-        type: tool[1].trim().toLowerCase(),
-        name: cleanCommandDetail(tool[2] ?? "", COMMAND_DETAIL_MAX),
-        status: "passed",
-      });
-      continue;
-    }
-
-    if (!rawLine.trim()) {
-      continue;
-    }
-    if (STEP_FAILED.test(rawLine)) {
-      markFailed(current);
-      continue;
-    }
-    if (STEP_PASSED.test(rawLine) || RUNNER_NOISE.test(rawLine)) {
-      if (/^Claude Code started\b/.test(rawLine)) {
-        current.agentStream = true;
-      }
-      continue;
-    }
-
-    if (/^\s/.test(rawLine)) {
-      appendOutput(lastCommand(current), stripToolIndent(rawLine));
-      continue;
-    }
-    if (current.agentStream) {
-      current.commands.push({
-        type: "note",
-        name: cleanCommandDetail(rawLine.trim()),
-        status: "passed",
-      });
-      continue;
-    }
-    appendOutput(current, rawLine.trim());
   }
 
   return steps
@@ -91,6 +52,47 @@ export function parseClaudeCodeLog(
       output: step.output,
       commands: step.commands,
     }));
+}
+
+function consumeStepLine(current: OpenStep, rawLine: string) {
+  const tool = rawLine.match(TOOL_LINE);
+  if (tool) {
+    current.agentStream = true;
+    current.commands.push({
+      type: tool[1].trim().toLowerCase(),
+      name: cleanCommandDetail(tool[2] ?? "", COMMAND_DETAIL_MAX),
+      status: "passed",
+    });
+    return;
+  }
+
+  if (!rawLine.trim()) {
+    return;
+  }
+  if (STEP_FAILED.test(rawLine)) {
+    markFailed(current);
+    return;
+  }
+  if (STEP_PASSED.test(rawLine) || RUNNER_NOISE.test(rawLine)) {
+    if (/^Claude Code started\b/.test(rawLine)) {
+      current.agentStream = true;
+    }
+    return;
+  }
+
+  if (/^\s/.test(rawLine)) {
+    appendOutput(lastCommand(current), stripToolIndent(rawLine));
+    return;
+  }
+  if (current.agentStream) {
+    current.commands.push({
+      type: "note",
+      name: cleanCommandDetail(rawLine.trim()),
+      status: "passed",
+    });
+    return;
+  }
+  appendOutput(current, rawLine.trim());
 }
 
 function startStep(

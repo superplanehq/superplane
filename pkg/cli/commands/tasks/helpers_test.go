@@ -31,11 +31,15 @@ func TestResolveTaskID(t *testing.T) {
 func TestTaskDisplayID(t *testing.T) {
 	task := openapi_client.NewFactoriesWorkOrder()
 	task.SetId("22222222-2222-2222-2222-222222222222")
-	assert.Equal(t, "22222222-2222-2222-2222-222222222222", taskDisplayID(*task))
+	assert.Equal(t, "22222222-2222-2222-2222-222222222222", taskDisplayID(task))
 
 	task.SetKey("SUPER-1823")
-	assert.Equal(t, "SUPER-1823", taskDisplayID(*task))
+	assert.Equal(t, "SUPER-1823", taskDisplayID(task))
 
 	task.SetNumber("1823")
-	assert.Equal(t, "1823", taskDisplayID(*task))
+	assert.Equal(t, "1823", taskDisplayID(task))
+
+	summary := openapi_client.NewFactoriesWorkOrderSummary()
+	summary.SetNumber("1824")
+	assert.Equal(t, "1824", taskDisplayID(summary))
 }

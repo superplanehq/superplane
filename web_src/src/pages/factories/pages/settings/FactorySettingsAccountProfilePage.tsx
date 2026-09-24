@@ -8,10 +8,8 @@ import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { usePersonalTokensPanel } from "@/hooks/usePersonalTokensPanel";
 import {
   accountEmailOptions,
-  disconnectAccountProvider,
   disconnectLinkedAccount,
   linkedAccountConnectHref,
-  ssoLinkHref,
   updateAccountEmail,
   updateAccountName,
 } from "@/lib/accountSettings";
@@ -19,19 +17,17 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { ChangePasswordDialog } from "@/pages/organization/settings/components/ChangePasswordDialog";
 
+import { AccountProfileAssociatedAccountsCard } from "./account-profile-redesign/AccountProfileAssociatedAccountsCard";
 import { AccountProfileRedesignPage } from "./account-profile-redesign/AccountProfileRedesignPage";
 import { AccountSecurityRedesignPage } from "./account-profile-redesign/AccountSecurityRedesignPage";
 import { DeleteAccountDangerZone } from "./DeleteAccountDangerZone";
 import { useAccountSettingsAuthResults } from "./useAccountSettingsAuthResults";
 
-function ssoAccountsFromAccount(providers: Array<{ provider: string; email?: string; username?: string }> | undefined) {
-  const connected = new Map(
-    (providers ?? []).map((provider) => [provider.provider, provider.username || provider.email || provider.provider]),
-  );
-  return [
-    { provider: "github" as const, identity: connected.get("github") ?? null },
-    { provider: "google" as const, identity: connected.get("google") ?? null },
-  ];
+function linkedGithubUsername(
+  linkedAccounts: Array<{ provider: string; username?: string }> | undefined,
+): string | null {
+  const github = linkedAccounts?.find((account) => account.provider === "github");
+  return github?.username?.trim() || null;
 }
 
 export function FactorySettingsAccountProfilePage() {
@@ -53,13 +49,14 @@ export function FactorySettingsAccountProfilePage() {
     return <p className="text-[13px] text-muted-foreground">Loading profile…</p>;
   }
 
-  const velocityGithub = (account.linked_accounts ?? []).find((linked) => linked.provider === "github");
   const tokens = tokensPanel.tokens.map((token) => ({
     id: token.id || "",
     name: token.name || "Unnamed",
     createdAt: token.createdAt ? new Date(token.createdAt).toLocaleDateString() : "Unknown",
     lastUsedAt: token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : undefined,
   }));
+
+  const redirectPath = `${location.pathname}${location.search}`;
 
   return (
     <>
@@ -96,41 +93,31 @@ export function FactorySettingsAccountProfilePage() {
             throw error;
           }
         }}
-        velocityGithubUsername={velocityGithub?.username ?? null}
-        onLinkVelocityGithub={() => {
-          window.location.assign(linkedAccountConnectHref("github", `${location.pathname}${location.search}`));
-        }}
-        onRemoveVelocityGithub={() => {
-          void disconnectLinkedAccount("github")
-            .then(async () => {
-              await refreshAccount();
-              showSuccessToast("GitHub link removed.");
-            })
-            .catch((error) => {
-              showErrorToast(getApiErrorMessage(error, "Failed to remove the linked account."));
-            });
-        }}
+        associatedAccounts={
+          <AccountProfileAssociatedAccountsCard
+            githubUsername={linkedGithubUsername(account.linked_accounts)}
+            onLinkGithub={() => {
+              window.location.assign(linkedAccountConnectHref("github", redirectPath));
+            }}
+            onRemoveGithub={() => {
+              void disconnectLinkedAccount("github")
+                .then(async () => {
+                  await refreshAccount();
+                  showSuccessToast("GitHub link removed.");
+                })
+                .catch((error) => {
+                  showErrorToast(getApiErrorMessage(error, "Failed to remove the GitHub link."));
+                });
+            }}
+          />
+        }
         security={
           <AccountSecurityRedesignPage
             passwordSet={account.has_password}
             tokens={tokens}
-            ssoAccounts={ssoAccountsFromAccount(account.providers)}
             hideMockDialogs
             embedded
             onChangePassword={() => setPasswordOpen(true)}
-            onConnectSso={(provider) => {
-              window.location.assign(ssoLinkHref(provider, `${location.pathname}${location.search}`));
-            }}
-            onDisconnectSso={(provider) => {
-              void disconnectAccountProvider(provider)
-                .then(async () => {
-                  await refreshAccount();
-                  showSuccessToast(provider === "github" ? "GitHub disconnected." : "Google disconnected.");
-                })
-                .catch((error) => {
-                  showErrorToast(getApiErrorMessage(error, "Failed to disconnect sign-in method."));
-                });
-            }}
             onCreateToken={() => {
               tokensPanel.openCreateDialog();
               return "";
@@ -143,7 +130,12 @@ export function FactorySettingsAccountProfilePage() {
             }}
           />
         }
-        dangerZone={<DeleteAccountDangerZone email={account.email} />}
+        dangerZone={
+          <DeleteAccountDangerZone
+            email={account.email}
+            organizationsPendingDeletion={account.organizations_pending_deletion}
+          />
+        }
       />
       {account.has_password ? <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} /> : null}
       <PersonalApiTokenDialogs panel={tokensPanel} />

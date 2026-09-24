@@ -60,6 +60,10 @@ func (w *PlanningSessionCleanupWorker) tick(ctx context.Context) {
 
 	for i := range sessions {
 		session := &sessions[i]
+		if session.CreatedByUserID == nil {
+			w.logger.Warnf("skip stale planning session %s without a creator", session.ID)
+			continue
+		}
 		if err := session.End(db); err != nil {
 			w.logger.WithError(err).Warnf("failed to end stale planning session %s", session.ID)
 			continue

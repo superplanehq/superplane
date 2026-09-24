@@ -33,7 +33,7 @@ export const createIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const nodeMetadata = context.node.metadata as BaseNodeMetadata;
     return buildIncidentExecutionDetails(context.execution, nodeMetadata?.instanceUrl);
   },

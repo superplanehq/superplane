@@ -27,15 +27,12 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test-client-secret"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"",
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 

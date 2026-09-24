@@ -18,6 +18,7 @@ type RunOpenRouterSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 	// MaxTurns is kept so old node JSON still decodes. OpenCode does not
 	// take a turn cap; the wrapper ignores this value.
 	MaxTurns int `mapstructure:"maxTurns"`
@@ -77,7 +78,7 @@ type OpenRouterBrokerTask struct {
 	Files    []runner.BrokerTaskFile
 }
 
-func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
+func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) OpenRouterBrokerTask {
 	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare OpenRouter agent",
 		PrepareScript:    runner.NodePrepareScript("opencode", opencodeMissingMessage, spec.WorkingDirectory),
@@ -85,6 +86,7 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 		RunScript:        runScript,
 		WorkingDirectory: spec.WorkingDirectory,
 		Steps:            spec.Steps,
+		DispatchedSteps:  dispatched,
 		Usage:            usage,
 		Setups:           setups,
 		Model:            strings.TrimSpace(spec.Model),
@@ -100,7 +102,11 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 }
 
 func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
-	return buildOpenRouterBrokerTask(spec, usage, setups)
+	return buildOpenRouterBrokerTask(spec, usage, setups, nil)
+}
+
+func BuildDispatchedBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) OpenRouterBrokerTask {
+	return buildOpenRouterBrokerTask(spec, usage, setups, dispatched)
 }
 
 func ApplyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
@@ -133,7 +139,7 @@ func planningFollowUpCommand(spec RunOpenRouterSpec) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
-			runner.WrapCommandInWorkingDirectory(
+			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
 				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
 			),

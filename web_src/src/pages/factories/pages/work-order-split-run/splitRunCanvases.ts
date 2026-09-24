@@ -304,7 +304,6 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   addPullRequestActivity: { title: "Add Pull Request Activity", iconSlug: "factory" },
   updatePullRequestActivity: { title: "Update Pull Request Activity", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
-  setWorkOrderStatusNote: { title: "Set Task Status Note", iconSlug: "factory" },
   reportWorkOrderCheck: { title: "Report Task Check", iconSlug: "factory" },
   "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
   "github.createPullRequest": { title: "Create Pull Request", iconSlug: "github" },

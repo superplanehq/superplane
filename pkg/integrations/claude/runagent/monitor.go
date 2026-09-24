@@ -97,7 +97,6 @@ func (a *RunAgent) handleTerminalSession(ctx core.ActionHookContext, client *Cli
 		mergeSessionIntoMetadata(metadata, sess)
 		_ = ctx.Metadata.Set(*metadata)
 		reclaimSession(client, metadata.Session.ID, persist, ctx.Logger)
-		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("managed agent session failed: %s", sm.Err.Message))
 	}
@@ -121,7 +120,6 @@ func (a *RunAgent) handleTerminalSession(ctx core.ActionHookContext, client *Cli
 	_ = ctx.Metadata.Set(*metadata)
 
 	reclaimSession(client, metadata.Session.ID, persist, ctx.Logger)
-	cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 	return nil
 }
@@ -136,7 +134,6 @@ func (a *RunAgent) finishTimeout(ctx core.ActionHookContext, client *Client, met
 		return emitErr
 	}
 	stopAndReclaim(client, metadata.Session.ID, persist, ctx.Logger)
-	cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 	return nil
 }
@@ -154,7 +151,6 @@ func (a *RunAgent) handlePollError(ctx core.ActionHookContext, client *Client, m
 		return emitErr
 	}
 	stopAndReclaim(client, metadata.Session.ID, persist, ctx.Logger)
-	cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 	return nil
 }
@@ -175,7 +171,6 @@ func (a *RunAgent) handleClientError(ctx core.ActionHookContext, metadata *Execu
 	// Best-effort reclaim: retry building a client now that the run is finished.
 	if c, cErr := NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
 		stopAndReclaim(c, metadata.Session.ID, persist, ctx.Logger)
-		cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
 		cleanupManagedVaultFromHook(c, ctx, ctx.Logger.Warnf)
 	} else {
 		ctx.Logger.Warnf("Cannot reclaim managed session %s: client unavailable: %v", metadata.Session.ID, cErr)
@@ -216,7 +211,6 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 	// cancelling often accompanies deleting the node, which drops the only
 	// record of this session ID.
 	_ = client.DeleteManagedSession(metadata.Session.ID)
-	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 	return nil
 }

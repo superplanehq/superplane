@@ -36,7 +36,7 @@ export const escalateIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     return buildIncidentExecutionDetails(context.execution);
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -47,14 +47,15 @@ export const escalateIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { incidentId?: string; escalationLevel?: string } | undefined;
+  const escalationLevel = Number(configuration?.escalationLevel);
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  if (configuration.escalationLevel && configuration.escalationLevel > 0) {
-    metadata.push({ icon: "arrow-up", label: `Level: ${configuration.escalationLevel}` });
+  if (Number.isFinite(escalationLevel) && escalationLevel > 0) {
+    metadata.push({ icon: "arrow-up", label: `Level: ${configuration?.escalationLevel}` });
   } else {
     metadata.push({ icon: "arrow-up", label: "Next level" });
   }
@@ -64,7 +65,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [

@@ -13,7 +13,6 @@ type UrlViewFlags = Parameters<typeof useDefaultAppTab>[0]["urlViewFlags"];
 const CANVAS_FLAGS: UrlViewFlags = {
   isRunInspectionMode: false,
   isMemoryMode: false,
-  isFilesMode: false,
   isConsoleMode: false,
 };
 

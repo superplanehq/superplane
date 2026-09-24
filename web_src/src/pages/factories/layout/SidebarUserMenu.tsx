@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
@@ -55,7 +55,6 @@ export function SidebarUserMenu({
   defaultOpen = false,
   planLabel,
 }: SidebarUserMenuProps) {
-  const navigate = useNavigate();
   const { account } = useAccount();
   const profileHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "account", "general")
@@ -108,22 +107,18 @@ export function SidebarUserMenu({
             planLabel={planLabel}
           />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className={MENU_ITEM_CLASS}
-            onClick={() => navigate(profileHref)}
-            data-testid="factories-sidebar-profile"
-          >
-            <UserIcon aria-hidden />
-            Profile
+          <DropdownMenuItem asChild className={MENU_ITEM_CLASS} data-testid="factories-sidebar-profile">
+            <Link to={profileHref}>
+              <UserIcon aria-hidden />
+              Profile
+            </Link>
           </DropdownMenuItem>
           {account?.installation_admin ? (
-            <DropdownMenuItem
-              className={MENU_ITEM_CLASS}
-              onClick={() => navigate("/admin")}
-              data-testid="factories-sidebar-installation-admin"
-            >
-              <Shield aria-hidden />
-              Installation Admin
+            <DropdownMenuItem asChild className={MENU_ITEM_CLASS} data-testid="factories-sidebar-installation-admin">
+              <Link to="/admin">
+                <Shield aria-hidden />
+                Installation Admin
+              </Link>
             </DropdownMenuItem>
           ) : null}
           <AppearanceMenuItem />
@@ -152,8 +147,6 @@ function OrganizationMenuHeader({
   organizationHref: string;
   planLabel?: string;
 }) {
-  const navigate = useNavigate();
-
   return (
     <div className="px-1 py-1" data-testid="factories-sidebar-organization">
       <div className="flex items-center gap-0.5">
@@ -164,12 +157,14 @@ function OrganizationMenuHeader({
           {organizationName}
         </p>
         <DropdownMenuItem
+          asChild
           aria-label="Organization settings"
           data-testid="factories-sidebar-organization-settings-link"
           className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
-          onSelect={() => navigate(organizationHref)}
         >
-          <Settings className="size-3.5" aria-hidden />
+          <Link to={organizationHref}>
+            <Settings className="size-3.5" aria-hidden />
+          </Link>
         </DropdownMenuItem>
         <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
       </div>

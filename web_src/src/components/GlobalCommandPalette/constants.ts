@@ -2,7 +2,6 @@ import {
   BookOpen,
   Building2,
   CircleUser,
-  Gauge,
   Key,
   KeyRound,
   Network,
@@ -74,14 +73,6 @@ export const ORGANIZATION_SETTINGS_LINKS: Array<{
     path: "settings/integrations",
     icon: Plug,
     permission: { resource: "integrations", action: "read" },
-  },
-  {
-    id: "usage",
-    label: "Usage",
-    description: "Limits and tracked usage",
-    path: "settings/billing",
-    icon: Gauge,
-    permission: { resource: "org", action: "read" },
   },
   {
     id: "secrets",

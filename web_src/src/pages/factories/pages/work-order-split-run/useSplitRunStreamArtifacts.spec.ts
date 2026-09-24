@@ -1,16 +1,16 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-const { useWorkOrderEventsMock, useWorkOrderArtifactsMock, useFactoryPullRequestsMock } = vi.hoisted(() => ({
+const { useWorkOrderEventsMock, useWorkOrderArtifactsMock, useWorkOrderMock } = vi.hoisted(() => ({
   useWorkOrderEventsMock: vi.fn(),
   useWorkOrderArtifactsMock: vi.fn(),
-  useFactoryPullRequestsMock: vi.fn(),
+  useWorkOrderMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: useWorkOrderEventsMock,
   useWorkOrderArtifacts: useWorkOrderArtifactsMock,
-  useFactoryPullRequests: useFactoryPullRequestsMock,
+  useWorkOrder: useWorkOrderMock,
 }));
 
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
@@ -43,7 +43,7 @@ describe("useSplitRunStreamArtifacts", () => {
     useWorkOrderArtifactsMock.mockReturnValue({
       data: [{ id: "art-branch-1", type: "TYPE_BRANCH", data: { name: "feature/retry-v2" } }],
     });
-    useFactoryPullRequestsMock.mockReturnValue({ data: [] });
+    useWorkOrderMock.mockReturnValue({ data: { pullRequests: [] } });
 
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", "order-1"));
 
@@ -60,7 +60,7 @@ describe("useSplitRunStreamArtifacts", () => {
   it("returns an empty index when the order id is missing", () => {
     useWorkOrderEventsMock.mockReturnValue({ data: { pages: [] } });
     useWorkOrderArtifactsMock.mockReturnValue({ data: [] });
-    useFactoryPullRequestsMock.mockReturnValue({ data: [] });
+    useWorkOrderMock.mockReturnValue({ data: { pullRequests: [] } });
 
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", undefined));
 

@@ -4,17 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { handleStopMock, handleRejectMock, handleBackToDraftMock } = vi.hoisted(() => ({
+const { handleStopMock, handleRejectMock } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
   handleRejectMock: vi.fn(),
-  handleBackToDraftMock: vi.fn(),
 }));
 
 vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
-    handleBackToDraft: handleBackToDraftMock,
     handleStopAutomation: vi.fn(),
     busy: false,
   }),
@@ -45,17 +43,23 @@ describe("WorkOrderSplitRunPopup Escape handling", () => {
   beforeEach(() => {
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
-    handleBackToDraftMock.mockReset().mockResolvedValue(true);
   });
 
   it("closes the popup when Escape is pressed", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     renderPopup(onClose);
 
     await user.keyboard("{Escape}");
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(
+      fetchSpy.mock.calls.some(
+        ([input]) => String(input).includes("/planning-sessions/") && String(input).endsWith("/end"),
+      ),
+    ).toBe(false);
+    fetchSpy.mockRestore();
   });
 
   it("cancels an in-progress title edit on the first Escape, and closes on the second", async () => {

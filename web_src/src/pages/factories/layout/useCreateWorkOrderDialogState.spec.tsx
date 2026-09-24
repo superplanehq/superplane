@@ -3,7 +3,13 @@ import { type ReactNode } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { describe, expect, it } from "bun:test";
 
-import { createWorkOrderPath, factoryHomePath, linesPath, workOrdersPath } from "../lib/factoryPagePaths";
+import {
+  createWorkOrderPath,
+  factoryLineDetailPath,
+  linesPath,
+  workOrderDetailPath,
+  workOrdersPath,
+} from "../lib/factoryPagePaths";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 
 const ORGANIZATION_ID = "org-1";
@@ -19,7 +25,13 @@ function useDialogState(canCreate: boolean, firstLineId = "line-plan-and-impleme
   const location = useLocation();
   const navigate = useNavigate();
   const state = useCreateWorkOrderDialogState(ORGANIZATION_ID, FACTORY_KEY, canCreate, firstLineId);
-  return { ...state, pathname: location.pathname, navigate };
+  return {
+    ...state,
+    pathname: location.pathname,
+    href: `${location.pathname}${location.search}`,
+    locationState: location.state,
+    navigate,
+  };
 }
 
 describe("useCreateWorkOrderDialogState", () => {
@@ -39,17 +51,33 @@ describe("useCreateWorkOrderDialogState", () => {
     expect(result.current.createWorkOrderOpen).toBe(true);
   });
 
-  it("replaces the deep link with the line board after create", () => {
+  it("opens the created task the same way as a GitHub import", () => {
     const { result } = renderHook(() => useDialogState(true), {
       wrapper: wrapper(createWorkOrderPath(ORGANIZATION_ID, FACTORY_KEY)),
     });
+    const order = { id: "order-1", number: "101", title: "Ship the refunds line" };
 
     act(() => {
-      result.current.completeCreateWorkOrder("101");
+      result.current.completeCreateWorkOrder("101", order);
     });
 
     expect(result.current.createWorkOrderOpen).toBe(false);
-    expect(result.current.pathname).toBe(factoryHomePath(ORGANIZATION_ID, FACTORY_KEY, "line-plan-and-implement"));
+    expect(result.current.href).toBe(
+      workOrderDetailPath(ORGANIZATION_ID, FACTORY_KEY, "101", "line-plan-and-implement"),
+    );
+    expect(result.current.locationState).toEqual({ peekOrder: order });
+  });
+
+  it("keeps the current line when create finishes from a board", () => {
+    const { result } = renderHook(() => useDialogState(true, "line-plan-and-implement"), {
+      wrapper: wrapper(factoryLineDetailPath(ORGANIZATION_ID, FACTORY_KEY, "line-hotfix")),
+    });
+
+    act(() => {
+      result.current.completeCreateWorkOrder("102");
+    });
+
+    expect(result.current.href).toBe(workOrderDetailPath(ORGANIZATION_ID, FACTORY_KEY, "102", "line-hotfix"));
   });
 
   it("does not open from New Task when create is not allowed", () => {

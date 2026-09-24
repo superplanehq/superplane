@@ -17,13 +17,10 @@ import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { APIKeys } from "./ApiKeys";
 import { APIKeyDetail } from "./ApiKeyDetail";
-import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
-import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
-  Gauge,
   CircleUser,
   Home,
   Key,
@@ -43,7 +40,6 @@ import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeat
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryListPath } from "@/pages/factories/lib/factoryPagePaths";
-import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
 import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
@@ -75,14 +71,9 @@ export function OrganizationSettings() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
-  const canReadOrg = permissionsLoading || canAct("org", "read");
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
-  const { data: usageStatus, error: usageError } = useOrganizationUsage(
-    organizationId || "",
-    !!organizationId && canReadOrg,
-  );
 
   if (userLoading) {
     return (
@@ -127,17 +118,7 @@ export function OrganizationSettings() {
     permission?: { resource: string; action: string };
   };
 
-  const sectionIds = [
-    "profile",
-    "general",
-    "members",
-    "groups",
-    "roles",
-    "integrations",
-    "secrets",
-    "api-keys",
-    "billing",
-  ];
+  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets", "api-keys"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -153,8 +134,6 @@ export function OrganizationSettings() {
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
   const userEmail = user?.email || "";
-  const usageEnabled =
-    usageStatus?.enabled === true || !!usageError || currentSection === "billing" || isUsagePageForced();
 
   const homeHref = factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
   const organizationLinks: NavLink[] = [
@@ -220,16 +199,6 @@ export function OrganizationSettings() {
     },
   ];
 
-  if (usageEnabled) {
-    organizationLinks.splice(6, 0, {
-      id: "billing",
-      label: "Usage",
-      href: `/${organizationId}/settings/billing`,
-      Icon: Gauge,
-      permission: { resource: "org", action: "read" },
-    });
-  }
-
   const userLinks: NavLink[] = [
     { id: "profile", label: "Profile", href: `/${organizationId}/settings/profile`, Icon: CircleUser },
     { id: "sign-out", label: "Sign Out", action: () => (window.location.href = "/logout"), Icon: LogOut },
@@ -286,10 +255,6 @@ export function OrganizationSettings() {
     integrations: {
       title: "Integrations",
       description: "Connect external tools and services to extend SuperPlane.",
-    },
-    billing: {
-      title: "Usage",
-      description: "Review organization limits and tracked usage for this organization.",
     },
     secrets: {
       title: "Secrets",
@@ -573,14 +538,6 @@ export function OrganizationSettings() {
                 <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
                   <Notifications />
                 </RequireExperimentalFeature>
-              }
-            />
-            <Route
-              path="billing"
-              element={
-                <RequirePermission resource="org" action="read">
-                  <Usage organizationId={organizationId || ""} />
-                </RequirePermission>
               }
             />
           </Routes>

@@ -23,7 +23,6 @@ vi.mock("@/hooks/useCanvasData", () => ({
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: (...args: unknown[]) => useFactoryWorkOrders(...args),
-  useFactoryPullRequests: () => ({ data: [] }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));

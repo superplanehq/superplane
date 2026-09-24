@@ -27,7 +27,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Populated homepage: Apps header, toolbar, folder sections, and app cards. */
+/** Populated homepage: Apps header, toolbar, and app cards. */
 export const Current: Story = {
   render: () => <HomePageHarness />,
 };

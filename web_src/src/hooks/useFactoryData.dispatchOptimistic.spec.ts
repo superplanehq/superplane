@@ -139,7 +139,7 @@ describe("useDispatchWorkOrder optimistic cache patch", () => {
     });
 
     const orders = ordersInCache(queryClient);
-    expect(orders.find((order) => order.id === "wo-1")).toEqual(serverOrder);
+    expect(orders.find((order) => order.id === "wo-1")).toMatchObject(serverOrder);
 
     const board = buildLinePhaseBoard(LINE, orders);
     expect(board[0]?.runs.map((run) => run.workOrderId)).toContain("wo-1");

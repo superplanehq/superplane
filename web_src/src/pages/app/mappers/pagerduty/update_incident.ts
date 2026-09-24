@@ -36,7 +36,7 @@ export const updateIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     return buildIncidentExecutionDetails(context.execution);
   },
 
@@ -48,27 +48,36 @@ export const updateIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as
+    | {
+        incidentId?: string;
+        status?: string;
+        priority?: string;
+        title?: string;
+        escalationPolicy?: string;
+        assignees?: unknown[];
+      }
+    | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
   // Show which fields are being updated
   const updates: string[] = [];
-  if (configuration.status) {
+  if (configuration?.status) {
     updates.push(`Status: ${configuration.status}`);
   }
-  if (configuration.priority) {
+  if (configuration?.priority) {
     updates.push("Priority");
   }
-  if (configuration.title) {
+  if (configuration?.title) {
     updates.push("Title");
   }
-  if (configuration.escalationPolicy) {
+  if (configuration?.escalationPolicy) {
     updates.push("Escalation Policy");
   }
-  if (configuration.assignees && configuration.assignees.length > 0) {
+  if (configuration?.assignees && configuration.assignees.length > 0) {
     updates.push(`Assignees (${configuration.assignees.length})`);
   }
 
@@ -81,7 +90,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [

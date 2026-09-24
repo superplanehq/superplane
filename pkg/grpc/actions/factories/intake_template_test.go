@@ -16,6 +16,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
+			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
@@ -42,19 +43,93 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, intakeSuperplaneLabelCondition, filter.Configuration["expression"])
 	})
 
-	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {
-		for _, source := range []string{
-			models.FactoryIntakeSourceSentryExceptions,
-			models.FactoryIntakeSourcePagerDutyIncidents,
-			models.FactoryIntakeSourceProductiveTasks,
-		} {
-			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
-			require.NoError(t, err)
-			assert.Equal(t, []yaml.Edge{
-				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
-			}, canvas.Spec.Edges)
-			assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
-		}
+	t.Run("Jira issues flow from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceJiraIssues})
+		require.NoError(t, err)
+
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["events"])
+		assert.Equal(t, true, trigger.Metadata[intakeMetadataJiraMoveOnComplete])
+		assert.Equal(t, "", trigger.Metadata[intakeMetadataJiraCompletionColumn])
+	})
+
+	t.Run("a Jira intake stores the chosen completion column on the trigger", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source: models.FactoryIntakeSourceJiraIssues,
+			Settings: intakeSettings{
+				ConfidencePct:        DefaultIntakeConfidencePct,
+				JiraMoveOnComplete:   true,
+				JiraCompletionColumn: "QA",
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, true, trigger.Metadata[intakeMetadataJiraMoveOnComplete])
+		assert.Equal(t, "QA", trigger.Metadata[intakeMetadataJiraCompletionColumn])
+	})
+
+	t.Run("a Jira work order reads the plain text description, not the raw document", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceJiraIssues})
+		require.NoError(t, err)
+
+		// Jira holds a description in Atlassian Document Format, which reads
+		// as a Go map once a template interpolates it.
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.NotContains(t, create.Configuration["description"], "fields.description")
+	})
+
+	t.Run("a Sentry work order reads the formatted issue payload, not the permalink", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.data.issue.title }}", create.Configuration["title"])
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+		assert.NotContains(t, create.Configuration["description"], "permalink")
+	})
+
+	t.Run("a Sentry issue flows from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+		require.NoError(t, err)
+
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, intakeSentryActionsFor(defaultSentryIntakeSettings()), trigger.Configuration["actions"])
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.Component)
+		assert.Equal(t, "true", filter.Configuration["expression"])
+	})
+
+	t.Run("PagerDuty creates a work order without a filter", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourcePagerDutyIncidents})
+		require.NoError(t, err)
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
+	})
+
+	t.Run("Productive.io filters key tasks by default", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceProductiveTasks})
+		require.NoError(t, err)
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
 	})
 
 	t.Run("every action node works on a whole batch at once", func(t *testing.T) {
@@ -137,6 +212,60 @@ func Test__IntakeFilterExpression(t *testing.T) {
 		assert.NotContains(t, expression, ">=")
 		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
 		assert.Contains(t, expression, intakeUnassignedCondition)
+	})
+}
+
+func Test__ensureIntakeFilterNode(t *testing.T) {
+	t.Run("inserts a filter between the trigger and the work order", func(t *testing.T) {
+		nodes := []models.Node{
+			triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+		}
+		graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, CreateNodeID: intakeCreateNodeID}
+
+		nodes, edges, graph, err := ensureIntakeFilterNode(nodes, edges, graph)
+		require.NoError(t, err)
+
+		filter := findModelNode(t, nodes, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.ComponentName())
+		assert.Equal(t, "true", filter.Configuration["expression"])
+		assert.Equal(t, intakeFilterNodeID, graph.FilterNodeID)
+		assert.ElementsMatch(t, []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, edges)
+	})
+
+	t.Run("keeps an existing filter in place", func(t *testing.T) {
+		nodes := []models.Node{
+			triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+			componentNode(intakeFilterNodeID, intakeFilterComponent),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}
+		graph := intakeGraph{
+			TriggerNodeID: intakeTriggerNodeID,
+			FilterNodeID:  intakeFilterNodeID,
+			CreateNodeID:  intakeCreateNodeID,
+		}
+
+		updatedNodes, updatedEdges, updatedGraph, err := ensureIntakeFilterNode(nodes, edges, graph)
+		require.NoError(t, err)
+
+		assert.Equal(t, nodes, updatedNodes)
+		assert.Equal(t, edges, updatedEdges)
+		assert.Equal(t, graph, updatedGraph)
+	})
+
+	t.Run("rejects a graph that cannot receive a filter", func(t *testing.T) {
+		_, _, _, err := ensureIntakeFilterNode(nil, nil, intakeGraph{TriggerNodeID: intakeTriggerNodeID})
+		require.EqualError(t, err, "intake automation has no filter to update")
 	})
 }
 

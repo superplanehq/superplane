@@ -51,20 +51,41 @@ describe("billingCreditBucketsView", () => {
     });
   });
 
-  it("says trial credit expired 14 days after registration", () => {
-    const expiredAt = "2026-09-10T12:00:00.000Z";
-    const [trial] = billingCreditBucketsView({
+  it("hides trial credit when remaining is zero", () => {
+    const buckets = billingCreditBucketsView({
       welcomeRemainingCents: 0,
       includedRemainingCents: 5000,
       purchasedRemainingCents: 5000,
       purchasedCents: 5000,
       plan: "business",
-      trialEndsAt: expiredAt,
+      trialEndsAt,
       now,
     });
 
-    expect(trial.footer).toBe(`Expired on ${new Date(expiredAt).toLocaleDateString()}. ${BILLING_TRIAL_TTL_COPY}`);
-    expect(trial.usedPercent).toBe(100);
+    expect(buckets.map((bucket) => bucket.key)).toEqual(["included", "topup"]);
+    expect(buckets[0]).toMatchObject({
+      heading: "Included usage",
+      spendOrderLabel: "Spend first",
+    });
+    expect(buckets[1]).toMatchObject({
+      heading: "Top-up credit",
+      spendOrderLabel: "Spend last",
+    });
+  });
+
+  it("hides trial credit when the trial expiry date is in the past", () => {
+    const buckets = billingCreditBucketsView({
+      welcomeRemainingCents: 4124,
+      includedRemainingCents: 5000,
+      purchasedRemainingCents: 0,
+      purchasedCents: 0,
+      plan: "trial",
+      trialEndsAt: "2026-09-10T12:00:00.000Z",
+      now,
+    });
+
+    expect(buckets.map((bucket) => bucket.key)).toEqual(["included", "topup"]);
+    expect(buckets.some((bucket) => bucket.key === "trial")).toBe(false);
   });
 
   it("keeps included usage at zero until Business is active", () => {
@@ -92,13 +113,13 @@ describe("billingCreditBucketsView", () => {
       adminGrantCents: 11000,
     });
 
-    expect(buckets.map((bucket) => bucket.key)).toEqual(["trial", "included", "topup", "grant"]);
-    expect(buckets[2]).toMatchObject({
+    expect(buckets.map((bucket) => bucket.key)).toEqual(["included", "topup", "grant"]);
+    expect(buckets[1]).toMatchObject({
       heading: "Top-up credit",
-      spendOrderLabel: "Spend third",
+      spendOrderLabel: "Spend next",
       remainingLabel: "$1042.78 remaining",
     });
-    expect(buckets[3]).toMatchObject({
+    expect(buckets[2]).toMatchObject({
       heading: "SuperPlane grant",
       spendOrderLabel: "Spend last",
       remainingLabel: "$110.00 remaining",
@@ -109,7 +130,7 @@ describe("billingCreditBucketsView", () => {
   });
 
   it("uses SuperPlane grant amounts as the used-percent denominator", () => {
-    const [, , , grant] = billingCreditBucketsView({
+    const [, , grant] = billingCreditBucketsView({
       welcomeRemainingCents: 0,
       includedRemainingCents: 0,
       purchasedRemainingCents: 0,
@@ -125,6 +146,23 @@ describe("billingCreditBucketsView", () => {
     });
   });
 
+  it("shows trial and SuperPlane grant together when both remain", () => {
+    const buckets = billingCreditBucketsView({
+      welcomeRemainingCents: 2500,
+      includedRemainingCents: 5000,
+      purchasedRemainingCents: 5000,
+      purchasedCents: 5000,
+      adminRemainingCents: 11000,
+      adminGrantCents: 11000,
+      trialEndsAt,
+      now,
+    });
+
+    expect(buckets.map((bucket) => bucket.key)).toEqual(["trial", "included", "topup", "grant"]);
+    expect(buckets[2].spendOrderLabel).toBe("Spend third");
+    expect(billingSpendOrderCopy(buckets)).toBe(BILLING_SPEND_ORDER_WITH_GRANT_COPY);
+  });
+
   it("does not show SuperPlane grant when remaining grant is zero", () => {
     const buckets = billingCreditBucketsView({
       welcomeRemainingCents: 4124,
@@ -133,6 +171,8 @@ describe("billingCreditBucketsView", () => {
       purchasedCents: 0,
       adminRemainingCents: 0,
       adminGrantCents: 1500,
+      trialEndsAt,
+      now,
     });
 
     expect(buckets.map((bucket) => bucket.key)).toEqual(["trial", "included", "topup"]);
@@ -148,6 +188,8 @@ describe("billingCreditRemainingShares", () => {
       includedRemainingCents: 2500,
       purchasedRemainingCents: 5000,
       purchasedCents: 5000,
+      trialEndsAt: "2026-09-24T12:00:00.000Z",
+      now: new Date("2026-09-10T12:00:00.000Z"),
     });
 
     expect(billingCreditRemainingShares(buckets)).toEqual([
@@ -166,7 +208,6 @@ describe("billingCreditRemainingShares", () => {
     });
 
     expect(billingCreditRemainingShares(buckets)).toEqual([
-      { key: "trial", percent: 0 },
       { key: "included", percent: 0 },
       { key: "topup", percent: 0 },
     ]);
@@ -183,7 +224,6 @@ describe("billingCreditRemainingShares", () => {
     });
 
     expect(billingCreditRemainingShares(buckets)).toEqual([
-      { key: "trial", percent: 0 },
       { key: "included", percent: 0 },
       { key: "topup", percent: 90 },
       { key: "grant", percent: 10 },
@@ -198,9 +238,19 @@ describe("BILLING_SPEND_ORDER_COPY", () => {
     );
   });
 
-  it("names SuperPlane grant only when that row is visible", () => {
-    expect(billingSpendOrderCopy(false)).toBe(BILLING_SPEND_ORDER_COPY);
-    expect(billingSpendOrderCopy(true)).toBe(BILLING_SPEND_ORDER_WITH_GRANT_COPY);
+  it("names only visible buckets in spend order", () => {
+    expect(billingSpendOrderCopy([{ key: "trial" }, { key: "included" }, { key: "topup" }])).toBe(
+      BILLING_SPEND_ORDER_COPY,
+    );
+    expect(billingSpendOrderCopy([{ key: "trial" }, { key: "included" }, { key: "topup" }, { key: "grant" }])).toBe(
+      BILLING_SPEND_ORDER_WITH_GRANT_COPY,
+    );
+    expect(billingSpendOrderCopy([{ key: "included" }, { key: "topup" }])).toBe(
+      "Hosted runs spend included usage first, then top-up credit.",
+    );
+    expect(billingSpendOrderCopy([{ key: "included" }, { key: "topup" }, { key: "grant" }])).toBe(
+      "Hosted runs spend included usage first, then top-up credit, then SuperPlane grant.",
+    );
   });
 });
 

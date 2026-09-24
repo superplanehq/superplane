@@ -82,6 +82,8 @@ func Test__CancelRun__RequestsCancellationAndDrainsWork(t *testing.T) {
 	require.NotNil(t, response)
 	require.NotNil(t, response.Run)
 	assert.Equal(t, pb.CanvasRun_STATE_CANCELLING, response.Run.State)
+	require.NotNil(t, response.Run.CancelledBy)
+	assert.Equal(t, r.User.String(), response.Run.CancelledBy.Id)
 	assert.True(t, runConsumer.HasReceivedMessage())
 	assert.True(t, executionCancellingConsumer.HasReceivedMessage())
 

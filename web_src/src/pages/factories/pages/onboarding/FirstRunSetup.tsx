@@ -20,7 +20,6 @@ import { sphereFor } from "./first-run/firstRunSphereFor";
 import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import {
-  DEFAULT_TICKET_SOURCE,
   useFirstRunSetupFlow,
   useFreshConnectionsOnConnectScreen,
   type FirstRunScreen,
@@ -147,12 +146,16 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
 
 /** Hosted credentials provision from this screen, so it shows finish progress. */
 function TicketsScreenHost({
+  organizationId,
   flow,
+  model,
   saving,
   chrome,
   sphere,
 }: {
+  organizationId: string;
   flow: FirstRunSetupFlow;
+  model: OnboardingPageModel;
   saving: boolean;
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
@@ -160,13 +163,25 @@ function TicketsScreenHost({
   const finishing = flow.blockingAction === "finishing-setup" || (flow.skipAgentScreen && saving);
   return (
     <FirstRunTicketsScreen
-      ticketSource={DEFAULT_TICKET_SOURCE}
+      ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
       continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
       savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      jiraConnected={model.setup.connected.has("jira")}
+      jiraProjects={model.jiraProjects}
+      jiraProjectsLoading={model.jiraProjectsLoading}
+      jiraProjectsError={model.jiraProjectsError}
+      jiraProjectId={model.jiraProjectId}
+      jiraCompletion={model.jiraCompletion}
+      organizationId={organizationId}
+      jiraIntegrationId={model.jiraIntegrationId}
       onSelectTicketSource={flow.selectTicketSource}
+      onConnectJira={() => void flow.connectJira()}
+      onSelectJiraProject={model.setJiraProjectId}
+      onJiraCompletionChange={model.setJiraCompletion}
+      onRetryJiraProjects={model.retryJiraProjects}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
   );
@@ -270,7 +285,9 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
+        organizationId={organizationId}
         flow={flow}
+        model={model}
         saving={model.saving}
         chrome={chromeFor("tickets")}
         sphere={sphereFor("tickets", setup.selectedRepo, model.githubOwner)}

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useEditorState, type Editor } from "@tiptap/react";
@@ -254,7 +255,7 @@ function AttachFileButton({
         type="file"
         hidden
         multiple
-        accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/markdown,.png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.md"
+        accept={WORK_ORDER_FILE_ACCEPT}
         data-testid="work-order-description-file-input"
         onChange={(event) => {
           const files = event.target.files;

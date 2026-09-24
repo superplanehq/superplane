@@ -4,7 +4,7 @@ import type { MultiFileDiffProps } from "@pierre/diffs/react";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { CanvasYamlDiffModal } from "./CanvasYamlDiffModal";
 
-type TestMultiFileDiffProps = MultiFileDiffProps<never>;
+type TestMultiFileDiffProps = MultiFileDiffProps<never, never>;
 
 const diffProps = vi.hoisted(() => ({
   latest: null as TestMultiFileDiffProps | null,
@@ -16,6 +16,10 @@ vi.mock("@pierre/diffs/react", () => ({
     return <div data-testid="multi-file-diff" />;
   },
 }));
+
+function yamlFileText(file: TestMultiFileDiffProps["oldFile"] | TestMultiFileDiffProps["newFile"]): string | undefined {
+  return file?.contents;
+}
 
 describe("CanvasYamlDiffModal", () => {
   beforeEach(() => {
@@ -35,14 +39,16 @@ describe("CanvasYamlDiffModal", () => {
       </ThemeProvider>,
     );
 
+    const latest = diffProps.latest;
+    const options = latest && latest.options;
     expect(screen.getByTestId("multi-file-diff")).toBeInTheDocument();
-    expect(diffProps.latest?.oldFile.contents).toBe("name: old\nshared: same\n");
-    expect(diffProps.latest?.newFile.contents).toBe("name: new\nshared: same\n");
-    expect(diffProps.latest?.options?.lineDiffType).toBe("word");
-    expect(diffProps.latest?.options?.parseDiffOptions).toEqual({ context: 6 });
-    expect(diffProps.latest?.options?.unsafeCSS).toContain("--diffs-bg-context-override: #ffffff");
-    expect(diffProps.latest?.options?.unsafeCSS).toContain('[data-line-type="context"]');
-    expect(diffProps.latest?.options?.unsafeCSS).toContain("--diffs-bg-addition-emphasis-override");
-    expect(diffProps.latest?.options?.unsafeCSS).toContain("--diffs-bg-deletion-emphasis-override");
+    expect(yamlFileText(latest && latest.oldFile)).toBe("name: old\nshared: same\n");
+    expect(yamlFileText(latest && latest.newFile)).toBe("name: new\nshared: same\n");
+    expect(options?.lineDiffType).toBe("word");
+    expect(options?.parseDiffOptions).toEqual({ context: 6 });
+    expect(options?.unsafeCSS).toContain("--diffs-bg-context-override: #ffffff");
+    expect(options?.unsafeCSS).toContain('[data-line-type="context"]');
+    expect(options?.unsafeCSS).toContain("--diffs-bg-addition-emphasis-override");
+    expect(options?.unsafeCSS).toContain("--diffs-bg-deletion-emphasis-override");
   });
 });

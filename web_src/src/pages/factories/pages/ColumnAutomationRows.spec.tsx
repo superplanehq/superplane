@@ -32,7 +32,7 @@ describe("ColumnAutomationRows", () => {
 
     const list = screen.getByRole("list", { name: "Backlog automations" });
     const rows = within(list).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual(["Listens to GitHub issues", "Scores new tasks"]);
+    expect(rows.map((row) => row.textContent)).toEqual(["Listens to GitHub issues", "Plans new tasks"]);
   });
 
   it("pads short columns with blank slots so every header keeps the same height", () => {

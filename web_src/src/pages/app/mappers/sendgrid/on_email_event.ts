@@ -1,7 +1,7 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type React from "react";
-import type { Predicate } from "../utils";
-import { formatPredicate } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate } from "../eventDisplay";
 import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -52,11 +52,7 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnEmailEventData;
     const category = Array.isArray(eventData?.category) ? eventData?.category.join(", ") : eventData?.category;
     return {
-      "Received At": eventData?.timestamp
-        ? new Date(Number(eventData.timestamp) * 1000).toLocaleString()
-        : context.event?.createdAt
-          ? new Date(context.event.createdAt).toLocaleString()
-          : "-",
+      "Received At": emailEventReceivedAt(eventData, context.event?.createdAt),
       Event: eventData?.event || "-",
       Email: eventData?.email || "-",
       Category: category || "-",
@@ -114,6 +110,16 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function emailEventReceivedAt(eventData: OnEmailEventData | undefined, createdAt?: string): string {
+  if (eventData?.timestamp) {
+    return new Date(Number(eventData.timestamp) * 1000).toLocaleString();
+  }
+  if (createdAt) {
+    return new Date(createdAt).toLocaleString();
+  }
+  return "-";
+}
 
 function buildTitle(email: string | undefined, eventType: string): string {
   if (email) {

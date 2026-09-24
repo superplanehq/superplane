@@ -108,10 +108,21 @@ func planningRefineKey(text string) string {
 }
 
 func planningWaitText(text string, refined bool, draft PlanningSessionDraft) string {
+	return planningWaitTextForKind(text, refined, draft, false)
+}
+
+func planningWaitTextForKind(text string, refined bool, draft PlanningSessionDraft, analysis bool) string {
 	if refined {
 		return planningRefinePrompt(text, draft)
 	}
+	if analysis {
+		return planningAnalysisFollowUpPrompt(text)
+	}
 	return planningDraftFollowUpPrompt(text, draft)
+}
+
+func planningAnalysisFollowUpPrompt(text string) string {
+	return text
 }
 
 func planningDraftFollowUpPrompt(text string, draft PlanningSessionDraft) string {

@@ -16,7 +16,7 @@ import type {
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getColorClass } from "@/lib/colors";
 import { getTriggerRenderer, getState, getStateMap } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";

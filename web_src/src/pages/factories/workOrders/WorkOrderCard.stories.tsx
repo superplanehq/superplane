@@ -89,13 +89,15 @@ export const ReviewPullRequest: Story = {
 };
 
 /**
- * Review pill plus the compact checks-passed mark. The mark keeps the
- * meaning through its color, icon, tooltip, and accessible name.
+ * Review pill plus the completed check-wait title.
  */
 export const ChecksPassedWithReview: Story = {
   name: "Review #2323 + checks passed",
   args: {
     checksPassedOrderIds: new Set(["wo-waiting"]),
+    checksPassedLabels: new Map([
+      ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+    ]),
   },
 };
 
@@ -172,6 +174,9 @@ export const ChecksPassedLongTitle: Story = {
       factory,
     ),
     checksPassedOrderIds: new Set(["wo-waiting"]),
+    checksPassedLabels: new Map([
+      ["wo-waiting", "Checks passed on [2e46445](https://github.com/acme/app/commit/2e46445)"],
+    ]),
   },
 };
 
@@ -180,6 +185,159 @@ export const ChecksPassedLongTitle: Story = {
  * keeps created time on the left and the owner given name plus avatar
  * on the right.
  */
+/**
+ * Draft task while the agent still works. The meter slot shows
+ * thinking states and a matrix loader.
+ */
+export const DraftAnalyzing: Story = {
+  name: "Draft analyzing",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft",
+        number: "1",
+        title: "The site feels weird lately",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    isAnalyzing: true,
+  },
+};
+
+/**
+ * Follow-up agent work after a score already exists. The meter slot
+ * stays on thinking states until the agent waits for the user.
+ */
+export const DraftAnalyzingWithScore: Story = {
+  name: "Draft analyzing after score",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-scored",
+        number: "2",
+        title: "The site feels weird lately",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    isAnalyzing: true,
+    clarityScore: 4,
+    confidenceScore: 3,
+  },
+};
+
+/** Refine finished with a mid Confidence: the card says Review. */
+export const DraftScoredPair: Story = {
+  name: "Draft with Clarity and Confidence (Review)",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-pair",
+        number: "3",
+        title: "Retry webhook delivery after provider timeouts",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 3,
+  },
+};
+
+/** Both scores high: the card says Ready. */
+export const DraftScoredReady: Story = {
+  name: "Draft ready to start",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-ready",
+        number: "5",
+        title: "Show the model name on the task card",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 5,
+    confidenceScore: 4,
+  },
+};
+
+/** Low Clarity: the card says Not ready. */
+export const DraftScoredBlocked: Story = {
+  name: "Draft not ready",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-blocked",
+        number: "6",
+        title: "Make it better",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    clarityScore: 2,
+    confidenceScore: 4,
+  },
+};
+
+/** Intake only: the verdict uses Confidence alone until a refine session scores Clarity. */
+export const DraftScoredIntakeOnly: Story = {
+  name: "Draft with Confidence only",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-intake",
+        number: "4",
+        title: "Reconcile settled ledger entries",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    confidenceScore: 4,
+  },
+};
+
+/**
+ * Draft with no score yet. The footer keeps created time and does not
+ * leave an empty action area.
+ */
+export const DraftUnscored: Story = {
+  name: "Draft with no score",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-draft-unscored",
+        number: "7",
+        title: "Triage inbound refund alerts",
+        state: "STATE_DRAFT",
+        statusNotes: [],
+        assignees: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+  },
+};
+
 export const OpenOwned: Story = {
   name: "Open with owner",
   args: {
@@ -189,6 +347,42 @@ export const OpenOwned: Story = {
         title: "Add refund reconciliation test",
         statusNotes: [],
         createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      }),
+      factory,
+    ),
+    pullRequests: [],
+  },
+};
+
+/**
+ * GitHub origin on the card. The source icon sits in the title row
+ * and opens the issue in a new tab.
+ */
+export const GitHubOrigin: Story = {
+  name: "GitHub origin",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        origin: {
+          url: "https://github.com/acme/payments/issues/12",
+          label: "acme/payments#12",
+        },
+      }),
+      factory,
+    ),
+  },
+};
+
+/**
+ * Manual origin on the card. The product logo sits in the title row
+ * and is not a link.
+ */
+export const ManualOrigin: Story = {
+  name: "Manual origin",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        createdBy: { user: { id: "user-1", name: "Ada Lovelace" } },
       }),
       factory,
     ),

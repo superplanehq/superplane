@@ -20,7 +20,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
-func Test__MaterializeFactoryAppDefaults(t *testing.T) {
+func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
@@ -28,7 +28,6 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		Registry:       r.Registry,
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
-		GitProvider:    r.GitProvider,
 		WebhookBaseURL: "http://localhost:8000",
 	}
 
@@ -58,9 +57,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 
 		backlog := liveBacklogCanvas(t, factoryModel)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     backlog.ID.String(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "backlog", response.GetTemplateId())
@@ -88,6 +87,11 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		assert.Equal(t, "line-implementation", response.GetTemplateId())
 		assert.NotEmpty(t, response.GetCanvasYaml())
 		assert.NotEmpty(t, response.GetConsoleYaml())
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		_, _, err = materialized.Parse(r.Registry, orgID)
+		require.NoError(t, err)
 	})
 
 	t.Run("an app from another factory reports not found", func(t *testing.T) {
@@ -95,9 +99,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		other := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, other.ID, support.RandomName("Plan"))
 
-		_, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     canvas.ID.String(),
+		_, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: canvas.ID.String(),
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
@@ -112,9 +116,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     intake.GetIntake().GetCanvasId(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: intake.GetIntake().GetCanvasId(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "intake:"+models.FactoryIntakeSourceGitHubIssues, response.GetTemplateId())
@@ -130,9 +134,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     canvas.ID.String(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: canvas.ID.String(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "line-implementation", response.GetTemplateId())
@@ -146,9 +150,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := createClaudeImplementationCanvas(t, r, factoryModel.ID)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     canvas.ID.String(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: canvas.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -173,15 +177,15 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		backlog := liveBacklogCanvas(t, factoryModel)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     backlog.ID.String(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
 
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
-		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, intakeAnalysisNodeID))
+		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, backlogRefinementNodeID))
 	})
 
 	t.Run("Backlog keeps the Claude agent when the instance default is unset", func(t *testing.T) {
@@ -193,17 +197,17 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		require.NoError(t, err)
 		backlog := liveBacklogCanvas(t, factoryModel)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     backlog.ID.String(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
 
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
-		analysis := findYAMLNode(t, defaults, intakeAnalysisNodeID)
-		assert.Equal(t, "runnerClaudeCode", analysis.Component)
-		assert.Equal(t, "opus", analysis.Configuration["model"])
+		refinement := findYAMLNode(t, defaults, backlogRefinementNodeID)
+		assert.Equal(t, "runnerClaudeCode", refinement.Component)
+		assert.Equal(t, "opus", refinement.Configuration["model"])
 	})
 
 	t.Run("a discussion PR feedback handler resets to its generated graph", func(t *testing.T) {
@@ -219,9 +223,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		require.NoError(t, err)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     handler.GetHandler().GetCanvasId(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: handler.GetHandler().GetCanvasId(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, prFeedbackDiscussionTemplateID, response.GetTemplateId())
@@ -236,7 +240,13 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 			"id":      prFeedbackDiscussionTemplateID,
 			"version": float64(factoryTemplateVersion),
 		}, trigger.Metadata[factoryTemplateMetadataKey])
-		assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, prFeedbackRunnerNodeID))
+		for _, runnerID := range []string{
+			prFeedbackRunnerNodeID,
+			prFeedbackReviewRunnerNodeID,
+			prFeedbackReplyRunnerNodeID,
+		} {
+			assertSuperPlaneRunnerNode(t, findYAMLNode(t, defaults, runnerID))
+		}
 	})
 
 	t.Run("a checks PR feedback handler resets to its generated graph", func(t *testing.T) {
@@ -253,9 +263,9 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		require.NoError(t, err)
 		enableInstanceSuperPlaneDefault(t)
 
-		response, err := MaterializeFactoryAppDefaults(ctx, orgID, &pb.MaterializeFactoryAppDefaultsRequest{
-			FactoryId: factoryModel.ID.String(),
-			AppId:     handler.GetHandler().GetCanvasId(),
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: handler.GetHandler().GetCanvasId(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, prFeedbackChecksTemplateID, response.GetTemplateId())

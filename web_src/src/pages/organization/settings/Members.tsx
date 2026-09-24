@@ -359,7 +359,7 @@ export function Members({ organizationId }: MembersProps) {
               <p className="text-gray-500 dark:text-gray-400">Loading...</p>
             </div>
           ) : (
-            <Table dense className="!overflow-x-hidden !whitespace-normal">
+            <Table dense>
               <TableHead>
                 <TableRow>
                   <TableHeader
@@ -415,11 +415,7 @@ export function Members({ organizationId }: MembersProps) {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="min-w-0">
-                      <div className="max-w-[26rem] truncate" title={member.email}>
-                        {member.email}
-                      </div>
-                    </TableCell>
+                    <TableCell>{member.email}</TableCell>
                     <TableCell>
                       <MemberRoleSelect
                         member={member}

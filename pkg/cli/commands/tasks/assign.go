@@ -71,7 +71,7 @@ func (c *taskAssignCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(
 			stdout,
 			"Task assignees updated: %s\nAssignees: %s\n",
-			taskDisplayID(task),
+			taskDisplayID(&task),
 			formatAssigneeList(task.GetAssignees()),
 		)
 		return err

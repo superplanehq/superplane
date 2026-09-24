@@ -5,7 +5,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import type { AmiStateChangeEvent } from "./types";
 
 interface Configuration {

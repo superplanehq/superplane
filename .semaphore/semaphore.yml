@@ -27,12 +27,6 @@ global_job_config:
     commands:
       - checkout
       - mkdir -p tmp/go tmp/go-build
-      # Only main stores these caches, so the keys carry no branch name.
-      # See scripts/ci_cache_store_go.sh.
-      - "cache restore go-mod-$(checksum go.sum),go-mod"
-      - "cache restore go-build-$(checksum go.sum),go-build"
-      - make dev.up
-      - make dev.setup
 
 auto_cancel:
   running:
@@ -43,8 +37,16 @@ blocks:
   - name: "Backend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          # Only main stores these caches, so the keys carry no branch name.
+          # See scripts/ci_cache_store_go.sh.
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup
       jobs:
         - name: Lint
           commands:
@@ -83,8 +85,11 @@ blocks:
   - name: "Security"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          - make dev.up
       jobs:
         - name: Tool configs
           commands:
@@ -109,21 +114,22 @@ blocks:
   - name: "Frontend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup
       jobs:
-        - name: Check Build
-          commands:
-            - make check.tool.configs
-            - make check.build.ui
-
         - name: Storybook Build
           commands:
             - make check.tool.configs
             - make check.build.storybook
 
         - name: Unit Tests
-          parallelism: 4
+          parallelism: 2
           commands:
             - make check.tool.configs
             - make check.test.ui.shard SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
@@ -143,6 +149,65 @@ blocks:
             - make check.tool.configs
             - make check.lint.ui.knip
 
+      epilogue:
+        always:
+          commands:
+            - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
+
+  - name: "Build Image"
+    dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      secrets:
+        - name: ghcr-push-token
+        - name: r2-static-assets
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(checksum go.sum),go-build"
+          - make dev.up
+          - make dev.setup.npm
+      jobs:
+        - name: Build image
+          commands:
+            - bash scripts/build-image
+
+  - name: "Runner Tests"
+    dependencies: []
+    run:
+      when: "change_in('/runner', {default_branch: 'main'})"
+    task:
+      prologue:
+        commands:
+          - sem-version go 1.25
+          - cache restore go-mod-runner-$(checksum runner/go.sum),go-mod-runner
+          - (cd runner && go mod download)
+          - cache store go-mod-runner-$(checksum runner/go.sum),go-mod-runner
+      jobs:
+        - name: fmt, vet, build, tests
+          commands:
+            - cd runner
+            - |
+              FILES=$(gofmt -l fleet-manager runner shared task-broker test)
+              if [ -n "$FILES" ]; then echo "gofmt needed on:"; echo "$FILES"; exit 1; fi
+            - go vet ./...
+            - mkdir -p bin
+            - make build
+            - sem-service start postgres 16
+            - export TEST_DATABASE_URL='postgresql://postgres:@0.0.0.0:5432/postgres?sslmode=disable'
+            - go test ./... -count=1 -p 1
+
+  - name: "Terraform"
+    dependencies: []
+    run:
+      when: "change_in('/release/terraform', {exclude: ['**/*.md'], default_branch: 'main'})"
+    task:
+      jobs:
+        - name: Format and validate
+          commands:
+            - make terraform.check
+
 after_pipeline:
   task:
     jobs:
@@ -150,9 +215,28 @@ after_pipeline:
         commands:
           - test-results gen-pipeline-report
 
+# One SuperPlane target `runner-prod` for all runner promotions.
+# Auto-promote only on main. Replace the mock env before a real publish.
+# Do not use production.
 promotions:
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
     deployment_target: production
     auto_promote:
-      when: "branch = 'main' AND result = 'passed'"
+      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/runner/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+
+  - name: Publish runner images
+    pipeline_file: runner-docker-publish.yml
+    deployment_target: runner-prod
+    auto_promote:
+      when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
+
+  - name: Publish runner binaries to S3
+    pipeline_file: runner-binary-s3.yml
+    deployment_target: runner-prod
+    auto_promote:
+      when: "result = 'passed' AND branch = 'main' AND change_in('/runner', {default_branch: 'main'})"
+
+  - name: Build runner AMIs
+    pipeline_file: runner-build-amis.yml
+    deployment_target: runner-prod

@@ -73,3 +73,15 @@ export function WorkOrderPullRequestChip({
     </div>
   );
 }
+
+export function WorkOrderMergeableChip() {
+  return (
+    <span
+      className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
+      data-testid="work-order-mergeable-chip"
+    >
+      <GitMerge className="size-3 shrink-0" aria-hidden />
+      <span>Mergeable</span>
+    </span>
+  );
+}

@@ -1,9 +1,27 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it, vi } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeability } from "@/api-client";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
+const mergeMutate = vi.fn();
+const experimentalFeatureHas = { current: (_id: string) => true };
+
+vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
+  useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
+  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (id: string) => experimentalFeatureHas.current(id),
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
@@ -15,10 +33,17 @@ const PR_NOTE: SplitRunFooterNote = {
 };
 
 const ACTIONS: SplitRunFooterAction[] = [
-  { id: "back-to-draft", kind: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
   { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" },
   { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" },
 ];
+
+const GITHUB_PR: FactoriesFactoryPullRequest = {
+  id: "pr-6812",
+  provider: "PROVIDER_GITHUB",
+  url: "https://github.com/acme/payments/pull/6812",
+  number: "6812",
+  state: "STATE_OPEN",
+};
 
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
@@ -27,34 +52,43 @@ beforeAll(() => {
   Element.prototype.scrollIntoView ??= () => {};
 });
 
+beforeEach(() => {
+  mergeMutate.mockReset();
+  experimentalFeatureHas.current = () => true;
+  mergeability.current = {
+    canMerge: true,
+    allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_MERGE"],
+    headSha: "abc123",
+  };
+});
+
 function renderNote(props: Partial<Parameters<typeof SplitRunAttentionNote>[0]> = {}) {
   return render(
     <MemoryRouter>
       <TooltipProvider>
-        <SplitRunAttentionNote note={PR_NOTE} tone="waiting" actions={ACTIONS} {...props} />
+        <SplitRunAttentionNote
+          note={PR_NOTE}
+          tone="waiting"
+          actions={ACTIONS}
+          organizationId="org-1"
+          factoryId="factory-1"
+          orderId="wo-1"
+          canAct
+          {...props}
+        />
       </TooltipProvider>
     </MemoryRouter>,
   );
 }
 
 describe("SplitRunAttentionNote for a pull request", () => {
-  it("says the pull request is ready and lists the three review steps", () => {
+  it("says the pull request is ready without a numbered guide", () => {
     renderNote();
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
-
-    const steps = within(within(note).getByRole("list", { name: "Next steps" })).getAllByRole("listitem");
-    expect(steps).toHaveLength(3);
-    expect(steps[0]).toHaveTextContent("1");
-    expect(steps[0]).toHaveTextContent("Review the pull request");
-    expect(steps[1]).toHaveTextContent("2");
-    expect(steps[1]).toHaveTextContent("Leave comments");
-    expect(steps[1]).toHaveTextContent("@superplaneagent");
-    expect(steps[2]).toHaveTextContent("3");
-    expect(steps[2]).toHaveTextContent("SuperPlane addresses them");
-
+    expect(within(note).queryByRole("list")).not.toBeInTheDocument();
     expect(note).not.toHaveTextContent("Waiting for user review");
     expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
   });
@@ -72,13 +106,13 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).getAllByRole("link")).toHaveLength(1);
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "To Backlog" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
   });
 
-  it("keeps the close actions behind a More menu", async () => {
+  it("shows the close actions in an actions-only More menu", async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();
-    renderNote({ onAction });
+    renderNote({ actionsOnly: true, onAction });
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
     const menu = await screen.findByRole("menu");
@@ -86,21 +120,20 @@ describe("SplitRunAttentionNote for a pull request", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["To Backlog", "Reject", "Approve"]);
+    ).toEqual(["Reject", "Approve"]);
 
     await user.click(within(menu).getByRole("menuitem", { name: "Approve" }));
-    expect(onAction).toHaveBeenCalledWith(ACTIONS[2]);
+    expect(onAction).toHaveBeenCalledWith(ACTIONS[1]);
   });
 
   it("hides the More menu when there are no actions", () => {
-    renderNote({ actions: [] });
+    renderNote({ actions: [], actionsOnly: true });
 
     expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-pull-request-cta")).toBeInTheDocument();
   });
 
   it("disables the More menu while an action is in flight", () => {
-    renderNote({ actionBusy: true });
+    renderNote({ actionBusy: true, actionsOnly: true });
 
     expect(screen.getByRole("button", { name: "More actions" })).toBeDisabled();
   });
@@ -115,5 +148,129 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).not.toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  });
+
+  it("enables merge when mergeability is true", () => {
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeEnabled();
+    expect(screen.queryByTestId("split-run-merge-reason")).not.toBeInTheDocument();
+  });
+
+  it("disables merge and shows the reason on hover when automation is running", async () => {
+    const user = userEvent.setup();
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
+      message: "Automation is still running.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
+  });
+
+  it("disables merge and shows the reason on hover when checks are still running", async () => {
+    const user = userEvent.setup();
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
+      message: "Checks are still running.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR], compact: true });
+
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Checks are still running.");
+  });
+
+  it("lists only allowed merge methods", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-method"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
+  });
+
+  it("merges with the method the person picks in the menu", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-method"));
+    await user.click(await screen.findByTestId("split-run-merge-method-MERGE_METHOD_MERGE"));
+
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-6812",
+      mergeMethod: "MERGE_METHOD_MERGE",
+      expectedHeadSha: "abc123",
+    });
+  });
+
+  it("does not offer merge methods while merge is blocked", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECK_FAILED",
+      message: "A check failed.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+  });
+
+  it("sends the selected method once on click", async () => {
+    const user = userEvent.setup();
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-button"));
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-6812",
+      mergeMethod: "MERGE_METHOD_SQUASH",
+      expectedHeadSha: "abc123",
+    });
+  });
+
+  it("hides merge for a merged pull request", () => {
+    renderNote({
+      pullRequests: [{ ...GITHUB_PR, state: "STATE_MERGED" }],
+    });
+
+    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+  });
+
+  it("hides merge when the pull request merge flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-merge-method")).not.toBeInTheDocument();
+  });
+
+  it("shows merged confirmation even when the flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderNote({
+      pullRequests: [{ ...GITHUB_PR, state: "STATE_MERGED" }],
+    });
+
+    expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
   });
 });

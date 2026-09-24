@@ -53,7 +53,7 @@ func createPlanningCleanupCanvas(
 		OrganizationID: r.Organization.ID,
 		LiveVersionID:  &liveVersionID,
 		FactoryID:      &factoryID,
-		Name:           support.RandomName("planning-cleanup"),
+		Name:           models.PlanningCanvasName,
 		CreatedBy:      &r.User,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,

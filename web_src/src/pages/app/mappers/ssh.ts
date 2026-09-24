@@ -9,7 +9,7 @@ import type {
   SubtitleContext,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getColorClass } from "@/lib/colors";
 import type React from "react";
 import { getTriggerRenderer } from "./mapperLookup";
@@ -66,6 +66,22 @@ function getSSHExitCode(execution: ExecutionInfo): number | undefined {
   return undefined;
 }
 
+function sshFinishedPassedState(execution: ExecutionInfo): EventState {
+  const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
+  if (outputs?.failed?.length) {
+    return "failed";
+  }
+
+  const code = getSSHExitCode(execution);
+  if (code === 0) {
+    return "success";
+  }
+  if (typeof code === "number") {
+    return "failed";
+  }
+  return "success";
+}
+
 const sshStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
@@ -86,19 +102,7 @@ const sshStateFunction = (execution: ExecutionInfo): EventState => {
   }
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
-    if (outputs?.failed?.length) {
-      return "failed";
-    }
-
-    const code = getSSHExitCode(execution);
-    if (code === 0) {
-      return "success";
-    }
-    if (typeof code === "number") {
-      return "failed";
-    }
-    return "success";
+    return sshFinishedPassedState(execution);
   }
 
   return "failed";
@@ -109,15 +113,11 @@ export const SSH_STATE_REGISTRY: EventStateRegistry = {
   getState: sshStateFunction,
 };
 
-type SSHCommandSource = "inline" | "file";
-
 type SSHConfiguration = {
   host: string;
   port?: number;
   username: string;
-  commandSource?: SSHCommandSource;
   commands?: string;
-  commandFile?: string;
   authMethod?: string;
 };
 
@@ -236,26 +236,7 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
     });
   }
 
-  // A blank/unset commandSource is treated as "inline" for backward
-  // compatibility with nodes saved before the file source was introduced.
-  // Use an exact match (no trimming): the field's visibility/required
-  // conditions and the backend both compare this value exactly, so only a
-  // clean "file" runs in file mode. Anything else (including padded values)
-  // is treated as inline here so the chip preview matches what actually runs.
-  const source: SSHCommandSource = config?.commandSource === "file" ? "file" : "inline";
-
-  // Branch on the source first so file mode never falls back to the inline
-  // commands preview. The worker ignores `commands` when running in file mode,
-  // so showing them here (e.g. while `commandFile` is still empty during
-  // editing) would misrepresent what actually runs.
-  if (source === "file") {
-    if (config?.commandFile) {
-      metadata.push({
-        icon: "file-code",
-        label: config.commandFile,
-      });
-    }
-  } else if (typeof config?.commands === "string" && config.commands) {
+  if (typeof config?.commands === "string" && config.commands) {
     const oneline = config.commands
       .split("\n")
       .filter((l) => l.trim() !== "")

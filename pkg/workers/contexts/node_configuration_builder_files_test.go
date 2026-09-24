@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test_NodeConfigurationBuilder_RewritesTaskDescriptionFileRefs(t *testing.T) {
+func Test_NodeConfigurationBuilder_KeepsStoredTaskDescriptionFileRefs(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
 	t.Setenv("BASE_URL", "http://files.test")
@@ -50,10 +50,11 @@ func Test_NodeConfigurationBuilder_RewritesTaskDescriptionFileRefs(t *testing.T)
 
 	result, err := builder.ResolveExpression(`task().description`)
 	require.NoError(t, err)
-	rewritten, ok := result.(string)
+	stored, ok := result.(string)
 	require.True(t, ok)
-	assert.NotContains(t, rewritten, blob.FileRef(file.ID))
-	assert.Contains(t, rewritten, "/api/v1/public/files/"+file.ID.String())
+	assert.Equal(t, description, stored)
+	assert.Contains(t, stored, blob.FileRef(file.ID))
+	assert.NotContains(t, stored, "/api/v1/public/files/"+file.ID.String())
 
 	files, err := builder.ResolveExpression(`task().files`)
 	require.NoError(t, err)

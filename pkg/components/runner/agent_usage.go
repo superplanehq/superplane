@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 func RecordRunnerLLMUsage(usage core.UsageRecorder, logger *log.Entry, finishedEventType string, configuration any, result json.RawMessage) {
@@ -34,9 +35,9 @@ func ParseRunnerLLMUsage(provider string, configuration any, result json.RawMess
 		return core.UsageRecord{}, false
 	}
 
-	model := strings.TrimSpace(parsed.Model)
+	model := pricebook.CatalogModelID(parsed.Model)
 	if model == "" {
-		model = configurationString(configuration, "model")
+		model = pricebook.CatalogModelID(configurationString(configuration, "model"))
 	}
 	if model == "" {
 		model = "unknown"

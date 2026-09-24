@@ -4,6 +4,9 @@ import type {
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
 } from "@/api-client";
+import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
 import {
@@ -12,6 +15,8 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  countWorkOrderFilters,
+  visibleWorkOrderFilters,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
@@ -46,7 +51,6 @@ interface WorkOrdersLoadedViewProps {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
   hostedCreditHeaderKicker?: ReactNode;
-  hostedCreditEmptyBanner?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
 }
 
@@ -57,24 +61,32 @@ interface WorkOrdersLoadedViewProps {
  * and the shell page only handles fetching + mutations.
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
-  const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const { organizationId, workOrders, factory, state, currentUserId, pullRequests = [] } = props;
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
+  const { data: factoryIntakes } = useFactoryIntakes(organizationId, factory.id ?? "");
+  const intakes = factoryIntakes ?? [];
+  const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
     [entries, state.scope, currentUserId],
   );
-  const filtered = useMemo(() => applyWorkOrderFilters(scoped, state.filters), [scoped, state.filters]);
+  const filtered = useMemo(
+    () => applyWorkOrderFilters(scoped, state.filters, { showPullRequestMerge }),
+    [scoped, state.filters, showPullRequestMerge],
+  );
   const searched = useMemo(() => applyWorkOrderSearch(filtered, state.search), [filtered, state.search]);
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
+  const visibleFilterCount = countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge));
   const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
@@ -88,7 +100,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       );
     }
     if (ordered.length === 0) {
-      if (state.scope !== "all" && state.filterCount === 0 && state.search.trim().length === 0) {
+      if (state.scope !== "all" && visibleFilterCount === 0 && state.search.trim().length === 0) {
         return (
           <WorkOrdersScopedEmptyState
             scopeLabel={state.scope === "my" ? "your work" : "active work"}
@@ -121,6 +133,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           addressingFeedbackLabels={addressingFeedbackLabels}
           waitingOnChecksOrderIds={waitingOnChecksOrderIds}
           checksPassedOrderIds={checksPassedOrderIds}
+          checksPassedLabels={checksPassedLabels}
           fixesPausedOrderIds={fixesPausedOrderIds}
           pullRequests={pullRequests}
         />
@@ -139,12 +152,13 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           state={state}
           entries={entries}
           factoryLines={props.factoryLines}
+          intakes={intakes}
           onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
-          hostedCreditEmptyBanner={props.hostedCreditEmptyBanner}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
+          showPullRequestMerge={showPullRequestMerge}
         />
       </div>
 

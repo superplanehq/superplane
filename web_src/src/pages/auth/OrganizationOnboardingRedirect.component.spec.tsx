@@ -18,6 +18,7 @@ const accountState = vi.hoisted(() => ({
     installation_admin: false,
     has_password: true,
     linked_accounts: [{ provider: "github", username: "dev-user" }],
+    organizations_pending_deletion: [],
     providers: [],
   } as NonNullable<AccountContextType["account"]>,
 }));
@@ -72,6 +73,7 @@ describe("OrganizationOnboardingRedirect", () => {
       installation_admin: false,
       has_password: true,
       linked_accounts: [{ provider: "github", username: "dev-user" }],
+      organizations_pending_deletion: [],
       providers: [],
     };
     location.replace.mockReset();
