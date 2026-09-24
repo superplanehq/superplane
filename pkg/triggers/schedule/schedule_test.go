@@ -74,6 +74,99 @@ func TestNextMinutesTrigger(t *testing.T) {
 	}
 }
 
+func TestNextWeeksTrigger(t *testing.T) {
+	tests := []struct {
+		name        string
+		interval    int
+		weekDays    []string
+		now         time.Time
+		expectNext  time.Time
+		expectError bool
+	}{
+		{
+			// 2025-01-08 is a Wednesday, so the target week starts on Sunday 2025-01-12.
+			name:       "weekday earlier than the current weekday stays in the target week",
+			interval:   1,
+			weekDays:   []string{"monday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-13T09:00:00Z"),
+		},
+		{
+			name:       "picks the earliest configured weekday in the target week",
+			interval:   1,
+			weekDays:   []string{"monday", "friday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-13T09:00:00Z"),
+		},
+		{
+			name:       "Sunday is the first day of the target week",
+			interval:   1,
+			weekDays:   []string{"sunday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-12T09:00:00Z"),
+		},
+		{
+			name:       "current weekday matches the configured weekday",
+			interval:   1,
+			weekDays:   []string{"wednesday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-15T09:00:00Z"),
+		},
+		{
+			// Saturday 2025-01-11 + 7 days lands in the week starting Sunday 2025-01-12.
+			name:       "late-in-week start does not skip the following week",
+			interval:   1,
+			weekDays:   []string{"monday"},
+			now:        mustParseTime("2025-01-11T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-13T09:00:00Z"),
+		},
+		{
+			// 2025-01-08 + 14 days is Wednesday 2025-01-22, in the week starting 2025-01-19.
+			name:       "multi-week interval",
+			interval:   2,
+			weekDays:   []string{"monday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-20T09:00:00Z"),
+		},
+		{
+			name:        "interval below the supported range",
+			interval:    0,
+			weekDays:    []string{"monday"},
+			now:         mustParseTime("2025-01-08T10:00:00Z"),
+			expectError: true,
+		},
+		{
+			name:        "interval above the supported range",
+			interval:    53,
+			weekDays:    []string{"monday"},
+			now:         mustParseTime("2025-01-08T10:00:00Z"),
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := nextWeeksTrigger(tt.interval, tt.weekDays, 9, 0, tt.now)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if !result.Equal(tt.expectNext) {
+				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
+			}
+		})
+	}
+}
+
 func TestGetNextTrigger(t *testing.T) {
 	tests := []struct {
 		name           string
