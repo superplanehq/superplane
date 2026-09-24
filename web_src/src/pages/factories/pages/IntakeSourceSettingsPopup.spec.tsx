@@ -13,11 +13,13 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_PRODUCTIVE_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
   INTAKE_SETTINGS_COPY,
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
+import { lineIntakeSourceById } from "./lineIntakeModel";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -157,7 +159,9 @@ function renderPopup(
                   ? DEFAULT_SENTRY_INTAKE_SETTINGS
                   : props.sourceId === "jira-issues"
                     ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
-                    : DEFAULT_GITHUB_INTAKE_SETTINGS)
+                    : props.sourceId === "productive-tasks"
+                      ? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS
+                      : DEFAULT_GITHUB_INTAKE_SETTINGS)
               }
               sourceId={props.sourceId}
               organizationId={props.organizationId}
@@ -213,6 +217,21 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["github-issues", "GitHub issues"],
+    ["jira-issues", "Jira issues"],
+    ["sentry-exceptions", "Sentry exceptions"],
+    ["productive-tasks", "Productive.io tasks"],
+  ] as const)("shows the %s picture left of the title", (sourceId, name) => {
+    renderPopup({ sourceId });
+
+    const heading = screen.getByRole("heading", { name: `Intake ${name}` });
+    const icon = screen.getByTestId("intake-source-settings-title-icon");
+    expect(icon).toHaveAttribute("alt", "");
+    expect(icon).toHaveAttribute("src", lineIntakeSourceById(sourceId)!.iconSrc);
+    expect(icon.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("offers the labels that exist in the repository", async () => {
