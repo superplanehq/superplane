@@ -90,16 +90,19 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "issue intake",
   ]),
 
-  // Workspace · Agent resources
-  entry("workspace", "agent-resources", "Agent resources", undefined, [
+  // Workspace · MCP servers
+  entry("workspace", "mcp", "MCP servers", undefined, [
     "mcp server",
     "mcp",
-    "skill",
     "oauth",
     "header",
     "agent",
     "sign-in",
+    "tools",
   ]),
+
+  // Workspace · Skills
+  entry("workspace", "skills", "Skills", undefined, ["skill", "skill.md", "agent", "github package"]),
 
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [
