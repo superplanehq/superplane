@@ -195,6 +195,7 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
+        jiraCompletionNeedsManualColumn={false}
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
       />,

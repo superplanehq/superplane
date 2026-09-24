@@ -35,15 +35,16 @@ export function useOnboardingJiraBinding(
     { enabled: Boolean(jiraIntegrationId && jiraProjectId) },
   );
   const jiraStatusColumns = useMemo(() => jiraStatusColumnNames(jiraStatusesQuery.data), [jiraStatusesQuery.data]);
-  const jiraCompletionNeedsManualColumn = useMemo(() => {
+  const jiraCompletionAutoResolved = useMemo(() => {
     if (!jiraProjectId || jiraStatusesQuery.isPending || jiraStatusesQuery.isError) {
       return false;
     }
     if (jiraStatusColumns.length === 0) {
       return false;
     }
-    return preferredJiraCompletionColumn(jiraStatusColumns, "") === "";
+    return preferredJiraCompletionColumn(jiraStatusColumns, "") !== "";
   }, [jiraProjectId, jiraStatusColumns, jiraStatusesQuery.isError, jiraStatusesQuery.isPending]);
+  const jiraCompletionNeedsManualColumn = Boolean(jiraProjectId && !jiraCompletionAutoResolved);
 
   useEffect(() => {
     setJiraProjectIdState(readOnboardingJiraProject(factoryId, jiraIntegrationId));
