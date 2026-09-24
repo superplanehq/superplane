@@ -197,6 +197,28 @@ describe("HostedModelFieldRenderer", () => {
     });
   });
 
+  it("uses an explicit factory when the route has no canvas", () => {
+    useCanvasMock.mockReturnValue({ data: undefined, isPending: true });
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value=""
+        onChange={vi.fn()}
+        organizationId="org-1"
+        factoryId="factory-9"
+      />,
+      "/org-1/apps/canvas-1",
+    );
+
+    expect(screen.queryByText("Loading models...")).not.toBeInTheDocument();
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: "factory-9",
+      sources: ["byok"],
+      enabled: true,
+    });
+  });
+
   it("loads organization BYOK models for the canvas factory", () => {
     useCanvasMock.mockReturnValue({ data: { metadata: { factoryId: "factory-1" } }, isPending: false });
 

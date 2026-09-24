@@ -17,7 +17,6 @@ export {
   FactorySettingsSoonPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
-  FactorySettingsModelsPage,
   FactorySettingsMCPPage,
   FactorySettingsSkillsPage,
   FactorySettingsSkillEditorPage,

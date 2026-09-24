@@ -14,6 +14,7 @@ export interface FieldRendererProps {
   allValues?: Record<string, unknown>;
   integrationId?: string;
   organizationId?: string;
+  factoryId?: string;
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
