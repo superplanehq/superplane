@@ -281,6 +281,19 @@ func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUI
 	return &run, nil
 }
 
+func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+	return tx.
+		Table("workflow_runs").
+		Select("workflow_runs.*").
+		Joins("JOIN workflows ON workflow_runs.workflow_id = workflows.id").
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Where("organizations.usage_retention_window_days IS NOT NULL").
+		Where("organizations.usage_retention_window_days > 0").
+		Where("workflow_runs.state = ?", CanvasRunStateFinished).
+		Where("workflow_runs.finished_at IS NOT NULL").
+		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
+}
+
 func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 
@@ -421,19 +434,6 @@ func deleteRowsLimited(db *gorm.DB, model any, limit int, query string, args ...
 	}
 
 	return result.RowsAffected, nil
-}
-
-func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
-	return tx.
-		Table("workflow_runs").
-		Select("workflow_runs.*").
-		Joins("JOIN workflows ON workflow_runs.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Where("organizations.usage_retention_window_days IS NOT NULL").
-		Where("organizations.usage_retention_window_days > 0").
-		Where("workflow_runs.state = ?", CanvasRunStateFinished).
-		Where("workflow_runs.finished_at IS NOT NULL").
-		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
 }
 
 func lockCanvasRunsForUpdate(tx *gorm.DB) *gorm.DB {
