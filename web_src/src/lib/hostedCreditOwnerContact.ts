@@ -1,8 +1,9 @@
 /**
- * Copy helper for telling a non-owner who they must contact to purchase
- * hosted credit. Organization admins and viewers can see the credit metrics
- * on Organization Spending, but only an `org_owner` can start checkout, so
- * the page names an owner instead of showing pack buttons.
+ * Copy helper for telling a member without billing permission who they must
+ * contact to purchase hosted credit. Organization members with `org.read` can
+ * see credit metrics on Organization Spending. Only an Admin (`org.update`)
+ * can start checkout, so the page names an owner instead of showing pack
+ * buttons.
  */
 
 export interface HostedCreditOwnerContactOwner {
@@ -18,11 +19,11 @@ export interface HostedCreditOwnerContactArgs {
 const GENERIC_CONTACT_MESSAGE = "Contact an organization owner to purchase hosted credit.";
 
 /**
- * Builds the sentence shown to admins and viewers in place of the hosted
- * credit checkout packs. Each owner label prefers a display name and falls
- * back to an email address; owners with neither are skipped. When no owner
- * has a usable label, the copy falls back to a generic sentence rather than
- * naming the organization with an empty owner list.
+ * Builds the sentence shown to members without billing permission in place of
+ * the hosted credit checkout packs. Each owner label prefers a display name
+ * and falls back to an email address; owners with neither are skipped. When
+ * no owner has a usable label, the copy falls back to a generic sentence
+ * rather than naming the organization with an empty owner list.
  */
 export function hostedCreditOwnerContactCopy({ organizationName, owners }: HostedCreditOwnerContactArgs): string {
   const ownerLabels = owners

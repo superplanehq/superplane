@@ -238,20 +238,21 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 		return nil, errors.New("invalid input")
 	}
 
-	organizationURL, ok := m[PropertyOrganizationURL].(string)
+	rawOrganizationURL, ok := m[PropertyOrganizationURL].(string)
 	if !ok {
 		return nil, errors.New("invalid organization URL")
 	}
 
-	if organizationURL == "" {
-		return nil, errors.New("organization URL is required")
+	organizationURL, err := common.ParseOrganizationURL(rawOrganizationURL)
+	if err != nil {
+		return nil, err
 	}
 
 	//
 	// The organization URL is not something you can change,
 	// so once it's set, you cannot change it.
 	//
-	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
+	err = ctx.Properties.Create(core.IntegrationPropertyDefinition{
 		Name:        PropertyOrganizationURL,
 		Label:       "Organization URL",
 		Description: "The URL of the Semaphore organization you are connected",

@@ -299,9 +299,6 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
-	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
 
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
@@ -362,7 +359,7 @@ func brokerResultAsAny(raw json.RawMessage) any {
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunnerFinishedEventType)
 }
 
 func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

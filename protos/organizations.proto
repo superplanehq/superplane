@@ -72,6 +72,18 @@ service Organizations {
     };
   }
 
+  rpc SetUserOwner(SetUserOwnerRequest) returns (SetUserOwnerResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/users/{user_id}/owner"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set organization owner flag";
+      description: "Sets or clears the owner flag for a member. The organization must keep at least one owner.";
+      tags: "Organization";
+    };
+  }
+
   rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/invite-link"
@@ -106,17 +118,6 @@ service Organizations {
     };
   }
 
-  rpc DescribeUsage(DescribeUsageRequest) returns (DescribeUsageResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/usage"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe organization usage";
-      description: "Returns usage tracking and limits for an organization";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeOrganizationWorkspaceUsage(DescribeOrganizationWorkspaceUsageRequest) returns (DescribeOrganizationWorkspaceUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/workspace-usage"
@@ -128,6 +129,17 @@ service Organizations {
     };
   }
 
+  rpc DescribeOrganizationSpendingReport(DescribeOrganizationSpendingReportRequest) returns (DescribeOrganizationSpendingReportResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/spending-report"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe organization spending report";
+      description: "Returns aggregated spending KPIs, chart series, and breakdown rows for the organization spending explorer";
+      tags: "Organization";
+    };
+  }
+
   rpc ListHostedLLMModels(ListHostedLLMModelsRequest) returns (ListHostedLLMModelsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/hosted-llm-models"
@@ -135,6 +147,17 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List hosted LLM models";
       description: "Returns the SuperPlane-hosted model allowlist for one provider";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListSelectableLLMModels(ListSelectableLLMModelsRequest) returns (ListSelectableLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/selectable-llm-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List selectable LLM models";
+      description: "Returns SuperPlane-hosted and selected BYOK models a picker may show";
       tags: "Organization";
     };
   }
@@ -193,6 +216,76 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create billing portal session";
       description: "Creates a customer portal session for invoices and receipts";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListOrganizationCreditGrants(ListOrganizationCreditGrantsRequest) returns (ListOrganizationCreditGrantsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/credit-grants"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization credit grants";
+      description: "Returns hosted-credit grants for an organization, newest first";
+      tags: "Organization";
+    };
+  }
+
+  rpc DescribeOrganizationBilling(DescribeOrganizationBillingRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/billing"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe organization billing";
+      description: "Returns the organization plan, trial window, and hosted-credit remaining amounts";
+      tags: "Organization";
+    };
+  }
+
+  rpc CreateBusinessCheckout(CreateBusinessCheckoutRequest) returns (CreateBusinessCheckoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/business-checkout"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create Business checkout";
+      description: "Creates a Polar checkout session for the Business subscription";
+      tags: "Organization";
+    };
+  }
+
+  rpc SyncOrganizationBilling(SyncOrganizationBillingRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/sync"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync organization billing";
+      description: "Reads the Polar Business subscription for the organization and updates the local plan";
+      tags: "Organization";
+    };
+  }
+
+  rpc CancelOrganizationSubscription(CancelOrganizationSubscriptionRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel organization subscription";
+      description: "Cancels the Polar Business subscription at the end of the current period";
+      tags: "Organization";
+    };
+  }
+
+  rpc ResumeOrganizationSubscription(ResumeOrganizationSubscriptionRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/resume"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume organization subscription";
+      description: "Clears a scheduled Polar Business cancellation so the subscription renews";
       tags: "Organization";
     };
   }
@@ -415,44 +508,6 @@ message ResetInviteLinkResponse {
   InviteLink invite_link = 1;
 }
 
-message OrganizationLimits {
-  int32 max_canvases = 1;
-  int32 max_nodes_per_canvas = 2;
-  int32 max_users = 3;
-  int32 retention_window_days = 4;
-  int64 max_events_per_month = 5;
-  int32 max_integrations = 6;
-  int64 max_agent_tokens_per_month = 7;
-  int64 max_runner_minutes_per_month = 8;
-}
-
-message OrganizationUsage {
-  int32 canvases = 1;
-  double event_bucket_level = 2;
-  double event_bucket_capacity = 3;
-  google.protobuf.Timestamp event_bucket_last_updated_at = 4;
-  google.protobuf.Timestamp next_event_bucket_decrease_at = 5;
-  double agent_token_bucket_level = 6;
-  double agent_token_bucket_capacity = 7;
-  google.protobuf.Timestamp agent_token_bucket_last_updated_at = 8;
-  google.protobuf.Timestamp next_agent_token_bucket_decrease_at = 9;
-  double runner_minutes_bucket_level = 10;
-  double runner_minutes_bucket_capacity = 11;
-  google.protobuf.Timestamp runner_minutes_bucket_last_updated_at = 12;
-  google.protobuf.Timestamp next_runner_minutes_bucket_decrease_at = 13;
-}
-
-message DescribeUsageRequest {
-  string id = 1;
-}
-
-message DescribeUsageResponse {
-  bool enabled = 1;
-  string status_message = 2;
-  OrganizationLimits limits = 3;
-  OrganizationUsage usage = 4;
-}
-
 message DescribeOrganizationWorkspaceUsageRequest {
   string id = 1;
   // Period window in days. Defaults to 30. Maximum is 90.
@@ -475,6 +530,86 @@ message DescribeOrganizationWorkspaceUsageResponse {
   repeated HostedCreditInvoice invoices = 13;
   int64 total_duration_seconds = 14;
   repeated UsageByMachineType by_machine_type = 15;
+  string default_hosted_provider = 16;
+  string default_hosted_model = 17;
+  google.protobuf.Timestamp welcome_credit_expires_at = 18;
+}
+
+message DescribeOrganizationSpendingReportRequest {
+  string id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  string factory_id = 4;
+  string model = 5;
+  string machine_type = 6;
+  string task_owner_id = 7;
+  string group_by = 8;
+  string time_grain = 9;
+  string usage_kind = 10;
+  string funding_source = 11;
+}
+
+message SpendingReportTotals {
+  int64 cost_cents = 1;
+  int64 total_tokens = 2;
+  int64 duration_seconds = 3;
+  int64 hosted_cost_cents = 4;
+  int64 byok_cost_cents = 5;
+}
+
+message SpendingReportSeriesValue {
+  string series_id = 1;
+  int64 cost_cents = 2;
+}
+
+message SpendingReportSeriesPoint {
+  string key = 1;
+  string label = 2;
+  int64 total_cents = 3;
+  repeated SpendingReportSeriesValue values = 4;
+}
+
+message SpendingReportBreakdownRow {
+  string id = 1;
+  string label = 2;
+  int64 total_tokens = 3;
+  int64 duration_seconds = 4;
+  int64 cost_cents = 5;
+  double share = 6;
+}
+
+message SpendingReportCatalogItem {
+  string id = 1;
+  string label = 2;
+}
+
+message SpendingReportCatalogs {
+  repeated SpendingReportCatalogItem workspaces = 1;
+  repeated SpendingReportCatalogItem users = 2;
+  repeated SpendingReportCatalogItem models = 3;
+  repeated SpendingReportCatalogItem machines = 4;
+}
+
+message SpendingReportCreditSnapshot {
+  int64 remaining_credit_cents = 1;
+  int64 grant_total_cents = 2;
+  int64 superplane_grant_cents = 3;
+  int64 purchased_credit_cents = 4;
+  int64 hosted_billed_cents = 5;
+  bool remaining_credit_warning = 6;
+  bool billing_enabled = 7;
+  bool has_billing_customer = 8;
+  google.protobuf.Timestamp welcome_credit_expires_at = 9;
+}
+
+message DescribeOrganizationSpendingReportResponse {
+  SpendingReportTotals kpi_totals = 1;
+  SpendingReportTotals explorer_totals = 2;
+  repeated SpendingReportSeriesPoint series = 3;
+  repeated SpendingReportCatalogItem series_keys = 4;
+  repeated SpendingReportBreakdownRow breakdown = 5;
+  SpendingReportCreditSnapshot credit = 6;
+  SpendingReportCatalogs catalogs = 7;
 }
 
 message HostedCreditInvoice {
@@ -499,6 +634,28 @@ message ListHostedLLMModelsResponse {
 message HostedLLMModel {
   string id = 1;
   string name = 2;
+}
+
+message ListSelectableLLMModelsRequest {
+  string id = 1;
+  string factory_id = 2;
+}
+
+message SelectableLLMNamedID {
+  string id = 1;
+  string name = 2;
+}
+
+message SelectableLLMModel {
+  SelectableLLMNamedID source = 1;
+  SelectableLLMNamedID provider = 2;
+  SelectableLLMNamedID model = 3;
+  string key = 4;
+  string label = 5;
+}
+
+message ListSelectableLLMModelsResponse {
+  repeated SelectableLLMModel models = 1;
 }
 
 message ListBYOKLLMModelsRequest {
@@ -558,6 +715,68 @@ message CreateBillingPortalSessionResponse {
   string portal_url = 1;
 }
 
+message ListOrganizationCreditGrantsRequest {
+  string id = 1;
+}
+
+message OrganizationCreditGrant {
+  string id = 1;
+  string kind = 2;
+  int64 amount_cents = 3;
+  string note = 4;
+  string actor_name = 5;
+  string polar_order_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+message ListOrganizationCreditGrantsResponse {
+  repeated OrganizationCreditGrant grants = 1;
+}
+
+message DescribeOrganizationBillingRequest {
+  string id = 1;
+}
+
+message DescribeOrganizationBillingResponse {
+  string plan = 1;
+  string plan_source = 2;
+  string polar_subscription_status = 3;
+  google.protobuf.Timestamp trial_ends_at = 4;
+  google.protobuf.Timestamp current_period_start = 5;
+  google.protobuf.Timestamp current_period_end = 6;
+  int64 remaining_credit_cents = 7;
+  int64 included_remaining_cents = 8;
+  int64 purchased_remaining_cents = 9;
+  bool billing_enabled = 10;
+  bool subscription_checkout_enabled = 11;
+  bool credit_purchase_allowed = 12;
+  bool has_billing_customer = 13;
+  int64 welcome_remaining_cents = 14;
+  int64 admin_remaining_cents = 15;
+  bool cancel_at_period_end = 16;
+}
+
+message CreateBusinessCheckoutRequest {
+  string id = 1;
+}
+
+message CreateBusinessCheckoutResponse {
+  string checkout_url = 1;
+}
+
+message SyncOrganizationBillingRequest {
+  string id = 1;
+}
+
+message CancelOrganizationSubscriptionRequest {
+  string id = 1;
+}
+
+message ResumeOrganizationSubscriptionRequest {
+  string id = 1;
+}
+
 message UsageByModel {
   string provider = 1;
   string model = 2;
@@ -577,6 +796,14 @@ message RemoveUserRequest {
 }
 
 message RemoveUserResponse {}
+
+message SetUserOwnerRequest {
+  string id = 1;
+  string user_id = 2;
+  bool is_owner = 3;
+}
+
+message SetUserOwnerResponse {}
 
 message ListIntegrationsRequest {
   string id = 1;
@@ -620,6 +847,7 @@ message IntegrationResourceRef {
   string type = 1;
   string name = 2;
   string id = 3;
+  string url = 4;
 }
 
 message UpdateIntegrationRequest {
@@ -825,11 +1053,6 @@ message BrowserAction {
 }
 
 // Event messages for organization lifecycle events
-message OrganizationCreated {
-  string organization_id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-}
-
 message OrganizationUpdated {
   string organization_id = 1;
   google.protobuf.Timestamp timestamp = 2;

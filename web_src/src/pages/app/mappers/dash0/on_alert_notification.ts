@@ -4,7 +4,7 @@ import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 
 interface AlertNotificationIssue {
   id?: string;
@@ -36,38 +36,51 @@ interface OnAlertNotificationConfiguration {
   statuses?: string[];
 }
 
+function alertTitle(issue?: AlertNotificationIssue): string {
+  return issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 alert notification";
+}
+
+function alertSubtitle(issue?: AlertNotificationIssue, createdAt?: string): string | React.ReactNode {
+  const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
+  if (subtitleParts && createdAt) {
+    return renderWithTimeAgo(subtitleParts, new Date(createdAt));
+  }
+  if (subtitleParts) {
+    return subtitleParts;
+  }
+  return createdAt ? renderTimeAgo(new Date(createdAt)) : "";
+}
+
+function formatAlertLabels(labels?: AlertIssueLabel[]): string {
+  return stringOrDash(labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", "));
+}
+
+function alertRootEventValues(issue?: AlertNotificationIssue): Record<string, string> {
+  return {
+    "Issue ID": stringOrDash(issue?.id),
+    "Issue Identifier": stringOrDash(issue?.issueIdentifier),
+    URL: stringOrDash(issue?.url),
+    Status: stringOrDash(issue?.status),
+    Summary: stringOrDash(issue?.summary),
+    Dataset: stringOrDash(issue?.dataset),
+    Start: stringOrDash(issue?.start),
+    Labels: formatAlertLabels(issue?.labels),
+  };
+}
+
 export const onAlertNotificationTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as AlertNotificationEventData | undefined;
     const issue = eventData?.issue;
-    const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 alert notification";
-    const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
-    const subtitle =
-      subtitleParts && context.event?.createdAt
-        ? renderWithTimeAgo(subtitleParts, new Date(context.event.createdAt))
-        : subtitleParts || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
-
     return {
-      title,
-      subtitle,
+      title: alertTitle(issue),
+      subtitle: alertSubtitle(issue, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as AlertNotificationEventData | undefined;
-
-    return {
-      "Issue ID": stringOrDash(eventData?.issue?.id),
-      "Issue Identifier": stringOrDash(eventData?.issue?.issueIdentifier),
-      URL: stringOrDash(eventData?.issue?.url),
-      Status: stringOrDash(eventData?.issue?.status),
-      Summary: stringOrDash(eventData?.issue?.summary),
-      Dataset: stringOrDash(eventData?.issue?.dataset),
-      Start: stringOrDash(eventData?.issue?.start),
-      Labels: stringOrDash(
-        eventData?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", "),
-      ),
-    };
+    return alertRootEventValues(eventData?.issue);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

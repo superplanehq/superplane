@@ -58,6 +58,16 @@ func Test__ListCreditPacksFiltersMetadata(t *testing.T) {
 						{"amount_type": "fixed", "price_amount": 10000},
 					},
 				},
+				{
+					"id":   "prod_custom",
+					"name": "Hosted credit custom",
+					"metadata": map[string]string{
+						"superplane_credit_pack": "true",
+					},
+					"prices": []map[string]any{
+						{"amount_type": "custom", "minimum_amount": 100, "preset_amount": 2500},
+					},
+				},
 			},
 			"pagination": map[string]any{"max_page": 1},
 		}))
@@ -67,9 +77,41 @@ func Test__ListCreditPacksFiltersMetadata(t *testing.T) {
 	client := NewClient(server.URL, "oat_test", server.Client())
 	packs, err := client.ListCreditPacks(context.Background())
 	require.NoError(t, err)
-	require.Len(t, packs, 3)
-	assert.Equal(t, []string{"prod_25", "prod_100", "prod_500"}, []string{packs[0].ID, packs[1].ID, packs[2].ID})
-	assert.Equal(t, []int64{2500, 10000, 50000}, []int64{packs[0].AmountCents, packs[1].AmountCents, packs[2].AmountCents})
+	require.Len(t, packs, 4)
+	assert.Equal(t, []string{"prod_25", "prod_100", "prod_500", "prod_custom"}, []string{packs[0].ID, packs[1].ID, packs[2].ID, packs[3].ID})
+	assert.Equal(t, []int64{2500, 10000, 50000, 0}, []int64{packs[0].AmountCents, packs[1].AmountCents, packs[2].AmountCents, packs[3].AmountCents})
+	assert.False(t, packs[0].CustomPrice)
+	assert.True(t, packs[3].CustomPrice)
+}
+
+func Test__ListCreditPacksKeepsFixedPriceOnMixedProducts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id":   "prod_mixed",
+					"name": "Hosted credit mixed",
+					"metadata": map[string]string{
+						"superplane_credit_pack": "true",
+					},
+					"prices": []map[string]any{
+						{"amount_type": "fixed", "price_amount": 5000},
+						{"amount_type": "custom", "minimum_amount": 100},
+					},
+				},
+			},
+			"pagination": map[string]any{"max_page": 1},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	packs, err := client.ListCreditPacks(context.Background())
+	require.NoError(t, err)
+	require.Len(t, packs, 1)
+	assert.Equal(t, "prod_mixed", packs[0].ID)
+	assert.Equal(t, int64(5000), packs[0].AmountCents)
+	assert.False(t, packs[0].CustomPrice)
 }
 
 func Test__GetCreditPackRejectsNonPackProducts(t *testing.T) {
@@ -114,6 +156,56 @@ func Test__GetCreditPackReturnsPack(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "prod_25", pack.ID)
 	assert.Equal(t, int64(2500), pack.AmountCents)
+	assert.False(t, pack.CustomPrice)
+}
+
+func Test__GetCreditPackReturnsCustomPack(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/products/prod_custom", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":   "prod_custom",
+			"name": "Hosted credit custom",
+			"metadata": map[string]string{
+				"superplane_credit_pack": "true",
+			},
+			"prices": []map[string]any{
+				{"amount_type": "custom", "minimum_amount": 100, "preset_amount": 2500},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	pack, err := client.GetCreditPack(context.Background(), "prod_custom")
+	require.NoError(t, err)
+	assert.Equal(t, "prod_custom", pack.ID)
+	assert.Equal(t, int64(0), pack.AmountCents)
+	assert.True(t, pack.CustomPrice)
+}
+
+func Test__GetCreditPackKeepsFixedPriceOnMixedProducts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/products/prod_mixed", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":   "prod_mixed",
+			"name": "Hosted credit mixed",
+			"metadata": map[string]string{
+				"superplane_credit_pack": "true",
+			},
+			"prices": []map[string]any{
+				{"amount_type": "custom", "minimum_amount": 100},
+				{"amount_type": "fixed", "price_amount": 5000},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	pack, err := client.GetCreditPack(context.Background(), "prod_mixed")
+	require.NoError(t, err)
+	assert.Equal(t, "prod_mixed", pack.ID)
+	assert.Equal(t, int64(5000), pack.AmountCents)
+	assert.False(t, pack.CustomPrice)
 }
 
 func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
@@ -324,6 +416,121 @@ func Test__GetOwnerMemberFiltersByExternalCustomerID(t *testing.T) {
 	memberID, err := client.GetOwnerMember(context.Background(), "org-1", "")
 	require.NoError(t, err)
 	assert.Equal(t, "mem_owner", memberID)
+}
+
+func Test__ListSubscriptionsFiltersByCustomerAndProduct(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/subscriptions/", r.URL.Path)
+		assert.Equal(t, "org-1", r.URL.Query().Get("external_customer_id"))
+		assert.Equal(t, "prod_business", r.URL.Query().Get("product_id"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id":                   "sub_canceled",
+					"status":               "canceled",
+					"current_period_start": "2026-08-01T12:00:00Z",
+					"current_period_end":   "2026-09-01T12:00:00Z",
+					"customer_id":          "cust_1",
+					"external_customer_id": "org-1",
+					"customer": map[string]any{
+						"id":          "cust_1",
+						"external_id": "org-1",
+					},
+				},
+				{
+					"id":                   "sub_active",
+					"status":               "active",
+					"current_period_start": "2026-09-01T12:00:00Z",
+					"current_period_end":   "2026-10-01T12:00:00Z",
+					"customer_id":          "cust_1",
+					"external_customer_id": "org-1",
+					"customer": map[string]any{
+						"id":          "cust_1",
+						"external_id": "org-1",
+					},
+				},
+			},
+			"pagination": map[string]any{"max_page": 1},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	subs, err := client.ListSubscriptions(context.Background(), "org-1", "prod_business")
+	require.NoError(t, err)
+	require.Len(t, subs, 2)
+	assert.Equal(t, "sub_canceled", subs[0].ID)
+	assert.Equal(t, "canceled", subs[0].Status)
+	assert.Equal(t, "sub_active", subs[1].ID)
+	assert.Equal(t, "active", subs[1].Status)
+	assert.Equal(t, "org-1", subs[1].organizationExternalID())
+	assert.False(t, subs[1].CurrentPeriodStart.Time.IsZero())
+	assert.False(t, subs[1].CurrentPeriodEnd.Time.IsZero())
+}
+
+func Test__ListSubscriptionsRequiresExternalCustomerID(t *testing.T) {
+	client := NewClient("http://polar.example", "oat_test", nil)
+	_, err := client.ListSubscriptions(context.Background(), "  ", "prod_business")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "external customer id is required")
+}
+
+func Test__CancelSubscriptionAtPeriodEndPatchesPolar(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_active", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, true, body["cancel_at_period_end"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_active",
+			"status":               "active",
+			"cancel_at_period_end": true,
+			"current_period_start": "2026-09-01T12:00:00Z",
+			"current_period_end":   "2026-10-01T12:00:00Z",
+			"external_customer_id": "org-1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	sub, err := client.CancelSubscriptionAtPeriodEnd(context.Background(), "sub_active")
+	require.NoError(t, err)
+	assert.Equal(t, "sub_active", sub.ID)
+	assert.Equal(t, "active", sub.Status)
+	assert.True(t, sub.CancelAtPeriodEnd)
+}
+
+func Test__ResumeSubscriptionPatchesPolar(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_active", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, false, body["cancel_at_period_end"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_active",
+			"status":               "active",
+			"cancel_at_period_end": false,
+			"current_period_start": "2026-09-01T12:00:00Z",
+			"current_period_end":   "2026-10-01T12:00:00Z",
+			"external_customer_id": "org-1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	sub, err := client.ResumeSubscription(context.Background(), "sub_active")
+	require.NoError(t, err)
+	assert.Equal(t, "sub_active", sub.ID)
+	assert.False(t, sub.CancelAtPeriodEnd)
+}
+
+func Test__CancelSubscriptionAtPeriodEndRequiresID(t *testing.T) {
+	client := NewClient("http://polar.example", "oat_test", nil)
+	_, err := client.CancelSubscriptionAtPeriodEnd(context.Background(), "  ")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "subscription id is required")
 }
 
 func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {

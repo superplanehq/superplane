@@ -2,6 +2,7 @@ package factories
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,15 +19,6 @@ func parseOrganizationID(organizationID string) (uuid.UUID, error) {
 	return orgID, nil
 }
 
-func parseFactoryID(factoryID string) (uuid.UUID, error) {
-	id, err := uuid.Parse(factoryID)
-	if err != nil {
-		return uuid.Nil, invalidArgument("invalid factory id")
-	}
-
-	return id, nil
-}
-
 func parseOrderID(orderID string) (uuid.UUID, error) {
 	id, err := uuid.Parse(orderID)
 	if err != nil {
@@ -34,6 +26,22 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	}
 
 	return id, nil
+}
+
+// findFactory resolves a factory path id for describe, update, and delete.
+// Accept UUID or workspace key only. See models.FindFactoryByRef.
+func findFactory(tx *gorm.DB, organizationID uuid.UUID, ref string) (*models.Factory, error) {
+	if strings.TrimSpace(ref) == "" {
+		return nil, invalidArgument("invalid factory id")
+	}
+	return models.FindFactoryByRef(tx, organizationID, ref)
+}
+
+func findWorkOrder(tx *gorm.DB, factory *models.Factory, ref string) (*models.FactoryWorkOrder, error) {
+	if strings.TrimSpace(ref) == "" {
+		return nil, invalidArgument("invalid work order id")
+	}
+	return factory.FindWorkOrderByRef(tx, ref)
 }
 
 func parsePullRequestID(prID string) (uuid.UUID, error) {
@@ -75,6 +83,12 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		Unassigned: req.Unassigned,
 	}
 
+	if req.GetBeforeId() != "" {
+		if beforeID, err := uuid.Parse(req.GetBeforeId()); err == nil {
+			filters.BeforeID = &beforeID
+		}
+	}
+
 	for _, state := range req.States {
 		if mapped, ok := workOrderStateFromProto(state); ok {
 			filters.States = append(filters.States, mapped)
@@ -87,17 +101,9 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		}
 	}
 
-	for _, assigneeID := range req.AssigneeIds {
-		userID, err := uuid.Parse(assigneeID)
-		if err != nil {
-			continue
-		}
-		filters.AssigneeIDs = append(filters.AssigneeIDs, userID)
-	}
-
-	if req.Mine != nil {
-		if userID, err := uuid.Parse(*req.Mine); err == nil {
-			filters.Mine = &userID
+	if req.UserId != nil {
+		if userID, err := uuid.Parse(*req.UserId); err == nil {
+			filters.UserID = &userID
 		}
 	}
 

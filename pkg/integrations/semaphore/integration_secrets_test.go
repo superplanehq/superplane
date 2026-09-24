@@ -35,6 +35,24 @@ func TestResolveSecrets(t *testing.T) {
 	assert.NotContains(t, secrets.Setup, "sem-token")
 }
 
+func TestResolveSecretsNormalizesOrganizationURL(t *testing.T) {
+	t.Parallel()
+
+	secrets, err := (&Semaphore{}).ResolveSecrets(core.IntegrationSecretContext{
+		Integration: &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				SecretAPIToken: {Name: SecretAPIToken, Value: []byte("sem-token")},
+			},
+			CurrentProperties: map[string]any{
+				PropertyOrganizationURL: "https://acme.semaphoreci.com/",
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("https://acme.semaphoreci.com"), secrets.Values[integrationSecretSemaphoreOrganizationURL])
+}
+
 func TestResolveSecretsWithoutOrganizationURL(t *testing.T) {
 	t.Parallel()
 

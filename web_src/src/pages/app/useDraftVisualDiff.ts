@@ -159,20 +159,19 @@ export function useDraftVisualDiff({
     const liveNodes = liveCanvasVersion.spec.nodes as ComponentsNode[];
     const liveEdges = liveCanvasVersion.spec.edges as ComponentsEdge[] | undefined;
     const ghostNodes = draftDiffResult.removedNodes.map((removedNode) => {
-      const prepared = prepareNode(
-        liveNodes,
-        removedNode as unknown as ComponentsNode,
-        allTriggers,
-        allComponents,
-        {},
-        {},
-        {},
-        canvasId,
+      const prepared = prepareNode({
+        nodes: liveNodes,
+        node: removedNode as unknown as ComponentsNode,
+        triggers: allTriggers,
+        components: allComponents,
+        nodeEventsMap: {},
+        nodeExecutionsMap: {},
+        nodeQueueItemsMap: {},
+        workflowId: canvasId,
         queryClient,
-        undefined,
-        liveEdges,
-        "edit",
-      );
+        edges: liveEdges,
+        canvasMode: "edit",
+      });
 
       return {
         ...prepared,

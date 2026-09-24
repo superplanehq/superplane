@@ -1,9 +1,13 @@
+import type { AgentActivity, AgentActivityState } from "@/lib/agentActivity";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 
 export type RunnerLiveLogDialogProps = {
   title: string;
   canvasMode: "live" | "edit";
   execution: ExecutionInfo | null;
+  component?: string;
+  iconSlug?: string;
+  session?: { organizationId?: string; canvasId?: string };
 };
 
 export function isExecutionInFlight(execution: ExecutionInfo): boolean {
@@ -17,8 +21,9 @@ export type LiveLogRecord =
   | { type: "error"; message: string }
   | { type: "cmd_start"; index: number; text: string; kind?: string; preview?: string; started_at?: number }
   | { type: "cmd_end"; index: number; status: "passed" | "failed"; duration_ms: number }
-  | { type: "tool_start"; id?: string; kind?: string; text?: string; started_at?: number }
-  | { type: "tool_end"; id?: string; kind?: string; status: "passed" | "failed"; duration_ms: number };
+  | { type: "tool_start"; id?: string; kind?: string; text?: string; started_at?: number; turn?: number }
+  | { type: "tool_end"; id?: string; kind?: string; status: "passed" | "failed"; duration_ms: number; turn?: number }
+  | { type: "turn"; turn: number; usage: Record<string, number> };
 
 export type CommandTool = {
   id: string;
@@ -39,15 +44,24 @@ export type CommandSection = {
   preview?: string;
   lines: string[];
   events: CommandSectionEvent[];
+  activities?: AgentActivity[];
   status: "running" | "passed" | "failed";
   duration_ms: number | null;
   started_at: number | null;
   collapsed: boolean;
 };
 
+export type PendingLiveLogRecord =
+  | { type: "line"; text: string; commandIndex?: number }
+  | { type: "tool_start"; kind: string; text: string; sourceId?: string; commandIndex?: number }
+  | { type: "tool_end"; status: "passed" | "failed"; durationMs: number; sourceId?: string; commandIndex?: number };
+
 export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
+  pendingRecords?: PendingLiveLogRecord[];
+  activityState?: AgentActivityState;
   error: string | null;
+  isLoading: boolean;
   isStreaming: boolean;
 };

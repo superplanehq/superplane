@@ -23,7 +23,7 @@ func mustSerializeWorkOrder(
 	createdByAutomation *factory.AutomationRef,
 ) *pb.WorkOrder {
 	t.Helper()
-	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation, models.UsageTotals{})
+	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation, workOrderUsageView{})
 	require.NoError(t, err)
 	return serialized
 }
@@ -71,6 +71,14 @@ func TestSerializeWorkOrderCreator_AutomationBranchWinsOverUser(t *testing.T) {
 func TestSerializeWorkOrderCreator_NoneReturnsNil(t *testing.T) {
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
 	assert.Nil(t, mustSerializeWorkOrder(t, nil, order, nil, nil).GetCreatedBy())
+}
+
+func TestSerializeWorkOrder_SourceRunID(t *testing.T) {
+	runID := uuid.New()
+	order := &models.FactoryWorkOrder{ID: uuid.New(), SourceRunID: &runID}
+
+	assert.Equal(t, runID.String(), mustSerializeWorkOrder(t, nil, order, nil, nil).GetSourceRunId())
+	assert.Empty(t, mustSerializeWorkOrder(t, nil, &models.FactoryWorkOrder{ID: uuid.New()}, nil, nil).GetSourceRunId())
 }
 
 func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {
@@ -165,9 +173,11 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	}
 
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
-	serialized, err := serializeWorkOrder(nil, order, dispatches, nil, models.UsageTotals{
-		TotalTokens: 10,
-		CostMicros:  50_000,
+	serialized, err := serializeWorkOrder(nil, order, dispatches, nil, workOrderUsageView{
+		Totals: models.UsageTotals{
+			TotalTokens: 10,
+			CostMicros:  50_000,
+		},
 	})
 	require.NoError(t, err)
 
@@ -271,7 +281,7 @@ func TestSerializeWorkOrderExecution_OmitsRunWhenRunIDNil(t *testing.T) {
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
-	})
+	}, nil)
 
 	assert.Nil(t, out.GetRun())
 	assert.Equal(t, pb.WorkOrderExecution_STATE_FINISHED, out.GetState())
@@ -296,10 +306,132 @@ func TestSerializeWorkOrderExecution_IncludesRunWhenRunIDSet(t *testing.T) {
 		},
 		CanvasID:   &canvasID,
 		CanvasName: "Implement app",
-	})
+	}, []string{"anthropic/claude-sonnet-4-6"})
 
 	require.NotNil(t, out.GetRun())
 	assert.Equal(t, runID.String(), out.GetRun().GetId())
 	assert.Equal(t, canvasID.String(), out.GetRun().GetAppId())
 	assert.Equal(t, "Implement app", out.GetRun().GetAppName())
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, out.GetModels())
+}
+
+func TestSerializeWorkOrder_IncludesUsageBreakdown(t *testing.T) {
+	executionID := uuid.New()
+	dispatches := []models.FactoryWorkOrderLineDispatchRecord{
+		{
+			FactoryWorkOrderLineDispatch: models.FactoryWorkOrderLineDispatch{
+				ID:     uuid.New(),
+				LineID: uuid.New(),
+			},
+			Executions: []models.FactoryWorkOrderExecutionRecord{
+				{
+					FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+						ID:       executionID,
+						StepName: "implement",
+						Status:   models.FactoryWorkOrderExecutionStatusFinished,
+						Result:   models.CanvasRunResultPassed,
+					},
+				},
+			},
+		},
+	}
+
+	serialized, err := serializeWorkOrder(nil, &models.FactoryWorkOrder{ID: uuid.New()}, dispatches, nil, workOrderUsageView{
+		Totals: models.UsageTotals{
+			TotalTokens:     1_000,
+			DurationSeconds: 90,
+			CostMicros:      730_000,
+		},
+		ByModel: []models.UsageByModel{
+			{Provider: "anthropic", Model: "claude-sonnet-4-6", TotalTokens: 1_000, CostMicros: 450_000},
+		},
+		ByMachineType: []models.UsageByMachineType{
+			{MachineType: "e1-large-amd64", DurationSeconds: 90, CostMicros: 280_000},
+		},
+		ModelsByExecution: map[uuid.UUID][]string{
+			executionID: {"anthropic/claude-sonnet-4-6"},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.EqualValues(t, 1000, serialized.GetTotalTokens())
+	assert.EqualValues(t, 73, serialized.GetTotalCostCents())
+	require.Len(t, serialized.GetUsageByModel(), 1)
+	assert.Equal(t, "anthropic", serialized.GetUsageByModel()[0].GetProvider())
+	assert.Equal(t, "claude-sonnet-4-6", serialized.GetUsageByModel()[0].GetModel())
+	assert.EqualValues(t, 1000, serialized.GetUsageByModel()[0].GetTotalTokens())
+	assert.EqualValues(t, 45, serialized.GetUsageByModel()[0].GetCostCents())
+	require.Len(t, serialized.GetUsageByMachineType(), 1)
+	assert.Equal(t, "e1-large-amd64", serialized.GetUsageByMachineType()[0].GetMachineType())
+	assert.EqualValues(t, 90, serialized.GetUsageByMachineType()[0].GetDurationSeconds())
+	assert.EqualValues(t, 28, serialized.GetUsageByMachineType()[0].GetCostCents())
+	require.Len(t, serialized.GetLineDispatches(), 1)
+	require.Len(t, serialized.GetLineDispatches()[0].GetStepExecutions(), 1)
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, serialized.GetLineDispatches()[0].GetStepExecutions()[0].GetModels())
+}
+
+func TestSerializeFactoryPullRequest_HidesMergeableDuringActiveMutationRun(t *testing.T) {
+	now := time.Now()
+	runID := uuid.New()
+	openMergeable := &models.FactoryPullRequest{
+		ID:                  uuid.New(),
+		FactoryID:           uuid.New(),
+		WorkOrderID:         uuid.New(),
+		State:               models.FactoryPullRequestStateOpen,
+		Mergeable:           true,
+		ActiveMutationRunID: &runID,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+
+	hidden := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
+	assert.False(t, hidden.GetMergeable())
+
+	openMergeable.ActiveMutationRunID = nil
+	shown := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
+	assert.True(t, shown.GetMergeable())
+}
+
+func TestAllocateCostCents_GivesTruncatedRemaindersToTheHeader(t *testing.T) {
+	cents := allocateCostCents([]int64{6_000, 6_000}, 1)
+	assert.Equal(t, []int64{1, 0}, cents)
+	assert.Equal(t, int64(1), cents[0]+cents[1])
+}
+
+func TestAllocateCostCents_KeepsExactCents(t *testing.T) {
+	cents := allocateCostCents([]int64{450_000, 280_000}, 73)
+	assert.Equal(t, []int64{45, 28}, cents)
+}
+
+func TestSerializeWorkOrder_ReconcilesSubCentBreakdownToHeader(t *testing.T) {
+	serialized, err := serializeWorkOrder(nil, &models.FactoryWorkOrder{ID: uuid.New()}, nil, nil, workOrderUsageView{
+		Totals: models.UsageTotals{CostMicros: 12_000},
+		ByModel: []models.UsageByModel{
+			{Provider: "anthropic", Model: "claude-sonnet-4-6", TotalTokens: 10, CostMicros: 6_000},
+			{Provider: "openai", Model: "gpt-4.1", TotalTokens: 10, CostMicros: 6_000},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.EqualValues(t, 1, serialized.GetTotalCostCents())
+	require.Len(t, serialized.GetUsageByModel(), 2)
+	assert.EqualValues(t, 1, serialized.GetUsageByModel()[0].GetCostCents()+serialized.GetUsageByModel()[1].GetCostCents())
+}
+
+func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
+	factory := &models.Factory{
+		ID:                 uuid.New(),
+		Name:               "Payments",
+		Key:                "PAY",
+		PlanningEnabled:    true,
+		PlanningClarity:    true,
+		PlanningConfidence: false,
+	}
+
+	serialized := serializeFactory(factory)
+	require.NotNil(t, serialized.Planning)
+	assert.True(t, serialized.Planning.Enabled)
+	assert.True(t, serialized.Planning.Clarity)
+	assert.False(t, serialized.Planning.Confidence)
+	assert.False(t, serialized.Planning.SetupCompleted)
 }

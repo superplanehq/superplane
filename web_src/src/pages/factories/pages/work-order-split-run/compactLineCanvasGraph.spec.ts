@@ -1,5 +1,5 @@
 import { Position, type Edge } from "@xyflow/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
@@ -14,7 +14,7 @@ type RoutedEdge = Edge & {
 
 function messyIfCanvas(): SplitRunCanvasModel {
   return {
-    key: "planning",
+    key: "implementation",
     title: "Create Implementation Plan",
     nodes: [
       { id: "on-run", name: "On Run", component: "triggerOnRun", position: { x: 12, y: 0 } },
@@ -32,7 +32,7 @@ function messyIfCanvas(): SplitRunCanvasModel {
         component: "runnerClaudeCode",
         position: { x: 220, y: 720 },
       },
-      { id: "artifact", name: "Add Plan Artifact", component: "addWorkOrderArtifact", position: { x: -40, y: 900 } },
+      { id: "artifact", name: "Add Task Artifact", component: "addWorkOrderArtifact", position: { x: -40, y: 900 } },
       {
         id: "false-agent",
         name: "Draft Implementation Plan",

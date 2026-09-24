@@ -36,7 +36,7 @@ export function getNextCronExecution(cronExpression: string, fromTime: Date): Da
     let iterations = 0;
 
     while (iterations < maxIterations) {
-      if (cronMatches(minute, hour, day, month, weekday, nextTime)) {
+      if (cronMatches({ minute, hour, day, month, weekday, date: nextTime })) {
         return nextTime;
       }
 
@@ -50,7 +50,18 @@ export function getNextCronExecution(cronExpression: string, fromTime: Date): Da
   }
 }
 
-function cronMatches(minute: string, hour: string, day: string, month: string, weekday: string, date: Date): boolean {
+type CronMatchOptions = {
+  minute: string;
+  hour: string;
+  day: string;
+  month: string;
+  weekday: string;
+  date: Date;
+};
+
+function cronMatches(options: CronMatchOptions): boolean {
+  const { minute, hour, day, month, weekday, date } = options;
+
   // Check minute (0-59)
   if (!matchesCronField(minute, date.getMinutes(), 0, 59)) return false;
 

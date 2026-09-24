@@ -70,7 +70,7 @@ func Test_UpdateRole(t *testing.T) {
 		req := &pb.Role_Spec{
 			InheritedRole: &pb.Role{
 				Metadata: &pb.Role_Metadata{
-					Name: models.RoleOrgViewer,
+					Name: models.RoleOrgOperator,
 				},
 			},
 			Permissions: []*pbAuth.Permission{
@@ -90,7 +90,7 @@ func Test_UpdateRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)
-		assert.Equal(t, models.RoleOrgViewer, roleDef.InheritsFrom.Name)
+		assert.Equal(t, models.RoleOrgOperator, roleDef.InheritsFrom.Name)
 		assert.Len(t, roleDef.Permissions, 1)
 	})
 

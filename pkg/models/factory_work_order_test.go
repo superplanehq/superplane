@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -894,6 +895,178 @@ func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_UpsertArtifact(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "upsert-artifact")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Upsert target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("creates then replaces data and clears dropped fields", func(t *testing.T) {
+		created, wasCreated, err := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/v1",
+				"title": "Preview",
+			},
+			Key: "storybook-preview",
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+		require.NotNil(t, created.Key)
+		assert.Equal(t, "storybook-preview", *created.Key)
+
+		updated, wasCreated, err := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url": "https://preview.example.com/v2",
+			},
+			Key: "storybook-preview",
+		})
+		require.NoError(t, err)
+		assert.False(t, wasCreated)
+		assert.Equal(t, created.ID, updated.ID)
+
+		data := mustArtifactData(t, updated)
+		assert.Equal(t, "https://preview.example.com/v2", data["url"])
+		_, hasTitle := data["title"]
+		assert.False(t, hasTitle)
+
+		artifacts, err := order.ListArtifacts(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, artifacts, 1)
+		assert.Equal(t, created.ID, artifacts[0].ID)
+
+		events, err := order.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 1, countEventsOfType(events, factory.EventTypeOrderArtifactAdded))
+	})
+
+	t.Run("rejects a type change and leaves the row unchanged", func(t *testing.T) {
+		created, wasCreated, err := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/typed",
+				"title": "Keep me",
+			},
+			Key: "typed-preview",
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+
+		_, _, err = order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{"body": "not a link"},
+			Key:  "typed-preview",
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+		assert.Contains(t, err.Error(), FactoryWorkOrderArtifactTypeLink)
+		assert.Contains(t, err.Error(), FactoryWorkOrderArtifactTypeMarkdown)
+
+		persisted, err := order.FindArtifactByKey(database.Conn(), "typed-preview")
+		require.NoError(t, err)
+		assert.Equal(t, created.ID, persisted.ID)
+		assert.Equal(t, FactoryWorkOrderArtifactTypeLink, persisted.Type)
+		data := mustArtifactData(t, persisted)
+		assert.Equal(t, "https://preview.example.com/typed", data["url"])
+		assert.Equal(t, "Keep me", data["title"])
+	})
+
+	t.Run("rejects a key held by another order in the same factory", func(t *testing.T) {
+		_, wasCreated, err := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{"url": "https://preview.example.com/owned"},
+			Key:  "shared-preview",
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+
+		otherOrder, err := factoryModel.CreateWorkOrder(database.Conn(), "Other upsert target", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		_, _, err = otherOrder.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{"url": "https://preview.example.com/stolen"},
+			Key:  "shared-preview",
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactKeyAlreadyExists)
+
+		otherArtifacts, err := otherOrder.ListArtifacts(database.Conn())
+		require.NoError(t, err)
+		assert.Empty(t, otherArtifacts)
+
+		owned, err := order.FindArtifactByKey(database.Conn(), "shared-preview")
+		require.NoError(t, err)
+		data := mustArtifactData(t, owned)
+		assert.Equal(t, "https://preview.example.com/owned", data["url"])
+	})
+
+	t.Run("inserts a new row when the key is empty", func(t *testing.T) {
+		first, wasCreated, err := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{"url": "https://preview.example.com/a"},
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+
+		second, wasCreated, err := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{"url": "https://preview.example.com/b"},
+			Key:  "   ",
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+		assert.NotEqual(t, first.ID, second.ID)
+		assert.Nil(t, first.Key)
+		assert.Nil(t, second.Key)
+	})
+
+	t.Run("retries a same-order unique conflict as a replace", func(t *testing.T) {
+		const workers = 2
+		const key = "concurrent-preview"
+		var wg sync.WaitGroup
+		errs := make([]error, workers)
+		ids := make([]uuid.UUID, workers)
+
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				artifact, _, upsertErr := order.UpsertArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+					Type: FactoryWorkOrderArtifactTypeLink,
+					Data: map[string]any{
+						"url": fmt.Sprintf("https://preview.example.com/c%d", idx),
+					},
+					Key: key,
+				})
+				errs[idx] = upsertErr
+				if artifact != nil {
+					ids[idx] = artifact.ID
+				}
+			}(i)
+		}
+		wg.Wait()
+
+		for _, upsertErr := range errs {
+			require.NoError(t, upsertErr)
+		}
+
+		artifacts, err := order.ListArtifacts(database.Conn())
+		require.NoError(t, err)
+		var keyed []FactoryWorkOrderArtifact
+		for _, artifact := range artifacts {
+			if artifact.Key != nil && *artifact.Key == key {
+				keyed = append(keyed, artifact)
+			}
+		}
+		require.Len(t, keyed, 1)
+		assert.Equal(t, ids[0], keyed[0].ID)
+		assert.Equal(t, ids[1], keyed[0].ID)
+	})
+}
+
 func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -1092,4 +1265,13 @@ func findEventOfType(t *testing.T, events []FactoryWorkOrderEvent, eventType str
 	}
 	t.Fatalf("expected event of type %q, got %v", eventType, eventTypes(events))
 	return FactoryWorkOrderEvent{}
+}
+
+func mustArtifactData(t *testing.T, artifact *FactoryWorkOrderArtifact) map[string]any {
+	t.Helper()
+	require.NotNil(t, artifact)
+
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifact.Data, &data))
+	return data
 }

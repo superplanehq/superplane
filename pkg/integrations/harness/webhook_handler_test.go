@@ -48,6 +48,10 @@ func (w *webhookContextMock) SetSecret(secret []byte) error {
 	return nil
 }
 
+func (w *webhookContextMock) CallbackHasActiveNodes(string) (bool, error) {
+	return false, nil
+}
+
 func Test__HarnessWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &HarnessWebhookHandler{}
 

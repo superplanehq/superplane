@@ -5,7 +5,7 @@ import { createIncidentMapper } from "./create_incident";
 import { createEventMapper } from "./create_event";
 import { updateIncidentMapper } from "./update_incident";
 import { getIncidentMapper } from "./get_incident";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIncident: createIncidentMapper,

@@ -90,11 +90,11 @@ Since service accounts are `users` rows, step 3 matches them automatically. The 
 
 Service accounts participate in the existing RBAC system as first-class principals:
 
-- **Role assignment**: An org admin can assign any role to a service account (e.g., `org_viewer`, `org_admin`, or a custom role).
+- **Role assignment**: An org admin can assign any role to a service account (e.g., `org_operator`, `org_maintainer`, `org_admin`, or a custom role).
 - **Group membership**: A service account can be added to groups, inheriting the group's role.
 - **Permission enforcement**: The authorization interceptor does not need changes. It checks permissions based on the user ID in the context, which is the service account's user ID.
 
-**Restriction**: Service accounts cannot be assigned the `org_owner` role. Ownership is reserved for human users.
+**Restriction**: Service accounts cannot be organization owners. Ownership is a membership flag reserved for human users.
 
 ### Codebase Impact
 
@@ -124,7 +124,7 @@ These work automatically because service accounts are rows in the `users` table:
 | **`/api/v1/me`** | `pkg/grpc/actions/me/get_user.go` | Return a response that works for both types. |
 | **`/api/v1/me/token`** | `pkg/grpc/actions/me/regenerate_token.go` | Block for service accounts — they manage tokens via the service account token endpoints. |
 | **Invitation flow** | `pkg/grpc/actions/organizations/create_invitation.go` | No change needed — invitations work by email, and service accounts have no email. Naturally excluded. |
-| **Assign role** | `pkg/grpc/actions/auth/assign_role.go` | `FindUser` resolves by ID or email. Works for service accounts (by ID). Add guard to prevent `org_owner` assignment. |
+| **Assign role** | `pkg/grpc/actions/auth/assign_role.go` | `FindUser` resolves by ID or email. Works for service accounts (by ID). Owner is a membership flag, not a role. |
 | **Delete organization** | `pkg/grpc/actions/organizations/delete_organization.go` | No change needed — uses user ID for logging only. |
 
 ### API Design
@@ -166,7 +166,7 @@ service ServiceAccounts {
 | `DeleteServiceAccount`            | `service_accounts:delete`    |
 | `RegenerateServiceAccountToken`   | `service_accounts:update`    |
 
-These permissions should be added to the `org_admin` and `org_owner` roles. The `org_viewer` role gets `service_accounts:read` only.
+These permissions should be added to the `org_admin` role. The `org_operator` role gets `service_accounts:read` only.
 
 ### Token Management
 
@@ -241,7 +241,7 @@ The service accounts management UI should be accessible under **Organization Set
 - **Token storage**: Raw tokens are never stored. Only SHA-256 hashes are persisted (same as human user tokens).
 - **Token display**: The raw token is shown exactly once at creation/regeneration time. It cannot be retrieved afterwards.
 - **Deletion cascade**: Deleting a service account clears its token hash and removes all RBAC policies associated with it.
-- **No owner role**: Service accounts cannot be assigned the `org_owner` role to prevent privilege escalation through non-human identities.
+- **No owner flag**: Service accounts cannot be organization owners. The owner flag is reserved for human users.
 - **Rate limiting**: Service account token authentication follows the same rate-limiting rules as user token authentication (same code path).
 
 ## Decisions

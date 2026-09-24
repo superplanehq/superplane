@@ -14,11 +14,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
@@ -255,46 +253,6 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Empty(t, response.Integration.Status.StateDescription)
 	})
 
-	t.Run("usage limit violation blocks integration creation", func(t *testing.T) {
-		name := support.RandomName("integration")
-		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
-		require.NoError(t, err)
-		integrationCount, err := models.CountIntegrationsByOrganization(r.Organization.ID.String())
-		require.NoError(t, err)
-
-		service := &fakeUsageService{
-			enabled: true,
-			checkOrganizationResp: &usagepb.CheckOrganizationLimitsResponse{
-				Allowed: false,
-				Violations: []*usagepb.LimitViolation{
-					{
-						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_INTEGRATIONS,
-						ConfiguredLimit: 0,
-						CurrentValue:    1,
-					},
-				},
-			},
-		}
-
-		_, err = CreateIntegrationWithUsage(
-			ctx,
-			service,
-			r.Registry,
-			nil,
-			baseURL,
-			baseURL,
-			r.Organization.ID.String(),
-			"github",
-			name,
-			appConfig,
-		)
-		require.Error(t, err)
-		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
-		assert.Equal(t, "organization integration limit exceeded", status.Convert(err).Message())
-		require.Len(t, service.checkOrganizationCalls, 1)
-		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
-	})
-
 	t.Run("github uses legacy create when new setup flow feature is off", func(t *testing.T) {
 		name := support.RandomName("integration")
 		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
@@ -347,6 +305,25 @@ func Test__CreateIntegration(t *testing.T) {
 		require.NotNil(t, response.Integration.Status.BrowserAction)
 		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
 		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
+	})
+
+	t.Run("sentry uses hosted install when the public app env is set", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "sentry", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.BrowserAction)
+		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
+		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/api/v1/sentry/app/install?state=")
 	})
 
 	t.Run("github keeps legacy create when privateApp is set and setup flow feature is off", func(t *testing.T) {

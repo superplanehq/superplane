@@ -1,6 +1,6 @@
 import type { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
 import { baseMapper } from "./base";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { createRepositorySandboxMapper } from "./create_repository_sandbox";
 import { EXECUTE_COMMAND_STATE_REGISTRY } from "./execute_command";
 

@@ -57,6 +57,8 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 			}))
 		})
 		usePolarTestServer(t, server)
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+		require.NoError(t, err)
 
 		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
 		require.NoError(t, err)
@@ -65,10 +67,43 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 		assert.Equal(t, "prod_25", resp.Products[0].Id)
 		assert.Equal(t, int64(2500), resp.Products[0].AmountCents)
 	})
+
+	t.Run("lists custom credit packs", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/products/", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"id":   "prod_custom",
+						"name": "Hosted credit custom",
+						"metadata": map[string]any{
+							"superplane_credit_pack": true,
+						},
+						"prices": []map[string]any{
+							{"amount_type": "custom", "minimum_amount": 100},
+						},
+					},
+				},
+				"pagination": map[string]any{"max_page": 1},
+			}))
+		})
+		usePolarTestServer(t, server)
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+		require.NoError(t, err)
+
+		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
+		require.NoError(t, err)
+		assert.True(t, resp.BillingEnabled)
+		require.Len(t, resp.Products, 1)
+		assert.Equal(t, "prod_custom", resp.Products[0].Id)
+		assert.Equal(t, int64(0), resp.Products[0].AmountCents)
+	})
 }
 
 func Test__CreateHostedCreditCheckout(t *testing.T) {
 	r := support.Setup(t)
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+	require.NoError(t, err)
 
 	t.Run("invalid organization id", func(t *testing.T) {
 		_, err := CreateHostedCreditCheckout(context.Background(), "bad", &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
@@ -112,6 +147,53 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
+	t.Run("creates checkout for a custom credit pack", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			switch {
+			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/products/"):
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":   "prod_custom",
+					"name": "Hosted credit custom",
+					"metadata": map[string]any{
+						"superplane_credit_pack": true,
+					},
+					"prices": []map[string]any{
+						{"amount_type": "custom", "minimum_amount": 100},
+					},
+				}))
+			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/customers/external/"):
+				http.Error(w, "missing", http.StatusNotFound)
+			case req.Method == http.MethodPost && req.URL.Path == "/customers/":
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":          "cust_custom",
+					"external_id": r.Organization.ID.String(),
+					"email":       nil,
+				}))
+			case req.Method == http.MethodPost && req.URL.Path == "/checkouts/":
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				assert.Equal(t, []any{"prod_custom"}, body["products"])
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"url":         "https://buy.example/custom",
+					"customer_id": "cust_custom",
+				}))
+			default:
+				http.NotFound(w, req)
+			}
+		})
+		usePolarTestServer(t, server)
+
+		resp, err := CreateHostedCreditCheckout(
+			context.Background(),
+			r.Organization.ID.String(),
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_custom"},
+			r.Account.ID.String(),
+			"http://localhost:8000",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "https://buy.example/custom", resp.CheckoutUrl)
+	})
+
 	t.Run("creates checkout and stores customer id", func(t *testing.T) {
 		createdOwners := []string{}
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
@@ -149,7 +231,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
 				assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
 				assert.Nil(t, body["customer_email"])
-				assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}", body["success_url"])
+				assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/organization/billing?credit=added&checkout_id={CHECKOUT_ID}", body["success_url"])
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 					"url":         "https://buy.example/checkout",
 					"customer_id": "cust_1",
@@ -264,6 +346,8 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 
 	t.Run("creates a polar team customer per organization with the same owner", func(t *testing.T) {
 		other, err := models.CreateOrganization(support.RandomName("billing-org"), "")
+		require.NoError(t, err)
+		_, err = models.SetAdminOrganizationPlan(database.Conn(), other.ID, models.BillingPlanBusiness)
 		require.NoError(t, err)
 		created := map[string]string{}
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
@@ -484,14 +568,14 @@ func Test__HostedCreditCheckoutSuccessURL(t *testing.T) {
 	orgID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	assert.Equal(
 		t,
-		"http://localhost:8000/11111111-1111-1111-1111-111111111111/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}",
+		"http://localhost:8000/11111111-1111-1111-1111-111111111111/organization/billing?credit=added&checkout_id={CHECKOUT_ID}",
 		hostedCreditCheckoutSuccessURL("http://localhost:8000/", orgID),
 	)
 
 	t.Setenv("BASE_URL", "https://app.example")
 	assert.Equal(
 		t,
-		"https://app.example/11111111-1111-1111-1111-111111111111/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}",
+		"https://app.example/11111111-1111-1111-1111-111111111111/organization/billing?credit=added&checkout_id={CHECKOUT_ID}",
 		hostedCreditCheckoutSuccessURL("  ", orgID),
 	)
 }

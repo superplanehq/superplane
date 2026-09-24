@@ -1,17 +1,15 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import {
   useFactory,
-  useFactoryPullRequests,
   useFactoryWorkOrders,
   useWorkOrder,
   useWorkOrderArtifacts,
   useWorkOrderEvents,
 } from "@/hooks/useFactoryData";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, firstFactoryLineId, workOrderDetailPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
@@ -24,15 +22,19 @@ import { presentWorkOrderStatusNotes } from "../lib/workOrderStatusNote";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 import { LinesPage } from "./LinesPage";
 
-/** Canonical `/work-order/:orderNumber` opens the line board with the popup. */
+/** Canonical `/task/:orderNumber` opens the line board with the popup. */
 export function WorkOrderDetailPage() {
   return <LinesPage />;
 }
 
-/** Legacy `/work-orders/:orderId` bookmarks go to the canonical permalink. */
+/**
+ * Legacy id-based `/tasks/:orderId` bookmarks (including old `/work-orders/:orderId`
+ * links, forwarded here by the App-level redirect) go to the canonical permalink.
+ */
 export function LegacyWorkOrderDetailRedirect() {
   const { orderId } = useParams<{ orderId: string }>();
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const location = useLocation();
   const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const resolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading);
   const number = canonicalWorkOrderNumber(resolution.order);
@@ -41,7 +43,9 @@ export function LegacyWorkOrderDetailRedirect() {
     return null;
   }
   if (number) {
-    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, number)} replace />;
+    // Carry the query string (e.g. `lineId`) so a bookmarked board line survives
+    // the id-to-number redirect instead of falling back to the first line.
+    return <Navigate to={`${workOrderDetailPath(organizationId, factoryKey, number)}${location.search}`} replace />;
   }
   return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
 }
@@ -66,9 +70,7 @@ export function WorkOrderDetailPanel({
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
-  const pullRequestsQuery = useFactoryPullRequests(organizationId, factoryId, { workOrderIds: [orderId] });
-  const checksQuery = useWorkOrderChecks(organizationId, factoryId, orderId);
-  const checks = useMemo(() => presentWorkOrderChecks(checksQuery.data ?? []), [checksQuery.data]);
+  const checks = useMemo(() => presentWorkOrderChecks(order?.checks ?? []), [order?.checks]);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
@@ -104,10 +106,9 @@ export function WorkOrderDetailPanel({
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
-      pullRequestsQuery={pullRequestsQuery}
       checks={checks}
-      isChecksLoading={checksQuery.isLoading}
-      checksError={checksQuery.error ?? null}
+      isChecksLoading={false}
+      checksError={null}
       canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
@@ -169,7 +170,6 @@ interface LoadedWorkOrderDetailProps {
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
-  pullRequestsQuery: ReturnType<typeof useFactoryPullRequests>;
   checks: WorkOrderCheckPresentation[];
   isChecksLoading: boolean;
   checksError: Error | null;
@@ -188,7 +188,6 @@ function LoadedWorkOrderDetail({
   events,
   eventsQuery,
   artifactsQuery,
-  pullRequestsQuery,
   checks,
   isChecksLoading,
   checksError,
@@ -217,9 +216,9 @@ function LoadedWorkOrderDetail({
       artifacts={artifactsQuery.data ?? []}
       isArtifactsLoading={artifactsQuery.isLoading}
       artifactsError={artifactsQuery.error ?? null}
-      pullRequests={pullRequestsQuery.data ?? []}
-      isPullRequestsLoading={pullRequestsQuery.isLoading}
-      pullRequestsError={pullRequestsQuery.error ?? null}
+      pullRequests={order.pullRequests ?? []}
+      isPullRequestsLoading={false}
+      pullRequestsError={null}
       checks={checks}
       isChecksLoading={isChecksLoading}
       checksError={checksError}

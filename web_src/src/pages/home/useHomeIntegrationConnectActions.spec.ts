@@ -1,0 +1,66 @@
+import { afterEach, describe, expect, it, vi } from "bun:test";
+
+import { peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+
+import { useHomeIntegrationConnectActions } from "./useHomeIntegrationConnectActions";
+
+describe("useHomeIntegrationConnectActions", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("returns capability setup to the onboarding repository flow", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const returnTo = "/org-1/workspaces/APP/setup?step=vcs&pick=newest";
+    const actions = useHomeIntegrationConnectActions({
+      organizationId: "org-1",
+      returnTo,
+      availableIntegrations: [{ name: "github", legacySetupOnly: false }],
+      connected: [],
+      pendingConnectKeyRef: { current: null },
+      setDialogMode: vi.fn(),
+      setDialogIntegrationName: vi.fn(),
+      setConfigureIntegrationId: vi.fn(),
+    });
+
+    actions.openConnectDialog("github");
+
+    expect(peekIntegrationSetupReturn("org-1")).toBe(returnTo);
+    expect(open).toHaveBeenCalledWith("/org-1/settings/integrations/github/setup", "_blank", "noopener,noreferrer");
+  });
+
+  it("does not open the create dialog for hosted Jira OAuth", () => {
+    const setDialogIntegrationName = vi.fn();
+    const actions = useHomeIntegrationConnectActions({
+      organizationId: "org-1",
+      availableIntegrations: [{ name: "jira", hostedAppInstall: true }],
+      connected: [],
+      pendingConnectKeyRef: { current: null },
+      setDialogMode: vi.fn(),
+      setDialogIntegrationName,
+      setConfigureIntegrationId: vi.fn(),
+    });
+
+    actions.openConnectDialog("jira");
+
+    expect(setDialogIntegrationName).not.toHaveBeenCalled();
+  });
+
+  it("opens the create dialog when Jira is not hosted", () => {
+    const setDialogIntegrationName = vi.fn();
+    const actions = useHomeIntegrationConnectActions({
+      organizationId: "org-1",
+      availableIntegrations: [{ name: "jira", hostedAppInstall: false }],
+      connected: [],
+      pendingConnectKeyRef: { current: null },
+      setDialogMode: vi.fn(),
+      setDialogIntegrationName,
+      setConfigureIntegrationId: vi.fn(),
+    });
+
+    actions.openConnectDialog("jira");
+
+    expect(setDialogIntegrationName).toHaveBeenCalledWith("jira");
+  });
+});

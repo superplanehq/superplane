@@ -35,10 +35,14 @@ func Test__WaitForPullRequestChecks__Setup(t *testing.T) {
 	metadata := &contexts.MetadataContext{}
 
 	err := component.Setup(core.SetupContext{
-		Integration:   integrationCtx,
-		HTTP:          httpCtx,
-		Metadata:      metadata,
-		Configuration: map[string]any{"repository": "hello", "ref": "abc123"},
+		Integration: integrationCtx,
+		HTTP:        httpCtx,
+		Metadata:    metadata,
+		Configuration: map[string]any{
+			"repository": "hello",
+			"ref":        "abc123",
+			"checkNames": []string{"DCO"},
+		},
 	})
 
 	require.NoError(t, err)
@@ -51,9 +55,8 @@ func Test__WaitForPullRequestChecks__Setup(t *testing.T) {
 func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 	component := &WaitForPullRequestChecks{}
 	sha := "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
-	zero := 0
 
-	t.Run("emits passed when all checks are terminal and quiet period is zero", func(t *testing.T) {
+	t.Run("emits passed when selected checks are terminal", func(t *testing.T) {
 		httpCtx := newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha))
 		executionState := &contexts.ExecutionStateContext{}
 		requests := &contexts.RequestContext{}
@@ -61,9 +64,9 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: WaitForPullRequestChecksConfiguration{
-				Repository:         "hello",
-				Ref:                sha,
-				QuietPeriodSeconds: &zero,
+				Repository: "hello",
+				Ref:        sha,
+				CheckNames: []string{"DCO", "ci/semaphore"},
 			},
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
@@ -106,28 +109,22 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 		assert.Empty(t, requests.Action)
 	})
 
-	t.Run("waits the quiet period when no check names are selected", func(t *testing.T) {
-		httpCtx := newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha))
-		executionState := &contexts.ExecutionStateContext{}
-		requests := &contexts.RequestContext{}
-
+	t.Run("rejects empty check names", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: WaitForPullRequestChecksConfiguration{
 				Repository: "hello",
 				Ref:        sha,
 			},
-			HTTP:           httpCtx,
+			HTTP:           newSnapshotHTTP("", ""),
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
-			ExecutionState: executionState,
-			Requests:       requests,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
 			Metadata:       &contexts.MetadataContext{},
 			Logger:         logrus.NewEntry(logrus.New()),
 		})
 
-		require.NoError(t, err)
-		assert.False(t, executionState.Finished)
-		assert.Equal(t, waitChecksEvaluateHook, requests.Action)
-		assert.Equal(t, time.Duration(waitChecksDefaultQuietPeriodSeconds)*time.Second, requests.Duration)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "checkNames is required")
 	})
 
 	t.Run("emits failed when a selected check failed", func(t *testing.T) {
@@ -155,10 +152,9 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: WaitForPullRequestChecksConfiguration{
-				Repository:         "hello",
-				Ref:                sha,
-				CheckNames:         []string{"build"},
-				QuietPeriodSeconds: &zero,
+				Repository: "hello",
+				Ref:        sha,
+				CheckNames: []string{"build"},
 			},
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
@@ -198,6 +194,7 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 			Configuration: WaitForPullRequestChecksConfiguration{
 				Repository: "hello",
 				Ref:        sha,
+				CheckNames: []string{"build"},
 			},
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
@@ -219,6 +216,11 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 	component := &WaitForPullRequestChecks{}
 	sha := "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
 	httpCtx := &contexts.HTTPContext{}
+	config := WaitForPullRequestChecksConfiguration{
+		Repository: "hello",
+		Ref:        sha,
+		CheckNames: []string{"build"},
+	}
 
 	t.Run("ignores other event types", func(t *testing.T) {
 		headers := http.Header{}
@@ -227,7 +229,7 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 		code, _, err := component.HandleWebhook(signedWaitChecksRequest(
 			[]byte(`{"repository":{"name":"hello"},"sha":"abc"}`),
 			headers,
-			WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			config,
 			nil,
 			httpCtx,
 		))
@@ -249,7 +251,7 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 				"check_run": {"head_sha": %q, "name": "build"}
 			}`, sha)),
 			headers,
-			WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			config,
 			func(key, value string) (*core.ExecutionContext, error) {
 				assert.Equal(t, waitChecksRefKV, key)
 				assert.Equal(t, "hello@"+sha, value)
@@ -268,6 +270,33 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 		assert.Empty(t, httpCtx.Requests)
 	})
 
+	t.Run("does not schedule evaluate when the execution is cancelling", func(t *testing.T) {
+		requests := &contexts.RequestContext{}
+		executionState := &contexts.ExecutionStateContext{Cancelling: true}
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", "check_run")
+
+		code, _, err := component.HandleWebhook(signedWaitChecksRequest(
+			[]byte(fmt.Sprintf(`{
+				"repository": {"name": "hello", "full_name": "testhq/hello"},
+				"check_run": {"head_sha": %q, "name": "build"}
+			}`, sha)),
+			headers,
+			config,
+			func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Requests:       requests,
+					ExecutionState: executionState,
+				}, nil
+			},
+			httpCtx,
+		))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Empty(t, requests.Action)
+	})
+
 	t.Run("rejects an invalid signature", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", "status")
@@ -277,7 +306,7 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 			Body:          []byte(`{"sha":"abc"}`),
 			Headers:       headers,
 			Logger:        logrus.NewEntry(logrus.New()),
-			Configuration: WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			Configuration: config,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			HTTP:          httpCtx,
 		})
@@ -291,13 +320,17 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 	component := &WaitForPullRequestChecks{}
 	sha := "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
-	zero := 0
+	config := WaitForPullRequestChecksConfiguration{
+		Repository: "hello",
+		Ref:        sha,
+		CheckNames: []string{"DCO", "ci/semaphore"},
+	}
 
 	t.Run("skips work when the execution already finished", func(t *testing.T) {
 		httpCtx := newSnapshotHTTP("", "")
 		err := component.HandleHook(core.ActionHookContext{
 			Name:           waitChecksEvaluateHook,
-			Configuration:  WaitForPullRequestChecksConfiguration{Repository: "hello", Ref: sha},
+			Configuration:  config,
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: &contexts.ExecutionStateContext{Finished: true},
@@ -309,18 +342,35 @@ func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 		assert.Empty(t, httpCtx.requests)
 	})
 
+	t.Run("skips work when the execution is cancelling", func(t *testing.T) {
+		httpCtx := newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha))
+		executionState := &contexts.ExecutionStateContext{Cancelling: true}
+		requests := &contexts.RequestContext{}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name:           waitChecksEvaluateHook,
+			Configuration:  config,
+			HTTP:           httpCtx,
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			ExecutionState: executionState,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       requests,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.requests)
+		assert.Empty(t, requests.Action)
+		assert.Empty(t, executionState.Channel)
+	})
+
 	t.Run("emits passed after a later evaluate", func(t *testing.T) {
 		httpCtx := newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha))
 		executionState := &contexts.ExecutionStateContext{}
 		startedAt := time.Now().Add(-time.Minute)
 
 		err := component.HandleHook(core.ActionHookContext{
-			Name: waitChecksEvaluateHook,
-			Configuration: WaitForPullRequestChecksConfiguration{
-				Repository:         "hello",
-				Ref:                sha,
-				QuietPeriodSeconds: &zero,
-			},
+			Name:           waitChecksEvaluateHook,
+			Configuration:  config,
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: executionState,
@@ -347,12 +397,8 @@ func Test__WaitForPullRequestChecks__HandleHook(t *testing.T) {
 		startedAt := time.Now().Add(-time.Minute).UTC().Truncate(time.Second)
 
 		err := component.HandleHook(core.ActionHookContext{
-			Name: waitChecksEvaluateHook,
-			Configuration: WaitForPullRequestChecksConfiguration{
-				Repository:         "hello",
-				Ref:                sha,
-				QuietPeriodSeconds: &zero,
-			},
+			Name:           waitChecksEvaluateHook,
+			Configuration:  config,
 			HTTP:           httpCtx,
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: executionState,

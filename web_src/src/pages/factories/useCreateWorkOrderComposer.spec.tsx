@@ -1,17 +1,17 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { createMutate, meResult } = vi.hoisted(() => ({
+const { createMutate, permissionsState } = vi.hoisted(() => ({
   createMutate: vi.fn(),
-  meResult: { current: { data: null as { id: string; name: string } | null } },
+  permissionsState: { currentUserId: undefined as string | undefined },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
 }));
 
-vi.mock("@/hooks/useMe", () => ({
-  useMe: () => meResult.current,
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => permissionsState,
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -28,7 +28,7 @@ describe("useCreateWorkOrderComposer", () => {
     createMutate.mockReset();
     onClose.mockReset();
     onCreated.mockReset();
-    meResult.current = { data: null };
+    permissionsState.currentUserId = undefined;
   });
 
   it("marks Create as loading while the task is created", async () => {
@@ -65,7 +65,7 @@ describe("useCreateWorkOrderComposer", () => {
   });
 
   it("seeds assigneeIds with the current user once me resolves", () => {
-    meResult.current = { data: { id: "user-me", name: "Me" } };
+    permissionsState.currentUserId = "user-me";
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -106,14 +106,14 @@ describe("useCreateWorkOrderComposer", () => {
       result.current.setAssigneeIds(["user-manual"]);
     });
 
-    meResult.current = { data: { id: "user-me", name: "Me" } };
+    permissionsState.currentUserId = "user-me";
     rerender();
 
     expect(result.current.assigneeIds).toEqual(["user-manual"]);
   });
 
   it("does not clobber a manual change made after me resolves", () => {
-    meResult.current = { data: { id: "user-me", name: "Me" } };
+    permissionsState.currentUserId = "user-me";
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -153,7 +153,7 @@ describe("useCreateWorkOrderComposer", () => {
       await result.current.handleCreate();
     });
 
-    expect(onCreated).toHaveBeenCalledWith("101");
+    expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -172,6 +172,59 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     expect(result.current.title).toHaveLength(256);
+  });
+
+  it("creates from a request draft and fills the title from the first body line", async () => {
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleCreate({
+        title: "",
+        description: "Refunds fail on retry.",
+      });
+    });
+
+    expect(createMutate).toHaveBeenCalledWith({
+      title: "Refunds fail on retry.",
+      description: "Refunds fail on retry.",
+      assigneeIds: [],
+    });
+    expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
+  });
+
+  it("uses New task when a request draft has no title text", async () => {
+    createMutate.mockResolvedValue({ id: "order-1", number: "102" });
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleCreate({
+        title: "",
+        description: "![receipt.png](sp-file://file-2)",
+      });
+    });
+
+    expect(createMutate).toHaveBeenCalledWith({
+      title: "New task",
+      description: "![receipt.png](sp-file://file-2)",
+      assigneeIds: [],
+    });
   });
 
   it("keeps the first 5000 characters of a long pasted description", () => {

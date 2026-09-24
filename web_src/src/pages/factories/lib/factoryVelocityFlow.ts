@@ -1,7 +1,7 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
-export type FactoryVelocityFlowPeriodDays = 14 | 30;
+export type FactoryVelocityFlowPeriodDays = 7 | 14 | 30;
 
 export function factoryVelocityPeriodLabel(days: FactoryVelocityFlowPeriodDays): string {
   return `Last ${days} days`;

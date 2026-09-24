@@ -43,7 +43,7 @@ interface OnIncidentAnnotatedEventData {
  */
 export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data?.data as OnIncidentAnnotatedEventData;
+    const eventData = (context.event?.data as { data?: OnIncidentAnnotatedEventData } | undefined)?.data;
     const incident = eventData?.incident;
     const agent = eventData?.agent;
     const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
@@ -56,14 +56,14 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data?.data as OnIncidentAnnotatedEventData;
+    const eventData = (context.event?.data as { data?: OnIncidentAnnotatedEventData } | undefined)?.data;
     return getDetailsForAnnotatedIncident(eventData?.incident, eventData?.agent, eventData?.annotation);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnIncidentAnnotatedMetadata;
-    const configuration = node.configuration as any;
+    const configuration = node.configuration as { contentFilter?: string } | undefined;
     const metadataItems = [];
 
     if (metadata?.service?.name) {
@@ -162,7 +162,12 @@ function getDetailsForAnnotatedIncident(
     details["Service"] = incident.service.summary;
   }
 
-  // Assignees
+  assignAnnotatedIncidentContext(details, incident);
+
+  return details;
+}
+
+function assignAnnotatedIncidentContext(details: Record<string, string>, incident?: AnnotatedIncident) {
   if (incident?.assignees && incident.assignees.length > 0) {
     const assigneeNames = incident.assignees.map((a) => a.summary).filter(Boolean);
     if (assigneeNames.length > 0) {
@@ -170,15 +175,11 @@ function getDetailsForAnnotatedIncident(
     }
   }
 
-  // Escalation policy
   if (incident?.escalation_policy?.summary) {
     details["Escalation Policy"] = incident.escalation_policy.summary;
   }
 
-  // Created at
   if (incident?.created_at) {
     details["Incident Created"] = new Date(incident.created_at).toLocaleString();
   }
-
-  return details;
 }

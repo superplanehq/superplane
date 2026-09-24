@@ -1,0 +1,20 @@
+export const SENTRY_INTAKE_SETUP_COPY = {
+  pageTitle: "How should Sentry issues become tasks?",
+  wizardStepConnect: "Connect Sentry",
+  wizardStepConnectHelper: "Install the SuperPlane Sentry app so SuperPlane can read issues and listen for new ones.",
+  wizardStepConnectExisting: "Choose the Sentry organization that SuperPlane will monitor.",
+  wizardStepProject: "Which Sentry project should create tasks?",
+  wizardStepProjectHelper:
+    "SuperPlane adds the newest unresolved issues of this project. SuperPlane also listens for new issues.",
+  wizardStepProjectHelperSkip: "SuperPlane listens for new issues. SuperPlane does not import existing issues.",
+  wizardConnect: "Connect Sentry",
+  wizardContinue: "Continue",
+  wizardFinish: "Finish",
+  wizardFinishing: "Finishing...",
+  wizardProjectsLoading: "Loading Sentry projects...",
+  wizardProjectsError: "SuperPlane could not load Sentry projects.",
+  wizardProjectsEmpty: "This connection has no available projects.",
+  wizardRetry: "Try again",
+  wizardConnectError: "SuperPlane could not open the Sentry install page.",
+  wizardCreateError: "SuperPlane could not create the Sentry intake.",
+} as const;

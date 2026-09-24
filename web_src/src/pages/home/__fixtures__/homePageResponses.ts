@@ -1,16 +1,8 @@
-import type {
-  CanvasFoldersCanvasFolder,
-  CanvasesCanvasSummary,
-  ComponentsEdge,
-  SuperplaneComponentsNode,
-} from "@/api-client";
+import type { CanvasesCanvasSummary, ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 
 /** Shared with AppPage stories so home → app continuity is obvious. */
 export const HOME_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
 export const SOFTWARE_FACTORY_APP_ID = "9725f25b-2947-4022-82f9-acb20a616bf6";
-
-const FOLDER_AUTOMATION_ID = "folder-automation";
-const FOLDER_RELEASES_ID = "folder-releases";
 
 function miniGraph(
   prefix: string,
@@ -34,7 +26,6 @@ function makeCanvas(
   id: string,
   name: string,
   options: {
-    folderId?: string;
     description?: string;
     starred?: boolean;
     starredAt?: string;
@@ -55,7 +46,6 @@ function makeCanvas(
     id,
     name,
     description: options.description,
-    folderId: options.folderId,
     createdAt: options.createdAt ?? "2026-05-05T00:00:00Z",
     createdBy: { name: options.createdByName ?? "Leonardo DiCaprio" },
     starred: options.starred,
@@ -63,22 +53,6 @@ function makeCanvas(
     nodes: graph.nodes,
     edges: graph.edges,
   } as CanvasesCanvasSummary;
-}
-
-function makeFolder(
-  id: string,
-  title: string,
-  backgroundColor: string,
-  canvasIds: string[],
-): CanvasFoldersCanvasFolder {
-  return {
-    metadata: { id },
-    spec: {
-      title,
-      backgroundColor,
-      canvases: canvasIds.map((canvasId) => ({ id: canvasId })),
-    },
-  } as CanvasFoldersCanvasFolder;
 }
 
 const softwareFactoryGraph = miniGraph("sf", [
@@ -95,7 +69,6 @@ const softwareFactoryGraph = miniGraph("sf", [
 
 const canvases: CanvasesCanvasSummary[] = [
   makeCanvas(SOFTWARE_FACTORY_APP_ID, "Software Factory", {
-    folderId: FOLDER_AUTOMATION_ID,
     description: "Issue → plan → PR → CI babysitting for factory-labeled work.",
     starred: true,
     starredAt: "2026-07-16T12:00:00Z",
@@ -103,7 +76,6 @@ const canvases: CanvasesCanvasSummary[] = [
     graph: softwareFactoryGraph,
   }),
   makeCanvas("app-pr-risk-review", "PR Risk Review", {
-    folderId: FOLDER_AUTOMATION_ID,
     description: "Scores pull requests and posts a risk summary.",
     createdAt: "2026-06-10T14:00:00Z",
     graph: miniGraph("prr", [
@@ -114,12 +86,10 @@ const canvases: CanvasesCanvasSummary[] = [
     ]),
   }),
   makeCanvas("app-docs-reviewer", "Docs Reviewer", {
-    folderId: FOLDER_AUTOMATION_ID,
     description: "Reviews documentation changes on open PRs.",
     createdAt: "2026-06-12T09:30:00Z",
   }),
   makeCanvas("app-superplane-saas", "SuperPlane SaaS", {
-    folderId: FOLDER_RELEASES_ID,
     description: "Production deployment pipeline console.",
     createdAt: "2026-05-20T08:00:00Z",
     graph: miniGraph("saas", [
@@ -131,7 +101,6 @@ const canvases: CanvasesCanvasSummary[] = [
     ]),
   }),
   makeCanvas("app-superplane-release", "SuperPlane Release", {
-    folderId: FOLDER_RELEASES_ID,
     description: "Release status, in-flight cuts, and history.",
     createdAt: "2026-05-22T11:15:00Z",
   }),
@@ -147,22 +116,12 @@ const canvases: CanvasesCanvasSummary[] = [
   }),
 ];
 
-const folders: CanvasFoldersCanvasFolder[] = [
-  makeFolder(FOLDER_AUTOMATION_ID, "Automation", "blue", [
-    SOFTWARE_FACTORY_APP_ID,
-    "app-pr-risk-review",
-    "app-docs-reviewer",
-  ]),
-  makeFolder(FOLDER_RELEASES_ID, "Releases", "green", ["app-superplane-saas", "app-superplane-release"]),
-];
-
 export interface HomePageFixture {
   organizationId: string;
   organizationName: string;
   /** Organization slug shown on the org General settings tabs. Defaults to a slugified organizationName. */
   organizationSlug?: string;
   canvases: CanvasesCanvasSummary[];
-  folders: CanvasFoldersCanvasFolder[];
   enabledExperimentalFeatures?: string[];
   factories?: Array<{ id: string; name: string; description?: string }>;
 }
@@ -172,14 +131,12 @@ export const defaultHomePageFixture: HomePageFixture = {
   organizationName: "SuperPlane",
   organizationSlug: "superplane",
   canvases,
-  folders,
 };
 
-/** Fresh org: no apps or folders — HomePage redirects to the create/setup screen. */
+/** Fresh org: no apps — HomePage redirects to the create/setup screen. */
 export const emptyHomePageFixture: HomePageFixture = {
   organizationId: HOME_ORGANIZATION_ID,
   organizationName: "Acme",
   organizationSlug: "acme",
   canvases: [],
-  folders: [],
 };

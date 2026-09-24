@@ -313,10 +313,6 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
-
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -368,7 +364,7 @@ func (c *RunJS) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhoo
 }
 
 func (c *RunJS) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunJSFinishedEventType)
 }
 
 func (c *RunJS) Cleanup(ctx core.SetupContext) error { return nil }

@@ -1,10 +1,6 @@
 import { canvasesCancelRun } from "@/api-client";
-import {
-  factoryQueryKeys,
-  useCloseWorkOrder,
-  useDispatchWorkOrder,
-  useUpdateWorkOrderStatus,
-} from "@/hooks/useFactoryData";
+import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
+import { invalidateFactoryWorkOrderQueries } from "@/hooks/useFactoryWebsocket";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -18,6 +14,21 @@ import { applySplitRunStop, stopSplitRunAutomation, type SplitRunStopRun } from 
 type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
   lineName?: string;
   stepIndex?: number;
+};
+
+type RejectedCloseCopy = {
+  success: string;
+  error: string;
+};
+
+const REJECT_COPY: RejectedCloseCopy = {
+  success: "Task closed as rejected.",
+  error: "Failed to close task",
+};
+
+const ARCHIVE_COPY: RejectedCloseCopy = {
+  success: "Task archived.",
+  error: "Failed to archive task",
 };
 
 function closeToast(choice: SplitRunStopChoice): string {
@@ -39,10 +50,6 @@ function closeToast(choice: SplitRunStopChoice): string {
   return "Task closed as failed.";
 }
 
-function rejectToast(): string {
-  return closeToast("canceled");
-}
-
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
   if (choice === "reopen") {
     return "Failed to reopen task";
@@ -56,13 +63,9 @@ function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): stri
   return "Failed to close task";
 }
 
-export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+function useSplitRunCancelRun(organizationId?: string, factoryId?: string, orderId?: string) {
   const queryClient = useQueryClient();
-  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
-  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
-  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
-  const live = Boolean(organizationId && factoryId && orderId);
-  const cancelRun = useMutation({
+  return useMutation({
     mutationFn: async (run: SplitRunStopRun) => {
       await canvasesCancelRun(
         withOrganizationHeader({
@@ -76,44 +79,39 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       if (!organizationId || !factoryId) {
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
-      if (orderId) {
-        await queryClient.invalidateQueries({
-          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
-        });
-      }
+      invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
     },
   });
+}
+
+export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
+  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
+  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
+  const live = Boolean(organizationId && factoryId && orderId);
+  const cancelRun = useSplitRunCancelRun(organizationId, factoryId, orderId);
 
   const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
 
-  const handleBackToDraft = useCallback(async () => {
-    if (!live || !orderId || busy) {
-      return false;
-    }
-    try {
-      await updateStatus.mutateAsync({ orderId, state: "STATE_DRAFT" });
-      showSuccessToast("Task returned to the Backlog.");
-      return true;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to return the task to the Backlog"));
-      return false;
-    }
-  }, [busy, live, orderId, updateStatus]);
+  const closeAsRejected = useCallback(
+    async (copy: RejectedCloseCopy) => {
+      if (!live || !orderId || busy) {
+        return false;
+      }
+      try {
+        await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
+        showSuccessToast(copy.success);
+        return true;
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, copy.error));
+        return false;
+      }
+    },
+    [busy, closeWorkOrder, live, orderId],
+  );
 
-  const handleReject = useCallback(async () => {
-    if (!live || !orderId || busy) {
-      return false;
-    }
-    try {
-      await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
-      showSuccessToast(rejectToast());
-      return true;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to close task"));
-      return false;
-    }
-  }, [busy, closeWorkOrder, live, orderId]);
+  const handleReject = useCallback(() => closeAsRejected(REJECT_COPY), [closeAsRejected]);
+  const handleArchive = useCallback(() => closeAsRejected(ARCHIVE_COPY), [closeAsRejected]);
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {
@@ -174,7 +172,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     handleStop,
     handleStopAutomation,
     handleReject,
-    handleBackToDraft,
+    handleArchive,
     busy,
   };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 
 import type { SuperplaneComponentsNode } from "@/api-client/types.gen";
 

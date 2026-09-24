@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/lib/errors";
-import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -149,7 +148,11 @@ function CatalogProviderCard({
   styles: CatalogStyles;
 }) {
   return (
-    <section className={styles.card}>
+    <section
+      id={`integration-${item.providerName}`}
+      className={cn(styles.card, "scroll-mt-8")}
+      data-testid={`integration-card-${item.providerName}`}
+    >
       <div className={styles.cardHeader}>
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex size-8 items-center justify-center">
@@ -174,6 +177,7 @@ function CatalogProviderCard({
             permissionsLoading={catalog.permissionsLoading}
             onConnect={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
             onCreatePrivateApp={() => catalog.handlePrivateAppClick(item.integrationDef ?? undefined)}
+            allowPrivateApp={appearance !== "factories"}
           />
         ) : (
           <PermissionTooltip
@@ -324,9 +328,6 @@ function ConnectErrors({ catalog }: { catalog: CatalogState }) {
   if (!catalog.createIntegrationMutation.isError) {
     return null;
   }
-  if (catalog.createIntegrationNotice) {
-    return <UsageLimitAlert notice={catalog.createIntegrationNotice} className="mt-4" />;
-  }
   return (
     <Alert variant="destructive" className="mt-4">
       <AlertTitle>Unable to create integration</AlertTitle>
@@ -363,9 +364,7 @@ function FactoriesConnectModal({ catalog }: { catalog: CatalogState }) {
               <Button
                 onClick={() => void catalog.handleConnect()}
                 disabled={
-                  catalog.createIntegrationMutation.isPending ||
-                  !catalog.integrationName.trim() ||
-                  !catalog.canCreateIntegrations
+                  catalog.createIntegrationMutation.isPending || !catalog.canConnect || !catalog.canCreateIntegrations
                 }
                 className="flex items-center gap-2"
               >
@@ -430,9 +429,7 @@ function LegacyConnectModal({ catalog }: { catalog: CatalogState }) {
               color="blue"
               onClick={() => void catalog.handleConnect()}
               disabled={
-                catalog.createIntegrationMutation.isPending ||
-                !catalog.integrationName.trim() ||
-                !catalog.canCreateIntegrations
+                catalog.createIntegrationMutation.isPending || !catalog.canConnect || !catalog.canCreateIntegrations
               }
               className="flex items-center gap-2"
             >

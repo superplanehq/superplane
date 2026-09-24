@@ -1,14 +1,14 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import type { AutomationCardActions } from "./automationCardActions";
 import { AutomationsPageList, EmptyAutomationsState } from "./automationsPageParts";
 
 type AutomationsPageBodyProps = {
   organizationId: string;
   factoryKey: string;
-  apps: FactoryApp[];
+  apps: FactoryAutomation[];
   workOrders: Parameters<typeof AutomationsPageList>[0]["workOrders"];
   appsLoading: boolean;
-  actionsForApp: (app: FactoryApp) => AutomationCardActions;
+  actionsForApp: (app: FactoryAutomation) => AutomationCardActions;
   canCreate: boolean;
   onCreate: () => void;
 };

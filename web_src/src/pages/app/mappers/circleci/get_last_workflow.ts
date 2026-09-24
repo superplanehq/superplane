@@ -10,7 +10,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimestamp, stringOrDash } from "../utils";
+import { formatTimestamp, stringOrDash } from "../eventDisplay";
 import { baseProps } from "./base";
 
 interface GetLastWorkflowConfiguration {

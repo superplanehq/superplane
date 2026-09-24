@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
+
+import { getNextParentheticalIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 
 import { createWithGeneratedName, isNameTakenError } from "./generatedName";
 
@@ -17,6 +19,19 @@ describe("isNameTakenError", () => {
   });
 });
 
+describe("getNextParentheticalIntegrationName", () => {
+  it("uses the owner name when it is free", () => {
+    expect(getNextParentheticalIntegrationName("github-acme", new Set())).toBe("github-acme");
+  });
+
+  it("appends (1) then (2) when the owner name is taken", () => {
+    expect(getNextParentheticalIntegrationName("github-acme", new Set(["github-acme"]))).toBe("github-acme (1)");
+    expect(getNextParentheticalIntegrationName("github-acme", new Set(["github-acme", "github-acme (1)"]))).toBe(
+      "github-acme (2)",
+    );
+  });
+});
+
 describe("createWithGeneratedName", () => {
   it("uses the base name when it is free", async () => {
     const create = vi.fn().mockResolvedValue("created");
@@ -29,7 +44,8 @@ describe("createWithGeneratedName", () => {
 
     expect(name).toBe("github-puppies-inc");
     expect(result).toBe("created");
-    expect(create).toHaveBeenCalledExactlyOnceWith("github-puppies-inc");
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith("github-puppies-inc");
   });
 
   it("skips names that are known to be taken", async () => {

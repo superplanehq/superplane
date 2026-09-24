@@ -18,7 +18,14 @@ export const VELOCITY_TIME_COLORS = {
   waiting: "#f59e0b",
 } as const;
 
-export const VELOCITY_COST_COLOR = "#6366f1";
+/**
+ * The two things spend goes to. Tokens stay indigo and compute moves to teal,
+ * so a reader tells the two bands apart without the legend.
+ */
+export const VELOCITY_COST_COLORS = {
+  model: "#6366f1",
+  compute: "#0d9488",
+} as const;
 
 /**
  * Colors of the intake bands. Known sources keep one color across workspaces so

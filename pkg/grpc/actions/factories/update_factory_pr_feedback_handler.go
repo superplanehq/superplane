@@ -28,18 +28,13 @@ func UpdateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to update factory PR feedback handler")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory PR feedback handler")
-	}
-
 	handlerID, err := parsePRFeedbackHandlerID(req.GetHandlerId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory PR feedback handler")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory PR feedback handler")
 	}
@@ -133,6 +128,20 @@ func applyPRFeedbackSettings(
 			return invalidArgument("PR feedback automation has no GitHub triggers to update")
 		}
 
+		runnerIDs := map[string]bool{graph.RunnerNodeID: true}
+		if !graph.isChecks() {
+			runnerIDs = graph.discussionRunnerNodeIDs(spec)
+		}
+		factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
+		if err != nil {
+			return err
+		}
+		runnerEnvironmentFrom := prFeedbackEnvironmentFrom(
+			resolvePRFeedbackBinding(tx, factory, updated.Repository),
+			updated.RunnerIntegrationNames,
+		)
+		independentDiscussionFlows := graph.hasIndependentDiscussionFlows(spec)
+
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
 			if triggerIDs[nodes[i].ID] {
@@ -155,27 +164,16 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
-				if len(updated.CheckNames) > 0 {
-					configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
-				} else {
-					delete(configuration, "checkNames")
-				}
+				configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
 				nodes[i].Configuration = configuration
 				continue
 			}
-			if nodes[i].ID == graph.RunnerNodeID {
+			if runnerIDs[nodes[i].ID] {
 				configuration := maps.Clone(nodes[i].Configuration)
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
-				if err != nil {
-					return err
-				}
-				configuration["environmentFrom"] = prFeedbackEnvironmentFrom(
-					resolvePRFeedbackBinding(tx, factory, updated.Repository),
-					updated.RunnerIntegrationNames,
-				)
+				configuration["environmentFrom"] = runnerEnvironmentFrom
 				nodes[i].Configuration = configuration
 				continue
 			}
@@ -184,13 +182,26 @@ func applyPRFeedbackSettings(
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["description"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
+				configuration["title"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
+				delete(configuration, "description")
 				nodes[i].Configuration = configuration
 				continue
 			}
-			if nodes[i].ID == graph.AnnounceLimitNodeID {
-				nodes[i].Configuration = prFeedbackChecksLimitStatusNoteConfiguration(updated.MaximumAttempts)
-				continue
+			if graph.isChecks() {
+				if title, description, ok := prFeedbackChecksActivityExpressions(nodes[i].ID); ok {
+					configuration := maps.Clone(nodes[i].Configuration)
+					if configuration == nil {
+						configuration = map[string]any{}
+					}
+					configuration["title"] = title
+					if description == "" {
+						delete(configuration, "description")
+					} else {
+						configuration["description"] = description
+					}
+					nodes[i].Configuration = configuration
+					continue
+				}
 			}
 			if nodes[i].ID != graph.ActivityNodeID && nodes[i].ComponentName() != prFeedbackActivityComponent {
 				continue
@@ -199,8 +210,14 @@ func applyPRFeedbackSettings(
 			if configuration == nil {
 				configuration = map[string]any{}
 			}
-			if !graph.isChecks() {
-				configuration["description"] = prFeedbackActivityDescriptionExpression()
+			if !graph.isChecks() && independentDiscussionFlows {
+				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID)
+				if !ok {
+					nodes[i].Configuration = configuration
+					continue
+				}
+				configuration["title"] = title
+				configuration["description"] = description
 			}
 			nodes[i].Configuration = configuration
 		}
@@ -211,7 +228,7 @@ func applyPRFeedbackSettings(
 			}
 		}
 
-		nodes, edges := ensureChecksAnnounceLimitNode(nodes, slices.Clone(liveVersion.Edges), graph, updated.MaximumAttempts)
+		nodes = ensurePRFeedbackConcurrency(nodes)
 
 		if err := canvases.PublishGeneratedCanvasNodes(
 			ctx,
@@ -220,14 +237,13 @@ func applyPRFeedbackSettings(
 			uuid.MustParse(userID),
 			"Update PR feedback settings",
 			nodes,
-			edges,
+			slices.Clone(liveVersion.Edges),
 			changesets.CanvasPublisherOptions{
 				Registry:       deps.Registry,
 				OrgID:          canvas.OrganizationID,
 				Encryptor:      deps.Encryptor,
 				AuthService:    deps.AuthService,
 				WebhookBaseURL: deps.WebhookBaseURL,
-				GitProvider:    deps.GitProvider,
 			},
 		); err != nil {
 			return err
@@ -243,33 +259,4 @@ func applyPRFeedbackSettings(
 	}
 
 	return nil
-}
-
-func ensureChecksAnnounceLimitNode(
-	nodes []models.Node,
-	edges []models.Edge,
-	graph prFeedbackGraph,
-	maximumAttempts int,
-) ([]models.Node, []models.Edge) {
-	if !graph.isChecks() || graph.PauseFixesNodeID == "" {
-		return nodes, edges
-	}
-	if findIntakeNode(nodes, prFeedbackAnnounceLimitNodeID) != nil {
-		return nodes, edges
-	}
-
-	nodes = append(nodes, models.Node{
-		ID:            prFeedbackAnnounceLimitNodeID,
-		Name:          "Set Fixes Paused Note",
-		Type:          "TYPE_ACTION",
-		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: prFeedbackSetStatusNoteComponent}},
-		Configuration: prFeedbackChecksLimitStatusNoteConfiguration(maximumAttempts),
-		Position:      models.Position{X: 1180, Y: 400},
-	})
-	edges = append(edges, models.Edge{
-		Channel:  "default",
-		SourceID: graph.PauseFixesNodeID,
-		TargetID: prFeedbackAnnounceLimitNodeID,
-	})
-	return nodes, edges
 }

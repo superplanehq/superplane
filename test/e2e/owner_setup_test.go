@@ -13,6 +13,9 @@ import (
 )
 
 func TestOwnerSetupFlow(t *testing.T) {
+	t.Cleanup(func() {
+		middleware.MarkOwnerSetupCompleted()
+	})
 	t.Run("completing owner setup via UI creates owner and redirects to home", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
@@ -132,8 +135,9 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 }
 
 func (s *ownerSetupSteps) assertRedirectedToOrganization() {
-	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.orgSlug, "expected to be redirected into the organization")
+	// The app lands on "/" first and then resolves the organization redirect
+	// after several async requests, so poll instead of checking once.
+	s.session.WaitUntilURLContains("/" + s.orgSlug)
 }
 
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {

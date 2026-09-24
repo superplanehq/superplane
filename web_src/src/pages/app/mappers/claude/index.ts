@@ -4,7 +4,7 @@ import { runAgentMapper } from "./run_agent";
 import { runCodeAgentMapper } from "./run_code_agent";
 import { getDailyUsageMapper } from "./get_daily_usage";
 import { createBatchMessageMapper } from "./create_batch_message";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   textPrompt: baseMapper,

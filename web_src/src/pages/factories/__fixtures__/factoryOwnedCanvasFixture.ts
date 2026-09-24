@@ -1,4 +1,4 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { defaultCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 
 import {
@@ -34,7 +34,7 @@ export {
   LINE_RUN_VERIFY_PASSED_ID,
 };
 
-function refundFactoryApp(id: string): FactoryApp {
+function refundFactoryApp(id: string): FactoryAutomation {
   const app = REFUND_FACTORY_APPS.find((candidate) => candidate.id === id);
   if (!app) {
     throw new Error(`Unknown refund factory app: ${id}`);
@@ -51,7 +51,7 @@ export const REFUND_VERIFIER_APP = refundFactoryApp("app-refund-verifier");
  * so FactoryAppCanvasPage does not redirect to Overview.
  */
 export function factoryOwnedCanvasFixture(
-  app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_PLANNER_APP,
+  app: Pick<FactoryAutomation, "id" | "name" | "description"> = REFUND_PLANNER_APP,
   extras: Partial<CanvasAppFixture> = {},
   factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
@@ -148,7 +148,7 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
 
 /** Factory-owned compact CI canvas plus the runs that Line cards open. */
 export function refundLineCanvasFixture(
-  app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_IMPLEMENTER_APP,
+  app: Pick<FactoryAutomation, "id" | "name" | "description"> = REFUND_IMPLEMENTER_APP,
   factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
   return factoryOwnedCanvasFixture(

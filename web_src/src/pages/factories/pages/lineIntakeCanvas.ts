@@ -20,11 +20,20 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.issue.body }}",
     title: "GitHub issue intake",
   },
+  "jira-issues": {
+    triggerComponent: "jira.onIssue",
+    triggerName: "On Issue",
+    createTitle: "{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}",
+    // Jira sends the raw description as an Atlassian Document Format object.
+    // The trigger reports a plain text copy next to it.
+    createDescription: "{{ root().data.description }}",
+    title: "Jira issue intake",
+  },
   "sentry-exceptions": {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
     createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: "{{ root().data.data.issue.permalink }}",
+    createDescription: "{{ root().data.description }}",
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {
@@ -33,6 +42,13 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createTitle: "{{ root().data.incident.title }}",
     createDescription: "{{ root().data.incident.html_url }}",
     title: "PagerDuty incident intake",
+  },
+  "productive-tasks": {
+    triggerComponent: "productive.onTask",
+    triggerName: "On Task",
+    createTitle: "{{ root().data.data.attributes.title }}",
+    createDescription: "{{ root().data.data.attributes.description }}",
+    title: "Productive.io task intake",
   },
 };
 
@@ -51,7 +67,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
     },
     {
       id: createId,
-      name: "Create Work Order",
+      name: "Create Task",
       type: "TYPE_ACTION",
       component: "createWorkOrder",
       configuration: {

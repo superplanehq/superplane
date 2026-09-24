@@ -6,14 +6,24 @@ interface FilterChipsProps {
   state: WorkOrderListState;
   /** Omit on a line board so leftover Tasks line filters stay hidden. */
   lineOptions?: WorkOrderFilterOption[];
+  sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
+  showPullRequestMerge?: boolean;
 }
 
 /** Applied filters, rendered under the title bar only when something is set. */
-export function FilterChips({ state, lineOptions, assigneeOptions }: FilterChipsProps) {
+export function FilterChips({
+  state,
+  lineOptions,
+  sourceOptions,
+  assigneeOptions,
+  showPullRequestMerge = false,
+}: FilterChipsProps) {
   const chips = buildWorkOrderFilterChips(state.filters, {
     lines: lineOptions ?? [],
+    sources: sourceOptions,
     assignees: assigneeOptions,
+    showPullRequestMerge,
   }).filter((chip) => lineOptions || chip.dimension !== "lineIds");
 
   if (chips.length === 0) {

@@ -27,16 +27,6 @@ func AddWorkOrderComment(
 		return nil, factoryErrorToStatus(err, "failed to add work order comment")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to add work order comment")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to add work order comment")
-	}
-
 	body := strings.TrimSpace(req.GetBody())
 	if body == "" {
 		return nil, factoryErrorToStatus(invalidArgument("body is required"), "failed to add work order comment")
@@ -57,8 +47,20 @@ func AddWorkOrderComment(
 		UserID: &userIDStr,
 	}
 
-	var comment *models.FactoryWorkOrderComment
 	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+	orderID := resolvedOrder.ID
+
+	var comment *models.FactoryWorkOrderComment
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factoryModel, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -81,37 +83,20 @@ func AddWorkOrderComment(
 		return nil, factoryErrorToStatus(err, "failed to add work order comment")
 	}
 
-	publishWorkOrderCommentNotifications(factoryID, orderID, orgID, userIDStr, comment)
+	publishWorkOrderCommentUpdated(factoryID, orderID)
 
 	return &pb.AddWorkOrderCommentResponse{
 		Comment: serializeWorkOrderComment(comment),
 	}, nil
 }
 
-func publishWorkOrderCommentNotifications(
-	factoryID, orderID, orgID uuid.UUID,
-	actorUserID string,
-	comment *models.FactoryWorkOrderComment,
-) {
+func publishWorkOrderCommentUpdated(factoryID, orderID uuid.UUID) {
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factoryID.String(),
 		orderID.String(),
 		factory.EventTypeOrderCommentAdded,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", orderID)
-	}
-
-	notification := messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID:   orgID.String(),
-		FactoryID:        factoryID.String(),
-		OrderID:          orderID.String(),
-		EventType:        factory.EventTypeOrderCommentAdded,
-		ActorUserID:      actorUserID,
-		CommentBody:      comment.Body,
-		MentionedUserIDs: uuidStrings(comment.MentionedUserIDs),
-	}
-	if err := notification.Publish(); err != nil {
-		log.WithError(err).Warnf("Failed to publish work order notification for order %s", orderID)
 	}
 }
 

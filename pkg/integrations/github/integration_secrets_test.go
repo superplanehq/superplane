@@ -32,6 +32,11 @@ func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
 	assert.Contains(t, secrets.Usage, "GITHUB_TOKEN")
 	assert.Contains(t, secrets.Usage, "The gh CLI is already installed")
 	assert.Contains(t, secrets.Usage, "Do not download or install gh")
+	assert.Contains(t, secrets.Usage, "https://github.com/<owner>/<repo>.git")
+	assert.NotContains(t, secrets.Usage, "x-access-token")
 	assert.NotContains(t, secrets.Usage, "ghp_test_token")
-	assert.Empty(t, secrets.Setup)
+	assert.Equal(t, githubSetupName, secrets.SetupName)
+	assert.Contains(t, secrets.Setup, "gh auth setup-git --hostname github.com --force")
+	assert.NotContains(t, secrets.Setup, "x-access-token")
+	assert.NotContains(t, secrets.Setup, "ghp_test_token")
 }

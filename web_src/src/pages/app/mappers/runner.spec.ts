@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { runnerConfigurationDetails, runnerMapper } from "./runner";
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "./types";
@@ -57,7 +57,7 @@ describe("runnerConfigurationDetails", () => {
         execution_timeout_seconds: 0,
       },
       {
-        "Machine type": "e1-large-arm64",
+        "Machine type": "Large ARM",
         "Execution mode": "Host",
         "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },

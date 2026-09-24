@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -18,6 +18,7 @@ describe("createOrgWorkspaceFixtureFetch", () => {
     const response = await fixtureFetch("http://localhost/api/v1/integrations");
     await expect(response.json()).resolves.toMatchObject({
       integrations: [expect.objectContaining({ name: "sentry" })],
+      githubAppConfigured: true,
     });
   });
 
@@ -33,6 +34,7 @@ describe("createOrgWorkspaceFixtureFetch", () => {
       "openai",
       "openrouter",
     ]);
+    expect(body.githubAppConfigured).toBe(true);
   });
 
   it("serves factory definitions when the canvas fixture declares no integrations", async () => {
@@ -49,6 +51,7 @@ describe("createOrgWorkspaceFixtureFetch", () => {
       "openai",
       "openrouter",
     ]);
+    expect(body.githubAppConfigured).toBe(true);
   });
 
   it("starts with the organization connections the story seeds", async () => {

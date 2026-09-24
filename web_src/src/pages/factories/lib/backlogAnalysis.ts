@@ -1,4 +1,5 @@
 import type { CanvasesCanvasRun } from "@/api-client";
+import { mergeCanvasRunUpdate } from "@/hooks/canvasInfiniteCache";
 
 import { isActiveCanvasRun } from "./workOrderPullRequest";
 
@@ -43,6 +44,51 @@ export function backlogAnalysisRuns(canvasId: string, runs: CanvasesCanvasRun[])
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
 }
 
+/** Apply one live run payload without losing newer state already in the cache. */
+export function upsertBacklogAnalysisRun(
+  current: BacklogAnalysisRun[] | undefined,
+  canvasId: string,
+  run: CanvasesCanvasRun,
+): BacklogAnalysisRun[] {
+  if (!current) {
+    const [incoming] = backlogAnalysisRuns(canvasId, [run]);
+    return incoming ? [incoming] : [];
+  }
+
+  const existingIndex = current.findIndex((entry) => entry.run.id === run.id);
+  if (existingIndex >= 0) {
+    const existing = current[existingIndex];
+    const mergedRun = mergeCanvasRunUpdate(existing.run, run);
+    if (mergedRun === existing.run) {
+      return current;
+    }
+
+    const next = [...current];
+    next[existingIndex] = { ...existing, run: mergedRun };
+    return next;
+  }
+
+  const [incoming] = backlogAnalysisRuns(canvasId, [run]);
+  if (!incoming) {
+    return current;
+  }
+
+  return backlogAnalysisRuns(canvasId, [...current.map((entry) => entry.run), run]);
+}
+
+/** Keep live events that arrived while an older REST snapshot was loading. */
+export function mergeBacklogAnalysisRunSnapshots(
+  current: BacklogAnalysisRun[] | undefined,
+  incoming: BacklogAnalysisRun[],
+  canvasId: string,
+): BacklogAnalysisRun[] {
+  let merged = incoming;
+  for (const entry of current ?? []) {
+    merged = upsertBacklogAnalysisRun(merged, canvasId, entry.run);
+  }
+  return merged;
+}
+
 export function backlogAnalysisRunsByWorkOrder(runs: BacklogAnalysisRun[]): Map<string, BacklogAnalysisRun[]> {
   const byWorkOrder = new Map<string, BacklogAnalysisRun[]>();
   for (const entry of runs) {
@@ -71,7 +117,7 @@ export function hasActiveBacklogAnalysisRun(runs: BacklogAnalysisRun[]): boolean
   return runs.some((entry) => isActiveCanvasRun(entry.run));
 }
 
-function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
+export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
   const envelope = asRecord(run.rootEvent?.data);
   const payload = asRecord(envelope?.data) ?? envelope;
   const id = asRecord(payload?.workOrder)?.id;
@@ -94,14 +140,14 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  * A freshly created draft has no Backlog run yet — the run is created
  * asynchronously after the create RPC returns — so the board cannot learn
  * "analyzing" from real run data alone. This tiny external store lets the
- * create mutation say "show analyzing now" the moment it succeeds, while
- * `useBacklogAnalysisRuns` keeps polling until the real run (or its result)
- * shows up. Entries self-clean via a TTL backstop so a card can never get
- * stuck in "Analyzing" if a run never appears.
+ * create mutation say "show analyzing now" the moment it succeeds. The canvas
+ * WebSocket replaces the entry when the real run appears. Entries self-clean
+ * via a TTL backstop so a card cannot stay in "Analyzing" indefinitely.
  */
 const PENDING_ANALYSIS_TTL_MS = 60_000;
 
 const pendingAnalysis = new Map<string, number>();
+const pendingAnalysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingAnalysisListeners = new Set<() => void>();
 let pendingAnalysisSnapshot: ReadonlySet<string> = new Set();
 
@@ -117,7 +163,21 @@ export function markBacklogAnalysisPending(workOrderId: string | undefined | nul
   if (!workOrderId) {
     return;
   }
-  pendingAnalysis.set(workOrderId, Date.now() + PENDING_ANALYSIS_TTL_MS);
+  const expiresAt = Date.now() + PENDING_ANALYSIS_TTL_MS;
+  pendingAnalysis.set(workOrderId, expiresAt);
+  clearTimeout(pendingAnalysisTimers.get(workOrderId));
+  pendingAnalysisTimers.set(
+    workOrderId,
+    setTimeout(() => {
+      pendingAnalysisTimers.delete(workOrderId);
+      if ((pendingAnalysis.get(workOrderId) ?? 0) > Date.now()) {
+        return;
+      }
+      if (pendingAnalysis.delete(workOrderId)) {
+        notifyPendingAnalysisListeners();
+      }
+    }, PENDING_ANALYSIS_TTL_MS),
+  );
   notifyPendingAnalysisListeners();
 }
 
@@ -126,6 +186,8 @@ export function clearBacklogAnalysisPending(workOrderId: string | undefined | nu
   if (!workOrderId || !pendingAnalysis.delete(workOrderId)) {
     return;
   }
+  clearTimeout(pendingAnalysisTimers.get(workOrderId));
+  pendingAnalysisTimers.delete(workOrderId);
   notifyPendingAnalysisListeners();
 }
 
@@ -135,6 +197,8 @@ export function pendingBacklogAnalysisIds(now = Date.now()): ReadonlySet<string>
   for (const [workOrderId, expiresAt] of pendingAnalysis) {
     if (expiresAt <= now) {
       pendingAnalysis.delete(workOrderId);
+      clearTimeout(pendingAnalysisTimers.get(workOrderId));
+      pendingAnalysisTimers.delete(workOrderId);
       pruned = true;
     }
   }

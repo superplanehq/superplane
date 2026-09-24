@@ -87,6 +87,18 @@ func MapFactoryLineNameUniqueConstraintError(err error) error {
 	return err
 }
 
+// defaultColumnColors returns the board colors a new line starts with,
+// matching the colors shown in onboarding: backlog stays unset (neutral),
+// the first phase column is sky, verify is yellow, and done is lime. Any
+// additional phase columns are left unset.
+func defaultColumnColors() map[string]string {
+	return map[string]string{
+		"phase-0": "sky",
+		"verify":  "yellow",
+		"done":    "lime",
+	}
+}
+
 func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) (*FactoryLine, error) {
 	now := time.Now()
 	line := &FactoryLine{
@@ -95,7 +107,7 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 		FactoryID:      f.ID,
 		Name:           name,
 		Steps:          datatypes.JSONSlice[FactoryLineStep](steps),
-		ColumnColors:   datatypes.NewJSONType(map[string]string{}),
+		ColumnColors:   datatypes.NewJSONType(defaultColumnColors()),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

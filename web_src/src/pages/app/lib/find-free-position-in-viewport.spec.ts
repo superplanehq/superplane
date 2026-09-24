@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { findFreePositionInViewport } from "./find-free-position-in-viewport";
 
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };

@@ -612,7 +612,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		requests := &contexts.RequestContext{}
 		oldCheckpoint := time.Now().Add(-time.Hour).UnixMilli()
 		metadata := &contexts.MetadataContext{Metadata: OnPipelineCompletedMetadata{
-			LastExecutionEnded: time.Now().Add(-time.Hour).UnixMilli(),
+			LastExecutionEnded: oldCheckpoint,
 			LastExecutionID:    "exec-old",
 		}}
 		recentEndTs := time.Now().UnixMilli()

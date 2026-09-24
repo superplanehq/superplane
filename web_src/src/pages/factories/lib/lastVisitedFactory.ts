@@ -75,6 +75,25 @@ export function pickInitialFactory<T extends { id?: string }>(
   return known[0];
 }
 
+function isWorkspaceReady(factory: { onboarding?: { completedAt?: string } }): boolean {
+  return Boolean(factory.onboarding?.completedAt);
+}
+
+/**
+ * Lands on a finished workspace when one exists. An incomplete last-visited
+ * workspace would send the user back into setup after they leave it.
+ */
+export function pickReadyFactory<T extends { id?: string; onboarding?: { completedAt?: string } }>(
+  factories: T[],
+  lastVisitedFactoryId: string | null,
+): T | null {
+  const ready = factories.filter(isWorkspaceReady);
+  if (ready.length > 0) {
+    return pickInitialFactory(ready, lastVisitedFactoryId);
+  }
+  return pickInitialFactory(factories, lastVisitedFactoryId);
+}
+
 export function recordLastVisitedFactory(accountId: string, organizationId: string, factoryId: string): void {
   if (!accountId || !organizationId || !factoryId || typeof window === "undefined") {
     return;

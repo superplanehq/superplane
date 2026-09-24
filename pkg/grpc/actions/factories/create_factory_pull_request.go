@@ -13,6 +13,7 @@ import (
 
 func CreateFactoryPullRequest(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.CreateFactoryPullRequestRequest,
 ) (*pb.CreateFactoryPullRequestResponse, error) {
@@ -21,23 +22,13 @@ func CreateFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
-	}
-
-	orderID, err := parseOrderID(req.GetWorkOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
-	}
-
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
 
-	order, err := factory.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
@@ -65,7 +56,17 @@ func CreateFactoryPullRequest(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 
-	serialized, err := serializeFactoryPullRequests(db, []models.FactoryPullRequest{*pullRequest})
+	if pullRequest.Provider == models.FactoryPullRequestProviderGitHub {
+		ScheduleFactoryPullRequestMergeabilityRefresh(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			pullRequest.ID,
+		)
+	}
+
+	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}

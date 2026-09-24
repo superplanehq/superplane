@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -45,8 +46,11 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	organization.UpdatedAt = &now
 	err = tx.Save(organization).Error
 	if err != nil {
-		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, grpcerrors.InvalidArgument(err, "invalid organization update")
+		if isTakenOrganizationIdentityError(err) {
+			// Names are not required to be unique; only the slug still has a
+			// database-level uniqueness constraint, so any collision that
+			// reaches this point is a slug collision.
+			return nil, grpcerrors.InvalidArgument(err, "organization slug is already in use")
 		}
 
 		log.Errorf("Error updating organization %s: %v", orgID, err)
@@ -113,4 +117,13 @@ func applyOrganizationSlugUpdate(tx *gorm.DB, organization *models.Organization,
 
 	organization.Slug = requestedSlug
 	return nil
+}
+
+func isTakenOrganizationIdentityError(err error) bool {
+	if errors.Is(err, models.ErrSlugAlreadyUsed) {
+		return true
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "duplicate key")
 }

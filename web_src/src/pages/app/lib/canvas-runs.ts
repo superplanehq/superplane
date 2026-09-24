@@ -1,5 +1,5 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase/eventState";
 import { getNodeComponentName } from "../utils";
 
 export function resolveNodeIconSlug(

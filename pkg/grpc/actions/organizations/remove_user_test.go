@@ -68,4 +68,13 @@ func Test_RemoveUser(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
 	})
+
+	t.Run("cannot remove last owner", func(t *testing.T) {
+		_, err := RemoveUser(ctx, r.AuthService, orgID, r.User.String())
+		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "cannot remove the last organization owner", msg)
+	})
 }

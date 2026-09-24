@@ -19,8 +19,9 @@ type WorkflowStagedFile struct {
 	UpdatedAt      time.Time `gorm:"not null"`
 
 	//
-	// Deleted marks a staged file removal (row kept). Effective read returns empty
-	// content when true. DiscardWorkflowStaging hard-deletes rows to revert staging.
+	// Deleted marks a leftover staged file removal (row kept). Effective read
+	// returns empty content when true. DiscardWorkflowStaging hard-deletes rows
+	// to revert staging. New staging updates cannot mark paths deleted.
 	//
 	Deleted bool `gorm:"not null;default:false"`
 }
@@ -63,36 +64,6 @@ func UpsertStagedFile(
 	}
 
 	return FindStagedFileForUser(db, workflowID, userID, path)
-}
-
-func MarkStagedFilePathDeleted(
-	db *gorm.DB,
-	workflowID, userID, baseVersionID, organizationID uuid.UUID,
-	path string,
-) error {
-	row := WorkflowStagedFile{
-		WorkflowID:     workflowID,
-		UserID:         userID,
-		BaseVersionID:  baseVersionID,
-		OrganizationID: organizationID,
-		Path:           path,
-		Content:        "",
-		Deleted:        true,
-		UpdatedAt:      time.Now(),
-	}
-
-	return db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "workflow_id"},
-			{Name: "user_id"},
-			{Name: "path"},
-		},
-		DoUpdates: clause.Assignments(map[string]any{
-			"content":    "",
-			"deleted":    true,
-			"updated_at": time.Now(),
-		}),
-	}).Create(&row).Error
 }
 
 func ListStagedFilesForUser(db *gorm.DB, workflowID, userID uuid.UUID) ([]WorkflowStagedFile, error) {

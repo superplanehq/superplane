@@ -7,7 +7,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { CreateSilenceConfiguration, CreateSilenceOutput, SilenceMatcher } from "./types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 
 export const createSilenceMapper: ComponentBaseMapper = {

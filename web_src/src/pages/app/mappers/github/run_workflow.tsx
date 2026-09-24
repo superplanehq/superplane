@@ -16,10 +16,10 @@ import type {
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { buildGithubExecutionSubtitle } from "./utils";
 
@@ -115,7 +115,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       iconSrc: githubIcon,
-      iconColor: getColorClass(context.componentDefinition?.color!),
+      iconColor: getColorClass(context.componentDefinition?.color),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       eventSections: runWorkflowEventSections(context.nodes, context.lastExecutions[0]),
@@ -155,8 +155,8 @@ export const runWorkflowMapper: ComponentBaseMapper = {
 
 function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
+  const configuration = node.configuration as { ref?: string; workflowFile?: string } | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
     metadata.push({ icon: "book", label: nodeMetadata.repository.name });
@@ -175,7 +175,7 @@ function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
 
 function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { inputs?: unknown } | undefined;
 
   const inputs = Array.isArray(configuration?.inputs)
     ? configuration.inputs.filter((input: unknown): input is { name: string; value: string } => {
@@ -225,7 +225,7 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   //
   if (execution) {
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
     sections.push({
       showAutomaticTime: true,

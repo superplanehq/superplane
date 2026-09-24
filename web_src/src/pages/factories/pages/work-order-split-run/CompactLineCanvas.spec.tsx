@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 

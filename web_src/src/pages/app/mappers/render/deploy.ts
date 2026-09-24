@@ -10,10 +10,10 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import renderIcon from "@/assets/icons/integrations/render.svg";
@@ -55,31 +55,53 @@ export const DEPLOY_STATE_MAP: EventStateMap = {
   },
 };
 
+function isCancelledStatus(status?: string): boolean {
+  const normalized = status?.toLowerCase();
+  return normalized === "cancelled" || normalized === "canceled";
+}
+
+function stateFromFailedOutput(outputs: { failed?: OutputPayload[] } | undefined) {
+  if (!outputs?.failed?.length) {
+    return undefined;
+  }
+
+  const failedOutput = outputs.failed[0]?.data as DeployOutput | undefined;
+  if (isCancelledStatus(failedOutput?.status)) {
+    return "cancelled";
+  }
+
+  return "failed";
+}
+
+function stateFromSuccessOutput(outputs: { success?: OutputPayload[] } | undefined) {
+  if (!outputs?.success?.length) {
+    return undefined;
+  }
+
+  const successOutput = outputs.success[0]?.data as DeployOutput | undefined;
+  if (isCancelledStatus(successOutput?.status)) {
+    return "cancelled";
+  }
+
+  if (successOutput?.rollbackToDeployId) {
+    return "rollback";
+  }
+
+  return undefined;
+}
+
 export const deployStateFunction: StateFunction = (execution) => {
   if (!execution) return "neutral";
 
   const outputs = execution.outputs as { failed?: OutputPayload[]; success?: OutputPayload[] } | undefined;
-  if (outputs?.failed?.length) {
-    const failedOutput = outputs.failed[0]?.data as DeployOutput | undefined;
-    const failedStatus = failedOutput?.status?.toLowerCase();
-    if (failedStatus === "cancelled" || failedStatus === "canceled") {
-      return "cancelled";
-    }
-
-    return "failed";
+  const failedState = stateFromFailedOutput(outputs);
+  if (failedState) {
+    return failedState;
   }
 
-  if (outputs?.success?.length) {
-    const successOutput = outputs.success[0]?.data as DeployOutput | undefined;
-    const successStatus = successOutput?.status?.toLowerCase();
-
-    if (successStatus === "cancelled" || successStatus === "canceled") {
-      return "cancelled";
-    }
-
-    if (successOutput?.rollbackToDeployId) {
-      return "rollback";
-    }
+  const successState = stateFromSuccessOutput(outputs);
+  if (successState) {
+    return successState;
   }
 
   return defaultStateFunction(execution);

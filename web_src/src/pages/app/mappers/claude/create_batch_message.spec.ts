@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createBatchMessageMapper } from "./create_batch_message";
 import { eventStateRegistry } from "./index";

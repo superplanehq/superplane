@@ -18,7 +18,7 @@ func Test_ListGroups(t *testing.T) {
 	orgID := r.Organization.ID.String()
 
 	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group"))
-	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group"))
+	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-2", models.RoleOrgOperator, "Test Group 2", "Another test group"))
 
 	t.Run("successful list groups", func(t *testing.T) {
 		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, r.AuthService)
@@ -31,7 +31,7 @@ func Test_ListGroups(t *testing.T) {
 			assert.NotEmpty(t, group.Metadata.Name)
 			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, group.Metadata.DomainType)
 			assert.Equal(t, orgID, group.Metadata.DomainId)
-			assert.Contains(t, []string{"org_admin", "org_viewer"}, group.Spec.Role)
+			assert.Contains(t, []string{"org_admin", "org_operator"}, group.Spec.Role)
 			assert.GreaterOrEqual(t, group.Status.MembersCount, int32(0))
 			assert.NotEmpty(t, group.Metadata.CreatedAt)
 			assert.NotEmpty(t, group.Metadata.UpdatedAt)

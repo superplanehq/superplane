@@ -62,9 +62,9 @@ services:
       START_ORGANIZATION_CLEANUP_WORKER: "yes"
       START_FACTORY_CLEANUP_WORKER: "yes"
       START_FACTORY_VELOCITY_SYNC_WORKER: "yes"
+      START_PRICE_BOOK_SYNC_WORKER: "yes"
+      START_PLANNING_SESSION_CLEANUP_WORKER: "yes"
       START_EVENT_RETENTION_WORKER: "yes"
-      START_USAGE_SYNC_WORKER: "yes"
-      START_REPOSITORY_PROVISIONER: "yes"
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -88,15 +88,18 @@ services:
       # Browser / links. For tunnels: match your public UI URL if you load the app through it.
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
-      # Default reaches this app from the runner-repo task-broker container (`make dev` there).
+      # Default reaches this app from the local task-broker container on the Compose network.
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL in .env (no trailing slash).
-      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://host.docker.internal:8000}
-      # Task broker /v1 (Runner component). Defaults match runner `make dev` (host port 8091).
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://app:8000}
+      # Task broker /v1 (Runner component). Defaults use Compose service DNS.
       # Base URL has no trailing slash. Set TASK_BROKER_BASE_URL in .env for a remote broker.
       # Empty TASK_BROKER_FLEET_ID keeps node machine types. Unset FLEET_ID uses fleet
       # `local` only when BASE_URL is the local Docker host.
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://host.docker.internal:8091}
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://task-broker:8081}
+      # Empty default. A hardcoded localhost public URL would hide a remote
+      # TASK_BROKER_BASE_URL. Local Compose rewrites task-broker for the browser.
       TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
+      TASK_BROKER_HOST_PORT: ${TASK_BROKER_HOST_PORT:-8091}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
       # Bearer; must match broker AUTH_TOKEN (runner compose default: dev-local-token).
       TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-local-token}
@@ -110,6 +113,17 @@ services:
       SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET: ${SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET:-}
       SUPERPLANE_GITHUB_APP_CLIENT_ID: ${SUPERPLANE_GITHUB_APP_CLIENT_ID:-}
       SUPERPLANE_GITHUB_APP_CLIENT_SECRET: ${SUPERPLANE_GITHUB_APP_CLIENT_SECRET:-}
+      SUPERPLANE_SENTRY_APP_SLUG: ${SUPERPLANE_SENTRY_APP_SLUG:-}
+      SUPERPLANE_SENTRY_APP_CLIENT_ID: ${SUPERPLANE_SENTRY_APP_CLIENT_ID:-}
+      SUPERPLANE_SENTRY_APP_CLIENT_SECRET: ${SUPERPLANE_SENTRY_APP_CLIENT_SECRET:-}
+      SUPERPLANE_JIRA_OAUTH_CLIENT_ID: ${SUPERPLANE_JIRA_OAUTH_CLIENT_ID:-}
+      SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET: ${SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET:-}
+      SUPERPLANE_DEV_HOSTED_OPENROUTER: ${SUPERPLANE_DEV_HOSTED_OPENROUTER:-}
+      SUPERPLANE_DEV_OPENROUTER_API_KEY: ${SUPERPLANE_DEV_OPENROUTER_API_KEY:-}
+      SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY: ${SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY:-}
+      SUPERPLANE_DEV_OPENROUTER_MODELS: ${SUPERPLANE_DEV_OPENROUTER_MODELS:-}
+      SUPERPLANE_DEV_OPENROUTER_BASE_URL: ${SUPERPLANE_DEV_OPENROUTER_BASE_URL:-}
+      SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL: ${SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL:-}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
@@ -123,28 +137,20 @@ services:
       PPROF_ENABLED: ${PPROF_ENABLED:-yes}
       PPROF_PORT: ${PPROF_PORT:-6060}
       OWNER_SETUP_ENABLED: "yes"
-      USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
-      VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
       POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
+      POLAR_BUSINESS_PRODUCT_ID: ${POLAR_BUSINESS_PRODUCT_ID:-}
       POLAR_ENVIRONMENT: ${POLAR_ENVIRONMENT:-sandbox}
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
 
       #
-      # Git storage configuration.
-      # For development environment, we use supergit.
-      # The only required configuration for supergit is the base URL.
-      # See: https://github.com/superplanehq/supergit
+      # Platform blob storage. Development uses a local directory. Hosted
+      # SuperPlane uses GCS (BLOB_STORAGE_PROVIDER=gcs).
       #
-      GIT_STORAGE_PROVIDER: ${GIT_STORAGE_PROVIDER:-supergit}
-      GIT_STORAGE_SUPERGIT_BASE_URL: ${GIT_STORAGE_SUPERGIT_BASE_URL:-http://supergit:8080/api}
-
-      #
-      # These are required if codestorage is used as the git storage.
-      # See: https://code.storage
-      #
-      GIT_STORAGE_CODE_STORAGE_NAME: ${GIT_STORAGE_CODE_STORAGE_NAME:-}
-      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY:-}
-      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH:-}
+      BLOB_STORAGE_PROVIDER: ${BLOB_STORAGE_PROVIDER:-filesystem}
+      BLOB_STORAGE_LOCAL_PATH: ${BLOB_STORAGE_LOCAL_PATH:-/var/lib/superplane/blobs}
+      BLOB_STORAGE_BUCKET: ${BLOB_STORAGE_BUCKET:-}
+      BLOB_STORAGE_CREDENTIALS_FILE: ${BLOB_STORAGE_CREDENTIALS_FILE:-}
+      START_FILE_CLEANUP_WORKER: ${START_FILE_CLEANUP_WORKER:-yes}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -165,31 +171,12 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      supergit:
-        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
-
-  supergit:
-    image: ghcr.io/superplanehq/supergit:0.1.1
-    environment:
-      SUPERGIT_ROOT: /var/lib/supergit/repos
-      SUPERGIT_PORT: "8080"
-      SUPERGIT_DEFAULT_BRANCH: ${CANVAS_STORAGE_DEFAULT_BRANCH:-main}
-      SUPERGIT_MAX_FILE_BYTES: ${CANVAS_STORAGE_MAX_FILE_BYTES:-10485760}
-      SUPERGIT_MAX_COMMIT_BYTES: ${CANVAS_STORAGE_MAX_COMMIT_BYTES:-26214400}
-    ports:
-      - ${SUPERGIT_PORT:-8080}:8080
-    volumes:
-      - supergit-data:/var/lib/supergit/repos
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
+      - blob-data:/var/lib/superplane/blobs
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -242,12 +229,81 @@ services:
       timeout: 3s
       retries: 5
 
-volumes:
-  supergit-data:
-    driver: local
+  # Local runner stack. Profile local-runner keeps these off in CI.
+  # The broker uses database `broker` on the dev Postgres (`db`).
+  # `make dev.setup` creates that database and starts task-broker.
+  # `make dev.server` starts the workers.
+  task-broker:
+    profiles: [local-runner]
+    build:
+      context: ./runner
+      dockerfile: task-broker/Dockerfile
+    ports:
+      - "127.0.0.1:${TASK_BROKER_HOST_PORT:-8091}:8081"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgres://postgres:the-cake-is-a-lie@db:5432/broker?sslmode=disable
+      AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
+      LISTEN_ADDR: :8081
+      TASK_BROKER_LIVE_LOGS_CORS_ORIGINS: ${TASK_BROKER_LIVE_LOGS_CORS_ORIGINS:-http://localhost:8000,http://localhost:5173}
+    depends_on:
+      db:
+        condition: service_healthy
 
+  task-broker-init:
+    image: curlimages/curl:8.11.1
+    profiles: [local-runner]
+    depends_on:
+      - task-broker
+    restart: "no"
+    environment:
+      AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        i=0
+        while [ "$$i" -lt 60 ]; do
+          if curl -fsS http://task-broker:8081/healthz >/dev/null; then
+            break
+          fi
+          i=$$((i + 1))
+          sleep 1
+        done
+        curl -fsS http://task-broker:8081/healthz >/dev/null
+        for id in local e1-large-amd64 e1-large-arm64 e1-tiny-amd64 e1-tiny-arm64; do
+          curl -fsS -X POST http://task-broker:8081/v1/fleets \
+            -H "Authorization: Bearer $$AUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$$id\",\"provisioner\":\"local\",\"arch\":\"amd64\",\"size\":\"local\"}" >/dev/null
+        done
+
+  runner:
+    profiles: [local-runner]
+    build:
+      context: ./runner
+      dockerfile: runner/Dockerfile.local
+    environment:
+      TASK_BROKER_URL: http://task-broker:8081
+      RUNNER_FLEET_ID: local
+      RUNNER_TRANSPORT: http
+      RUNNER_SHELL_USE_PIPE: "1"
+      RUNNER_RESET_TASK_HOME: "1"
+      BROKER_AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      task-broker-init:
+        condition: service_completed_successfully
+    restart: on-failure
+
+volumes:
   go-pkg-cache:
     driver: local
 
   postgres-data:
+    driver: local
+
+  blob-data:
     driver: local

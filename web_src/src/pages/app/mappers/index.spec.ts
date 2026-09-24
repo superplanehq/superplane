@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
-import { getComponentBaseMapper, getExecutionDetails, getStateMap } from "./index";
+import { getComponentBaseMapper, getExecutionDetails, getStateMap, getTriggerRenderer } from "./index";
+import { defaultTriggerRenderer } from "./default";
 import { RUNNER_STATE_REGISTRY } from "./runner";
 
 function makeNode(name: string): ComponentsNode {
@@ -59,7 +60,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(getStateMap("runnerBash")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -91,7 +92,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(getStateMap("runnerJS")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -123,7 +124,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(getStateMap("runnerPython")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -159,7 +160,7 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
     expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
@@ -174,6 +175,10 @@ describe("getExecutionDetails", () => {
         isCollapsed: false,
         configuration: {
           machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
         },
         metadata: {},
       },
@@ -191,7 +196,96 @@ describe("getExecutionDetails", () => {
       canvasMode: "live",
     });
 
-    expect(props.customField).toBeDefined();
+    expect(props.headerAction).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
+  it("resolves runnerSuperPlane mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerSuperPlane");
+    const props = mapper.props({
+      node: {
+        id: "node-superplane-1",
+        name: "Run SuperPlane Agent",
+        componentName: "runnerSuperPlane",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerSuperPlane",
+        label: "Run SuperPlane Agent",
+        description: "Runs a SuperPlane-hosted coding agent on a fleet runner",
+        icon: "code",
+        color: "#1D4ED8",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.headerAction).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
+    expect(getStateMap("runnerSuperPlane")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
+  it("resolves runnerOpenRouter mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerOpenRouter");
+    const props = mapper.props({
+      node: {
+        id: "node-openrouter-1",
+        name: "Run OpenRouter Agent",
+        componentName: "runnerOpenRouter",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerOpenRouter",
+        label: "Run OpenRouter Agent",
+        description: "Runs an OpenRouter-backed coding agent on a fleet runner",
+        icon: "code",
+        color: "#6366F1",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.headerAction).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
+    expect(getStateMap("runnerOpenRouter")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+});
+
+describe("getTriggerRenderer", () => {
+  it("uses the default renderer when the trigger name is empty", () => {
+    const event = {
+      id: "event-1",
+      createdAt: new Date().toISOString(),
+      data: {},
+      nodeId: "missing-trigger",
+      type: "unknown",
+    };
+
+    expect(getTriggerRenderer("").getTitleAndSubtitle({ event })).toEqual(
+      defaultTriggerRenderer.getTitleAndSubtitle({ event }),
+    );
   });
 });

@@ -16,6 +16,7 @@ export type RightSideControlsProps = {
 
   onSidebarOpen?: () => void;
   onAddNote?: () => void | Promise<void>;
+  onOpenSpecYaml?: () => void;
   onConsoleAddPanel?: () => void;
   onConsoleOpenYaml?: () => void;
   consoleYamlReadOnly?: boolean;
@@ -42,6 +43,7 @@ function EditModeButtons({
   consoleEditControls,
   onSidebarOpen,
   onAddNote,
+  onOpenSpecYaml,
   onConsoleAddPanel,
   onConsoleOpenYaml,
   consoleYamlReadOnly,
@@ -87,6 +89,14 @@ function EditModeButtons({
           testId="add-note-button"
           icon={<FilePlus className="h-3.5 w-3.5" />}
         />
+        {onOpenSpecYaml ? (
+          <ControlButton
+            tooltip="View canvas and console YAML"
+            onClick={onOpenSpecYaml}
+            testId="canvas-spec-yaml-button"
+            icon={<FileCode className="h-3.5 w-3.5" />}
+          />
+        ) : null}
       </>
     );
   }

@@ -1,6 +1,8 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
+import type { ResyncStagedOptions } from "@/hooks/useCanvasStagingResync";
+
 import {
   runFactoryConfigureDiscard,
   runFactoryConfigureSave,
@@ -49,10 +51,7 @@ type UseFactoryConfigureSessionOptions = {
   ) => void;
   draftCanvasSpecsRef: MutableRefObject<Map<string, CanvasesCanvas["spec"] | null>>;
   setDraftCanvasSpec: Dispatch<SetStateAction<CanvasesCanvas["spec"] | null>>;
-  resyncStagedEditorState: (
-    versionId: string,
-    options?: { bumpResetNonce?: boolean; preferCachedStagedSpec?: boolean },
-  ) => Promise<void>;
+  resyncStagedEditorState: (versionId: string, options?: ResyncStagedOptions) => Promise<void>;
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
   commitStagingPending: boolean;
   resetStagingPending: boolean;

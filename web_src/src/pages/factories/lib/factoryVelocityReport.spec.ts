@@ -1,8 +1,10 @@
 import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
+  VELOCITY_PERIOD_OPTIONS,
   hasVelocityOutput,
+  isVelocityPeriodDays,
   toVelocityReport,
   velocityBreakdownSeries,
   type VelocityIntakeSeries,
@@ -165,6 +167,20 @@ describe("toVelocityReport", () => {
     expect(report.hasPeopleCohort).toBe(false);
     expect(report.repository).toBeUndefined();
   });
+
+  it("reports the total people count and whether more pages are available", () => {
+    const report = toVelocityReport({ ...RESPONSE, peopleTotal: 12, peopleHasMore: true });
+
+    expect(report.peopleTotal).toBe(12);
+    expect(report.peopleHasMore).toBe(true);
+  });
+
+  it("falls back the total to the page length when the API omits it", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.peopleTotal).toBe(RESPONSE.people?.length);
+    expect(report.peopleHasMore).toBe(false);
+  });
 });
 
 describe("hasVelocityOutput", () => {
@@ -182,6 +198,24 @@ describe("hasVelocityOutput", () => {
     const report = toVelocityReport({ totals: { waste: 2 } });
 
     expect(hasVelocityOutput(report)).toBe(true);
+  });
+});
+
+describe("VELOCITY_PERIOD_OPTIONS", () => {
+  it("offers 7d next to 14d and 30d", () => {
+    expect(VELOCITY_PERIOD_OPTIONS).toEqual([
+      { value: "7", label: "7d" },
+      { value: "14", label: "14d" },
+      { value: "30", label: "30d" },
+    ]);
+  });
+
+  it("accepts only the period values the selector shows", () => {
+    expect(isVelocityPeriodDays(7)).toBe(true);
+    expect(isVelocityPeriodDays(14)).toBe(true);
+    expect(isVelocityPeriodDays(30)).toBe(true);
+    expect(isVelocityPeriodDays(1)).toBe(false);
+    expect(isVelocityPeriodDays(90)).toBe(false);
   });
 });
 

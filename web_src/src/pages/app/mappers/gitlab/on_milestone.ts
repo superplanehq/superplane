@@ -4,7 +4,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { buildGitlabSubtitle } from "./utils";
 import type { GitLabNodeMetadata } from "./types";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 
 interface OnMilestoneConfiguration {
   actions: string[];

@@ -1,9 +1,12 @@
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { Loader2, Plus, SquarePen } from "lucide-react";
+import { FilePlus, Loader2, Plus, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -16,11 +19,11 @@ import {
 function CreateTriggerButton({
   canAdd,
   atCapacity,
-  onClick,
+  open = false,
 }: {
   canAdd: boolean;
   atCapacity: boolean;
-  onClick?: () => void;
+  open?: boolean;
 }) {
   return (
     <PermissionTooltip allowed={canAdd} message="You do not have permission to create tasks.">
@@ -30,8 +33,10 @@ function CreateTriggerButton({
         aria-label={BACKLOG_CREATE_COPY.createWorkOrder}
         title={atCapacity ? "The backlog is full." : BACKLOG_CREATE_COPY.createWorkOrder}
         data-testid="lines-backlog-create"
-        onClick={onClick}
-        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60",
+          open && "bg-accent text-foreground",
+        )}
       >
         <Plus className="size-3.5" aria-hidden />
       </button>
@@ -42,7 +47,10 @@ function CreateTriggerButton({
 function GhostCardOutline() {
   return (
     <svg
-      className="pointer-events-none absolute inset-0 size-full text-border transition-colors group-hover/create-ghost:text-foreground/40"
+      className={cn(
+        "pointer-events-none absolute inset-0 size-full text-border transition-colors group-hover/create-ghost:text-foreground/40",
+        "group-data-[open]/create-ghost:text-foreground/40",
+      )}
       aria-hidden
     >
       <rect
@@ -65,11 +73,11 @@ function GhostCardOutline() {
 function CreateGhostCard({
   canAdd,
   atCapacity,
-  onClick,
+  open = false,
 }: {
   canAdd: boolean;
   atCapacity: boolean;
-  onClick?: () => void;
+  open?: boolean;
 }) {
   return (
     <PermissionTooltip allowed={canAdd} message="You do not have permission to create tasks." className="w-full">
@@ -79,8 +87,11 @@ function CreateGhostCard({
         aria-label={BACKLOG_CREATE_COPY.createWorkOrder}
         title={atCapacity ? "The backlog is full." : BACKLOG_CREATE_COPY.createWorkOrder}
         data-testid="lines-backlog-create-ghost"
-        onClick={onClick}
-        className="group/create-ghost relative flex min-h-[4.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2.5 py-5 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+        data-open={open ? "true" : undefined}
+        className={cn(
+          "group/create-ghost relative flex min-h-[4.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2.5 py-5 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-60",
+          open && "bg-muted/70 text-foreground",
+        )}
       >
         <GhostCardOutline />
         <Plus className="size-4" aria-hidden />
@@ -107,18 +118,38 @@ function IntakeSourceIcon({ source }: { source: BacklogIntakeSource }) {
         alt=""
         data-testid={`lines-backlog-create-icon-${source.intakeId}`}
         className={cn(
-          "size-3.5 shrink-0 object-contain",
+          "size-4 shrink-0 object-contain",
           source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+          logoDarkInvertClass(source.iconSrc),
         )}
       />
     );
   }
 
   return (
-    <span className="flex size-3.5 shrink-0 items-center justify-center rounded-sm bg-muted text-[9px] font-medium">
+    <span className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted text-[10px] font-medium">
       {source.iconAlt.slice(0, 1)}
     </span>
   );
+}
+
+type CreateMenuSourcesProps = {
+  sources: BacklogIntakeSource[];
+  query: string;
+  focusedIntakeId: string | null;
+  items: BacklogIntakeItem[];
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  errorMessage?: string;
+  resultsRef: RefObject<HTMLDivElement | null>;
+  onQueryChange: (query: string) => void;
+  onFocusedIntakeChange: (intakeId: string | null) => void;
+  onImportItem: (item: BacklogIntakeItem) => void;
+  onScroll: (target: HTMLDivElement) => void;
+};
+
+function activeIntakeSource(sources: BacklogIntakeSource[], focusedIntakeId: string | null) {
+  return sources.find((source) => source.intakeId === focusedIntakeId) ?? sources[0];
 }
 
 function CreateMenuSources({
@@ -134,10 +165,88 @@ function CreateMenuSources({
   onFocusedIntakeChange,
   onImportItem,
   onScroll,
+}: CreateMenuSourcesProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const activeSource = activeIntakeSource(sources, focusedIntakeId);
+  const showTabs = sources.length > 1;
+
+  useEffect(() => {
+    if (!showTabs) {
+      return;
+    }
+    searchInputRef.current?.focus();
+  }, [focusedIntakeId, showTabs]);
+
+  if (!activeSource) {
+    return null;
+  }
+
+  const searchPanel = (
+    <IntakeSearchPanel
+      key={activeSource.intakeId}
+      source={activeSource}
+      query={query}
+      showIcon={!showTabs}
+      indentResults={!showTabs}
+      inputRef={searchInputRef}
+      items={items}
+      isLoading={isLoading}
+      isLoadingMore={isLoadingMore}
+      errorMessage={errorMessage}
+      resultsRef={resultsRef}
+      onQueryChange={onQueryChange}
+      onFocusedIntakeChange={onFocusedIntakeChange}
+      onImportItem={onImportItem}
+      onScroll={onScroll}
+    />
+  );
+
+  if (!showTabs) {
+    return searchPanel;
+  }
+
+  return (
+    <div>
+      <Tabs value={activeSource.intakeId} onValueChange={onFocusedIntakeChange} className="gap-0 px-2.5 pt-1.5">
+        <TabsList data-testid="lines-backlog-create-tabs">
+          {sources.map((source) => (
+            <TabsTrigger
+              key={source.intakeId}
+              value={source.intakeId}
+              data-testid={`lines-backlog-create-tab-${source.intakeId}`}
+            >
+              <IntakeSourceIcon source={source} />
+              {source.iconAlt}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {searchPanel}
+    </div>
+  );
+}
+
+function IntakeSearchPanel({
+  source,
+  query,
+  showIcon,
+  indentResults,
+  inputRef,
+  items,
+  isLoading,
+  isLoadingMore,
+  errorMessage,
+  resultsRef,
+  onQueryChange,
+  onFocusedIntakeChange,
+  onImportItem,
+  onScroll,
 }: {
-  sources: BacklogIntakeSource[];
+  source: BacklogIntakeSource;
   query: string;
-  focusedIntakeId: string | null;
+  showIcon: boolean;
+  indentResults: boolean;
+  inputRef: RefObject<HTMLInputElement | null>;
   items: BacklogIntakeItem[];
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -148,38 +257,35 @@ function CreateMenuSources({
   onImportItem: (item: BacklogIntakeItem) => void;
   onScroll: (target: HTMLDivElement) => void;
 }) {
-  return sources.map((source) => {
-    const focused = focusedIntakeId === source.intakeId;
-    const searchId = `lines-backlog-create-search-${source.intakeId}`;
-    return (
-      <div key={source.intakeId} data-testid={`lines-backlog-create-source-${source.intakeId}`}>
-        <label htmlFor={searchId} className="mt-0.5 flex items-center gap-2 px-2 py-1">
-          <IntakeSourceIcon source={source} />
-          <Input
-            id={searchId}
-            value={focused ? query : ""}
-            onChange={(event) => onQueryChange(event.target.value)}
-            onFocus={() => onFocusedIntakeChange(source.intakeId)}
-            placeholder={searchPlaceholderForIntake(source.name)}
-            data-testid={searchId}
-            className="h-7 px-2 text-[13px]"
-          />
-        </label>
-        {focused ? (
-          <IntakeSearchResults
-            intakeId={source.intakeId}
-            items={items}
-            isLoading={isLoading}
-            isLoadingMore={isLoadingMore}
-            errorMessage={errorMessage}
-            resultsRef={resultsRef}
-            onScroll={onScroll}
-            onImportItem={onImportItem}
-          />
-        ) : null}
-      </div>
-    );
-  });
+  const searchId = `lines-backlog-create-search-${source.intakeId}`;
+  return (
+    <div data-testid={`lines-backlog-create-source-${source.intakeId}`}>
+      <Label htmlFor={searchId} className="mt-1 gap-2.5 px-2.5 py-1.5 font-normal">
+        {showIcon ? <IntakeSourceIcon source={source} /> : null}
+        <Input
+          ref={inputRef}
+          id={searchId}
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          onFocus={() => onFocusedIntakeChange(source.intakeId)}
+          placeholder={searchPlaceholderForIntake(source.name)}
+          data-testid={searchId}
+          className="h-8 px-2.5 text-sm"
+        />
+      </Label>
+      <IntakeSearchResults
+        intakeId={source.intakeId}
+        items={items}
+        isLoading={isLoading}
+        isLoadingMore={isLoadingMore}
+        errorMessage={errorMessage}
+        resultsRef={resultsRef}
+        indent={indentResults}
+        onScroll={onScroll}
+        onImportItem={onImportItem}
+      />
+    </div>
+  );
 }
 
 function IntakeSearchResults({
@@ -189,6 +295,7 @@ function IntakeSearchResults({
   isLoadingMore,
   errorMessage,
   resultsRef,
+  indent = true,
   onScroll,
   onImportItem,
 }: {
@@ -198,6 +305,7 @@ function IntakeSearchResults({
   isLoadingMore: boolean;
   errorMessage?: string;
   resultsRef: RefObject<HTMLDivElement | null>;
+  indent?: boolean;
   onScroll: (target: HTMLDivElement) => void;
   onImportItem: (item: BacklogIntakeItem) => void;
 }) {
@@ -215,7 +323,7 @@ function IntakeSearchResults({
           <button
             key={item.id}
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-accent"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent"
             data-testid={`lines-backlog-create-item-${item.id}`}
             onClick={() => onImportItem(item)}
           >
@@ -233,12 +341,42 @@ function IntakeSearchResults({
   return (
     <div
       ref={resultsRef}
-      className="mt-0.5 mb-1 ml-7 flex max-h-36 flex-col overflow-y-auto"
+      className={cn("mt-0.5 mb-1 flex max-h-44 flex-col overflow-y-auto", indent && "ml-8")}
       data-testid={`lines-backlog-create-items-${intakeId}`}
       onScroll={(event) => onScroll(event.currentTarget)}
     >
       {body}
     </div>
+  );
+}
+
+function CreateMenuAction({
+  testId,
+  icon: Icon,
+  title,
+  hint,
+  onClick,
+}: {
+  testId: string;
+  icon: LucideIcon;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      className="flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left hover:bg-accent"
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="mt-0.5 block text-[13px] text-muted-foreground">{hint}</span>
+      </span>
+    </button>
   );
 }
 
@@ -297,11 +435,25 @@ export function BacklogCreatePopover({
     onQueryChange("");
   };
 
-  const Trigger = variant === "ghost" ? CreateGhostCard : CreateTriggerButton;
+  const openMenu = () => {
+    if (!canAdd) {
+      return;
+    }
+    setOpen(true);
+    const firstIntakeId = sources[0]?.intakeId;
+    if (firstIntakeId) {
+      onFocusedIntakeChange(firstIntakeId);
+    }
+  };
 
-  if (!isLoading && sources.length === 0) {
-    return <Trigger canAdd={canAdd} atCapacity={atCapacity} onClick={canAdd ? onCreateManually : undefined} />;
-  }
+  useEffect(() => {
+    if (!open || focusedIntakeId || !sources[0]) {
+      return;
+    }
+    onFocusedIntakeChange(sources[0].intakeId);
+  }, [open, focusedIntakeId, sources, onFocusedIntakeChange]);
+
+  const Trigger = variant === "ghost" ? CreateGhostCard : CreateTriggerButton;
 
   return (
     <Popover
@@ -310,37 +462,35 @@ export function BacklogCreatePopover({
         if (!canAdd) {
           return;
         }
-        setOpen(nextOpen);
-        if (!nextOpen) {
-          onFocusedIntakeChange(null);
-          onQueryChange("");
+        if (nextOpen) {
+          openMenu();
+          return;
         }
+        close();
       }}
     >
       <PopoverTrigger asChild>
         <span className={variant === "ghost" ? "flex w-full" : "inline-flex"}>
-          <Trigger canAdd={canAdd} atCapacity={atCapacity} />
+          <Trigger canAdd={canAdd} atCapacity={atCapacity} open={open} />
         </span>
       </PopoverTrigger>
       <PopoverContent
         side="right"
         align="start"
-        className="w-80 p-1.5"
+        className="w-96 p-2"
         sideOffset={6}
         data-testid="lines-backlog-create-menu"
       >
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-accent"
-          data-testid="lines-backlog-create-manually"
+        <CreateMenuAction
+          testId="lines-backlog-create-manually"
+          icon={FilePlus}
+          title={BACKLOG_CREATE_COPY.createManually}
+          hint={BACKLOG_CREATE_COPY.createManuallyHint}
           onClick={() => {
             close();
             onCreateManually();
           }}
-        >
-          <SquarePen className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          {BACKLOG_CREATE_COPY.createManually}
-        </button>
+        />
         <CreateMenuSources
           sources={sources}
           query={query}

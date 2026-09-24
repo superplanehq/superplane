@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { ActionsAction, CanvasesCanvas, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { FACTORY_NODE_CARD_WIDTH, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { ElkLayoutEngine } from "@/lib/layout";
@@ -22,11 +22,11 @@ type ElkLayoutEngineInternals = {
 };
 
 describe("ElkLayoutEngine", () => {
-  it("reserves room for Claude Code steps in vertical layouts", () => {
+  it("reserves room for SuperPlane agent steps in vertical layouts", () => {
     const autoLayout = new ElkLayoutEngine();
     const node: ComponentsNode = {
       id: "agent",
-      component: "runnerClaudeCode",
+      component: "runnerSuperPlane",
       configuration: {
         steps: [{ name: "Clone Repo" }, { name: "Write Implementation Plan" }, { name: "Use plan as output" }],
       },

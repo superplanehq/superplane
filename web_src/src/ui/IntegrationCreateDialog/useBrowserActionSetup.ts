@@ -48,9 +48,9 @@ export function useBrowserActionSetup({
     // where to continue so callers such as workspace setup regain control. The
     // legacy GitHub connect creates a new integration during the round trip, so
     // the marker is stored per organization, not per integration id.
-    rememberIntegrationSetupReturn(organizationId, returnTo);
+    rememberIntegrationSetupReturn(organizationId, returnTo, integrationId);
     followBrowserAction(browserAction);
-  }, [browserAction, organizationId, returnTo]);
+  }, [browserAction, organizationId, returnTo, integrationId]);
 
   // Used for a browser action with no URL (e.g. "fill in more config and save"): submits the
   // current configuration and advances to whatever browser action comes next, if any.

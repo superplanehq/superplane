@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { onEc2AlarmTriggerRenderer } from "./on_alarm";
 import { triggerRenderers } from "../index";
 import type { TriggerEventContext, TriggerRendererContext, NodeInfo } from "../../types";

@@ -19,6 +19,7 @@ func init() {
 type UpdatePullRequestActivity struct{}
 
 type UpdatePullRequestActivityConfiguration struct {
+	Title       string `json:"title" mapstructure:"title"`
 	Description string `json:"description" mapstructure:"description"`
 	Access      string `json:"access" mapstructure:"access"`
 }
@@ -38,7 +39,7 @@ func (c *UpdatePullRequestActivity) Description() string {
 func (c *UpdatePullRequestActivity) Documentation() string {
 	return `The Update Pull Request Activity component updates the activity that belongs to the current canvas run.
 
-Use ` + "`description`" + ` to replace the displayed activity text. Use ` + "`access`" + ` to keep the current access or request exclusive access. If exclusive access is not available, the component waits and retries.
+Use ` + "`title`" + ` and ` + "`description`" + ` to replace the displayed Markdown content. Use ` + "`access`" + ` to keep the current access or request exclusive access. If exclusive access is not available, the component waits and retries.
 
 The component emits ` + "`limitReached`" + ` when an exclusive request hits the attempt limit. That exclusive request also records a run error, so the canvas run fails. A description-only update after the limit emits ` + "`default`" + `. A newer pull request head does not stop this activity.
 
@@ -58,6 +59,7 @@ func (c *UpdatePullRequestActivity) ExampleOutput() map[string]any {
 		"timestamp": "2026-01-01T00:00:00Z",
 		"type":      updatePullRequestActivityEventType,
 		"data": map[string]any{
+			"title":        "Checks failed",
 			"description":  "Fixing failed checks on d1209da",
 			"attempt":      1,
 			"attemptLimit": 3,
@@ -77,9 +79,16 @@ func (c *UpdatePullRequestActivity) OutputChannels(configuration any) []core.Out
 func (c *UpdatePullRequestActivity) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "title",
+			Label:       "Title",
+			Description: "Replace the activity title with Markdown content.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+		},
+		{
 			Name:        "description",
 			Label:       "Description",
-			Description: "Replace the current activity description.",
+			Description: "Replace the activity details with Markdown content.",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 		},
@@ -148,6 +157,9 @@ func (c *UpdatePullRequestActivity) apply(
 	}
 
 	params := core.UpdatePullRequestActivityParams{Access: config.Access}
+	if config.Title != "" {
+		params.Title = &config.Title
+	}
 	if config.Description != "" {
 		params.Description = &config.Description
 	}

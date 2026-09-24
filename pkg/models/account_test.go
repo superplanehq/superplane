@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
+	"gorm.io/gorm"
 )
 
 func TestFindAccountByProvider(t *testing.T) {
@@ -32,7 +34,7 @@ func TestFindAccountByProvider(t *testing.T) {
 		err = database.Conn().Create(provider).Error
 		require.NoError(t, err)
 
-		foundAccount, err := FindAccountByProvider("github", "12345")
+		foundAccount, err := FindAccountByProvider(database.Conn(), "github", "12345")
 		require.NoError(t, err)
 		assert.Equal(t, account.ID, foundAccount.ID)
 		assert.Equal(t, account.Email, foundAccount.Email)
@@ -40,9 +42,38 @@ func TestFindAccountByProvider(t *testing.T) {
 	})
 
 	t.Run("should return error when provider not found", func(t *testing.T) {
-		account, err := FindAccountByProvider("nonexistent", "99999")
+		account, err := FindAccountByProvider(database.Conn(), "nonexistent", "99999")
 		assert.Error(t, err)
 		assert.Nil(t, account)
+	})
+
+	t.Run("should use the supplied transaction", func(t *testing.T) {
+		account, err := CreateAccount("Tx User", "tx-user@example.com")
+		require.NoError(t, err)
+
+		err = database.Conn().Transaction(func(tx *gorm.DB) error {
+			provider := &AccountProvider{
+				AccountID:  account.ID,
+				Provider:   "github",
+				ProviderID: "tx-github-id",
+				Username:   "txuser",
+				Email:      account.Email,
+				Name:       account.Name,
+			}
+			if err := tx.Create(provider).Error; err != nil {
+				return err
+			}
+
+			found, err := FindAccountByProvider(tx, "github", "tx-github-id")
+			require.NoError(t, err)
+			assert.Equal(t, account.ID, found.ID)
+
+			_, outsideErr := FindAccountByProvider(database.Conn(), "github", "tx-github-id")
+			assert.ErrorIs(t, outsideErr, gorm.ErrRecordNotFound)
+
+			return errors.New("rollback")
+		})
+		require.Error(t, err)
 	})
 
 	t.Run("should return error when account is deleted", func(t *testing.T) {
@@ -68,10 +99,11 @@ func TestFindAccountByProvider(t *testing.T) {
 		err = database.Conn().Delete(deletedAccount).Error
 		require.NoError(t, err)
 
-		account, err := FindAccountByProvider("google", "67890")
+		account, err := FindAccountByProvider(database.Conn(), "google", "67890")
 		assert.Error(t, err)
 		assert.Nil(t, account)
 	})
+
 }
 
 func TestAccount_UpdateEmail(t *testing.T) {

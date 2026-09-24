@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	ErrAccountDeleteLastUncreatedOwner    = errors.New("transfer ownership of organizations you did not create before you delete this account")
 	ErrAccountDeleteLastInstallationAdmin = errors.New("promote another installation admin before you delete this account")
 	ErrLastSignInMethod                   = errors.New("keep at least one sign-in method")
 	ErrSignInMethodNotConnected           = errors.New("this sign-in method is not connected")
@@ -108,16 +107,47 @@ func tombstoneEmail(accountID uuid.UUID, now time.Time) string {
 	return fmt.Sprintf("deleted-%s-%d@deleted.invalid", accountID, now.Unix())
 }
 
+func ListOrganizationsPendingAccountDeletion(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
+	var pending []Organization
+	err := organizationsTouchedByAccount(tx, accountID).
+		Where(`
+			NOT EXISTS (
+				SELECT 1 FROM users
+				WHERE users.organization_id = organizations.id
+				AND users.is_owner = ?
+				AND users.type = ?
+				AND users.deleted_at IS NULL
+				AND (users.account_id IS NULL OR users.account_id <> ?)
+			)
+		`, true, UserTypeHuman, accountID).
+		Order("name ASC, id ASC").
+		Find(&pending).Error
+	return pending, err
+}
+
 func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 	if a == nil {
 		return errors.New("account is required")
 	}
 
-	createdOrgs, err := ListOrganizationsCreatedByAccount(tx, a.ID)
+	candidates, err := listOrganizationsForAccountDeletion(tx, a.ID)
 	if err != nil {
 		return err
 	}
-	for _, organization := range createdOrgs {
+	for _, organization := range candidates {
+		if _, err := LockOrganization(tx, organization.ID); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return err
+		}
+		owners, err := ListOrganizationOwners(tx, organization.ID)
+		if err != nil {
+			return err
+		}
+		if organizationHasOtherHumanOwner(owners, a.ID) {
+			continue
+		}
 		if err := SoftDeleteOrganizationInTransaction(tx, organization.ID.String()); err != nil {
 			return err
 		}
@@ -157,4 +187,36 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 		"email":      tombstoneEmail(a.ID, now),
 		"deleted_at": now,
 	}).Error
+}
+
+func organizationsTouchedByAccount(tx *gorm.DB, accountID uuid.UUID) *gorm.DB {
+	return tx.Where(`
+		(
+			created_by_account_id = ?
+			OR id IN (
+				SELECT organization_id FROM users
+				WHERE account_id = ?
+				AND type = ?
+				AND deleted_at IS NULL
+			)
+		)
+	`, accountID, accountID, UserTypeHuman)
+}
+
+func listOrganizationsForAccountDeletion(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
+	var organizations []Organization
+	err := organizationsTouchedByAccount(tx, accountID).
+		Order("id").
+		Find(&organizations).Error
+	return organizations, err
+}
+
+func organizationHasOtherHumanOwner(owners []User, accountID uuid.UUID) bool {
+	for i := range owners {
+		if owners[i].AccountID != nil && *owners[i].AccountID == accountID {
+			continue
+		}
+		return true
+	}
+	return false
 }

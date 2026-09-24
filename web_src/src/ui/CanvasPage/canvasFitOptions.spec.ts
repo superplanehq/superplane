@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   CANVAS_FIT_VIEW_INCLUDE_HIDDEN,
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,

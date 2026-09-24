@@ -142,6 +142,7 @@ function buildNormalizedComponentBaseProps(
     selected: asBoolean(record.selected),
     metadata: sanitizeArray(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
+    headerAction: sanitizeReactNodeValue(record.headerAction as React.ReactNode),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
     customFieldVisibility: record.customFieldVisibility === "live-only" ? "live-only" : "always",
     eventStateMap: isRecord(record.eventStateMap)

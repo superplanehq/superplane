@@ -1,7 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -59,13 +59,10 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
     details["From"] = result.start ? new Date(result.start).toLocaleString() : "-";
     details["To"] = result.end ? new Date(result.end).toLocaleString() : "-";
 
-    details["Avg. CPU Usage"] = result.avgCpuUsagePercent !== undefined ? `${result.avgCpuUsagePercent}%` : "-";
-    details["Avg. Memory Usage"] =
-      result.avgMemoryUsagePercent !== undefined ? `${result.avgMemoryUsagePercent}%` : "-";
-    details["Avg. Outbound Bandwidth"] =
-      result.avgPublicOutboundBandwidthMbps !== undefined ? `${result.avgPublicOutboundBandwidthMbps} Mbps` : "-";
-    details["Avg. Inbound Bandwidth"] =
-      result.avgPublicInboundBandwidthMbps !== undefined ? `${result.avgPublicInboundBandwidthMbps} Mbps` : "-";
+    details["Avg. CPU Usage"] = formatMetric(result.avgCpuUsagePercent, "%");
+    details["Avg. Memory Usage"] = formatMetric(result.avgMemoryUsagePercent, "%");
+    details["Avg. Outbound Bandwidth"] = formatMetric(result.avgPublicOutboundBandwidthMbps, " Mbps");
+    details["Avg. Inbound Bandwidth"] = formatMetric(result.avgPublicInboundBandwidthMbps, " Mbps");
 
     return details;
   },
@@ -75,6 +72,10 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function formatMetric(value: number | undefined, suffix: string): string {
+  return value !== undefined ? `${value}${suffix}` : "-";
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

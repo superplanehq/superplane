@@ -58,27 +58,53 @@ export interface ToggleAdminExperimentalFeatureVariables {
   enabled: boolean;
 }
 
+export interface ToggleAdminExperimentalFeaturesVariables {
+  featureIds: string[];
+  enabled: boolean;
+}
+
 interface ToggleMutationContext {
   previous?: ExperimentalFeaturesRegistry;
 }
 
-export const useToggleAdminExperimentalFeature = (orgId: string) => {
+function setEnabledFeatureIds(
+  previous: ExperimentalFeaturesRegistry,
+  featureIds: string[],
+  enabled: boolean,
+): ExperimentalFeaturesRegistry {
+  const next = new Set(previous.enabled);
+  for (const featureId of featureIds) {
+    if (enabled) next.add(featureId);
+    else next.delete(featureId);
+  }
+  return { ...previous, enabled: Array.from(next) };
+}
+
+async function toggleAdminExperimentalFeatures(orgId: string, featureIds: string[], enabled: boolean): Promise<void> {
+  for (const featureId of featureIds) {
+    await toggleAdminExperimentalFeature(orgId, featureId, enabled);
+  }
+}
+
+function useAdminExperimentalFeatureMutation<TVariables>(
+  orgId: string,
+  mutationFn: (variables: TVariables) => Promise<void>,
+  featureIdsFrom: (variables: TVariables) => { featureIds: string[]; enabled: boolean },
+) {
   const queryClient = useQueryClient();
   const queryKey = adminExperimentalFeaturesKeys.registry(orgId);
 
-  return useMutation<void, Error, ToggleAdminExperimentalFeatureVariables, ToggleMutationContext>({
-    mutationFn: ({ featureId, enabled }) => toggleAdminExperimentalFeature(orgId, featureId, enabled),
-    onMutate: async ({ featureId, enabled }) => {
+  return useMutation<void, Error, TVariables, ToggleMutationContext>({
+    mutationFn,
+    onMutate: async (variables) => {
+      const { featureIds, enabled } = featureIdsFrom(variables);
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<ExperimentalFeaturesRegistry>(queryKey);
       if (previous) {
-        const next = new Set(previous.enabled);
-        if (enabled) next.add(featureId);
-        else next.delete(featureId);
-        queryClient.setQueryData<ExperimentalFeaturesRegistry>(queryKey, {
-          ...previous,
-          enabled: Array.from(next),
-        });
+        queryClient.setQueryData<ExperimentalFeaturesRegistry>(
+          queryKey,
+          setEnabledFeatureIds(previous, featureIds, enabled),
+        );
       }
       return { previous };
     },
@@ -94,4 +120,22 @@ export const useToggleAdminExperimentalFeature = (orgId: string) => {
       queryClient.invalidateQueries({ queryKey });
     },
   });
+}
+
+export const useToggleAdminExperimentalFeature = (orgId: string) => {
+  return useAdminExperimentalFeatureMutation(
+    orgId,
+    ({ featureId, enabled }: ToggleAdminExperimentalFeatureVariables) =>
+      toggleAdminExperimentalFeature(orgId, featureId, enabled),
+    ({ featureId, enabled }) => ({ featureIds: [featureId], enabled }),
+  );
+};
+
+export const useToggleAdminExperimentalFeatures = (orgId: string) => {
+  return useAdminExperimentalFeatureMutation(
+    orgId,
+    ({ featureIds, enabled }: ToggleAdminExperimentalFeaturesVariables) =>
+      toggleAdminExperimentalFeatures(orgId, featureIds, enabled),
+    ({ featureIds, enabled }) => ({ featureIds, enabled }),
+  );
 };

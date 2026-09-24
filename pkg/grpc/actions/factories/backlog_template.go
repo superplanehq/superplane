@@ -15,15 +15,18 @@ import (
 
 const (
 	backlogDefaultName        = "Backlog"
-	backlogDefaultDescription = "Score new work orders for how well an agent can complete them."
+	backlogDefaultDescription = "Plan new draft tasks."
+	backlogTemplateVersion    = 3
 	backlogTriggerNodeID      = "trigger"
-	backlogTriggerName        = "On Work Order"
-	backlogAnalysisSubject    = "work order"
+	backlogTriggerName        = "On Task"
+
+	backlogRefinementFilterNodeID = "task-refinement-enabled"
+	backlogRefinementNodeID       = "refine-task"
 )
 
 // ensureBacklogCanvas creates the factory Backlog automation when the factory
 // has no On Work Order trigger yet. A second intake must not add a second
-// scorer.
+// planner.
 func ensureBacklogCanvas(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -97,8 +100,9 @@ func createBacklogCanvas(
 	}
 
 	canvasDoc := buildBacklogCanvas(backlogCanvasRequest{
-		Name:  name,
-		Agent: resolveIntakeAgent(db, factoryModel),
+		Name:       name,
+		Agent:      resolveIntakeAgent(db, factoryModel),
+		GitHubName: resolveGitHubInstallationName(db, factoryModel),
 	})
 
 	nodes, edges, err := canvasDoc.Parse(deps.Registry, factoryModel.OrganizationID.String())
@@ -106,12 +110,11 @@ func createBacklogCanvas(
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build Backlog automation")
 	}
 
-	response, err := canvases.CreateCanvasWithSeedFiles(
+	response, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
-		deps.GitProvider,
 		deps.WebhookBaseURL,
 		factoryModel.OrganizationID,
 		canvasDoc.Metadata.Name,
@@ -119,8 +122,6 @@ func createBacklogCanvas(
 		&factoryModel.ID,
 		nodes,
 		edges,
-		deps.UsageService,
-		nil,
 	)
 	if err != nil {
 		return uuid.Nil, err
@@ -130,13 +131,28 @@ func createBacklogCanvas(
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create Backlog automation")
 	}
+	if err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		canvasModel, err := models.FindCanvasInTransaction(tx, factoryModel.OrganizationID, canvasID)
+		if err != nil {
+			return err
+		}
+		return canvasModel.StampFactoryAppTemplate(
+			tx,
+			backlogTriggerNodeID,
+			models.FactoryAppTemplateBacklogID,
+			backlogTemplateVersion,
+		)
+	}); err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to mark Backlog automation version")
+	}
 
 	return canvasID, nil
 }
 
 type backlogCanvasRequest struct {
-	Name  string
-	Agent *intakeAgent
+	Name       string
+	Agent      *intakeAgent
+	GitHubName string
 }
 
 func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
@@ -144,8 +160,6 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 	if name == "" {
 		name = backlogDefaultName
 	}
-
-	spec := intakeSpec{analysisSubject: backlogAnalysisSubject}
 
 	return &yaml.Canvas{
 		APIVersion: yaml.APIVersion,
@@ -156,8 +170,9 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 		},
 		Spec: &yaml.CanvasSpec{
 			Edges: []yaml.Edge{
-				{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: intakeAnalysisNodeID},
-				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+				{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: backlogRefinementFilterNodeID},
+				{Channel: "true", SourceID: backlogRefinementFilterNodeID, TargetID: backlogRefinementNodeID},
+				{Channel: "failed", SourceID: backlogRefinementNodeID, TargetID: intakeAddRunErrorNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -165,25 +180,38 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:      backlogTriggerName,
 					Type:      yaml.NodeTypeTrigger,
 					Component: factory.OnWorkOrderTriggerName,
+					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion),
 					Position:  yaml.Position{X: 160, Y: 80},
 				},
 				{
-					ID:            intakeAnalysisNodeID,
-					Name:          intakeAnalysisNodeName,
-					Type:          yaml.NodeTypeAction,
-					Component:     request.Agent.component(),
-					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
-					Concurrency:   intakeConcurrency(),
-					Position:      yaml.Position{X: 160, Y: 260},
+					ID:        backlogRefinementFilterNodeID,
+					Name:      "Refine task?",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeFilterComponent,
+					Configuration: map[string]any{
+						"expression": "{{ root().data.taskRefinementEnabled == true }}",
+					},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 260},
 				},
 				{
-					ID:            intakeReportConfidenceNodeID,
-					Name:          "Report Confidence",
+					ID:            backlogRefinementNodeID,
+					Name:          "Refine Task",
 					Type:          yaml.NodeTypeAction,
-					Component:     intakeReportConfidenceComponent,
-					Configuration: intakeConfidenceReportConfiguration(backlogAnalysisSubject),
+					Component:     request.Agent.component(),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.GitHubName),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
+				},
+				{
+					ID:        intakeAddRunErrorNodeID,
+					Name:      intakeAddRunErrorNodeName,
+					Type:      yaml.NodeTypeAction,
+					Component: intakeAddRunErrorComponent,
+					Configuration: map[string]any{
+						"message": intakeAddRunErrorMessage,
+					},
+					Position: yaml.Position{X: 160, Y: 620},
 				},
 			},
 		},

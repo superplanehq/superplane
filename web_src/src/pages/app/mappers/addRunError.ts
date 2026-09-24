@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getTriggerRenderer, getStateMap } from ".";
+import { getTriggerRenderer, getStateMap } from "./mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
 
@@ -49,7 +49,8 @@ export const addRunErrorMapper: ComponentBaseMapper = {
       details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const message = payload?.data?.message;
+    const data = payload?.data as { message?: unknown } | undefined;
+    const message = data?.message;
     if (typeof message === "string" && message !== "") {
       details["Error Message"] = message;
     }

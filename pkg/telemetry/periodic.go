@@ -157,8 +157,10 @@ func countPendingEvents() (int64, error) {
 	err := database.Conn().
 		Table("workflow_events AS we").
 		Joins("JOIN workflows AS w ON we.workflow_id = w.id").
+		Joins("JOIN organizations AS o ON w.organization_id = o.id").
 		Where("we.state = ?", "pending").
 		Where("w.deleted_at IS NULL").
+		Where("o.deleted_at IS NULL").
 		Count(&count).
 		Error
 	if err != nil {
@@ -174,8 +176,10 @@ func countPendingExecutions() (int64, error) {
 	err := database.Conn().
 		Table("workflow_node_executions AS wne").
 		Joins("JOIN workflows AS w ON wne.workflow_id = w.id").
+		Joins("JOIN organizations AS o ON w.organization_id = o.id").
 		Where("wne.state = ?", "pending").
 		Where("w.deleted_at IS NULL").
+		Where("o.deleted_at IS NULL").
 		Count(&count).
 		Error
 	if err != nil {

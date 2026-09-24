@@ -1,28 +1,49 @@
 package contexts
 
 import (
+	"context"
+	"strings"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
 // EmitWorkOrderCreated fans a new work order out to every On Work Order
-// trigger in the factory. Failures are logged: the work order already exists,
-// and a missed score can be retried by creating the item again.
+// trigger in the factory. When Planning is off, the Backlog canvas is
+// skipped so no planning or analysis run starts. Failures are logged:
+// the work order already exists, and a missed score can be retried by
+// creating the item again.
 func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
 	if factoryModel == nil || order == nil {
 		return
 	}
 
-	if err := emitWorkOrderCreated(tx, factoryModel, order); err != nil {
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil); err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
 	}
 }
 
-func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) error {
+func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) error {
+	if factoryModel == nil || order == nil || canvasID == uuid.Nil {
+		return nil
+	}
+	refinementEnabled := true
+	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled)
+}
+
+func emitWorkOrderCreated(
+	tx *gorm.DB,
+	factoryModel *models.Factory,
+	order *models.FactoryWorkOrder,
+	onlyCanvas uuid.UUID,
+	refinementEnabledOverride *bool,
+) error {
 	canvases, err := factoryModel.ListCanvases(tx)
 	if err != nil {
 		return err
@@ -46,12 +67,22 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return err
 	}
 
-	payload := workOrderCreatedPayload(order)
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	payload := workOrderCreatedPayloadWithRefinement(tx, order, &refinementEnabled)
 	emitted := []models.CanvasEvent{}
 
 	for i := range live {
+		if onlyCanvas != uuid.Nil && live[i].ID != onlyCanvas {
+			continue
+		}
 		spec, ok := specs[live[i].ID]
 		if !ok {
+			continue
+		}
+		if !refinementEnabled && models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
 			continue
 		}
 		nodeID := onWorkOrderNodeID(spec)
@@ -81,13 +112,47 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 	return nil
 }
 
-func workOrderCreatedPayload(order *models.FactoryWorkOrder) map[string]any {
+func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
+	return workOrderCreatedPayloadWithRefinement(tx, order, nil)
+}
+
+func workOrderCreatedPayloadWithRefinement(
+	tx *gorm.DB,
+	order *models.FactoryWorkOrder,
+	refinementEnabledOverride *bool,
+) map[string]any {
+	description := order.Description
+	filePayloads := []any{}
+	_, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
+	} else {
+		for _, file := range files {
+			filePayloads = append(filePayloads, file.Map())
+		}
+	}
+
 	workOrder := map[string]any{
 		"id":          order.ID.String(),
 		"title":       order.Title,
-		"description": order.Description,
+		"description": description,
 		"number":      order.Number,
 		"state":       order.State,
+		"files":       filePayloads,
+	}
+	if repository, repositoryURL, defaultBranch := workOrderCreatedRepository(tx, order); repository != "" {
+		workOrder["repository"] = repository
+		workOrder["repository_url"] = repositoryURL
+		workOrder["default_branch"] = defaultBranch
 	}
 	if order.OriginURL != nil && *order.OriginURL != "" {
 		origin := map[string]any{"url": *order.OriginURL}
@@ -97,7 +162,47 @@ func workOrderCreatedPayload(order *models.FactoryWorkOrder) map[string]any {
 		workOrder["origin"] = origin
 	}
 
-	return map[string]any{"workOrder": workOrder}
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	return map[string]any{
+		"workOrder": workOrder,
+		models.WorkOrderCreatedRefinementEnabledDataKey: refinementEnabled,
+	}
+}
+
+func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) bool {
+	factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to snapshot Planning settings for work order %s", order.ID)
+		return false
+	}
+	return factoryModel.PlanningEnabled
+}
+
+func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
+	repository := strings.TrimSpace(stringValue(order.Repository))
+	defaultBranch := strings.TrimSpace(stringValue(order.DefaultBranch))
+	if repository == "" || defaultBranch == "" {
+		factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
+		if err == nil {
+			config := factoryModel.OnboardingConfigValue()
+			if repository == "" {
+				repository = strings.TrimSpace(config.AppRepository)
+			}
+			if defaultBranch == "" {
+				defaultBranch = strings.TrimSpace(config.DefaultBranch)
+			}
+		}
+	}
+	if repository == "" {
+		return "", "", ""
+	}
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	return repository, githubRepositoryURL(repository), defaultBranch
 }
 
 func onWorkOrderNodeID(spec models.LiveCanvasSpec) string {

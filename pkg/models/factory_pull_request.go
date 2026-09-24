@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -78,23 +80,28 @@ var (
 )
 
 type FactoryPullRequest struct {
-	ID                  uuid.UUID
-	OrganizationID      uuid.UUID
-	FactoryID           uuid.UUID
-	WorkOrderID         uuid.UUID
-	Provider            string
-	ExternalID          *string
-	Repository          string
-	Number              int64
-	URL                 string
-	Title               string
-	State               string
-	MergedAt            *time.Time
-	ClosedAt            *time.Time
-	CurrentRevisionID   *uuid.UUID
-	ActiveMutationRunID *uuid.UUID
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                      uuid.UUID
+	OrganizationID          uuid.UUID
+	FactoryID               uuid.UUID
+	WorkOrderID             uuid.UUID
+	Provider                string
+	ExternalID              *string
+	Repository              string
+	Number                  int64
+	URL                     string
+	Title                   string
+	State                   string
+	MergedAt                *time.Time
+	ClosedAt                *time.Time
+	CurrentRevisionID       *uuid.UUID
+	ActiveMutationRunID     *uuid.UUID
+	Mergeable               bool
+	MergeBlockedReason      string
+	MergeBlockedMessage     string
+	MergeableHeadSHA        string
+	MergeableAllowedMethods string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 type FactoryPullRequestRun struct {
@@ -104,6 +111,7 @@ type FactoryPullRequestRun struct {
 	RevisionID        *uuid.UUID
 	Access            string
 	State             string
+	Title             string
 	Description       string
 	Attempt           *int
 	AttemptLimit      *int
@@ -115,6 +123,7 @@ type FactoryPullRequestRun struct {
 
 type FactoryPullRequestLinkedRun struct {
 	Run          CanvasRun
+	Title        string
 	Description  string
 	Access       string
 	State        string
@@ -320,6 +329,139 @@ func (p *FactoryPullRequest) Update(tx *gorm.DB, patch FactoryPullRequestPatch) 
 	})
 }
 
+type FactoryPullRequestMergeabilitySnapshot struct {
+	Mergeable      bool
+	BlockedReason  string
+	BlockedMessage string
+	HeadSHA        string
+	AllowedMethods string
+}
+
+func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {
+	now := time.Now()
+	headSHA := strings.TrimSpace(snapshot.HeadSHA)
+	allowedMethods := strings.TrimSpace(snapshot.AllowedMethods)
+	knownHead := strings.TrimSpace(p.MergeableHeadSHA)
+	result := tx.Model(p).
+		Where("mergeable_head_sha IN ?", []string{"", knownHead, headSHA}).
+		Updates(map[string]any{
+			"mergeable":                 snapshot.Mergeable,
+			"merge_blocked_reason":      snapshot.BlockedReason,
+			"merge_blocked_message":     snapshot.BlockedMessage,
+			"mergeable_head_sha":        headSHA,
+			"mergeable_allowed_methods": allowedMethods,
+			"updated_at":                now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil
+	}
+	p.Mergeable = snapshot.Mergeable
+	p.MergeBlockedReason = snapshot.BlockedReason
+	p.MergeBlockedMessage = snapshot.BlockedMessage
+	p.MergeableHeadSHA = headSHA
+	p.MergeableAllowedMethods = allowedMethods
+	p.UpdatedAt = now
+	return nil
+}
+
+func (p *FactoryPullRequest) HasCachedMergeability() bool {
+	return p.Mergeable || strings.TrimSpace(p.MergeBlockedReason) != "" || strings.TrimSpace(p.MergeableHeadSHA) != ""
+}
+
+func (p *FactoryPullRequest) CachedAllowedMethods() []string {
+	return splitFactoryMergeMethods(p.MergeableAllowedMethods)
+}
+
+func splitFactoryMergeMethods(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.ToUpper(strings.TrimSpace(part))
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
+func ListOpenGitHubFactoryPullRequestsForWebhook(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	repository string,
+	numbers []int64,
+	sha string,
+) ([]FactoryPullRequest, error) {
+	repository = strings.TrimSpace(repository)
+	sha = strings.TrimSpace(sha)
+	if organizationID == uuid.Nil || repository == "" {
+		return nil, nil
+	}
+
+	if len(numbers) == 0 && sha == "" {
+		return nil, nil
+	}
+
+	query := tx.Model(&FactoryPullRequest{}).
+		Where("organization_id = ?", organizationID).
+		Where("provider = ?", FactoryPullRequestProviderGitHub).
+		Where("state IN ?", []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
+		Where("repository = ?", repository)
+
+	revisionIDs := tx.Model(&FactoryPullRequestRevision{}).Select("id").Where("sha = ?", sha)
+	switch {
+	case len(numbers) > 0 && sha != "":
+		query = query.Where(
+			"(number IN ? OR current_revision_id IN (?) OR mergeable_head_sha = ?)",
+			numbers,
+			revisionIDs,
+			sha,
+		)
+	case len(numbers) > 0:
+		query = query.Where("number IN ?", numbers)
+	default:
+		query = query.Where("(current_revision_id IN (?) OR mergeable_head_sha = ?)", revisionIDs, sha)
+	}
+
+	var pullRequests []FactoryPullRequest
+	err := query.Find(&pullRequests).Error
+	if err != nil {
+		return nil, err
+	}
+	return pullRequests, nil
+}
+
+func ListGitHubFactoryPullRequestsForWebhook(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	repository string,
+	numbers []int64,
+) ([]FactoryPullRequest, error) {
+	repository = strings.TrimSpace(repository)
+	if organizationID == uuid.Nil || repository == "" || len(numbers) == 0 {
+		return nil, nil
+	}
+
+	var pullRequests []FactoryPullRequest
+	err := tx.Model(&FactoryPullRequest{}).
+		Where("organization_id = ?", organizationID).
+		Where("provider = ?", FactoryPullRequestProviderGitHub).
+		Where("repository = ?", repository).
+		Where("number IN ?", numbers).
+		Find(&pullRequests).Error
+	if err != nil {
+		return nil, err
+	}
+	return pullRequests, nil
+}
+
 func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) (*FactoryPullRequest, error) {
 	query := tx.Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID)
 
@@ -430,17 +572,6 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		runIDs = append(runIDs, link.RunID)
 	}
 
-	var runs []CanvasRun
-	err = tx.Where("id IN ?", runIDs).Find(&runs).Error
-	if err != nil {
-		return nil, err
-	}
-
-	runByID := make(map[uuid.UUID]CanvasRun, len(runs))
-	for _, run := range runs {
-		runByID[run.ID] = run
-	}
-
 	revisionIDs := make([]uuid.UUID, 0)
 	seenRevisions := map[uuid.UUID]bool{}
 	for _, link := range links {
@@ -450,15 +581,42 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		seenRevisions[*link.RevisionID] = true
 		revisionIDs = append(revisionIDs, *link.RevisionID)
 	}
+
+	ctx := tx.Statement.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	g, gctx := errgroup.WithContext(ctx)
+
+	var runs []CanvasRun
+	g.Go(func() error {
+		if len(runIDs) == 0 {
+			return nil
+		}
+		return tx.WithContext(gctx).Where("id IN ?", runIDs).Find(&runs).Error
+	})
+
 	revisionByID := map[uuid.UUID]FactoryPullRequestRevision{}
-	if len(revisionIDs) > 0 {
+	g.Go(func() error {
+		if len(revisionIDs) == 0 {
+			return nil
+		}
 		var revisions []FactoryPullRequestRevision
-		if err := tx.Where("id IN ?", revisionIDs).Find(&revisions).Error; err != nil {
-			return nil, err
+		if err := tx.WithContext(gctx).Where("id IN ?", revisionIDs).Find(&revisions).Error; err != nil {
+			return err
 		}
 		for _, revision := range revisions {
 			revisionByID[revision.ID] = revision
 		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	runByID := make(map[uuid.UUID]CanvasRun, len(runs))
+	for _, run := range runs {
+		runByID[run.ID] = run
 	}
 
 	seenRunByPullRequest := map[uuid.UUID]map[uuid.UUID]bool{}
@@ -478,6 +636,7 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		seen[link.RunID] = true
 		linked := FactoryPullRequestLinkedRun{
 			Run:          run,
+			Title:        link.Title,
 			Description:  link.Description,
 			Access:       link.Access,
 			State:        link.State,

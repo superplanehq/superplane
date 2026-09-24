@@ -2,7 +2,7 @@ import type { MeNotificationSettings } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
@@ -72,6 +72,12 @@ describe("FactorySettingsAccountNotificationsPage", () => {
 
     expect(screen.getByTestId("account-redesign-notifications")).toBeInTheDocument();
     expect(screen.queryByText("Failed to load notification settings.")).not.toBeInTheDocument();
+    expect(screen.getByText("Status changes on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Review requests on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Agent questions on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Ready plans on your tasks")).toBeInTheDocument();
+    expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mentions in task comments")).not.toBeInTheDocument();
   });
 
   it("shows an error when the first load has no settings", () => {

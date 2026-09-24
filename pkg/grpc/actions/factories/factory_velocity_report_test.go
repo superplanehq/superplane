@@ -96,6 +96,28 @@ func TestCollectVelocityOrders_ReportsEarliestMerge(t *testing.T) {
 	assert.Equal(t, localMidnight(first), orders[orderID].day)
 }
 
+func TestCollectVelocityOrders_CopiesAssigneeIDs(t *testing.T) {
+	window := testWindow(t)
+	orderID := uuid.New()
+	opener := uuid.New()
+	first, second := uuid.New(), uuid.New()
+	mergedAt := window.start.Add(24 * time.Hour)
+
+	orders := collectVelocityOrders([]models.FactoryVelocityPullRequest{
+		{
+			WorkOrderID: orderID,
+			CreatedByID: &opener,
+			AssigneeIDs: []uuid.UUID{first, second},
+			MergedAt:    &mergedAt,
+		},
+	}, window)
+
+	require.Len(t, orders, 1)
+	assert.Equal(t, []uuid.UUID{first, second}, orders[orderID].assigneeIDs)
+	require.NotNil(t, orders[orderID].createdByID)
+	assert.Equal(t, opener, *orders[orderID].createdByID)
+}
+
 func TestCollectVelocityOrders_SkipsWorkOutsideWindow(t *testing.T) {
 	window := testWindow(t)
 	before := window.start.Add(-time.Hour)
@@ -114,12 +136,39 @@ func TestApplyVelocityOrderUsage(t *testing.T) {
 	orderID := uuid.New()
 	orders := map[uuid.UUID]*velocityOrder{orderID: {id: orderID}}
 
-	applyVelocityOrderUsage(orders, map[uuid.UUID]models.UsageTotals{
-		orderID: {TotalTokens: 4200, CostMicros: 2_500_000},
+	applyVelocityOrderUsage(orders, map[uuid.UUID]models.UsageSplit{
+		orderID: {
+			Model:   models.UsageTotals{TotalTokens: 4200, CostMicros: 2_500_000},
+			Compute: models.UsageTotals{DurationSeconds: 900, CostMicros: 500_000},
+		},
 	})
 
-	assert.Equal(t, int64(4200), orders[orderID].tokens)
-	assert.Equal(t, int64(250), orders[orderID].costCents, "2.5 million micros is 250 cents")
+	order := orders[orderID]
+	assert.Equal(t, int64(4200), order.tokens)
+	assert.Equal(t, int64(250), order.modelCostCents, "2.5 million micros is 250 cents")
+	assert.Equal(t, int64(50), order.computeCostCents)
+	assert.Equal(t, int64(300), order.costCents, "the total is the two bands together")
+}
+
+func TestApplyVelocityOrderUsage_LeavesOrdersWithoutSpendAtZero(t *testing.T) {
+	orderID := uuid.New()
+	orders := map[uuid.UUID]*velocityOrder{orderID: {id: orderID}}
+
+	applyVelocityOrderUsage(orders, map[uuid.UUID]models.UsageSplit{})
+
+	assert.Zero(t, orders[orderID].costCents)
+	assert.Zero(t, orders[orderID].modelCostCents)
+	assert.Zero(t, orders[orderID].computeCostCents)
+}
+
+func TestMedianCents(t *testing.T) {
+	assert.Zero(t, medianCents(nil), "a day with no tasks has no median")
+	assert.Equal(t, int64(180), medianCents([]int64{900, 180, 20}), "the middle of an odd sample")
+	assert.Equal(t, int64(150), medianCents([]int64{100, 200, 900, 20}), "the two middle values, averaged")
+
+	values := []int64{300, 100, 200}
+	medianCents(values)
+	assert.Equal(t, []int64{300, 100, 200}, values, "the sample keeps its order")
 }
 
 func TestVelocityIntakeTotals_KeepsSeriesOrderAndDropsWaste(t *testing.T) {
@@ -147,7 +196,7 @@ func TestVelocityPeopleBuilder_JoinsGitHubAuthorWithMember(t *testing.T) {
 	})
 	builder.addFactoryOrder(&velocityOrder{createdByID: &userID, merged: true, costCents: 120})
 
-	rows := builder.rowsByMergedDesc()
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
 	require.Len(t, rows, 1, "one person is one row, whichever identity the work came from")
 	assert.Equal(t, userID.String(), rows[0].id)
 	assert.Equal(t, "Ada Lovelace", rows[0].name)
@@ -162,7 +211,7 @@ func TestVelocityPeopleBuilder_KeepsAuthorsOutsideTheOrganization(t *testing.T) 
 
 	builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{AuthorLogin: "outside-contributor"})
 
-	rows := builder.rowsByMergedDesc()
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "github:outside-contributor", rows[0].id)
 	assert.Equal(t, "outside-contributor", rows[0].name, "the login stands in for a missing name")
@@ -174,7 +223,112 @@ func TestVelocityPeopleBuilder_SkipsAutomationOrders(t *testing.T) {
 	builder.addFactoryOrder(&velocityOrder{merged: true})
 	builder.addFactoryOrder(&velocityOrder{createdByID: func() *uuid.UUID { id := uuid.New(); return &id }(), merged: true})
 
-	assert.Empty(t, builder.rowsByMergedDesc(), "the table lists people, not automations or former members")
+	assert.Empty(t, builder.rowsSorted(velocitySortTotal, velocitySortDesc), "the table lists people, not automations or former members")
+}
+
+func TestVelocityPeopleBuilder_CreditsAssigneeOnlyOrder(t *testing.T) {
+	opener, assignee := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: opener, Name: "Opener"},
+		{UserID: assignee, Name: "Assignee"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		assigneeIDs: []uuid.UUID{assignee},
+		merged:      true,
+		costCents:   40,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, assignee.String(), rows[0].id)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+	assert.Equal(t, int64(40), rows[0].costCents)
+}
+
+func TestVelocityPeopleBuilder_CreditsAssigneeNotOpener(t *testing.T) {
+	opener, assignee := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: opener, Name: "Opener"},
+		{UserID: assignee, Name: "Assignee"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		createdByID: &opener,
+		assigneeIDs: []uuid.UUID{assignee},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1, "one order credits one person")
+	assert.Equal(t, "Assignee", rows[0].name)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+}
+
+func TestVelocityPeopleBuilder_CreditsOpenerOnceWhenAlsoAssignee(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Ada"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		createdByID: &userID,
+		assigneeIDs: []uuid.UUID{userID},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, 1, rows[0].factoryMerged, "an opener who is also assigned is credited once")
+}
+
+func TestVelocityPeopleBuilder_CreditsOpenerWhenUnassigned(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Ada"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{createdByID: &userID, merged: true})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, userID.String(), rows[0].id)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+}
+
+func TestVelocityPeopleBuilder_FallsBackToOpenerWhenAssigneeIsNotAMember(t *testing.T) {
+	opener, outsider := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: opener, Name: "Opener"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		createdByID: &opener,
+		assigneeIDs: []uuid.UUID{outsider},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "Opener", rows[0].name)
+	assert.Equal(t, 1, rows[0].factoryMerged)
+}
+
+func TestVelocityPeopleBuilder_CreditsFirstAssigneeWhoIsAMember(t *testing.T) {
+	outsider, member := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: member, Name: "Member"},
+	})
+
+	builder.addFactoryOrder(&velocityOrder{
+		assigneeIDs: []uuid.UUID{outsider, member},
+		merged:      true,
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "Member", rows[0].name)
+	assert.Equal(t, 1, rows[0].factoryMerged)
 }
 
 func TestVelocityPeopleBuilder_ReportsWasteOnlyContributors(t *testing.T) {
@@ -183,7 +337,7 @@ func TestVelocityPeopleBuilder_ReportsWasteOnlyContributors(t *testing.T) {
 
 	builder.addFactoryOrder(&velocityOrder{createdByID: &userID, merged: false, costCents: 90})
 
-	rows := builder.rowsByMergedDesc()
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
 	require.Len(t, rows, 1, "spend without a merge still belongs to somebody")
 	assert.Equal(t, 1, rows[0].factoryWaste)
 }
@@ -201,11 +355,102 @@ func TestVelocityPeopleBuilder_OrdersByMergedThenName(t *testing.T) {
 	builder.addFactoryOrder(&velocityOrder{createdByID: &third, merged: true})
 	builder.addFactoryOrder(&velocityOrder{createdByID: &third, merged: true})
 
-	rows := builder.rowsByMergedDesc()
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
 	require.Len(t, rows, 3)
 	assert.Equal(t, "Barbara", rows[0].name, "most merges first")
 	assert.Equal(t, "Alan", rows[1].name, "ties break on name")
 	assert.Equal(t, "Zoe", rows[2].name)
+}
+
+// TestVelocityPeopleBuilder_RowsSorted_EveryKeyAndDirection covers the sort
+// keys the People table can request, in both directions, including a tie on
+// the primary key so the name/id tie-break proves stable paging.
+func TestVelocityPeopleBuilder_RowsSorted_EveryKeyAndDirection(t *testing.T) {
+	alice, bob, carol := uuid.New(), uuid.New(), uuid.New()
+
+	// Alice: 1 factory merge + 1 authored merge (total 2), $1 cost, no cycle time.
+	// Bob: 3 factory merges (total 3), $3 cost, median cycle 20h.
+	// Carol: 3 factory merges (total 3, ties Bob), $9 cost, median cycle 5h.
+	build := func() *velocityPeopleBuilder {
+		builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+			{UserID: alice, Name: "Alice", GitHubLogin: "alice-gh"},
+			{UserID: bob, Name: "Bob"},
+			{UserID: carol, Name: "Carol"},
+		})
+		builder.addFactoryOrder(&velocityOrder{createdByID: &alice, merged: true, costCents: 100})
+		builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{AuthorLogin: "alice-gh"})
+		for i := 0; i < 3; i++ {
+			cycle := 20.0
+			builder.addFactoryOrder(&velocityOrder{createdByID: &bob, merged: true, costCents: 100, cycleHours: &cycle})
+		}
+		for i := 0; i < 3; i++ {
+			cycle := 5.0
+			builder.addFactoryOrder(&velocityOrder{createdByID: &carol, merged: true, costCents: 300, cycleHours: &cycle})
+		}
+		return builder
+	}
+
+	t.Run("total desc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortTotal, velocitySortDesc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Bob", rows[0].name, "bob and carol tie on total; name breaks the tie")
+		assert.Equal(t, "Carol", rows[1].name)
+		assert.Equal(t, "Alice", rows[2].name, "alice has the lowest total")
+	})
+
+	t.Run("total asc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortTotal, velocitySortAsc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Alice", rows[0].name, "alice has the lowest total")
+		assert.Equal(t, "Bob", rows[1].name, "the tie-break stays name-ascending even in ASC order")
+		assert.Equal(t, "Carol", rows[2].name)
+	})
+
+	t.Run("factoryMerged desc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortFactoryMerged, velocitySortDesc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Bob", rows[0].name, "bob and carol tie on factory merges; name breaks the tie")
+		assert.Equal(t, "Carol", rows[1].name)
+		assert.Equal(t, "Alice", rows[2].name)
+	})
+
+	t.Run("authoredMerged desc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortAuthoredMerged, velocitySortDesc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Alice", rows[0].name, "only alice authored a merge outside SuperPlane")
+	})
+
+	t.Run("medianCycleHours asc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortMedianCycleHours, velocitySortAsc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Alice", rows[0].name, "no cycle time sorts as zero")
+		assert.Equal(t, "Carol", rows[1].name, "carol's median cycle is shorter than bob's")
+		assert.Equal(t, "Bob", rows[2].name)
+	})
+
+	t.Run("medianCycleHours desc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortMedianCycleHours, velocitySortDesc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Bob", rows[0].name)
+		assert.Equal(t, "Carol", rows[1].name)
+		assert.Equal(t, "Alice", rows[2].name)
+	})
+
+	t.Run("costUsd desc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortCostUsd, velocitySortDesc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Carol", rows[0].name, "carol spent the most")
+		assert.Equal(t, "Bob", rows[1].name)
+		assert.Equal(t, "Alice", rows[2].name, "alice spent the least")
+	})
+
+	t.Run("costUsd asc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortCostUsd, velocitySortAsc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Alice", rows[0].name, "alice spent the least")
+		assert.Equal(t, "Bob", rows[1].name)
+		assert.Equal(t, "Carol", rows[2].name, "carol spent the most, so she is last")
+	})
 }
 
 func TestVelocityPeopleBuilder_MedianCycleOfMemberOrders(t *testing.T) {
@@ -217,7 +462,7 @@ func TestVelocityPeopleBuilder_MedianCycleOfMemberOrders(t *testing.T) {
 		builder.addFactoryOrder(&velocityOrder{createdByID: &userID, merged: true, cycleHours: &cycle})
 	}
 
-	rows := builder.rowsByMergedDesc()
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
 	require.Len(t, rows, 1)
 	assert.Equal(t, float64(10), medianFloats(rows[0].cycleHours))
 }

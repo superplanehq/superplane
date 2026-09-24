@@ -2,10 +2,13 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
   FactoriesWorkOrderArtifact,
+  FactoryIntakeHealth,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
@@ -32,9 +35,20 @@ import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvase
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
-export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
+export {
+  ADD_INTAKE_COPY,
+  ADD_INTAKE_TEMPLATES,
+  addIntakeTemplatesForOrg,
+  isAddIntakeSoon,
+  type AddIntakeTemplate,
+} from "./addIntakeTemplates";
 
-export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents";
+export type LineIntakeSourceId =
+  | "github-issues"
+  | "jira-issues"
+  | "sentry-exceptions"
+  | "pagerduty-incidents"
+  | "productive-tasks";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -86,9 +100,28 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     },
   },
   {
+    id: "jira-issues",
+    name: "Jira issues",
+    description: "Creates tasks from Jira issues.",
+    iconSrc: jiraIcon,
+    iconAlt: "Jira",
+    listen: {
+      kind: "webhook",
+      label: "On Jira issue",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Jira issue becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
+    description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
     listen: {
@@ -117,6 +150,25 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     evaluate: {
       label: "Create a task",
       rule: "A matching PagerDuty incident becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "productive-tasks",
+    name: "Productive.io tasks",
+    description: "Create tasks from Productive.io tasks.",
+    iconSrc: productiveIcon,
+    iconAlt: "Productive",
+    listen: {
+      kind: "webhook",
+      label: "On Productive.io task",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Productive.io task becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
@@ -155,20 +207,31 @@ export interface ConfiguredLineIntakeSource {
   /** Canvas that implements the intake, used to open the automation editor. */
   appId: string;
   healthy: boolean;
+  paused: boolean;
   settings: IntakeSourceSettings;
   source: LineIntakeSource;
+  /** Why the intake is unhealthy. HEALTH_OK when it can receive items. */
+  health?: FactoryIntakeHealth;
+  /** Live trigger connection. Empty when the intake is unbound. */
+  integrationId?: string;
+  /** Live trigger resource, such as a Jira project key. */
+  resourceId?: string;
 }
 
 const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
   SOURCE_GITHUB_ISSUES: "github-issues",
+  SOURCE_JIRA_ISSUES: "jira-issues",
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
+  SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
   "github-issues": "SOURCE_GITHUB_ISSUES",
+  "jira-issues": "SOURCE_JIRA_ISSUES",
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
+  "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {
@@ -189,8 +252,12 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         intakeId,
         appId: intake.canvasId?.trim() ?? "",
         healthy: intake.healthy !== false,
+        paused: intake.paused === true,
         settings: intakeSettingsFromApi(name, intake.settings),
         source: { ...source, name },
+        health: intake.health,
+        integrationId: intake.integrationId?.trim() || undefined,
+        resourceId: intake.resourceId?.trim() || undefined,
       },
     ];
   });
@@ -234,13 +301,16 @@ export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): 
 }
 
 /** Row title on the board. It says what the intake listens to, and nothing else. */
-export function lineIntakeListenTitle(source: LineIntakeSource): string {
+export function lineIntakeListenTitle(source: LineIntakeSource, paused = false): string {
+  if (paused) {
+    return `Listening to ${source.name} is paused`;
+  }
   return `Listening to ${source.name}`;
 }
 
 export const LINE_INTAKE_COPY = {
-  needsRepair: "Needs repair",
-  needsRepairHelper: "The automation can no longer create tasks. Open it to repair the steps.",
+  paused: "Paused",
+  pausedHelper: "New items do not become tasks. You can still import one item by hand.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
   analysisCompleteHeadline: "Ticket analysis finished",

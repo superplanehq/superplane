@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -8,43 +9,124 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
+func factoryPullRequestMergeableOnBoard(pullRequest *models.FactoryPullRequest) bool {
+	if pullRequest == nil || pullRequest.ActiveMutationRunID != nil {
+		return false
+	}
+	return pullRequest.Mergeable && pullRequest.State == models.FactoryPullRequestStateOpen
+}
+
 func serializeFactoryPullRequests(
+	ctx context.Context,
 	tx *gorm.DB,
 	pullRequests []models.FactoryPullRequest,
+	workOrderNumbers map[uuid.UUID]int64,
 ) ([]*pb.FactoryPullRequest, error) {
 	if len(pullRequests) == 0 {
 		return nil, nil
 	}
 
+	if workOrderNumbers == nil {
+		workOrderIDs := make([]uuid.UUID, 0, len(pullRequests))
+		seenWorkOrders := map[uuid.UUID]bool{}
+		for i := range pullRequests {
+			if seenWorkOrders[pullRequests[i].WorkOrderID] {
+				continue
+			}
+			seenWorkOrders[pullRequests[i].WorkOrderID] = true
+			workOrderIDs = append(workOrderIDs, pullRequests[i].WorkOrderID)
+		}
+		numbers, err := workOrderNumbersByID(tx, workOrderIDs)
+		if err != nil {
+			return nil, err
+		}
+		workOrderNumbers = numbers
+	}
+
+	runsByPullRequest, revisions, usageByRun, err := loadPullRequestSerialization(ctx, tx, pullRequests)
+	if err != nil {
+		return nil, err
+	}
+
+	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
+	for i := range pullRequests {
+		serialized = append(serialized, serializeFactoryPullRequest(
+			&pullRequests[i],
+			workOrderNumbers[pullRequests[i].WorkOrderID],
+			runsByPullRequest[pullRequests[i].ID],
+			revisions[pullRequests[i].ID],
+			usageByRun,
+		))
+	}
+	return serialized, nil
+}
+
+func loadSerializedPullRequestsByWorkOrderIDs(
+	ctx context.Context,
+	tx *gorm.DB,
+	workOrderIDs []uuid.UUID,
+	workOrderNumbers map[uuid.UUID]int64,
+) (map[uuid.UUID][]*pb.FactoryPullRequest, error) {
+	result := map[uuid.UUID][]*pb.FactoryPullRequest{}
+	if len(workOrderIDs) == 0 {
+		return result, nil
+	}
+
+	grouped, err := models.ListPullRequestsByWorkOrderIDs(tx, workOrderIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	flat := make([]models.FactoryPullRequest, 0)
+	for _, workOrderID := range workOrderIDs {
+		flat = append(flat, grouped[workOrderID]...)
+	}
+
+	serialized, err := serializeFactoryPullRequests(ctx, tx, flat, workOrderNumbers)
+	if err != nil {
+		return nil, err
+	}
+	for i, pullRequest := range serialized {
+		result[flat[i].WorkOrderID] = append(result[flat[i].WorkOrderID], pullRequest)
+	}
+	return result, nil
+}
+
+func loadPullRequestSerialization(
+	ctx context.Context,
+	tx *gorm.DB,
+	pullRequests []models.FactoryPullRequest,
+) (
+	map[uuid.UUID][]models.FactoryPullRequestLinkedRun,
+	map[uuid.UUID]*models.FactoryPullRequestRevision,
+	map[uuid.UUID]models.UsageTotals,
+	error,
+) {
 	pullRequestIDs := make([]uuid.UUID, len(pullRequests))
-	workOrderIDs := make([]uuid.UUID, 0, len(pullRequests))
-	seenWorkOrders := map[uuid.UUID]bool{}
 	for i := range pullRequests {
 		pullRequestIDs[i] = pullRequests[i].ID
-		if seenWorkOrders[pullRequests[i].WorkOrderID] {
-			continue
-		}
-		seenWorkOrders[pullRequests[i].WorkOrderID] = true
-		workOrderIDs = append(workOrderIDs, pullRequests[i].WorkOrderID)
 	}
 
-	numbers, err := workOrderNumbersByID(tx, workOrderIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	runsByPullRequest, err := models.ListPullRequestRuns(tx, pullRequestIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	revisions, err := listCurrentPullRequestRevisions(tx, pullRequests)
-	if err != nil {
-		return nil, err
+	g, gctx := errgroup.WithContext(ctx)
+	var runsByPullRequest map[uuid.UUID][]models.FactoryPullRequestLinkedRun
+	var revisions map[uuid.UUID]*models.FactoryPullRequestRevision
+	g.Go(func() error {
+		var err error
+		runsByPullRequest, err = models.ListPullRequestRuns(tx.WithContext(gctx), pullRequestIDs)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		revisions, err = listCurrentPullRequestRevisions(tx.WithContext(gctx), pullRequests)
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, err
 	}
 
 	runIDs := make([]uuid.UUID, 0)
@@ -53,9 +135,6 @@ func serializeFactoryPullRequests(
 			runIDs = append(runIDs, linked.Run.ID)
 		}
 	}
-	// Usage totals are enrichment-only. If the usage rollup lookup fails
-	// (for example, a transient schema migration issue), do not fail the
-	// whole PR listing. Log a warning and degrade to zero usage instead.
 	usageByRun, err := models.SumUsageForRunTrees(tx, runIDs)
 	if err != nil {
 		log.WithError(err).Warnf(
@@ -64,18 +143,7 @@ func serializeFactoryPullRequests(
 		)
 		usageByRun = map[uuid.UUID]models.UsageTotals{}
 	}
-
-	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
-	for i := range pullRequests {
-		serialized = append(serialized, serializeFactoryPullRequest(
-			&pullRequests[i],
-			numbers[pullRequests[i].WorkOrderID],
-			runsByPullRequest[pullRequests[i].ID],
-			revisions[pullRequests[i].ID],
-			usageByRun,
-		))
-	}
-	return serialized, nil
+	return runsByPullRequest, revisions, usageByRun, nil
 }
 
 func serializeFactoryPullRequest(
@@ -101,6 +169,7 @@ func serializeFactoryPullRequest(
 		Runs:            serializePullRequestRuns(runs, usageByRun),
 		Activities:      serializePullRequestActivities(runs, usageByRun),
 		CurrentRevision: serializePullRequestRevision(currentRevision),
+		Mergeable:       factoryPullRequestMergeableOnBoard(pullRequest),
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID
@@ -122,6 +191,7 @@ func serializePullRequestRuns(
 	for _, linked := range runs {
 		usage := usageByRun[linked.Run.ID]
 		result = append(result, &pb.FactoryPullRequestRun{
+			Title:       linked.Title,
 			Description: linked.Description,
 			TotalTokens: usage.TotalTokens,
 			CostCents:   usage.CostCents(),
@@ -140,6 +210,7 @@ func serializePullRequestActivities(
 		usage := usageByRun[linked.Run.ID]
 		activity := &pb.FactoryPullRequestActivity{
 			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+			Title:       linked.Title,
 			Description: linked.Description,
 			Access:      linked.Access,
 			State:       linked.State,

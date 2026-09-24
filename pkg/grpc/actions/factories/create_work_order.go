@@ -7,22 +7,20 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"gorm.io/gorm"
 )
 
 func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order")
-	}
-
-	factoryID, err := parseFactoryID(req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
@@ -43,13 +41,35 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
 	assigneeIDs := []uuid.UUID{createdByID}
-	order, err := factory.CreateWorkOrder(db, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
+	var order *models.FactoryWorkOrder
+	var bound storedfiles.BindResult
+	err = db.Transaction(func(tx *gorm.DB) error {
+		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
+		if err != nil {
+			return err
+		}
+		order = created
+		result, bindErr := storedfiles.BindDescriptionFiles(
+			ctx,
+			tx,
+			blob.Current(),
+			orgID,
+			factory.ID,
+			order.ID,
+			order.Description,
+		)
+		bound = result
+		return bindErr
+	})
+	if delErr := storedfiles.ApplyBindResult(ctx, db, blob.Current(), orgID, factory.ID, bound, err); delErr != nil {
+		log.WithError(delErr).Warn("Failed to delete file objects after bind")
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
@@ -62,20 +82,6 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		factoryevents.EventTypeOrderStatusUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
-	}
-
-	if assignedIDs := newAssigneeIDs(nil, assigneeIDs); len(assignedIDs) > 0 {
-		notification := messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID:  orgID.String(),
-			FactoryID:       factory.ID.String(),
-			OrderID:         order.ID.String(),
-			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
-			ActorUserID:     createdByID.String(),
-			AssignedUserIDs: assignedIDs,
-		}
-		if err := notification.Publish(); err != nil {
-			log.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
-		}
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)

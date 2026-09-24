@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { validateConsoleContent, MAX_CONSOLE_PANELS } from "./consoleYaml";
 

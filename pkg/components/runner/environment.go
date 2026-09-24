@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -15,6 +16,11 @@ const (
 
 	EnvironmentValueSourceLiteral = "literal"
 	EnvironmentValueSourceSecret  = "secret"
+
+	// EnvExecutionTimeoutSeconds is the node wall-clock limit in seconds.
+	// OpenRouter wait/retry uses this so a 60s rate-limit pause cannot outlive
+	// the broker task timeout.
+	EnvExecutionTimeoutSeconds = "SUPERPLANE_EXECUTION_TIMEOUT_SECONDS"
 )
 
 // Runner tasks execute with a terminal attached, so commands like `git log`
@@ -355,4 +361,16 @@ func resolveExplicitEnvironment(secrets core.SecretsContext, environment []Envir
 	}
 
 	return resolved, nil
+}
+
+// AttachExecutionTimeoutEnv copies the node timeout into the task environment
+// so agent wrappers can cap waits before the broker kills the task.
+func AttachExecutionTimeoutEnv(environment []BrokerEnvironmentVariable, timeoutSeconds int) []BrokerEnvironmentVariable {
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = DefaultExecutionTimeoutSeconds
+	}
+	return append(environment, BrokerEnvironmentVariable{
+		Name:  EnvExecutionTimeoutSeconds,
+		Value: strconv.Itoa(timeoutSeconds),
+	})
 }

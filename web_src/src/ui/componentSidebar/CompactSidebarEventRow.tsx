@@ -5,7 +5,7 @@ import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSideb
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";
-import { DEFAULT_EVENT_STATE_MAP, type EventState, type EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP, type EventState, type EventStateMap } from "@/ui/componentBase/eventState";
 import { Link, useParams } from "react-router";
 import type { SidebarEvent } from "./types";
 import { SidebarEventActionsMenu } from "./SidebarEventItem/SidebarEventActionsMenu";

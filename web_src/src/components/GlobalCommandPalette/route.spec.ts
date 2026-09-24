@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getRouteContext } from "./route";
 
 describe("getRouteContext", () => {
@@ -34,13 +34,13 @@ describe("getRouteContext", () => {
     const publicPaths = [
       "/",
       "/admin",
-      "/create",
       "/invite/token-1",
-      "/install",
       "/login",
+      "/onboarding",
       "/setup",
       "/signup",
       "/welcome",
+      "/github/approved",
     ];
     for (const path of publicPaths) {
       expect(getRouteContext(path)).toEqual({ organizationId: null, canvasId: null });

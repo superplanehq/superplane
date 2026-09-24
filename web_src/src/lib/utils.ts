@@ -34,17 +34,17 @@ export const formatTimestamp = (date: Date): string => {
  * @param maxDepth - Maximum recursion depth to prevent infinite loops (default: 5)
  * @returns A flattened object with primitive values
  */
-export function flattenObject(obj: any, maxDepth: number = 5): Record<string, any> {
+export function flattenObject(obj: unknown, maxDepth: number = 5): Record<string, unknown> {
   if (maxDepth <= 0 || obj === null || obj === undefined) {
     return {};
   }
 
-  function flatten(current: any, depth: number): Record<string, any> {
+  function flatten(current: unknown, depth: number): Record<string, unknown> {
     if (depth <= 0 || current === null || current === undefined) {
       return {};
     }
 
-    const flatResult: Record<string, any> = {};
+    const flatResult: Record<string, unknown> = {};
 
     if (Array.isArray(current)) {
       // For arrays, flatten each element and merge results

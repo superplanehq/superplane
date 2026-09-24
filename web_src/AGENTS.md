@@ -40,7 +40,7 @@ after layout.
 ### Setup
 
 1. **Storybook development**: Components are developed and tested in Storybook
-2. **TypeScript checking**: Run `npm run build && npm run test` regularly
+2. **TypeScript checking**: Run `npm run build && npm run test:run` regularly
 3. **Component stories**: Create comprehensive stories showing all component states
 4. **Formatting**: Run `npm run format` before committing file edits to keep Prettier formatting consistent
 
@@ -90,7 +90,7 @@ src/
 Always run before committing:
 
 ```bash
-npm run build && npm run test
+npm run build && npm run test:run
 npm run lint:budget
 ```
 

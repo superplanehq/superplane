@@ -19,14 +19,11 @@ interface OnPipelineCompletedEventData {
 export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnPipelineCompletedEventData;
-    const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
-    const status = eventData?.status || "";
-    const subtitle =
-      status && context.event?.createdAt
-        ? renderWithTimeAgo(status, new Date(context.event.createdAt))
-        : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
-    return { title, subtitle };
+    return {
+      title: pipelineCompletedTitle(eventData),
+      subtitle: pipelineCompletedSubtitle(pipelineStatus(eventData), context.event?.createdAt),
+    };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -44,30 +41,17 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnPipelineCompletedMetadata;
     const configuration = node.configuration as { pipelineIdentifier?: string };
-    const metadataItems: TriggerProps["metadata"] = [];
-
-    const pipelineLabel = metadata?.pipelineIdentifier || configuration?.pipelineIdentifier;
-    if (pipelineLabel) {
-      metadataItems.push({ icon: "workflow", label: pipelineLabel });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: HarnessIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: pipelineCompletedMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnPipelineCompletedEventData;
-      const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
-      const status = eventData?.status || "";
-      const subtitle =
-        status && lastEvent.createdAt
-          ? renderWithTimeAgo(status, new Date(lastEvent.createdAt))
-          : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
-
+      const { title, subtitle } = onPipelineCompletedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
@@ -80,3 +64,31 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function pipelineCompletedTitle(eventData?: OnPipelineCompletedEventData): string {
+  return "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
+}
+
+function pipelineStatus(eventData?: OnPipelineCompletedEventData): string {
+  return eventData?.status || "";
+}
+
+function pipelineCompletedSubtitle(status: string, createdAt?: string): string | React.ReactNode {
+  if (status && createdAt) {
+    return renderWithTimeAgo(status, new Date(createdAt));
+  }
+
+  return status || (createdAt ? renderTimeAgo(new Date(createdAt)) : "");
+}
+
+function pipelineCompletedMetadataItems(
+  metadata?: OnPipelineCompletedMetadata,
+  configuration?: { pipelineIdentifier?: string },
+) {
+  const pipelineLabel = metadata?.pipelineIdentifier || configuration?.pipelineIdentifier;
+  if (!pipelineLabel) {
+    return [];
+  }
+
+  return [{ icon: "workflow", label: pipelineLabel }];
+}

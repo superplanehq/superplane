@@ -5,7 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/superplanehq/superplane"><img src="https://img.shields.io/badge/status-beta-F4D35E?style=flat-square&amp;labelColor=171714" alt="Beta"></a>
   <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="Build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-F4D35E?style=flat-square&amp;labelColor=171714" alt="Apache 2.0"></a>
   <a href="https://discord.superplane.com"><img src="https://img.shields.io/discord/1409914582239023200?label=Discord&amp;style=flat-square&amp;labelColor=171714&amp;color=F4D35E" alt="Discord"></a>
@@ -18,13 +17,6 @@
   <a href="https://superplane.com/blog/">Blog</a> ·
   <a href="https://luma.com/superplane">Event</a>
 </p>
-
-> [!NOTE]
-> SuperPlane is in beta. We are building the **Open source factory for one-shot
-> engineering**. Follow the
-> [latest releases](https://github.com/superplanehq/superplane/releases),
-> explore [open issues](https://github.com/superplanehq/superplane/issues) and
-> see [how you can contribute](#contributing) as the SuperPlane matures.
 
 ## About
 

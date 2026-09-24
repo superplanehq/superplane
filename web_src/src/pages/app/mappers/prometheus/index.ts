@@ -6,7 +6,7 @@ import { getSilenceMapper } from "./get_silence";
 import { queryMapper } from "./query";
 import { queryRangeMapper } from "./query_range";
 import { onAlertCustomFieldRenderer, onAlertTriggerRenderer } from "./on_alert";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getAlert: getAlertMapper,

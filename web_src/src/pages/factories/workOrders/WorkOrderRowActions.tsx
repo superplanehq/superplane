@@ -1,7 +1,6 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
@@ -19,8 +18,15 @@ interface CardOwnerMarkProps {
   organizationId: string;
 }
 
+/** Visible given name on a card. The full name stays on the title. */
+function ownerGivenName(fullName: string): string {
+  const givenName = fullName.trim().split(/\s+/)[0];
+  return givenName || fullName;
+}
+
 /**
- * Display-only owner avatar for cards. The owner cannot be changed here.
+ * Display-only owner given name and avatar for cards. The name sits left
+ * of the avatar. The owner cannot be changed here.
  */
 export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
@@ -33,18 +39,22 @@ export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
     return null;
   }
 
+  const display = resolveUser(owner.id, owner.name);
+  const ownerName = display?.name ?? owner.name;
+  if (!ownerName) {
+    return null;
+  }
+
   return (
     <span
-      className="inline-flex size-5 shrink-0 items-center justify-center"
+      className="inline-flex min-w-0 items-center gap-1.5"
       data-testid={`work-order-row-assignees-${entry.id}`}
-      title={owner.name}
+      title={ownerName}
     >
-      <OrgUserReference
-        display={resolveUser(owner.id, owner.name)}
-        size="xs"
-        showName={false}
-        className="rounded-full leading-none"
-      />
+      <span className="truncate text-[11px] leading-4 text-muted-foreground">{ownerGivenName(ownerName)}</span>
+      <span className="inline-flex size-5 shrink-0 items-center justify-center">
+        <OrgUserReference display={display} size="xs" showName={false} className="rounded-full leading-none" />
+      </span>
     </span>
   );
 }
@@ -81,82 +91,6 @@ export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGr
         className="rounded-full ring-2 ring-background"
       />
     </span>
-  );
-}
-
-/** Line to start on: the preferred line when it exists, else the only line. */
-function resolveStartLineName(lines: FactoriesFactoryLine[], preferredLineName?: string): string | undefined {
-  const names = lines.map((line) => line.name?.trim()).filter((name): name is string => Boolean(name));
-  if (preferredLineName && names.includes(preferredLineName)) {
-    return preferredLineName;
-  }
-  if (names.length === 1) {
-    return names[0];
-  }
-  return undefined;
-}
-
-interface StartDraftButtonProps {
-  entry: WorkOrderListEntry;
-  lines: FactoriesFactoryLine[];
-  preferredLineName?: string;
-  canDispatch: boolean;
-  isDispatching: boolean;
-  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
-}
-
-/**
- * Persistent Start control on a draft card. One click sends the task
- * to the preferred line, or opens the line picker when more than one line
- * exists.
- */
-export function StartDraftButton({
-  entry,
-  lines,
-  preferredLineName,
-  canDispatch,
-  isDispatching,
-  onDispatch,
-}: StartDraftButtonProps) {
-  if (entry.displayStatus !== "draft") {
-    return null;
-  }
-
-  const lineName = resolveStartLineName(lines, preferredLineName);
-  const disabled = !canDispatch || lines.length === 0;
-
-  const startButton = (
-    <LoadingButton
-      type="button"
-      size="xs"
-      disabled={disabled}
-      loading={isDispatching}
-      loadingText="Starting..."
-      data-testid={`work-order-card-start-${entry.id}`}
-      onClick={lineName ? () => void onDispatch(entry.id, { lineName }) : undefined}
-    >
-      Start
-    </LoadingButton>
-  );
-
-  return (
-    <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this task.">
-        {lineName ? (
-          startButton
-        ) : (
-          <DispatchWorkOrderPopover
-            lines={lines}
-            isSaving={isDispatching}
-            canDispatch={canDispatch}
-            submitLabel="Start"
-            onDispatch={(input) => onDispatch(entry.id, input)}
-          >
-            {startButton}
-          </DispatchWorkOrderPopover>
-        )}
-      </PermissionTooltip>
-    </div>
   );
 }
 

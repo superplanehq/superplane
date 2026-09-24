@@ -8,7 +8,7 @@ import type {
 } from "./types";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getStateMap, getTriggerRenderer } from ".";
+import { getStateMap, getTriggerRenderer } from "./mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
 

@@ -32,24 +32,19 @@ const KINDS: { kind: DecisionFooterKind; label: string; note: string }[] = [
     note: "No footer. Stop lives on the automation.",
   },
   {
-    kind: "waiting",
-    label: "Needs attention",
-    note: "To Backlog, Reject, and Approve in the note.",
-  },
-  {
     kind: "statusNote",
     label: "Status note + PR",
-    note: "Custom note, Review PR, To Backlog, Reject, and Approve.",
+    note: "Custom note, Review PR, Reject, and Approve.",
   },
   {
     kind: "failed",
     label: "Step failed",
-    note: "Debug, To Backlog, Reject, and Rerun.",
+    note: "Debug, Reject, and Rerun.",
   },
   {
     kind: "draft",
     label: "Draft",
-    note: "Start and Reject in the note.",
+    note: "Archive and Build in the note.",
   },
   {
     kind: "completed",
@@ -84,11 +79,6 @@ export const Compare: Story = {
 export const Running: Story = {
   name: "Running — no footer",
   render: () => <SplitRunDecisionFooterPreview kind="running" />,
-};
-
-export const Waiting: Story = {
-  name: "Needs attention",
-  render: () => <SplitRunDecisionFooterPreview kind="waiting" />,
 };
 
 export const StatusNote: Story = {

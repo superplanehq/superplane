@@ -1,11 +1,11 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
+  FactoriesFactoryIntakeSettings,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
-  FactoriesFactoryPrFeedbackHandler,
   FactoriesUpdateFactoryOnboardingBody,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -16,10 +16,17 @@ import {
   type FactoryAgentRewrite,
 } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import type { IssuesChoiceId } from "./onboardingFixtures";
+import {
+  forgetOnboardingIntakeBinding,
+  onboardingIntakeBinding,
+  rememberOnboardingIntakeBinding,
+} from "./onboardingIntakeBinding";
 
-export const DEFAULT_LINE_NAME = "plan-and-implement";
+export const DEFAULT_LINE_NAME = "implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
+export const JIRA_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_JIRA_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -103,7 +110,7 @@ async function provisionLineApps(args: {
   return steps;
 }
 
-export type ListFactoryApps = () => Promise<FactoryApp[]>;
+export type ListFactoryApps = () => Promise<FactoryAutomation[]>;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -156,7 +163,32 @@ export async function provisionEventApps(args: {
 
 export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
-export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
+export type CreateFactoryIntake = (input: {
+  source: FactoriesFactoryIntakeSource;
+  integrationId?: string;
+  resourceId?: string;
+  settings?: FactoriesFactoryIntakeSettings;
+}) => Promise<FactoriesFactoryIntake>;
+
+export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
+
+function isBacklogIntake(intake: FactoriesFactoryIntake): boolean {
+  return intake.source === GITHUB_INTAKE_SOURCE || intake.source === JIRA_INTAKE_SOURCE;
+}
+
+function jiraIntakeMatches(intake: FactoriesFactoryIntake, integrationId: string, resourceId: string): boolean {
+  const binding = onboardingIntakeBinding(intake);
+  return binding.integrationId === integrationId && binding.resourceId === resourceId;
+}
+
+async function removeProvisionedIntake(
+  deleteIntake: DeleteFactoryIntake,
+  intake: FactoriesFactoryIntake,
+): Promise<void> {
+  if (!intake.id) return;
+  await deleteIntake(intake.id);
+  forgetOnboardingIntakeBinding(intake.id);
+}
 
 // The GitHub intake opens a task for each matching issue. The Backlog
 // canvas scores those tasks. The backend reads the connection and the
@@ -175,26 +207,73 @@ export async function provisionGithubIntake(args: {
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
-export type ListFactoryPRFeedbackHandlers = () => Promise<FactoriesFactoryPrFeedbackHandler[]>;
-
-export type CreateFactoryPRFeedbackHandler = (input: {
-  repository?: string;
-}) => Promise<FactoriesFactoryPrFeedbackHandler>;
-
-// The PR feedback handler addresses review comments after a work-order PR
-// opens. Match by repository so a retried finish does not add a second copy.
-export async function provisionPRFeedbackHandler(args: {
-  listHandlers: ListFactoryPRFeedbackHandlers;
-  createHandler: CreateFactoryPRFeedbackHandler;
-  repository: string;
-}): Promise<FactoriesFactoryPrFeedbackHandler> {
-  const handlers = await args.listHandlers();
-  const existing = handlers.find((handler) => handler.settings?.subject?.repository === args.repository);
-  if (existing) {
+export async function provisionJiraIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
+  integrationId: string;
+  resourceId: string;
+  settings?: FactoriesFactoryIntakeSettings;
+}): Promise<FactoriesFactoryIntake> {
+  const intakes = await args.listIntakes();
+  const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
+  if (existing && jiraIntakeMatches(existing, args.integrationId, args.resourceId)) {
     return existing;
   }
+  if (existing) {
+    await removeProvisionedIntake(args.deleteIntake, existing);
+  }
 
-  return args.createHandler({ repository: args.repository });
+  const created = await args.createIntake({
+    source: JIRA_INTAKE_SOURCE,
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+    ...(args.settings ? { settings: args.settings } : {}),
+  });
+  rememberOnboardingIntakeBinding(created.id, {
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+  });
+  return created;
+}
+
+// Create the selected backlog intake and remove a leftover intake from an
+// earlier failed finish, so analysis follows the source the user chose.
+export async function provisionOnboardingIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
+  issuesChoice: IssuesChoiceId | null;
+  jira?: {
+    integrationId: string;
+    projectId: string;
+    settings?: FactoriesFactoryIntakeSettings;
+  };
+}): Promise<FactoriesFactoryIntake | undefined> {
+  const intakes = await args.listIntakes();
+  const desiredSource = args.issuesChoice === "jira" ? JIRA_INTAKE_SOURCE : GITHUB_INTAKE_SOURCE;
+  for (const intake of intakes) {
+    if (!isBacklogIntake(intake) || intake.source === desiredSource) continue;
+    await removeProvisionedIntake(args.deleteIntake, intake);
+  }
+
+  if (args.issuesChoice !== "jira") {
+    return provisionGithubIntake({
+      listIntakes: args.listIntakes,
+      createIntake: args.createIntake,
+    });
+  }
+  if (!args.jira?.integrationId || !args.jira.projectId) {
+    throw new Error("Connect Jira, then choose a project.");
+  }
+  return provisionJiraIntake({
+    listIntakes: args.listIntakes,
+    createIntake: args.createIntake,
+    deleteIntake: args.deleteIntake,
+    integrationId: args.jira.integrationId,
+    resourceId: args.jira.projectId,
+    settings: args.jira.settings,
+  });
 }
 
 export async function provisionLine(args: {

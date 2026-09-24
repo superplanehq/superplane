@@ -1,11 +1,11 @@
 import type { CanvasesCanvasRunRef } from "@/api-client";
 import type { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatDuration } from "@/lib/duration";
 import { appRunPath } from "@/lib/appPaths";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getState, getStateMap, getTriggerRenderer } from ".";
+import { getState, getStateMap, getTriggerRenderer } from "./mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

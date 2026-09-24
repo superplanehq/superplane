@@ -172,25 +172,25 @@ func TestCanvasPage(t *testing.T) {
 }
 
 func TestCanvasPageYamlViewer(t *testing.T) {
-	t.Run("Files tab shows canvas YAML definition", func(t *testing.T) {
+	t.Run("YAML modal shows canvas YAML definition", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("YamlTestNode")
-		steps.openFilesTab()
-		steps.assertFileIsOpen("canvas.yaml")
+		steps.openYamlModal()
+		steps.assertYamlTabIsOpen("canvas.yaml")
 		steps.assertYamlContentVisible("YamlTestNode")
 		steps.assertYamlContentVisible("metadata:")
 	})
 
-	t.Run("Files tab can return to canvas", func(t *testing.T) {
+	t.Run("YAML modal can return to canvas", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("SwitchTest")
-		steps.openFilesTab()
+		steps.openYamlModal()
 		steps.assertYamlContentVisible("SwitchTest")
-		steps.returnToCanvasTab()
+		steps.closeYamlModal()
 		steps.assertNodeIsAdded("SwitchTest")
 	})
 }
@@ -738,35 +738,35 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	}
 }
 
-func (s *CanvasPageSteps) openFilesTab() {
+func (s *CanvasPageSteps) openYamlModal() {
 	s.canvas.Save()
 	s.canvas.ClickOnEmptyCanvasArea()
 	s.session.Sleep(300)
-	filesTab := q.TestID("canvas-view-mode-files")
-	s.session.AssertVisible(filesTab)
-	s.session.Click(filesTab)
-	s.session.AssertVisible(q.TestID("files-overlay"))
-	s.session.AssertVisible(q.TestID("file-editor"))
+	yamlButton := q.TestID("canvas-spec-yaml-button")
+	s.session.AssertVisible(yamlButton)
+	s.session.Click(yamlButton)
+	s.session.AssertVisible(q.TestID("canvas-spec-yaml-modal"))
+	s.session.AssertVisible(q.TestID("canvas-spec-yaml-editor"))
 	s.waitForMonacoEditor()
 }
 
-func (s *CanvasPageSteps) returnToCanvasTab() {
-	s.session.Click(q.TestID("canvas-view-mode-live"))
-	s.session.Sleep(500)
+func (s *CanvasPageSteps) closeYamlModal() {
+	s.session.Click(q.Locator(`[data-testid="canvas-spec-yaml-modal"] >> text=Close`))
+	s.session.Sleep(300)
 }
 
-func (s *CanvasPageSteps) assertFileIsOpen(name string) {
+func (s *CanvasPageSteps) assertYamlTabIsOpen(name string) {
 	s.session.AssertText(name)
-	s.session.AssertVisible(q.TestID("file-editor"))
+	s.session.AssertVisible(q.TestID("canvas-spec-yaml-editor"))
 }
 
 func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
 	s.waitForMonacoEditor()
-	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="file-editor"] >> text=%s`, text)))
+	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="canvas-spec-yaml-editor"] >> text=%s`, text)))
 }
 
 func (s *CanvasPageSteps) waitForMonacoEditor() {
-	monacoLines := q.Locator(`[data-testid="file-editor"] .view-lines`)
+	monacoLines := q.Locator(`[data-testid="canvas-spec-yaml-editor"] .view-lines`)
 	if err := monacoLines.Run(s.session).WaitFor(pw.LocatorWaitForOptions{
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(15000),

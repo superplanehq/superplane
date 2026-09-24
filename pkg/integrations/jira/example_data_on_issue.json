@@ -3,12 +3,23 @@
   "type": "jira.issue",
   "data": {
     "action": "created",
+    "url": "https://your-domain.atlassian.net/browse/ENG-42",
     "issue": {
       "id": "10001",
       "key": "ENG-42",
       "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001",
       "fields": {
         "summary": "Login page returns 500 on invalid password",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Sign in with a wrong password returns a 500 error." }]
+            }
+          ]
+        },
         "issuetype": { "name": "Bug" },
         "project": { "id": "10000", "key": "ENG", "name": "Engineering" },
         "status": { "name": "To Do", "statusCategory": { "name": "To Do", "key": "new" } },
@@ -28,6 +39,7 @@
         "updated": "2026-07-17T09:30:00.000+0000"
       }
     },
+    "description": "Sign in with a wrong password returns a 500 error.",
     "user": {
       "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
       "displayName": "Bob Jones",

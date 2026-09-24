@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -16,12 +15,12 @@ import (
 )
 
 type OrganizationService struct {
+	pb.UnimplementedOrganizationsServer
 	authorizationService authorization.Authorization
 	registry             *registry.Registry
 	oidcProvider         oidc.Provider
 	baseURL              string
 	webhooksBaseURL      string
-	usageService         usage.Service
 }
 
 func NewOrganizationService(
@@ -30,14 +29,12 @@ func NewOrganizationService(
 	oidcProvider oidc.Provider,
 	baseURL string,
 	webhooksBaseURL string,
-	usageService usage.Service,
 ) *OrganizationService {
 	return &OrganizationService{
 		registry:             registry,
 		oidcProvider:         oidcProvider,
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
-		usageService:         usageService,
 		authorizationService: authorizationService,
 	}
 }
@@ -55,6 +52,11 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.Up
 func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.RemoveUser(ctx, s.authorizationService, orgID, req.UserId)
+}
+
+func (s *OrganizationService) SetUserOwner(ctx context.Context, req *pb.SetUserOwnerRequest) (*pb.SetUserOwnerResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.SetUserOwner(ctx, orgID, req.UserId, req.IsOwner)
 }
 
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
@@ -77,14 +79,6 @@ func (s *OrganizationService) ResetInviteLink(ctx context.Context, req *pb.Reset
 	return organizations.ResetInviteLink(ctx, orgID)
 }
 
-func (s *OrganizationService) DescribeUsage(
-	ctx context.Context,
-	req *pb.DescribeUsageRequest,
-) (*pb.DescribeUsageResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeUsage(ctx, s.usageService, orgID)
-}
-
 func (s *OrganizationService) DescribeOrganizationWorkspaceUsage(
 	ctx context.Context,
 	req *pb.DescribeOrganizationWorkspaceUsageRequest,
@@ -93,12 +87,28 @@ func (s *OrganizationService) DescribeOrganizationWorkspaceUsage(
 	return organizations.DescribeOrganizationWorkspaceUsage(ctx, orgID, req)
 }
 
+func (s *OrganizationService) DescribeOrganizationSpendingReport(
+	ctx context.Context,
+	req *pb.DescribeOrganizationSpendingReportRequest,
+) (*pb.DescribeOrganizationSpendingReportResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganizationSpendingReport(ctx, orgID, req)
+}
+
 func (s *OrganizationService) ListHostedLLMModels(
 	ctx context.Context,
 	req *pb.ListHostedLLMModelsRequest,
 ) (*pb.ListHostedLLMModelsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ListHostedLLMModels(ctx, orgID, req)
+}
+
+func (s *OrganizationService) ListSelectableLLMModels(
+	ctx context.Context,
+	req *pb.ListSelectableLLMModelsRequest,
+) (*pb.ListSelectableLLMModelsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListSelectableLLMModels(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ListBYOKLLMModels(
@@ -142,13 +152,62 @@ func (s *OrganizationService) CreateBillingPortalSession(
 	return organizations.CreateBillingPortalSession(ctx, orgID, req)
 }
 
+func (s *OrganizationService) ListOrganizationCreditGrants(
+	ctx context.Context,
+	req *pb.ListOrganizationCreditGrantsRequest,
+) (*pb.ListOrganizationCreditGrantsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListOrganizationCreditGrants(ctx, orgID, req)
+}
+
+func (s *OrganizationService) DescribeOrganizationBilling(
+	ctx context.Context,
+	req *pb.DescribeOrganizationBillingRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganizationBilling(ctx, orgID, req)
+}
+
+func (s *OrganizationService) CreateBusinessCheckout(
+	ctx context.Context,
+	req *pb.CreateBusinessCheckoutRequest,
+) (*pb.CreateBusinessCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
+}
+
+func (s *OrganizationService) SyncOrganizationBilling(
+	ctx context.Context,
+	req *pb.SyncOrganizationBillingRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.SyncOrganizationBilling(ctx, orgID, req)
+}
+
+func (s *OrganizationService) CancelOrganizationSubscription(
+	ctx context.Context,
+	req *pb.CancelOrganizationSubscriptionRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.CancelOrganizationSubscription(ctx, orgID, req)
+}
+
+func (s *OrganizationService) ResumeOrganizationSubscription(
+	ctx context.Context,
+	req *pb.ResumeOrganizationSubscriptionRequest,
+) (*pb.DescribeOrganizationBillingResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ResumeOrganizationSubscription(ctx, orgID, req)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return organizations.AcceptInviteLinkWithUsage(ctx, s.authorizationService, s.usageService, accountID, req.Token)
+	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
 }
 
 func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
@@ -168,9 +227,8 @@ func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req 
 
 func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateIntegrationWithUsage(
+	return organizations.CreateIntegration(
 		ctx,
-		s.usageService,
 		s.registry,
 		s.oidcProvider,
 		s.baseURL,

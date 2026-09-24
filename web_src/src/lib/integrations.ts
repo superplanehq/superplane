@@ -17,6 +17,23 @@ export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationD
   return definition?.name === "github" && definition.hostedAppInstall === true;
 }
 
+export function usesHostedJiraOAuth(definition?: IntegrationsIntegrationDefinition): boolean {
+  return definition?.name === "jira" && definition.hostedAppInstall === true;
+}
+
+const HOSTED_JIRA_CREDENTIAL_FIELDS = ["clientId", "clientSecret"];
+
+/** Hide Client ID and Client Secret when SuperPlane holds the Jira OAuth app. */
+export function hiddenFieldsForHostedJira(
+  definition: IntegrationsIntegrationDefinition | null | undefined,
+  hiddenFieldNames: string[],
+): string[] {
+  if (!usesHostedJiraOAuth(definition ?? undefined)) {
+    return hiddenFieldNames;
+  }
+  return [...hiddenFieldNames, ...HOSTED_JIRA_CREDENTIAL_FIELDS];
+}
+
 /** Show Create your own GitHub App beside hosted Connect. */
 export function offersPrivateGitHubAppSetup(definition?: IntegrationsIntegrationDefinition): boolean {
   return usesHostedGitHubAppInstall(definition);

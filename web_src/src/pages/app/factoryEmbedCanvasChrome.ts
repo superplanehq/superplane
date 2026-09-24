@@ -19,12 +19,10 @@ type FactoryEmbedCanvasChromeInput = {
   runInspectionChromeActive: boolean;
   handleSelectMemoryMode: () => void;
   handleSelectConsoleMode: () => void;
-  handleSelectFilesMode: () => void;
   handleEnterEditModeFromHeader: () => void | Promise<void>;
   handleExitEditSession: () => void;
   handleSelectLiveCanvas: () => void;
   handleBackToRunList: () => void;
-  filesHeaderActionsSlotId: string;
   runsHasFitToViewRef: RefObject<boolean>;
   hasFitToViewRef: RefObject<boolean>;
   runsViewportRef: RefObject<ViewportLike | undefined>;
@@ -66,8 +64,6 @@ function resolveFactoryShellModeActions(input: FactoryEmbedCanvasChromeInput) {
   return {
     onSelectMemory: hideFactoryShellChrome ? undefined : input.handleSelectMemoryMode,
     onSelectConsole: hideFactoryShellChrome ? undefined : input.handleSelectConsoleMode,
-    onSelectFiles: hideFactoryShellChrome ? undefined : input.handleSelectFilesMode,
-    filesHeaderActionsSlotId: hideFactoryShellChrome ? undefined : input.filesHeaderActionsSlotId,
     isEditSessionActive: input.factoryViewOnly ? false : input.editSessionActive,
     onEnterEditMode: input.factoryViewOnly ? undefined : input.handleEnterEditModeFromHeader,
     onExitEditMode: input.factoryViewOnly ? undefined : input.handleExitEditSession,
@@ -117,18 +113,16 @@ export function resolveFactoryEmbedSidebars({
   headerModeAllowsRuns,
   editSessionActive,
   isMemoryMode,
-  isFilesMode,
   runInspectionChromeActive,
 }: {
   factoryEmbed: boolean;
   headerModeAllowsRuns: boolean;
   editSessionActive: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   runInspectionChromeActive: boolean;
 }) {
   return {
-    showRunsSidebar: !factoryEmbed && headerModeAllowsRuns && !editSessionActive && !isMemoryMode && !isFilesMode,
+    showRunsSidebar: !factoryEmbed && headerModeAllowsRuns && !editSessionActive && !isMemoryMode,
     showVersionsSidebar: !factoryEmbed && editSessionActive && !runInspectionChromeActive && !isMemoryMode,
   };
 }

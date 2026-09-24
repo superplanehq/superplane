@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -29,7 +28,6 @@ func NormalizePath(path string) string {
 
 type AppFileReader struct {
 	db     *gorm.DB
-	git    git.Provider
 	app    *models.Canvas
 	userID uuid.UUID
 }
@@ -38,8 +36,8 @@ func IsSpecFilePath(path string) bool {
 	return path == CanvasYAMLPath || path == ConsoleYAMLPath
 }
 
-func NewAppFileReader(db *gorm.DB, git git.Provider, canvas *models.Canvas, userID uuid.UUID) *AppFileReader {
-	return &AppFileReader{db: db, git: git, app: canvas, userID: userID}
+func NewAppFileReader(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID) *AppFileReader {
+	return &AppFileReader{db: db, app: canvas, userID: userID}
 }
 
 func (r *AppFileReader) Read(ctx context.Context, path string) (reader io.ReadCloser, err error) {
@@ -79,22 +77,11 @@ func (r *AppFileReader) ReadFromVersion(ctx context.Context, path string, versio
 	}
 
 	path = NormalizePath(path)
-
-	//
-	// Spec files (canvas.yaml, console.yaml) are not yet written to git,
-	// so we still need to take them from the database, and convert to YAML here.
-	//
-	// NOTE: this should be removed once spec files are also written to git.
-	//
-	if IsSpecFilePath(path) {
-		return r.readSpecFromVersion(ctx, path, v)
+	if !IsSpecFilePath(path) {
+		return nil, ErrFileNotFound
 	}
 
-	//
-	// Arbitrary files are read directly from the git repository.
-	// NOTE: once all versions point to git commits, we should use the commit SHA here.
-	//
-	return r.readFromGit(ctx, path)
+	return r.readSpecFromVersion(ctx, path, v)
 }
 
 func (r *AppFileReader) readSpecFromVersion(ctx context.Context, path string, version *models.CanvasVersion) (reader io.ReadCloser, err error) {
@@ -141,20 +128,4 @@ func (r *AppFileReader) ReadFromStaging(ctx context.Context, path string) (reade
 	}
 
 	return io.NopCloser(strings.NewReader(file.Content)), nil
-}
-
-func (r *AppFileReader) readFromGit(ctx context.Context, path string) (reader io.ReadCloser, err error) {
-	ctx, done := telemetry.Span(ctx, "reader.read_from_git")
-	defer done(&err)
-
-	repository, err := models.FindRepository(r.app.OrganizationID, r.app.ID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFileNotFound
-		}
-
-		return nil, fmt.Errorf("failed to find repository: %w", err)
-	}
-
-	return r.git.GetFile(ctx, repository.RepoID, path, "")
 }

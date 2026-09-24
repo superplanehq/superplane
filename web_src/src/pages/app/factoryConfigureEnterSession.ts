@@ -1,6 +1,8 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
+import type { ResyncStagedOptions } from "@/hooks/useCanvasStagingResync";
+
 export type FactoryConfigureEnterDeps = {
   activateCanvasVersionForEditing: (
     versionId: string,
@@ -9,10 +11,7 @@ export type FactoryConfigureEnterDeps = {
   ) => void;
   draftCanvasSpecsRef: MutableRefObject<Map<string, CanvasesCanvas["spec"] | null>>;
   previewingCurrentVersionRef: MutableRefObject<boolean>;
-  resyncStagedEditorState: (
-    versionId: string,
-    options?: { bumpResetNonce?: boolean; preferCachedStagedSpec?: boolean },
-  ) => Promise<void>;
+  resyncStagedEditorState: (versionId: string, options?: ResyncStagedOptions) => Promise<void>;
   setDraftCanvasSpec: Dispatch<SetStateAction<CanvasesCanvas["spec"] | null>>;
   setEditSessionActive: Dispatch<SetStateAction<boolean>>;
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
@@ -28,6 +27,35 @@ type StartFactoryConfigureEnterOptions = {
   editEnabledVisitIdRef: MutableRefObject<number | null>;
   deps: FactoryConfigureEnterDeps;
 };
+
+/** Give the staged-spec fetch a short window, then open Configure on the seed. */
+export const FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS = 2000;
+
+async function awaitStagedResync(
+  resync: FactoryConfigureEnterDeps["resyncStagedEditorState"],
+  versionId: string,
+  abort: AbortController,
+): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const winner = await Promise.race([
+      resync(versionId, { bumpResetNonce: false, signal: abort.signal }).then(
+        () => "resync" as const,
+        () => "resync" as const,
+      ),
+      new Promise<"timeout">((resolve) => {
+        timeoutId = setTimeout(() => resolve("timeout"), FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS);
+      }),
+    ]);
+    if (winner === "timeout") {
+      abort.abort();
+    }
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 /** Seed draft + await staged resync for one Configure visit. Returns cancel cleanup. */
 export function startFactoryConfigureEnter({
@@ -53,6 +81,7 @@ export function startFactoryConfigureEnter({
   };
 
   let cancelled = false;
+  const resyncAbort = new AbortController();
   const {
     activateCanvasVersionForEditing: activate,
     draftCanvasSpecsRef: specsRef,
@@ -69,10 +98,12 @@ export function startFactoryConfigureEnter({
   setDraft(immediateSpec);
 
   // Await staged resync before enabling edit so a late applyStagedSpec cannot
-  // wipe edits typed against the immediate seed.
+  // wipe edits typed against the immediate seed. A hung repository-file fetch
+  // must not leave "Loading canvas..." forever: time-box it, abort the apply,
+  // and keep the seed.
   void (async () => {
     try {
-      await resync(configureVersionId, { bumpResetNonce: false });
+      await awaitStagedResync(resync, configureVersionId, resyncAbort);
     } catch {
       // Keep the immediate live/committed spec so Configure stays usable.
     }
@@ -91,6 +122,7 @@ export function startFactoryConfigureEnter({
 
   return () => {
     cancelled = true;
+    resyncAbort.abort();
     // Strict Mode remount: allow retry only when edit never enabled for visit.
     if (editEnabledVisitIdRef.current !== visitId && inFlightVisitIdRef.current === visitId) {
       inFlightVisitIdRef.current = null;

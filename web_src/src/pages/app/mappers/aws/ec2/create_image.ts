@@ -10,11 +10,11 @@ import type {
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import type { Ec2Image } from "./types";
 
 interface Configuration {
@@ -125,7 +125,7 @@ function createImageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }

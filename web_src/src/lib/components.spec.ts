@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
 import {
   filterVisibleConfiguration,
@@ -149,8 +149,10 @@ describe("components value parsing and validation", () => {
         buildField({ name: "items", type: "multi-select", defaultValue: '["a","b"]' }),
         buildField({ name: "single", type: "multi-select", defaultValue: "a" }),
         buildField({ name: "config", type: "object", defaultValue: '{"ok":true}' }),
+        buildField({ name: "badObject", type: "object", defaultValue: "not-json" }),
         buildField({ name: "timezone", type: "timezone", defaultValue: "current" }),
         buildField({ name: "raw", type: "string", defaultValue: "value" }),
+        buildField({ name: "empty", type: "string" }),
       ]),
     ).toEqual({
       count: 3,
@@ -158,6 +160,7 @@ describe("components value parsing and validation", () => {
       items: ["a", "b"],
       single: ["a"],
       config: { ok: true },
+      badObject: {},
       timezone: (-new Date().getTimezoneOffset() / 60).toString(),
       raw: "value",
     });

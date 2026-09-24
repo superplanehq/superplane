@@ -39,16 +39,23 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return nil, grpcerrors.Internal(err, "failed to count personal tokens")
 	}
 
+	notificationSettings, err := loadNotificationSettings(ctx, user.OrganizationID, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	userProto := &pb.User{
-		Id:             user.ID.String(),
-		Name:           user.Name,
-		Email:          user.GetEmail(),
-		OrganizationId: orgID,
-		CreatedAt:      timestamppb.New(user.CreatedAt),
-		HasToken:       tokenCount > 0,
-		Permissions:    []*pbAuth.Permission{},
-		Roles:          []string{},
-		Groups:         []string{},
+		Id:                             user.ID.String(),
+		Name:                           user.Name,
+		Email:                          user.GetEmail(),
+		OrganizationId:                 orgID,
+		CreatedAt:                      timestamppb.New(user.CreatedAt),
+		HasToken:                       tokenCount > 0,
+		Permissions:                    []*pbAuth.Permission{},
+		Roles:                          []string{},
+		Groups:                         []string{},
+		IsOwner:                        user.IsOwner,
+		BrowserNotificationPreferences: serializeBrowserNotificationPreferences(notificationSettings),
 	}
 
 	if !includePermissions {
@@ -98,6 +105,23 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	return &pb.MeResponse{
 		User: userProto,
 	}, nil
+}
+
+func loadNotificationSettings(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	userID uuid.UUID,
+) (*models.UserNotificationSettings, error) {
+	settings, err := models.FindUserNotificationSettings(database.DB(ctx), organizationID, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		defaults := models.DefaultUserNotificationSettings()
+		return &defaults, nil
+	}
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load notification settings")
+	}
+
+	return settings, nil
 }
 
 func loadUser(ctx context.Context, orgID, userID string) (user *models.User, err error) {

@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { baseMapper } from "./base";
 import { getCreditsMapper } from "./get_credits";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   chatCompletion: baseMapper,

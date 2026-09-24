@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";

@@ -1,0 +1,210 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-websocket
+  namespace: {{ .Release.Namespace }}
+{{- if eq .Values.ingress.className "gce" }}
+  annotations:
+    cloud.google.com/backend-config: '{"default": "ingress-websocket-backend-config"}'
+    cloud.google.com/neg: '{"ingress": true}'
+{{- end }}
+spec:
+  type: NodePort
+  selector:
+    app: superplane
+    service: {{ .Release.Name }}-websocket
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-websocket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-websocket
+spec:
+  replicas: {{ .Values.websocket.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  minReadySeconds: 10
+  selector:
+    matchLabels:
+      app: superplane
+      service: {{ .Release.Name }}-websocket
+  template:
+    metadata:
+      name: {{ .Release.Name }}-websocket
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-websocket
+    spec:
+      terminationGracePeriodSeconds: 75
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-websocket
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.domain.configMapName }}
+            - secretRef:
+                name: {{ include "secrets.database.name" . }}
+            - secretRef:
+                name: {{ include "secrets.rabbitmq.name" . }}
+            - secretRef:
+                name: {{ include "secrets.authentication.name" . }}
+            - secretRef:
+                name: {{ include "secrets.telemetry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.encryption.name" . }}
+            - secretRef:
+                name: {{ include "secrets.jwt.name" . }}
+            - secretRef:
+                name: {{ include "secrets.session.name" . }}
+            - secretRef:
+                name: {{ include "secrets.sentry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.dash0Web.name" . }}
+            {{- if .Values.posthog.enabled }}
+            - secretRef:
+                name: {{ include "secrets.posthog.name" . }}
+            {{- end }}
+            {{- if .Values.polar.enabled }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
+          env:
+            - name: START_PUBLIC_API
+              value: "yes"
+            - name: START_GRPC_GATEWAY
+              value: "no"
+            - name: START_EVENT_DISTRIBUTER
+              value: "yes"
+            - name: START_WEB_SERVER
+              value: "no"
+            - name: START_WEBSOCKET_SERVER
+              value: "yes"
+            - name: START_RBAC_POLICY_RELOAD_CONSUMER
+              value: "yes"
+            - name: PUBLIC_API_BASE_PATH
+              value: "/api/v1"
+            - name: WEB_BASE_PATH
+              value: ""
+            - name: SWAGGER_BASE_PATH
+              value: "/app/api/swagger"
+            - name: RBAC_MODEL_PATH
+              value: /app/rbac/rbac_model.conf
+            - name: RBAC_ORG_POLICY_PATH
+              value: /app/rbac/rbac_org_policy.csv
+            - name: RBAC_CANVAS_POLICY_PATH
+              value: /app/rbac/rbac_canvas_policy.csv
+            - name: APPLICATION_NAME
+              value: superplane
+            - name: DB_POOL_SIZE
+              value: "{{ .Values.websocket.dbPoolSize }}"
+            - name: DB_STATEMENT_TIMEOUT
+              value: "{{ .Values.database.statementTimeout }}"
+            - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
+              value: "{{ .Values.database.idleInTransactionSessionTimeout }}"
+            - name: TEMPLATE_DIR
+              value: /app/templates
+            - name: OIDC_KEYS_PATH
+              value: /app/oidc-keys
+            - name: BLOCK_SIGNUP
+{{- if .Values.api.blockSignup }}
+              value: "yes"
+{{- else }}
+              value: "no"
+{{- end }}
+            - name: ENABLE_PASSWORD_LOGIN
+              value: {{ ternary "yes" "no" .Values.authentication.enablePasswordLogin | quote }}
+            - name: OWNER_SETUP_ENABLED
+{{- if .Values.api.ownerSetupEnabled }}
+              value: "yes"
+{{- else }}
+              value: "no"
+{{- end }}
+            - name: OTEL_ENABLED
+              value: "yes"
+            - name: SUPERPLANE_BEACON_ENABLED
+              value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
+            - name: SUPERPLANE_INSTALLATION_TYPE
+              value: {{ .Values.installation.type | quote }}
+            - name: BLOB_STORAGE_PROVIDER
+              value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_BUCKET
+              value: {{ .Values.blobStorage.bucket | quote }}
+            - name: BLOB_STORAGE_REGION
+              value: {{ .Values.blobStorage.region | quote }}
+            - name: BLOB_STORAGE_LOCAL_PATH
+              value: {{ .Values.blobStorage.localPath | quote }}
+            - name: BLOB_STORAGE_CREDENTIALS_FILE
+              value: {{ .Values.blobStorage.credentialsFile | quote }}
+
+          volumeMounts:
+            - name: oidc-keys
+              mountPath: /app/oidc-keys
+              readOnly: true
+{{- if eq .Values.blobStorage.provider "filesystem" }}
+            - name: blob-data
+              mountPath: {{ .Values.blobStorage.localPath }}
+{{- end }}
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+          {{- with .Values.websocket.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      volumes:
+        - name: oidc-keys
+          secret:
+            secretName: {{ include "secrets.oidc.name" . }}
+{{- if eq .Values.blobStorage.provider "filesystem" }}
+        - name: blob-data
+          emptyDir: {}
+{{- end }}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   requiredIntegrationsReady,
@@ -118,6 +118,48 @@ describe("syncSelectionsWithInstances", () => {
       syncSelectionsWithInstances(data, { github: { id: "old", name: "old", ready: true } }, { github: "new" }),
     ).toEqual({
       github: { id: "new", name: "new", ready: false },
+    });
+  });
+
+  // Onboarding lists github as a manual selection: the wizard must not adopt
+  // an existing organization connection, or the repository list would come
+  // from an account the user did not pick.
+  it("never auto-selects a manual-selection integration", () => {
+    const data = [
+      {
+        name: "github",
+        allInstances: [instance("old", "ready")],
+        readyInstances: [instance("old", "ready")],
+      },
+    ];
+    expect(syncSelectionsWithInstances(data, {}, {}, ["github"])).toBeNull();
+  });
+
+  it("keeps a saved selection for a manual-selection integration", () => {
+    const data = [
+      {
+        name: "github",
+        allInstances: [instance("saved", "ready")],
+        readyInstances: [instance("saved", "ready")],
+      },
+    ];
+    expect(
+      syncSelectionsWithInstances(data, { github: { id: "saved", name: "saved", ready: false } }, {}, ["github"]),
+    ).toEqual({
+      github: { id: "saved", name: "saved", ready: true },
+    });
+  });
+
+  it("applies a preferred instance for a manual-selection integration", () => {
+    const data = [
+      {
+        name: "github",
+        allInstances: [instance("old", "ready"), instance("picked", "ready")],
+        readyInstances: [instance("old", "ready"), instance("picked", "ready")],
+      },
+    ];
+    expect(syncSelectionsWithInstances(data, {}, { github: "picked" }, ["github"])).toEqual({
+      github: { id: "picked", name: "picked", ready: true },
     });
   });
 });

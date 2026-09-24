@@ -62,7 +62,7 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 }
 
 func repositoryCanvasFilePath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/repository/file"
+	return "/api/v1/canvases/" + canvasID + "/file"
 }
 
 func stagingPath(canvasID string) string {

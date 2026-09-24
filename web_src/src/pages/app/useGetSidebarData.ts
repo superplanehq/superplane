@@ -51,17 +51,17 @@ export function useGetSidebarData({
       });
 
       return {
-        ...prepareSidebarData(
+        ...prepareSidebarData({
           node,
-          canvasNodes,
-          allComponents,
-          allTriggers,
-          executionsMap,
-          queueItemsMap,
-          eventsMap,
+          nodes: canvasNodes,
+          components: allComponents,
+          triggers: allTriggers,
+          nodeExecutionsMap: executionsMap,
+          nodeQueueItemsMap: queueItemsMap,
+          nodeEventsMap: eventsMap,
           totalHistoryCount,
           totalQueueCount,
-        ),
+        }),
         isLoading: nodeData.isLoading,
       };
     },
