@@ -220,6 +220,68 @@ func Test__AWS__Sync(t *testing.T) {
 	})
 }
 
+func Test__AWS__CleanupPreservesEarlierErrors(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`{"__type":"InternalException","message":"remove targets failed"}`)),
+			},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))},
+			{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`{"__type":"InternalException","message":"delete destination failed"}`)),
+			},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))},
+			{
+				StatusCode: http.StatusInternalServerError,
+				Body: io.NopCloser(strings.NewReader(`
+					<ErrorResponse>
+						<Error>
+							<Code>ServiceFailure</Code>
+							<Message>delete role policy failed</Message>
+						</Error>
+					</ErrorResponse>
+				`)),
+			},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))},
+		},
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+			"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+			"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+		},
+		Metadata: common.IntegrationMetadata{
+			Session: &common.SessionMetadata{},
+			EventBridge: &common.EventBridgeMetadata{
+				Rules: map[string]common.EventBridgeRuleMetadata{
+					"rule": {Name: "rule", Region: "us-east-1"},
+				},
+				APIDestinations: map[string]common.APIDestinationMetadata{
+					"us-east-1": {Name: "destination"},
+				},
+			},
+			IAM: &common.IAMMetadata{
+				TargetDestinationRole: &common.IAMRoleMetadata{RoleName: "role"},
+			},
+		},
+	}
+
+	err := (&AWS{}).Cleanup(core.IntegrationCleanupContext{
+		HTTP:        httpContext,
+		Integration: integrationCtx,
+	})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "failed to remove targets for rule rule")
+	assert.ErrorContains(t, err, "failed to delete API destination")
+	assert.ErrorContains(t, err, "failed to delete IAM role policy for role")
+	assert.Len(t, httpContext.Requests, 6)
+}
+
 func Test__AWS__ListResources(t *testing.T) {
 	a := &AWS{}
 
