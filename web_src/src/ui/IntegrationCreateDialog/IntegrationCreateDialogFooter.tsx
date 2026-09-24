@@ -11,7 +11,7 @@ interface IntegrationCreateDialogFooterProps {
   browserActionCompleted: boolean;
   mutationPending: boolean;
   isCreatePending: boolean;
-  integrationName: string;
+  canSubmit: boolean;
   onCompleteWebhookSetup: () => Promise<void>;
   onBrowserActionContinue: () => void;
   onBrowserActionConfigSave: () => Promise<void>;
@@ -26,7 +26,7 @@ export function IntegrationCreateDialogFooter({
   browserActionCompleted,
   mutationPending,
   isCreatePending,
-  integrationName,
+  canSubmit,
   onCompleteWebhookSetup,
   onBrowserActionContinue,
   onBrowserActionConfigSave,
@@ -101,7 +101,7 @@ export function IntegrationCreateDialogFooter({
       <LoadingButton
         color="blue"
         onClick={() => void onSubmit()}
-        disabled={!integrationName?.trim()}
+        disabled={!canSubmit}
         loading={isCreatePending}
         loadingText="Connecting..."
         className="flex items-center gap-2"

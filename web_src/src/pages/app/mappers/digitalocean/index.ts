@@ -43,7 +43,7 @@ import { createGPUDropletMapper } from "./create_gpu_droplet";
 import { getGPUDropletMapper } from "./get_gpu_droplet";
 import { updateGPUDropletMapper } from "./update_gpu_droplet";
 import { deleteGPUDropletMapper } from "./delete_gpu_droplet";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDroplet: createDropletMapper,

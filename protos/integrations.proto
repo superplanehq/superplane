@@ -45,6 +45,9 @@ message ListIntegrationsRequest {
 
 message ListIntegrationsResponse {
   repeated IntegrationDefinition integrations = 1;
+  // True when this process holds complete public GitHub App credentials.
+  // Independent of per-organization hosted install (factories feature).
+  bool github_app_configured = 2;
 }
 
 message IntegrationDefinition {

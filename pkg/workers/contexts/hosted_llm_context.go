@@ -44,6 +44,11 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 		return core.HostedLLMAccess{}, err
 	}
 
+	managementKey, err := decryptHostedManagementKey(c.encryptor, row)
+	if err != nil {
+		return core.HostedLLMAccess{}, err
+	}
+
 	allowed, err := models.ResolveSelectableLLMModels(c.tx, c.organizationID, c.factoryID, provider, models.UsageFundingSourceHosted)
 	if err != nil {
 		return core.HostedLLMAccess{}, err
@@ -51,9 +56,20 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 
 	return core.HostedLLMAccess{
 		APIKey:        apiKey,
+		ManagementKey: managementKey,
 		BaseURL:       row.BaseURL,
 		AllowedModels: allowed,
 	}, nil
+}
+
+func decryptHostedManagementKey(encryptor crypto.Encryptor, row *models.HostedLLMProvider) (string, error) {
+	if row.Provider != models.UsageProviderOpenRouter {
+		return "", nil
+	}
+	if !row.HasManagementKey() {
+		return "", fmt.Errorf("%w: %s", models.ErrHostedLLMProviderNoManagementKey, row.Provider)
+	}
+	return llm.DecryptManagementKey(context.Background(), encryptor, row.Provider, row.ManagementKey)
 }
 
 func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
@@ -72,4 +88,15 @@ func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model 
 
 func (c *HostedLLMContext) AssertCreditAvailable() error {
 	return models.AssertHostedRunAllowed(database.Conn(), c.organizationID, c.factoryID)
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(c.tx)
+	if err != nil {
+		return core.DefaultHostedLLMModel{}, err
+	}
+	return core.DefaultHostedLLMModel{
+		Provider: defaultModel.Provider,
+		Model:    defaultModel.Model,
+	}, nil
 }

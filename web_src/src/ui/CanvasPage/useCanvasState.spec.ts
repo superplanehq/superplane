@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { Edge, Node } from "@xyflow/react";
 import { FACTORY_COMPACT_LAYER_STRIDE, FACTORY_EDIT_VERTICAL_EXTRA_PER_LAYER } from "@/lib/factoryEditVerticalSpacing";
 import type { CanvasPageProps } from ".";

@@ -1,15 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
-import { afterOnboardingPath, finishOnboardingError, provisionWorkspace } from "./useFinishOnboarding";
+import {
+  afterOnboardingPath,
+  afterWorkspaceProvisioned,
+  finishOnboardingError,
+  provisionWorkspace,
+} from "./useFinishOnboarding";
 
 const readyPlan = {
-  providerId: "openrouter",
-  component: "runnerOpenRouter",
+  component: "runnerSuperPlane",
   credentialsSource: "hosted",
-  integrationName: "openrouter",
-  harness: "AGENT_HARNESS_CLAUDE_CODE",
-  model: "openai/gpt-4.1",
-  planningModel: "openai/gpt-4.1",
+  harness: "AGENT_HARNESS_SUPERPLANE",
+  model: "",
+  planningModel: "",
 } as const;
 
 describe("finishOnboardingError", () => {
@@ -25,6 +28,23 @@ describe("finishOnboardingError", () => {
         plan: readyPlan,
       }),
     ).toBeNull();
+  });
+
+  it("requires a Jira connection and project when the ticket source is Jira", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: "acme/web",
+        workspaceName: "Web",
+        githubReady: true,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+        issuesChoice: "jira",
+        jiraReady: false,
+        jiraProjectId: "",
+      }),
+    ).toBe("Connect Jira, then choose a project.");
   });
 });
 
@@ -48,8 +68,7 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
-      listPRFeedbackHandlers: vi.fn().mockResolvedValue([]),
-      createPRFeedbackHandler: vi.fn().mockResolvedValue({ id: "handler-1" }),
+      deleteIntake: vi.fn().mockResolvedValue({}),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],
@@ -60,10 +79,9 @@ describe("provisionWorkspace", () => {
       github: { id: "github-1" },
       agentPlan: readyPlan,
       agentRewrite: {
-        component: "runnerOpenRouter",
-        model: readyPlan.model,
-        planningModel: readyPlan.planningModel,
-        credentials: { source: "hosted" as const },
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
       },
       ...overrides,
     };
@@ -71,9 +89,11 @@ describe("provisionWorkspace", () => {
 
   it("saves the issues choice it was given, not a value read off setup state", async () => {
     const updateOnboarding = vi.fn().mockResolvedValue({});
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
 
-    await provisionWorkspace(provisionArgs({ issuesChoice: "vcs", updateOnboarding }));
+    await provisionWorkspace(provisionArgs({ issuesChoice: "vcs", updateOnboarding, createIntake }));
 
+    expect(createIntake).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
     const issuesSourceCalls = updateOnboarding.mock.calls
       .map(([input]) => input.issuesSource)
       .filter((value) => value !== undefined);
@@ -91,6 +111,118 @@ describe("provisionWorkspace", () => {
     const completeCall = updateOnboarding.mock.calls.find(([input]) => input.complete);
     expect(completeCall?.[0]).toMatchObject({ complete: true });
   });
+
+  it("creates a Jira intake instead of GitHub issues when the ticket source is Jira", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" });
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+
+    await provisionWorkspace(
+      provisionArgs({
+        issuesChoice: "jira",
+        createIntake,
+        updateOnboarding,
+        jira: { integrationId: "jira-1", projectId: "PAY" },
+      }),
+    );
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_JIRA_ISSUES",
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+    const issuesSourceCalls = updateOnboarding.mock.calls
+      .map(([input]) => input.issuesSource)
+      .filter((value) => value !== undefined);
+    expect(issuesSourceCalls).toEqual(["ISSUES_SOURCE_JIRA"]);
+  });
+
+  it("creates a Jira intake with the chosen completion column", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-jira" });
+
+    await provisionWorkspace(
+      provisionArgs({
+        issuesChoice: "jira",
+        createIntake,
+        jira: {
+          integrationId: "jira-1",
+          projectId: "PAY",
+          settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+        },
+      }),
+    );
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_JIRA_ISSUES",
+      integrationId: "jira-1",
+      resourceId: "PAY",
+      settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
+    });
+  });
+
+  it("does not create a comments handler during workspace setup", async () => {
+    await provisionWorkspace(provisionArgs());
+  });
+
+  it("does not create a GitHub intake when the ticket source is Jira without a project", async () => {
+    const createIntake = vi.fn();
+
+    await expect(provisionWorkspace(provisionArgs({ issuesChoice: "jira", createIntake }))).rejects.toThrow(
+      "Connect Jira, then choose a project.",
+    );
+
+    expect(createIntake).not.toHaveBeenCalled();
+  });
+});
+
+describe("afterWorkspaceProvisioned", () => {
+  it("renames the organization, refreshes the switcher, then opens the new slug", async () => {
+    const updateOrganization = vi.fn().mockResolvedValue("acme-org");
+    const invalidateAccountOrganizations = vi.fn();
+    const navigate = vi.fn();
+
+    await afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization,
+      invalidateAccountOrganizations,
+      navigate,
+    });
+
+    expect(updateOrganization).toHaveBeenCalledWith({ name: "Acme Org", slug: "acme-org" });
+    expect(invalidateAccountOrganizations).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/sp/lines/line-1", { replace: true });
+  });
+
+  it("hands the renamed organization to onProvisioned instead of navigating", async () => {
+    const updateOrganization = vi.fn().mockResolvedValue("acme-org");
+    const invalidateAccountOrganizations = vi.fn();
+    const navigate = vi.fn();
+    const onProvisioned = vi.fn();
+
+    await afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization,
+      invalidateAccountOrganizations,
+      navigate,
+      onProvisioned,
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(onProvisioned).toHaveBeenCalledWith({
+      organizationId: "acme-org",
+      factoryKey: "SP",
+      lineId: "line-1",
+    });
+  });
 });
 
 describe("afterOnboardingPath", () => {
@@ -101,6 +233,6 @@ describe("afterOnboardingPath", () => {
         factoryKey: "SP",
         lineId: "line-1",
       }),
-    ).toBe("/org-1/workspaces/SP/lines/line-1");
+    ).toBe("/org-1/workspaces/sp/lines/line-1");
   });
 });

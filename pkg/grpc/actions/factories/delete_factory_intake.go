@@ -16,18 +16,13 @@ func DeleteFactoryIntake(ctx context.Context, organizationID string, req *pb.Del
 		return nil, factoryErrorToStatus(err, "failed to delete factory intake")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to delete factory intake")
-	}
-
 	intakeID, err := parseIntakeID(req.GetIntakeId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory intake")
 	}
 
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, err := models.FindFactory(tx, orgID, factoryID)
+		factory, err := findFactory(tx, orgID, req.GetFactoryId())
 		if err != nil {
 			return err
 		}

@@ -18,7 +18,7 @@ func TestUpdateGroup(t *testing.T) {
 	orgID := r.Organization.ID.String()
 
 	t.Run("successful role update", func(t *testing.T) {
-		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgViewer, "Test Group", "Test Description")
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgOperator, "Test Group", "Test Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -36,7 +36,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("successful metadata update", func(t *testing.T) {
-		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description")
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "metadata-group", models.RoleOrgOperator, "Metadata Group", "Metadata Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -52,7 +52,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
-		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description")
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "full-update-group", models.RoleOrgOperator, "Full Update Group", "Full Update Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -70,7 +70,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("update preserves group membership", func(t *testing.T) {
-		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description")
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "membership-group", models.RoleOrgOperator, "Membership Group", "Membership Description")
 		require.NoError(t, err)
 
 		userID1 := uuid.New().String()
@@ -96,13 +96,13 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("nil spec returns current state without panic", func(t *testing.T) {
-		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "nil-spec-group", models.RoleOrgViewer, "Nil Spec Group", "Nil Spec Description")
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "nil-spec-group", models.RoleOrgOperator, "Nil Spec Group", "Nil Spec Description")
 		require.NoError(t, err)
 
 		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "nil-spec-group", nil, r.AuthService)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, models.RoleOrgViewer, resp.Group.Spec.Role)
+		assert.Equal(t, models.RoleOrgOperator, resp.Group.Spec.Role)
 		assert.Equal(t, "Nil Spec Group", resp.Group.Spec.DisplayName)
 		assert.Equal(t, "Nil Spec Description", resp.Group.Spec.Description)
 	})

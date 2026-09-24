@@ -1,5 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AccountContext } from "@/contexts/accountContextState";
 import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
 import { OutcomeProgressWidget } from "@/components/AgentSidebar/widgets/OutcomeProgressWidget";
@@ -37,16 +36,12 @@ import { FactoryAgentSetupNotice } from "./FactoryAgentSetupNotice";
 import { FactoryChatComposer } from "./FactoryChatComposer";
 import { FactoryConversationTranscript } from "./FactoryConversationTranscript";
 
-const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
-
 type ChatConversationProps = {
   chatId: string;
   canvasId: string;
   organizationId: string;
   initialStatus: string;
   refreshChatStatus: () => Promise<string | undefined>;
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
   isAutoLayoutOnUpdateEnabled: boolean;
   onAgentStagingReady?: AgentStagingReadyHandler;
@@ -97,8 +92,6 @@ export function FactoryAgentTabPanel({ toolSidebarState }: { toolSidebarState: C
       organizationId={organizationId}
       initialStatus={chatQuery.data?.status ?? "idle"}
       refreshChatStatus={refreshChatStatus}
-      agentMode={toolSidebarState.agentMode}
-      onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
       isAutoLayoutOnUpdateEnabled={toolSidebarState.isAutoLayoutOnUpdateEnabled}
       onAgentStagingReady={toolSidebarState.onAgentStagingReady}
@@ -116,8 +109,6 @@ function ChatConversation({
   organizationId,
   initialStatus,
   refreshChatStatus,
-  agentMode,
-  onModeSwitch,
   isEditing,
   isAutoLayoutOnUpdateEnabled,
   onAgentStagingReady,
@@ -141,12 +132,9 @@ function ChatConversation({
   useEffect(() => {
     setStatus(initialStatus || "idle");
   }, [initialStatus, chatId]);
-  useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
-
   const showThinking = useThinkingIndicator(rawMessages, status);
-  useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode, isAutoLayoutOnUpdateEnabled });
+  useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, isAutoLayoutOnUpdateEnabled });
   const handlers = useAgentConversationHandlers({
-    agentMode,
     chatId,
     canvasId,
     isAutoLayoutOnUpdateEnabled,
@@ -160,9 +148,25 @@ function ChatConversation({
     setOutcomeState,
   });
 
+  const reconcileStreamingStatus = useCallback(async () => {
+    if (status !== "streaming") {
+      return;
+    }
+    try {
+      const nextStatus = await refreshChatStatus();
+      if (nextStatus && nextStatus !== "streaming") {
+        setStatus(nextStatus);
+      }
+    } catch {
+      // Live events remain authoritative. A later reconnect retries recovery.
+    }
+  }, [refreshChatStatus, status]);
   const wsCallbacks = useMemo(
-    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
-    [setOutcomeState],
+    () => ({
+      ...createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+      onConnectionOpen: () => void reconcileStreamingStatus(),
+    }),
+    [reconcileStreamingStatus, setOutcomeState],
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
@@ -221,9 +225,6 @@ function ChatConversation({
         sendPending={sendMutation.isPending || resetMutation.isPending}
         stopping={interruptMutation.isPending}
         statusLabel={resolveComposerStatusLabel(resetMutation.isPending, sendMutation.isPending, status)}
-        agentMode={agentMode}
-        onModeSwitch={onModeSwitch}
-        modeDisabled={agentBusy}
       />
     </div>
   );
@@ -233,49 +234,6 @@ function resolveComposerStatusLabel(resetPending: boolean, sendPending: boolean,
   if (resetPending) return "Clearing chat...";
   if (sendPending) return "Starting agent...";
   return statusLabel(status);
-}
-
-function useStreamingStatusReconciler(
-  status: string,
-  setStatus: (value: string) => void,
-  refreshChatStatus: () => Promise<string | undefined>,
-) {
-  const activeRef = useRef(false);
-  const inFlightRef = useRef(false);
-  const reconcile = useCallback(async () => {
-    if (inFlightRef.current) {
-      return;
-    }
-
-    inFlightRef.current = true;
-    try {
-      const nextStatus = await refreshChatStatus();
-      if (activeRef.current && nextStatus && nextStatus !== "streaming") {
-        setStatus(nextStatus);
-      }
-    } catch {
-      // Websocket events remain the primary status path; refetch only repairs missed terminal events.
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, [refreshChatStatus, setStatus]);
-
-  useEffect(() => {
-    if (status !== "streaming") {
-      return;
-    }
-
-    activeRef.current = true;
-    void reconcile();
-    const intervalId = window.setInterval(() => {
-      void reconcile();
-    }, STREAMING_STATUS_RECONCILE_INTERVAL_MS);
-
-    return () => {
-      activeRef.current = false;
-      window.clearInterval(intervalId);
-    };
-  }, [reconcile, status]);
 }
 
 function ComposerWithCanvasData({
@@ -293,9 +251,6 @@ function ComposerWithCanvasData({
   sendPending: boolean;
   stopping?: boolean;
   statusLabel: string;
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
-  modeDisabled?: boolean;
 }) {
   const { data: canvas } = useCanvas(organizationId, canvasId, {
     staleTime: Infinity,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { factoryAppRunPath } from "../lib/factoryPagePaths";
 import {
@@ -32,7 +32,7 @@ describe("canvasExpandHrefForLine", () => {
       }),
     );
     expect(hrefFor("implementation")).toContain(`run=${LINE_RUN_IMPLEMENT_FAILED_ID}`);
-    expect(hrefFor("planning")).toBeUndefined();
+    expect(hrefFor("risk")).toBeUndefined();
   });
 
   it("uses the selected phase run when the canvas name is not a known key", () => {

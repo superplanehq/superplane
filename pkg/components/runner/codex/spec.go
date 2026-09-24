@@ -16,6 +16,7 @@ type RunCodexSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 }
 
 func decodeRunCodexSpec(raw any) (RunCodexSpec, error) {
@@ -40,6 +41,9 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
+		return err
+	}
 	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
 		return err
 	}
@@ -52,9 +56,6 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenAIAPIKey); err != nil {
 		return err
 	}
-	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envOpenAIBaseURL); err != nil {
-		return err
-	}
 	if spec.ExecutionTimeoutSeconds != 0 {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > runner.MaxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
@@ -63,14 +64,21 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	return nil
 }
 
-func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) ([]runner.BrokerCommand, []runner.BrokerTaskFile) {
-	return runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
+// CodexBrokerTask is the ordered broker commands and task files for a run.
+type CodexBrokerTask struct {
+	Commands []runner.BrokerCommand
+	Files    []runner.BrokerTaskFile
+}
+
+func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) CodexBrokerTask {
+	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare Codex",
 		PrepareScript:    runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
 		RunScriptName:    "run.js",
 		RunScript:        runScript,
 		WorkingDirectory: spec.WorkingDirectory,
 		Steps:            spec.Steps,
+		DispatchedSteps:  dispatched,
 		Usage:            usage,
 		Setups:           setups,
 		Model:            strings.TrimSpace(spec.Model),
@@ -82,4 +90,54 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 			)
 		},
 	})
+	return CodexBrokerTask{Commands: commands, Files: files}
+}
+
+func BuildBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexBrokerTask {
+	return buildCodexBrokerTask(spec, usage, setups, nil)
+}
+
+func BuildDispatchedBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) CodexBrokerTask {
+	return buildCodexBrokerTask(spec, usage, setups, dispatched)
+}
+
+func ApplyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {
+	return applyPlanningFollowUp(task, environment, spec)
+}
+
+// applyPlanningFollowUp keeps the machine on after canvas steps when this run
+// is a planning session. Line apps never attach a planning token, so they
+// keep the default step list and finish.
+func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {
+	if !runner.HasPlanningSessionToken(environment) {
+		return task
+	}
+	task.Files = append(task.Files, runner.FollowUpLoopFile())
+	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
+	return task
+}
+
+func planningFollowUpCommand(spec RunCodexSpec) runner.BrokerCommand {
+	workdir := planningFollowUpWorkingDirectory(spec)
+	model := strings.TrimSpace(spec.Model)
+	return runner.BrokerCommand{
+		Name: "Wait for the next message",
+		Command: runner.WrapAgentStepCommand(
+			runner.WrapPromptCommandInWorkingDirectory(
+				workdir,
+				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
+			),
+		),
+		Kind:    runner.LiveLogKindPrompt,
+		Preview: "Wait for the next user message",
+	}
+}
+
+func planningFollowUpWorkingDirectory(spec RunCodexSpec) string {
+	for i := len(spec.Steps) - 1; i >= 0; i-- {
+		if runner.NormalizeAgentStepType(spec.Steps[i].Type) == runner.AgentStepPrompt {
+			return runner.EffectiveWorkingDirectory(spec.WorkingDirectory, spec.Steps[i].WorkingDirectory)
+		}
+	}
+	return strings.TrimSpace(spec.WorkingDirectory)
 }

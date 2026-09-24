@@ -65,6 +65,7 @@ export function WorkOrderDetailSidebar({
     <div className="flex flex-col gap-6">
       <WorkOrderSidebarOverview
         organizationId={organizationId}
+        factoryKey={factoryKey}
         order={order}
         displayStatus={displayStatus}
         statusMeta={statusMeta}

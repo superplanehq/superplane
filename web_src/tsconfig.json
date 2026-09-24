@@ -2,7 +2,8 @@
   "files": [],
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@factory-templates/*": ["../pkg/grpc/actions/factories/templates/*"]
     }
   },
   "references": [

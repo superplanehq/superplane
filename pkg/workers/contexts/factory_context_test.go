@@ -1,20 +1,32 @@
 package contexts
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestFactoryContext_CreateWorkOrder(t *testing.T) {
@@ -29,10 +41,11 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	t.Run("creates work order on factory-owned app", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		workOrder, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		workOrder, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
 			Title:       "From GitHub issue",
 			Description: "Automated intake",
 		})
+		require.True(t, created)
 		require.NoError(t, err)
 		assert.Equal(t, "From GitHub issue", workOrder.Title)
 		assert.Equal(t, "Automated intake", workOrder.Description)
@@ -101,8 +114,9 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-		created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
 		require.NoError(t, err)
+		require.True(t, inserted)
 
 		persisted, err := factory.FindWorkOrder(database.Conn(), uuid.MustParse(created.ID))
 		require.NoError(t, err)
@@ -114,7 +128,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	t.Run("rejects blank title", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, models.ErrFactoryWorkOrderTitleRequired)
 	})
@@ -123,7 +137,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		regularCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		ctx := NewFactoryContext(database.Conn(), regularCanvas, nodeExecution)
 
-		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
 		require.Error(t, err)
 		assert.EqualError(t, err, "app is not owned by a factory")
 	})
@@ -155,9 +169,462 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&workOrderExecution).Error)
 
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-		_, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
+		_, _, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
 		require.Error(t, err)
 		assert.EqualError(t, err, "cannot create work order while executing another work order")
+	})
+}
+
+func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	sentryPayload := func(issueID string) map[string]any {
+		return map[string]any{
+			"type": "sentry.issue",
+			"data": map[string]any{
+				"resource": "issue",
+				"action":   "created",
+				"data": map[string]any{
+					"issue": map[string]any{
+						"id":        issueID,
+						"title":     "boom",
+						"permalink": "https://acme.sentry.io/issues/" + issueID + "/",
+					},
+				},
+			},
+		}
+	}
+
+	countOrders := func(factoryModel *models.Factory) int {
+		t.Helper()
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 100})
+		require.NoError(t, err)
+		return len(orders)
+	}
+
+	t.Run("skips a Sentry issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing sentry task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.sentry.io/issues/123/", Label: "boom"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("123"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("does not skip issue 12 when issue 123 already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Issue 123",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.sentry.io/issues/123/", Label: "123"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("12"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("skips a self-hosted Sentry issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing sentry task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://sentry.internal.example/issues/123/", Label: "boom"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("123"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("creates a task when the Sentry issue has none", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("456"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		origin := models.WorkOrderOrigin{
+			URL:   "https://github.com/acme/payments/issues/12",
+			Label: "acme/payments#12",
+		}
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"First github task",
+			"",
+			nil,
+			nil,
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": origin.URL,
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("serializes concurrent creates for the same Sentry issue", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		canvasOne, executionOne, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("789"))
+		canvasTwo, executionTwo, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, sentryPayload("789"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasOne.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasTwo.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		created := make([]bool, 2)
+		errs := make([]error, 2)
+		canvases := []*models.Canvas{canvasOne, canvasTwo}
+		executions := []*models.CanvasNodeExecution{executionOne, executionTwo}
+
+		for i := 0; i < 2; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					ctx := NewFactoryContext(tx, canvases[idx], executions[idx])
+					_, didCreate, createErr := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "boom"})
+					created[idx] = didCreate
+					return createErr
+				})
+			}(i)
+		}
+
+		close(start)
+		wg.Wait()
+
+		for _, createErr := range errs {
+			require.NoError(t, createErr)
+		}
+
+		createdCount := 0
+		for _, didCreate := range created {
+			if didCreate {
+				createdCount++
+			}
+		}
+		assert.Equal(t, 1, createdCount)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+}
+
+func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	jiraPayloadOnSite := func(action, siteURL, issueKey string) map[string]any {
+		return map[string]any{
+			"type": "jira.issue",
+			"data": map[string]any{
+				"action": action,
+				"url":    siteURL + "/browse/" + issueKey,
+				"issue":  map[string]any{"key": issueKey},
+			},
+		}
+	}
+	jiraPayload := func(action, issueKey string) map[string]any {
+		return jiraPayloadOnSite(action, "https://acme.atlassian.net", issueKey)
+	}
+
+	countOrders := func(factoryModel *models.Factory) int {
+		t.Helper()
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 100})
+		require.NoError(t, err)
+		return len(orders)
+	}
+
+	t.Run("skips a Jira issue that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		existing, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing jira task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-5", Label: "ENG-5"},
+		)
+		require.NoError(t, err)
+		beforeEvents, err := existing.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-5"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Existing jira task"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		afterEvents, err := existing.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		assert.Len(t, afterEvents, len(beforeEvents))
+	})
+
+	t.Run("create then update for the same issue inserts one work order", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		createdCanvas, createdExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-9"))
+		_, err = factoryModel.CreateIntake(database.Conn(), createdCanvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		createdCtx := NewFactoryContext(database.Conn(), createdCanvas, createdExecution)
+
+		first, created, err := createdCtx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, first)
+		require.NotNil(t, first.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-9", first.Origin.URL)
+		assert.Equal(t, "ENG-9", first.Origin.Label)
+
+		persisted, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(first.ID))
+		require.NoError(t, err)
+		beforeEvents, err := persisted.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, beforeEvents)
+
+		updatedCanvas, updatedExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-9"))
+		updatedCtx := NewFactoryContext(database.Conn(), updatedCanvas, updatedExecution)
+
+		second, created, err := updatedCtx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, second)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		afterEvents, err := persisted.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		assert.Len(t, afterEvents, len(beforeEvents))
+	})
+
+	t.Run("creates a task when the same key exists on another Jira site", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Other site issue",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://other.atlassian.net/browse/ENG-5", Label: "ENG-5"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayloadOnSite("created", "https://acme.atlassian.net", "ENG-5"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Acme ENG-5"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		require.NotNil(t, order.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-5", order.Origin.URL)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("does not skip ENG-5 when ENG-50 already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Issue ENG-50",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-50", Label: "ENG-50"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-5"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Issue ENG-5"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("creates a task when the Jira issue has none", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-7"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		require.NotNil(t, order.Origin)
+		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-7", order.Origin.URL)
+		assert.Equal(t, "ENG-7", order.Origin.Label)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		origin := models.WorkOrderOrigin{
+			URL:   "https://github.com/acme/payments/issues/12",
+			Label: "acme/payments#12",
+		}
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"First github task",
+			"",
+			nil,
+			nil,
+			nil,
+			origin,
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": origin.URL,
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("serializes concurrent creates for the same Jira issue", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		canvasOne, executionOne, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-8"))
+		canvasTwo, executionTwo, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-8"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasOne.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+		_, err = factoryModel.CreateIntake(database.Conn(), canvasTwo.ID, models.FactoryIntakeSourceJiraIssues)
+		require.NoError(t, err)
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		created := make([]bool, 2)
+		errs := make([]error, 2)
+		canvases := []*models.Canvas{canvasOne, canvasTwo}
+		executions := []*models.CanvasNodeExecution{executionOne, executionTwo}
+
+		for i := 0; i < 2; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					ctx := NewFactoryContext(tx, canvases[idx], executions[idx])
+					_, didCreate, createErr := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+					created[idx] = didCreate
+					return createErr
+				})
+			}(i)
+		}
+
+		close(start)
+		wg.Wait()
+
+		for _, createErr := range errs {
+			require.NoError(t, createErr)
+		}
+
+		createdCount := 0
+		for _, didCreate := range created {
+			if didCreate {
+				createdCount++
+			}
+		}
+		assert.Equal(t, 1, createdCount)
+		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 }
 
@@ -558,6 +1025,122 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_AddPullRequest_NotifiesGitHubRecorded(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Tracked", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	var recordedOrg, recordedFactory, recordedPR uuid.UUID
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithGitHubPullRequestRecorded(func(organizationID, factoryID, pullRequestID uuid.UUID) {
+			recordedOrg = organizationID
+			recordedFactory = factoryID
+			recordedPR = pullRequestID
+		})
+
+	created, err := ctx.AddPullRequest(core.AddPullRequestParams{
+		OrderID:    order.ID.String(),
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     44,
+		URL:        "https://github.com/acme/app/pull/44",
+		Title:      "Ready",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, factory.OrganizationID, recordedOrg)
+	assert.Equal(t, factory.ID, recordedFactory)
+	assert.Equal(t, created.ID, recordedPR.String())
+
+	recordedPR = uuid.Nil
+	_, err = ctx.AddPullRequest(core.AddPullRequestParams{
+		OrderID:    order.ID.String(),
+		Provider:   models.FactoryPullRequestProviderBitbucket,
+		Repository: "acme/app",
+		Number:     45,
+		URL:        "https://bitbucket.org/acme/app/pull-requests/45",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uuid.Nil, recordedPR)
+}
+
+func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("includes origin when the task has one", func(t *testing.T) {
+		originURL := "https://github.com/acme/payments/issues/12"
+		originLabel := "acme/payments#12"
+		order, err := factory.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Close origin after merge",
+			"",
+			&r.User,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: originURL, Label: originLabel},
+		)
+		require.NoError(t, err)
+
+		pullRequest, err := order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     42,
+			URL:        "https://github.com/acme/payments/pull/42",
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		match, err := ctx.FindPullRequest(core.FindPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     42,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, match.PullRequest)
+		assert.Equal(t, pullRequest.ID.String(), match.PullRequest.ID)
+		require.NotNil(t, match.WorkOrder)
+		require.NotNil(t, match.WorkOrder.Origin)
+		assert.Equal(t, originURL, match.WorkOrder.Origin.URL)
+		assert.Equal(t, originLabel, match.WorkOrder.Origin.Label)
+	})
+
+	t.Run("omits origin when the task has none", func(t *testing.T) {
+		order, err := factory.CreateWorkOrder(database.Conn(), "No origin", "", &r.User, nil, nil)
+		require.NoError(t, err)
+
+		_, err = order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     43,
+			URL:        "https://github.com/acme/payments/pull/43",
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		match, err := ctx.FindPullRequest(core.FindPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/payments",
+			Number:     43,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, match.WorkOrder)
+		assert.Nil(t, match.WorkOrder.Origin)
+	})
+}
+
 func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -621,12 +1204,7 @@ func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
 		Body:    "Ready for review",
 	}))
 
-	require.Len(t, notifications, 1)
-	assert.Equal(t, factory.ID.String(), notifications[0].FactoryID)
-	assert.Equal(t, order.ID.String(), notifications[0].OrderID)
-	assert.Equal(t, factoryevents.EventTypeOrderCommentAdded, notifications[0].EventType)
-	assert.Equal(t, "Ready for review", notifications[0].CommentBody)
-	assert.NotEmpty(t, notifications[0].ActorName)
+	assert.Empty(t, notifications)
 }
 
 func TestFactoryContext_SetWorkOrderStatusNote_EmitsNotification(t *testing.T) {
@@ -724,6 +1302,75 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	assert.Equal(t, "component-under-test", artifactAutomation.StepName)
 }
 
+func TestFactoryContext_AddWorkOrderArtifact_KeyedRefresh(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Keyed artifact target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	var reasons []string
+	var notifications []messages.FactoryWorkOrderNotificationMessage
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			reasons = append(reasons, reason)
+		}).
+		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+			notifications = append(notifications, notification)
+		})
+
+	first, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url":   "https://preview.example.com/v1",
+			"title": "Preview",
+		},
+		Key: "storybook-preview",
+	})
+	require.NoError(t, err)
+
+	second, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url": "https://preview.example.com/v2",
+		},
+		Key: "storybook-preview",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, "https://preview.example.com/v2", second.Data["url"])
+	_, hasTitle := second.Data["title"]
+	assert.False(t, hasTitle)
+
+	assert.Equal(t, []string{
+		factoryevents.EventTypeOrderArtifactAdded,
+		factoryevents.EventTypeOrderArtifactUpdated,
+	}, reasons)
+	assert.Empty(t, notifications)
+
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+
+	events, err := order.ListEvents(database.Conn(), 50, nil)
+	require.NoError(t, err)
+	addedCount := 0
+	for _, event := range events {
+		if event.Type == factoryevents.EventTypeOrderArtifactAdded {
+			addedCount++
+		}
+		assert.NotEqual(t, factoryevents.EventTypeOrderArtifactUpdated, event.Type)
+	}
+	assert.Equal(t, 1, addedCount)
+}
+
 type automationPayload struct {
 	NodeID   string `json:"nodeId"`
 	NodeName string `json:"nodeName"`
@@ -810,6 +1457,232 @@ func linkRunToWorkOrder(
 	}
 	require.NoError(t, database.Conn().Create(&execution).Error)
 	return line
+}
+
+func TestFactoryContext_CreateWorkOrderIngestsGitHubImagesBeforeEmit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	imageURL := "https://user-images.githubusercontent.com/1/ok.png"
+	description := "See ![bug](" + imageURL + ")"
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithRemoteImageFetch(
+		func(context.Context, *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       io.NopCloser(bytes.NewReader([]byte("png-bytes"))),
+			}, nil
+		},
+	)
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From GitHub issue",
+		Description: description,
+	})
+	require.True(t, inserted)
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.Contains(t, persisted.Description, blob.FileRefScheme+"://")
+	assert.NotContains(t, persisted.Description, imageURL)
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	reader, err := store.Get(t.Context(), files[0].StorageKey)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reader.Close() })
+	body, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("png-bytes"), body)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	assert.Contains(t, payload["description"], blob.FileRef(files[0].ID))
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 1)
+	item, ok := listed[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, files[0].ID.String(), item["id"])
+	url, ok := item["url"].(string)
+	require.True(t, ok)
+	assert.Contains(t, url, "/api/v1/public/files/"+files[0].ID.String())
+}
+
+func TestFactoryContext_CreateWorkOrderStoresProductiveAttachments(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	inline := "https://files.productive.io/attachments/files/1/original/shot.png"
+	canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+		"type": productive.TaskPayloadType,
+		"data": map[string]any{
+			"meta": map[string]any{"event": productive.TaskCreatedEvent},
+			"data": map[string]any{"id": "20305431", "type": "tasks"},
+		},
+	})
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithProductiveTaskFiles(
+		func(context.Context, string, string) ([]productive.TaskFile, error) {
+			return []productive.TaskFile{
+				{
+					Name:        "shot.png",
+					ContentType: "image/png",
+					Body:        []byte("png-bytes"),
+					ReplaceURLs: []string{inline},
+				},
+				{
+					Name:        "notes.pdf",
+					ContentType: "application/pdf",
+					Body:        []byte("pdf-bytes"),
+				},
+			}, nil
+		},
+	)
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From Productive.io task",
+		Description: "See ![shot](" + inline + ")",
+	})
+	require.True(t, inserted)
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.NotContains(t, persisted.Description, inline)
+	assert.Contains(t, persisted.Description, "![shot]("+blob.FileRefScheme+"://")
+	assert.Contains(t, persisted.Description, "[notes.pdf]("+blob.FileRefScheme+"://")
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 2)
+}
+
+func TestFactoryContext_CreateWorkOrderDefersFileCleanupUntilCallerApplies(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "bug.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, store, file, bytes.NewReader([]byte("png-bytes"))))
+	loaded, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	sourceKey := loaded.StorageKey
+
+	var jobs []FileBindCleanup
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithFileBindCleanup(func(job FileBindCleanup) {
+		jobs = append(jobs, job)
+	})
+	_, _, err = ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From workspace file",
+		Description: "See ![bug](" + blob.FileRef(file.ID) + ")",
+	})
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	_, err = store.Head(t.Context(), sourceKey)
+	require.NoError(t, err)
+
+	ApplyFileBindCleanups(jobs, nil)
+	_, err = store.Head(t.Context(), sourceKey)
+	assert.ErrorIs(t, err, blob.ErrNotFound)
+}
+
+func onWorkOrderEventWorkOrder(t *testing.T, event models.CanvasEvent) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(event.Data.Data())
+	require.NoError(t, err)
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+	data, ok := envelope["data"].(map[string]any)
+	require.True(t, ok, "event data: %s", raw)
+	workOrder, ok := data["workOrder"].(map[string]any)
+	require.True(t, ok, "workOrder payload: %s", raw)
+	return workOrder
 }
 
 func setupFactoryAppExecution(

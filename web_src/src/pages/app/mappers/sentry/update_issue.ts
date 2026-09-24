@@ -2,7 +2,7 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import { addDetail, addFormattedTimestamp, buildEventSections, getProjectLabel } from "./utils";
 import type {
   ComponentBaseContext,
@@ -107,38 +107,51 @@ export const updateIssueMapper: ComponentBaseMapper = {
 function buildMetadata(node: NodeInfo) {
   const configuration = node.configuration as UpdateIssueConfiguration | undefined;
   const nodeMetadata = node.metadata as UpdateIssueNodeMetadata | undefined;
-  const metadata = [];
+  return [...issueMetadataItems(configuration, nodeMetadata), ...visibilityMetadataItems(configuration)].slice(0, 3);
+}
 
+function issueMetadataItems(
+  configuration: UpdateIssueConfiguration | undefined,
+  nodeMetadata: UpdateIssueNodeMetadata | undefined,
+) {
+  const items: Array<{ icon: string; label: string }> = [];
   const issueLabel = nodeMetadata?.issueTitle || configuration?.issueId;
+
   if (issueLabel) {
-    metadata.push({ icon: "bug", label: issueLabel });
+    items.push({ icon: "bug", label: issueLabel });
   }
 
   if (configuration?.status) {
-    metadata.push({ icon: "check-circle-2", label: configuration.status });
+    items.push({ icon: "check-circle-2", label: configuration.status });
   }
 
   if (configuration?.assignedTo) {
-    metadata.push({ icon: "user", label: nodeMetadata?.assigneeLabel || configuration.assignedTo });
+    items.push({ icon: "user", label: nodeMetadata?.assigneeLabel || configuration.assignedTo });
   }
 
   if (configuration?.priority) {
-    metadata.push({ icon: "flag", label: configuration.priority });
+    items.push({ icon: "flag", label: configuration.priority });
   }
 
+  return items;
+}
+
+function visibilityMetadataItems(configuration: UpdateIssueConfiguration | undefined) {
+  const items: Array<{ icon: string; label: string }> = [];
+
   if (configuration?.hasSeen != null) {
-    metadata.push({ icon: "eye", label: `Seen: ${formatBoolean(configuration.hasSeen)}` });
+    items.push({ icon: "eye", label: `Seen: ${formatBoolean(configuration.hasSeen)}` });
   }
 
   if (configuration?.isPublic != null) {
-    metadata.push({ icon: "globe", label: `Public: ${formatBoolean(configuration.isPublic)}` });
+    items.push({ icon: "globe", label: `Public: ${formatBoolean(configuration.isPublic)}` });
   }
 
   if (configuration?.isSubscribed != null) {
-    metadata.push({ icon: "bell", label: `Subscribed: ${formatBoolean(configuration.isSubscribed)}` });
+    items.push({ icon: "bell", label: `Subscribed: ${formatBoolean(configuration.isSubscribed)}` });
   }
 
-  return metadata.slice(0, 3);
+  return items;
 }
 
 function formatBoolean(value: boolean | undefined): string | undefined {

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { posthog, isPostHogEnabled } from "@/posthog";
+import { useFactoriesThemeClass } from "@/pages/factories/lib/useFactoriesThemeClass";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { WelcomeSurveyLayout } from "./WelcomeSurveyLayout";
 import { getWelcomeSurveyRedirectPath } from "./welcomeSurveyRedirect";
 
 const NEW_USER_ONBOARDING_SURVEY_NAME = "New User Onboarding Survey";
@@ -14,6 +16,8 @@ const findNewUserSurvey = (surveys: PostHogSurvey[]) =>
   ) ?? null;
 
 const WelcomeSurvey: React.FC = () => {
+  useFactoriesThemeClass();
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [survey, setSurvey] = useState<PostHogSurvey | null>(null);
@@ -79,11 +83,9 @@ const WelcomeSurvey: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-400 px-4 py-10">
-      <div className="w-full max-w-xl rounded-lg bg-white px-8 py-9 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 sm:px-10">
-        <PostHogSurveyForm survey={survey} redirectTo={redirectTo} onComplete={handleSurveyComplete} />
-      </div>
-    </div>
+    <WelcomeSurveyLayout>
+      <PostHogSurveyForm survey={survey} redirectTo={redirectTo} onComplete={handleSurveyComplete} />
+    </WelcomeSurveyLayout>
   );
 };
 

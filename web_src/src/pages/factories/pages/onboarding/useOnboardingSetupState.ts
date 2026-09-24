@@ -23,6 +23,10 @@ export type OnboardingSetupState = {
   finished: boolean;
 };
 
+export type InitialOnboardingSetupState = Partial<
+  Pick<OnboardingSetupState, "vcsHost" | "selectedRepo" | "issuesRepo" | "issuesChoice" | "agent">
+>;
+
 function isIssuesReady(issuesChoice: IssuesChoiceId | null, connected: Set<IntegrationId>): boolean {
   if (issuesChoice === "skip" || issuesChoice === "vcs") {
     return true;
@@ -65,6 +69,7 @@ export function useOnboardingSetupState(
     connected?: Set<IntegrationId>;
     remainingCreditCents?: number;
     simulateDiscovery?: boolean;
+    initial?: InitialOnboardingSetupState;
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
@@ -74,18 +79,18 @@ export function useOnboardingSetupState(
     () => initialName.trim().length > 0 && !isPlaceholderWorkspaceName(initialName),
   );
   const [localConnected, setLocalConnected] = useState<Set<IntegrationId>>(() => new Set());
-  const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+  const [vcsHost, setVcsHost] = useState<VcsHostId | null>(() => options?.initial?.vcsHost ?? null);
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(() => options?.initial?.selectedRepo ?? null);
   /** True after Continue to issues — starts repository analysis. */
   const [repoCommitted, setRepoCommitted] = useState(false);
   /** Backlog repository for GitHub/GitLab Issues (may differ from the app repo). */
-  const [issuesRepo, setIssuesRepo] = useState<string | null>(null);
+  const [issuesRepo, setIssuesRepo] = useState<string | null>(() => options?.initial?.issuesRepo ?? null);
   const [issuesDiscovering, setIssuesDiscovering] = useState(false);
-  const [issuesDiscovered, setIssuesDiscovered] = useState(false);
-  const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(null);
+  const [issuesDiscovered, setIssuesDiscovered] = useState(() => Boolean(options?.initial?.issuesChoice));
+  const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(() => options?.initial?.issuesChoice ?? null);
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
-  const [agent, setAgent] = useState<AgentHarnessId | null>(null);
+  const [agent, setAgent] = useState<AgentHarnessId | null>(() => options?.initial?.agent ?? null);
   const [finished, setFinished] = useState(false);
   const discoveryTimerRef = useRef<number | null>(null);
   const connected = options?.connected ?? localConnected;
@@ -148,6 +153,12 @@ export function useOnboardingSetupState(
     },
     [resetIssuesState, suggestWorkspaceName],
   );
+
+  const clearRepository = useCallback(() => {
+    setSelectedRepo(null);
+    setRepoCommitted(false);
+    resetIssuesState();
+  }, [resetIssuesState]);
 
   const commitRepoStep = useCallback(() => {
     setRepoCommitted(true);
@@ -230,6 +241,7 @@ export function useOnboardingSetupState(
     selectVcsHost,
     selectedRepo,
     selectRepo,
+    clearRepository,
     repoCommitted,
     commitRepoStep,
     issuesRepo: backlogRepo,

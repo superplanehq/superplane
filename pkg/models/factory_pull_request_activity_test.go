@@ -436,7 +436,7 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 		assert.Equal(t, models.FactoryPullRequestActivityStateActive, granted.Activity.State)
 	})
 
-	t.Run("updates a description after the attempt limit", func(t *testing.T) {
+	t.Run("updates title and description after the attempt limit", func(t *testing.T) {
 		pullRequest, canvas := createActivityFixture(t, db, r)
 		handler := createCheckHandler(t, db, r, pullRequest, canvas, 1)
 		first := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
@@ -458,11 +458,14 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, models.FactoryPullRequestActivityOutcomeLimitReached, limited.Outcome)
-		require.NoError(t, limited.Activity.UpdateDescription(db, "Automatic fixes paused after 1 attempts"))
+		title := "Automatic fixes paused"
+		description := "Review the [failed checks](https://example.com/checks)."
+		require.NoError(t, limited.Activity.UpdateContent(db, &title, &description))
 
 		reloaded, err := models.FindPullRequestActivityByRunID(db, limitedRun.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "Automatic fixes paused after 1 attempts", reloaded.Description)
+		assert.Equal(t, title, reloaded.Title)
+		assert.Equal(t, description, reloaded.Description)
 		assert.Equal(t, models.FactoryPullRequestActivityStateLimitReached, reloaded.State)
 	})
 

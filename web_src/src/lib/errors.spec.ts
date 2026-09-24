@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
 
 describe("errors", () => {
@@ -36,6 +36,15 @@ describe("errors", () => {
         "Failed to emit event",
       ),
     ).toBe("Failed to emit event");
+  });
+
+  it("uses the fallback when the API hides the failure as internal error", () => {
+    expect(
+      getApiErrorMessage(
+        { response: { data: { message: "internal error" } } },
+        "SuperPlane could not create the Sentry intake.",
+      ),
+    ).toBe("SuperPlane could not create the Sentry intake.");
   });
 
   it("extracts a message from a JSON error response", async () => {

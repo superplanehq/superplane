@@ -24,10 +24,10 @@ const (
 )
 
 var machineTypeSelectOptions = []configuration.FieldOption{
-	{Label: MachineTypeE1LargeAMD64, Value: MachineTypeE1LargeAMD64},
-	{Label: MachineTypeE1LargeARM64, Value: MachineTypeE1LargeARM64},
-	{Label: MachineTypeE1TinyAMD64, Value: MachineTypeE1TinyAMD64},
-	{Label: MachineTypeE1TinyARM64, Value: MachineTypeE1TinyARM64},
+	{Label: "Large x64", Value: MachineTypeE1LargeAMD64},
+	{Label: "Large ARM", Value: MachineTypeE1LargeARM64},
+	{Label: "Small x64", Value: MachineTypeE1TinyAMD64},
+	{Label: "Small ARM", Value: MachineTypeE1TinyARM64},
 }
 
 func requireMachineType(machineType string) (string, error) {

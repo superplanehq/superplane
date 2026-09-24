@@ -4,12 +4,13 @@ import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegratio
 import { usePermissions } from "@/contexts/usePermissions";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import {
   isCapabilityBasedIntegrationDefinition,
   usesHostedGitHubAppInstall,
+  usesHostedJiraOAuth,
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
@@ -17,7 +18,9 @@ import { posthog, isPostHogEnabled } from "@/posthog";
 import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
-import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
+import { areRequiredCreateFieldsFilled } from "@/ui/IntegrationCreateDialog/configurationFields";
 import { useMe } from "@/hooks/useMe";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
@@ -49,6 +52,9 @@ export function useIntegrationCatalog(organizationId: string) {
     () => filterIntegrationCatalog(integrationCatalog, filterQuery),
     [filterQuery, integrationCatalog],
   );
+  const canConnect =
+    Boolean(integrationName.trim()) &&
+    areRequiredCreateFieldsFilled(selectedIntegration?.configuration ?? [], configuration);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -86,13 +92,11 @@ export function useIntegrationCatalog(organizationId: string) {
     selectedInstructions: selectedIntegration?.instructions?.trim() ?? "",
     integrationName,
     setIntegrationName,
+    canConnect,
     configuration,
     setConfiguration,
     isModalOpen,
     createIntegrationMutation,
-    createIntegrationNotice: createIntegrationMutation.isError
-      ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
-      : null,
     handlePrivateAppClick: (definition?: IntegrationsIntegrationDefinition) =>
       startCatalogPrivateGitHubApp({
         organizationId,
@@ -167,23 +171,31 @@ function useIntegrationCatalogActions({
       if (!canCreateIntegrations) {
         return;
       }
-      if (usesHostedGitHubAppInstall(integration)) {
-        analytics.integrationConnectStart("github", "integrations_page", organizationId);
-        void startDirectGitHubConnect({
+      if (
+        startCatalogHostedGitHubConnect({
+          integration,
           organizationId,
-          returnTo: integrationsBasePath,
           integrationsBasePath,
-          existingNames: integrationNames,
-          connected: organizationIntegrations ?? [],
+          integrationNames,
+          organizationIntegrations,
           currentUserId,
-          goTo: navigate,
-          create: async (payload) => {
-            const response = await createIntegrationMutation.mutateAsync(payload);
-            return response.data;
-          },
-        }).catch((error) => {
-          showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
-        });
+          navigate,
+          createIntegrationMutation,
+        })
+      ) {
+        return;
+      }
+      if (
+        startCatalogHostedJiraConnect({
+          integration,
+          organizationId,
+          integrationsBasePath,
+          integrationNames,
+          organizationIntegrations,
+          navigate,
+          createIntegrationMutation,
+        })
+      ) {
         return;
       }
       if (isCapabilityBasedIntegrationDefinition(integration)) {
@@ -200,28 +212,20 @@ function useIntegrationCatalogActions({
       setIsModalOpen(true);
       analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
     },
-    handleConnect: async () => {
-      if (!canCreateIntegrations || !selectedIntegration?.name) {
-        return;
-      }
-      try {
-        const result = await createIntegrationMutation.mutateAsync({
-          integrationName: selectedIntegration.name,
-          name: integrationName,
-          configuration,
-        });
-        setIsModalOpen(false);
-        setSelectedIntegration(null);
-        setIntegrationName("");
-        setConfiguration({});
-        const createdId = result.data?.integration?.metadata?.id;
-        if (createdId) {
-          navigate(integrationDetailPath(integrationsBasePath, createdId));
-        }
-      } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
-      }
-    },
+    handleConnect: () =>
+      submitCatalogConnect({
+        canCreateIntegrations,
+        selectedIntegration,
+        integrationName,
+        configuration,
+        createIntegrationMutation,
+        integrationsBasePath,
+        navigate,
+        setIsModalOpen,
+        setSelectedIntegration,
+        setIntegrationName,
+        setConfiguration,
+      }),
     handleRequestIntegration: () => {
       analytics.integrationRequested(organizationId);
     },
@@ -245,6 +249,145 @@ function useIntegrationCatalogActions({
       }
     },
   };
+}
+
+async function submitCatalogConnect({
+  canCreateIntegrations,
+  selectedIntegration,
+  integrationName,
+  configuration,
+  createIntegrationMutation,
+  integrationsBasePath,
+  navigate,
+  setIsModalOpen,
+  setSelectedIntegration,
+  setIntegrationName,
+  setConfiguration,
+}: {
+  canCreateIntegrations: boolean;
+  selectedIntegration: IntegrationsIntegrationDefinition | null;
+  integrationName: string;
+  configuration: Record<string, unknown>;
+  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
+  integrationsBasePath: string;
+  navigate: ReturnType<typeof useNavigate>;
+  setIsModalOpen: (open: boolean) => void;
+  setSelectedIntegration: (integration: IntegrationsIntegrationDefinition | null) => void;
+  setIntegrationName: (name: string) => void;
+  setConfiguration: (configuration: Record<string, unknown>) => void;
+}) {
+  if (!canCreateIntegrations || !selectedIntegration?.name) {
+    return;
+  }
+  if (!integrationName.trim()) {
+    showErrorToast("Integration name is required");
+    return;
+  }
+  if (!areRequiredCreateFieldsFilled(selectedIntegration.configuration ?? [], configuration)) {
+    showErrorToast("Enter every required field.");
+    return;
+  }
+
+  try {
+    const result = await createIntegrationMutation.mutateAsync({
+      integrationName: selectedIntegration.name,
+      name: integrationName,
+      configuration,
+    });
+    setIsModalOpen(false);
+    setSelectedIntegration(null);
+    setIntegrationName("");
+    setConfiguration({});
+    const createdId = result.data?.integration?.metadata?.id;
+    if (createdId) {
+      navigate(integrationDetailPath(integrationsBasePath, createdId));
+    }
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "Failed to create integration"));
+  }
+}
+
+function startCatalogHostedGitHubConnect({
+  integration,
+  organizationId,
+  integrationsBasePath,
+  integrationNames,
+  organizationIntegrations,
+  currentUserId,
+  navigate,
+  createIntegrationMutation,
+}: {
+  integration: IntegrationsIntegrationDefinition;
+  organizationId: string;
+  integrationsBasePath: string;
+  integrationNames: Set<string>;
+  organizationIntegrations: ReturnType<typeof useConnectedIntegrations>["data"];
+  currentUserId?: string;
+  navigate: ReturnType<typeof useNavigate>;
+  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
+}): boolean {
+  if (!usesHostedGitHubAppInstall(integration)) {
+    return false;
+  }
+
+  analytics.integrationConnectStart("github", "integrations_page", organizationId);
+  void startDirectGitHubConnect({
+    organizationId,
+    returnTo: integrationsBasePath,
+    integrationsBasePath,
+    existingNames: integrationNames,
+    connected: organizationIntegrations ?? [],
+    currentUserId,
+    goTo: navigate,
+    create: async (payload) => {
+      const response = await createIntegrationMutation.mutateAsync(payload);
+      return response.data;
+    },
+    update: persistGitHubSetupReturnPath(organizationId),
+  }).catch((error) => {
+    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
+  });
+  return true;
+}
+
+function startCatalogHostedJiraConnect({
+  integration,
+  organizationId,
+  integrationsBasePath,
+  integrationNames,
+  organizationIntegrations,
+  navigate,
+  createIntegrationMutation,
+}: {
+  integration: IntegrationsIntegrationDefinition;
+  organizationId: string;
+  integrationsBasePath: string;
+  integrationNames: Set<string>;
+  organizationIntegrations: ReturnType<typeof useConnectedIntegrations>["data"];
+  navigate: ReturnType<typeof useNavigate>;
+  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
+}): boolean {
+  if (!usesHostedJiraOAuth(integration)) {
+    return false;
+  }
+
+  analytics.integrationConnectStart("jira", "integrations_page", organizationId);
+  void startDirectJiraConnect({
+    organizationId,
+    returnTo: integrationsBasePath,
+    existingNames: integrationNames,
+    connected: organizationIntegrations ?? [],
+    onExistingReady: (integrationId) => {
+      navigate(integrationDetailPath(integrationsBasePath, integrationId));
+    },
+    create: async (payload) => {
+      const response = await createIntegrationMutation.mutateAsync(payload);
+      return response.data;
+    },
+  }).catch((error) => {
+    showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
+  });
+  return true;
 }
 
 function startCatalogPrivateGitHubApp({
@@ -280,6 +423,6 @@ function startCatalogPrivateGitHubApp({
       return response.data;
     },
   }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
   });
 }

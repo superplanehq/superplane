@@ -3,6 +3,7 @@ package factories
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -18,35 +19,28 @@ const (
 	intakeFilterNodeID  = "filter"
 	intakeCreateNodeID  = "create-work-order"
 
+	intakeAuthorPermissionNodeID = "get-author-permission"
+	intakeAuthorFilterNodeID     = "author-has-repository-access"
+
 	// Legacy node identifiers. A graph generated before intake became
 	// create-only still resolves so settings and health keep working.
 	intakeAnalysisNodeID         = "analyze"
 	intakeThresholdNodeID        = "threshold"
 	intakeReportConfidenceNodeID = "report-confidence"
 
-	// The analysis node name is part of the generated backlog graph's contract:
-	// the report-check fields read the score by this name.
-	intakeAnalysisNodeName = "Analyze intake"
-	intakeCreateNodeName   = "Create Work Order"
+	intakeCreateNodeName = "Create Task"
 
 	intakeFilterComponent           = "if"
+	intakeAuthorPermissionComponent = "github.getRepositoryPermission"
 	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
-	intakeReportConfidenceComponent = "reportWorkOrderCheck"
 
-	intakeConfidenceCheckKey  = "confidence"
-	intakeConfidenceCheckName = "Confidence score"
-	intakeConfidenceScoreMax  = 5
-	intakeConfidenceFormat    = "fraction"
-	intakeConfidenceDirection = "higherIsBetter"
+	intakeAddRunErrorNodeID    = "add-run-error"
+	intakeAddRunErrorNodeName  = "Record Analysis Failure"
+	intakeAddRunErrorComponent = "addRunError"
+	intakeAddRunErrorMessage   = "The analysis agent failed. Open the agent logs to find the cause."
 
-	// Band edges of the confidence meter, which reads High from 4, Medium at
-	// 3, and Low below 3. The check has no neutral threshold, so Medium maps
-	// to caution and Low maps to critical.
-	intakeConfidenceCautionAt  = 3
-	intakeConfidenceCriticalAt = 2
-
-	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
+	intakeAnalysisTimeoutSeconds = 1800
 
 	// intakeConcurrencyMax is how many items an intake node works on at once.
 	// A node runs one execution at a time by default, which makes a batch of
@@ -68,7 +62,8 @@ const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 var intakeAnalysisComponents = intakeAgentComponents()
 
 func intakeAgentComponents() []string {
-	components := make([]string, 0, len(intakeAgentSpecs))
+	components := make([]string, 0, len(intakeAgentSpecs)+1)
+	components = append(components, models.SuperPlaneRunnerComponent)
 	for _, spec := range intakeAgentSpecs {
 		components = append(components, spec.component)
 	}
@@ -82,7 +77,6 @@ type intakeSpec struct {
 	triggerComponent     string
 	triggerName          string
 	triggerConfiguration map[string]any
-	analysisSubject      string
 	createTitle          string
 	createDescription    string
 }
@@ -93,8 +87,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a GitHub issue is opened.",
 		triggerComponent:     "github.onIssue",
 		triggerName:          "On Issue",
-		triggerConfiguration: map[string]any{"actions": []any{"opened"}},
-		analysisSubject:      "GitHub issue",
+		triggerConfiguration: map[string]any{"actions": intakeTriggerActionsFor(defaultIntakeSettings())},
 		createTitle:          "{{ root().data.issue.title }}",
 		createDescription:    "{{ root().data.issue.body }}",
 	},
@@ -103,10 +96,9 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a Sentry exception is reported.",
 		triggerComponent:     "sentry.onIssue",
 		triggerName:          "On Issue Event",
-		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
-		analysisSubject:      "Sentry exception",
+		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		createTitle:          "{{ root().data.data.issue.title }}",
-		createDescription:    "{{ root().data.data.issue.permalink }}",
+		createDescription:    "{{ root().data.description }}",
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",
@@ -117,9 +109,31 @@ var intakeSpecsBySource = map[string]intakeSpec{
 			"events":    []any{"incident.triggered"},
 			"urgencies": []any{"high", "low"},
 		},
-		analysisSubject:   "PagerDuty incident",
 		createTitle:       "{{ root().data.incident.title }}",
 		createDescription: "{{ root().data.incident.html_url }}",
+	},
+	models.FactoryIntakeSourceProductiveTasks: {
+		name:                 "Productive.io tasks",
+		description:          "Create a work order when a Productive.io task is created.",
+		triggerComponent:     "productive.onTask",
+		triggerName:          "On Task",
+		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		createTitle:          "{{ root().data.data.attributes.title }}",
+		createDescription:    "{{ root().data.data.attributes.description }}",
+	},
+	models.FactoryIntakeSourceJiraIssues: {
+		name:             "Jira issues",
+		description:      "Create a work order when a Jira issue is created or updated.",
+		triggerComponent: "jira.onIssue",
+		triggerName:      "On Issue",
+		triggerConfiguration: map[string]any{
+			"events": intakeTriggerEventsFor(defaultJiraIntakeSettings()),
+		},
+		createTitle: `{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}`,
+		// The raw description field holds an Atlassian Document Format
+		// object, so the work order reads the plain text copy the trigger
+		// reports next to it.
+		createDescription: `{{ root().data.description }}`,
 	},
 }
 
@@ -142,7 +156,7 @@ func intakeDefaultDescription(source string) string {
 
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
 // source and create a work order. GitHub intakes keep a filter node so label
-// and assignment settings have somewhere to live. Confidence scoring happens
+// and assignment settings have somewhere to live. Planning happens
 // on the factory Backlog canvas after the work order exists.
 func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	spec, ok := intakeSpecsBySource[request.Source]
@@ -162,6 +176,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Type:          yaml.NodeTypeTrigger,
 			Component:     spec.triggerComponent,
 			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Metadata:      intakeTriggerMetadata(request.Source, request.Settings),
 			Integration:   request.Binding.integrationRef(),
 			Position:      yaml.Position{X: 160, Y: 80},
 		},
@@ -169,14 +184,15 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	edges := []yaml.Edge{}
 	createY := 260
 
-	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+	if intakeSourceHasFilterNode(request.Source) {
+		settings := intakeSettingsOrDefault(request.Source, request.Settings)
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
 			Type:      yaml.NodeTypeAction,
 			Component: intakeFilterComponent,
 			Configuration: map[string]any{
-				"expression": intakeFilterExpressionFor(request.Source, defaultIntakeSettings()),
+				"expression": intakeFilterExpressionFor(request.Source, settings),
 			},
 			Concurrency: intakeConcurrency(),
 			Position:    yaml.Position{X: 160, Y: 260},
@@ -225,6 +241,159 @@ func intakeConcurrency() *yaml.ConcurrencySpec {
 	return &yaml.ConcurrencySpec{Max: &max}
 }
 
+func ensureIntakeFilterNode(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+) ([]models.Node, []models.Edge, intakeGraph, error) {
+	if graph.FilterNodeID != "" {
+		return nodes, edges, graph, nil
+	}
+	if graph.TriggerNodeID == "" || graph.CreateNodeID == "" {
+		return nil, nil, graph, fmt.Errorf("intake automation has no filter to update")
+	}
+
+	nodes = upsertIntakeNode(nodes, models.Node{
+		ID:   intakeFilterNodeID,
+		Name: "Matches filters?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": "true",
+		},
+		Position:    models.Position{X: 160, Y: 260},
+		Concurrency: intakeModelConcurrency(),
+	})
+	graph.FilterNodeID = intakeFilterNodeID
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.TriggerNodeID && edge.TargetID == graph.CreateNodeID
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: graph.TriggerNodeID,
+		TargetID: intakeFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, graph, nil
+}
+
+func configureIntakeAuthorAccess(
+	nodes []models.Node,
+	edges []models.Edge,
+	graph intakeGraph,
+	enabled bool,
+) ([]models.Node, []models.Edge, error) {
+	if !enabled {
+		nodes = slices.DeleteFunc(nodes, func(node models.Node) bool {
+			return node.ID == graph.AuthorPermissionNodeID || node.ID == graph.AuthorFilterNodeID
+		})
+		edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+			return edge.SourceID == graph.AuthorPermissionNodeID ||
+				edge.TargetID == graph.AuthorPermissionNodeID ||
+				edge.SourceID == graph.AuthorFilterNodeID ||
+				edge.TargetID == graph.AuthorFilterNodeID
+		})
+		return nodes, ensureIntakeEdge(edges, models.Edge{
+			Channel:  "true",
+			SourceID: graph.FilterNodeID,
+			TargetID: graph.CreateNodeID,
+		}), nil
+	}
+
+	trigger := findIntakeNode(nodes, graph.TriggerNodeID)
+	if trigger == nil {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub trigger")
+	}
+	repository, _ := trigger.Configuration["repository"].(string)
+	if strings.TrimSpace(repository) == "" {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub repository")
+	}
+	if trigger.IntegrationID == nil || strings.TrimSpace(*trigger.IntegrationID) == "" {
+		return nil, nil, fmt.Errorf("intake automation has no GitHub integration")
+	}
+
+	permissionNode := models.Node{
+		ID:   intakeAuthorPermissionNodeID,
+		Name: "Get Author Repository Permission",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeAuthorPermissionComponent},
+		},
+		Configuration: map[string]any{
+			"repository": repository,
+			"username":   "{{ root().data.issue.user.login }}",
+		},
+		Position:      models.Position{X: 160, Y: 440},
+		Concurrency:   intakeModelConcurrency(),
+		IntegrationID: trigger.IntegrationID,
+	}
+	authorFilterNode := models.Node{
+		ID:   intakeAuthorFilterNodeID,
+		Name: "Author Has Repository Access?",
+		Type: models.NodeTypeComponent,
+		Ref: models.NodeRef{
+			Component: &models.ComponentRef{Name: intakeFilterComponent},
+		},
+		Configuration: map[string]any{
+			"expression": `root().data.permission != "none"`,
+		},
+		Position:    models.Position{X: 160, Y: 620},
+		Concurrency: intakeModelConcurrency(),
+	}
+	nodes = upsertIntakeNode(nodes, permissionNode)
+	nodes = upsertIntakeNode(nodes, authorFilterNode)
+
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return edge.SourceID == graph.FilterNodeID &&
+			(edge.TargetID == graph.CreateNodeID || edge.TargetID == intakeAuthorPermissionNodeID)
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: graph.FilterNodeID,
+		TargetID: intakeAuthorPermissionNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "default",
+		SourceID: intakeAuthorPermissionNodeID,
+		TargetID: intakeAuthorFilterNodeID,
+	})
+	edges = ensureIntakeEdge(edges, models.Edge{
+		Channel:  "true",
+		SourceID: intakeAuthorFilterNodeID,
+		TargetID: graph.CreateNodeID,
+	})
+	return nodes, edges, nil
+}
+
+func intakeModelConcurrency() *models.ConcurrencySpec {
+	max := intakeConcurrencyMax
+	return &models.ConcurrencySpec{Max: &max}
+}
+
+func upsertIntakeNode(nodes []models.Node, updated models.Node) []models.Node {
+	for i := range nodes {
+		if nodes[i].ID == updated.ID {
+			nodes[i] = updated
+			return nodes
+		}
+	}
+	return append(nodes, updated)
+}
+
+func ensureIntakeEdge(edges []models.Edge, expected models.Edge) []models.Edge {
+	if slices.Contains(edges, expected) {
+		return edges
+	}
+	return append(edges, expected)
+}
+
 // intakeTriggerConfiguration lays the binding over the template so the trigger
 // listens on a concrete resource. The template map is shared between intakes,
 // so it is copied rather than written to.
@@ -240,23 +409,73 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
-// intakeAnalysisConfiguration configures the runner that scores a work order.
-// The runner components reject a node without a machine type or credentials, so
-// the generated node names the machine and the credentials of the workspace
-// agent.
-func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
+func intakeTriggerMetadata(source string, settings intakeSettings) map[string]any {
+	if source != models.FactoryIntakeSourceJiraIssues {
+		return nil
+	}
+	return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
+}
+
+func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {
+	if settings.ConfidencePct != 0 {
+		return settings
+	}
+	if source == models.FactoryIntakeSourceJiraIssues {
+		return defaultJiraIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		return defaultSentryIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		return defaultProductiveIntakeSettings()
+	}
+	return defaultIntakeSettings()
+}
+
+func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[string]any {
+	configuration := intakeRunnerConfiguration(agent, githubName)
+	configuration["steps"] = []any{
+		map[string]any{
+			"name":    "Clone repository",
+			"type":    runner.AgentStepBash,
+			"command": intakeAnalysisCloneCommand(),
+		},
+		map[string]any{
+			"name":             "Refine Task",
+			"type":             "prompt",
+			"workingDirectory": "repo",
+			"prompt":           intakeRefinementPrompt(),
+		},
+	}
+	return configuration
+}
+
+func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string]any {
+	if strings.TrimSpace(githubName) == "" {
+		githubName = intakeGitHubAppName
+	}
+
 	configuration := map[string]any{
-		"machineType": intakeAnalysisMachineType,
-		"steps": []any{
+		"machineType":             intakeAnalysisMachineType,
+		"executionTimeoutSeconds": intakeAnalysisTimeoutSeconds,
+		"environmentFrom": []any{
 			map[string]any{
-				"name":   "Analyze and score",
-				"type":   "prompt",
-				"prompt": intakeAnalysisPrompt(spec.analysisSubject),
+				"source": "integration",
+				"integration": map[string]any{
+					"name": githubName,
+				},
+			},
+		},
+		"environment": []any{
+			map[string]any{
+				"name":        "REPO_URL",
+				"value":       "{{ root().data.workOrder.repository_url }}",
+				"valueSource": "literal",
 			},
 			map[string]any{
-				"name":    "Use analysis as output",
-				"type":    runner.AgentStepBash,
-				"command": intakeAnalysisOutputCommand(),
+				"name":        "BASE",
+				"value":       "{{ root().data.workOrder.default_branch }}",
+				"valueSource": "literal",
 			},
 		},
 	}
@@ -271,89 +490,21 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string
 	return configuration
 }
 
-func intakeAnalysisPrompt(subject string) string {
+func intakeRefinementPrompt() string {
+	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
+}
+
+func intakeAnalysisCloneCommand() string {
 	return strings.Join([]string{
-		fmt.Sprintf("Analyze this %s and decide whether it is suitable for an engineering work order.", subject),
-		"Consider impact, clarity, feasibility, and whether an agent on this factory line can take a concrete action.",
-		fmt.Sprintf("Write one JSON object to %s. Do not write the result to another file.", intakeAnalysisOutputFile),
-		fmt.Sprintf("The file must parse with jq. Run `jq empty %s` and keep editing until it succeeds.", intakeAnalysisOutputFile),
-		"Keys:",
-		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
-		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
-		`- "reasons": exactly three short sentences that explain the score.`,
-		"Write three reasons: what the item names, what already exists, and whether an agent can do the work.",
-		"",
-		"Event:",
-		"{{ root().data }}",
+		"set -euo pipefail",
+		`if [ -z "${REPO_URL:-}" ]; then`,
+		`  echo "This workspace has no repository to analyze." >&2`,
+		"  exit 1",
+		"fi",
+		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
+		"rm -rf repo",
+		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
 	}, "\n")
-}
-
-// intakeAnalysisOutputCommand promotes the file the agent wrote to the node's
-// result, so the rest of the graph reads fields instead of parsing text. The
-// prompt asks for an exact shape, but this step accepts what an agent really
-// produces: a quoted number, a missing summary, or a different number of
-// reasons. Only the score is required, because the report check cannot run
-// without it.
-func intakeAnalysisOutputCommand() string {
-	return fmt.Sprintf(`if ! jq -ce '{
-  score: (.score | tonumber | floor),
-  summary: ((.summary // "") | tostring),
-  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring]
-}' %s > "$SUPERPLANE_RESULT_FILE"; then
-  echo "The analysis at %s has no readable score" >&2
-  exit 1
-fi`, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
-}
-
-func intakeAnalysisScorePath() string {
-	return fmt.Sprintf(`$[%q].data.result.score`, intakeAnalysisNodeName)
-}
-
-func intakeWorkOrderIDFromRootExpression() string {
-	return `{{ root().data.workOrder.id }}`
-}
-
-func intakeConfidenceSummaryExpression() string {
-	return fmt.Sprintf(`{{ $[%q].data.result.summary }}`, intakeAnalysisNodeName)
-}
-
-func intakeConfidenceWriteupExpression(subject string) string {
-	intro := fmt.Sprintf(
-		"The automation read this %s. It scored how suitable the work is for an agent on this factory line.",
-		subject,
-	)
-	return fmt.Sprintf(
-		`{{ %q + "\n\n### Why this score\n- " + join($[%q].data.result.reasons, "\n- ") }}`,
-		intro,
-		intakeAnalysisNodeName,
-	)
-}
-
-// intakeConfidenceScoreExpression maps the analysis percentage to the 0–5
-// scale of the work-order confidence meter. The meter rounds the score it
-// receives, so the expression rounds too and both agree on the bar count.
-func intakeConfidenceScoreExpression() string {
-	pctPerPoint := 100 / intakeConfidenceScoreMax
-	return fmt.Sprintf(
-		`{{ int(round(int(%s) / %d.0)) }}`,
-		intakeAnalysisScorePath(), pctPerPoint,
-	)
-}
-
-func intakeConfidenceReportConfiguration(subject string) map[string]any {
-	return map[string]any{
-		"orderId":    intakeWorkOrderIDFromRootExpression(),
-		"checkKey":   intakeConfidenceCheckKey,
-		"name":       intakeConfidenceCheckName,
-		"score":      intakeConfidenceScoreExpression(),
-		"maxScore":   strconv.Itoa(intakeConfidenceScoreMax),
-		"format":     intakeConfidenceFormat,
-		"direction":  intakeConfidenceDirection,
-		"cautionAt":  float64(intakeConfidenceCautionAt),
-		"criticalAt": float64(intakeConfidenceCriticalAt),
-		"summary":    intakeConfidenceSummaryExpression(),
-		"analysis":   intakeConfidenceWriteupExpression(subject),
-	}
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

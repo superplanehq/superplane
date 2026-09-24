@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 
 vi.mock("@/contexts/useAccount", () => ({
@@ -16,12 +16,19 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({ data: null }),
-  useOrganizationUsage: () => ({ data: null, error: null }),
+}));
+
+vi.mock("@/hooks/useAccountOrganizations", () => ({
+  useAccountOrganizations: () => ({ data: [], refetch: vi.fn() }),
+}));
+
+const experimentalFeatureMocks = vi.hoisted(() => ({
+  has: vi.fn((_featureId: string) => false),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: () => false,
+    has: experimentalFeatureMocks.has,
     enabledExperimentalFeatures: [],
     isLoading: false,
   }),
@@ -31,15 +38,16 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
 }));
 
-vi.mock("@/lib/env", () => ({
-  isUsagePageForced: () => false,
-}));
-
 vi.mock("@/posthog", () => ({
   posthog: { reset: vi.fn() },
 }));
 
 describe("OrganizationMenuButton", () => {
+  beforeEach(() => {
+    experimentalFeatureMocks.has.mockReset();
+    experimentalFeatureMocks.has.mockReturnValue(false);
+  });
+
   it("links the logo to organization selection when no organization is active", () => {
     render(
       <MemoryRouter>
@@ -58,5 +66,16 @@ describe("OrganizationMenuButton", () => {
     );
 
     expect(screen.getByRole("link", { name: "Go to canvases" })).toHaveAttribute("href", "/org-123");
+  });
+
+  it("links the logo to workspaces when factories are on", () => {
+    experimentalFeatureMocks.has.mockImplementation((featureId) => featureId === "factories");
+    render(
+      <MemoryRouter>
+        <OrganizationMenuButton organizationId="org-123" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Go to canvases" })).toHaveAttribute("href", "/org-123/workspaces");
   });
 });

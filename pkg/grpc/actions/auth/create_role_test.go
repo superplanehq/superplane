@@ -72,7 +72,7 @@ func Test_CreateRole(t *testing.T) {
 				},
 				InheritedRole: &pb.Role{
 					Metadata: &pb.Role_Metadata{
-						Name: models.RoleOrgViewer,
+						Name: models.RoleOrgOperator,
 					},
 				},
 			},
@@ -90,7 +90,7 @@ func Test_CreateRole(t *testing.T) {
 		assert.Equal(t, "Custom Role With Inheritance", createdRole.GetSpec().GetDisplayName())
 		assert.Equal(t, "Custom Role With Inheritance Description", createdRole.GetSpec().GetDescription())
 		assert.NotNil(t, createdRole.GetSpec().GetInheritedRole())
-		assert.Equal(t, models.RoleOrgViewer, createdRole.GetSpec().GetInheritedRole().GetMetadata().GetName())
+		assert.Equal(t, models.RoleOrgOperator, createdRole.GetSpec().GetInheritedRole().GetMetadata().GetName())
 	})
 
 	t.Run("invalid request - missing role name", func(t *testing.T) {

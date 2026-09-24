@@ -41,11 +41,11 @@ func (c *AddPullRequest) Label() string {
 }
 
 func (c *AddPullRequest) Description() string {
-	return "Attach a pull request to a work order"
+	return "Attach a pull request to a task"
 }
 
 func (c *AddPullRequest) Documentation() string {
-	return `The Add Pull Request component records a pull request on a work order.
+	return `The Add Pull Request component records a pull request on a task.
 
 Required fields are ` + "`repository`" + `, ` + "`number`" + `, and ` + "`url`" + `. ` + "`provider`" + ` defaults to ` + "`github`" + `. ` + "`state`" + ` defaults to ` + "`open`" + `.
 
@@ -53,7 +53,7 @@ Required fields are ` + "`repository`" + `, ` + "`number`" + `, and ` + "`url`" 
 
 Set ` + "`mergedAt`" + ` or ` + "`closedAt`" + ` (RFC3339) when the pull request is already merged or closed so Velocity uses the real day.
 
-` + "`orderId`" + ` defaults to ` + "`{{ order().id }}`" + `. In a flow that is not dispatched from a factory line, replace it with the work order id from a previous step. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` defaults to ` + "`{{ order().id }}`" + `. In a flow that is not dispatched from a factory line, replace it with the task id from a previous step. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddPullRequest) Icon() string {
@@ -91,8 +91,8 @@ func (c *AddPullRequest) Configuration() []configuration.Field {
 	fields := []configuration.Field{
 		{
 			Name:        "orderId",
-			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run.",
+			Label:       "Task ID",
+			Description: "Task to target. Defaults to the task driving the current run.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",

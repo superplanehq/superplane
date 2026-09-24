@@ -1,12 +1,13 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
 import { getColorClass } from "@/lib/colors";
+import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 
 import type {
   ComponentBaseContext,
@@ -19,7 +20,7 @@ import type {
   SubtitleContext,
 } from "./types";
 
-import { stringOrDash } from "./utils";
+import { stringOrDash } from "./eventDisplay";
 
 const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
@@ -54,7 +55,7 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
   const machineTypeRaw = c.machineType ?? c.machine_type;
   const machineType = typeof machineTypeRaw === "string" ? machineTypeRaw.trim() : "";
   if (machineType) {
-    details["Machine type"] = machineType;
+    details["Machine type"] = machineTypeLabel(machineType);
   }
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
   if (rawMode === EXECUTION_MODE_DOCKER) {
@@ -188,8 +189,16 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
-      customField: <RunnerLiveLogDialog title={title} canvasMode={canvasMode} execution={lastExecution} />,
-      customFieldPosition: "after",
+      headerAction: (
+        <RunnerLiveLogDialog
+          title={title}
+          canvasMode={canvasMode}
+          execution={lastExecution}
+          component={context.node.componentName || componentDef.name}
+          iconSlug={iconSlug}
+          session={{ organizationId: context.organizationId, canvasId: context.canvasId }}
+        />
+      ),
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -217,7 +226,7 @@ export const runnerMapper: ComponentBaseMapper = {
   },
 };
 
-export const claudeCodeMapper: ComponentBaseMapper = {
+export const agentHarnessMapper: ComponentBaseMapper = {
   ...runnerMapper,
   props(context: ComponentBaseContext): ComponentBaseProps {
     const props = runnerMapper.props(context);

@@ -23,7 +23,8 @@ export function FactoryAppResetConfirmDialog({ open, onOpenChange, onConfirm }: 
           <AlertDialogTitle>Reset to factory defaults?</AlertDialogTitle>
           <AlertDialogDescription>
             This replaces your current draft with the bundled template for this app. It keeps your connected repository
-            and integrations. The change applies only after you click Save.
+            and integrations. When this instance has a SuperPlane default model, the draft uses Run SuperPlane Agent.
+            The change applies only after you click Save.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

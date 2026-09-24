@@ -25,7 +25,7 @@ func UpdateCanvas(
 	dismissAgentSuggestionID *string,
 ) (*pb.UpdateCanvasResponse, error) {
 	err := db.Transaction(func(tx *gorm.DB) error {
-		return updateCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID, name, description, dismissAgentSuggestionID)
+		return UpdateCanvasInTransaction(tx, canvas, name, description, dismissAgentSuggestionID)
 	})
 
 	if err != nil {
@@ -35,9 +35,7 @@ func UpdateCanvas(
 		return nil, err
 	}
 
-	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); publishErr != nil {
-		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
-	}
+	PublishCanvasUpdated(canvas)
 
 	refreshedCanvas, err := models.FindCanvasInTransaction(db, canvas.OrganizationID, canvas.ID)
 	if err != nil {
@@ -57,12 +55,33 @@ func UpdateCanvas(
 		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
 	}
 
-	serializedCanvas, err := SerializeCanvas(refreshedCanvas, liveVersion, user, nil)
+	serializedCanvas, err := serializePreparedCanvas(db, refreshedCanvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to serialize canvas")
 	}
 
 	return &pb.UpdateCanvasResponse{Canvas: serializedCanvas}, nil
+}
+
+// UpdateCanvasInTransaction writes canvas metadata without publishing.
+// Callers that wrap this in a larger transaction must publish after commit.
+func UpdateCanvasInTransaction(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	name *string,
+	description *string,
+	dismissAgentSuggestionID *string,
+) error {
+	return updateCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID, name, description, dismissAgentSuggestionID)
+}
+
+func PublishCanvasUpdated(canvas *models.Canvas) {
+	if canvas == nil {
+		return
+	}
+	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); publishErr != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
+	}
 }
 
 func updateCanvasInTransaction(

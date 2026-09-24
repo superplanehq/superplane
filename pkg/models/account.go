@@ -16,15 +16,20 @@ const AccountBlockedMessage = "Your account has been blocked. Please contact sup
 var ErrAccountBlocked = errors.New(AccountBlockedMessage)
 
 type Account struct {
-	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Email             string
-	Name              string
-	InstallationAdmin bool `gorm:"default:false"`
-	PasswordChangedAt *time.Time
-	BlockedAt         *time.Time
-	CreatedAt         *time.Time
-	UpdatedAt         *time.Time
-	DeletedAt         gorm.DeletedAt `gorm:"index"`
+	ID                     uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Email                  string
+	Name                   string
+	InstallationAdmin      bool `gorm:"default:false"`
+	PasswordChangedAt      *time.Time
+	BlockedAt              *time.Time
+	WelcomeCreditGrantedAt *time.Time
+	CreatedAt              *time.Time
+	UpdatedAt              *time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
+}
+
+func (a *Account) HasReceivedWelcomeCredit() bool {
+	return a != nil && a.WelcomeCreditGrantedAt != nil
 }
 
 func (a *Account) IsInstallationAdmin() bool {
@@ -242,19 +247,19 @@ func (a *Account) FindAccountProviderByID(provider, providerID string) (*Account
 	return &account, nil
 }
 
-func FindAccountByProvider(provider, providerID string) (*Account, error) {
-	var accountProvider AccountProvider
-	err := database.Conn().
-		Where("provider = ?", provider).
-		Where("provider_id = ?", providerID).
-		First(&accountProvider).
+func FindAccountByProvider(tx *gorm.DB, provider, providerID string) (*Account, error) {
+	var account Account
+	err := tx.
+		Joins("JOIN account_providers ON account_providers.account_id = accounts.id").
+		Where("account_providers.provider = ?", provider).
+		Where("account_providers.provider_id = ?", providerID).
+		First(&account).
 		Error
-
 	if err != nil {
 		return nil, err
 	}
 
-	return FindAccountByID(accountProvider.AccountID.String())
+	return &account, nil
 }
 
 func CountActiveInstallationAdmins(tx *gorm.DB) (int64, error) {

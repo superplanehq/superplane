@@ -1,12 +1,51 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
+  bindHostedGitHubInstallation,
   hostedGitHubAppSlug,
   hostedGitHubBindPath,
+  hostedGitHubInstallRequested,
+  hostedGitHubInstallRequestedAccount,
   hostedGitHubInstallURL,
+  hostedGitHubStartedByLogin,
   hostedGitHubState,
+  pendingGitHubInstallRequests,
   pendingGitHubInstallations,
 } from "./hostedGitHubInstall";
+
+describe("bindHostedGitHubInstallation", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubFetch(response: Partial<Response>) {
+    const fetchSpy = vi.fn().mockResolvedValue(response as Response);
+    vi.stubGlobal("fetch", fetchSpy);
+    return fetchSpy;
+  }
+
+  it("does not follow the success redirect, which can leave the page origin", async () => {
+    const fetchSpy = stubFetch({ type: "opaqueredirect", ok: false, status: 0 });
+
+    await expect(bindHostedGitHubInstallation("csrf", "11")).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith("/api/v1/github/app/bind?state=csrf&installation_id=11", {
+      credentials: "same-origin",
+      redirect: "manual",
+    });
+  });
+
+  it("accepts a plain success answer", async () => {
+    stubFetch({ type: "basic", ok: true, status: 200 });
+
+    await expect(bindHostedGitHubInstallation("csrf", "11")).resolves.toBeUndefined();
+  });
+
+  it("throws on an error status", async () => {
+    stubFetch({ type: "basic", ok: false, status: 404 });
+
+    await expect(bindHostedGitHubInstallation("csrf", "11")).rejects.toThrow("Failed to connect the GitHub account");
+  });
+});
 
 describe("pendingGitHubInstallations", () => {
   it("reads valid rows", () => {
@@ -29,6 +68,25 @@ describe("pendingGitHubInstallations", () => {
   });
 });
 
+describe("pendingGitHubInstallRequests", () => {
+  it("reads every request and keeps legacy metadata compatible", () => {
+    expect(
+      pendingGitHubInstallRequests({
+        installRequests: [
+          { id: 1, accountLogin: "acme", requesterLogin: "member", createdAt: "2026-09-08T12:00:00Z" },
+          { id: "2", accountLogin: "octo", requesterLogin: "member" },
+        ],
+      }),
+    ).toEqual([
+      { id: "1", accountLogin: "acme", requesterLogin: "member", createdAt: "2026-09-08T12:00:00Z" },
+      { id: "2", accountLogin: "octo", requesterLogin: "member" },
+    ]);
+    expect(pendingGitHubInstallRequests({ installRequested: true, installRequestedAccount: "legacy" })).toEqual([
+      { accountLogin: "legacy" },
+    ]);
+  });
+});
+
 describe("hosted GitHub URLs", () => {
   it("builds the public bind path", () => {
     expect(hostedGitHubBindPath("csrf", "11")).toBe("/api/v1/github/app/bind?state=csrf&installation_id=11");
@@ -43,5 +101,25 @@ describe("hosted GitHub URLs", () => {
   it("reads state and slug", () => {
     expect(hostedGitHubState({ state: "csrf" })).toBe("csrf");
     expect(hostedGitHubAppSlug({ githubApp: { slug: "superplane" } })).toBe("superplane");
+  });
+
+  it("reads the GitHub login that authorized the connect", () => {
+    expect(hostedGitHubStartedByLogin({ startedByGitHubLogin: "forestileao" })).toBe("forestileao");
+    expect(hostedGitHubStartedByLogin({})).toBe("");
+    expect(hostedGitHubStartedByLogin(undefined)).toBe("");
+  });
+
+  it("reads a pending GitHub install request", () => {
+    expect(hostedGitHubInstallRequested({ installRequested: true })).toBe(true);
+    expect(hostedGitHubInstallRequested({ installRequested: false })).toBe(false);
+    expect(hostedGitHubInstallRequested({})).toBe(false);
+    expect(hostedGitHubInstallRequested(undefined)).toBe(false);
+  });
+
+  it("reads the organization waiting for approval", () => {
+    expect(hostedGitHubInstallRequestedAccount({ installRequestedAccount: "acme" })).toBe("acme");
+    expect(hostedGitHubInstallRequestedAccount({ owner: "acme" })).toBe("");
+    expect(hostedGitHubInstallRequestedAccount({ installRequestedAccount: "acme", owner: "other" })).toBe("acme");
+    expect(hostedGitHubInstallRequestedAccount({})).toBe("");
   });
 });

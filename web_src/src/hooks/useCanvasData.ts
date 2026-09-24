@@ -13,11 +13,6 @@ import {
   canvasesCreateCanvas,
   canvasesUpdateCanvas,
   canvasesUpdateCanvasPreference,
-  canvasFoldersListCanvasFolders,
-  canvasFoldersCreateCanvasFolder,
-  canvasFoldersUpdateCanvasFolder,
-  canvasFoldersUpdateCanvasFolderPosition,
-  canvasFoldersDeleteCanvasFolder,
   canvasesListCanvasVersions,
   canvasesDeleteCanvas,
   canvasesListNodeExecutions,
@@ -30,8 +25,6 @@ import {
   canvasesListEventExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
-  canvasesGetCanvasRepository,
-  canvasesListCanvasRepositoryFiles,
   canvasesPutCanvasStaging,
   canvasesCommitCanvasStaging,
   canvasesDeleteCanvasStaging,
@@ -41,7 +34,6 @@ import {
   widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
 import type {
-  CanvasFoldersCanvasFolder,
   CanvasesCanvas,
   CanvasesCanvasSummary,
   CanvasesCanvasRun,
@@ -130,8 +122,6 @@ export const canvasKeys = {
   all: ["canvases"] as const,
   lists: () => [...canvasKeys.all, "list"] as const,
   list: (orgId: string) => [...canvasKeys.lists(), orgId] as const,
-  folders: () => [...canvasKeys.all, "folders"] as const,
-  folderList: (orgId: string) => [...canvasKeys.folders(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
@@ -263,20 +253,6 @@ export interface ConsoleLayoutItem {
   minH?: number;
 }
 
-export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "slate", "orange"] as const;
-export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
-export const DEFAULT_CANVAS_FOLDER_COLOR: CanvasFolderColor = "blue";
-
-export function normalizeCanvasFolderColor(value?: string): CanvasFolderColor {
-  if (value === "yellow") {
-    return "slate";
-  }
-
-  return CANVAS_FOLDER_COLORS.includes(value as CanvasFolderColor)
-    ? (value as CanvasFolderColor)
-    : DEFAULT_CANVAS_FOLDER_COLOR;
-}
-
 export const triggerKeys = {
   all: ["triggers"] as const,
   lists: () => [...triggerKeys.all, "list"] as const,
@@ -295,8 +271,12 @@ export const widgetKeys = {
 
 export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
 
+type UseCanvasesOptions = {
+  enabled?: boolean;
+};
+
 // Hooks for fetching canvases
-export const useCanvases = (organizationId: string) => {
+export const useCanvases = (organizationId: string, options: UseCanvasesOptions = {}) => {
   return useQuery({
     queryKey: canvasKeys.list(organizationId),
     queryFn: async () => {
@@ -307,18 +287,7 @@ export const useCanvases = (organizationId: string) => {
       );
       return response.data?.canvases || [];
     },
-    enabled: !!organizationId,
-  });
-};
-
-export const useCanvasFolders = (organizationId: string) => {
-  return useQuery({
-    queryKey: canvasKeys.folderList(organizationId),
-    queryFn: async () => {
-      const response = await canvasFoldersListCanvasFolders(withOrganizationHeader({ organizationId }));
-      return response.data?.folders || [];
-    },
-    enabled: !!organizationId,
+    enabled: !!organizationId && (options.enabled ?? true),
   });
 };
 
@@ -467,6 +436,7 @@ export const useCreateCanvas = (organizationId: string) => {
     ) => {
       return await canvasesCreateCanvas(
         withOrganizationHeader({
+          organizationId,
           body: {
             name: data.name,
             description: data.description || "",
@@ -661,281 +631,6 @@ function applyCanvasPreferenceToSummary(
   };
 }
 
-export const useCreateCanvasFolder = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { title: string; backgroundColor?: CanvasFolderColor }) => {
-      return await canvasFoldersCreateCanvasFolder(
-        withOrganizationHeader({
-          organizationId,
-          body: {
-            folder: {
-              spec: {
-                title: data.title,
-                backgroundColor: data.backgroundColor || DEFAULT_CANVAS_FOLDER_COLOR,
-              },
-            },
-          },
-        }),
-      );
-    },
-    onSuccess: (response) => {
-      const createdFolder = response?.data?.folder;
-      queryClient.setQueryData(
-        canvasKeys.folderList(organizationId),
-        (current: CanvasFoldersCanvasFolder[] | undefined) => {
-          if (!createdFolder?.metadata?.id) {
-            return current;
-          }
-
-          const nextFolders = current ? [...current] : [];
-          const existingFolderIndex = nextFolders.findIndex(
-            (folder) => folder.metadata?.id === createdFolder.metadata?.id,
-          );
-          if (existingFolderIndex >= 0) {
-            nextFolders[existingFolderIndex] = createdFolder;
-          } else {
-            nextFolders.unshift(createdFolder);
-          }
-
-          return nextFolders;
-        },
-      );
-      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-    },
-  });
-};
-
-export const useUpdateCanvasFolder = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { folderId: string; title: string; backgroundColor: CanvasFolderColor }) => {
-      return await canvasFoldersUpdateCanvasFolder(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: data.folderId },
-          body: {
-            folder: {
-              spec: {
-                title: data.title,
-                backgroundColor: data.backgroundColor,
-              },
-            },
-          },
-        }),
-      );
-    },
-    onSuccess: (response) => {
-      const updatedFolder = response?.data?.folder;
-      queryClient.setQueryData(
-        canvasKeys.folderList(organizationId),
-        (current: CanvasFoldersCanvasFolder[] | undefined) => {
-          if (!current || !updatedFolder?.metadata?.id) {
-            return current;
-          }
-
-          const nextFolders = current.map((folder) =>
-            folder.metadata?.id === updatedFolder.metadata?.id ? updatedFolder : folder,
-          );
-          return nextFolders;
-        },
-      );
-      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-    },
-  });
-};
-
-export const useMoveCanvasFolder = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN" }) => {
-      return await canvasFoldersUpdateCanvasFolderPosition(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: data.folderId },
-          body: {
-            direction: data.direction,
-          },
-        }),
-      );
-    },
-    onSuccess: (response) => {
-      const folders = response?.data?.folders;
-      if (folders) {
-        queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
-      }
-
-      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-    },
-  });
-};
-
-export const useDeleteCanvasFolder = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (folderId: string) => {
-      return await canvasFoldersDeleteCanvasFolder(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: folderId },
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-    },
-  });
-};
-
-type UpdateCanvasFolderMembershipInput = {
-  folderId: string;
-  title: string;
-  backgroundColor: CanvasFolderColor;
-  canvasIds: string[];
-};
-
-function updateCanvasListFolderMembership(
-  canvases: CanvasesCanvasSummary[] | undefined,
-  data: UpdateCanvasFolderMembershipInput,
-) {
-  if (!canvases) {
-    return canvases;
-  }
-
-  const targetCanvasIds = new Set(data.canvasIds);
-
-  return canvases.map((canvas) => {
-    const canvasId = canvas.id;
-    if (!canvasId) {
-      return canvas;
-    }
-
-    if (targetCanvasIds.has(canvasId)) {
-      return {
-        ...canvas,
-        folderId: data.folderId,
-      };
-    }
-
-    if (canvas.folderId !== data.folderId) {
-      return canvas;
-    }
-
-    return {
-      ...canvas,
-      folderId: undefined,
-    };
-  });
-}
-
-function updateCanvasFolderListMembership(
-  folders: CanvasFoldersCanvasFolder[] | undefined,
-  data: UpdateCanvasFolderMembershipInput,
-) {
-  if (!folders) {
-    return folders;
-  }
-
-  const targetCanvasIds = new Set(data.canvasIds);
-
-  return folders.map((folder) => {
-    const folderId = folder.metadata?.id;
-    if (!folderId) {
-      return folder;
-    }
-
-    if (folderId === data.folderId) {
-      return {
-        ...folder,
-        spec: {
-          ...folder.spec,
-          title: data.title,
-          backgroundColor: data.backgroundColor,
-          canvases: data.canvasIds.map((id) => ({ id })),
-        },
-      };
-    }
-
-    const canvases = folder.spec?.canvases || [];
-    const nextCanvases = canvases.filter((canvas) => !canvas.id || !targetCanvasIds.has(canvas.id));
-    if (nextCanvases.length === canvases.length) {
-      return folder;
-    }
-
-    return {
-      ...folder,
-      spec: {
-        ...folder.spec,
-        canvases: nextCanvases,
-      },
-    };
-  });
-}
-
-export const useUpdateCanvasFolderMembership = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: UpdateCanvasFolderMembershipInput) => {
-      return await canvasFoldersUpdateCanvasFolder(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: data.folderId },
-          body: {
-            folder: {
-              spec: {
-                title: data.title,
-                backgroundColor: data.backgroundColor,
-                canvases: data.canvasIds.map((id) => ({ id })),
-              },
-            },
-            replaceMembership: true,
-          },
-        }),
-      );
-    },
-    onMutate: async (data) => {
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) }),
-        queryClient.cancelQueries({ queryKey: canvasKeys.folderList(organizationId) }),
-      ]);
-
-      const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
-      const previousFolders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(
-        canvasKeys.folderList(organizationId),
-      );
-
-      queryClient.setQueryData(canvasKeys.list(organizationId), (current: CanvasesCanvasSummary[] | undefined) =>
-        updateCanvasListFolderMembership(current, data),
-      );
-      queryClient.setQueryData(
-        canvasKeys.folderList(organizationId),
-        (current: CanvasFoldersCanvasFolder[] | undefined) => updateCanvasFolderListMembership(current, data),
-      );
-
-      return { previousCanvases, previousFolders };
-    },
-    onError: (_error, _data, context) => {
-      if (context?.previousCanvases) {
-        queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
-      }
-
-      if (context?.previousFolders) {
-        queryClient.setQueryData(canvasKeys.folderList(organizationId), context.previousFolders);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-    },
-  });
-};
-
 export const useUpdateCanvasVersion = (canvasId: string) => {
   const queryClient = useQueryClient();
 
@@ -1078,9 +773,9 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      // Full refetches (poll / invalidate / refetch()) walk every already-
+      // Full refetches (invalidate / refetch()) walk every already-
       // loaded cursor sequentially — TanStack Query's infinite behavior. To
-      // avoid re-issuing N ListRuns calls each minute for a canvas whose
+      // avoid re-issuing N ListRuns calls during a resync for a canvas whose
       // shared cache holds many pages, we reuse any page that already lives
       // in the cache for its cursor *and* still matches page 1's totalCount.
       // Page 1 (pageParam == null) always hits the network so fresh runs and
@@ -1115,7 +810,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.runs?.length || 0), 0);
       // Page 1 is the only page guaranteed to carry a fresh totalCount on
-      // poll/refetch; tail pages may be cache-reused and must not drive this.
+      // refetch; tail pages may be cache-reused and must not drive this.
       const totalCount = allPages[0]?.totalCount ?? lastPage?.totalCount ?? 0;
 
       if (currentLoadedCount >= totalCount) return undefined;
@@ -1123,7 +818,6 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
-    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });
@@ -1713,15 +1407,6 @@ export const useUpdateCanvasConsole = (
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
 export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
 
-async function fetchRepositoryFileContent(
-  canvasId: string,
-  path: string,
-  versionId?: string,
-  stage = false,
-): Promise<string> {
-  return fetchRepositorySpecFileContent(canvasId, path, versionId, stage);
-}
-
 // fetchRepositoryFileContentCached reads raw repository-file content through the
 // React Query cache so callers (the Files diff, committed baselines, selection)
 // reuse and dedupe identical reads. Committed (stage=false) content only changes
@@ -1740,64 +1425,6 @@ export function fetchRepositoryFileContentCached(
     staleTime: stage ? 0 : Number.POSITIVE_INFINITY,
   });
 }
-
-export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: canvasKeys.repository(canvasId),
-    queryFn: async () => {
-      const response = await canvasesGetCanvasRepository(
-        withOrganizationHeader({
-          path: { canvasId },
-        }),
-      );
-      return response.data?.repository;
-    },
-    enabled: enabled && !!canvasId,
-    staleTime: 30_000,
-    refetchInterval: (query) => {
-      const state = query.state.data?.status?.state;
-      return state === "STATE_PENDING" ? 3000 : false;
-    },
-  });
-};
-
-export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: canvasKeys.repositoryFiles(canvasId),
-    queryFn: async () => {
-      const response = await canvasesListCanvasRepositoryFiles(
-        withOrganizationHeader({
-          path: { canvasId },
-        }),
-      );
-      return response.data;
-    },
-    enabled: enabled && !!canvasId,
-    staleTime: 15_000,
-  });
-};
-
-export const useCanvasRepositoryFile = (
-  canvasId: string,
-  path: string | null,
-  enabled: boolean = true,
-  versionId?: string,
-  stage = false,
-) => {
-  const normalizedPath = path ?? "";
-  return useQuery({
-    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId, stage),
-    queryFn: async () => {
-      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId, stage);
-      return {
-        path: normalizedPath,
-        content,
-      };
-    },
-    enabled: enabled && !!canvasId && !!normalizedPath,
-    staleTime: 15_000,
-  });
-};
 
 // useStageCanvasSpecFiles writes canvas.yaml/console.yaml edits to staging (no commit).
 export const useStageCanvasSpecFiles = (canvasId: string) => {
@@ -1865,54 +1492,3 @@ export const useDiscardCanvasStaging = (canvasId: string) => {
     },
   });
 };
-
-// useStageRepositoryFiles stages arbitrary repository file edits into staging.
-export const useStageRepositoryFiles = (canvasId: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (operations: CanvasesCanvasRepositoryFileOperation[]) => {
-      registerLocalStagingWrite(canvasId);
-      const response = await canvasesPutCanvasStaging(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: { operations },
-        }),
-      );
-      return response.data?.stagingSummary;
-    },
-    onSuccess: (stagingSummary) => {
-      queryClient.setQueryData(
-        canvasKeys.canvasStaging(canvasId),
-        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
-      );
-      invalidateStagedCanvasCaches(queryClient, canvasId);
-    },
-  });
-};
-
-// useDiscardRepositoryFilePaths reverts specific staged paths, refreshing StagingSummary.
-export const useDiscardRepositoryFilePaths = (canvasId: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (paths: string[]) => {
-      registerLocalStagingWrite(canvasId);
-      const response = await canvasesDeleteCanvasStaging(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: paths.length > 0 ? { paths } : undefined,
-        }),
-      );
-      return response.data?.stagingSummary;
-    },
-    onSuccess: (stagingSummary) => {
-      queryClient.setQueryData(
-        canvasKeys.canvasStaging(canvasId),
-        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
-      );
-      invalidateStagedCanvasCaches(queryClient, canvasId);
-    },
-  });
-};
-
-export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
-export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;

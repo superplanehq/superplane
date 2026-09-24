@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   branchTreeUrl,
@@ -197,7 +197,7 @@ describe("extractPrArtifactState", () => {
 
   it("keeps a merged PR merged even when draft:true is also set", () => {
     // Defensive: merged is the strongest signal; a merged PR that once was
-    // a draft should not flip back to draft on redisplay.
+    // a former draft should not show as draft on redisplay.
     expect(extractPrArtifactState({ merged: true, draft: true })).toBe("merged");
   });
 

@@ -1,8 +1,9 @@
-import type { FactoriesFactory, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { CanvasesCanvasRun, FactoriesFactory, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -32,13 +33,14 @@ export function AutomationDetail({
 }: {
   organizationId: string;
   factoryKey: string;
-  app: FactoryApp;
+  app: FactoryAutomation;
   actions: AutomationCardActions;
   factory: FactoriesFactory | null | undefined;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const canvasId = app.id ?? "";
+  useCanvasRuntimeWebsocket(canvasId, organizationId, Boolean(canvasId));
   const {
     data: runsPages,
     isLoading: runsLoading,
@@ -112,6 +114,7 @@ export function AutomationDetail({
           factory={factory}
           workOrders={workOrders}
           workOrderCardContext={workOrderCardContext}
+          canvasRuns={canvasRuns}
           runs={runs}
           runsLoading={runsLoading}
           isFetchingNextPage={isFetchingNextPage}
@@ -130,6 +133,7 @@ function AutomationDetailTabs({
   factory,
   workOrders,
   workOrderCardContext,
+  canvasRuns,
   runs,
   runsLoading,
   isFetchingNextPage,
@@ -142,6 +146,7 @@ function AutomationDetailTabs({
   factory: FactoriesFactory | null | undefined;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
+  canvasRuns: CanvasesCanvasRun[];
   runs: FactoryAutomationRunCard[];
   runsLoading: boolean;
   isFetchingNextPage: boolean;
@@ -181,6 +186,7 @@ function AutomationDetailTabs({
                     workOrders={workOrders}
                     workOrderCardContext={workOrderCardContext}
                     run={run}
+                    canvasRun={canvasRuns.find((item) => item.id === run.runId)}
                   />
                 </li>
               ))}
@@ -209,6 +215,7 @@ function AutomationRunCard({
   workOrders,
   workOrderCardContext,
   run,
+  canvasRun,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -217,9 +224,10 @@ function AutomationRunCard({
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
   run: FactoryAutomationRunCard;
+  canvasRun?: CanvasesCanvasRun;
 }) {
   const href = factoryAppRunPath(organizationId, factoryKey, appId, run.runId, { from: "automations" });
-  const order = findWorkOrderForAutomationRun(workOrders, run.runId);
+  const order = findWorkOrderForAutomationRun(workOrders, run.runId, canvasRun);
   if (order) {
     const entry = buildWorkOrderListEntry(order, factory);
     return <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />;

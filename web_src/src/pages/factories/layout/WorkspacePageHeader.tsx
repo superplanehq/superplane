@@ -15,6 +15,8 @@ interface WorkspacePageHeaderBaseProps {
   actionsAlign?: "start" | "end";
   /** Optional content stacked below the title/actions row (filter chips, tabs, etc.). */
   belowRow?: ReactNode;
+  /** Compact line above the title, e.g. the trial kicker. */
+  aboveTitle?: ReactNode;
 }
 
 interface WorkspaceSectionHeaderProps extends WorkspacePageHeaderBaseProps {
@@ -63,7 +65,7 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
   const isEntity = props.variant === "entity";
   const hasSubtitle = Boolean(props.subtitle);
   const actionsAlign = props.actionsAlign ?? "end";
-  const alignItems = hasSubtitle || isEntity ? "items-start" : "items-center";
+  const alignItems = hasSubtitle || isEntity ? "items-start" : props.aboveTitle ? "items-end" : "items-center";
   return (
     <header
       className={cn(factoryContentHeaderClassName, props.className)}
@@ -88,11 +90,16 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
               {props.kicker}
             </p>
           ) : null}
-          <div className={cn("flex min-w-0 flex-wrap items-center gap-3", isEntity && "mt-1")}>
-            <h1 className="workspace-page-title min-w-0 overflow-visible" data-testid="workspace-page-header-title">
-              {props.title}
-            </h1>
-            {!isEntity && props.leading ? <div className="flex items-center gap-2">{props.leading}</div> : null}
+          <div className={cn("flex min-w-0 flex-col gap-1", isEntity && "mt-1")}>
+            {props.aboveTitle ? <div data-testid="workspace-page-header-above-title">{props.aboveTitle}</div> : null}
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <h1 className="workspace-page-title min-w-0 overflow-visible" data-testid="workspace-page-header-title">
+                {props.title}
+              </h1>
+              {!isEntity && props.leading ? (
+                <div className="flex min-w-0 items-center gap-2">{props.leading}</div>
+              ) : null}
+            </div>
           </div>
           {hasSubtitle ? (
             <p className="workspace-body-text mt-1 text-muted-foreground" data-testid="workspace-page-header-subtitle">

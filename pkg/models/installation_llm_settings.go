@@ -12,7 +12,8 @@ const (
 	installationLLMSettingsID = 1
 
 	DefaultWelcomeGrantCents   int64 = 5000
-	DefaultMarkupBPS                 = 2000
+	DefaultWelcomeGrantTTL           = 14 * 24 * time.Hour
+	DefaultMarkupBPS                 = 1000
 	DefaultWarningThresholdBPS       = 2000
 	MarkupBaseBPS                    = 10000
 	MicrosPerCent              int64 = 10_000
@@ -20,12 +21,14 @@ const (
 
 // InstallationLLMSettings is the singleton hosted-LLM catalog policy.
 type InstallationLLMSettings struct {
-	ID                  int `gorm:"primary_key"`
-	WelcomeGrantCents   int64
-	MarkupBPS           int
-	WarningThresholdBPS int
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                    int `gorm:"primary_key"`
+	WelcomeGrantCents     int64
+	MarkupBPS             int
+	WarningThresholdBPS   int
+	DefaultHostedProvider *string
+	DefaultHostedModel    *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 func (InstallationLLMSettings) TableName() string {
@@ -52,14 +55,37 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 		return nil, errors.New("warning threshold must be between 0 and 10000 basis points")
 	}
 
+	defaultModel, err := NormalizeDefaultHostedLLMModel(
+		stringValue(settings.DefaultHostedProvider),
+		stringValue(settings.DefaultHostedModel),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := AssertDefaultHostedLLMModelAllowed(tx, defaultModel); err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
+	provider := stringPointer(defaultModel.Provider)
+	model := stringPointer(defaultModel.Model)
 	err = tx.Model(&InstallationLLMSettings{}).
 		Where("id = ?", installationLLMSettingsID).
+		Select(
+			"welcome_grant_cents",
+			"markup_bps",
+			"warning_threshold_bps",
+			"default_hosted_provider",
+			"default_hosted_model",
+			"updated_at",
+		).
 		Updates(map[string]any{
-			"welcome_grant_cents":   settings.WelcomeGrantCents,
-			"markup_bps":            settings.MarkupBPS,
-			"warning_threshold_bps": settings.WarningThresholdBPS,
-			"updated_at":            now,
+			"welcome_grant_cents":     settings.WelcomeGrantCents,
+			"markup_bps":              settings.MarkupBPS,
+			"warning_threshold_bps":   settings.WarningThresholdBPS,
+			"default_hosted_provider": provider,
+			"default_hosted_model":    model,
+			"updated_at":              now,
 		}).Error
 	if err != nil {
 		return nil, err
@@ -68,6 +94,8 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 	current.WelcomeGrantCents = settings.WelcomeGrantCents
 	current.MarkupBPS = settings.MarkupBPS
 	current.WarningThresholdBPS = settings.WarningThresholdBPS
+	current.DefaultHostedProvider = provider
+	current.DefaultHostedModel = model
 	current.UpdatedAt = now
 	return current, nil
 }
@@ -120,4 +148,10 @@ func CentsToMicros(cents int64) int64 {
 		return 0
 	}
 	return cents * MicrosPerCent
+}
+
+// SignedMicrosToCents converts millionths of a dollar to whole cents and
+// keeps the sign. Refunds store negative amounts.
+func SignedMicrosToCents(micros int64) int64 {
+	return micros / MicrosPerCent
 }

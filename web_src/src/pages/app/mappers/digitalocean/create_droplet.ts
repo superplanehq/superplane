@@ -1,7 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -14,6 +14,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import type { DropletPayload } from "./droplet_payloads";
 
 export const createDropletMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -32,7 +33,7 @@ export const createDropletMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -40,10 +41,10 @@ export const createDropletMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const droplet = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const droplet = outputs?.default?.[0]?.data as DropletPayload | undefined;
     if (!droplet) return details;
 
-    const ip = droplet.networks?.v4?.find((n: any) => n.type === "public")?.ip_address;
+    const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
 
     details["Droplet ID"] = droplet.id?.toString() || "-";
     details["Name"] = droplet.name || "-";
@@ -66,7 +67,7 @@ export const createDropletMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { region?: string; size?: string } | undefined;
 
   if (configuration?.region) {
     metadata.push({ icon: "map-pin", label: `Region: ${configuration.region}` });
@@ -81,7 +82,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [

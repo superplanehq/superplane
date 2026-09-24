@@ -2,9 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+
+import { formatRelative } from "@/lib/datetime";
 
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
@@ -143,19 +145,55 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows a status dot, title, start time, and owner", () => {
+  it("shows a status dot, title, created time, and owner", () => {
     const { row } = renderView(WorkOrdersBoardView);
 
     expect(within(row).getByLabelText("Running")).toBeInTheDocument();
     expect(within(row).queryByText("Running")).not.toBeInTheDocument();
     expect(within(row).getByText(entry.title)).toBeInTheDocument();
-    expect(within(row).getByText(/\d+[smhd] ago$/)).toBeInTheDocument();
+    expect(within(row).getByText(formatRelative(new Date(entry.createdAtMs)))).toBeInTheDocument();
     const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
     expect(owner).toBeInTheDocument();
+    expect(within(owner).getByText("Ada")).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
     expect(effectivePointerEvents(owner)).toBe("none");
     expect(within(row).queryByText(entry.displayKey)).not.toBeInTheDocument();
     expect(within(row).queryByText(/verify/i)).not.toBeInTheDocument();
+  });
+
+  it("puts created time on the left and the first name with the avatar on the right", () => {
+    const createdAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent = buildWorkOrderListEntry(
+      {
+        id: "wo-recent",
+        number: "9",
+        title: "Add refund reconciliation test",
+        state: "STATE_OPEN",
+        createdAt: createdAt.toISOString(),
+        updatedAt: createdAt.toISOString(),
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-a", name: "hotfix" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [{ id: "e1", step: "verify", state: "STATE_STARTED" }],
+          },
+        ],
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [recent]);
+    const createdLabel = formatRelative(createdAt);
+    const time = within(row).getByText(createdLabel);
+    const owner = within(row).getByTestId(`work-order-row-assignees-${recent.id}`);
+
+    expect(time).toBeInTheDocument();
+    expect(within(owner).getByText("Ada")).toBeInTheDocument();
+    expect(time.compareDocumentPosition(owner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(time.parentElement?.className).not.toMatch(/ml-auto/);
+    expect(owner.parentElement?.className).toMatch(/ml-auto/);
   });
 
   it("shows a Run failed label on a waiting card after a failed step", () => {
@@ -184,10 +222,23 @@ describe("WorkOrdersBoardView layout", () => {
 
     const chip = within(row).getByText("Run failed").closest("span[title]");
     expect(chip?.querySelector("svg")).toBeTruthy();
+    expect(chip?.className).toMatch(/rounded-full/);
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+
+    const title = within(row).getByText(waiting.title);
+    const time = within(row).getByText(formatRelative(new Date(waiting.createdAtMs)));
+    const owner = within(row).getByTestId(`work-order-row-assignees-${waiting.id}`);
+    expect(chip).toBeInstanceOf(HTMLElement);
+    if (!(chip instanceof HTMLElement)) {
+      throw new Error("expected a status chip");
+    }
+    expect(title.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chip.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(time.parentElement).not.toContainElement(chip);
+    expect(within(owner).getByText("Arnold")).toBeInTheDocument();
   });
 
-  it("shows a Start button on a draft backlog card", () => {
+  it("does not render a Start button on a draft backlog card", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft",
@@ -206,39 +257,9 @@ describe("WorkOrdersBoardView layout", () => {
       factoryLines: [{ id: "line-a", name: "hotfix" }],
     });
 
-    const start = within(row).getByRole("button", { name: "Start" });
-    expect(start).toBeInTheDocument();
-    expect(effectivePointerEvents(start)).toBe("auto");
+    expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(row).queryByTestId("work-order-card-start-wo-draft")).not.toBeInTheDocument();
     expect(within(row).queryByTestId("work-order-row-assignees-wo-draft")).not.toBeInTheDocument();
-  });
-
-  it("starts a draft on the preferred line without opening the card", async () => {
-    const user = userEvent.setup();
-    const draft = buildWorkOrderListEntry(
-      {
-        id: "wo-draft",
-        number: "5",
-        title: "Draft: rework refund telemetry",
-        state: "STATE_DRAFT",
-        createdAt: "2024-06-01T00:00:00Z",
-        updatedAt: "2024-06-02T00:00:00Z",
-        lineDispatches: [],
-      },
-      factory,
-    );
-
-    const { router, onDispatch, row } = renderView(WorkOrdersBoardView, [draft], {
-      factoryLines: [
-        { id: "line-a", name: "plan-and-implement" },
-        { id: "line-b", name: "hotfix" },
-      ],
-      preferredLineName: "plan-and-implement",
-    });
-
-    await user.click(within(row).getByRole("button", { name: "Start" }));
-
-    expect(router.state.location.pathname).toBe("/");
-    expect(onDispatch).toHaveBeenCalledWith("wo-draft", { lineName: "plan-and-implement" });
   });
 });
 
@@ -290,7 +311,7 @@ describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
 });
 
 describe("WorkOrderCard scores", () => {
-  it("shows a score and a Start button to the right of the score", () => {
+  it("shows a verdict word and no Start button", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft-scored",
@@ -319,7 +340,8 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidenceScore={5}
+            clarityScore={5}
+            confidenceScore={3}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
@@ -327,16 +349,17 @@ describe("WorkOrderCard scores", () => {
     );
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
-    expect(score).toHaveAttribute("aria-valuenow", "5");
-    expect(score).toHaveAttribute("aria-valuemax", "5");
-    expect(score.querySelectorAll("[data-filled='true']")).toHaveLength(5);
-    expect(score.querySelectorAll("[data-filled='false']")).toHaveLength(0);
-    const start = screen.getByRole("button", { name: "Start" });
-    expect(start).toBeInTheDocument();
-    expect(score.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(score).toHaveAttribute("data-tone", "caution");
+    expect(score).toHaveTextContent("Clarity5Confidence3");
+    expect(score).toHaveAttribute(
+      "aria-label",
+      "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
+    );
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-start-wo-draft-scored")).not.toBeInTheDocument();
   });
 
-  it("shows the check name and score when the bars are hovered", async () => {
+  it("shows the verdict headline when the score badges are hovered", async () => {
     const user = userEvent.setup();
     const draft = buildWorkOrderListEntry(
       {
@@ -366,7 +389,8 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidenceScore={4}
+            clarityScore={4}
+            confidenceScore={2}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
@@ -375,12 +399,12 @@ describe("WorkOrderCard scores", () => {
 
     const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
     expect(effectivePointerEvents(score)).toBe("auto");
+    expect(score).toHaveTextContent("Clarity4Confidence2");
 
     await user.hover(score);
 
     const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("Confidence score");
-    expect(tip).toHaveTextContent("4/5");
+    expect(tip).toHaveTextContent("Review before you start");
   });
 });
 
@@ -421,6 +445,14 @@ describe("WorkOrderCard attention", () => {
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
     expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    const pill = screen.getByText("Waiting for user review").closest("span[title]");
+    expect(pill).toBeInstanceOf(HTMLElement);
+    if (!(pill instanceof HTMLElement)) {
+      throw new Error("expected a status pill");
+    }
+    expect(pill.className).toMatch(/rounded-full/);
+    const time = screen.getByText(formatRelative(new Date(waitingOrder.createdAt ?? "")));
+    expect(time.parentElement).not.toContainElement(pill);
   });
 
   it("shows Waiting on status checks when a check wait is active", () => {
@@ -455,8 +487,7 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
-    expect(screen.getByLabelText("Status checks passed")).toBeInTheDocument();
-    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+    expect(screen.getByText("Status checks passed")).toBeInTheDocument();
     expect(screen.queryByText("Waiting on status checks")).not.toBeInTheDocument();
   });
 
@@ -492,25 +523,6 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
-    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
-  });
-
-  it("shows the check-fix activity on the card while the fixer runs", () => {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>
-          <WorkOrderCard
-            entry={buildWorkOrderListEntry(waitingOrder, factory)}
-            {...cardProps}
-            addressingFeedbackOrderIds={new Set(["wo-waiting"])}
-            addressingFeedbackLabels={new Map([["wo-waiting", "Fixing failed checks on d8b80c2"]])}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    expect(screen.getByText("Fixing failed checks on d8b80c2")).toBeInTheDocument();
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 });

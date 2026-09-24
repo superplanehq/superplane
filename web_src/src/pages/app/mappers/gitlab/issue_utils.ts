@@ -37,6 +37,27 @@ export function getDetailsForWebhookIssue(issue: WebhookIssue | undefined): Reco
  * Get display details for a full API Issue response.
  * Used by action mappers (create_issue, etc.).
  */
+function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = value;
+  }
+}
+
+function addClosedDetails(details: Record<string, string>, issue: Issue) {
+  if (!issue.closed_by) {
+    return;
+  }
+
+  details["Closed By"] = issue.closed_by.username;
+  details["Closed At"] = issue.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
+}
+
+function addJoinedDetail(details: Record<string, string>, key: string, values?: string[]) {
+  if (values && values.length > 0) {
+    details[key] = values.join(", ");
+  }
+}
+
 export function getDetailsForApiIssue(issue: Issue | undefined): Record<string, string> {
   if (!issue) {
     return {};
@@ -52,26 +73,15 @@ export function getDetailsForApiIssue(issue: Issue | undefined): Record<string, 
     "Created By": issue.author?.username || "-",
   };
 
-  if (issue.closed_by) {
-    details["Closed By"] = issue.closed_by.username;
-    details["Closed At"] = issue.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
-  }
-
-  if (issue.labels && issue.labels.length > 0) {
-    details["Labels"] = issue.labels.join(", ");
-  }
-
-  if (issue.assignees && issue.assignees.length > 0) {
-    details["Assignees"] = issue.assignees.map((assignee) => assignee.username).join(", ");
-  }
-
-  if (issue.milestone) {
-    details["Milestone"] = issue.milestone.title;
-  }
-
-  if (issue.due_date) {
-    details["Due Date"] = issue.due_date;
-  }
+  addClosedDetails(details, issue);
+  addJoinedDetail(details, "Labels", issue.labels);
+  addJoinedDetail(
+    details,
+    "Assignees",
+    issue.assignees?.map((assignee) => assignee.username),
+  );
+  addDetail(details, "Milestone", issue.milestone?.title);
+  addDetail(details, "Due Date", issue.due_date);
 
   return details;
 }

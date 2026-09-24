@@ -14,8 +14,8 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 }
 
 /**
- * Display vocabulary for the Tasks workspace: Draft, Running, Needs
- * attention, Completed, Failed, Rejected, Canceled. The idle-open key stays
+ * Display vocabulary for the Tasks workspace: Draft, Running, Waiting,
+ * Completed, Failed, Rejected, Canceled. The idle-open key stays
  * `waiting` so stored filters keep working. Persisted state + result
  * columns in the database stay unchanged; this file is the single mapping
  * layer.
@@ -31,7 +31,13 @@ export type WorkOrderDisplayStatus =
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
-  { label: string; filterLabel: string; summary: string; className: string; dotClassName: string }
+  {
+    label: string;
+    filterLabel: string;
+    summary: string;
+    className: string;
+    dotClassName: string;
+  }
 > = {
   draft: {
     label: "Draft",
@@ -50,8 +56,8 @@ const DISPLAY_STATUS_META: Record<
     dotClassName: "bg-[color:var(--status-running-dot)]",
   },
   waiting: {
-    label: "Needs attention",
-    filterLabel: "Needs attention",
+    label: "Waiting",
+    filterLabel: "Waiting",
     summary: "A person must act before this work can continue.",
     className:
       "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]",
@@ -126,7 +132,7 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   },
   {
     id: "review",
-    title: "Needs attention",
+    title: "Waiting",
     description: "Tasks that wait for a human decision.",
     statuses: ["waiting"],
   },

@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,15 +19,17 @@ import (
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	"github.com/superplanehq/superplane/pkg/blob/gcs"
+	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/git"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -35,7 +38,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
 )
@@ -118,7 +120,6 @@ func startWorkers(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
-	gitProvider gitprovider.Provider,
 	baseURL string,
 	authService authorization.Authorization,
 	agentProvider agents.Provider,
@@ -132,6 +133,8 @@ func startWorkers(
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
+		startFactorySentryResolveConsumer(rabbitMQURL, encryptor, registry)
+		startFactoryJiraCloseConsumer(rabbitMQURL, encryptor, registry, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -144,7 +147,7 @@ func startWorkers(
 	if os.Getenv("START_RUN_FINALIZER") == "yes" {
 		log.Println("Starting Run Finalizer")
 
-		w := workers.NewRunFinalizer(rabbitMQURL, registry)
+		w := workers.NewRunFinalizer(rabbitMQURL, registry).WithEncryptor(encryptor)
 		go w.Start(context.Background())
 	}
 
@@ -152,7 +155,7 @@ func startWorkers(
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -167,7 +170,7 @@ func startWorkers(
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -195,7 +198,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -227,7 +230,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker(gitProvider, agentProvider)
+		w := workers.NewCanvasCleanupWorker(agentProvider)
 		go w.Start(context.Background())
 	}
 
@@ -238,45 +241,10 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
-		log.Println("Starting Repository Provisioner")
-		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
-		go w.Start(context.Background())
-	}
-
-	var workerUsageService usage.Service
-	initWorkerUsageService := func() (usage.Service, error) {
-		if workerUsageService != nil {
-			return workerUsageService, nil
-		}
-
-		service, err := usage.NewServiceFromEnv()
-		if err != nil {
-			return nil, err
-		}
-		workerUsageService = service
-		return workerUsageService, nil
-	}
-	getRequiredWorkerUsageService := func() usage.Service {
-		service, err := initWorkerUsageService()
-		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
-		}
-		return service
-	}
-	getOptionalWorkerUsageService := func() usage.Service {
-		service, err := initWorkerUsageService()
-		if err != nil {
-			log.Printf("usage service unavailable for agent canvas tool: %v", err)
-			return nil
-		}
-		return service
-	}
-
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
+		w := workers.NewOrganizationCleanupWorker(agentProvider)
 		go w.Start(context.Background())
 	}
 
@@ -287,10 +255,37 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_FILE_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting File Cleanup Worker")
+
+		w := workers.NewFileCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_FACTORY_VELOCITY_SYNC_WORKER") == "yes" {
 		log.Println("Starting Factory Velocity Sync Worker")
 
 		w := workers.NewFactoryVelocitySyncWorker(rabbitMQURL, encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
+		log.Println("Starting Price Book Sync Worker")
+
+		w := workers.NewPriceBookSyncWorker(encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Planning Session Cleanup Worker")
+
+		w := workers.NewPlanningSessionCleanupWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" {
+		log.Println("Starting Event Retention Worker")
+		w := workers.NewEventRetentionWorker()
 		go w.Start(context.Background())
 	}
 
@@ -299,34 +294,15 @@ func startWorkers(
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
 			Encryptor:         encryptor,
 			ComponentRegistry: registry,
-			GitProvider:       gitProvider,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
-			UsageService:      getOptionalWorkerUsageService(),
 		})
-		w := workers.NewAgentStreamWorkerWithUsageService(
+		w := workers.NewAgentStreamWorker(
 			agentProvider,
 			rabbitMQURL,
-			getOptionalWorkerUsageService(),
 			agentToolRegistry,
 		)
 		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService := getRequiredWorkerUsageService()
-
-		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
-			log.Println("Starting Event Retention Worker")
-			w := workers.NewEventRetentionWorker(usageService)
-			go w.Start(context.Background())
-		}
-
-		if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" && usageService.Enabled() {
-			log.Println("Starting Usage Sync Worker")
-			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
-			go w.Start(context.Background())
-		}
 	}
 
 }
@@ -357,20 +333,35 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go factoryNotificationConsumer.Start()
 }
 
+func startFactorySentryResolveConsumer(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	componentRegistry *registry.Registry,
+) {
+	log.Println("Starting Factory Sentry Resolve Consumer")
+	consumer := workers.NewFactorySentryResolveConsumer(rabbitMQURL, encryptor, componentRegistry)
+	go consumer.Start()
+}
+
+func startFactoryJiraCloseConsumer(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	componentRegistry *registry.Registry,
+	baseURL string,
+) {
+	log.Println("Starting Factory Jira Close Consumer")
+	consumer := workers.NewFactoryJiraCloseConsumer(rabbitMQURL, encryptor, componentRegistry, baseURL)
+	go consumer.Start()
+}
+
 func buildGRPCServices(
 	baseURL, webhooksBaseURL string,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
-	gitProvider gitprovider.Provider,
 	agentService agentsActions.AgentsService,
 ) (*grpc.Services, error) {
-	usageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		return nil, fmt.Errorf("initialize usage service: %w", err)
-	}
-
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
@@ -378,9 +369,7 @@ func buildGRPCServices(
 		AuthService:     authService,
 		Registry:        registry,
 		OIDCProvider:    oidcProvider,
-		GitProvider:     gitProvider,
 		AgentService:    agentService,
-		UsageService:    usageService,
 	})
 }
 
@@ -391,7 +380,6 @@ func startPublicAPI(
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
-	gitProvider gitprovider.Provider,
 	grpcServices *grpc.Services,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
@@ -399,10 +387,6 @@ func startPublicAPI(
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
-	usageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		log.Panicf("failed to initialize usage service for public api: %v", err)
-	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	server, err := public.NewServer(
@@ -410,14 +394,12 @@ func startPublicAPI(
 		registry,
 		jwtSigner,
 		oidcProvider,
-		gitProvider,
 		basePath,
 		baseURL,
 		webhooksBaseURL,
 		appEnv,
 		templateDir,
 		authService,
-		usageService,
 		blockSignup,
 	)
 	if err != nil {
@@ -586,6 +568,10 @@ func Start() {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
+	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
+		log.WithError(err).Error("development hosted OpenRouter seed skipped")
+	}
+
 	authService, err := authorization.NewAuthService()
 	if err != nil {
 		log.Fatalf("failed to create auth service: %v", err)
@@ -618,11 +604,12 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	log.Println("Creating Git Provider")
-	gitProvider, err := git.NewProvider()
+	log.Println("Creating blob storage provider")
+	blobProvider, err := newBlobProvider()
 	if err != nil {
-		panic(fmt.Sprintf("failed to create git provider: %v", err))
+		panic(fmt.Sprintf("failed to create blob storage provider: %v", err))
 	}
+	blob.SetCurrent(blobProvider)
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
@@ -660,14 +647,6 @@ func Start() {
 
 	agentProvider, agentService := buildAgentService(authService)
 
-	runnerUsageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		log.Fatalf("failed to initialize usage service for runner limits: %v", err)
-	}
-	runner.SetRunnerMinutesLimitChecker(func(organizationID string) error {
-		return usage.EnsureCanStartRunnerTask(context.Background(), runnerUsageService, organizationID)
-	})
-
 	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
@@ -677,7 +656,6 @@ func Start() {
 			authService,
 			registry,
 			oidcProvider,
-			gitProvider,
 			agentService,
 		)
 		if err != nil {
@@ -693,7 +671,6 @@ func Start() {
 			jwtSigner,
 			oidcProvider,
 			authService,
-			gitProvider,
 			grpcServices,
 		)
 	}
@@ -702,7 +679,6 @@ func Start() {
 		encryptorInstance,
 		registry,
 		oidcProvider,
-		gitProvider,
 		baseURL,
 		authService,
 		agentProvider,
@@ -723,6 +699,27 @@ func getWebhookBaseURL(baseURL string) string {
 		webhookBaseURL = baseURL
 	}
 	return webhookBaseURL
+}
+
+func newBlobProvider() (blob.Provider, error) {
+	name := strings.TrimSpace(os.Getenv("BLOB_STORAGE_PROVIDER"))
+	if name == "" {
+		return nil, fmt.Errorf("BLOB_STORAGE_PROVIDER is not set")
+	}
+
+	switch name {
+	case blob.ProviderGCS:
+		log.Println("Creating GCS blob storage provider")
+		return gcs.NewProvider()
+	case blob.ProviderS3:
+		log.Println("Creating S3 blob storage provider")
+		return s3blob.NewProvider()
+	case blob.ProviderFilesystem:
+		log.Println("Creating filesystem blob storage provider")
+		return filesystem.NewProvider()
+	default:
+		return nil, fmt.Errorf("unsupported blob storage provider %q", name)
+	}
 }
 
 /*

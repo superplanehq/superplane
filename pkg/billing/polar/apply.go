@@ -55,7 +55,7 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		return nil
 	}
 
-	orgID, err := parseOrganizationID(event.Data.Customer.ExternalID)
+	orgID, err := parseOrganizationID(event.Data)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 		return permanentApplyError("order event is required")
 	}
 
-	orgID, err := parseOrganizationID(event.Data.Customer.ExternalID)
+	orgID, err := parseOrganizationID(event.Data)
 	if err != nil {
 		return err
 	}
@@ -107,8 +107,8 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 	return models.ReversePolarOrderCredit(tx, orgID, event.Data.ID, reverseMicros, refundID)
 }
 
-func parseOrganizationID(externalID string) (uuid.UUID, error) {
-	orgID, err := uuid.Parse(strings.TrimSpace(externalID))
+func parseOrganizationID(data OrderData) (uuid.UUID, error) {
+	orgID, err := uuid.Parse(data.organizationExternalID())
 	if err != nil {
 		return uuid.Nil, permanentApplyError("order customer external id is not an organization id")
 	}
@@ -119,10 +119,16 @@ func orderIsCreditPack(ctx context.Context, data OrderData, lookup CreditPackLoo
 	if data.Product.IsCreditPack() {
 		return true, nil
 	}
-	if lookup == nil || strings.TrimSpace(data.Product.ID) == "" {
+	for _, item := range data.Items {
+		if item.Product.IsCreditPack() {
+			return true, nil
+		}
+	}
+	productID := data.productID()
+	if lookup == nil || productID == "" {
 		return false, nil
 	}
-	pack, err := lookup.GetCreditPack(ctx, data.Product.ID)
+	pack, err := lookup.GetCreditPack(ctx, productID)
 	if err != nil {
 		if errors.Is(err, ErrNotCreditPack) || IsNotFound(err) {
 			return false, nil
@@ -158,7 +164,11 @@ func shouldGrantPurchase(data OrderData) bool {
 }
 
 // purchasedFaceValueCents uses the price Polar charged, not the first catalog price.
+// Custom (pay-what-you-want) packs grant the paid net amount, excluding tax.
 func purchasedFaceValueCents(data OrderData) int64 {
+	if orderHasCustomPrice(data) {
+		return customPaidAmountCents(data)
+	}
 	if amount := fixedPriceAmount(data.ProductPrice); amount > 0 {
 		return amount
 	}
@@ -176,8 +186,35 @@ func purchasedFaceValueCents(data OrderData) int64 {
 	return data.Product.FaceValueCents()
 }
 
+func orderHasCustomPrice(data OrderData) bool {
+	if data.ProductPrice.isCustom() {
+		return true
+	}
+	for _, item := range data.Items {
+		if item.ProductPrice.isCustom() {
+			return true
+		}
+	}
+	return false
+}
+
+func customPaidAmountCents(data OrderData) int64 {
+	if data.NetAmount > 0 {
+		return data.NetAmount
+	}
+	for _, item := range data.Items {
+		if item.Amount > 0 {
+			return item.Amount
+		}
+	}
+	if data.ProductPrice.PriceAmount > 0 {
+		return data.ProductPrice.PriceAmount
+	}
+	return 0
+}
+
 func fixedPriceAmount(price priceJSON) int64 {
-	if price.AmountType != "" && price.AmountType != "fixed" {
+	if !price.isFixed() {
 		return 0
 	}
 	if price.PriceAmount > 0 {

@@ -1,0 +1,23 @@
+export const PRODUCTIVE_INTAKE_SETUP_COPY = {
+  pageTitle: "How should Productive.io tasks become tasks?",
+  wizardStepConnect: "Connect Productive.io",
+  wizardStepConnectHelper: "Connect Productive.io so SuperPlane can read tasks and receive new task events.",
+  wizardStepConnectExisting: "Choose the Productive.io account that SuperPlane will monitor.",
+  wizardStepProject: "Which Productive.io project should create tasks?",
+  wizardStepProjectHelper:
+    "SuperPlane adds the 10 newest open tasks from this project. SuperPlane also listens for new tasks.",
+  wizardStepProjectHelperSkip: "SuperPlane listens for new tasks. SuperPlane does not import existing tasks.",
+  wizardConnect: "Connect Productive.io",
+  wizardConnectAnother: "Connect another account",
+  wizardContinue: "Continue",
+  wizardFinish: "Finish",
+  wizardFinishing: "Finishing...",
+  wizardConnectionsLoading: "Loading Productive.io connections...",
+  wizardProjectsLoading: "Loading Productive.io projects...",
+  wizardProjectsError: "SuperPlane could not load Productive.io projects.",
+  wizardProjectsErrorHint: "If this continues, make sure that the connection is still valid.",
+  wizardProjectsEmpty: "This connection has no available projects.",
+  wizardRetry: "Try again",
+  wizardCheckConnection: "Check connection",
+  wizardCreateError: "SuperPlane could not create the Productive.io intake.",
+} as const;

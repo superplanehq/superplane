@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 
 import { getApiErrorMessage } from "@/lib/errors";
-import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
+import {
+  getNextIntegrationName,
+  getNextParentheticalIntegrationName,
+} from "@/pages/organization/settings/components/IntegrationSetup/lib";
 
 const MAX_NAME_ATTEMPTS = 20;
 
@@ -28,7 +31,7 @@ export function useGeneratedIntegrationName(args: {
 
   const name = useMemo(() => {
     if (!args.isGitHub) return args.typedName;
-    return createdName ?? getNextIntegrationName(baseName, args.existingNames);
+    return createdName ?? getNextParentheticalIntegrationName(baseName, args.existingNames);
   }, [args.existingNames, args.isGitHub, args.typedName, baseName, createdName]);
 
   return { name, baseName, setCreatedName };

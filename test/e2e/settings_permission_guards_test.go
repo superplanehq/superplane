@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -15,14 +16,14 @@ import (
 )
 
 func TestSettingsPermissionGuards(t *testing.T) {
-	t.Run("viewer can read settings resources but cannot manage them", func(t *testing.T) {
+	t.Run("operator can read settings resources but cannot manage them", func(t *testing.T) {
 		steps := &settingsPermissionGuardSteps{t: t}
 		steps.start()
 		steps.givenGroupExists("readonly-team")
 		steps.givenRoleExists("readonly-role")
 		steps.givenAPIKeyExists("readonly-bot")
 		memberEmail := steps.givenMemberExists("readonly-member")
-		steps.loginAsViewer()
+		steps.loginAsOperator()
 
 		steps.visitGeneralSettings()
 		steps.assertOrgUpdateDisabled()
@@ -75,6 +76,15 @@ func TestSettingsPermissionGuards(t *testing.T) {
 		steps.visitIntegrationDetail(integration.ID.String())
 		steps.assertIntegrationDeleteDisabled()
 	})
+
+	t.Run("operator cannot open factory workspace settings by URL", func(t *testing.T) {
+		steps := &settingsPermissionGuardSteps{t: t}
+		steps.start()
+		factory := steps.givenFactoryExists()
+		steps.loginAsOperator()
+		steps.visitFactoryWorkspaceSettings(factory)
+		steps.assertPermissionDenied()
+	})
 }
 
 type settingsPermissionGuardSteps struct {
@@ -88,8 +98,8 @@ func (s *settingsPermissionGuardSteps) start() {
 	s.session.Login()
 }
 
-func (s *settingsPermissionGuardSteps) loginAsViewer() {
-	loginAsViewer(s.t, s.session)
+func (s *settingsPermissionGuardSteps) loginAsOperator() {
+	loginAsOperator(s.t, s.session)
 }
 
 func (s *settingsPermissionGuardSteps) loginWithPermissions(roleLabel string, permissions ...*permissionSpec) {
@@ -160,8 +170,8 @@ func (s *settingsPermissionGuardSteps) assertGroupsCreateDisabled() {
 
 func (s *settingsPermissionGuardSteps) assertGroupUpdateDisabled(name string) {
 	row := s.rowByText(name)
-	require.NoError(s.t, row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Viewer"}).WaitFor())
-	disabled, err := row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Viewer"}).IsDisabled()
+	require.NoError(s.t, row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Operator"}).WaitFor())
+	disabled, err := row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Operator"}).IsDisabled()
 	require.NoError(s.t, err)
 	require.True(s.t, disabled)
 }
@@ -198,7 +208,7 @@ func (s *settingsPermissionGuardSteps) assertInviteLinkCreateDisabled() {
 
 func (s *settingsPermissionGuardSteps) assertMemberUpdateDisabled(email string) {
 	row := s.rowByText(email)
-	disabled, err := row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Viewer"}).IsDisabled()
+	disabled, err := row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Operator"}).IsDisabled()
 	require.NoError(s.t, err)
 	require.True(s.t, disabled)
 }
@@ -267,7 +277,7 @@ func (s *settingsPermissionGuardSteps) givenGroupExists(name string) {
 		s.session.OrgID.String(),
 		models.DomainTypeOrganization,
 		name,
-		models.RoleOrgViewer,
+		models.RoleOrgOperator,
 		name,
 		name,
 	))
@@ -292,7 +302,7 @@ func (s *settingsPermissionGuardSteps) givenRoleExists(displayName string) {
 }
 
 func (s *settingsPermissionGuardSteps) givenMemberExists(label string) string {
-	account := createAccountForRole(s.t, s.session, label, models.RoleOrgViewer)
+	account := createAccountForRole(s.t, s.session, label, models.RoleOrgOperator)
 	return account.Email
 }
 
@@ -312,4 +322,21 @@ func (s *settingsPermissionGuardSteps) givenIntegrationExists(name string) *mode
 	require.NoError(s.t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
 	integration.State = models.IntegrationStateReady
 	return integration
+}
+
+func (s *settingsPermissionGuardSteps) givenFactoryExists() *models.Factory {
+	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
+	factory, err := models.CreateFactory(database.DB(s.t.Context()), s.session.OrgID, support.RandomName("factory"), "permission guard", "")
+	require.NoError(s.t, err)
+	return factory
+}
+
+func (s *settingsPermissionGuardSteps) visitFactoryWorkspaceSettings(factory *models.Factory) {
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/settings/workspace/general")
+	s.session.Sleep(500)
+}
+
+func (s *settingsPermissionGuardSteps) assertPermissionDenied() {
+	s.session.AssertVisible(q.TestID("permission-denied-page"))
+	s.session.AssertText("Permission denied")
 }

@@ -28,6 +28,10 @@ func (FactoryPullRequestRevision) TableName() string {
 	return "factory_pull_request_revisions"
 }
 
+func (p *FactoryPullRequest) LockForUpdate(tx *gorm.DB) error {
+	return p.lock(tx)
+}
+
 func (p *FactoryPullRequest) lock(tx *gorm.DB) error {
 	var locked FactoryPullRequest
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -66,7 +70,20 @@ func (p *FactoryPullRequest) ObserveRevision(tx *gorm.DB, sha string) (*FactoryP
 	// a force-push back to a SHA we already stored. Do not cancel runs
 	// still bound to the former SHA. A check fixer often creates that head.
 	p.CurrentRevisionID = &revision.ID
-	if err := tx.Model(p).Update("current_revision_id", revision.ID).Error; err != nil {
+	updates := map[string]any{"current_revision_id": revision.ID}
+	if p.MergeableHeadSHA != sha {
+		p.Mergeable = false
+		p.MergeBlockedReason = ""
+		p.MergeBlockedMessage = ""
+		p.MergeableHeadSHA = ""
+		p.MergeableAllowedMethods = ""
+		updates["mergeable"] = false
+		updates["merge_blocked_reason"] = ""
+		updates["merge_blocked_message"] = ""
+		updates["mergeable_head_sha"] = ""
+		updates["mergeable_allowed_methods"] = ""
+	}
+	if err := tx.Model(p).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 	result.Current = true

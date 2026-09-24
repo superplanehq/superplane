@@ -14,8 +14,8 @@ import { SidebarUserMenu } from "./SidebarUserMenu";
 const withAccountOrganizations: Decorator = (Story) => {
   const queryClient = useQueryClient();
   queryClient.setQueryData(accountOrganizationsQueryKey, [
-    { id: FACTORIES_ORGANIZATION_ID, name: "SuperPlane" },
-    { id: "org-storybook-acme", name: "Acme" },
+    { id: FACTORIES_ORGANIZATION_ID, slug: "superplane", name: "SuperPlane" },
+    { id: "org-storybook-acme", slug: "acme", name: "Acme" },
   ]);
   return <Story />;
 };
@@ -54,6 +54,40 @@ export const Default: Story = {
 export const Open: Story = {
   args: {
     ...defaultArgs,
+    defaultOpen: true,
+  },
+};
+
+export const Trial: Story = {
+  args: {
+    ...defaultArgs,
+    planLabel: "Trial",
+  },
+};
+
+export const TrialOpen: Story = {
+  name: "Trial (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "Trial",
+    defaultOpen: true,
+  },
+};
+
+export const BusinessOpen: Story = {
+  name: "Business (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "Business",
+    defaultOpen: true,
+  },
+};
+
+export const NoPlanOpen: Story = {
+  name: "No plan (open)",
+  args: {
+    ...defaultArgs,
+    planLabel: "No plan",
     defaultOpen: true,
   },
 };

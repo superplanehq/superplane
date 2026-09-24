@@ -68,28 +68,18 @@ export const octopusTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const event = context.event?.data as OctopusEventData | undefined;
+    const event = (context.event?.data as OctopusEventData | undefined) ?? {};
     const values: Record<string, string> = {
       "Received At": formatTimestamp(context.event?.createdAt),
       Event: stringOrDash(context.event?.type),
-      "Event Type": stringOrDash(event?.eventType),
+      "Event Type": stringOrDash(event.eventType),
     };
 
-    if (event?.projectId) {
-      values["Project"] = event.projectName || event.projectId;
-    }
-    if (event?.environmentId) {
-      values["Environment"] = event.environmentName || event.environmentId;
-    }
-    if (event?.releaseId) {
-      values["Release"] = event.releaseName || event.releaseId;
-    }
-    if (event?.deploymentId) {
-      values["Deployment ID"] = event.deploymentId;
-    }
-    if (event?.message) {
-      values["Message"] = event.message;
-    }
+    addNamedOrId(values, "Project", event.projectId, event.projectName);
+    addNamedOrId(values, "Environment", event.environmentId, event.environmentName);
+    addNamedOrId(values, "Release", event.releaseId, event.releaseName);
+    addDetail(values, "Deployment ID", event.deploymentId);
+    addDetail(values, "Message", event.message);
 
     return values;
   },
@@ -122,6 +112,18 @@ export const octopusTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = value;
+  }
+}
+
+function addNamedOrId(details: Record<string, string>, key: string, id?: string, name?: string) {
+  if (id) {
+    details[key] = name || id;
+  }
+}
 
 function buildMetadata(
   configuration: OnDeploymentEventConfiguration | undefined,

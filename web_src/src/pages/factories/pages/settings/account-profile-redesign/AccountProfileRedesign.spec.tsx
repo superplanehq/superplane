@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -35,16 +35,18 @@ describe("AccountProfileRedesignPlayground", () => {
     Element.prototype.scrollIntoView ??= () => undefined;
   });
 
-  it("shows Profile copy and the redesigned Account nav", () => {
+  it("shows Account copy and the redesigned Account nav", () => {
     renderPlayground();
 
-    expect(screen.getByRole("heading", { name: "Profile" })).toBeInTheDocument();
-    expect(screen.getByText("Your name, appearance, and GitHub identity.")).toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("Account");
+    expect(
+      screen.getByText("Preferences, profile information, and security for your SuperPlane account."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Profile");
-    expect(screen.getByTestId("account-redesign-nav-account-security")).toHaveTextContent("Security");
-    expect(screen.queryByTestId("account-redesign-nav-account-notifications")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Account");
+    expect(screen.queryByTestId("account-redesign-nav-account-security")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-nav-account-notifications")).toHaveTextContent("Notifications");
     expect(screen.queryByTestId("account-redesign-nav-account-preferences")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-nav-account-general")).not.toBeInTheDocument();
     expect(screen.queryByText("Leave workspace")).not.toBeInTheDocument();
@@ -52,6 +54,8 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.queryByTestId("account-redesign-danger")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-appearance")).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-theme")).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-security")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Security & access" })).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-user-id")).not.toBeInTheDocument();
     expect(screen.queryByText(/User ID/)).not.toBeInTheDocument();
   });
@@ -71,14 +75,6 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(save).toBeDisabled();
   });
 
-  it("links GitHub for Velocity from Profile", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByRole("button", { name: "Link GitHub" }));
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("Linked as ada");
-  });
-
   it("lets the user switch the profile email across sign-in methods", async () => {
     const user = userEvent.setup();
     render(
@@ -94,27 +90,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByTestId("account-redesign-identity")).toHaveTextContent("ada@users.noreply.github.com");
   });
 
-  it("moves the profile email to the remaining sign-in method after disconnect", async () => {
-    const user = userEvent.setup();
-    render(
-      <ThemeProvider>
-        <TooltipProvider>
-          <AccountProfileRedesignPlayground initialPage="security" initialProfile={ACCOUNT_REDESIGN_SECURE_PROFILE} />
-        </TooltipProvider>
-      </ThemeProvider>,
-    );
-
-    await user.click(
-      within(screen.getByTestId("account-redesign-sso-google")).getByRole("button", { name: "Disconnect" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Disconnect Google" }));
-
-    await user.click(screen.getByTestId("account-redesign-nav-account-profile"));
-    expect(screen.getByTestId("account-redesign-identity")).toHaveTextContent("ada@users.noreply.github.com");
-    expect(screen.getByTestId("account-redesign-email")).toHaveTextContent("ada@users.noreply.github.com");
-  });
-
-  it("hides the password row when the account has no password", () => {
+  it("hides the Sign in methods card when the account has no password", () => {
     render(
       <ThemeProvider>
         <TooltipProvider>
@@ -127,77 +103,43 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.queryByTestId("account-redesign-password")).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-signin")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-signin")).not.toBeInTheDocument();
   });
 
-  it("disables last SSO disconnect when no password is set", () => {
-    render(
-      <ThemeProvider>
-        <TooltipProvider>
-          <AccountProfileRedesignPlayground
-            initialPage="security"
-            initialProfile={{
-              ...ACCOUNT_REDESIGN_SECURE_PROFILE,
-              passwordSet: false,
-              ssoAccounts: [
-                { provider: "github", identity: "ada" },
-                { provider: "google", identity: null },
-              ],
-            }}
-          />
-        </TooltipProvider>
-      </ThemeProvider>,
-    );
-
-    expect(
-      within(screen.getByTestId("account-redesign-sso-github")).getByRole("button", { name: "Disconnect" }),
-    ).toBeDisabled();
-    expect(screen.getByText("Keep at least one sign-in method.")).toBeInTheDocument();
-  });
-
-  it("opens Security with password, SSO methods, and tokens", async () => {
-    const user = userEvent.setup();
+  it("shows Security & access with password and tokens only", () => {
     renderPlayground();
 
-    await user.click(screen.getByTestId("account-redesign-nav-account-security"));
-    expect(screen.getByRole("heading", { name: "Security" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Security & access" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sign in methods" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
-    expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso-github")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso-google")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in with Google" })).not.toBeInTheDocument();
     expect(
       screen.getByText("This token acts as you. Organization API keys act as the organization."),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sessions")).not.toBeInTheDocument();
     expect(screen.queryByText("Two-factor authentication")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
-    expect(screen.queryByText("GitHub for Velocity")).not.toBeInTheDocument();
   });
 
-  it("connects Google and disconnects GitHub on the same account", async () => {
+  it("links and removes GitHub from Associated accounts", async () => {
     const user = userEvent.setup();
-    render(
-      <ThemeProvider>
-        <TooltipProvider>
-          <AccountProfileRedesignPlayground initialPage="security" />
-        </TooltipProvider>
-      </ThemeProvider>,
+    renderPlayground();
+
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
+      "Velocity uses this GitHub account to credit your pull requests.",
     );
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
-
-    await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
+    await user.click(screen.getByRole("button", { name: "Link GitHub" }));
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent("Linked as ada-lovelace");
 
     await user.click(
-      within(screen.getByTestId("account-redesign-sso-github")).getByRole("button", { name: "Disconnect" }),
+      within(screen.getByTestId("account-redesign-associated-github")).getByRole("button", { name: "Remove" }),
     );
-    await user.click(screen.getByRole("button", { name: "Disconnect GitHub" }));
+    expect(screen.getByText(/Velocity reports stop crediting your pull requests/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove link" }));
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Not connected");
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
+    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
   });
 
   it("turns task emails off and hides events", async () => {
@@ -215,8 +157,10 @@ describe("AccountProfileRedesignPlayground", () => {
       />,
     );
 
-    expect(screen.getByText("Choose which task emails SuperPlane sends you.")).toBeInTheDocument();
-    expect(screen.getByText("Added as a task owner")).toBeInTheDocument();
+    expect(screen.getByText("Choose which task emails and browser alerts SuperPlane sends you.")).toBeInTheDocument();
+    expect(screen.getByText("Status changes on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Agent questions on your tasks")).toBeInTheDocument();
+    expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("switch", { name: "Send task emails" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ emailEnabled: false }));
@@ -235,12 +179,58 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
   });
 
+  it("keeps browser notifications off by default", () => {
+    render(
+      <AccountNotificationsRedesignPage
+        email="ada@example.com"
+        workspaces={[{ id: "ws-1", name: "Semaphore" }]}
+        notifications={ACCOUNT_REDESIGN_NOTIFICATIONS}
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-notifications-browser-off")).toHaveTextContent(
+      "Browser notifications are off.",
+    );
+    expect(screen.queryByTestId("account-redesign-notifications-browser-events")).not.toBeInTheDocument();
+  });
+
+  it("asks for permission when browser notifications are already on", async () => {
+    const user = userEvent.setup();
+    const requestPermission = vi.fn(async () => "granted" as NotificationPermission);
+    class FakeNotification {
+      static permission: NotificationPermission = "default";
+      static requestPermission = requestPermission;
+    }
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: FakeNotification,
+    });
+
+    render(
+      <AccountNotificationsRedesignPage
+        email="ada@example.com"
+        workspaces={[{ id: "ws-1", name: "Semaphore" }]}
+        notifications={{ ...ACCOUNT_REDESIGN_NOTIFICATIONS, browserEnabled: true }}
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-notifications-browser-allow")).toHaveTextContent(
+      "This browser needs permission before SuperPlane can show alerts.",
+    );
+    await user.click(screen.getByRole("button", { name: "Allow notifications" }));
+    expect(requestPermission).toHaveBeenCalled();
+  });
+
   it("filters the settings nav", async () => {
     const user = userEvent.setup();
     renderPlayground();
 
     await user.type(screen.getByTestId("account-redesign-find"), "sec");
-    expect(screen.getByTestId("account-redesign-nav-account-security")).toBeInTheDocument();
-    expect(screen.queryByTestId("account-redesign-nav-account-profile")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-nav-account-profile")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-nav-account-notifications")).not.toBeInTheDocument();
   });
 });

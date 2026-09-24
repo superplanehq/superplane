@@ -5,11 +5,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -24,7 +26,8 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.Lis
 	}
 
 	return &pb.ListIntegrationsResponse{
-		Integrations: serializeIntegrations(registry, orgID, registry.ListIntegrations()),
+		Integrations:        serializeIntegrations(registry, orgID, registry.ListIntegrations()),
+		GithubAppConfigured: config.LoadGitHubHostedAppConfig().Enabled(),
 	}, nil
 }
 
@@ -52,7 +55,8 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 		// Hosted GitHub install and the setup wizard are independent.
 		// Connect uses HostedAppInstall. The wizard needs new_integration_setup_flow.
 		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
-		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name())
+		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name()) ||
+			jira.UseHostedInstall(integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),

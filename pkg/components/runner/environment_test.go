@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -308,6 +309,19 @@ func Test__ValidateEnvironmentFromConfigurationField(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+}
+
+func TestAttachExecutionTimeoutEnvUsesDefaultWhenUnset(t *testing.T) {
+	t.Parallel()
+
+	got := AttachExecutionTimeoutEnv(nil, 0)
+	require.Len(t, got, 1)
+	assert.Equal(t, EnvExecutionTimeoutSeconds, got[0].Name)
+	assert.Equal(t, fmt.Sprintf("%d", DefaultExecutionTimeoutSeconds), got[0].Value)
+
+	got = AttachExecutionTimeoutEnv([]BrokerEnvironmentVariable{{Name: "KEEP", Value: "1"}}, 90)
+	require.Len(t, got, 2)
+	assert.Equal(t, "90", got[1].Value)
 }
 
 func strPtr(v string) *string {

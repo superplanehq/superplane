@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 describe("usePageTitle", () => {

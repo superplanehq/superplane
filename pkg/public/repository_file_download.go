@@ -110,7 +110,7 @@ func (s *Server) findFileReader(ctx context.Context, db *gorm.DB, r *http.Reques
 
 	version := strings.TrimSpace(r.URL.Query().Get("version_id"))
 	stage := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("stage")), "true")
-	appFileReader := files.NewAppFileReader(db, s.gitProvider, canvas, user.ID)
+	appFileReader := files.NewAppFileReader(db, canvas, user.ID)
 
 	switch {
 

@@ -12,41 +12,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import type { SsoProviderItem } from "./accountSecuritySso";
-
-export function DisconnectSsoDialog({
-  provider,
-  onOpenChange,
-  onConfirm,
-}: {
-  provider: SsoProviderItem | null;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-}) {
-  if (!provider) {
-    return null;
-  }
-
-  return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Disconnect {provider.label}</DialogTitle>
-          <DialogDescription>You cannot sign in with {provider.label} until you connect it again.</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Keep {provider.label}
-          </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm}>
-            Disconnect {provider.label}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function PasswordDialog({
   open,
   onOpenChange,

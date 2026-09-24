@@ -5,12 +5,21 @@ import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
 import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
+import { analysisSphereFor } from "./firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
-import type { FirstRunAnalysisStatus, FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
+import { canAnalyzeTicketSource } from "./firstRunTicketSource";
+import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
+import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
+import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
+import type { JiraCompletionColumnValue } from "../../jiraCompletionColumn";
+
+const STORY_JIRA_PROJECTS = [
+  { id: "PAY", name: "Payments" },
+  { id: "CORE", name: "Core" },
+];
 
 const STAGE_MS = 900;
-const COMPLETE_AFTER_MS = STAGE_MS * 3;
 
 /**
  * Clickable Storybook journey for the first-run PRD. Local state only.
@@ -20,48 +29,47 @@ export function FirstRunFlow({
   firstName,
   email = FIRST_RUN_STORY_EMAIL,
   initialScreen = "welcome",
-  githubStartsConnected = false,
-  analysisStatus = "running",
-  completeAfterMs = COMPLETE_AFTER_MS,
   board,
   onLogOut,
 }: {
   firstName?: string;
   email?: string;
   initialScreen?: FirstRunScreenId;
-  githubStartsConnected?: boolean;
-  analysisStatus?: FirstRunAnalysisStatus;
-  completeAfterMs?: number;
   board?: ReactNode;
   onLogOut?: () => void;
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
-  const [githubConnected, setGithubConnected] = useState(githubStartsConnected);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
+  const [jiraConnected, setJiraConnected] = useState(false);
+  const [jiraProjectId, setJiraProjectId] = useState("");
+  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>({
+    ...DEFAULT_JIRA_COMPLETION_SETTINGS,
+  });
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
-  const [stageIndex, setStageIndex] = useState(0);
+  const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
 
-  const chromeFor = (stepIndex: number): FirstRunChrome => ({
+  const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
     email,
     onLogOut,
     stepIndex,
+    onBack,
   });
 
   useEffect(() => {
-    if (screen !== "analysis" || analysisStatus === "failed") return;
-
+    if (screen !== "analysis") return;
     const stageTimer = window.setInterval(() => {
-      setStageIndex((current) => Math.min(current + 1, 2));
+      setProgress((current) => {
+        const scored = Math.min(current.scored + 1, current.total);
+        // Roughly two of three demo tickets score above the threshold.
+        const ready = Math.ceil((scored * 2) / 3);
+        return { total: current.total, scored, ready, stageIndex: scored === current.total ? 2 : 1 };
+      });
     }, STAGE_MS);
-    const doneTimer =
-      analysisStatus === "running" ? window.setTimeout(() => setScreen("board"), completeAfterMs) : undefined;
+    return () => window.clearInterval(stageTimer);
+  }, [screen]);
 
-    return () => {
-      window.clearInterval(stageTimer);
-      if (doneTimer) window.clearTimeout(doneTimer);
-    };
-  }, [analysisStatus, completeAfterMs, screen]);
+  const analysisSphere = analysisSphereFor(selectedRepository, progress.total);
 
   if (screen === "welcome") {
     return (
@@ -70,19 +78,7 @@ export function FirstRunFlow({
   }
 
   if (screen === "connect") {
-    return (
-      <FirstRunConnectScreen
-        githubConnected={githubConnected}
-        chrome={chromeFor(1)}
-        showPrivateApp
-        onConnectGitHub={() => {
-          setGithubConnected(true);
-          setScreen("choose");
-        }}
-        onCreatePrivateApp={() => undefined}
-        onContinue={() => setScreen("choose")}
-      />
-    );
+    return <FirstRunConnectScreen chrome={chromeFor(1)} onConnectGitHub={() => setScreen("choose")} />;
   }
 
   if (screen === "choose") {
@@ -90,7 +86,8 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        chrome={chromeFor(2)}
+        organizationName="acme"
+        chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
         onEditConnection={() => setScreen("connect")}
         onContinue={() => {
@@ -104,11 +101,26 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
-        chrome={chromeFor(3)}
+        chrome={chromeFor(3, () => setScreen("choose"))}
+        jiraConnected={jiraConnected}
+        jiraProjects={STORY_JIRA_PROJECTS}
+        jiraProjectId={jiraProjectId}
+        jiraCompletion={jiraCompletion}
+        organizationId="org-1"
+        jiraIntegrationId={jiraConnected ? "jira-story" : ""}
         onSelectTicketSource={setTicketSource}
+        onConnectJira={() => {
+          setTicketSource("jira");
+          setJiraConnected(true);
+        }}
+        onSelectJiraProject={(id) => {
+          setJiraProjectId(id);
+          setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
+        }}
+        onJiraCompletionChange={setJiraCompletion}
         onAnalyzeTickets={() => {
-          if (!ticketSource) return;
-          setStageIndex(0);
+          if (!canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId })) return;
+          setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
           setScreen("analysis");
         }}
       />
@@ -118,13 +130,11 @@ export function FirstRunFlow({
   if (screen === "analysis") {
     return (
       <FirstRunAnalysisScreen
-        status={analysisStatus}
-        currentStageIndex={stageIndex}
+        progress={progress}
+        sourceName={ticketSource === "jira" ? "Jira issues" : "GitHub issues"}
         chrome={chromeFor(4)}
-        onRetry={() => {
-          setStageIndex(0);
-          setScreen("analysis");
-        }}
+        sphere={analysisSphere}
+        onGoToBoard={() => setScreen("board")}
       />
     );
   }

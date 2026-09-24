@@ -40,12 +40,14 @@ var failingConclusions = map[string]bool{
 }
 
 type PullRequestCheck struct {
-	Key        string `json:"key"`
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	Status     string `json:"status"`
-	Conclusion string `json:"conclusion,omitempty"`
-	DetailsURL string `json:"detailsUrl,omitempty"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Conclusion  string `json:"conclusion,omitempty"`
+	Description string `json:"description,omitempty"`
+	Summary     string `json:"summary,omitempty"`
+	DetailsURL  string `json:"detailsUrl,omitempty"`
 }
 
 type waitChecksEvaluation struct {
@@ -81,13 +83,21 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 				status = checkStatusPending
 				conclusion = ""
 			}
+			description := ""
+			summary := ""
+			if run.GetOutput() != nil {
+				description = strings.TrimSpace(run.GetOutput().GetTitle())
+				summary = firstLine(run.GetOutput().GetSummary())
+			}
 			latest[key] = PullRequestCheck{
-				Key:        key,
-				Name:       name,
-				Kind:       checkKindCheckRun,
-				Status:     status,
-				Conclusion: conclusion,
-				DetailsURL: firstNonEmpty(run.GetDetailsURL(), run.GetHTMLURL()),
+				Key:         key,
+				Name:        name,
+				Kind:        checkKindCheckRun,
+				Status:      status,
+				Conclusion:  conclusion,
+				Description: description,
+				Summary:     summary,
+				DetailsURL:  firstNonEmpty(run.GetDetailsURL(), run.GetHTMLURL()),
 			}
 		}
 	}
@@ -115,6 +125,7 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 				Kind:       checkKindStatus,
 				Status:     normalizedStatus,
 				Conclusion: conclusion,
+				Summary:    strings.TrimSpace(status.GetDescription()),
 				DetailsURL: status.GetTargetURL(),
 			}
 		}
@@ -168,13 +179,16 @@ func evaluatePullRequestChecks(checks []PullRequestCheck, selectedNames []string
 }
 
 func selectedChecks(checks []PullRequestCheck, selectedNames []string) []PullRequestCheck {
-	if len(selectedNames) == 0 {
-		return checks
-	}
-
 	wanted := map[string]bool{}
 	for _, name := range selectedNames {
-		wanted[strings.ToLower(strings.TrimSpace(name))] = true
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			continue
+		}
+		wanted[strings.ToLower(trimmed)] = true
+	}
+	if len(wanted) == 0 {
+		return nil
 	}
 
 	selected := make([]PullRequestCheck, 0, len(checks))
@@ -243,6 +257,17 @@ func checkFingerprint(checks []PullRequestCheck) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func firstLine(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	if index := strings.IndexAny(trimmed, "\n\r"); index >= 0 {
+		return strings.TrimSpace(trimmed[:index])
+	}
+	return trimmed
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {
@@ -252,22 +277,11 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func nextEvaluateDelay(now, lastChange, timeoutAt time.Time, allTerminal bool, quietPeriod, pollInterval time.Duration) time.Duration {
+func nextEvaluateDelay(now, timeoutAt time.Time, pollInterval time.Duration) time.Duration {
 	if !now.Before(timeoutAt) {
 		return 0
 	}
 	timeoutRemain := timeoutAt.Sub(now)
-	if allTerminal {
-		quietUntil := lastChange.Add(quietPeriod)
-		if !now.Before(quietUntil) {
-			return 0
-		}
-		quietRemain := quietUntil.Sub(now)
-		if quietRemain < timeoutRemain {
-			return quietRemain
-		}
-		return timeoutRemain
-	}
 	if pollInterval < timeoutRemain {
 		return pollInterval
 	}
