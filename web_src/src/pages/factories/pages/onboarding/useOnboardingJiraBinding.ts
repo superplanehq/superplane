@@ -35,16 +35,11 @@ export function useOnboardingJiraBinding(
     [factoryId, jiraIntegrationId],
   );
 
-  const setJiraCompletion = useCallback((next: JiraCompletionColumnValue) => {
-    setJiraCompletionState(next);
-  }, []);
-
   return {
     jiraIntegrationId,
     jiraProjectId,
     setJiraProjectId,
     jiraCompletion,
-    setJiraCompletion,
     jiraProjects: jiraProjectsQuery.data ?? [],
     jiraProjectsLoading: jiraProjectsQuery.isPending,
     jiraProjectsError: jiraProjectsQuery.isError,

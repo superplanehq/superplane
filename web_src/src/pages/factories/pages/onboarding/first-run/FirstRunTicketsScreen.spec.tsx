@@ -4,19 +4,6 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
-import { JIRA_COMPLETION_COLUMN_COPY } from "../../jiraCompletionColumnCopy";
-
-vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: () => ({
-    data: [
-      { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
-      { id: "done", name: "Done" },
-    ],
-    isLoading: false,
-    isError: false,
-  }),
-}));
 
 describe("FirstRunTicketsScreen", () => {
   it("keeps analysis stopped until a ticket system is selected", async () => {
@@ -106,8 +93,6 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId=""
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -126,8 +111,6 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -169,8 +152,6 @@ describe("FirstRunTicketsScreen", () => {
           { id: "CORE", name: "Core" },
         ]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
         onSelectJiraProject={onSelectJiraProject}
@@ -194,31 +175,18 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
   });
 
-  it("shows the completion column after a Jira project is chosen", async () => {
-    const user = userEvent.setup();
-    const onJiraCompletionChange = vi.fn();
-
+  it("does not show completion column settings during onboarding", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
         jiraConnected
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
-        onJiraCompletionChange={onJiraCompletionChange}
       />,
     );
 
-    expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
-    expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
-    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
-    await user.click(screen.getByTestId("jira-move-on-complete"));
-    expect(onJiraCompletionChange).toHaveBeenCalledWith({
-      jiraMoveOnComplete: false,
-      jiraCompletionColumn: "",
-    });
+    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
   });
 });

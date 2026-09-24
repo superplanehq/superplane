@@ -27,9 +27,7 @@ export function SentryIntakeSetupDialog(props: SentryIntakeSetupDialogProps) {
   const helper =
     setup.step === "connection"
       ? SENTRY_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : setup.skipInitialImport
-        ? SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
-        : SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const showConnectAction =
     setup.step === "connection" && !setup.connectedQuery.isLoading && setup.sentryIntegrations.length === 0;
 
@@ -289,8 +287,13 @@ function SetupFooter({ setup, onCreated }: { setup: SentryIntakeSetupModel; onCr
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
-        checked={setup.skipInitialImport}
-        onCheckedChange={setup.setSkipInitialImport}
+        checked={!setup.skipInitialImport}
+        onCheckedChange={(importExisting) => setup.setSkipInitialImport(!importExisting)}
+        helper={
+          setup.skipInitialImport
+            ? SENTRY_INTAKE_SETUP_COPY.importExistingHelperOff
+            : SENTRY_INTAKE_SETUP_COPY.importExistingHelper
+        }
         testId="sentry-skip-initial-import"
       />
       <Button

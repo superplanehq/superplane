@@ -9,6 +9,7 @@ import {
   factoryHomePath,
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPlanningPath,
@@ -178,6 +179,14 @@ describe("factoryPlanningSetupPath", () => {
   it("opens the Planning setup page on the line board", () => {
     expect(factoryPlanningSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/planning",
+    );
+  });
+});
+
+describe("factoryGitHubIntakeSetupPath", () => {
+  it("opens the GitHub intake setup page on the line board", () => {
+    expect(factoryGitHubIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/github",
     );
   });
 });
