@@ -1,4 +1,4 @@
-import { compareModelLabels, hostedLLMTechnicalName, parseHostedLLMModelKey } from "./hostedLLMModels";
+import { compareModelLabels, hostedLLMTechnicalName, parseHostedLLMModelKey, pickHostedModel } from "./hostedLLMModels";
 
 export const SELECTABLE_LLM_SOURCE_HOSTED = "hosted";
 export const SELECTABLE_LLM_SOURCE_BYOK = "byok";
@@ -71,6 +71,24 @@ export function selectableLLMModelsForProvider(models: SelectableLLMModel[], pro
     return [];
   }
   return models.filter((model) => model.provider.id === wanted);
+}
+
+const LEGACY_CLAUDE_MODEL_ALIASES = new Set(["haiku", "opus", "sonnet"]);
+
+/** Allowlisted model that replaces an empty value or a Claude alias such as "sonnet". */
+export function defaultByokRunnerModel(current: string, provider: string, modelIds: string[]): string | undefined {
+  const selected = current.trim();
+  if (modelIds.includes(selected)) {
+    return undefined;
+  }
+  if (selected !== "" && !LEGACY_CLAUDE_MODEL_ALIASES.has(selected.toLowerCase())) {
+    return undefined;
+  }
+  const picked = pickHostedModel(provider, modelIds);
+  if (!picked || picked === selected) {
+    return undefined;
+  }
+  return picked;
 }
 
 export function byokRunnerModelOptions(

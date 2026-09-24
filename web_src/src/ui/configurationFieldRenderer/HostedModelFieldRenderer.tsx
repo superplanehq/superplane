@@ -1,8 +1,7 @@
 import React from "react";
-import { useParams } from "react-router";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Text } from "@/components/Text/text";
-import { useCanvas } from "@/hooks/useCanvasData";
+import { useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
@@ -29,18 +28,6 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
   }
   return <StringFieldRenderer {...props} />;
 };
-
-function useCanvasFactoryScope(organizationId: string | undefined) {
-  const { appId } = useParams<{ appId?: string }>();
-  const canvasQuery = useCanvas(organizationId ?? "", appId ?? "", {
-    enabled: Boolean(organizationId && appId),
-    staleTime: Infinity,
-  });
-  return {
-    factoryId: canvasQuery.data?.metadata?.factoryId,
-    waitingForCanvas: Boolean(appId) && canvasQuery.isPending,
-  };
-}
 
 function SuperPlaneModelField({ field, value, onChange, organizationId, readOnly = false }: FieldRendererProps) {
   const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED]);
