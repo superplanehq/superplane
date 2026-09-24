@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/Text/text";
@@ -18,19 +18,10 @@ import {
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
 import { THINKING_LEVEL_KEY, THINKING_LEVELS, normalizeThinkingLevel } from "@/lib/thinkingLevel";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 import type { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
-
-const MENU_LABEL_CLASSNAME = "text-[11px] font-medium tracking-[0.04em] text-muted-foreground";
-const MENU_ITEM_CLASSNAME = "cursor-pointer text-[13px]";
 
 export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) => {
   const provider = props.field.typeOptions?.hostedModel?.provider ?? "";
@@ -193,6 +184,8 @@ function ModelThinkingSelect({
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
+  const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
+  const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
 
   return (
     <DropdownMenu>
@@ -208,30 +201,21 @@ function ModelThinkingSelect({
           <ChevronDown className="size-4 opacity-50" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56">
-        <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>Model</DropdownMenuLabel>
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            className={MENU_ITEM_CLASSNAME}
-            onSelect={() => onCommit(option.value, thinkingLevel)}
-          >
-            <span className="flex-1">{option.label}</span>
-            {model === option.value ? <Check className="size-3.5" aria-hidden /> : null}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>Thinking</DropdownMenuLabel>
-        {THINKING_LEVELS.map((level) => (
-          <DropdownMenuItem
-            key={level.label}
-            className={MENU_ITEM_CLASSNAME}
-            onSelect={() => onCommit(committedModel, level.value)}
-          >
-            <span className="flex-1">{level.label}</span>
-            {thinkingLevel === level.value ? <Check className="size-3.5" aria-hidden /> : null}
-          </DropdownMenuItem>
-        ))}
+      <DropdownMenuContent align="start" className="min-w-44">
+        <DropdownMenuValueSub
+          label="Model"
+          testId={modelListTestId}
+          value={model}
+          options={options}
+          onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
+        />
+        <DropdownMenuValueSub
+          label="Thinking"
+          testId={thinkingTestId}
+          value={thinkingLevel}
+          options={[...THINKING_LEVELS]}
+          onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

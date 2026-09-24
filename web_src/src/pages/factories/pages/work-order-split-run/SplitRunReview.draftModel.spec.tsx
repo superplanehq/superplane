@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
@@ -33,6 +33,11 @@ beforeAll(() => {
   Element.prototype.releasePointerCapture ??= () => {};
   Element.prototype.scrollIntoView ??= () => {};
 });
+
+async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, parentTestId: string, optionName: string) {
+  await user.hover(screen.getByTestId(parentTestId));
+  fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
+}
 
 function renderDraftFooter(
   onStart: () => void,
@@ -97,10 +102,9 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
     await user.click(screen.getByRole("button", { name: "Model: Auto" }));
-    expect(screen.getByText("Model")).toBeInTheDocument();
-    expect(screen.getByText("Thinking")).toBeInTheDocument();
-    expect(screen.getAllByRole("menuitem", { name: "Auto" })).toHaveLength(2);
-    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    expect(screen.getByTestId("split-run-draft-model-list")).toHaveTextContent("Auto");
+    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Auto");
+    await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
     expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: DRAFT_START_THINKING_AUTO });
   });
 
@@ -110,8 +114,21 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
     await user.click(screen.getByRole("button", { name: "Model: Auto" }));
-    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    await selectFlyoutOption(user, "split-run-draft-thinking", "High");
     expect(onChange).toHaveBeenCalledWith({ model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
+    expect(screen.getByTestId("split-run-draft-model-list")).toBeInTheDocument();
+  });
+
+  it("keeps the menu open so the user can pick model and thinking", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await selectFlyoutOption(user, "split-run-draft-thinking", "High");
+    await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
+    expect(onChange).toHaveBeenNthCalledWith(1, { model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
+    expect(onChange).toHaveBeenNthCalledWith(2, { model: "claude-opus-4-6", thinkingLevel: DRAFT_START_THINKING_AUTO });
   });
 
   it("disables the model chevron when Start is disabled", () => {
