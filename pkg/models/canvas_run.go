@@ -234,10 +234,14 @@ func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	return runs, nil
 }
 
-func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([]CanvasRun, error) {
+func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, windowDays int, limit int) ([]CanvasRun, error) {
+	if windowDays <= 0 {
+		return nil, nil
+	}
+
 	var runs []CanvasRun
 
-	query := expiredFinishedRunsQuery(db, referenceTime).
+	query := expiredFinishedRunsQuery(db, referenceTime, windowDays).
 		Scopes(
 			withoutRunQueueItems,
 			withoutActiveRunExecutions,
@@ -257,10 +261,14 @@ func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([
 	return runs, nil
 }
 
-func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUID) (*CanvasRun, error) {
+func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, windowDays int, runID uuid.UUID) (*CanvasRun, error) {
+	if windowDays <= 0 {
+		return nil, nil
+	}
+
 	var run CanvasRun
 
-	err := expiredFinishedRunsQuery(db, referenceTime).
+	err := expiredFinishedRunsQuery(db, referenceTime, windowDays).
 		Scopes(
 			lockCanvasRunsForUpdate,
 			withoutRunQueueItems,
@@ -281,17 +289,15 @@ func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUI
 	return &run, nil
 }
 
-func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time, windowDays int) *gorm.DB {
+	cutoff := referenceTime.UTC().AddDate(0, 0, -windowDays)
+
 	return tx.
 		Table("workflow_runs").
 		Select("workflow_runs.*").
-		Joins("JOIN workflows ON workflow_runs.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Where("organizations.usage_retention_window_days IS NOT NULL").
-		Where("organizations.usage_retention_window_days > 0").
 		Where("workflow_runs.state = ?", CanvasRunStateFinished).
 		Where("workflow_runs.finished_at IS NOT NULL").
-		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
+		Where("workflow_runs.finished_at < ?", cutoff)
 }
 
 func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {

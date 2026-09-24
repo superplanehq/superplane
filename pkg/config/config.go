@@ -20,6 +20,13 @@ func MaxEmitCount() int {
 	return intFromEnv("SUPERPLANE_MAX_EMIT_COUNT", 100)
 }
 
+// EventRetentionWindowDays is how long finished canvas runs stay before
+// EventRetentionWorker deletes them. Default is 180 days (~6 months) so
+// leftover SaaS 14-day org values do not drop run history early.
+func EventRetentionWindowDays() int {
+	return intFromEnv("EVENT_RETENTION_WINDOW_DAYS", 180)
+}
+
 func MaxPayloadSize() int {
 	return intFromEnv("SUPERPLANE_MAX_PAYLOAD_SIZE", 512*1024)
 }

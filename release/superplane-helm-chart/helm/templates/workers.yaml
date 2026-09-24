@@ -92,6 +92,8 @@ spec:
               value: "yes"
             - name: START_EVENT_RETENTION_WORKER
               value: "yes"
+            - name: EVENT_RETENTION_WINDOW_DAYS
+              value: "180"
             - name: START_NODE_REQUEST_CLEANUP_WORKER
               value: "yes"
             - name: RBAC_MODEL_PATH

@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,12 +20,14 @@ const (
 )
 
 type EventRetentionWorker struct {
-	logger *log.Entry
+	logger     *log.Entry
+	windowDays int
 }
 
 func NewEventRetentionWorker() *EventRetentionWorker {
 	return &EventRetentionWorker{
-		logger: log.WithFields(log.Fields{"worker": "EventRetentionWorker"}),
+		logger:     log.WithFields(log.Fields{"worker": "EventRetentionWorker"}),
+		windowDays: config.EventRetentionWindowDays(),
 	}
 }
 
@@ -76,7 +79,11 @@ func (w *EventRetentionWorker) tick(ctx context.Context) {
 }
 
 func (w *EventRetentionWorker) cleanRuns(referenceTime time.Time, limit int) (int, error) {
-	runs, err := models.ListExpiredFinishedRuns(database.Conn(), referenceTime, limit)
+	if w.windowDays <= 0 {
+		return 0, nil
+	}
+
+	runs, err := models.ListExpiredFinishedRuns(database.Conn(), referenceTime, w.windowDays, limit)
 	if err != nil {
 		return 0, err
 	}
@@ -93,7 +100,7 @@ func (w *EventRetentionWorker) cleanRuns(referenceTime time.Time, limit int) (in
 
 		var summary *models.RunDeletionSummary
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
-			locked, err := models.LockExpiredFinishedRun(tx, referenceTime, run.ID)
+			locked, err := models.LockExpiredFinishedRun(tx, referenceTime, w.windowDays, run.ID)
 			if err != nil {
 				return fmt.Errorf("lock run %s: %w", run.ID, err)
 			}

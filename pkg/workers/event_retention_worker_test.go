@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,17 +14,17 @@ import (
 	"gorm.io/datatypes"
 )
 
-func setOrganizationRetentionWindowDays(t *testing.T, orgID uuid.UUID, days int32) {
+func retentionWorker(t *testing.T, windowDays int) *EventRetentionWorker {
 	t.Helper()
-	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", orgID).Update("usage_retention_window_days", days).Error)
+	t.Setenv("EVENT_RETENTION_WINDOW_DAYS", strconv.Itoa(windowDays))
+	return NewEventRetentionWorker()
 }
 
 func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -55,11 +56,13 @@ func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 }
 
-func Test__EventRetentionWorker_SkipsWhenRetentionWindowDisabled(t *testing.T) {
+func Test__EventRetentionWorker_SkipsWhenRunIsWithinDefaultWindow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
+	t.Setenv("EVENT_RETENTION_WINDOW_DAYS", "")
 	worker := NewEventRetentionWorker()
+	require.Equal(t, 180, worker.windowDays)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -95,8 +98,7 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -175,8 +177,7 @@ func Test__EventRetentionWorker_CleansMultipleExpiredCompletedRootEventChains(t 
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -218,8 +219,7 @@ func Test__EventRetentionWorker_DoesNotDeleteUnrelatedCanvasData(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	eligibleCanvas, _ := support.CreateCanvas(
 		t,
@@ -289,8 +289,7 @@ func Test__EventRetentionWorker_RespectsMaxRunsPerTick(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -321,8 +320,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithQueuedWork(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -367,8 +365,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -438,8 +435,7 @@ func Test__EventRetentionWorker_DoesNotStarveEligibleRunsWhenBlockedRunsAreOlder
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -485,8 +481,7 @@ func Test__EventRetentionWorker_KeepsFactoryWorkOrderExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewEventRetentionWorker()
-	setOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+	worker := retentionWorker(t, 30)
 
 	canvas, _ := support.CreateCanvas(
 		t,
