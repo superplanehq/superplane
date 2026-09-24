@@ -12,7 +12,7 @@ export type LaneListener = {
   healthy: boolean;
   paused?: boolean;
   /** Text the badge shows while the automation cannot run. */
-  needsRepairLabel: string;
+  needsRepairLabel?: string;
   /** Text the badge shows while live items are ignored. */
   pausedLabel?: string;
   pausedHelper?: string;
@@ -108,7 +108,7 @@ function LaneListenerRow({ listener }: { listener: LaneListener }) {
           className="shrink-0 text-[11px] font-medium text-amber-700 dark:text-amber-400"
           data-testid={`${listener.testId}-needs-repair`}
         >
-          {listener.needsRepairLabel}
+          {listener.needsRepairLabel ?? "Needs repair"}
         </span>
       )}
       <Settings className="size-3.5 shrink-0 text-muted-foreground group-hover/listener:text-foreground" aria-hidden />
