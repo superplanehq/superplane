@@ -48,6 +48,7 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
@@ -1620,8 +1621,9 @@ describe("LinesPage board editing", () => {
     const scopeAll = within(actions).getByTestId("work-orders-scope-all");
     const filter = within(actions).getByTestId("work-orders-filter-trigger");
     const search = within(actions).getByTestId("work-orders-search-trigger");
-    expect(within(actions).getByTestId("work-orders-scope-active")).toHaveTextContent("Active");
-    expect(within(actions).getByTestId("work-orders-scope-my")).toBeInTheDocument();
+    expect(within(actions).queryByTestId("work-orders-scope-active")).not.toBeInTheDocument();
+    expect(scopeAll).toHaveTextContent("All");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveTextContent("My");
     expect(scopeAll.className).toMatch(/rounded-full/);
     expect(filter).toHaveAccessibleName("Filter");
     expect(filter).not.toHaveTextContent("Filter");
@@ -1643,6 +1645,22 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("treats a leftover Active scope as All and keeps every card", () => {
+    window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "active");
+    useFactoryWorkOrders.mockReturnValue({
+      data: [DRAFT_WORK_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+    });
+    renderLinesBoard();
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).queryByTestId("work-orders-scope-active")).not.toBeInTheDocument();
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
+    expect(window.localStorage.getItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`)).toBe("active");
   });
 
   it("lists Source in the filter menu from configured intakes", async () => {

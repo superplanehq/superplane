@@ -116,6 +116,7 @@ import {
   UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
+  type WorkOrderScope,
 } from "../lib/workOrderListModel";
 import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
@@ -124,7 +125,7 @@ import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcut
 import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
-import { ScopePills } from "../workOrders/header/ScopePills";
+import { ScopePills, type ScopePillOption } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
 import {
   WorkOrderBoardLane,
@@ -219,12 +220,23 @@ import {
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
+type LineBoardScope = Extract<WorkOrderScope, "all" | "my">;
+
+const LINE_BOARD_SCOPES: ReadonlyArray<ScopePillOption<LineBoardScope>> = WORK_ORDER_SCOPES.filter(
+  (scope): scope is ScopePillOption<LineBoardScope> => scope.id === "all" || scope.id === "my",
+);
+
+function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
+  return scope === "my" ? "my" : "all";
+}
+
 function boardWorkOrdersPageOptions(state: WorkOrderListState, currentUserId?: string): FactoryWorkOrdersPageOptions {
   const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+  const scope = lineBoardWorkOrderScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : state.scope === "my" ? currentUserId : undefined,
+    userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
     unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: state.scope === "my" && ownerIds.length !== 1,
+    requireUser: scope === "my" && ownerIds.length !== 1,
   };
 }
 
@@ -239,7 +251,7 @@ function applyVisibleWorkOrders(
   const visibleIds = new Set(
     applyWorkOrderSearch(
       applyWorkOrderFilters(
-        applyWorkOrderScope(entries, state.scope, currentUserId),
+        applyWorkOrderScope(entries, lineBoardWorkOrderScope(state.scope), currentUserId),
         {
           ...state.filters,
           lineIds: [],
@@ -851,9 +863,9 @@ function LineDetailHeader({
       actions={
         <>
           <ScopePills
-            value={state.scope}
+            value={lineBoardWorkOrderScope(state.scope)}
             onChange={state.setScope}
-            options={WORK_ORDER_SCOPES}
+            options={LINE_BOARD_SCOPES}
             testIdPrefix="work-orders-scope"
           />
           <FilterMenu
