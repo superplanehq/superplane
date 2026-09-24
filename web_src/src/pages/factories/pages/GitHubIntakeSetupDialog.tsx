@@ -20,7 +20,7 @@ export function GitHubIntakeSetupDialog(props: GitHubIntakeSetupDialogProps) {
   return (
     <FirstRunShell
       testId="github-intake-setup"
-      chrome={{ onBack: props.onClose }}
+      chrome={{ stepIndex: 0, stepCount: 1, onBack: props.onClose }}
       sphere={{
         testId: "github-intake-setup-sphere",
         level: 0.58,

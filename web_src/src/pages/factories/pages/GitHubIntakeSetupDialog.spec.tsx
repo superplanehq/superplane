@@ -73,7 +73,9 @@ describe("GitHubIntakeSetupDialog", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("github-setup-repository-missing")).toBeInTheDocument();
+    expect(screen.getByTestId("github-setup-repository-missing")).toHaveTextContent(
+      GITHUB_INTAKE_SETUP_COPY.repositoryMissing,
+    );
     await user.click(screen.getByTestId("github-setup-finish"));
 
     await waitFor(() => {

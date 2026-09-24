@@ -9,5 +9,5 @@ export const GITHUB_INTAKE_SETUP_COPY = {
   wizardFinishing: "Finishing...",
   wizardCreateError: "SuperPlane could not create the GitHub intake.",
   repositoryMissing:
-    "No backlog repository is set in this workspace. SuperPlane still creates the intake. Set a repository in workspace settings to import existing issues.",
+    "No backlog repository is set in this workspace. SuperPlane still creates the intake. Connect a repository on the intake canvas before it can receive issues.",
 } as const;
