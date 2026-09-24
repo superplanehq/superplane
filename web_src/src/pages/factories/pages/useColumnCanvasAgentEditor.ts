@@ -4,11 +4,11 @@ import {
   useCanvas,
   useCanvasStaging,
   useCommitCanvasStaging,
-  useDiscardCanvasStaging,
   useUpdateCanvasVersion,
 } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { fetchStagedCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -26,6 +26,7 @@ const AGENT_SAVED_NOTICE = "Agent saved.";
 const AGENT_SAVED_AFTER_DISCARD_NOTICE =
   "Agent saved. Earlier canvas edits were discarded because the live canvas changed.";
 const STALE_STAGING_UPDATE_MESSAGE = "stale staging cannot be updated";
+const CURRENT_STAGING_KEPT_MESSAGE = "current staging cannot be discarded";
 const REFINEMENT_AGENT_NODE_ID = "refine-task";
 
 type CanvasDraftSummary = {
@@ -33,7 +34,7 @@ type CanvasDraftSummary = {
   stale?: boolean;
 };
 
-type StageCanvasYaml = (input: { versionId: string; canvasYaml: string }) => Promise<unknown>;
+type StageCanvasYaml = (input: { versionId: string; canvasYaml: string; replaceIfStale?: boolean }) => Promise<unknown>;
 
 interface ColumnCanvasAgentEditorOptions {
   showVisualEvidenceSetting?: boolean;
@@ -66,7 +67,6 @@ export function useColumnCanvasAgentEditor(
   const canvasStagingQuery = useCanvasStaging(appId, enabled);
   const updateVersion = useUpdateCanvasVersion(canvasId);
   const commitStaging = useCommitCanvasStaging(canvasId);
-  const discardCanvasStaging = useDiscardCanvasStaging(canvasId);
   const queryClient = useQueryClient();
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -94,7 +94,6 @@ export function useColumnCanvasAgentEditor(
         }
         return result.data;
       },
-      discardStaging: () => discardCanvasStaging.mutateAsync(undefined),
       refreshCanvas: async () => {
         const result = await canvasQuery.refetch();
         if (result.error) {
@@ -102,6 +101,7 @@ export function useColumnCanvasAgentEditor(
         }
         return result.data;
       },
+      readStagedCanvas: () => readStagedAgentCanvas(canvasId, () => canvasQuery.refetch()),
     });
   };
 
@@ -128,8 +128,8 @@ export async function persistColumnAgent(args: {
   commit: (message: string) => Promise<unknown>;
   invalidate: () => Promise<unknown> | unknown;
   readStagingSummary: () => Promise<CanvasDraftSummary | undefined>;
-  discardStaging: () => Promise<unknown>;
   refreshCanvas: () => Promise<CanvasesCanvas | undefined>;
+  readStagedCanvas: () => Promise<CanvasesCanvas | undefined>;
 }) {
   const {
     canvas,
@@ -141,8 +141,8 @@ export async function persistColumnAgent(args: {
     commit,
     invalidate,
     readStagingSummary,
-    discardStaging,
     refreshCanvas,
+    readStagedCanvas,
   } = args;
   const targetNodeIds = agentNodeIds?.length ? agentNodeIds : agentNodeId ? [agentNodeId] : [];
   if (!canvas || targetNodeIds.length === 0 || !appId) {
@@ -155,29 +155,37 @@ export async function persistColumnAgent(args: {
       agentNodeIds: targetNodeIds,
       draft,
     });
+  const editFromStagedCanvas = () =>
+    agentEditFromStagedCanvas({
+      readStagedCanvas,
+      agentNodeIds: targetNodeIds,
+      draft,
+    });
 
   try {
     const summary = await readStagingSummary();
     let discardedEarlierEdits = false;
     let stagedEdit = agentEditFromCanvas(canvas, targetNodeIds, draft);
     if (canvasDraftIsStale(summary)) {
-      await discardStaging();
-      discardedEarlierEdits = true;
       stagedEdit = await editFromLiveCanvas();
+      discardedEarlierEdits = await stageReplacingStaleDraft({
+        stageYaml,
+        versionId: stagedEdit.versionId,
+        canvasYaml: stagedEdit.canvasYaml,
+        rebuildFromStagedCanvas: editFromStagedCanvas,
+      });
+    } else {
+      discardedEarlierEdits = await stageColumnAgentDiscardingStaleDraft({
+        stageYaml,
+        versionId: stagedEdit.versionId,
+        canvasYaml: stagedEdit.canvasYaml,
+        rebuildFromLiveCanvas: editFromLiveCanvas,
+        rebuildFromStagedCanvas: editFromStagedCanvas,
+      });
     }
-
-    const discardedDuringStage = await stageColumnAgentDiscardingStaleDraft({
-      stageYaml,
-      discardStaging,
-      versionId: stagedEdit.versionId,
-      canvasYaml: stagedEdit.canvasYaml,
-      rebuildFromLiveCanvas: editFromLiveCanvas,
-    });
     await commit(UPDATE_AGENT_COMMIT_MESSAGE);
     await invalidate();
-    showSuccessToast(
-      discardedEarlierEdits || discardedDuringStage ? AGENT_SAVED_AFTER_DISCARD_NOTICE : AGENT_SAVED_NOTICE,
-    );
+    showSuccessToast(discardedEarlierEdits ? AGENT_SAVED_AFTER_DISCARD_NOTICE : AGENT_SAVED_NOTICE);
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Failed to save agent"));
     throw error;
@@ -211,6 +219,18 @@ async function agentEditFromLiveCanvas(args: {
   return agentEditFromCanvas(canvas, args.agentNodeIds, args.draft);
 }
 
+async function agentEditFromStagedCanvas(args: {
+  readStagedCanvas: () => Promise<CanvasesCanvas | undefined>;
+  agentNodeIds: string[];
+  draft: PlanningReviewDraft;
+}): Promise<{ versionId: string; canvasYaml: string }> {
+  const canvas = await args.readStagedCanvas();
+  if (!canvas) {
+    throw new Error("Agent canvas is not loaded");
+  }
+  return agentEditFromCanvas(canvas, args.agentNodeIds, args.draft);
+}
+
 function canvasDraftIsStale(summary: CanvasDraftSummary | undefined): boolean {
   return Boolean(summary?.hasStaging && summary.stale);
 }
@@ -219,12 +239,16 @@ function isStaleStagingUpdateError(error: unknown): boolean {
   return getApiErrorMessage(error, "").includes(STALE_STAGING_UPDATE_MESSAGE);
 }
 
+function isCurrentStagingKeptError(error: unknown): boolean {
+  return getApiErrorMessage(error, "").includes(CURRENT_STAGING_KEPT_MESSAGE);
+}
+
 async function stageColumnAgentDiscardingStaleDraft(args: {
   stageYaml: StageCanvasYaml;
-  discardStaging: () => Promise<unknown>;
   versionId: string;
   canvasYaml: string;
   rebuildFromLiveCanvas: () => Promise<{ versionId: string; canvasYaml: string }>;
+  rebuildFromStagedCanvas: () => Promise<{ versionId: string; canvasYaml: string }>;
 }): Promise<boolean> {
   try {
     await args.stageYaml({ versionId: args.versionId, canvasYaml: args.canvasYaml });
@@ -235,8 +259,58 @@ async function stageColumnAgentDiscardingStaleDraft(args: {
     }
   }
 
-  await args.discardStaging();
   const refreshedEdit = await args.rebuildFromLiveCanvas();
-  await args.stageYaml({ versionId: refreshedEdit.versionId, canvasYaml: refreshedEdit.canvasYaml });
-  return true;
+  return stageReplacingStaleDraft({
+    stageYaml: args.stageYaml,
+    versionId: refreshedEdit.versionId,
+    canvasYaml: refreshedEdit.canvasYaml,
+    rebuildFromStagedCanvas: args.rebuildFromStagedCanvas,
+  });
+}
+
+async function stageReplacingStaleDraft(args: {
+  stageYaml: StageCanvasYaml;
+  versionId: string;
+  canvasYaml: string;
+  rebuildFromStagedCanvas: () => Promise<{ versionId: string; canvasYaml: string }>;
+}): Promise<boolean> {
+  try {
+    await args.stageYaml({
+      versionId: args.versionId,
+      canvasYaml: args.canvasYaml,
+      replaceIfStale: true,
+    });
+    return true;
+  } catch (error) {
+    if (!isCurrentStagingKeptError(error)) {
+      throw error;
+    }
+  }
+
+  const stagedEdit = await args.rebuildFromStagedCanvas();
+  await args.stageYaml({ versionId: stagedEdit.versionId, canvasYaml: stagedEdit.canvasYaml });
+  return false;
+}
+
+async function readStagedAgentCanvas(
+  canvasId: string,
+  refetchCanvas: () => Promise<{ data?: CanvasesCanvas; error?: unknown }>,
+): Promise<CanvasesCanvas | undefined> {
+  const result = await refetchCanvas();
+  if (result.error) {
+    throw result.error;
+  }
+  const live = result.data;
+  const liveVersionId = live?.metadata?.liveVersionId;
+  if (!live || !liveVersionId) {
+    throw new Error("Agent canvas is not loaded");
+  }
+  const staged = await fetchStagedCanvasVersionWithSpec(canvasId, { id: liveVersionId });
+  if (!staged?.spec) {
+    throw new Error("Agent canvas is not loaded");
+  }
+  return {
+    ...live,
+    spec: staged.spec,
+  };
 }
