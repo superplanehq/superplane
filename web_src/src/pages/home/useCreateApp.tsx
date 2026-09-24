@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 import { PLACEHOLDER_NODE_CONTEXT_KEY, setAgentBootContext } from "@/lib/agentBootContext";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
@@ -50,7 +49,7 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         applyBlankAppBootContext(canvasId);
         navigate(appPath(organizationId, canvasId, "?edit=1"));
       } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
+        showErrorToast("Failed to create app");
         throw error;
       }
     },

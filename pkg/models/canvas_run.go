@@ -234,53 +234,6 @@ func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	return runs, nil
 }
 
-func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([]CanvasRun, error) {
-	var runs []CanvasRun
-
-	query := expiredFinishedRunsQuery(db, referenceTime).
-		Scopes(
-			withoutRunQueueItems,
-			withoutActiveRunExecutions,
-			withoutPendingRunRequests,
-			oldestCanvasRunsFirst,
-		)
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&runs).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return runs, nil
-}
-
-func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUID) (*CanvasRun, error) {
-	var run CanvasRun
-
-	err := expiredFinishedRunsQuery(db, referenceTime).
-		Scopes(
-			lockCanvasRunsForUpdate,
-			withoutRunQueueItems,
-			withoutActiveRunExecutions,
-			withoutPendingRunRequests,
-		).
-		Where("workflow_runs.id = ?", runID).
-		First(&run).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return &run, nil
-}
-
 func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 
@@ -421,19 +374,6 @@ func deleteRowsLimited(db *gorm.DB, model any, limit int, query string, args ...
 	}
 
 	return result.RowsAffected, nil
-}
-
-func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
-	return tx.
-		Table("workflow_runs").
-		Select("workflow_runs.*").
-		Joins("JOIN workflows ON workflow_runs.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Where("organizations.usage_retention_window_days IS NOT NULL").
-		Where("organizations.usage_retention_window_days > 0").
-		Where("workflow_runs.state = ?", CanvasRunStateFinished).
-		Where("workflow_runs.finished_at IS NOT NULL").
-		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
 }
 
 func lockCanvasRunsForUpdate(tx *gorm.DB) *gorm.DB {

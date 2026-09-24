@@ -7,7 +7,6 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { canvasKeys, useCreateCanvas } from "@/hooks/useCanvasData";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 
 import {
@@ -169,7 +168,7 @@ export function useInstallFactory({ organizationId: organizationIdOverride }: Us
         pendingCanvasRef.current = null;
         return { canvasId, canvasName };
       } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to install factory"));
+        showErrorToast("Failed to install factory");
         throw error;
       } finally {
         isInstallingRef.current = false;

@@ -4,7 +4,6 @@ import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegratio
 import { usePermissions } from "@/contexts/usePermissions";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import {
@@ -97,9 +96,6 @@ export function useIntegrationCatalog(organizationId: string) {
     setConfiguration,
     isModalOpen,
     createIntegrationMutation,
-    createIntegrationNotice: createIntegrationMutation.isError
-      ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
-      : null,
     handlePrivateAppClick: (definition?: IntegrationsIntegrationDefinition) =>
       startCatalogPrivateGitHubApp({
         organizationId,
@@ -305,8 +301,8 @@ async function submitCatalogConnect({
     if (createdId) {
       navigate(integrationDetailPath(integrationsBasePath, createdId));
     }
-  } catch (error) {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
+  } catch {
+    showErrorToast("Failed to create integration");
   }
 }
 
@@ -347,8 +343,8 @@ function startCatalogHostedGitHubConnect({
       return response.data;
     },
     update: persistGitHubSetupReturnPath(organizationId),
-  }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+  }).catch(() => {
+    showErrorToast("Failed to connect GitHub");
   });
   return true;
 }
@@ -387,8 +383,8 @@ function startCatalogHostedJiraConnect({
       const response = await createIntegrationMutation.mutateAsync(payload);
       return response.data;
     },
-  }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect Jira"));
+  }).catch(() => {
+    showErrorToast("Failed to connect Jira");
   });
   return true;
 }
@@ -425,7 +421,7 @@ function startCatalogPrivateGitHubApp({
       const response = await createIntegrationMutation.mutateAsync(payload);
       return response.data;
     },
-  }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+  }).catch(() => {
+    showErrorToast("Failed to connect GitHub");
   });
 }
