@@ -194,6 +194,12 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
+	// Productive.io task webhooks often omit the task list. The intake
+	// filter reads that relationship, so load it before the event is emitted.
+	if err := ensureTaskList(ctx, document); err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
 	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document)); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -212,6 +218,31 @@ type productiveDelivery struct {
 	Object struct {
 		Data map[string]any `json:"data"`
 	} `json:"object"`
+}
+
+func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) error {
+	if taskListID(document) != "" || ctx.HTTP == nil || ctx.Integration == nil {
+		return nil
+	}
+
+	id, _ := document["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	task, err := client.GetTask(id)
+	if err != nil {
+		return fmt.Errorf("error reading task %s: %v", id, err)
+	}
+
+	setTaskListID(document, task.TaskListID)
+	return nil
 }
 
 func taskDocument(body []byte) (map[string]any, error) {
