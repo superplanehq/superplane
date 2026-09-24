@@ -85,36 +85,14 @@ service Canvases {
     };
   }
 
-  rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/repository"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get canvas repository";
-      description: "Returns information about the canvas git repository";
-      tags: "CanvasRepository";
-    };
-  }
-
-  rpc ListCanvasRepositoryFiles(ListCanvasRepositoryFilesRequest) returns (ListCanvasRepositoryFilesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/repository/files"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List canvas repository files";
-      description: "Lists files in the git repository attached to a canvas";
-      tags: "CanvasRepository";
-    };
-  }
-
   rpc PutCanvasStaging(PutCanvasStagingRequest) returns (PutCanvasStagingResponse) {
     option (google.api.http) = {
       put: "/api/v1/canvases/{canvas_id}/staging"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Stage canvas repository files";
-      description: "Writes staged edits for the current user without creating a new version";
+      summary: "Stage canvas spec files";
+      description: "Writes staged canvas.yaml and console.yaml edits for the current user without creating a new version";
       tags: "CanvasStaging";
     };
   }
@@ -148,7 +126,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Commit canvas staging";
-      description: "Commits the current user's staged edits to the main branch";
+      description: "Commits the current user's staged canvas.yaml and console.yaml edits as a new canvas version";
       tags: "CanvasStaging";
     };
   }
@@ -428,49 +406,6 @@ message CreateCanvasResponse {
   Canvas canvas = 1;
 }
 
-message CanvasRepository {
-  message Metadata {
-    string canvas_id = 1;
-    google.protobuf.Timestamp updated_at = 2;
-  }
-
-  enum State {
-    STATE_UNSPECIFIED = 0;
-    STATE_PENDING = 1;
-    STATE_READY = 2;
-    STATE_ERROR = 3;
-  }
-
-  message Status {
-    State state = 1;
-    string head_sha = 2;
-    optional string error = 3;
-  }
-
-  Metadata metadata = 1;
-  Status status = 2;
-}
-
-message GetCanvasRepositoryRequest {
-  string canvas_id = 1;
-}
-
-message GetCanvasRepositoryResponse {
-  CanvasRepository repository = 1;
-}
-
-message ListCanvasRepositoryFilesRequest {
-  string canvas_id = 1;
-}
-
-message CanvasRepositoryFile {
-  string path = 1;
-}
-
-message ListCanvasRepositoryFilesResponse {
-  repeated CanvasRepositoryFile files = 1;
-}
-
 message CanvasRepositoryFileOperation {
   string path = 1;
   bytes content = 2;
@@ -566,12 +501,11 @@ message CanvasSummary {
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
   UserRef created_by = 6;
-  string folder_id = 7;
-  repeated Node nodes = 8;
-  repeated Components.Edge edges = 9;
-  bool starred = 10;
-  google.protobuf.Timestamp starred_at = 11;
-  string factory_id = 12;
+  repeated Node nodes = 7;
+  repeated Components.Edge edges = 8;
+  bool starred = 9;
+  google.protobuf.Timestamp starred_at = 10;
+  string factory_id = 11;
 }
 
 message CanvasPreference {
@@ -589,10 +523,9 @@ message Canvas {
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
-    string folder_id = 8;
-    string live_version_id = 9;
-    repeated string dismissed_agent_suggestion_ids = 10;
-    string factory_id = 11;
+    string live_version_id = 8;
+    repeated string dismissed_agent_suggestion_ids = 9;
+    string factory_id = 10;
   }
 
   message Spec {
@@ -905,6 +838,12 @@ message CanvasRun {
   google.protobuf.Timestamp cancelled_at = 12;
   CanvasRunRef parent = 13;
   repeated string errors = 14;
+  UserRef cancelled_by = 15;
+  // Ledger totals for this run tree. UI hides zero values.
+  int64 total_tokens = 16;
+  int64 cost_cents = 17;
+  // Models that recorded spend on this run tree.
+  repeated string models = 18;
 }
 
 message CanvasRunRef {

@@ -72,25 +72,67 @@ describe("workOrderCardPullRequestVisibleLabel", () => {
 });
 
 describe("visibleWorkOrderCardAttentionReasons", () => {
+  it("hides Status checks passed when the pull request is mergeable and the flag is on", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(
+        ["approval", "checksPassed"],
+        {
+          pullRequest: pr({ mergeable: true }),
+          extraCount: 0,
+        },
+        true,
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps Status checks passed when the pull request is mergeable but the flag is off", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(
+        ["approval", "checksPassed"],
+        {
+          pullRequest: pr({ mergeable: true }),
+          extraCount: 0,
+        },
+        false,
+      ),
+    ).toEqual(["checksPassed"]);
+  });
+
+  it("keeps Status checks passed when the pull request is mergeable and the flag is undefined", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(["approval", "checksPassed"], {
+        pullRequest: pr({ mergeable: true }),
+        extraCount: 0,
+      }),
+    ).toEqual(["checksPassed"]);
+  });
+
   it("hides Waiting for user review when the shown pull request is open", () => {
     expect(
       visibleWorkOrderCardAttentionReasons(["approval", "checksPassed"], { pullRequest: pr(), extraCount: 0 }),
     ).toEqual(["checksPassed"]);
   });
 
-  it("keeps Needs attention and review when the pull request is not open", () => {
+  it("hides Waiting for user review when the shown pull request is merged", () => {
     expect(
-      visibleWorkOrderCardAttentionReasons(["approval", "stalled"], {
+      visibleWorkOrderCardAttentionReasons(["approval", "failed"], {
+        pullRequest: pr({ state: "STATE_MERGED" }),
+        extraCount: 0,
+      }),
+    ).toEqual(["failed"]);
+  });
+
+  it("keeps review when the pull request is not open", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(["approval", "failed"], {
         pullRequest: pr({ state: "STATE_CLOSED" }),
         extraCount: 0,
       }),
-    ).toEqual(["approval", "stalled"]);
+    ).toEqual(["approval", "failed"]);
   });
 
-  it("keeps Needs attention next to an open pull request", () => {
-    expect(visibleWorkOrderCardAttentionReasons(["stalled"], { pullRequest: pr(), extraCount: 0 })).toEqual([
-      "stalled",
-    ]);
+  it("does not invent an idle attention reason next to an open pull request", () => {
+    expect(visibleWorkOrderCardAttentionReasons([], { pullRequest: pr(), extraCount: 0 })).toEqual([]);
   });
 });
 

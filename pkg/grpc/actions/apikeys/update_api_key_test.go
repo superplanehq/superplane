@@ -6,9 +6,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 )
@@ -63,6 +65,47 @@ func TestUpdateAPIKeyPreservesScopeWhenCanvasIdsOmitted(t *testing.T) {
 	var user models.User
 	require.NoError(t, database.Conn().First(&user, "id = ?", apiKey.ID).Error)
 	require.Equal(t, datatypes.NewJSONSlice([]string{canvas.ID.String()}), user.APIKeyCanvasIDs)
+}
+
+func TestUpdateAPIKeyRejectsDuplicateName(t *testing.T) {
+	r := support.Setup(t)
+	existing, err := models.CreateAPIKey(
+		database.Conn(),
+		r.Organization.ID,
+		"ci-bot",
+		nil,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	renamed, err := models.CreateAPIKey(
+		database.Conn(),
+		r.Organization.ID,
+		"nightly-bot",
+		nil,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	_, err = UpdateAPIKey(apiKeyContext(r), &pb.UpdateAPIKeyRequest{
+		Id:   renamed.ID.String(),
+		Name: "  ci-bot  ",
+	})
+	require.Error(t, err)
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	require.Equal(t, "API key with the same name already exists", grpcerrors.StatusMessage(err))
+
+	var user models.User
+	require.NoError(t, database.Conn().First(&user, "id = ?", renamed.ID).Error)
+	require.Equal(t, "nightly-bot", user.Name)
+
+	var original models.User
+	require.NoError(t, database.Conn().First(&original, "id = ?", existing.ID).Error)
+	require.Equal(t, "ci-bot", original.Name)
 }
 
 func TestUpdateAPIKeyRejectsBlankName(t *testing.T) {

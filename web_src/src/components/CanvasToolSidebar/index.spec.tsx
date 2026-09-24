@@ -7,7 +7,7 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() => {
+const { sendMutation, resetMutation, chatState, chatRefetch, websocketState } = vi.hoisted(() => {
   const state = {
     hasChat: true,
     isError: false,
@@ -29,6 +29,9 @@ const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() =>
     },
     chatState: state,
     chatRefetch: vi.fn(async () => ({ data: { id: "chat-1", status: state.refetchStatus } })),
+    websocketState: {
+      callbacks: undefined as { onConnectionOpen?: () => void } | undefined,
+    },
   };
 });
 
@@ -80,7 +83,9 @@ vi.mock("@/hooks/useAgentChats", () => ({
 }));
 
 vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
-  useAgentSessionWebsocket: () => undefined,
+  useAgentSessionWebsocket: (_organizationId: string, _sessionId: string, callbacks: unknown) => {
+    websocketState.callbacks = callbacks as { onConnectionOpen?: () => void };
+  },
 }));
 
 vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
@@ -115,30 +120,6 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
   };
 }
 
-function mockStreamingReconcileInterval() {
-  const ticks: Array<() => void> = [];
-  const captureInterval = ((handler: TimerHandler) => {
-    if (typeof handler === "function") {
-      ticks.push(handler as () => void);
-    }
-    return 0;
-  }) as typeof setInterval;
-  const previousWindow = window.setInterval;
-  const previousGlobal = globalThis.setInterval;
-  window.setInterval = captureInterval;
-  globalThis.setInterval = captureInterval;
-
-  return {
-    tickReconcile: async () => {
-      await Promise.all(ticks.map((tick) => tick()));
-    },
-    restore: () => {
-      window.setInterval = previousWindow;
-      globalThis.setInterval = previousGlobal;
-    },
-  };
-}
-
 describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
@@ -150,6 +131,7 @@ describe("CanvasToolSidebar", () => {
     chatState.refetchStatus = "idle";
     chatState.error = null;
     chatRefetch.mockClear();
+    websocketState.callbacks = undefined;
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
@@ -320,54 +302,46 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("clears stale streaming state when a durable chat refetch returns idle", async () => {
-    const { tickReconcile, restore } = mockStreamingReconcileInterval();
-    try {
-      chatState.status = "streaming";
-      chatState.refetchStatus = "streaming";
+    chatState.status = "streaming";
+    chatState.refetchStatus = "streaming";
 
-      render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-      expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
-      expect(screen.getByText("Agent is running...")).toBeInTheDocument();
-      await act(async () => {
-        await Promise.resolve();
-      });
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-      chatState.refetchStatus = "idle";
-      await act(async () => {
-        await tickReconcile();
-      });
+    chatState.refetchStatus = "idle";
+    await act(async () => {
+      websocketState.callbacks?.onConnectionOpen?.();
+      await Promise.resolve();
+    });
 
-      expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
-      expect(screen.getByText("Ready")).toBeInTheDocument();
-      expect(screen.queryByTestId("agent-stop-button")).not.toBeInTheDocument();
-    } finally {
-      restore();
-    }
+    expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-stop-button")).not.toBeInTheDocument();
   });
 
   it("keeps streaming state while durable chat refetches are still streaming", async () => {
-    const { tickReconcile, restore } = mockStreamingReconcileInterval();
-    try {
-      chatState.status = "streaming";
-      chatState.refetchStatus = "streaming";
+    chatState.status = "streaming";
+    chatState.refetchStatus = "streaming";
 
-      render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-      expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
-      await act(async () => {
-        await Promise.resolve();
-      });
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-      await act(async () => {
-        await tickReconcile();
-      });
+    await act(async () => {
+      websocketState.callbacks?.onConnectionOpen?.();
+      await Promise.resolve();
+    });
 
-      expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
-      expect(screen.getByText("Agent is running...")).toBeInTheDocument();
-      expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
-    } finally {
-      restore();
-    }
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
   });
 });

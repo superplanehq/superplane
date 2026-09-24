@@ -33,6 +33,10 @@ func (w *integrationWebhookContext) SetSecret(secret []byte) error {
 	return nil
 }
 
+func (w *integrationWebhookContext) CallbackHasActiveNodes(string) (bool, error) {
+	return false, nil
+}
+
 func Test__Octopus__Sync(t *testing.T) {
 	integration := &Octopus{}
 

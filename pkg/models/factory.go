@@ -21,6 +21,8 @@ const (
 
 	FactoryKeyMinLength = 2
 	FactoryKeyMaxLength = 5
+
+	DefaultFactoryWorkOrderListLimit = 100
 )
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
@@ -44,9 +46,28 @@ type Factory struct {
 	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
 	OnboardingCompletedAt  *time.Time
 	HostedSpendBudgetCents *int64
+	PlanningEnabled        bool
+	PlanningClarity        bool
+	PlanningConfidence     bool
+	PlanningSetupCompleted bool
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
+}
+
+// FactoryPlanning is the workspace toggle for draft chat plus the two
+// optional checks. New workspaces start with Planning and the Confidence
+// estimate on. The Clarity check is opt-in because it makes the agent ask
+// more questions before a task is ready.
+type FactoryPlanning struct {
+	Enabled        bool
+	Clarity        bool
+	Confidence     bool
+	SetupCompleted bool
+}
+
+func DefaultFactoryPlanning() FactoryPlanning {
+	return FactoryPlanning{Enabled: true, Clarity: false, Confidence: true, SetupCompleted: false}
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -132,18 +153,23 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		return nil, err
 	}
 
+	planning := DefaultFactoryPlanning()
 	now := time.Now()
 	factory := &Factory{
-		ID:                    uuid.New(),
-		OrganizationID:        organizationID,
-		Name:                  name,
-		Description:           description,
-		Key:                   normalizedKey,
-		NextWorkOrderNumber:   1,
-		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
-		OnboardingCompletedAt: nil,
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		ID:                     uuid.New(),
+		OrganizationID:         organizationID,
+		Name:                   name,
+		Description:            description,
+		Key:                    normalizedKey,
+		NextWorkOrderNumber:    1,
+		OnboardingConfig:       datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		OnboardingCompletedAt:  nil,
+		PlanningEnabled:        planning.Enabled,
+		PlanningClarity:        planning.Clarity,
+		PlanningConfidence:     planning.Confidence,
+		PlanningSetupCompleted: planning.SetupCompleted,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
@@ -372,6 +398,38 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 		return err
 	}
 	f.HostedSpendBudgetCents = budgetCents
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) Planning() FactoryPlanning {
+	return FactoryPlanning{
+		Enabled:        f.PlanningEnabled,
+		Clarity:        f.PlanningClarity,
+		Confidence:     f.PlanningConfidence,
+		SetupCompleted: f.PlanningSetupCompleted,
+	}
+}
+
+func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("planning_enabled", "planning_clarity", "planning_confidence", "planning_setup_completed", "updated_at").
+		Updates(map[string]any{
+			"planning_enabled":         planning.Enabled,
+			"planning_clarity":         planning.Clarity,
+			"planning_confidence":      planning.Confidence,
+			"planning_setup_completed": planning.SetupCompleted,
+			"updated_at":               now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PlanningEnabled = planning.Enabled
+	f.PlanningClarity = planning.Clarity
+	f.PlanningConfidence = planning.Confidence
+	f.PlanningSetupCompleted = planning.SetupCompleted
 	f.UpdatedAt = now
 	return nil
 }
@@ -756,14 +814,22 @@ func (f *Factory) FindWorkOrderByRef(tx *gorm.DB, ref string) (*FactoryWorkOrder
 }
 
 type ListFactoryWorkOrdersFilters struct {
-	AssigneeIDs []uuid.UUID
-	States      []string
-	Results     []string
-	Unassigned  *bool
-	Mine        *uuid.UUID
+	States     []string
+	Results    []string
+	Unassigned *bool
+	UserID     *uuid.UUID
+	// Limit pages the result. Zero uses DefaultFactoryWorkOrderListLimit.
+	Limit int
+	// BeforeID is a keyset cursor. The query returns rows older than that
+	// order in updated_at DESC, id DESC order.
+	BeforeID *uuid.UUID
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	if filters.Limit <= 0 {
+		filters.Limit = DefaultFactoryWorkOrderListLimit
+	}
+
 	query := tx.
 		Model(&FactoryWorkOrder{}).
 		Preload("CreatedBy").
@@ -780,44 +846,90 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 		query = query.Where("factory_work_orders.result IN ?", filters.Results)
 	}
 
-	if filters.Unassigned != nil && *filters.Unassigned {
-		query = query.Where(`
+	query = applyWorkOrderUserFilters(query, filters)
+
+	if filters.BeforeID != nil {
+		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return []FactoryWorkOrder{}, nil
+			}
+			return nil, err
+		}
+		query = query.Where(
+			"(factory_work_orders.updated_at, factory_work_orders.id) < (?, ?)",
+			cursor.UpdatedAt,
+			cursor.ID,
+		)
+	}
+
+	query = query.
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(filters.Limit)
+
+	var orders []FactoryWorkOrder
+	err := query.Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
+	unassigned := filters.Unassigned != nil && *filters.Unassigned
+	if filters.UserID == nil && !unassigned {
+		return query
+	}
+
+	if filters.UserID != nil && unassigned {
+		return query.Where(`
+			(
+				NOT EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				)
+				OR EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+					AND factory_work_order_assignees.user_id = ?
+				)
+				OR factory_work_orders.created_by_id = ?
+			)`, *filters.UserID, *filters.UserID)
+	}
+
+	if unassigned {
+		return query.Where(`
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 			)`)
 	}
 
-	if len(filters.AssigneeIDs) > 0 {
-		query = query.Where(`
-			EXISTS (
-				SELECT 1 FROM factory_work_order_assignees
-				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-				AND factory_work_order_assignees.user_id IN ?
-			)`, filters.AssigneeIDs)
-	}
-
-	if filters.Mine != nil {
-		query = query.Where(`
+	return query.Where(`
+		(
 			EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 				AND factory_work_order_assignees.user_id = ?
 			)
-			OR factory_work_orders.created_by_id = ?`, *filters.Mine, *filters.Mine)
-	}
+			OR factory_work_orders.created_by_id = ?
+		)`, *filters.UserID, *filters.UserID)
+}
 
-	var orders []FactoryWorkOrder
-	err := query.
-		Order("factory_work_orders.created_at DESC").
-		Order("factory_work_orders.id DESC").
-		Find(&orders).
-		Error
+func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
+	var cursor FactoryWorkOrder
+	err := tx.
+		Select("id", "updated_at").
+		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
+		Where("factory_work_orders.factory_id = ?", f.ID).
+		Where("factory_work_orders.id = ?", beforeID).
+		Take(&cursor).Error
 	if err != nil {
 		return nil, err
 	}
-
-	return orders, nil
+	return &cursor, nil
 }
 
 func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {

@@ -2,14 +2,7 @@ import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-cl
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Ellipsis } from "lucide-react";
-import { Fragment } from "react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import {
@@ -69,7 +62,6 @@ const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
   complete: "work-order-complete-button",
   reject: "work-order-reject-button",
   "reject-draft": "work-order-reject-draft-button",
-  "back-to-draft": "work-order-back-to-draft-button",
   reopen: "work-order-reopen-open-button",
 };
 
@@ -104,16 +96,14 @@ function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
 
       <DropdownMenuContent align="end" className="w-48">
         {actions.map((action) => (
-          <Fragment key={action.kind}>
-            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuItem
-              disabled={action.disabled}
-              onSelect={() => applyWorkOrderStatusAction(action.kind, props)}
-              data-testid={HEADER_ACTION_TEST_ID[action.kind]}
-            >
-              {action.label}
-            </DropdownMenuItem>
-          </Fragment>
+          <DropdownMenuItem
+            key={action.kind}
+            disabled={action.disabled}
+            onSelect={() => applyWorkOrderStatusAction(action.kind, props)}
+            data-testid={HEADER_ACTION_TEST_ID[action.kind]}
+          >
+            {action.label}
+          </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

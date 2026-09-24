@@ -4,12 +4,16 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 
 import { AutomationDetail } from "./AutomationDetail";
 import { AutomationCard } from "./automationsPageParts";
 import { duplicateAutomationName } from "./automationCardActions";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+
+const { useCanvasRuntimeWebsocket } = vi.hoisted(() => ({
+  useCanvasRuntimeWebsocket: vi.fn(),
+}));
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useInfiniteCanvasRuns: () => ({
@@ -40,6 +44,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCanvasWebsocket", () => ({
+  useCanvasRuntimeWebsocket,
+}));
+
 vi.mock("./LineVelocityPanel", () => ({
   LineVelocityPanel: () => <div data-testid="line-velocity-panel">Velocity</div>,
 }));
@@ -52,7 +60,15 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   }),
 }));
 
-const app: FactoryApp = {
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
+const app: FactoryAutomation = {
   id: "app-refund-planner",
   name: "Refund Planner",
   description: "Plans reconciliation work across ledger + payment services.",
@@ -195,6 +211,8 @@ describe("AutomationDetail tabs", () => {
 
   it("shows Runs and Velocity tabs, with run rows as soft cards", () => {
     renderDetail();
+
+    expect(useCanvasRuntimeWebsocket).toHaveBeenCalledWith("app-refund-planner", "org-1", true);
 
     expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("data-state", "active");
     expect(screen.getByRole("tab", { name: "Velocity" })).toBeInTheDocument();

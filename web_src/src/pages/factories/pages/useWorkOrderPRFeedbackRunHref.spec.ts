@@ -47,8 +47,11 @@ describe("prFeedbackLogRunsFromPullRequests", () => {
   it("prefers activity labels over the raw run description", () => {
     const pullRequests: FactoriesFactoryPullRequest[] = [
       {
+        id: "pr-7",
         workOrderId: "wo-1",
         number: "7",
+        url: "https://github.com/example/repo/pull/7",
+        title: "Fix retries",
         runs: [
           {
             description: "Fixing failed checks on a82fd91",
@@ -63,6 +66,7 @@ describe("prFeedbackLogRunsFromPullRequests", () => {
             state: "active",
             attempt: 2,
             attemptLimit: 3,
+            revision: { id: "revision-1", sha: "a82fd91" },
             run: run({ id: "r1", canvasId: "c-1", state: "STATE_STARTED", createdAt: "2026-08-26T12:00:00Z" }),
           },
         ],
@@ -73,9 +77,68 @@ describe("prFeedbackLogRunsFromPullRequests", () => {
       { canvasId: "c-1", name: "Fix pull request checks" },
     ]);
     expect(matches).toHaveLength(1);
-    expect(matches[0]?.description).toBe("Waiting for another pull request activity");
-    expect(matches[0]?.attemptLabel).toBe("Attempt 2 of 3");
+    expect(matches[0]?.title).toBe("Fixing failed checks on a82fd91");
+    expect(matches[0]?.description).toBeUndefined();
+    expect(matches[0]?.waitingForAccess).toBe(true);
+    expect(matches[0]?.attemptLabel).toBe("· 2/3");
     expect(matches[0]?.costCents).toBe("12");
+    expect(matches[0]?.pullRequest).toMatchObject({
+      id: "pr-7",
+      number: "7",
+      url: "https://github.com/example/repo/pull/7",
+    });
+    expect(matches[0]?.revision).toEqual({ id: "revision-1", sha: "a82fd91" });
+  });
+
+  it("keeps Markdown activity titles and descriptions", () => {
+    const matches = prFeedbackLogRunsFromPullRequests([
+      {
+        id: "pr-7",
+        number: "7",
+        activities: [
+          {
+            title: "Address **review** comment",
+            description: "Read the [requested changes](https://example.com/review).",
+            run: run({
+              id: "r1",
+              canvasId: "c-1",
+              state: "STATE_FINISHED",
+              createdAt: "2026-08-26T12:00:00Z",
+            }),
+          },
+        ],
+      },
+    ]);
+
+    expect(matches[0]?.title).toBe("Address **review** comment");
+    expect(matches[0]?.description).toBe("Read the [requested changes](https://example.com/review).");
+  });
+
+  it("sorts activities from all pull requests in chronological order", () => {
+    const matches = prFeedbackLogRunsFromPullRequests([
+      {
+        id: "pr-2",
+        number: "2",
+        activities: [
+          {
+            revision: { sha: "bbbbbbb" },
+            run: run({ id: "later", canvasId: "c-1", createdAt: "2026-08-26T12:00:00Z" }),
+          },
+        ],
+      },
+      {
+        id: "pr-1",
+        number: "1",
+        activities: [
+          {
+            revision: { sha: "aaaaaaa" },
+            run: run({ id: "older", canvasId: "c-1", createdAt: "2026-08-26T11:00:00Z" }),
+          },
+        ],
+      },
+    ]);
+
+    expect(matches.map((match) => match.run.id)).toEqual(["older", "later"]);
   });
 
   it("uses linked-run spend when activity fields are zero from emit-unpopulated", () => {
@@ -141,6 +204,7 @@ describe("statusForCanvasRun", () => {
     expect(statusForCanvasRun(run({ state: "STATE_PENDING" }))).toBe("pending");
     expect(statusForCanvasRun(run({ state: "STATE_STARTED" }))).toBe("running");
     expect(statusForCanvasRun(run({ state: "STATE_CANCELLING" }))).toBe("failed");
+    expect(statusForCanvasRun(run({ state: "STATE_CANCELLING", result: "RESULT_PASSED" }))).toBe("passed");
     expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_PASSED" }))).toBe("passed");
     expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_FAILED" }))).toBe("failed");
     expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }))).toBe("failed");

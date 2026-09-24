@@ -9,6 +9,31 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
+func TestIntakeRunTitle_JiraUsesKeyWhenSummaryIsMissing(t *testing.T) {
+	t.Run("key and summary", func(t *testing.T) {
+		event := models.CanvasEvent{Data: models.NewJSONValue(map[string]any{
+			"type": "jira.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"key":    "ENG-42",
+					"fields": map[string]any{"summary": "Login fails"},
+				},
+			},
+		})}
+		assert.Equal(t, "ENG-42: Login fails", intakeRunTitle(models.FactoryIntakeSourceJiraIssues, event))
+	})
+
+	t.Run("key only", func(t *testing.T) {
+		event := models.CanvasEvent{Data: models.NewJSONValue(map[string]any{
+			"type": "jira.issue",
+			"data": map[string]any{
+				"issue": map[string]any{"key": "ENG-42", "fields": map[string]any{}},
+			},
+		})}
+		assert.Equal(t, "ENG-42", intakeRunTitle(models.FactoryIntakeSourceJiraIssues, event))
+	})
+}
+
 func Test__IntakeRunPlacement(t *testing.T) {
 	runID := uuid.New()
 	run := models.CanvasRun{ID: runID}

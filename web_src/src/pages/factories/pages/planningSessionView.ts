@@ -1,12 +1,9 @@
 import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
-
-export function workspacePlanningRepository(
-  factory: { onboarding?: { appRepository?: string | null } } | null | undefined,
-): string {
-  return factory?.onboarding?.appRepository?.trim() ?? "";
-}
+import { planningTaskMessageFromPayload } from "./planningTaskMessage";
+import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "./work-order-split-run/agentActivity";
+import { composerChipsWorking } from "./work-order-split-run/planChipStatus";
 
 export type PlanningSessionPayload = {
   id?: string;
@@ -18,9 +15,11 @@ export type PlanningSessionPayload = {
   waitState?: string;
   executionId?: string;
   selectableModelKey?: string;
+  kind?: "PLANNING_SESSION_KIND_TASK_CREATION" | "PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS";
   messages?: PlanningSessionMessagePayload[];
+  activities?: PlanningSessionActivityPayload[];
   draft?: { title?: string; description?: string; workOrderId?: string } | null;
-  created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
+  created?: Array<{ id?: string; key?: string; title?: string; description?: string; number?: string | number }>;
   survey?: PlanningSessionSurveyPayload | null;
 };
 
@@ -28,8 +27,41 @@ export type PlanningSessionMessagePayload = {
   id?: string;
   role?: string;
   text?: string;
+  userId?: string;
   /** When the server persisted the message (ISO 8601). Both roles carry this. */
   createdAt?: string;
+  activityId?: string;
+};
+
+export type PlanningSessionActivityPayload = {
+  id?: string;
+  schemaVersion?: number;
+  provider?: string;
+  status?: string;
+  lastSequence?: number | string;
+  startedAt?: string;
+  completedAt?: string;
+  truncated?: boolean;
+  turn?: number;
+  items?: PlanningSessionActivityItemPayload[];
+};
+
+type PlanningSessionActivityItemPayload = {
+  type?: string;
+  id?: string;
+  kind?: string;
+  text?: string;
+  name?: string;
+  input?: string;
+  output?: string;
+  outputStreams?: Array<{ stream?: string; text?: string }>;
+  status?: string;
+  code?: string;
+  startedAt?: string;
+  durationMs?: number | string;
+  exitCode?: number;
+  signal?: string;
+  truncated?: boolean;
 };
 
 export type PlanningSessionSurveyPayload = {
@@ -37,17 +69,98 @@ export type PlanningSessionSurveyPayload = {
   questions?: Array<{ prompt?: string; options?: string[] }>;
 };
 
+/**
+ * A planning session is one durable conversation across multiple agent runs.
+ * Keep messages that are missing from a partial or stale response so a rewind
+ * cannot replace the visible transcript with only the current run.
+ */
+export function mergePlanningSessionHistory(
+  previous: PlanningSessionPayload | null | undefined,
+  next: PlanningSessionPayload | null,
+): PlanningSessionPayload | null {
+  if (!previous || !next || !previous.id || previous.id !== next.id) {
+    return next;
+  }
+  const activities = mergePlanningSessionActivities(previous.activities, next.activities);
+  return {
+    ...next,
+    messages: mergePlanningSessionMessages(previous.messages, next.messages),
+    ...(previous.activities || next.activities ? { activities } : {}),
+  };
+}
+
+function mergePlanningSessionActivities(
+  previous: PlanningSessionActivityPayload[] | undefined,
+  next: PlanningSessionActivityPayload[] | undefined,
+): PlanningSessionActivityPayload[] {
+  const activities = new Map((previous ?? []).flatMap((activity) => (activity.id ? [[activity.id, activity]] : [])));
+  for (const activity of next ?? []) {
+    if (activity.id) {
+      activities.set(activity.id, { ...activities.get(activity.id), ...activity });
+    }
+  }
+  return [...activities.values()].sort((left, right) => timestampMs(left.startedAt) - timestampMs(right.startedAt));
+}
+
+function mergePlanningSessionMessages(
+  previous: PlanningSessionMessagePayload[] | undefined,
+  next: PlanningSessionMessagePayload[] | undefined,
+): PlanningSessionMessagePayload[] {
+  const merged = [...(previous ?? [])];
+  const positions = new Map(merged.map((message, index) => [planningSessionMessageKey(message), index]));
+
+  for (const message of next ?? []) {
+    const key = planningSessionMessageKey(message);
+    const position = positions.get(key);
+    if (position === undefined) {
+      positions.set(key, merged.length);
+      merged.push(message);
+      continue;
+    }
+    merged[position] = { ...merged[position], ...message };
+  }
+
+  return merged
+    .map((message, index) => ({ message, index, createdAt: planningSessionMessageTime(message) }))
+    .sort((left, right) => {
+      if (left.createdAt !== undefined && right.createdAt !== undefined && left.createdAt !== right.createdAt) {
+        return left.createdAt - right.createdAt;
+      }
+      return left.index - right.index;
+    })
+    .map(({ message }) => message);
+}
+
+function planningSessionMessageKey(message: PlanningSessionMessagePayload): string {
+  const id = message.id?.trim();
+  if (id) {
+    return `id:${id}`;
+  }
+  return `content:${message.role ?? ""}\u0000${message.createdAt ?? ""}\u0000${message.text ?? ""}`;
+}
+
+function planningSessionMessageTime(message: PlanningSessionMessagePayload): number | undefined {
+  if (!message.createdAt) {
+    return undefined;
+  }
+  const parsed = Date.parse(message.createdAt);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 export function createWithAgentViewFromSession(
   session: PlanningSessionPayload,
-  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
+  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen"> & {
+    analysisDelivered?: boolean;
+  },
 ): CreateWithAgentView {
+  const activities = (session.activities ?? []).flatMap(agentActivityFromPayload);
   return {
     repository: session.repository ?? "",
-    machineStatus: createWithAgentMachineStatus(session),
+    machineStatus: createWithAgentMachineStatus(session, extras.analysisDelivered),
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
-    messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
+    messages: planningSessionMessagesFromPayload(session),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
     created: createdOrdersFromSession(session),
@@ -55,20 +168,35 @@ export function createWithAgentViewFromSession(
     endConfirmOpen: extras.endConfirmOpen,
     selectableModelKey: session.selectableModelKey ?? "",
     refining: Boolean(session.draft?.workOrderId?.trim()),
+    ...(activities.length > 0 ? { activities } : {}),
   };
 }
 
 function createdOrdersFromSession(session: PlanningSessionPayload): CreateWithAgentCreatedOrder[] {
   return (session.created ?? [])
-    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
-      Boolean(order.id && order.key && order.title),
+    .filter(
+      (order): order is { id: string; key: string; title: string; description?: string; number?: string | number } =>
+        Boolean(order.id && order.key && order.title),
     )
-    .map((order) => ({
-      id: order.id,
-      key: order.key,
-      title: order.title,
-      description: order.description ?? "",
-    }));
+    .map((order) => {
+      const number = Number(order.number);
+      return {
+        id: order.id,
+        key: order.key,
+        title: order.title,
+        description: order.description ?? "",
+        ...(Number.isFinite(number) && number > 0 ? { number } : {}),
+      };
+    });
+}
+
+function planningSessionMessagesFromPayload(session: PlanningSessionPayload): CreateWithAgentMessage[] {
+  const createdByID = new Map(createdOrdersFromSession(session).map((order) => [order.id, order]));
+  return (session.messages ?? []).flatMap((message) =>
+    message.role === "task"
+      ? planningTaskMessageFromPayload(message, createdByID)
+      : planningSessionMessageFromPayload(message),
+  );
 }
 
 function planningSessionRightPane(
@@ -102,6 +230,44 @@ function planningSessionSurveyFromPayload(
   return { id: survey?.id, questions };
 }
 
+export function planningSessionHasPendingSurvey(
+  session: Pick<PlanningSessionPayload, "survey"> | null | undefined,
+): boolean {
+  return Boolean(planningSessionSurveyFromPayload(session?.survey));
+}
+
+/** True when the session is held for the next user message. */
+export function planningSessionIsWaiting(
+  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+): boolean {
+  return Boolean(session && session.state !== "ended" && session.waitState === "pending");
+}
+
+/** True when the agent is still running this session. */
+export function planningSessionIsWorking(
+  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+): boolean {
+  return Boolean(session && session.state !== "ended" && session.waitState !== "pending");
+}
+
+/**
+ * Draft cards follow the refine strip rule so both surfaces leave the
+ * thinking state at the same moment: the agent works while the session
+ * machine starts or runs, and a Backlog analysis counts only until the
+ * first score arrives.
+ */
+export function draftCardAgentIsWorking(
+  session: PlanningSessionMachineInput | null | undefined,
+  backlogAnalyzing: boolean,
+  score?: number,
+): boolean {
+  return composerChipsWorking({
+    isAnalyzing: backlogAnalyzing,
+    score,
+    machineStatus: session ? createWithAgentMachineStatus(session) : undefined,
+  });
+}
+
 export function isFailedPlanningCanvasRun(run: { result?: string } | null | undefined): boolean {
   return run?.result === "RESULT_FAILED" || run?.result === "RESULT_CANCELLED";
 }
@@ -109,22 +275,32 @@ export function isFailedPlanningCanvasRun(run: { result?: string } | null | unde
 export function applyPlanningSessionLiveRun(
   view: CreateWithAgentView,
   run: { result?: string } | null | undefined,
+  analysisDelivered = false,
 ): CreateWithAgentView {
-  if (view.machineStatus === "failed") {
+  if (view.machineStatus === "failed" || view.machineStatus === "passed") {
     return view;
   }
   if (isFailedPlanningCanvasRun(run)) {
-    return { ...view, machineStatus: "failed" };
+    return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
   }
   if (run?.result === "RESULT_PASSED" && view.machineStatus !== "waiting") {
-    return { ...view, machineStatus: "failed" };
+    return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
   }
   return view;
 }
 
-function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {
+function analysisStopStatus(analysisDelivered: boolean): CreateWithAgentView["machineStatus"] {
+  return analysisDelivered ? "passed" : "failed";
+}
+
+export type PlanningSessionMachineInput = Pick<PlanningSessionPayload, "state" | "waitState" | "executionId">;
+
+function createWithAgentMachineStatus(
+  session: PlanningSessionMachineInput,
+  analysisDelivered?: boolean,
+): CreateWithAgentView["machineStatus"] {
   if (session.state === "ended") {
-    return "failed";
+    return analysisStopStatus(Boolean(analysisDelivered));
   }
   if (!session.executionId) {
     return "starting";
@@ -139,20 +315,177 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
   if (message.role === "user" && message.text && isPlanningRefineNote(message.text)) {
     return [];
   }
+  if (message.role === "plan") {
+    return planningPlanMessageFromPayload(message);
+  }
   if (message.text && (message.role === "user" || message.role === "agent")) {
-    const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
-    return [
-      {
-        id: message.id ?? message.text,
-        kind: "text",
-        role: message.role,
-        text: message.text,
-        ...(message.role === "user" && isPlanningSurveyReply(message.text) ? { origin: "survey" as const } : {}),
-        ...(createdAtMs === undefined ? {} : { createdAtMs }),
-      },
-    ];
+    return planningTextMessageFromPayload(message);
   }
   return [];
+}
+
+function planningTextMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const text = message.text;
+  if (!text) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? text,
+      kind: "text",
+      role: message.role === "agent" ? "agent" : "user",
+      text,
+      ...(message.role === "user" && isPlanningSurveyReply(text) ? { origin: "survey" as const } : {}),
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+      ...(message.userId?.trim() ? { userId: message.userId.trim() } : {}),
+      ...(message.activityId?.trim() ? { activityId: message.activityId.trim() } : {}),
+    },
+  ];
+}
+
+function planningPlanMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  const score = planningPlanScoreFromPayload(message.text);
+  if (score === undefined) {
+    return [];
+  }
+  const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
+  return [
+    {
+      id: message.id ?? message.text ?? "plan",
+      kind: "plan",
+      role: "plan",
+      score,
+      ...(createdAtMs === undefined ? {} : { createdAtMs }),
+    },
+  ];
+}
+
+function planningPlanScoreFromPayload(text: string | undefined): number | undefined {
+  if (!text?.trim()) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(text) as { score?: unknown };
+    if (typeof parsed.score === "number" && Number.isFinite(parsed.score)) {
+      return parsed.score;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function agentActivityFromPayload(payload: PlanningSessionActivityPayload): AgentActivity[] {
+  const id = payload.id?.trim();
+  const status = parsedActivityStatus(payload.status);
+  if (!id || !status) {
+    return [];
+  }
+  return [
+    {
+      id,
+      provider: payload.provider?.trim() || "agent",
+      status,
+      turn: payload.turn,
+      sequence: numericValue(payload.lastSequence),
+      startedAtMs: optionalTimestampMs(payload.startedAt),
+      completedAtMs: optionalTimestampMs(payload.completedAt),
+      items: (payload.items ?? []).flatMap(agentActivityItemFromPayload),
+      truncated: Boolean(payload.truncated),
+    },
+  ];
+}
+
+function agentActivityItemFromPayload(payload: PlanningSessionActivityItemPayload): AgentActivityItem[] {
+  const id = payload.id?.trim();
+  if (!id) {
+    return [];
+  }
+  if (payload.type === "content" && (payload.kind === "reasoning" || payload.kind === "assistant")) {
+    return [contentActivityItem(payload, id, payload.kind)];
+  }
+  if (payload.type === "tool") {
+    return [toolActivityItem(payload, id)];
+  }
+  if (payload.type === "notice") {
+    return [{ type: "notice", id, code: payload.code ?? "notice", text: payload.text ?? "Agent activity notice" }];
+  }
+  return [];
+}
+
+function contentActivityItem(
+  payload: PlanningSessionActivityItemPayload,
+  id: string,
+  kind: "reasoning" | "assistant",
+): AgentActivityItem {
+  return {
+    type: "content",
+    id,
+    kind,
+    text: payload.text ?? "",
+    status: payload.status === "running" ? "running" : "passed",
+    startedAtMs: optionalTimestampMs(payload.startedAt),
+    durationMs: optionalNumericValue(payload.durationMs),
+    truncated: Boolean(payload.truncated),
+  };
+}
+
+function toolActivityItem(payload: PlanningSessionActivityItemPayload, id: string): AgentActivityItem {
+  const kind = payload.kind?.trim() || "tool";
+  return {
+    type: "tool",
+    id,
+    kind,
+    name: payload.name?.trim() || kind,
+    input: payload.input ?? "",
+    output: payload.output ?? "",
+    outputStreams: (payload.outputStreams ?? []).map((output) => ({
+      stream: output.stream ?? "stdout",
+      text: output.text ?? "",
+    })),
+    status: parsedActivityStatus(payload.status) ?? "failed",
+    startedAtMs: optionalTimestampMs(payload.startedAt),
+    durationMs: optionalNumericValue(payload.durationMs),
+    exitCode: payload.exitCode,
+    signal: payload.signal,
+    truncated: Boolean(payload.truncated),
+  };
+}
+
+function parsedActivityStatus(status: string | undefined): AgentActivityStatus | undefined {
+  if (
+    status === "running" ||
+    status === "passed" ||
+    status === "failed" ||
+    status === "cancelled" ||
+    status === "timed_out" ||
+    status === "interrupted"
+  ) {
+    return status;
+  }
+  return undefined;
+}
+
+function numericValue(value: number | string | undefined): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function optionalNumericValue(value: number | string | undefined): number | undefined {
+  return value === undefined ? undefined : numericValue(value);
+}
+
+function timestampMs(value: string | undefined): number {
+  return optionalTimestampMs(value) ?? 0;
+}
+
+function optionalTimestampMs(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 function parsePlanningMessageCreatedAt(createdAt: string | undefined): number | undefined {

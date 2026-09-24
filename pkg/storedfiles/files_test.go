@@ -1,4 +1,4 @@
-package storedfiles
+package storedfiles_test
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -54,7 +55,7 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 
 	loaded, err := models.FindFile(db, file.ID)
 	require.NoError(t, err)
@@ -63,13 +64,13 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 
 	description := "See ![bug](" + blob.FileRef(file.ID) + ")"
 	sourceKey := loaded.StorageKey
-	bound, err := BindDescriptionFiles(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
+	bound, err := storedfiles.BindDescriptionFiles(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
 	require.NoError(t, err)
 	require.Equal(t, []string{sourceKey}, bound.StaleKeys)
 	require.Len(t, bound.CopiedKeys, 1)
 	_, err = provider.Head(t.Context(), sourceKey)
 	require.NoError(t, err)
-	require.NoError(t, ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, bound, nil))
+	require.NoError(t, storedfiles.ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, bound, nil))
 	_, err = provider.Head(t.Context(), sourceKey)
 	assert.ErrorIs(t, err, blob.ErrNotFound)
 
@@ -79,6 +80,32 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 	assert.Equal(t, order.ID, *reparented.WorkOrderID)
 	assert.Contains(t, reparented.StorageKey, "/tasks/"+order.ID.String()+"/")
 	_, err = provider.Head(t.Context(), reparented.StorageKey)
+	require.NoError(t, err)
+}
+
+func TestStorePendingUploadLeavesFilePending(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeOrganization,
+		OrganizationID: r.Organization.ID,
+		Filename:       "evidence.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+
+	upload, err := storedfiles.StorePendingUpload(t.Context(), provider, file, bytes.NewReader([]byte("png-bytes")))
+	require.NoError(t, err)
+	assert.Equal(t, int64(9), upload.SizeBytes)
+	assert.NotEmpty(t, upload.Checksum)
+
+	loaded, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FileStatePending, loaded.State)
+	_, err = provider.Head(t.Context(), file.StorageKey)
 	require.NoError(t, err)
 }
 
@@ -104,9 +131,9 @@ func TestBindDescriptionFilesRejectsForeignWorkOrder(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 
-	_, err = BindDescriptionFiles(
+	_, err = storedfiles.BindDescriptionFiles(
 		t.Context(),
 		db,
 		provider,
@@ -137,7 +164,7 @@ func TestBindDescriptionFilesDeletesCopiedObjectWhenLaterFileFails(t *testing.T)
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 
 	sourceKey := file.StorageKey
 	nextKey, err := blob.ObjectKey(file.InstallationID, blob.ScopeTask, r.Organization.ID, factoryModel.ID, order.ID, file.ID)
@@ -145,7 +172,7 @@ func TestBindDescriptionFilesDeletesCopiedObjectWhenLaterFileFails(t *testing.T)
 
 	description := "![ok](" + blob.FileRef(file.ID) + ") ![missing](" + blob.FileRef(uuid.New()) + ")"
 	err = db.Transaction(func(tx *gorm.DB) error {
-		_, bindErr := BindDescriptionFiles(t.Context(), tx, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
+		_, bindErr := storedfiles.BindDescriptionFiles(t.Context(), tx, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
 		return bindErr
 	})
 	assert.ErrorIs(t, err, models.ErrFileNotFound)
@@ -181,7 +208,7 @@ func TestBindDescriptionFilesSerializesConcurrentTaskQuota(t *testing.T) {
 			CreatedByID:    r.User,
 		})
 		require.NoError(t, createErr)
-		require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+		require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 	}
 
 	workspaceFiles := make([]*models.File, 2)
@@ -195,7 +222,7 @@ func TestBindDescriptionFilesSerializesConcurrentTaskQuota(t *testing.T) {
 			CreatedByID:    r.User,
 		})
 		require.NoError(t, createErr)
-		require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+		require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 		workspaceFiles[i] = file
 	}
 
@@ -207,7 +234,7 @@ func TestBindDescriptionFilesSerializesConcurrentTaskQuota(t *testing.T) {
 			start.Done()
 			start.Wait()
 			errCh <- db.Transaction(func(tx *gorm.DB) error {
-				_, bindErr := BindDescriptionFiles(
+				_, bindErr := storedfiles.BindDescriptionFiles(
 					t.Context(),
 					tx,
 					provider,
@@ -262,7 +289,7 @@ func TestIngestRemoteImagesRewritesGitHubURL(t *testing.T) {
 	failURL := server.URL + "/fail.png"
 	markdown := "![ok](" + okURL + ") ![fail](" + failURL + ")"
 
-	ingested, err := IngestRemoteImages(
+	ingested, err := storedfiles.IngestRemoteImages(
 		t.Context(),
 		db,
 		provider,
@@ -304,9 +331,9 @@ func TestIngestRemoteImagesDeletesObjectsWhenTransactionRollsBack(t *testing.T) 
 	require.NoError(t, err)
 
 	okURL := server.URL + "/ok.png"
-	var ingested IngestResult
+	var ingested storedfiles.IngestResult
 	err = db.Transaction(func(tx *gorm.DB) error {
-		result, ingestErr := IngestRemoteImages(
+		result, ingestErr := storedfiles.IngestRemoteImages(
 			t.Context(),
 			tx,
 			provider,
@@ -328,7 +355,7 @@ func TestIngestRemoteImagesDeletesObjectsWhenTransactionRollsBack(t *testing.T) 
 	})
 	require.Error(t, err)
 	require.Len(t, ingested.ObjectKeys, 1)
-	require.NoError(t, ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, BindResult{CopiedKeys: ingested.ObjectKeys}, err))
+	require.NoError(t, storedfiles.ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, storedfiles.BindResult{CopiedKeys: ingested.ObjectKeys}, err))
 
 	_, headErr := provider.Head(t.Context(), ingested.ObjectKeys[0])
 	assert.ErrorIs(t, headErr, blob.ErrNotFound)
@@ -356,13 +383,13 @@ func TestApplyBindResultRecordsAbandonedObjectsWhenDeleteFails(t *testing.T) {
 	key := "abandoned/" + uuid.NewString()
 	require.NoError(t, provider.Put(t.Context(), key, strings.NewReader("png-bytes"), blob.PutOptions{ContentType: "image/png"}))
 
-	err = ApplyBindResult(
+	err = storedfiles.ApplyBindResult(
 		t.Context(),
 		db,
 		failDeleteProvider{Provider: provider},
 		r.Organization.ID,
 		factoryModel.ID,
-		BindResult{CopiedKeys: []string{key}},
+		storedfiles.BindResult{CopiedKeys: []string{key}},
 		errors.New("force rollback"),
 	)
 	require.Error(t, err)
@@ -373,7 +400,7 @@ func TestApplyBindResultRecordsAbandonedObjectsWhenDeleteFails(t *testing.T) {
 	assert.Equal(t, key, stale[0].StorageKey)
 	assert.Equal(t, models.FileStateFailed, stale[0].State)
 
-	require.NoError(t, DeleteObjectAndRow(t.Context(), db, provider, &stale[0]))
+	require.NoError(t, storedfiles.DeleteObjectAndRow(t.Context(), db, provider, &stale[0]))
 	_, headErr := provider.Head(t.Context(), key)
 	assert.ErrorIs(t, headErr, blob.ErrNotFound)
 }
@@ -396,7 +423,7 @@ func TestCompleteUploadRejectsOversizedBody(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = CompleteUpload(t.Context(), db, provider, file, io.LimitReader(strings.NewReader(strings.Repeat("a", models.MaxFileBytes+8)), int64(models.MaxFileBytes+8)))
+	err = storedfiles.CompleteUpload(t.Context(), db, provider, file, io.LimitReader(strings.NewReader(strings.Repeat("a", models.MaxFileBytes+8)), int64(models.MaxFileBytes+8)))
 	assert.ErrorIs(t, err, models.ErrFileQuotaExceeded)
 
 	loaded, err := models.FindFile(db, file.ID)
@@ -432,10 +459,10 @@ func TestCompleteUploadDeletesObjectWhenReadyQuotaExceeded(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, filler, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, filler, bytes.NewReader([]byte("png-bytes"))))
 	require.NoError(t, db.Model(filler).Update("size_bytes", models.MaxOrganizationFileBytes).Error)
 
-	err = CompleteUpload(t.Context(), db, provider, pending, bytes.NewReader([]byte("png-bytes")))
+	err = storedfiles.CompleteUpload(t.Context(), db, provider, pending, bytes.NewReader([]byte("png-bytes")))
 	assert.ErrorIs(t, err, models.ErrFileQuotaExceeded)
 
 	loaded, err := models.FindFile(db, pending.ID)
@@ -465,7 +492,7 @@ func TestDescriptionForDispatchRewritesReadyFileRefs(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, ready, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, ready, bytes.NewReader([]byte("png-bytes"))))
 
 	pending, err := models.CreatePendingFile(db, models.CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
@@ -488,7 +515,7 @@ func TestDescriptionForDispatchRewritesReadyFileRefs(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, foreign, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, foreign, bytes.NewReader([]byte("png-bytes"))))
 
 	markdown := fmt.Sprintf(
 		"See ![ready](%s) ![pending](%s) ![foreign](%s)",
@@ -496,7 +523,7 @@ func TestDescriptionForDispatchRewritesReadyFileRefs(t *testing.T) {
 		blob.FileRef(pending.ID),
 		blob.FileRef(foreign.ID),
 	)
-	rewritten, files, err := DescriptionForDispatch(
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
 		t.Context(),
 		db,
 		provider,
@@ -539,10 +566,10 @@ func TestDescriptionForDispatchSkipsOtherTaskFiles(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 
 	markdown := "![other](" + blob.FileRef(file.ID) + ")"
-	rewritten, files, err := DescriptionForDispatch(
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
 		t.Context(),
 		db,
 		provider,
@@ -557,9 +584,103 @@ func TestDescriptionForDispatchSkipsOtherTaskFiles(t *testing.T) {
 	assert.Equal(t, markdown, rewritten)
 }
 
+func TestRestoreFileRefsRewritesHMACAndGCSURLs(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Restore", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		Filename:       "shot.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	hmacURL := "https://app.example/api/v1/public/files/" + file.ID.String() + "?expires=1&sig=abc&sp_file=1"
+	gcsURL := "https://storage.googleapis.com/superplane-prod-global/881b70a0-5c9e-47da-a4ca-395f402f3aea/orgs/" +
+		r.Organization.ID.String() + "/workspaces/" + factoryModel.ID.String() + "/tasks/" + order.ID.String() + "/" + file.ID.String() +
+		"?X-Goog-Algorithm=GOOG4-RSA-SHA256&sp_file=1"
+	foreign := uuid.New()
+	foreignURL := "https://app.example/api/v1/public/files/" + foreign.String() + "?expires=1&sig=abc&sp_file=1"
+
+	hmacRestored, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "![shot.png]("+hmacURL+")")
+	require.NoError(t, err)
+	assert.Equal(t, "![shot.png]("+blob.FileRef(file.ID)+")", hmacRestored)
+
+	gcsRestored, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "See ![shot.png]("+gcsURL+")")
+	require.NoError(t, err)
+	assert.Equal(t, "See ![shot.png]("+blob.FileRef(file.ID)+")", gcsRestored)
+	assert.NotContains(t, gcsRestored, "sp_file=1")
+
+	dropped, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "![x]("+foreignURL+")")
+	require.NoError(t, err)
+	assert.NotContains(t, dropped, "sp_file=1")
+	assert.NotContains(t, dropped, blob.FileRef(foreign))
+
+	foreignHost := "https://example.test/" + file.ID.String() + "?sp_file=1"
+	unchanged, err := storedfiles.RestoreFileRefs(db, r.Organization.ID, factoryModel.ID, order.ID, "![shot.png]("+foreignHost+")")
+	require.NoError(t, err)
+	assert.Equal(t, "![shot.png]("+foreignHost+")", unchanged)
+	assert.NotContains(t, unchanged, blob.FileRef(file.ID))
+}
+
+func TestDescriptionForDispatchMintsDescriptionAndSpecRefs(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Dispatch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		Filename:       "shot.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, storedfiles.CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	description := "See ![shot.png](" + blob.FileRef(file.ID) + ")"
+	spec := "# Retry refunds\n\n![shot.png](" + blob.FileRef(file.ID) + ")"
+	combined := description + "\n\nSpec:\n" + spec
+	assert.Contains(t, combined, blob.FileRef(file.ID))
+
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		order.ID,
+		combined,
+		time.Hour,
+	)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	assert.Contains(t, rewritten, files[0].URL)
+	assert.Contains(t, files[0].URL, "sp_file=1")
+	assert.NotContains(t, rewritten, blob.FileRef(file.ID))
+}
+
 func TestDescriptionForDispatchLeavesPlainMarkdown(t *testing.T) {
 	markdown := "No files here"
-	rewritten, files, err := DescriptionForDispatch(
+	rewritten, files, err := storedfiles.DescriptionForDispatch(
 		t.Context(),
 		nil,
 		nil,

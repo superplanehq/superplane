@@ -49,15 +49,15 @@ export const BacklogCatalog: Story = {
 
 export const PhaseCatalog: Story = {
   name: "Phase catalog",
-  render: () => <OpenPicker catalog={catalogForColumn("phase-0")} />,
+  render: () => <OpenPicker catalog={catalogForColumn("phase-0", { allowCustom: true })} />,
 };
 
 export const VerifyCatalog: Story = {
   name: "Verify catalog",
-  render: () => <OpenPicker catalog={catalogForColumn("verify")} takenIds={["discussion"]} />,
+  render: () => <OpenPicker catalog={catalogForColumn("verify", { allowCustom: true })} takenIds={["discussion"]} />,
 };
 
 export const DoneCatalog: Story = {
   name: "Done catalog",
-  render: () => <OpenPicker catalog={catalogForColumn("done")} takenIds={["pr-closure"]} />,
+  render: () => <OpenPicker catalog={catalogForColumn("done", { allowCustom: true })} takenIds={["pr-closure"]} />,
 };

@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import type { UpdateHttpSyntheticCheckConfiguration } from "./types";
+import type { HttpSyntheticCheckPayload, UpdateHttpSyntheticCheckConfiguration } from "./types";
 import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -50,7 +50,7 @@ export const updateHttpSyntheticCheckMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as HttpSyntheticCheckPayload | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };
@@ -76,6 +76,37 @@ export const updateHttpSyntheticCheckMapper: ComponentBaseMapper = {
   },
 };
 
+function requestMetadataItems(request: UpdateHttpSyntheticCheckConfiguration["request"] | undefined): MetadataItem[] {
+  const items: MetadataItem[] = [];
+
+  if (request?.url) {
+    items.push({ icon: "globe", label: truncate(request.url, 50) });
+  }
+
+  if (request?.method) {
+    items.push({ icon: "arrow-right", label: request.method.toUpperCase() });
+  }
+
+  return items;
+}
+
+function scheduleMetadataItems(
+  schedule: UpdateHttpSyntheticCheckConfiguration["schedule"] | undefined,
+): MetadataItem[] {
+  const items: MetadataItem[] = [];
+
+  if (schedule?.locations && schedule.locations.length > 0) {
+    const locationNames = schedule.locations.map((loc) => LOCATION_LABELS[loc] || loc).join(", ");
+    items.push({ icon: "map-pin", label: locationNames });
+  }
+
+  if (schedule?.interval) {
+    items.push({ icon: "clock", label: `Every ${schedule.interval}` });
+  }
+
+  return items;
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as UpdateHttpSyntheticCheckConfiguration;
@@ -85,30 +116,15 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "fingerprint", label: idPreview });
   }
 
-  if (configuration?.request?.url) {
-    const urlPreview = truncate(configuration.request?.url, 50);
-    metadata.push({ icon: "globe", label: urlPreview });
-  }
-
-  if (configuration?.request?.method) {
-    metadata.push({ icon: "arrow-right", label: configuration.request.method.toUpperCase() });
-  }
-
-  if (configuration?.schedule?.locations && configuration.schedule.locations.length > 0) {
-    const locationNames = configuration.schedule.locations.map((loc) => LOCATION_LABELS[loc] || loc).join(", ");
-    metadata.push({ icon: "map-pin", label: locationNames });
-  }
-
-  if (configuration?.schedule?.interval) {
-    metadata.push({ icon: "clock", label: `Every ${configuration.schedule.interval}` });
-  }
+  metadata.push(...requestMetadataItems(configuration?.request));
+  metadata.push(...scheduleMetadataItems(configuration?.schedule));
 
   return metadata;
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

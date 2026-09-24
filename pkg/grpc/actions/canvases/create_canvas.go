@@ -7,20 +7,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -31,47 +27,6 @@ func CreateCanvas(
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
-	gitProvider git.Provider,
-	webhookBaseURL string,
-	organizationID uuid.UUID,
-	name string,
-	description string,
-	factoryID *uuid.UUID,
-	usageService usage.Service,
-) (*pb.CreateCanvasResponse, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
-	}
-
-	return CreateCanvasWithSeedFiles(
-		ctx,
-		registry,
-		encryptor,
-		authService,
-		gitProvider,
-		webhookBaseURL,
-		organizationID,
-		name,
-		description,
-		factoryID,
-		[]models.Node{},
-		[]models.Edge{},
-		usageService,
-		nil,
-	)
-}
-
-// CreateCanvasWithSeedFiles is the variant called by the app install flow. It
-// persists the provided files alongside the canvas's pending repository row so
-// the repository provisioner can commit them as the repo's initial content. A
-// nil/empty seedFiles slice is equivalent to calling CreateCanvas.
-func CreateCanvasWithSeedFiles(
-	ctx context.Context,
-	registry *registry.Registry,
-	encryptor crypto.Encryptor,
-	authService authorization.Authorization,
-	gitProvider git.Provider,
 	webhookBaseURL string,
 	organizationID uuid.UUID,
 	name string,
@@ -79,30 +34,20 @@ func CreateCanvasWithSeedFiles(
 	factoryID *uuid.UUID,
 	nodes []models.Node,
 	edges []models.Edge,
-	usageService usage.Service,
-	seedFiles []models.RepositorySeedFile,
 ) (*pb.CreateCanvasResponse, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
+	}
+
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	createdBy := uuid.MustParse(userID)
-	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
+	createdBy, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to count organization canvases")
-	}
-
-	err = usage.EnsureOrganizationWithinLimits(
-		ctx,
-		usageService,
-		organizationID.String(),
-		&usagepb.OrganizationState{Canvases: int32(canvasCount + 1)},
-		&usagepb.CanvasState{Nodes: int32(len(nodes))},
-	)
-
-	if err != nil {
-		return nil, err
+		return nil, grpcerrors.Unauthenticated(err, "user not authenticated")
 	}
 
 	canvasID := uuid.New()
@@ -151,21 +96,6 @@ func CreateCanvasWithSeedFiles(
 			return err
 		}
 
-		repository, err := canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
-			OrganizationID: organizationID,
-			CanvasID:       canvasID,
-		}))
-
-		if err != nil {
-			return err
-		}
-
-		if len(seedFiles) > 0 {
-			if err := models.CreateRepositorySeedFilesInTransaction(tx, repository.ID, seedFiles); err != nil {
-				return err
-			}
-		}
-
 		//
 		// If this is a canvas creation with no nodes,
 		// nothing else to do here.
@@ -201,7 +131,6 @@ func CreateCanvasWithSeedFiles(
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
-			GitProvider:    gitProvider,
 		})
 
 		if err != nil {
@@ -212,18 +141,14 @@ func CreateCanvasWithSeedFiles(
 	})
 
 	if err != nil {
-		return nil, err
-	}
-
-	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
-		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
+		return nil, classifyCanvasCreateError(err)
 	}
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
 		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
 		if err != nil {
-			return nil, err
+			return nil, classifyCanvasCreateError(err)
 		}
 	}
 
@@ -234,12 +159,24 @@ func CreateCanvasWithSeedFiles(
 
 	proto, err := serializePreparedCanvas(database.DB(ctx), &canvas, liveVersion, user, nil)
 	if err != nil {
-		return nil, err
+		return nil, classifyCanvasCreateError(err)
 	}
 
 	return &pb.CreateCanvasResponse{
 		Canvas: proto,
 	}, nil
+}
+
+func classifyCanvasCreateError(err error) error {
+	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+		return err
+	}
+
+	if grpcerrors.Code(err) == codes.ResourceExhausted {
+		return grpcerrors.ResourceExhausted(err, grpcerrors.StatusMessage(err))
+	}
+
+	return grpcerrors.Internal(err, "failed to create canvas")
 }
 
 func validateCanvasFactoryID(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID) error {

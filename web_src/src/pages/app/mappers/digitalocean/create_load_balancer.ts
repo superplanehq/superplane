@@ -33,7 +33,7 @@ export const createLoadBalancerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -41,16 +41,14 @@ export const createLoadBalancerMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const lb = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const lb = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!lb) return details;
 
-    details["Load Balancer ID"] = lb.id?.toString() || "-";
-    details["Name"] = lb.name || "-";
-    details["IP Address"] = lb.ip || "-";
-    details["Status"] = lb.status || "-";
+    Object.assign(details, loadBalancerIdentityDetails(lb));
 
-    if (lb.region?.name || lb.region?.slug) {
-      details["Region"] = lb.region?.name || lb.region?.slug || "-";
+    const region = lb.region as Record<string, unknown> | undefined;
+    if (region != null && (region.name != null || region.slug != null)) {
+      details["Region"] = region.name != null ? String(region.name) : String(region.slug);
     }
 
     if (Array.isArray(lb.droplet_ids) && lb.droplet_ids.length > 0) {
@@ -65,6 +63,15 @@ export const createLoadBalancerMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function loadBalancerIdentityDetails(lb: Record<string, unknown>): Record<string, string> {
+  return {
+    "Load Balancer ID": lb.id != null ? String(lb.id) : "-",
+    Name: lb.name != null ? String(lb.name) : "-",
+    "IP Address": lb.ip != null ? String(lb.ip) : "-",
+    Status: lb.status != null ? String(lb.status) : "-",
+  };
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

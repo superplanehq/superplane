@@ -40,12 +40,14 @@ var failingConclusions = map[string]bool{
 }
 
 type PullRequestCheck struct {
-	Key        string `json:"key"`
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	Status     string `json:"status"`
-	Conclusion string `json:"conclusion,omitempty"`
-	DetailsURL string `json:"detailsUrl,omitempty"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Conclusion  string `json:"conclusion,omitempty"`
+	Description string `json:"description,omitempty"`
+	Summary     string `json:"summary,omitempty"`
+	DetailsURL  string `json:"detailsUrl,omitempty"`
 }
 
 type waitChecksEvaluation struct {
@@ -81,13 +83,21 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 				status = checkStatusPending
 				conclusion = ""
 			}
+			description := ""
+			summary := ""
+			if run.GetOutput() != nil {
+				description = strings.TrimSpace(run.GetOutput().GetTitle())
+				summary = firstLine(run.GetOutput().GetSummary())
+			}
 			latest[key] = PullRequestCheck{
-				Key:        key,
-				Name:       name,
-				Kind:       checkKindCheckRun,
-				Status:     status,
-				Conclusion: conclusion,
-				DetailsURL: firstNonEmpty(run.GetDetailsURL(), run.GetHTMLURL()),
+				Key:         key,
+				Name:        name,
+				Kind:        checkKindCheckRun,
+				Status:      status,
+				Conclusion:  conclusion,
+				Description: description,
+				Summary:     summary,
+				DetailsURL:  firstNonEmpty(run.GetDetailsURL(), run.GetHTMLURL()),
 			}
 		}
 	}
@@ -115,6 +125,7 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 				Kind:       checkKindStatus,
 				Status:     normalizedStatus,
 				Conclusion: conclusion,
+				Summary:    strings.TrimSpace(status.GetDescription()),
 				DetailsURL: status.GetTargetURL(),
 			}
 		}
@@ -244,6 +255,17 @@ func checkFingerprint(checks []PullRequestCheck) string {
 	}
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
+}
+
+func firstLine(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	if index := strings.IndexAny(trimmed, "\n\r"); index >= 0 {
+		return strings.TrimSpace(trimmed[:index])
+	}
+	return trimmed
 }
 
 func firstNonEmpty(values ...string) string {

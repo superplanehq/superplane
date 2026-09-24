@@ -1,6 +1,9 @@
 package factories
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -20,7 +23,29 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 	if factory.HostedSpendBudgetCents != nil {
 		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
 	}
+	serialized.Planning = serializeFactoryPlanning(factory.Planning())
 	return serialized
+}
+
+func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
+	return &pb.FactoryPlanning{
+		Enabled:        planning.Enabled,
+		Clarity:        planning.Clarity,
+		Confidence:     planning.Confidence,
+		SetupCompleted: planning.SetupCompleted,
+	}
+}
+
+func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanning {
+	if planning == nil {
+		return models.DefaultFactoryPlanning()
+	}
+	return models.FactoryPlanning{
+		Enabled:        planning.GetEnabled(),
+		Clarity:        planning.GetClarity(),
+		Confidence:     planning.GetConfidence(),
+		SetupCompleted: planning.GetSetupCompleted(),
+	}
 }
 
 func serializeFactoryWithLines(
@@ -110,37 +135,53 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 	return result
 }
 
-func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, 0, len(canvases))
+func serializeFactoryAutomations(canvases []models.Canvas) []*pb.Factory_Automation {
+	result := make([]*pb.Factory_Automation, 0, len(canvases))
 	for _, canvas := range canvases {
-		name := canvas.Name
-		description := canvas.Description
-		app := &pb.Factory_App{
-			Id:          canvas.ID.String(),
-			Name:        name,
-			Description: description,
-		}
-		if canvas.CreatedAt != nil {
-			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
-		}
-		if canvas.UpdatedAt != nil {
-			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
-		}
-		result = append(result, app)
+		result = append(result, serializeFactoryAutomation(canvas))
 	}
 	return result
 }
 
-func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
+	automation := &pb.Factory_Automation{
+		Id:          canvas.ID.String(),
+		Name:        canvas.Name,
+		Description: canvas.Description,
+	}
+	if canvas.ColumnKey != nil {
+		automation.ColumnKey = *canvas.ColumnKey
+	}
+	if canvas.CreatedAt != nil {
+		automation.CreatedAt = timestamppb.New(*canvas.CreatedAt)
+	}
+	if canvas.UpdatedAt != nil {
+		automation.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
+	}
+	return automation
+}
+
+func serializeFactoryIntakes(
+	tx *gorm.DB,
+	intakes []models.FactoryIntake,
+	specs map[uuid.UUID]models.LiveCanvasSpec,
+	states map[string]string,
+) []*pb.FactoryIntake {
 	result := make([]*pb.FactoryIntake, len(intakes))
 	for i := range intakes {
-		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+		result[i] = serializeFactoryIntake(tx, &intakes[i], specs[intakes[i].CanvasID], states)
 	}
 	return result
 }
 
-func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+func serializeFactoryIntake(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	spec models.LiveCanvasSpec,
+	states map[string]string,
+) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
+	health := intakeHealth(tx, intake, graph, spec, states)
 
 	serialized := &pb.FactoryIntake{
 		Id:                  intake.ID.String(),
@@ -148,11 +189,15 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 		CanvasId:            intake.CanvasID.String(),
 		Name:                intake.Name(),
 		Source:              serializeFactoryIntakeSource(intake.Source),
-		Settings:            serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
-		Healthy:             graph.Healthy(spec.Edges),
+		Settings:            serializeIntakeSettings(intake.Source, intakeSettingsFromGraph(intake.Source, graph, spec)),
+		Healthy:             health == pb.FactoryIntake_HEALTH_OK,
+		Health:              health,
+		IntegrationId:       graph.TriggerIntegrationID(spec),
+		ResourceId:          graph.TriggerResourceID(spec),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
 		UpdatedAt:           timestamppb.New(intake.UpdatedAt),
 		InitialImportStatus: serializeFactoryIntakeInitialImportStatus(intake.InitialImportStatus),
+		Paused:              intake.Paused(),
 	}
 	if intake.InitialImportItemCount != nil {
 		itemCount := int32(*intake.InitialImportItemCount)
@@ -164,6 +209,35 @@ func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvas
 	}
 
 	return serialized
+}
+
+func intakeIntegrationStates(tx *gorm.DB, orgID uuid.UUID) (map[string]string, error) {
+	states := map[string]string{}
+	if tx == nil || orgID == uuid.Nil {
+		return states, nil
+	}
+
+	integrations, err := models.ListIntegrations(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range integrations {
+		states[integrations[i].ID.String()] = integrations[i].State
+	}
+	return states, nil
+}
+
+func configurationString(value any) string {
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func serializeFactoryIntakeInitialImportStatus(status string) pb.FactoryIntake_InitialImportStatus {
@@ -191,6 +265,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
 	case models.FactoryIntakeSourceProductiveTasks:
 		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
+	case models.FactoryIntakeSourceJiraIssues:
+		return pb.FactoryIntake_SOURCE_JIRA_ISSUES
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -206,6 +282,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
 	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
 		return models.FactoryIntakeSourceProductiveTasks, nil
+	case pb.FactoryIntake_SOURCE_JIRA_ISSUES:
+		return models.FactoryIntakeSourceJiraIssues, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}
@@ -323,14 +401,21 @@ func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID
 	return result
 }
 
+type workOrderUsageView struct {
+	Totals            models.UsageTotals
+	ByModel           []models.UsageByModel
+	ByMachineType     []models.UsageByMachineType
+	ModelsByExecution map[uuid.UUID][]string
+}
+
 func serializeWorkOrder(
 	f *models.Factory,
 	order *models.FactoryWorkOrder,
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
-	usage models.UsageTotals,
+	usage workOrderUsageView,
 ) (*pb.WorkOrder, error) {
-	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
+	serializedDispatches := serializeWorkOrderLineDispatches(dispatches, usage.ModelsByExecution)
 
 	displayKey := ""
 	if f != nil {
@@ -341,6 +426,9 @@ func serializeWorkOrder(
 	if err != nil {
 		return nil, err
 	}
+
+	totalCostCents := usage.Totals.CostCents()
+	byModel, byMachineType := serializeWorkOrderUsageBreakdown(usage.ByModel, usage.ByMachineType, totalCostCents)
 
 	return &pb.WorkOrder{
 		Id:                   order.ID.String(),
@@ -355,13 +443,123 @@ func serializeWorkOrder(
 		Assignees:            serializeWorkOrderAssignees(order.Assignees),
 		LineDispatches:       serializedDispatches,
 		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
-		TotalTokens:          usage.TotalTokens,
-		TotalCostCents:       usage.CostCents(),
-		TotalDurationSeconds: usage.DurationSeconds,
+		TotalTokens:          usage.Totals.TotalTokens,
+		TotalCostCents:       totalCostCents,
+		TotalDurationSeconds: usage.Totals.DurationSeconds,
+		UsageByModel:         byModel,
+		UsageByMachineType:   byMachineType,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
+}
+
+func serializeWorkOrderSummary(
+	f *models.Factory,
+	order *models.FactoryWorkOrder,
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	createdByAutomation *factory.AutomationRef,
+	usage workOrderUsageView,
+) (*pb.WorkOrderSummary, error) {
+	statusNotes, err := serializeWorkOrderStatusNotes(order)
+	if err != nil {
+		return nil, err
+	}
+
+	displayKey := ""
+	if f != nil {
+		displayKey = f.WorkOrderKey(order.Number)
+	}
+
+	return &pb.WorkOrderSummary{
+		Id:                   order.ID.String(),
+		Title:                order.Title,
+		Description:          order.Description,
+		Number:               order.Number,
+		Key:                  displayKey,
+		State:                serializeWorkOrderState(order.State),
+		Result:               serializeWorkOrderResult(order.Result),
+		CreatedAt:            timestamppb.New(order.CreatedAt),
+		UpdatedAt:            timestamppb.New(order.UpdatedAt),
+		Assignees:            serializeWorkOrderAssignees(order.Assignees),
+		LineDispatches:       serializeWorkOrderLineDispatches(dispatches, nil),
+		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
+		TotalTokens:          usage.Totals.TotalTokens,
+		TotalCostCents:       usage.Totals.CostCents(),
+		TotalDurationSeconds: usage.Totals.DurationSeconds,
+		StatusNotes:          statusNotes,
+		Origin:               serializeWorkOrderOrigin(order),
+	}, nil
+}
+
+const microsPerCent = 10_000
+
+func serializeWorkOrderUsageBreakdown(
+	byModel []models.UsageByModel,
+	byMachine []models.UsageByMachineType,
+	totalCents int64,
+) ([]*pb.UsageByModel, []*pb.UsageByMachineType) {
+	micros := make([]int64, 0, len(byModel)+len(byMachine))
+	for _, row := range byModel {
+		micros = append(micros, row.CostMicros)
+	}
+	for _, row := range byMachine {
+		micros = append(micros, row.CostMicros)
+	}
+	cents := allocateCostCents(micros, totalCents)
+
+	modelsOut := make([]*pb.UsageByModel, 0, len(byModel))
+	for i, row := range byModel {
+		modelsOut = append(modelsOut, &pb.UsageByModel{
+			Provider:    row.Provider,
+			Model:       row.Model,
+			TotalTokens: row.TotalTokens,
+			CostCents:   cents[i],
+		})
+	}
+	machinesOut := make([]*pb.UsageByMachineType, 0, len(byMachine))
+	offset := len(byModel)
+	for i, row := range byMachine {
+		machinesOut = append(machinesOut, &pb.UsageByMachineType{
+			MachineType:     row.MachineType,
+			DurationSeconds: row.DurationSeconds,
+			CostCents:       cents[offset+i],
+		})
+	}
+	return modelsOut, machinesOut
+}
+
+type costRemainder struct {
+	index     int
+	remainder int64
+}
+
+func allocateCostCents(micros []int64, totalCents int64) []int64 {
+	cents := make([]int64, len(micros))
+	remainders := make([]costRemainder, 0, len(micros))
+	var sum int64
+	for i, value := range micros {
+		if value < 0 {
+			value = 0
+		}
+		cents[i] = value / microsPerCent
+		sum += cents[i]
+		remainders = append(remainders, costRemainder{index: i, remainder: value % microsPerCent})
+	}
+	gap := totalCents - sum
+	if gap <= 0 {
+		return cents
+	}
+	sort.SliceStable(remainders, func(i, j int) bool {
+		return remainders[i].remainder > remainders[j].remainder
+	})
+	for i := 0; i < int(gap) && i < len(remainders); i++ {
+		if remainders[i].remainder == 0 {
+			break
+		}
+		cents[remainders[i].index]++
+	}
+	return cents
 }
 
 func serializeWorkOrderSourceRunID(order *models.FactoryWorkOrder) string {
@@ -462,15 +660,21 @@ func serializeWorkOrderCreator(
 	}
 }
 
-func serializeWorkOrderLineDispatches(dispatches []models.FactoryWorkOrderLineDispatchRecord) []*pb.WorkOrderLineDispatch {
+func serializeWorkOrderLineDispatches(
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	modelsByExecution map[uuid.UUID][]string,
+) []*pb.WorkOrderLineDispatch {
 	result := make([]*pb.WorkOrderLineDispatch, 0, len(dispatches))
 	for _, dispatch := range dispatches {
-		result = append(result, serializeWorkOrderLineDispatch(dispatch))
+		result = append(result, serializeWorkOrderLineDispatch(dispatch, modelsByExecution))
 	}
 	return result
 }
 
-func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatchRecord) *pb.WorkOrderLineDispatch {
+func serializeWorkOrderLineDispatch(
+	dispatch models.FactoryWorkOrderLineDispatchRecord,
+	modelsByExecution map[uuid.UUID][]string,
+) *pb.WorkOrderLineDispatch {
 	item := &pb.WorkOrderLineDispatch{
 		Id: dispatch.ID.String(),
 		Line: &pb.LineRef{
@@ -481,7 +685,7 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 		State:          serializeLineDispatchState(dispatch.State),
 		Result:         serializeLineDispatchResult(dispatch.Result),
 		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
-		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions),
+		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, modelsByExecution),
 		Model:          dispatch.Model,
 	}
 	if dispatch.FinishedAt != nil {
@@ -534,15 +738,18 @@ func serializeLineDispatchResult(result string) pb.WorkOrderLineDispatch_Result 
 	}
 }
 
-func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionRecord) []*pb.WorkOrderExecution {
+func serializeWorkOrderExecutions(
+	executions []models.FactoryWorkOrderExecutionRecord,
+	modelsByExecution map[uuid.UUID][]string,
+) []*pb.WorkOrderExecution {
 	result := make([]*pb.WorkOrderExecution, 0, len(executions))
 	for _, execution := range executions {
-		result = append(result, serializeWorkOrderExecution(execution))
+		result = append(result, serializeWorkOrderExecution(execution, modelsByExecution[execution.ID]))
 	}
 	return result
 }
 
-func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
+func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord, models []string) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
 		Id:              execution.ID.String(),
 		Step:            execution.StepName,
@@ -554,6 +761,7 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 		TotalTokens:     execution.TotalTokens,
 		CostCents:       execution.CostCents,
 		DurationSeconds: execution.DurationSeconds,
+		Models:          models,
 	}
 	if execution.RunID != nil {
 		runRef := &pb.WorkOrderExecution_RunRef{

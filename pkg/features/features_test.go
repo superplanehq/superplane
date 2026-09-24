@@ -20,7 +20,15 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactorySentryIntake, f.ID)
 		assert.Equal(t, "Factory Sentry Intake", f.Label)
-		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
+		assert.Equal(t, "Add Sentry intake from the Backlog column", f.Description)
+	})
+
+	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryJiraIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
+		assert.Equal(t, "Factory Jira Intake", f.Label)
+		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
@@ -39,20 +47,38 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Show the in-progress workspace Models settings page", f.Description)
 	})
 
-	t.Run("known id returns draft start model feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryDraftStartModel)
+	t.Run("known id returns organization byok feature", func(t *testing.T) {
+		f, ok := Get(FeatureOrganizationBYOK)
 		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryDraftStartModel, f.ID)
-		assert.Equal(t, "Draft Start Model", f.Label)
-		assert.Equal(t, "Show a model selector next to Start on a draft task", f.Description)
+		assert.Equal(t, FeatureOrganizationBYOK, f.ID)
+		assert.Equal(t, "Organization BYOK", f.Label)
+		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
 	})
 
-	t.Run("known id returns create with agent feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryCreateWithAgent)
+	t.Run("known id returns custom automations feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryCustomAutomations)
 		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryCreateWithAgent, f.ID)
-		assert.Equal(t, "Create with an Agent", f.Label)
-		assert.Equal(t, "Create and refine factory tasks with an agent", f.Description)
+		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
+		assert.Equal(t, "Custom Automations", f.Label)
+		assert.Equal(t, "Add a blank custom automation to a board column", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
+	t.Run("known id returns workspace agent resources feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceAgentResources)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceAgentResources, f.ID)
+		assert.Equal(t, "Agent Resources", f.Label)
+		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
+	})
+
+	t.Run("known id returns pull request merge feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryPullRequestMerge)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryPullRequestMerge, f.ID)
+		assert.Equal(t, "Pull Request Merge", f.Label)
+		assert.Equal(t, "Show the Mergeable chip on task cards and the Merge button on pull request review", f.Description)
+		assert.Nil(t, f.Released)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -71,10 +97,14 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
+	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
-	assert.True(t, Exists(FeatureFactoryDraftStartModel))
-	assert.True(t, Exists(FeatureFactoryCreateWithAgent))
+	assert.True(t, Exists(FeatureOrganizationBYOK))
+	assert.True(t, Exists(FeatureFactoryCustomAutomations))
+	assert.True(t, Exists(FeatureWorkspaceAgentResources))
+	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
+	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

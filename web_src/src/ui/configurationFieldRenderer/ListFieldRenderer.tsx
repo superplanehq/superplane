@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
-import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { listFieldItemTitle } from "./listFieldItemTitle";
@@ -201,16 +200,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       return (
         <DayInYearFieldRenderer
           field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "day-in-year" }}
-          value={item}
-          onChange={(val) => updateItem(index, val)}
-        />
-      );
-    }
-
-    if (itemDefinition?.type === "repository-file") {
-      return (
-        <RepositoryFileFieldRenderer
-          field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "repository-file" }}
           value={item}
           onChange={(val) => updateItem(index, val)}
         />

@@ -11,8 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/git/inmemory"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -57,7 +55,6 @@ type ResourceRegistry struct {
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry
-	GitProvider  git.Provider
 }
 
 func (r *ResourceRegistry) Close() {}
@@ -78,7 +75,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
-	_ = models.LoadCurrentPriceBook(database.Conn())
+	restoreSeedUsagePriceBooks(t)
 
 	encryptor := crypto.NewNoOpEncryptor()
 	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
@@ -91,7 +88,6 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		Encryptor:   encryptor,
 		Registry:    registry,
 		AuthService: AuthService(t),
-		GitProvider: inmemory.NewProvider(),
 	}
 
 	//
@@ -691,39 +687,6 @@ func VerifyNodeRequestCount(t require.TestingT, workflowID uuid.UUID, expected i
 	require.Equal(t, expected, int(actual))
 }
 
-func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string, register bool) (*models.Canvas, *models.Repository) {
-	t.Helper()
-
-	canvas, _ := CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
-		OrganizationID: canvas.OrganizationID,
-		CanvasID:       canvas.ID,
-	})
-
-	_, err := canvas.CreatePendingRepository(r.GitProvider.Name(), repoID)
-	require.NoError(t, err)
-
-	if register {
-		_, err := r.GitProvider.CreateRepository(t.Context(), repoID)
-		require.NoError(t, err)
-	}
-
-	repository, err := models.FindRepository(r.Organization.ID, canvas.ID)
-	require.NoError(t, err)
-
-	switch status {
-	case models.RepositoryStatusReady:
-		require.NoError(t, repository.MarkReady(database.Conn()))
-	case models.RepositoryStatusError:
-		require.NoError(t, repository.MarkError(database.Conn()))
-	}
-
-	repository, err = models.FindRepository(r.Organization.ID, canvas.ID)
-	require.NoError(t, err)
-
-	return canvas, repository
-}
-
 func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID string) {
 	var existingNode models.CanvasNode
 	err := database.Conn().
@@ -752,4 +715,14 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	}
 
 	require.NoError(t, database.Conn().Create(&node).Error)
+}
+
+var seedUsagePriceBookVersions = []string{"2026-09-23.1"}
+
+func restoreSeedUsagePriceBooks(t require.TestingT) {
+	db := database.Conn()
+	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
+	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
+	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-23.1"))
+	require.NoError(t, models.LoadCurrentPriceBook(db))
 }

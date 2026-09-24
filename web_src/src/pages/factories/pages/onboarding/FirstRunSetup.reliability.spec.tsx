@@ -76,6 +76,15 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     finish: vi.fn(),
     provisionedDestination: null,
     githubOwner: undefined,
+    jiraIntegrationId: "",
+    jiraProjectId: "",
+    setJiraProjectId: vi.fn(),
+    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
+    setJiraCompletion: vi.fn(),
+    jiraProjects: [],
+    jiraProjectsLoading: false,
+    jiraProjectsError: false,
+    retryJiraProjects: vi.fn(),
     ...overrides,
   };
 }

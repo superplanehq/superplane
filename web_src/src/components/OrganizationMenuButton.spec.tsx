@@ -16,7 +16,6 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({ data: null }),
-  useOrganizationUsage: () => ({ data: null, error: null }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -37,10 +36,6 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
-}));
-
-vi.mock("@/lib/env", () => ({
-  isUsagePageForced: () => false,
 }));
 
 vi.mock("@/posthog", () => ({

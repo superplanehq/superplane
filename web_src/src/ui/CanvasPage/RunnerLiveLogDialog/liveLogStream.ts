@@ -1,3 +1,4 @@
+import { parseAgentActivityRecordText, type AgentActivityRecord } from "@/lib/agentActivity";
 import {
   applyPromptUsageRecord,
   emptyPromptUsageState,
@@ -8,7 +9,7 @@ import {
 } from "@/lib/agentRunTelemetry";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-type LiveLogRecordEnvelope = {
+export type LiveLogRecordEnvelope = {
   type?: string;
   text?: string;
   kind?: string;
@@ -21,6 +22,23 @@ type LiveLogRecordEnvelope = {
   status?: "passed" | "failed";
   duration_ms?: number;
   started_at?: number;
+  schema_version?: number;
+  event_id?: string;
+  activity_id?: string;
+  sequence?: number;
+  timestamp?: string;
+  provider?: string;
+  channel?: string;
+  content_id?: string;
+  tool_id?: string;
+  name?: string;
+  input?: string;
+  partial_json?: string;
+  complete?: boolean;
+  output_stream?: string;
+  exit_code?: number;
+  signal?: string;
+  truncated?: boolean;
 };
 
 type LiveLogSessionResponse = {
@@ -31,12 +49,19 @@ type LiveLogSessionResponse = {
 
 export type LiveLogStreamHandlers = {
   onOpen?: () => void;
+  onRecord?: (record: AgentActivityRecord) => void;
   onLogLine: (text: string, commandIndex?: number) => void;
   onStreamError: (message: string) => void;
   onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
-  onToolStart?: (kind: string, text: string, id?: string, turn?: number) => void;
-  onToolEnd?: (status: "passed" | "failed", durationMs: number, id?: string, turn?: number) => void;
+  onToolStart?: (kind: string, text: string, id?: string, turn?: number, commandIndex?: number) => void;
+  onToolEnd?: (
+    status: "passed" | "failed",
+    durationMs: number,
+    id?: string,
+    turn?: number,
+    commandIndex?: number,
+  ) => void;
   onTurn?: (turn: number, usage: Record<string, number>, message?: string) => void;
 };
 
@@ -112,6 +137,11 @@ function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamH
     handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message);
     return true;
   }
+  const nestedActivity = parseAgentActivityRecordText(rec.text);
+  if (nestedActivity) {
+    handlers.onRecord?.(nestedActivity);
+    return true;
+  }
   if (typeof rec.index === "number") {
     handlers.onLogLine(rec.text, rec.index);
   } else {
@@ -151,6 +181,7 @@ function dispatchToolStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogSt
     typeof rec.text === "string" ? rec.text : "",
     typeof rec.id === "string" ? rec.id : undefined,
     typeof rec.turn === "number" ? rec.turn : undefined,
+    typeof rec.index === "number" ? rec.index : undefined,
   );
   return true;
 }
@@ -168,6 +199,7 @@ function dispatchToolEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStre
     rec.duration_ms,
     typeof rec.id === "string" ? rec.id : undefined,
     typeof rec.turn === "number" ? rec.turn : undefined,
+    typeof rec.index === "number" ? rec.index : undefined,
   );
   return true;
 }
@@ -198,6 +230,10 @@ function dispatchCmdEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStrea
 }
 
 function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
+  if (rec.schema_version === 2) {
+    handlers.onRecord?.(rec);
+    return;
+  }
   if (dispatchLineRecord(rec, handlers)) {
     return;
   }

@@ -16,6 +16,7 @@ const (
 	FactoryIntakeSourceSentryExceptions   = "sentry-exceptions"
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
 	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
+	FactoryIntakeSourceJiraIssues         = "jira-issues"
 
 	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
 	FactoryIntakeInitialImportStatusPending     = "pending"
@@ -38,6 +39,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceSentryExceptions,
 	FactoryIntakeSourcePagerDutyIncidents,
 	FactoryIntakeSourceProductiveTasks,
+	FactoryIntakeSourceJiraIssues,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,
@@ -51,6 +53,7 @@ type FactoryIntake struct {
 	Source                 string
 	InitialImportStatus    string
 	InitialImportItemCount *int
+	PausedAt               *time.Time
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 
@@ -72,6 +75,10 @@ func (i *FactoryIntake) Name() string {
 		return ""
 	}
 	return i.Canvas.Name
+}
+
+func (i *FactoryIntake) Paused() bool {
+	return i.PausedAt != nil
 }
 
 func MapFactoryIntakeCanvasUniqueConstraintError(err error) error {
@@ -124,6 +131,24 @@ func (i *FactoryIntake) FailInitialImport(tx *gorm.DB) error {
 
 func (i *FactoryIntake) SkipInitialImport(tx *gorm.DB) error {
 	return i.updateInitialImport(tx, FactoryIntakeInitialImportStatusSkipped, nil)
+}
+
+func (i *FactoryIntake) SetPaused(tx *gorm.DB, paused bool) error {
+	now := time.Now()
+	var pausedAt *time.Time
+	if paused {
+		pausedAt = &now
+	}
+	if err := tx.Model(i).Select("paused_at", "updated_at").Updates(map[string]any{
+		"paused_at":  pausedAt,
+		"updated_at": now,
+	}).Error; err != nil {
+		return err
+	}
+
+	i.PausedAt = pausedAt
+	i.UpdatedAt = now
+	return nil
 }
 
 func (i *FactoryIntake) updateInitialImport(tx *gorm.DB, status string, itemCount *int) error {

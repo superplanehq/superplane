@@ -58,26 +58,18 @@ export interface CanvasAppFixture {
   executionsByEventId?: Record<string, { executions?: unknown[] }>;
   /** GET /api/v1/canvases/{canvasId}/memory (real API returns `{items: []}`) */
   memory?: { items?: unknown[] };
-  /** GET /api/v1/canvases/{canvasId}/repository/file?path=console.yaml */
+  /** GET /api/v1/canvases/{canvasId}/file?path=console.yaml */
   consoleYaml?: string;
   /**
-   * Extra repository file bodies keyed by path (e.g. `README.md`).
+   * Extra file bodies keyed by path (e.g. `README.md`).
    * `console.yaml` still prefers `consoleYaml` when both are set.
    */
   repositoryFileContents?: Record<string, string>;
-  /**
-   * Paths returned by GET .../repository/files. Defaults to the standard
-   * app-repo trio (`README.md`, `canvas.yaml`, `console.yaml`) plus any
-   * keys from `repositoryFileContents`.
-   */
-  repositoryFilePaths?: string[];
   /** GET /api/v1/agents/canvases/{canvasId}/chat */
   agentChat?: { chat?: Record<string, unknown> };
   /** GET /api/v1/agents/chats/{chatId}/messages */
   agentMessages?: { messages?: Array<Record<string, unknown>>; hasMore?: boolean };
 }
-
-const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml"] as const;
 
 const capturedFixture = defaultRaw as CanvasAppFixture;
 
@@ -279,7 +271,16 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re("/api/v1/triggers"), resolve: () => ({ json: fixture.triggers ?? { triggers: [] } }) },
     { pattern: re("/api/v1/actions"), resolve: () => ({ json: fixture.actions ?? { actions: [] } }) },
     { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets ?? { widgets: [] } }) },
-    { pattern: re("/api/v1/integrations"), resolve: () => ({ json: fixture.integrations ?? { integrations: [] } }) },
+    {
+      pattern: re("/api/v1/integrations"),
+      resolve: () => {
+        const payload =
+          fixture.integrations && typeof fixture.integrations === "object"
+            ? fixture.integrations
+            : { integrations: [] };
+        return { json: { githubAppConfigured: true, ...payload } };
+      },
+    },
     { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
 
     // Draft-version listing must stay empty (no open drafts); every other version
@@ -369,31 +370,9 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     // Real API shape is `{items: []}`; some legacy fixtures used `{memory: []}`
     // which no widget ever read successfully — normalize on `items` here.
     { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: fixture.memory ?? { items: [] } }) },
-    // Files tab needs a ready repository before it will render the tree.
-    // Without this, `useCanvasRepository` returns `undefined` and TanStack
-    // Query surfaces `["canvases","repository",…] data is undefined`.
     {
-      pattern: re(`${CANVAS}/repository/files`),
-      resolve: () => ({
-        json: {
-          files: resolveRepositoryFilePaths(fixture).map((path) => ({ path })),
-        },
-      }),
-    },
-    {
-      pattern: re(`${CANVAS}/repository/file`),
+      pattern: re(`${CANVAS}/file`),
       resolve: (_m, url) => ({ text: resolveRepositoryFileContent(fixture, url.searchParams.get("path")) }),
-    },
-    {
-      pattern: re(`${CANVAS}/repository`),
-      resolve: () => ({
-        json: {
-          repository: {
-            metadata: { canvasId: fixture.canvasId },
-            status: { state: "STATE_READY", headSha: "storybook-fixture-head" },
-          },
-        },
-      }),
     },
     { pattern: re(CANVAS), resolve: () => ({ json: canvasDetailResponse(fixture) }) },
     { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
@@ -441,7 +420,6 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     },
 
     { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
-    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
@@ -600,18 +578,6 @@ function filterRuns(runs: Array<Record<string, unknown>>, url: URL): Array<Recor
     }
     return true;
   });
-}
-
-function resolveRepositoryFilePaths(fixture: CanvasAppFixture): string[] {
-  if (fixture.repositoryFilePaths?.length) {
-    return [...fixture.repositoryFilePaths];
-  }
-
-  const paths = new Set<string>(DEFAULT_REPOSITORY_FILE_PATHS);
-  for (const path of Object.keys(fixture.repositoryFileContents ?? {})) {
-    paths.add(path);
-  }
-  return Array.from(paths).sort();
 }
 
 function resolveRepositoryFileContent(fixture: CanvasAppFixture, path: string | null): string {

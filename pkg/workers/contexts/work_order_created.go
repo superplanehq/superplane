@@ -15,19 +15,35 @@ import (
 )
 
 // EmitWorkOrderCreated fans a new work order out to every On Work Order
-// trigger in the factory. Failures are logged: the work order already exists,
-// and a missed score can be retried by creating the item again.
+// trigger in the factory. When Planning is off, the Backlog canvas is
+// skipped so no planning or analysis run starts. Failures are logged:
+// the work order already exists, and a missed score can be retried by
+// creating the item again.
 func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
 	if factoryModel == nil || order == nil {
 		return
 	}
 
-	if err := emitWorkOrderCreated(tx, factoryModel, order); err != nil {
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil); err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
 	}
 }
 
-func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) error {
+func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) error {
+	if factoryModel == nil || order == nil || canvasID == uuid.Nil {
+		return nil
+	}
+	refinementEnabled := true
+	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled)
+}
+
+func emitWorkOrderCreated(
+	tx *gorm.DB,
+	factoryModel *models.Factory,
+	order *models.FactoryWorkOrder,
+	onlyCanvas uuid.UUID,
+	refinementEnabledOverride *bool,
+) error {
 	canvases, err := factoryModel.ListCanvases(tx)
 	if err != nil {
 		return err
@@ -51,12 +67,22 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return err
 	}
 
-	payload := workOrderCreatedPayload(tx, order)
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	payload := workOrderCreatedPayloadWithRefinement(tx, order, &refinementEnabled)
 	emitted := []models.CanvasEvent{}
 
 	for i := range live {
+		if onlyCanvas != uuid.Nil && live[i].ID != onlyCanvas {
+			continue
+		}
 		spec, ok := specs[live[i].ID]
 		if !ok {
+			continue
+		}
+		if !refinementEnabled && models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
 			continue
 		}
 		nodeID := onWorkOrderNodeID(spec)
@@ -87,9 +113,17 @@ func emitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 }
 
 func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
+	return workOrderCreatedPayloadWithRefinement(tx, order, nil)
+}
+
+func workOrderCreatedPayloadWithRefinement(
+	tx *gorm.DB,
+	order *models.FactoryWorkOrder,
+	refinementEnabledOverride *bool,
+) map[string]any {
 	description := order.Description
 	filePayloads := []any{}
-	markdown, files, err := storedfiles.DescriptionForDispatch(
+	_, files, err := storedfiles.DescriptionForDispatch(
 		context.Background(),
 		tx,
 		blob.Current(),
@@ -102,7 +136,6 @@ func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[st
 	if err != nil {
 		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
 	} else {
-		description = markdown
 		for _, file := range files {
 			filePayloads = append(filePayloads, file.Map())
 		}
@@ -129,7 +162,23 @@ func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[st
 		workOrder["origin"] = origin
 	}
 
-	return map[string]any{"workOrder": workOrder}
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	return map[string]any{
+		"workOrder": workOrder,
+		models.WorkOrderCreatedRefinementEnabledDataKey: refinementEnabled,
+	}
+}
+
+func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) bool {
+	factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to snapshot Planning settings for work order %s", order.ID)
+		return false
+	}
+	return factoryModel.PlanningEnabled
 }
 
 func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {

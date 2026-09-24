@@ -193,15 +193,11 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		if listErr != nil {
 			return listErr
 		}
-		if err := s.refuseAccountDeleteGuards(r, tx, account, users); err != nil {
+		if err := s.refuseAccountDeleteGuards(tx, account); err != nil {
 			return err
 		}
 		return account.SoftDelete(tx, time.Now())
 	})
-	if errors.Is(err, models.ErrAccountDeleteLastUncreatedOwner) {
-		http.Error(w, "Transfer ownership of organizations you did not create before you delete this account.", http.StatusConflict)
-		return
-	}
 	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
 		http.Error(w, "Promote another installation admin before you delete this account.", http.StatusConflict)
 		return
@@ -220,41 +216,18 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account *models.Account, users []models.User) error {
-	if account.IsInstallationAdmin() {
-		count, err := models.CountActiveInstallationAdmins(tx)
-		if err != nil {
-			return err
-		}
-		if count <= 1 {
-			return models.ErrAccountDeleteLastInstallationAdmin
-		}
+func (s *Server) refuseAccountDeleteGuards(tx *gorm.DB, account *models.Account) error {
+	if !account.IsInstallationAdmin() {
+		return nil
 	}
 
-	for _, user := range users {
-		organization, err := models.FindOrganizationByIDInTransaction(tx, user.OrganizationID.String())
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if organization.CreatedByAccountID != nil && *organization.CreatedByAccountID == account.ID {
-			continue
-		}
-
-		if !user.IsOwner {
-			continue
-		}
-
-		if err := models.RefuseIfLastOrganizationOwner(tx, organization.ID, user.ID); err != nil {
-			if errors.Is(err, models.ErrLastOrganizationOwner) {
-				return models.ErrAccountDeleteLastUncreatedOwner
-			}
-			return err
-		}
+	count, err := models.CountActiveInstallationAdmins(tx)
+	if err != nil {
+		return err
 	}
-
+	if count <= 1 {
+		return models.ErrAccountDeleteLastInstallationAdmin
+	}
 	return nil
 }
 

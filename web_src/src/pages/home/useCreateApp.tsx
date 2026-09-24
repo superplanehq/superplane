@@ -1,19 +1,15 @@
 import { useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { showErrorToast } from "@/lib/toast";
+import { useCreateCanvas } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { PLACEHOLDER_NODE_CONTEXT_KEY, setAgentBootContext } from "@/lib/agentBootContext";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { appPath } from "@/lib/appPaths";
-import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
-import type { CanvasFolderData } from "./types";
 
 interface UseCreateAppOptions {
-  folder?: CanvasFolderData;
   onCreated?: () => void;
 }
 
@@ -25,27 +21,19 @@ function applyBlankAppBootContext(canvasId: string) {
   sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
 }
 
-export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
+export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
   const { canAct } = usePermissions();
   const createCanvasMutation = useCreateCanvas(organizationId || "");
-  const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId || "");
   const { mutateAsync: createCanvas } = createCanvasMutation;
-  const { mutateAsync: updateCanvasFolderMembership } = updateCanvasFolderMembershipMutation;
 
   const canCreateCanvases = canAct("canvases", "create");
-  const canUpdateCanvases = canAct("canvases", "update");
-  const isSaving = createCanvasMutation.isPending || updateCanvasFolderMembershipMutation.isPending;
+  const isSaving = createCanvasMutation.isPending;
 
   const createApp = useCallback(
     async (name: string) => {
       if (!organizationId || !canCreateCanvases || isSaving) {
-        return;
-      }
-
-      if (folder && !canUpdateCanvases) {
-        showErrorToast("You don't have permission to update canvases.");
         return;
       }
 
@@ -58,33 +46,15 @@ export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
         const canvasId = result?.data?.canvas?.metadata?.id;
         if (!canvasId) return;
 
-        if (folder) {
-          try {
-            await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
-          } catch (error) {
-            showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-          }
-        }
-
         onCreated?.();
         applyBlankAppBootContext(canvasId);
         navigate(appPath(organizationId, canvasId, "?edit=1"));
       } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
+        showErrorToast(getApiErrorMessage(error, "Failed to create app"));
         throw error;
       }
     },
-    [
-      canCreateCanvases,
-      canUpdateCanvases,
-      createCanvas,
-      folder,
-      isSaving,
-      navigate,
-      onCreated,
-      organizationId,
-      updateCanvasFolderMembership,
-    ],
+    [canCreateCanvases, createCanvas, isSaving, navigate, onCreated, organizationId],
   );
 
   return {

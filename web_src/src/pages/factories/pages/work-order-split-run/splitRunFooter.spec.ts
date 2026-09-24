@@ -8,6 +8,7 @@ import {
   doneFooterForStatus,
   rerunStartStepIndex,
   splitRunCloseNeedsConfirm,
+  splitRunDecisionTone,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
 
@@ -33,40 +34,25 @@ const DRAFT_NOTE = {
   text: "From GitHub issue PAY-842. Confidence 5/5.",
 };
 
-const BACK_TO_DRAFT = {
-  id: "back-to-draft",
-  kind: "back-to-draft",
-  label: "To Backlog",
-  emphasis: "quiet",
-  icon: "undo-2",
-};
 const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const ARCHIVE = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
-const REFINE = {
-  id: "refine",
-  kind: "refine",
-  label: "Refine",
-  emphasis: "quiet",
-  icon: "sparkles",
-  tooltip: "Ask an agent to update this task.",
-};
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 
 describe("buildSplitRunFooter", () => {
-  it("keeps a draft note with Refine, Archive, and Start", () => {
+  it("keeps a draft note with Archive and Start", () => {
     expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
       kind: "draft",
       sentence: "This task is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
       attentionCard: true,
-      actions: [REFINE, ARCHIVE, START],
+      actions: [ARCHIVE, START],
     });
   });
 
-  it("tells a draft is under analysis and drops Archive", () => {
+  it("tells a draft is under analysis and keeps Archive", () => {
     const footer = buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE, isAnalyzing: true });
 
     expect(footer).toEqual({
@@ -77,9 +63,58 @@ describe("buildSplitRunFooter", () => {
         text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
       },
       attentionCard: true,
-      actions: [REFINE, START],
+      actions: [ARCHIVE, START],
     });
-    expect(footer.actions).not.toContainEqual(expect.objectContaining({ kind: "archive" }));
+  });
+
+  it("keeps Start available when Clarity is 2 or lower", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 1, confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("This task is not ready to start");
+    expect(footer.note?.text).toBe("The task is not clear enough. Tell the agent more in the chat.");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(footer.actions.find((action) => action.kind === "start")).toEqual(START);
+    expect(footer.clarityScore).toBe(1);
+    expect(footer.confidenceScore).toBe(5);
+    expect(splitRunDecisionTone(footer)).toBe("draft-blocked");
+  });
+
+  it("warns about agent fit when Confidence is 2 or lower", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 5, confidenceScore: 2 });
+
+    expect(footer.note?.headline).toBe("Review before you start");
+    expect(footer.note?.text).toBe("An agent may need steering. Start if you accept the risk, or split the work.");
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
+  });
+
+  it("warns before Start when either score is 3", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 3, confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("Review the plan before you start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
+  });
+
+  it("invites Start when both scores are 4 or 5", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 4, confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("This task is ready to start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(splitRunDecisionTone(footer)).toBe("draft-ready");
+  });
+
+  it("scores an intake draft on Confidence alone", () => {
+    expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 5 }).note?.headline).toBe(
+      "This task is ready to start",
+    );
+    expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 1 }).note?.headline).toBe("Review before you start");
+  });
+
+  it("keeps Archive after analysis writes a score", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", isAnalyzing: true, clarityScore: 4, confidenceScore: 4 });
+
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(footer.note?.headline).toBe("This task is ready to start");
   });
 
   it("keeps no close actions on a running order", () => {
@@ -114,7 +149,7 @@ describe("buildSplitRunFooter", () => {
     ]);
   });
 
-  it("keeps a waiting note on the decision strip with To Backlog, Reject, and Approve", () => {
+  it("keeps a waiting note on the decision strip with Reject and Approve", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
     expect(footer.attentionCard).toBe(true);
@@ -124,33 +159,28 @@ describe("buildSplitRunFooter", () => {
       sourceName: "PR Closure",
       cta: PR_NOTE.cta,
     });
-    expect(footer.sentence).toBe("This task needs attention.");
-    expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, APPROVE]);
+    expect(footer.sentence).toBe("This task is waiting.");
+    expect(footer.actions).toEqual([REJECT, APPROVE]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
-  it("uses the default waiting note when a waiting order has no run note", () => {
+  it("omits the decision strip when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
-      sentence: "This task needs attention.",
-      note: {
-        headline: "This task needs a decision",
-        text: "Every automation finished. This task is ready to complete.",
-      },
-      attentionCard: true,
-      actions: [BACK_TO_DRAFT, REJECT, APPROVE],
+      sentence: "This task is waiting.",
+      actions: [],
     });
   });
 
   it("hides the decision strip while a waiting order is still running a follow-up", () => {
     expect(buildSplitRunFooter({ kind: "waiting", decision: false })).toEqual({
       kind: "waiting",
-      sentence: "This task needs attention.",
+      sentence: "This task is waiting.",
       actions: [],
     });
   });
 
-  it("treats a stopped open implement as To Backlog, Reject, and Rerun", () => {
+  it("treats a stopped open implement as Reject and Rerun", () => {
     const footer = buildSplitRunFooter({ kind: "stopped" });
 
     expect(footer.attentionCard).toBe(true);
@@ -158,9 +188,9 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.text).toBe("This automation did not finish. This task still needs a decision.");
     expect(footer.note?.cta).toBeUndefined();
     expect(footer.note?.actor).toBeUndefined();
-    expect(footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
-    expect(footer.actions[0]?.icon).toBe("undo-2");
-    expect(footer.actions.map((action) => action.kind)).toEqual(["back-to-draft", "reject", "rerun"]);
+    expect(footer.sentence).toBe("This task stopped.");
+    expect(footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
+    expect(footer.actions.map((action) => action.kind)).toEqual(["reject", "rerun"]);
     expect(splitRunCloseNeedsConfirm("stopped")).toBe(false);
   });
 
@@ -172,14 +202,14 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.actor).toEqual(actor);
   });
 
-  it("treats a failed open implement as a decision strip with To Backlog, Reject, and Rerun", () => {
+  it("treats a failed open implement as a decision strip with Reject and Rerun", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Debug");
-    expect(footer.sentence).toBe("This task needs attention.");
-    expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, RERUN]);
+    expect(footer.sentence).toBe("This task failed.");
+    expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 

@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	executionKVMachineType = "machine_type"
-	executionKVFleetID     = "fleet_id"
+	executionKVMachineType     = "machine_type"
+	executionKVFleetID         = "fleet_id"
+	executionKVAnalysisSession = "analysis_session"
 )
 
 func storeRunnerFleetKV(ctx core.ExecutionContext, machineType string) error {

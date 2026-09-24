@@ -12,6 +12,10 @@ interface OnWorkflowCompletedMetadata {
   };
 }
 
+interface OnWorkflowCompletedConfiguration {
+  projectSlug?: string;
+}
+
 interface OnWorkflowCompletedEventData {
   workflow?: {
     id: string;
@@ -35,66 +39,34 @@ interface OnWorkflowCompletedEventData {
 export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnWorkflowCompletedEventData;
-    const workflowName = eventData?.workflow?.name || "Workflow";
-    const status = eventData?.workflow?.status || "";
-    const subtitle =
-      status && context.event?.createdAt
-        ? renderWithTimeAgo(status, new Date(context.event.createdAt))
-        : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return {
-      title: workflowName,
-      subtitle,
+      title: workflowName(eventData),
+      subtitle: workflowSubtitle(workflowStatus(eventData), context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnWorkflowCompletedEventData;
-    const workflowUrl = eventData?.workflow?.url || "";
-
-    return {
-      Workflow: eventData?.workflow?.name || "",
-      Status: eventData?.workflow?.status || "",
-      "Workflow URL": workflowUrl,
-      "Pipeline Number": eventData?.pipeline?.number?.toString() || "",
-      Project: eventData?.project?.name || "",
-      Organization: eventData?.organization?.name || "",
-    };
+    return workflowCompletedValues(context.event?.data as OnWorkflowCompletedEventData);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnWorkflowCompletedMetadata;
-    const configuration = node.configuration as any;
-    const metadataItems = [];
-
-    const projectLabel = metadata?.project?.name || metadata?.project?.slug || configuration?.projectSlug;
-    if (projectLabel) {
-      metadataItems.push({
-        icon: "folder",
-        label: projectLabel,
-      });
-    }
+    const configuration = node.configuration as OnWorkflowCompletedConfiguration | undefined;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: CircleCILogo,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: workflowCompletedMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnWorkflowCompletedEventData;
-      const workflowName = eventData?.workflow?.name || "Workflow";
-      const status = eventData?.workflow?.status || "";
-      const subtitle =
-        status && lastEvent.createdAt
-          ? renderWithTimeAgo(status, new Date(lastEvent.createdAt))
-          : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
-
+      const { title, subtitle } = onWorkflowCompletedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
-        title: workflowName,
+        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -105,3 +77,55 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function workflowCompletedValues(eventData?: OnWorkflowCompletedEventData): Record<string, string> {
+  return {
+    Workflow: emptyIfMissing(eventData?.workflow?.name),
+    Status: emptyIfMissing(eventData?.workflow?.status),
+    "Workflow URL": emptyIfMissing(eventData?.workflow?.url),
+    "Pipeline Number": emptyIfMissing(eventData?.pipeline?.number),
+    Project: emptyIfMissing(eventData?.project?.name),
+    Organization: emptyIfMissing(eventData?.organization?.name),
+  };
+}
+
+function emptyIfMissing(value: string | number | undefined): string {
+  if (value == null) {
+    return "";
+  }
+
+  return String(value);
+}
+
+function workflowName(eventData?: OnWorkflowCompletedEventData): string {
+  return eventData?.workflow?.name || "Workflow";
+}
+
+function workflowStatus(eventData?: OnWorkflowCompletedEventData): string {
+  return eventData?.workflow?.status || "";
+}
+
+function workflowSubtitle(status: string, createdAt?: string): string | React.ReactNode {
+  if (status && createdAt) {
+    return renderWithTimeAgo(status, new Date(createdAt));
+  }
+
+  return status || (createdAt ? renderTimeAgo(new Date(createdAt)) : "");
+}
+
+function workflowCompletedMetadataItems(
+  metadata?: OnWorkflowCompletedMetadata,
+  configuration?: OnWorkflowCompletedConfiguration,
+) {
+  const projectLabel = metadata?.project?.name || metadata?.project?.slug || configuration?.projectSlug;
+  if (!projectLabel) {
+    return [];
+  }
+
+  return [
+    {
+      icon: "folder",
+      label: projectLabel,
+    },
+  ];
+}

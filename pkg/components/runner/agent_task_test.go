@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,55 @@ func TestWrapCommandInWorkingDirectoryAllowsAbsolutePath(t *testing.T) {
 	assert.Equal(t, `cd '/tmp/workspace' && node run.js`, got)
 }
 
+func TestWrapPromptCommandInWorkingDirectoryCopiesSkills(t *testing.T) {
+	t.Parallel()
+
+	got := WrapPromptCommandInWorkingDirectory("repo", `node run.js`)
+	assert.Contains(t, got, `cd "$_sp_root"/'repo'`)
+	assert.Contains(t, got, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
+	assert.Contains(t, got, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.agents/skills" .agents/skills`)
+	assert.Contains(t, got, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
+	assert.NotContains(t, got, `cp -a "$SUPERPLANE_TASK_DIR/.claude/skills/." .claude/skills/`)
+	assert.Contains(t, got, "node run.js")
+	assert.True(t, strings.Index(got, "cp -a") < strings.Index(got, "node run.js"))
+}
+
+func TestAppendVisualEvidenceProtocolAddsProtocolToFirstPromptOnly(t *testing.T) {
+	t.Parallel()
+
+	firstPrompt := "implement the change"
+	secondPrompt := "review the change"
+	command := "git status"
+	steps := []AgentStep{
+		{Name: "Prepare", Type: AgentStepBash, Command: &command},
+		{Name: "Implement", Type: AgentStepPrompt, Prompt: &firstPrompt},
+		{Name: "Review", Type: AgentStepPrompt, Prompt: &secondPrompt},
+	}
+
+	got := AppendVisualEvidenceProtocol(steps, true)
+
+	require.Len(t, got, len(steps))
+	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
+	assert.Contains(t, *got[1].Prompt, firstPrompt)
+	assert.Contains(t, *got[1].Prompt, "Visual evidence protocol")
+	assert.Contains(t, *got[1].Prompt, "posterPath")
+	assert.Contains(t, *got[1].Prompt, "must not replace the requested product implementation")
+	assert.Contains(t, *got[1].Prompt, "Remove every story, preview route, harness, or fixture created only for evidence")
+	assert.Equal(t, secondPrompt, *got[2].Prompt)
+	assert.Equal(t, command, *got[0].Command)
+	twice := AppendVisualEvidenceProtocol(got, true)
+	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Visual evidence protocol"))
+}
+
+func TestAppendVisualEvidenceProtocolDoesNothingWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	prompt := "implement the change"
+	steps := []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt}}
+
+	assert.Equal(t, steps, AppendVisualEvidenceProtocol(steps, false))
+}
+
 func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	t.Parallel()
 
@@ -72,6 +122,9 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Contains(t, commands[2].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[2].Command, `cd "$_sp_root"/'repo'`)
 	assert.Contains(t, commands[2].Command, "node run.js 02-implement.txt")
+	assert.Contains(t, commands[2].Command, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
+	assert.Contains(t, commands[2].Command, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
+	assert.NotContains(t, commands[1].Command, `_sp_install_workspace_skills`)
 	assertAgentStepMergesUsage(t, commands[2].Command, "node run.js 02-implement.txt")
 	assert.Contains(t, commands[3].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[3].Command, `cd "$_sp_root"/'repo'`)
@@ -81,6 +134,7 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Contains(t, prepare, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
 	assert.Equal(t, TurnTelemetryScript, requireBrokerFile(t, files, "turn_telemetry.js").Content)
+	assert.Equal(t, ActivityStreamScript, requireBrokerFile(t, files, "activity_stream.js").Content)
 }
 
 func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
@@ -238,4 +292,63 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 	assert.Contains(t, commands[1].Command, `curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
 	assert.Contains(t, commands[1].Command, "sp_file=1")
 	assert.Equal(t, "Implement", commands[2].Name)
+}
+
+func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := MintAgentStepFileRefs(
+		[]AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:     "Prepare",
+		PrepareScript:   NodePrepareScript("", "", ""),
+		RunScriptName:   "run.js",
+		RunScript:       "echo run",
+		Steps:           []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
+		DispatchedSteps: dispatched,
+		Model:           "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, signed)
+	assert.NotContains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, "sp-file://")
+	require.Len(t, commands, 3)
+	assert.Equal(t, "Fetch task attachments", commands[1].Name)
+	assert.Contains(t, commands[1].Command, "curl -fsSL")
+	assert.Contains(t, commands[1].Command, "sp_file=1")
+	assert.Equal(t, "Implement", commands[2].Name)
+	assert.Contains(t, commands[2].Preview, "sp-file://"+fileID)
+	assert.NotContains(t, commands[2].Preview, "sp_file=1")
+}
+
+func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	description := "See ![shot.png](sp-file://" + fileID + ")"
+	spec := "# Retry refunds\n\n![shot.png](sp-file://" + fileID + ")"
+	original := description + "\n\nSpec:\n" + spec
+	signed := "https://storage.googleapis.com/bucket/orgs/x/workspaces/y/tasks/z/" + fileID + "?sp_file=1"
+	dispatched, err := MintAgentStepFileRefs(
+		[]AgentStep{{Name: "Refine Task", Type: AgentStepPrompt, Prompt: &original}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, dispatched[0].Prompt)
+	assert.Contains(t, original, "sp-file://"+fileID)
+	assert.Contains(t, *dispatched[0].Prompt, signed)
+	assert.NotContains(t, *dispatched[0].Prompt, "sp-file://")
 }

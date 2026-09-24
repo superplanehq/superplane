@@ -1,10 +1,14 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useComponent } from "@/hooks/useComponentData";
+import { cn } from "@/lib/utils";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
+import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
+import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
 
 const EXPRESSION_CONTEXT = {
@@ -17,10 +21,16 @@ export function PlanningReviewForm({
   draft,
   onChange,
   organizationId,
+  factoryId,
+  factoryKey,
+  showVisualEvidenceSetting = false,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  showVisualEvidenceSetting?: boolean;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -36,6 +46,9 @@ export function PlanningReviewForm({
           key={component.id}
           component={component}
           organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          showVisualEvidenceSetting={showVisualEvidenceSetting}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -46,10 +59,16 @@ export function PlanningReviewForm({
 function AgentPanel({
   component,
   organizationId,
+  factoryId,
+  factoryKey,
+  showVisualEvidenceSetting,
   onChange,
 }: {
   component: PlanningReviewComponent;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  showVisualEvidenceSetting: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const setConfigurationField = (name: string, value: unknown) => {
@@ -64,7 +83,10 @@ function AgentPanel({
   return (
     <div className="flex flex-col gap-4" data-testid={`planning-review-component-${component.id}`}>
       <section
-        className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
+        className={cn(
+          "grid gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm",
+          showVisualEvidenceSetting ? "grid-cols-3" : "grid-cols-2",
+        )}
         data-testid="planning-review-settings"
       >
         <div className="flex flex-col gap-2">
@@ -96,10 +118,29 @@ function AgentPanel({
             fieldPath="model"
           />
         ) : null}
+        {showVisualEvidenceSetting ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`planning-review-visual-evidence-${component.id}`}>Include visual evidence</Label>
+            <div className="flex h-9 items-center">
+              <Switch
+                id={`planning-review-visual-evidence-${component.id}`}
+                checked={component.configuration.includeVisualEvidence === true}
+                onCheckedChange={(checked) => setConfigurationField("includeVisualEvidence", checked)}
+              />
+            </div>
+          </div>
+        ) : null}
       </section>
       <PlanningReviewStepList
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
+      />
+      <PlanningReviewResourcesCard
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        disabledIds={disabledAgentResourceIds(component.configuration)}
+        onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
       />
     </div>
   );

@@ -1,25 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { AccountLinkedAccount } from "@/contexts/accountContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import type * as AccountSettings from "@/lib/accountSettings";
-import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FactorySettingsAccountProfilePage } from "./FactorySettingsAccountProfilePage";
 
-const accountState: {
-  linked: AccountLinkedAccount[];
-} = {
-  linked: [],
-};
 const refreshAccount = vi.fn(async () => undefined);
-const disconnectLinkedAccount = vi.fn(async (_provider: string) => undefined);
-const assign = vi.fn();
 const showSuccessToast = vi.fn();
 const showErrorToast = vi.fn();
 
@@ -33,7 +22,8 @@ vi.mock("@/contexts/useAccount", () => ({
       installation_admin: false,
       has_password: true,
       providers: [],
-      linked_accounts: accountState.linked,
+      linked_accounts: [],
+      organizations_pending_deletion: [],
     },
     refreshAccount,
   }),
@@ -42,16 +32,6 @@ vi.mock("@/contexts/useAccount", () => ({
 vi.mock("./DeleteAccountDangerZone", () => ({
   DeleteAccountDangerZone: () => null,
 }));
-
-vi.mock("@/lib/accountSettings", () => {
-  const actual = unmockedSrc<typeof AccountSettings>("lib/accountSettings");
-  return {
-    ...actual,
-    disconnectLinkedAccount: (provider: string) => disconnectLinkedAccount(provider),
-    linkedAccountConnectHref: (provider: string, redirect: string) =>
-      `/auth/${provider}?intent=connect&redirect=${encodeURIComponent(redirect)}`,
-  };
-});
 
 vi.mock("@/lib/toast", () => ({
   showSuccessToast: (message: string) => showSuccessToast(message),
@@ -73,68 +53,34 @@ function renderPage(path = "/settings/account/profile") {
   );
 }
 
-describe("FactorySettingsAccountProfilePage velocity GitHub", () => {
+describe("FactorySettingsAccountProfilePage associated accounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    accountState.linked = [];
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: { assign, pathname: "/settings/account/profile", search: "" },
-    });
   });
 
-  it("sends a member who linked nothing to the connect flow", async () => {
+  it("shows Associated accounts for GitHub PR credit", () => {
     renderPage();
 
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent(
-      "This link does not change how you sign in",
+    expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
+      "Velocity uses this GitHub account to credit your pull requests.",
     );
-    await userEvent.click(screen.getByRole("button", { name: "Link GitHub" }));
-
-    expect(assign).toHaveBeenCalledWith("/auth/github?intent=connect&redirect=%2Fsettings%2Faccount%2Fprofile");
+    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso-github")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in with GitHub" })).not.toBeInTheDocument();
   });
 
-  it("shows the linked login", () => {
-    accountState.linked = [{ provider: "github", username: "shiroyasha" }];
-    renderPage();
-
-    expect(screen.getByText(/Linked as shiroyasha/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Link GitHub" })).not.toBeInTheDocument();
-  });
-
-  it("removes the link after the member confirms", async () => {
-    accountState.linked = [{ provider: "github", username: "shiroyasha" }];
-    renderPage();
-
-    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
-    await userEvent.click(screen.getByRole("button", { name: "Remove link" }));
-
-    await waitFor(() => {
-      expect(disconnectLinkedAccount).toHaveBeenCalledWith("github");
-    });
-    expect(refreshAccount).toHaveBeenCalled();
-    expect(showSuccessToast).toHaveBeenCalledWith("GitHub link removed.");
-  });
-
-  it("keeps the link when the member backs out", async () => {
-    accountState.linked = [{ provider: "github", username: "shiroyasha" }];
-    renderPage();
-
-    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
-    await userEvent.click(screen.getByRole("button", { name: "Keep the link" }));
-
-    expect(disconnectLinkedAccount).not.toHaveBeenCalled();
-  });
-
-  it("reports an identity another account already uses", async () => {
+  it("reports when another account already uses the GitHub link", async () => {
     renderPage("/settings/account/profile?auth_error=linked_account_in_use");
 
     await waitFor(() => {
-      expect(showErrorToast).toHaveBeenCalledWith("Another SuperPlane account already uses this GitHub account.");
+      expect(showErrorToast).toHaveBeenCalledWith(
+        "Another member in one of your organizations already uses this GitHub account.",
+      );
     });
   });
 
-  it("confirms a completed link and reloads the account", async () => {
+  it("confirms a completed GitHub link and reloads the account", async () => {
     renderPage("/settings/account/profile?linked_account=linked");
 
     await waitFor(() => {

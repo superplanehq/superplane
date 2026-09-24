@@ -1,4 +1,10 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { usePermissions } from "@/contexts/usePermissions";
+import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
+import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -10,16 +16,19 @@ import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { LineBoardOrderCard } from "./LineBoardOrderCard";
-import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
+import { LineBoardColumnCardList, LineBoardOrderCard } from "./LineBoardOrderCard";
+import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
+import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
+import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
 
 export type BacklogColumnProps = {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  lineId?: string;
   orders: FactoriesWorkOrder[];
   title: string;
   size: number | null;
@@ -28,12 +37,12 @@ export type BacklogColumnProps = {
   onCloseSettings: () => void;
   onSaveSettings: (settings: { name: string; size: number | null }) => void;
   colorId: LineBoardColumnColorId | null;
+  colorView?: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Tasks the Backlog automation analyzes right now. */
@@ -47,6 +56,12 @@ export type BacklogColumnProps = {
   /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  paging?: {
+    hasMore: boolean;
+    isLoading: boolean;
+    onLoadMore: () => void;
+  };
+  cardsPending?: boolean;
 };
 
 export type BacklogIntakePanel = {
@@ -61,6 +76,7 @@ export function BacklogColumn({
   organizationId,
   factoryId,
   factoryKey,
+  lineId,
   orders,
   title,
   size,
@@ -69,12 +85,12 @@ export function BacklogColumn({
   onCloseSettings,
   onSaveSettings,
   colorId,
+  colorView,
   onColorChange,
   canCreateWorkOrder,
   canRename,
   onRename,
   onCreateWorkOrder,
-  onCreateWithAgent,
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
@@ -83,17 +99,22 @@ export function BacklogColumn({
   automations,
   automationRowCount,
   onAutomationRowAction,
+  paging,
+  cardsPending = false,
 }: BacklogColumnProps) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
+  const { canAct } = usePermissions();
+  const canUpdateWorkOrders = canAct("work_orders", "update");
+  const intakesQuery = useFactoryIntakes(organizationId, factoryId);
+  const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
     createMenu,
     onCreateWorkOrder,
-    onCreateWithAgent,
   });
 
   return (
@@ -106,11 +127,11 @@ export function BacklogColumn({
         titleTestId="lines-column-title-backlog"
         count={orders.length}
         tone="neutral"
-        surfaceClassName={surfaceClassName}
+        surfaceClassName={lane.surfaceClassName}
         emptyDescription="No tasks in the backlog."
         emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
         keepChildrenWhenEmpty
-        className={surfaceClassName ? undefined : "bg-muted"}
+        className={lane.className}
         actions={
           <BacklogColumnHeaderActions
             title={title}
@@ -120,6 +141,14 @@ export function BacklogColumn({
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
+            onRefreshBacklog={
+              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
+                ? () => {
+                    void runBacklogRefresh(refreshBacklog.mutateAsync);
+                  }
+                : undefined
+            }
+            refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
           />
@@ -131,7 +160,7 @@ export function BacklogColumn({
           onRowAction: onAutomationRowAction,
           testId: "lines-backlog-automation-rows",
         })}
-        banner={intakePanel ? <BacklogColumnIntakeBanner panel={intakePanel} /> : null}
+        banner={<BacklogColumnBanner panel={intakePanel} />}
         testId="lines-backlog-column"
       >
         <BacklogColumnOrderList
@@ -141,6 +170,9 @@ export function BacklogColumn({
           analyzingOrderIds={analyzingOrderIds}
           atCapacity={atCapacity}
           createPopover={createPopover}
+          paging={paging}
+          cardsPending={cardsPending}
+          scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "backlog") : undefined}
         />
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
@@ -162,6 +194,8 @@ function BacklogColumnHeaderActions({
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
+  onRefreshBacklog,
+  refreshBacklogPending,
   colorId,
   onColorChange,
 }: Pick<
@@ -176,6 +210,8 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
+  onRefreshBacklog?: () => void;
+  refreshBacklogPending?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
@@ -193,6 +229,8 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
+        onRefreshBacklog={onRefreshBacklog}
+        refreshBacklogPending={refreshBacklogPending}
         colorId={colorId}
         onColorChange={onColorChange}
       />
@@ -200,7 +238,11 @@ function BacklogColumnHeaderActions({
   );
 }
 
-function BacklogColumnIntakeBanner({ panel }: { panel: BacklogIntakePanel }) {
+function BacklogColumnBanner({ panel }: { panel?: BacklogIntakePanel }) {
+  if (!panel) {
+    return null;
+  }
+
   return (
     <BacklogIntakeSources
       intakes={panel.sources}
@@ -218,12 +260,35 @@ function BacklogColumnOrderList({
   analyzingOrderIds,
   atCapacity,
   createPopover,
-}: Pick<BacklogColumnProps, "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds"> & {
+  paging,
+  cardsPending,
+  scrollPersistenceKey,
+}: Pick<
+  BacklogColumnProps,
+  "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging" | "cardsPending"
+> & {
   atCapacity: boolean;
   createPopover: BacklogCreatePopoverProps;
+  scrollPersistenceKey?: string;
 }) {
+  const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
+  const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
+    hasMore: paging?.hasMore,
+    isLoading: paging?.isLoading,
+    onLoadMore: paging?.onLoadMore,
+  });
+
   return (
-    <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+    <LineBoardColumnCardList
+      ref={scrollRef}
+      pending={Boolean(cardsPending)}
+      className={workOrderKanbanLaneScrollClassName}
+      testId="lines-backlog-column-scroll"
+      onScroll={(element) => {
+        handleScroll(element);
+        loadMoreIfNeeded(element);
+      }}
+    >
       {orders.map((order) => (
         <li key={order.id}>
           <LineBoardOrderCard
@@ -239,18 +304,34 @@ function BacklogColumnOrderList({
           <BacklogCreatePopover variant="ghost" {...createPopover} />
         </li>
       )}
-    </ul>
+    </LineBoardColumnCardList>
   );
 }
 
 type BacklogCreatePopoverProps = ReturnType<typeof backlogCreatePopoverProps>;
+
+async function runBacklogRefresh(run: () => Promise<RefreshBacklogResult>): Promise<void> {
+  try {
+    const toast = backlogRefreshToast(await run());
+    if (toast.kind === "error") {
+      showErrorToast(toast.message);
+      return;
+    }
+    if (toast.kind === "success") {
+      showSuccessToast(toast.message);
+      return;
+    }
+    showInfoToast(toast.message);
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, BACKLOG_REFRESH_COPY.failed));
+  }
+}
 
 function backlogCreatePopoverProps(args: {
   canAdd: boolean;
   atCapacity: boolean;
   createMenu: ReturnType<typeof useBacklogCreateMenu>;
   onCreateWorkOrder: () => void;
-  onCreateWithAgent?: () => void;
 }) {
   return {
     canAdd: args.canAdd,
@@ -262,7 +343,6 @@ function backlogCreatePopoverProps(args: {
     onQueryChange: args.createMenu.setQuery,
     onFocusedIntakeChange: args.createMenu.setFocusedIntake,
     onCreateManually: args.onCreateWorkOrder,
-    onCreateWithAgent: args.onCreateWithAgent,
     onImportItem: args.createMenu.importItem,
     isLoading: args.createMenu.isLoading,
     isLoadingMore: args.createMenu.isLoadingMore,

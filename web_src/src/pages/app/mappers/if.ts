@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getTriggerRenderer, getState, getStateMap } from "./mapperLookup";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -36,14 +36,18 @@ export const IF_STATE_MAP: EventStateMap = {
   },
 };
 
+function isIfExecutionError(execution: ExecutionInfo): boolean {
+  return Boolean(
+    execution.resultMessage &&
+      (execution.resultReason === "RESULT_REASON_ERROR" ||
+        (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED")),
+  );
+}
+
 export const ifStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
+  if (isIfExecutionError(execution)) {
     return "error";
   }
 
@@ -116,9 +120,9 @@ export const ifMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const configuration = context.execution.configuration as IfConfiguration;
-    const details: Record<string, any> = {
+    const details: Record<string, string> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       Expression: configuration.expression,
     };
@@ -129,7 +133,7 @@ export const ifMapper: ComponentBaseMapper = {
 
 function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const eventSection: EventSection = {

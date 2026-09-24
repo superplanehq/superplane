@@ -30,6 +30,15 @@ func Test__UsageTotalsAdd(t *testing.T) {
 	assert.Equal(t, int64(8), combined.CostCents())
 }
 
+func Test__WorkOrderRunUsage__ComputeCostMicrosKeepsSubCent(t *testing.T) {
+	row := models.WorkOrderRunUsage{
+		CostMicros:       183_150,
+		HostedCostMicros: 180_000,
+	}
+	assert.Equal(t, int64(3_150), row.ComputeCostMicros())
+	assert.Zero(t, row.CostCents()-row.HostedCostCents())
+}
+
 func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -485,6 +494,142 @@ func Test__SumUsageForWorkOrders__IncludesModelTokensAndCompute(t *testing.T) {
 	assert.Greater(t, total.CostCents(), pricebook.MicrosToCents(computeEvent.CostMicros))
 }
 
+func Test__ListUsageByModelForWorkOrders__ReportsNothingForNoOrders(t *testing.T) {
+	byModel, err := models.ListUsageByModelForWorkOrders(nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, byModel)
+}
+
+func Test__ListUsageByMachineTypeForWorkOrders__ReportsNothingForNoOrders(t *testing.T) {
+	byMachine, err := models.ListUsageByMachineTypeForWorkOrders(nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, byMachine)
+}
+
+func Test__ListUsageByModelForWorkOrders__GroupsLedgerByOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, first := createFactoryOrder(t, r)
+	second, err := factory.CreateWorkOrder(db, "Two", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	firstRun := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": first.ID.String()},
+		},
+	})
+	secondRun := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": second.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, firstRun.ID)))
+	gpt := sonnetUsage(t, r, secondRun.ID)
+	gpt.Provider = models.UsageProviderOpenAI
+	gpt.Model = "gpt-4.1"
+	require.NoError(t, models.RecordUsage(db, gpt))
+
+	byModel, err := models.ListUsageByModelForWorkOrders(db, []uuid.UUID{first.ID, second.ID})
+	require.NoError(t, err)
+	require.Len(t, byModel[first.ID], 1)
+	assert.Equal(t, "claude-sonnet-4-6", byModel[first.ID][0].Model)
+	require.Len(t, byModel[second.ID], 1)
+	assert.Equal(t, "gpt-4.1", byModel[second.ID][0].Model)
+}
+
+func Test__ListUsageByMachineTypeForWorkOrders__GroupsLedgerByOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 90,
+		IdempotencyKey:  "runner:compute:" + uuid.New().String(),
+	}))
+
+	byMachine, err := models.ListUsageByMachineTypeForWorkOrders(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	require.Len(t, byMachine[order.ID], 1)
+	assert.Equal(t, "e1-large-amd64", byMachine[order.ID][0].MachineType)
+	assert.Equal(t, int64(90), byMachine[order.ID][0].DurationSeconds)
+}
+
+func Test__ListModelsForWorkOrderExecutions__GroupsLedgerModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000,
+		TotalTokens:     1_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenAI,
+		Model:           "gpt-4.1",
+		InputTokens:     500,
+		TotalTokens:     500,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	names, err := models.ListModelsForWorkOrderExecutions(db, []uuid.UUID{execution.ID})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6", "openai/gpt-4.1"}, names[execution.ID])
+}
+
+func Test__ListModelsForRunTrees__IncludesDescendantModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	parent := startFactoryCanvasRun(t, r, factory.ID, nil)
+	now := parent.CreatedAt
+	if now == nil {
+		created := time.Now()
+		now = &created
+	}
+	child := models.CanvasRun{
+		ID:               uuid.New(),
+		WorkflowID:       parent.WorkflowID,
+		NodeID:           parent.NodeID,
+		VersionID:        parent.VersionID,
+		ParentRunID:      &parent.ID,
+		ParentWorkflowID: &parent.WorkflowID,
+		State:            models.CanvasRunStateStarted,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	require.NoError(t, db.Create(&child).Error)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, child.ID)))
+
+	names, err := models.ListModelsForRunTrees(db, []uuid.UUID{parent.ID})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, names[parent.ID])
+}
+
 func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.UUID, tokens, cents int64) {
 	t.Helper()
 
@@ -757,7 +902,7 @@ func Test__ListWorkOrderRunUsage__GroupsModelAndComputeForOneRun(t *testing.T) {
 	assert.Equal(t, r.UserModel.GetEmail(), rows[0].UserEmail)
 	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
 	assert.Equal(t, int64(90), rows[0].DurationSeconds)
-	assert.Contains(t, rows[0].BYOKModels, "anthropic/claude-sonnet-4-6")
+	assert.Contains(t, rows[0].BYOKModels, "claude-sonnet-4-6")
 	assert.Empty(t, rows[0].Models)
 	assert.Contains(t, rows[0].MachineTypes, "e1-large-amd64")
 	assert.Positive(t, rows[0].CostCents())
@@ -781,7 +926,7 @@ func Test__ListWorkOrderRunUsage__HostedModelDoesNotMarkYourKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, rows, 1)
-	assert.Contains(t, rows[0].Models, "anthropic/claude-sonnet-4-6")
+	assert.Contains(t, rows[0].Models, "claude-sonnet-4-6")
 	assert.Empty(t, rows[0].BYOKModels)
 	assert.Zero(t, rows[0].BYOKCostCents())
 	assert.Positive(t, rows[0].HostedCostCents())
@@ -809,8 +954,8 @@ func Test__ListWorkOrderRunUsage__SplitsMixedFundingModels(t *testing.T) {
 	}, 50, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, rows[0].Models)
-	assert.Equal(t, []string{"anthropic/claude-opus-4-1"}, rows[0].BYOKModels)
+	assert.Equal(t, []string{"claude-sonnet-4-6"}, rows[0].Models)
+	assert.Equal(t, []string{"claude-opus-4-1"}, rows[0].BYOKModels)
 }
 
 func Test__ListWorkOrderRunUsage__OmitsOtherFactoriesAndRowsWithoutExecution(t *testing.T) {
@@ -858,7 +1003,7 @@ func Test__ListWorkOrderRunUsage__IncludesAnalysisWithoutExecution(t *testing.T)
 	assert.Equal(t, uuid.Nil, rows[0].WorkOrderExecutionID)
 	assert.Equal(t, order.ID, rows[0].WorkOrderID)
 	assert.Equal(t, int64(1_000_000), rows[0].TotalTokens)
-	assert.Contains(t, rows[0].BYOKModels, "anthropic/claude-sonnet-4-6")
+	assert.Contains(t, rows[0].BYOKModels, "claude-sonnet-4-6")
 	assert.Empty(t, rows[0].MachineTypes)
 	assert.Empty(t, rows[0].UserName)
 	assert.Empty(t, rows[0].UserEmail)

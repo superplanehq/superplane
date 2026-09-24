@@ -1,17 +1,13 @@
 package grpc
 
 import (
-	"fmt"
-
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
-	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
 	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
@@ -25,7 +21,6 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 type Services struct {
@@ -40,7 +35,6 @@ type Services struct {
 	Triggers      pbTriggers.TriggersServer
 	Widgets       pbWidgets.WidgetsServer
 	Canvases      pbCanvases.CanvasesServer
-	CanvasFolders pbCanvasFolders.CanvasFoldersServer
 	Factories     pbFactories.FactoriesServer
 	Files         pbFiles.FilesServer
 	APIKeys       pbAPIKeys.ApiKeysServer
@@ -54,16 +48,10 @@ type ServicesConfig struct {
 	AuthService     authorization.Authorization
 	Registry        *registry.Registry
 	OIDCProvider    oidc.Provider
-	GitProvider     git.Provider
 	AgentService    agentsActions.AgentsService
-	UsageService    usage.Service
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
-	if cfg.UsageService == nil {
-		return nil, fmt.Errorf("usage service is required")
-	}
-
 	return &Services{
 		Users:  NewUsersService(cfg.AuthService),
 		Groups: NewGroupsService(cfg.AuthService),
@@ -74,7 +62,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.OIDCProvider,
 			cfg.BaseURL,
 			cfg.WebhooksBaseURL,
-			cfg.UsageService,
 		),
 		Integrations: NewIntegrationService(cfg.Encryptor, cfg.Registry),
 		Secrets:      NewSecretService(cfg.Encryptor, cfg.AuthService),
@@ -86,18 +73,13 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.AuthService,
 			cfg.Registry,
 			cfg.Encryptor,
-			cfg.GitProvider,
 			cfg.WebhooksBaseURL,
-			cfg.UsageService,
 		),
-		CanvasFolders: NewCanvasFolderService(),
 		Factories: NewFactoryService(
 			cfg.Registry,
 			cfg.Encryptor,
 			cfg.AuthService,
-			cfg.GitProvider,
 			cfg.WebhooksBaseURL,
-			cfg.UsageService,
 		),
 		Files:   NewFilesService(cfg.AuthService),
 		APIKeys: NewAPIKeysService(cfg.AuthService),

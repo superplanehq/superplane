@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { pullRequestReviewNote } from "./splitRunPullRequestReview";
+import { defaultMergeMethod, pullRequestReviewNote } from "./splitRunPullRequestReview";
 
 describe("pullRequestReviewNote", () => {
   it("recognizes a note whose call to action opens a GitHub pull request", () => {
@@ -23,7 +23,7 @@ describe("pullRequestReviewNote", () => {
 
   it("ignores notes without a link", () => {
     expect(pullRequestReviewNote({ headline: "Implement did not pass", cta: { label: "Debug" } })).toBeUndefined();
-    expect(pullRequestReviewNote({ headline: "This task needs a decision" })).toBeUndefined();
+    expect(pullRequestReviewNote({ headline: "No pull request" })).toBeUndefined();
   });
 
   it("ignores links that are not pull requests", () => {
@@ -39,5 +39,13 @@ describe("pullRequestReviewNote", () => {
         cta: { label: "Debug", href: "/org/workspaces/key/apps/app-1/runs/run-1" },
       }),
     ).toBeUndefined();
+  });
+});
+
+describe("defaultMergeMethod", () => {
+  it("prefers squash, then a merge commit, then rebase", () => {
+    expect(defaultMergeMethod(["MERGE_METHOD_REBASE", "MERGE_METHOD_SQUASH"])).toBe("MERGE_METHOD_SQUASH");
+    expect(defaultMergeMethod(["MERGE_METHOD_REBASE", "MERGE_METHOD_MERGE"])).toBe("MERGE_METHOD_MERGE");
+    expect(defaultMergeMethod(["MERGE_METHOD_REBASE"])).toBe("MERGE_METHOD_REBASE");
   });
 });

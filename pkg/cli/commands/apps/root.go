@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/memory"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/staging"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -16,7 +15,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Manage apps",
 		Long: core.AgentSkillsHelp() + `
 
-An app is a SuperPlane automation made up of a canvas, console, and files.
+An app is a SuperPlane automation made up of a canvas and a console.
 
 App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 (e.g. https://app.superplane.com/<organization-id>/apps/<app-id>)`,
@@ -45,7 +44,6 @@ App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 	root.AddCommand(staging.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))
-	root.AddCommand(files.NewRootCommand(options))
 	root.AddCommand(memory.NewCommand(options))
 
 	return root

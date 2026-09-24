@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { ConfigurationField } from "@/api-client";
 import { useCanvas, useCanvases } from "@/hooks/useCanvasData";
-import { useFactoryApps } from "@/hooks/useFactoryData";
+import { useFactoryAutomations } from "@/hooks/useFactoryData";
 
 import { AppFieldRenderer } from "./AppFieldRenderer";
 
@@ -19,12 +19,12 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
-  useFactoryApps: vi.fn(),
+  useFactoryAutomations: vi.fn(),
 }));
 
 const mockUseCanvases = vi.mocked(useCanvases);
 const mockUseCanvas = vi.mocked(useCanvas);
-const mockUseFactoryApps = vi.mocked(useFactoryApps);
+const mockUseFactoryApps = vi.mocked(useFactoryAutomations);
 
 function appField(overrides: Partial<ConfigurationField> = {}): ConfigurationField {
   return {
@@ -62,7 +62,7 @@ beforeEach(() => {
     data: [],
     isLoading: false,
     error: null,
-  } as unknown as ReturnType<typeof useFactoryApps>);
+  } as unknown as ReturnType<typeof useFactoryAutomations>);
 
   mockUseCanvases.mockReturnValue({
     data: [
@@ -120,7 +120,7 @@ describe("AppFieldRenderer", () => {
       ],
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useFactoryApps>);
+    } as unknown as ReturnType<typeof useFactoryAutomations>);
 
     render(
       <ControlledRenderer

@@ -10,7 +10,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 )
 
 func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
@@ -137,12 +136,15 @@ func processBrokerTaskStatus(
 
 	// Persist spend when the broker reports a terminal task after SuperPlane
 	// already finished the node. A late webhook still carries billed tokens.
-	publishRunnerUsage(organizationID, task, logger)
 	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
 	RecordRunnerComputeUsage(usage, logger, state, configuration, task)
 
 	if state.IsFinished() {
 		return nil
+	}
+
+	if brokerTaskCanceled(task) && isAnalysisSessionExecution(state) {
+		return state.Cancel()
 	}
 
 	channel := FailedOutputChannel
@@ -160,26 +162,19 @@ func processBrokerTaskStatus(
 	return state.Emit(channel, finishedEventType, []any{out})
 }
 
-func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {
-	organizationID = strings.TrimSpace(organizationID)
-	taskID := task.brokerTaskID()
-	if organizationID == "" || taskID == "" {
-		return
-	}
-	if task.ClaimedAt == nil || task.FinishedAt == nil {
-		return
-	}
+func brokerTaskCanceled(task *Task) bool {
+	return strings.EqualFold(strings.TrimSpace(task.Status), "canceled")
+}
 
-	seconds := billableSeconds(task.FinishedAt.Sub(*task.ClaimedAt))
-	if seconds == 0 {
+func markAnalysisSession(state core.ExecutionStateContext) {
+	if state == nil {
 		return
 	}
+	_ = state.SetKV(executionKVAnalysisSession, "true")
+}
 
-	if err := messages.NewRunnerTaskFinishedMessage(organizationID, taskID, seconds).Publish(); err != nil {
-		if logger != nil {
-			logger.WithError(err).Warn("runner: failed to publish usage")
-		}
-	}
+func isAnalysisSessionExecution(state core.ExecutionStateContext) bool {
+	return executionKV(state, executionKVAnalysisSession) == "true"
 }
 
 // billableSeconds rounds a task duration up to the next whole second. Clock skew

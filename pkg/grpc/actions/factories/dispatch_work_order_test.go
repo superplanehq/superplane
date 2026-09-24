@@ -64,6 +64,67 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	assert.Equal(t, dispatch.Id, active.ID.String())
 }
 
+func Test__DispatchWorkOrder__CompletesActiveAnalysisRun(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	analysisCanvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	analysisRun, err := models.CreateCanvasRunInTransaction(
+		db,
+		analysisCanvas.ID,
+		"start",
+		models.CanvasRunStateStarted,
+		"",
+	)
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    analysisCanvas.ID,
+		CanvasRunID: analysisRun.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+
+	event := support.EmitCanvasEventForNode(t, analysisCanvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, analysisCanvas.ID, backlogRefinementNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("run_id", analysisRun.ID).Error)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	updatedSession, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+
+	updatedRun, err := models.FindUnscopedCanvasRun(db, analysisRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+	result, err := updatedRun.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
+
+	updatedExecution, err := models.FindNodeExecutionInTransaction(db, analysisCanvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+}
+
 // Test__DispatchWorkOrder__RejectsWhenAlreadyActive covers acceptance
 // criterion 5: a work order with an active line dispatch cannot be
 // dispatched again.

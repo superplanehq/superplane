@@ -14,6 +14,8 @@ const { spawn } = require("child_process");
 const HOLD_SECONDS = 45;
 const WAIT_RETRY_SECONDS = 1;
 const FOLLOW_UP_CMD_INDEX_BASE = 1000;
+const MAX_UNREACHABLE_WAITS = 8;
+const WAIT_FETCH_TIMEOUT_MS = (HOLD_SECONDS + 15) * 1000;
 
 function nextAction(result) {
   const status = result && result.status ? String(result.status) : "";
@@ -26,20 +28,6 @@ function nextAction(result) {
       return { type: "prompt", text };
     }
     return { type: "wait" };
-  }
-  if (status === "created") {
-    const key = String((result && result.work_order_key) || (result && result.work_order_id) || "").trim();
-    const label = key ? ` (${key})` : "";
-    return {
-      type: "prompt",
-      text: `The user created the draft task${label}. Acknowledge that in one short friendly sentence. Ask what they want to do next. Do not call propose_draft. Do not start a new draft. Then stop.`,
-    };
-  }
-  if (status === "skipped") {
-    return {
-      type: "prompt",
-      text: "The user skipped that draft. Acknowledge that in one short friendly sentence. Ask what they want to do next. Do not call propose_draft. Do not start a new draft. Then stop.",
-    };
   }
   return { type: "wait" };
 }
@@ -59,7 +47,7 @@ async function safeWaitRequest(doFetch) {
     response = await doFetch();
     text = await response.text();
   } catch {
-    return { status: "pending" };
+    return { status: "pending", unreachable: true };
   }
   let parsed = {};
   if (text) {
@@ -83,6 +71,7 @@ async function requestJSON(method, urlPath) {
         Accept: "application/json",
         "ngrok-skip-browser-warning": "1",
       },
+      signal: AbortSignal.timeout(WAIT_FETCH_TIMEOUT_MS),
     }),
   );
 }
@@ -125,6 +114,23 @@ async function waitOnce() {
   return requestJSON("GET", `/api/v1/runner/planning-sessions/wait?hold_seconds=${HOLD_SECONDS}`);
 }
 
+function persistAnalysisContinuation(taskDir, result) {
+  if (!taskDir) {
+    return;
+  }
+  const file = path.join(taskDir, "analysis_continuation.md");
+  const text = String((result && result.continuation) || "").trim();
+  if (!text) {
+    try {
+      fs.unlinkSync(file);
+    } catch (_err) {
+      // No previous rewind file.
+    }
+    return;
+  }
+  fs.writeFileSync(file, `${text}\n`);
+}
+
 function writePrompt(taskDir, text) {
   const dir = path.join(taskDir, "prompts");
   fs.mkdirSync(dir, { recursive: true });
@@ -138,7 +144,10 @@ function runPromptFile(taskDir, promptFile, model, extraArgs = []) {
     const child = spawn(
       process.execPath,
       [path.join(taskDir, "run.js"), promptFile, model || "", ...extraArgs],
-      { stdio: "inherit" },
+      {
+        stdio: "inherit",
+        env: { ...process.env, SUPERPLANE_ANALYSIS_REWIND: "yes" },
+      },
     );
     child.on("error", reject);
     child.on("close", (code) => resolve(code == null ? 1 : code));
@@ -186,13 +195,28 @@ async function runFollowUpPrompt(text, helpers, followUpIndex) {
   return code;
 }
 
+function isUnreachableWait(result) {
+  return Boolean(result && result.unreachable);
+}
+
 async function runLoop(helpers) {
   const wait = helpers.waitOnce;
   const sleep = helpers.sleep || defaultSleep;
   const log = helpers.log || ((msg) => process.stderr.write(msg));
+  const maxUnreachable = helpers.maxUnreachableWaits || MAX_UNREACHABLE_WAITS;
   let followUpIndex = 0;
+  let unreachableStreak = 0;
   while (true) {
     const result = await wait();
+    if (isUnreachableWait(result)) {
+      unreachableStreak += 1;
+      if (unreachableStreak >= maxUnreachable) {
+        log(`stopped waiting after ${unreachableStreak} consecutive unreachable SuperPlane contacts\n`);
+        return 0;
+      }
+    } else {
+      unreachableStreak = 0;
+    }
     const action = nextAction(result);
     if (action.type === "exit") {
       return action.code;
@@ -201,6 +225,7 @@ async function runLoop(helpers) {
       await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
+    persistAnalysisContinuation(helpers.taskDir, result);
     const code = await runFollowUpPrompt(action.text, helpers, followUpIndex);
     followUpIndex += 1;
     if (code !== 0) {
@@ -216,6 +241,7 @@ async function main() {
   const extraArgs = process.argv.slice(3);
   const code = await runLoop({
     waitOnce,
+    taskDir,
     runPrompt: (text) => runPromptFile(taskDir, writePrompt(taskDir, text), model, extraArgs),
   });
   process.exit(code);
@@ -223,8 +249,10 @@ async function main() {
 
 module.exports = {
   FOLLOW_UP_CMD_INDEX_BASE,
+  MAX_UNREACHABLE_WAITS,
   interpretWaitResponse,
   nextAction,
+  persistAnalysisContinuation,
   runLoop,
   safeWaitRequest,
   writeLiveLogRecord,

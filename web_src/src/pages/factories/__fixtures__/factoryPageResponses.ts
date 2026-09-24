@@ -11,16 +11,23 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
-  FactoryApp,
+  FactoriesFactoryAgentResource,
+  FactoryAutomation,
   FactoryLineStep,
   SuperplaneUsersUser,
 } from "@/api-client";
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
+import type { PlanningSessionPayload } from "../pages/planningSessionView";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
-import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import {
+  DEFAULT_FACTORY_USAGE,
+  EMPTY_USAGE_REPORT,
+  ACTIVE_TRIAL_ENDS_AT,
+  type StorybookUsageReport,
+} from "./usageReportFixtures";
 import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
@@ -64,7 +71,7 @@ export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[nu
   };
 }
 
-export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
+export const GITHUB_ISSUES_INTAKE_APP: FactoryAutomation = {
   id: GITHUB_ISSUES_INTAKE_APP_ID,
   name: "GitHub issue intake",
   description: "Listens for GitHub issues and creates backlog tasks.",
@@ -145,7 +152,7 @@ function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   };
 }
 
-export const REFUND_FACTORY_APPS: FactoryApp[] = [
+export const REFUND_FACTORY_APPS: FactoryAutomation[] = [
   {
     id: "app-refund-planner",
     name: "Refund Planner",
@@ -199,6 +206,13 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   },
 ];
 
+export const DEFAULT_FACTORY_PLANNING = {
+  enabled: true,
+  clarity: true,
+  confidence: true,
+  setupCompleted: false,
+} as const;
+
 export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
   name: "Semaphore",
@@ -207,6 +221,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
     "Handles reconciliation work: implement a change across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
   onboarding: { completedAt: LAST_WEEK },
+  planning: { ...DEFAULT_FACTORY_PLANNING, setupCompleted: true },
 };
 
 export const EMPTY_FACTORY: FactoriesFactory = {
@@ -215,12 +230,20 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   key: "PF",
   description: "New factory. No lines or tasks configured yet.",
   lines: [],
+  planning: { ...DEFAULT_FACTORY_PLANNING },
 };
+
+export function factoryWithPlanning(
+  factory: FactoriesFactory,
+  planning: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean },
+): FactoriesFactory {
+  return { ...factory, planning };
+}
 
 const ACME_ONBOARDING_DONE_APP_ID = "app-acme-done";
 const ACME_ONBOARDING_BACKLOG_APP_ID = "app-acme-backlog";
 
-export const ACME_ONBOARDING_APPS: FactoryApp[] = [
+export const ACME_ONBOARDING_APPS: FactoryAutomation[] = [
   {
     id: ACME_ONBOARDING_BACKLOG_APP_ID,
     name: "Backlog",
@@ -263,6 +286,7 @@ export const ACME_ONBOARDING_FACTORY: FactoriesFactory = {
   description: "Empty first-run workspace. The board has no tickets yet.",
   lines: [ACME_ONBOARDING_LINE],
   onboarding: { completedAt: LAST_WEEK },
+  planning: { ...DEFAULT_FACTORY_PLANNING },
 };
 
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
@@ -285,7 +309,7 @@ export interface FactoriesFixture {
   organizationId: string;
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
-  appsByFactoryId: Record<string, FactoryApp[]>;
+  appsByFactoryId: Record<string, FactoryAutomation[]>;
   /** Intakes the workspace declared. Created intakes are appended here. */
   intakesByFactoryId?: Record<string, FactoriesFactoryIntake[]>;
   /** PR feedback handlers the workspace declared. */
@@ -329,6 +353,7 @@ export interface FactoriesFixture {
     subscriptionCheckoutEnabled?: boolean;
     creditPurchaseAllowed?: boolean;
     hasBillingCustomer?: boolean;
+    cancelAtPeriodEnd?: boolean;
   };
   /** Count of POST /billing/sync calls in this fixture session. */
   billingSyncCalls?: number;
@@ -356,8 +381,14 @@ export interface FactoriesFixture {
   pullRequestsByOrderId?: Record<string, FactoriesFactoryPullRequest[]>;
   /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
   checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
+  /** Storybook-only refine-chat sessions for `GET …/work-orders/{id}/planning-session`. */
+  planningSessionsByWorkOrderId?: Record<string, PlanningSessionPayload>;
   /** Storybook-only intake items for the Backlog create search. */
   intakeItemCatalog?: BacklogIntakeItemCatalog;
+  /** Workspace agent resources (MCP connections and skill shells). */
+  agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
+  /** Tools returned by GET .../agent-resources/{id}/tools. */
+  agentResourceToolsById?: Record<string, Array<{ name: string; description?: string }>>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
@@ -400,7 +431,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationBilling: {
     plan: "trial",
     planSource: "system",
-    trialEndsAt: "2026-09-22T12:00:00.000Z",
+    trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",
     includedRemainingCents: "0",
     purchasedRemainingCents: "0",

@@ -3,16 +3,23 @@ import { describe, expect, it } from "bun:test";
 import {
   firstPositiveWorkOrderMetric,
   formatDurationSeconds,
+  formatUsageCsvDollarsFromMicros,
   formatUsageMachineTypes,
   formatUsageModels,
   formatUsageOccurredAt,
   formatUsageSpend,
+  formatUsageSpendMicros,
   formatUsageTaskKey,
   formatUsageTaskName,
   formatUsageTokensAndTime,
+  formatUsdMicros,
   formatWorkOrderExecutionUsage,
+  usageSpendMicros,
   usageTokenSpendCents,
+  usageTokenSpendMicros,
   usageVmSpendCents,
+  usageVmSpendMicros,
+  workOrderSpendBreakdownRows,
 } from "./workOrderUsage";
 
 describe("firstPositiveWorkOrderMetric", () => {
@@ -160,6 +167,54 @@ describe("usageVmSpendCents", () => {
   });
 });
 
+describe("usageSpendMicros", () => {
+  it("prefers ledger micros when the field is present", () => {
+    expect(usageSpendMicros("3150", "18")).toBe(3150);
+    expect(usageSpendMicros(0, "18")).toBe(0);
+  });
+
+  it("falls back to whole cents when micros are omitted", () => {
+    expect(usageSpendMicros(undefined, "18")).toBe(180_000);
+  });
+});
+
+describe("formatUsageSpendMicros", () => {
+  it("keeps two decimals at one cent and above", () => {
+    expect(formatUsageSpendMicros(1_230_000)).toBe("$1.23");
+    expect(formatUsageSpendMicros(20_000)).toBe("$0.02");
+  });
+
+  it("shows sub-cent VM spend instead of an em dash", () => {
+    expect(formatUsageSpendMicros(3_150)).toBe("$0.00315");
+    expect(formatUsageSpendMicros(90)).toBe("$0.00009");
+  });
+
+  it("returns an em dash when there is no spend", () => {
+    expect(formatUsageSpendMicros(0)).toBe("—");
+  });
+});
+
+describe("usageVmSpendMicros", () => {
+  it("keeps a remainder that is smaller than one cent", () => {
+    expect(usageVmSpendMicros(183_150, 180_000, 0)).toBe(3_150);
+    expect(usageTokenSpendMicros(180_000, 0)).toBe(180_000);
+  });
+});
+
+describe("formatUsageCsvDollarsFromMicros", () => {
+  it("matches the table's sub-cent precision without a dollar sign", () => {
+    expect(formatUsageCsvDollarsFromMicros(1_230_000)).toBe("1.23");
+    expect(formatUsageCsvDollarsFromMicros(3_150)).toBe("0.00315");
+    expect(formatUsageCsvDollarsFromMicros(0)).toBe("");
+  });
+});
+
+describe("formatUsdMicros", () => {
+  it("formats a whole-cent amount with two decimals", () => {
+    expect(formatUsdMicros(50_000)).toBe("$0.05");
+  });
+});
+
 describe("formatUsageOccurredAt", () => {
   it("formats an ISO timestamp without the year or UTC suffix", () => {
     expect(formatUsageOccurredAt("2026-09-08T15:04:00Z")).toBe("Sep 8, 3:04 PM");
@@ -172,5 +227,28 @@ describe("formatUsageOccurredAt", () => {
   it("returns an em dash for missing or invalid values", () => {
     expect(formatUsageOccurredAt(undefined)).toBe("—");
     expect(formatUsageOccurredAt("not-a-date")).toBe("—");
+  });
+});
+
+describe("workOrderSpendBreakdownRows", () => {
+  it("lists models with spend and one machine time row", () => {
+    expect(
+      workOrderSpendBreakdownRows(
+        [
+          { provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" },
+          { provider: "openai", model: "gpt-4.1", totalTokens: "10", costCents: "0" },
+        ],
+        [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
+      ),
+    ).toEqual([
+      { label: "claude-sonnet-4-6", detail: "2.7k tokens", spend: "$0.45" },
+      { label: "Machine time", detail: "1 min 30 s", spend: "$0.28" },
+    ]);
+  });
+
+  it("returns no rows when nothing has spend", () => {
+    expect(
+      workOrderSpendBreakdownRows([{ model: "claude-sonnet-4-6", totalTokens: "10", costCents: "0" }], []),
+    ).toEqual([]);
   });
 });

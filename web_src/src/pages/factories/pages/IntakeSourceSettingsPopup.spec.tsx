@@ -4,6 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -11,10 +16,18 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_PRODUCTIVE_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
+  INTAKE_SETTINGS_COPY,
+  type IntakeSettingsTab,
+} from "./intakeSourceSettingsModel";
+import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
@@ -33,6 +46,18 @@ vi.mock("@/hooks/useCanvasData", () => {
     useInfiniteCanvasRuns,
   };
 });
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
+    data: [
+      { id: "todo", name: "To Do" },
+      { id: "qa", name: "QA" },
+      { id: "done", name: "Done" },
+    ],
+    isLoading: false,
+    isError: false,
+  }),
+}));
 
 useInfiniteCanvasRuns.mockReturnValue({
   data: {
@@ -63,8 +88,8 @@ const githubAutomationGraph = githubIntakeGraph();
 
 /** Same pipeline the canvas editor uses, so the popup renders editor nodes. */
 function githubIntakeGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData(
-    {
+  const { nodes, edges } = prepareData({
+    workflow: {
       metadata: { id: "app-github-issues-intake", name: "GitHub issues", factoryId: "factory-1" },
       spec: {
         nodes: [
@@ -84,19 +109,19 @@ function githubIntakeGraph(): IntakeAutomationGraph {
         ],
       },
     },
-    [{ name: "github.onIssue", label: "On Issue" }],
-    [
+    triggers: [{ name: "github.onIssue", label: "On Issue" }],
+    components: [
       { name: "if", label: "If" },
       { name: "createWorkOrder", label: "Create Task" },
     ],
-    {},
-    {},
-    {},
-    "app-github-issues-intake",
-    new QueryClient(),
-    null,
-    "live",
-  );
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "app-github-issues-intake",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
 
   return {
     nodes,
@@ -117,6 +142,13 @@ function renderPopup(
     initialTab?: IntakeSettingsTab;
     labelOptions?: string[];
     labelOptionsLoading?: boolean;
+    sourceId?: LineIntakeSourceId;
+    settings?: typeof DEFAULT_GITHUB_INTAKE_SETTINGS;
+    organizationId?: string;
+    integrationId?: string;
+    resourceId?: string;
+    deleteError?: string;
+    onDelete?: () => void | Promise<void>;
   } = {},
 ) {
   return render(
@@ -125,11 +157,28 @@ function renderPopup(
         <ThemeProvider>
           <TooltipProvider>
             <IntakeSourceSettingsPopup
-              settings={DEFAULT_GITHUB_INTAKE_SETTINGS}
+              settings={
+                props.settings ??
+                (props.sourceId === "sentry-exceptions"
+                  ? DEFAULT_SENTRY_INTAKE_SETTINGS
+                  : props.sourceId === "jira-issues"
+                    ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
+                    : props.sourceId === "pagerduty-incidents"
+                      ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "PagerDuty incidents" }
+                      : props.sourceId === "productive-tasks"
+                        ? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS
+                        : DEFAULT_GITHUB_INTAKE_SETTINGS)
+              }
+              sourceId={props.sourceId}
+              organizationId={props.organizationId}
+              integrationId={props.integrationId}
+              resourceId={props.resourceId}
               labelOptions={props.labelOptions ?? ["bug", "enhancement"]}
               labelOptionsLoading={props.labelOptionsLoading}
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
+              deleteError={props.deleteError}
+              onDelete={props.onDelete}
               editAutomationHref={props.editAutomationHref}
               canvasId={props.canvasId}
               runHrefFor={props.runHrefFor}
@@ -174,6 +223,22 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["github-issues", "GitHub issues", githubIcon],
+    ["jira-issues", "Jira issues", jiraIcon],
+    ["sentry-exceptions", "Sentry exceptions", sentryIcon],
+    ["pagerduty-incidents", "PagerDuty incidents", pagerdutyIcon],
+    ["productive-tasks", "Productive.io tasks", productiveIcon],
+  ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
+    renderPopup({ sourceId });
+
+    const heading = screen.getByRole("heading", { name: `Intake ${name}` });
+    const icon = screen.getByTestId("intake-source-settings-title-icon");
+    expect(icon).toHaveAttribute("alt", "");
+    expect(icon).toHaveAttribute("src", iconSrc);
+    expect(icon.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("offers the labels that exist in the repository", async () => {
@@ -315,18 +380,88 @@ describe("IntakeSourceSettingsPopup", () => {
 
     await waitFor(() =>
       expect(onSave).toHaveBeenCalledWith({
-        name: "GitHub issues",
-        confidencePct: 65,
-        labelFilterMode: "include",
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
         labels: ["bug"],
         filterByLabel: true,
-        assignment: "any",
-        newIssues: true,
         reopenedIssues: false,
-        superplaneLabelAdded: true,
         authorsWithAccess: true,
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+    "hides connection, project, and pause controls for a %s intake",
+    (sourceId) => {
+      renderPopup({ sourceId });
+
+      expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+    "deletes a %s intake after confirmation",
+    async (sourceId) => {
+      const onDelete = vi.fn();
+      const user = userEvent.setup();
+      renderPopup({ sourceId, onDelete });
+
+      expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+
+      await user.click(screen.getByTestId("intake-source-settings-delete"));
+      expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+      expect(onDelete).not.toHaveBeenCalled();
+      await user.click(screen.getByTestId("intake-delete-cancel"));
+      expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
+      expect(onDelete).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("intake-source-settings-delete"));
+      await user.click(screen.getByTestId("intake-delete-confirm"));
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("shows a delete error in the confirmation dialog", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      onDelete: vi.fn().mockRejectedValue(new Error("delete failed")),
+      deleteError: INTAKE_SETTINGS_COPY.deleteError,
+    });
+
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+
+    const dialog = screen.getByTestId("intake-delete-dialog");
+    expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteError);
+    expect(within(screen.getByTestId("intake-source-settings")).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows the Jira completion column on the General tab", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "jira-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" },
+      organizationId: "org-1",
+      integrationId: "jira-1",
+      resourceId: "ENG",
+      onSave,
+    });
+
+    expect(screen.getByRole("heading", { name: "Intake Jira issues" })).toBeInTheDocument();
+    expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
+    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
+    await user.click(screen.getByTestId("jira-completion-column-select"));
+    await user.click(screen.getByRole("option", { name: "QA" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jiraMoveOnComplete: true,
+        jiraCompletionColumn: "QA",
+      }),
+    );
   });
 });
