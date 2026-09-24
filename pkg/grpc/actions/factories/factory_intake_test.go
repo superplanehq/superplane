@@ -129,7 +129,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "payments", trigger.Configuration["project"])
-		assert.Equal(t, []any{"created", "unresolved"}, trigger.Configuration["actions"])
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
 		assert.Equal(t, integrationID, intake.GetIntegrationId())
 		assert.Equal(t, "payments", intake.GetResourceId())
 		assert.True(t, intake.GetHealthy())

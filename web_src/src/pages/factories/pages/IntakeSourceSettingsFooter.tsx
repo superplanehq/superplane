@@ -71,7 +71,7 @@ export function IntakeSourceSettingsFooter({
           disabled={savePending}
           onClick={async () => {
             try {
-              await onSave(normalizeIntakeSourceSettings(draft));
+              await onSave(normalizeIntakeSourceSettings(draft, sourceId));
               onClose();
             } catch {
               // The parent supplies the actionable error message.
