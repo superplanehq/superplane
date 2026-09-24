@@ -7,6 +7,7 @@ import {
   hostedModelsQueriesLoading,
   isAgentStepReady,
   isHostedAgentReady,
+  onboardingAgentGate,
   resolveOnboardingAgent,
   shouldShowHostedCreditGrant,
 } from "./onboardingAgentReadiness";
@@ -120,6 +121,34 @@ describe("resolveOnboardingAgent", () => {
     ).toBe("openai");
   });
 
+  it("uses a connected provider key before hosted models when the organization brings its own key", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      }),
+    ).toMatchObject({
+      providerId: "claude",
+      credentialsSource: "integration",
+      model: "sonnet",
+    });
+  });
+
+  it("keeps the hosted model when bring-your-own-key is on and no provider is connected", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected(),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      })?.credentialsSource,
+    ).toBe("hosted");
+  });
+
   it("prefers hosted SuperPlane over a connected org provider when a default model is set", () => {
     expect(
       resolveOnboardingAgent({
@@ -178,6 +207,32 @@ describe("isHostedAgentReady", () => {
 
   it("is not ready without a plan", () => {
     expect(isHostedAgentReady(undefined)).toBe(false);
+  });
+});
+
+describe("onboardingAgentGate", () => {
+  it("skips the agent screen when hosted models cover the agent", () => {
+    expect(onboardingAgentGate({ hostedAgentReady: true, bringYourOwnKey: false, bringYourOwnKeyLoading: false })).toBe(
+      "skip",
+    );
+  });
+
+  it("shows the agent screen when the organization can bring its own key", () => {
+    expect(onboardingAgentGate({ hostedAgentReady: true, bringYourOwnKey: true, bringYourOwnKeyLoading: false })).toBe(
+      "show",
+    );
+  });
+
+  it("waits while the bring-your-own-key flag is still loading", () => {
+    expect(onboardingAgentGate({ hostedAgentReady: true, bringYourOwnKey: false, bringYourOwnKeyLoading: true })).toBe(
+      "pending",
+    );
+  });
+
+  it("shows the agent screen when no hosted model is ready", () => {
+    expect(
+      onboardingAgentGate({ hostedAgentReady: false, bringYourOwnKey: false, bringYourOwnKeyLoading: false }),
+    ).toBe("show");
   });
 });
 

@@ -74,6 +74,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    bringYourOwnKey: false,
+    bringYourOwnKeyLoading: false,
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
@@ -112,9 +114,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
-function renderSetup(model: OnboardingPageModel) {
+function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
   render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+    <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
   );
@@ -216,5 +218,36 @@ describe("FirstRunSetup chrome", () => {
     );
 
     expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
+  });
+
+  it("opens the agent screen when the organization can bring its own key", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: true, bringYourOwnKey: true });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
+
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled();
+    expect(model.finish).not.toHaveBeenCalled();
+  });
+
+  it("waits to choose the agent screen while the bring-your-own-key flag is loading", () => {
+    renderSetup(pageModel({ hostedAgentReady: true, bringYourOwnKeyLoading: true }));
+
+    const continueButton = screen.getByTestId("first-run-analyze-tickets");
+    expect(continueButton).toBeDisabled();
+    expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.agent.loading);
+    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+  });
+
+  it("resumes on the agent screen when a bring-your-own-key organization has hosted models", () => {
+    renderSetup(
+      pageModel({ hostedAgentReady: true, bringYourOwnKey: true, openSection: "agent" }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
+
+    expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
 });

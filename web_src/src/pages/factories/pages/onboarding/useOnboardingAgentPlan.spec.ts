@@ -26,6 +26,21 @@ describe("useOnboardingAgentPlan", () => {
     });
   });
 
+  it("uses a connected provider key when the organization brings its own key", () => {
+    const { result } = renderHook(() =>
+      useOnboardingAgentPlan("org-1", new Set(["claude"]), 0, {
+        provider: "anthropic",
+        model: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      }),
+    );
+
+    expect(result.current.plan).toMatchObject({
+      providerId: "claude",
+      credentialsSource: "integration",
+    });
+  });
+
   it("requires a provider connection when no hosted agent is configured", () => {
     const { result } = renderHook(() => useOnboardingAgentPlan("org-1", new Set(), 0));
 

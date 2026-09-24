@@ -70,6 +70,7 @@ function AgentScreen({
   sphere,
   saving,
   loading,
+  hostedAgentReady,
   onRequestConnect,
   onContinue,
 }: {
@@ -79,6 +80,7 @@ function AgentScreen({
   sphere?: FirstRunSphereProps;
   saving: boolean;
   loading: boolean;
+  hostedAgentReady: boolean;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
@@ -102,7 +104,7 @@ function AgentScreen({
         <LoadingButton
           type="button"
           className="w-full"
-          disabled={!setup.agentReady || loading}
+          disabled={(!setup.agentReady && !hostedAgentReady) || loading}
           loading={saving}
           loadingText={FIRST_RUN_COPY.finish.saving}
           onClick={onContinue}
@@ -167,6 +169,7 @@ function TicketsScreenHost({
       chrome={chrome}
       sphere={sphere}
       continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
+      continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
       savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
       jiraConnected={model.setup.connected.has("jira")}
@@ -303,6 +306,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.blockingAction === "finishing-setup" || model.saving}
       loading={model.agentLoading}
+      hostedAgentReady={model.hostedAgentReady}
       onRequestConnect={model.requestConnect}
       onContinue={() => void flow.finishSetup()}
     />

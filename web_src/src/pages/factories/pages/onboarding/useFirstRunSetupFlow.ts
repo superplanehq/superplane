@@ -28,6 +28,7 @@ import {
   ticketSourceFromIssuesChoice,
 } from "./first-run/firstRunTicketSource";
 import { type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import { onboardingAgentGate, type OnboardingAgentGate } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -69,8 +70,9 @@ function startConnectOnPicker(searchParams: URLSearchParams): boolean {
   return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
 }
 
-function screenWithoutAgent(screen: FirstRunScreen, skipAgentScreen: boolean): FirstRunScreen {
-  return screen === "agent" && skipAgentScreen ? "tickets" : screen;
+function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
+  if (screen !== "agent" || agentGate === "show") return screen;
+  return "tickets";
 }
 
 function useFirstRunBlockingAction() {
@@ -186,7 +188,7 @@ function screenWithoutIncompleteJira(
 
 function useFirstRunNavigation(
   model: OnboardingPageModel,
-  skipAgentScreen: boolean,
+  agentGate: OnboardingAgentGate,
   connection: ReturnType<typeof useGitHubConnectionState>,
 ) {
   const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(connection.initialScreen);
@@ -211,7 +213,7 @@ function useFirstRunNavigation(
 
   return {
     screen: screenWithoutIncompleteJira(
-      screenWithoutAgent(openedScreen, skipAgentScreen),
+      screenWithoutAgent(openedScreen, agentGate),
       model.setup.issuesChoice,
       model.jiraProjectId,
     ),
@@ -244,7 +246,7 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
 
 function useFirstRunCommands(
   model: OnboardingPageModel,
-  skipAgentScreen: boolean,
+  agentGate: OnboardingAgentGate,
   connection: ReturnType<typeof useGitHubConnectionState>,
   navigation: ReturnType<typeof useFirstRunNavigation>,
   blocking: ReturnType<typeof useFirstRunBlockingAction>,
@@ -263,7 +265,8 @@ function useFirstRunCommands(
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
       if (!(await model.saveIssues(issuesChoice))) return;
-      if (!skipAgentScreen) return navigation.goToScreen("agent");
+      if (agentGate === "pending") return;
+      if (agentGate === "show") return navigation.goToScreen("agent");
       blocking.setAction("finishing-setup");
       await model.finish(issuesChoice);
     });
@@ -389,11 +392,16 @@ export function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refre
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
-  const skipAgentScreen = model.hostedAgentReady;
+  const agentGate = onboardingAgentGate({
+    hostedAgentReady: model.hostedAgentReady,
+    bringYourOwnKey: model.bringYourOwnKey,
+    bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
+  });
+  const skipAgentScreen = agentGate === "skip";
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(model, organizationId);
-  const navigation = useFirstRunNavigation(model, skipAgentScreen, connection);
-  const commands = useFirstRunCommands(model, skipAgentScreen, connection, navigation, blocking);
+  const navigation = useFirstRunNavigation(model, agentGate, connection);
+  const commands = useFirstRunCommands(model, agentGate, connection, navigation, blocking);
   const binding = useGitHubInstallationBinding(
     organizationId,
     model,
@@ -416,6 +424,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...commands,
     ...binding,
     skipAgentScreen,
+    agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,

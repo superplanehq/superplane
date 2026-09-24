@@ -1,5 +1,7 @@
 import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { hostedModelIds } from "@/lib/hostedLLMModels";
+import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 
@@ -15,7 +17,7 @@ export function useOnboardingAgentPlan(
   organizationId: string,
   connected: Set<IntegrationId>,
   remainingCreditCents: number,
-  defaultHosted?: { provider?: string; model?: string },
+  defaultHosted?: { provider?: string; model?: string; preferOwnKey?: boolean },
 ) {
   const needHostedModels = isAgentProviderConnected(connected);
   const anthropic = useHostedLLMModels(organizationId, "anthropic", needHostedModels);
@@ -33,6 +35,7 @@ export function useOnboardingAgentPlan(
       },
       defaultHostedProvider: defaultHosted?.provider,
       defaultHostedModel: defaultHosted?.model,
+      preferOwnKey: defaultHosted?.preferOwnKey,
     }),
   };
 }
@@ -61,4 +64,18 @@ export function agentRewriteFromPlan(
       name: selections[integrationName]?.name ?? integrationName,
     },
   };
+}
+
+export function useOnboardingAgentContext(
+  organizationId: string,
+  connected: Set<IntegrationId>,
+  preferOwnKey: boolean,
+) {
+  const spend = useOrganizationWorkspaceUsage(organizationId);
+  const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
+  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents, {
+    provider: spend.data?.defaultHostedProvider,
+    model: spend.data?.defaultHostedModel,
+    preferOwnKey,
+  });
 }
