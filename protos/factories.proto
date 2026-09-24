@@ -1785,6 +1785,9 @@ message WorkOrderLineDispatch {
   // Model chosen at Start. Empty means Auto: each runner keeps the model
   // stored on the live automation canvas.
   string model = 10;
+  // Thinking chosen at Start. Empty means Auto: each runner keeps the
+  // thinking level stored on the live automation canvas.
+  string thinking_level = 11;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -1896,6 +1899,8 @@ message DispatchWorkOrderRequest {
   bool replace_active = 5;
   // Optional model override for this start. Empty means Auto.
   string model = 6;
+  // Optional thinking override for this start. Empty means Auto.
+  string thinking_level = 7;
 }
 
 message DispatchWorkOrderResponse {

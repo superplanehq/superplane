@@ -119,6 +119,15 @@ func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
 	require.NotContains(t, task.Commands[1].Command, " 64")
 }
 
+func TestBuildOpenRouterBrokerTaskPassesThinking(t *testing.T) {
+	t.Parallel()
+
+	spec := validOpenRouterSpec("fix tests")
+	spec.ThinkingLevel = "low"
+	task := buildOpenRouterBrokerTask(spec, "", nil, nil)
+	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6' 'low'`)
+}
+
 func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
 	t.Parallel()
 
