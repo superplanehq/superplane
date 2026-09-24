@@ -9,8 +9,6 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 const SENTRY_INTAKE_SETTINGS_COPY = {
   intakeSection: "Create task when:",
   newIssues: "A new issue is created",
-  regressedIssues: "An issue becomes unresolved",
-  assignedIssues: "An issue is assigned",
 } as const;
 
 export function SentryIntakeFilterFields({
@@ -41,18 +39,6 @@ export function SentryIntakeFilterFields({
             title={SENTRY_INTAKE_SETTINGS_COPY.newIssues}
             checked={settings.sentryNewIssues}
             onChange={() => update("sentryNewIssues", !settings.sentryNewIssues)}
-          />
-          <IntakeSettingsCheckbox
-            id={`${idPrefix}-regressed-issues`}
-            title={SENTRY_INTAKE_SETTINGS_COPY.regressedIssues}
-            checked={settings.sentryRegressedIssues}
-            onChange={() => update("sentryRegressedIssues", !settings.sentryRegressedIssues)}
-          />
-          <IntakeSettingsCheckbox
-            id={`${idPrefix}-assigned-issues`}
-            title={SENTRY_INTAKE_SETTINGS_COPY.assignedIssues}
-            checked={settings.sentryAssignedIssues}
-            onChange={() => update("sentryAssignedIssues", !settings.sentryAssignedIssues)}
           />
         </div>
       </fieldset>
