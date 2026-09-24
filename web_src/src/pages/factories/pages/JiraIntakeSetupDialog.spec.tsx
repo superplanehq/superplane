@@ -132,7 +132,9 @@ describe("JiraIntakeSetupDialog", () => {
 
     expect(await screen.findByRole("heading", { name: JIRA_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
     expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toBeInTheDocument();
-    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("10 newest");
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
+      "adds the newest unresolved issues",
+    );
     expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
       "listens for new issues",
     );
