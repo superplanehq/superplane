@@ -220,6 +220,8 @@ type productiveDelivery struct {
 	} `json:"object"`
 }
 
+const taskListFetchAttempts = 3
+
 func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) error {
 	if taskListID(document) != "" || ctx.HTTP == nil || ctx.Integration == nil {
 		return nil
@@ -236,16 +238,24 @@ func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) err
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	task, err := client.GetTask(id)
-	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.WithError(err).Warnf("productive task %s: task list unavailable, continuing without it", id)
+	var lastErr error
+	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+		task, err := client.GetTask(id)
+		if err == nil {
+			setTaskListID(document, task.TaskListID)
+			return nil
 		}
-		return nil
+		lastErr = err
 	}
 
-	setTaskListID(document, task.TaskListID)
-	return nil
+	if ctx.Logger != nil {
+		ctx.Logger.WithError(lastErr).Warnf(
+			"productive task %s: task list unavailable after %d attempts",
+			id,
+			taskListFetchAttempts,
+		)
+	}
+	return fmt.Errorf("productive task %s: task list unavailable: %v", id, lastErr)
 }
 
 func taskDocument(body []byte) (map[string]any, error) {
