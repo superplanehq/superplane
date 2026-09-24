@@ -11,14 +11,11 @@ describe("filterMCPCatalog", () => {
     expect(filterMCPCatalog(MCP_CATALOG, "GitHub").map((entry) => entry.id)).toEqual(["github"]);
     expect(filterMCPCatalog(MCP_CATALOG, "linear").map((entry) => entry.id)).toEqual(["linear"]);
     expect(filterMCPCatalog(MCP_CATALOG, "pager").map((entry) => entry.id)).toEqual(["pagerduty"]);
-    expect(filterMCPCatalog(MCP_CATALOG, "observability").map((entry) => entry.id).sort()).toEqual([
-      "datadog",
-      "grafana",
-      "honeycomb",
-      "logfire",
-      "newrelic",
-      "sentry",
-    ]);
+    expect(
+      filterMCPCatalog(MCP_CATALOG, "observability")
+        .map((entry) => entry.id)
+        .sort(),
+    ).toEqual(["datadog", "grafana", "honeycomb", "logfire", "newrelic", "sentry"]);
   });
 });
 

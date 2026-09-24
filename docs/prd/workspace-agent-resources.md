@@ -14,8 +14,7 @@ sections are separate. One attach function still injects enabled rows.
    rows. Do not add a second table.
 2. **Separate MCP and Skills settings pages.** The pages live under
    Workspace settings. Permission is `factories:update`. Experimental
-   flags are `workspace_mcp` and `workspace_skills`. The legacy flag
-   `workspace_agent_resources` enables both. The old
+   flags are `workspace_mcp` and `workspace_skills`. The old
    `workspace/agent-resources` route redirects to the new pages.
 3. **MCP v1 auth is headers or OAuth.** SuperPlane completes OAuth in the
    browser. The runner receives only a Bearer access token. Do not write
@@ -66,7 +65,7 @@ Do not reinvent these pieces:
 | OAuth | SuperPlane is the MCP OAuth client. Inject Bearer at task start. |
 | Cap | At most 20 enabled MCP servers per workspace. |
 | Skills v1 | Inline SKILL.md only. Extra files and scripts are not included. |
-| Flags | `workspace_mcp` and `workspace_skills`. `workspace_agent_resources` is a legacy alias. |
+| Flags | `workspace_mcp` and `workspace_skills`. |
 | Settings pages | Workspace / MCP servers and Workspace / Skills. |
 | Routes | `.../settings/workspace/mcp` and `.../settings/workspace/skills`. Skill create and edit use `/new` and `/:resourceId`. |
 | Tools | Workspace `disabledTools` plus node `disabledAgentResourceTools`. New tools stay on. |

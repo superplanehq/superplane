@@ -19,7 +19,7 @@ import (
 
 func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -99,7 +99,7 @@ func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRejectsNonJSON(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

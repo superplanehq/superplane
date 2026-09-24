@@ -20,14 +20,15 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
-func enableWorkspaceAgentResources(t *testing.T, orgID uuid.UUID) {
+func enableWorkspaceMCPAndSkills(t *testing.T, orgID uuid.UUID) {
 	t.Helper()
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceMCP))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceSkills))
 }
 
 func Test__DeleteFactoryAgentResourceRevokesOAuth(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -67,7 +68,7 @@ func Test__DeleteFactoryAgentResourceRevokesOAuth(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -110,7 +111,7 @@ func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -171,7 +172,7 @@ func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -192,7 +193,7 @@ func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -208,7 +209,7 @@ func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceAgentResources(t, r.Organization.ID)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

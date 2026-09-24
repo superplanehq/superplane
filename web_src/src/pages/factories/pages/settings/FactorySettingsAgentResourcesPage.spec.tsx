@@ -4,7 +4,6 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import {
-  FEATURE_WORKSPACE_AGENT_RESOURCES,
   FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
@@ -29,6 +28,7 @@ vi.mock("@monaco-editor/react", () => ({
 
 const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
 const skillsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
+const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 describe("FactorySettingsMCPPage", () => {
   beforeAll(() => {
@@ -49,12 +49,12 @@ describe("FactorySettingsMCPPage", () => {
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-skills")).not.toBeInTheDocument();
   }, 10000);
 
-  it("shows the nav items when the legacy feature is on", async () => {
+  it("shows the nav items when both features are on", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -105,7 +105,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -117,7 +117,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources?tab=skills`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -129,7 +129,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={mcpPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -148,7 +148,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -169,7 +169,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -188,7 +188,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [OAUTH_NOT_CONNECTED_RESOURCE] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -204,7 +204,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`${mcpPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -222,7 +222,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`${mcpPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -249,7 +249,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -267,7 +267,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -289,7 +289,7 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={skillsPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -305,7 +305,7 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={`${skillsPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -321,7 +321,7 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={`${skillsPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -337,7 +337,7 @@ describe("FactorySettingsSkillsPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 
@@ -354,7 +354,7 @@ describe("FactorySettingsSkillsPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [UI_UX_PRO_MAX_SKILL] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+        experimentalFeatures={mcpAndSkills}
       />,
     );
 

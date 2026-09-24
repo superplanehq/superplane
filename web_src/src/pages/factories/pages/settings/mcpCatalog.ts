@@ -1,13 +1,6 @@
 import type { FactoryAgentResourceAuth } from "@/api-client";
 
-export type MCPCatalogCategory =
-  | "code"
-  | "issues"
-  | "chat"
-  | "cicd"
-  | "observability"
-  | "incident"
-  | "infrastructure";
+export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
 
 export type MCPCatalogEntry = {
   id: string;

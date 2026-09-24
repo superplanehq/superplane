@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import { CUSTOM_MCP_CATALOG_ID, filterMCPCatalog, groupMCPCatalog, MCP_CATALOG, type MCPCatalogEntry } from "./mcpCatalog";
+import {
+  CUSTOM_MCP_CATALOG_ID,
+  filterMCPCatalog,
+  groupMCPCatalog,
+  MCP_CATALOG,
+  type MCPCatalogEntry,
+} from "./mcpCatalog";
 
 export function MCPAddPicker({
   open,
