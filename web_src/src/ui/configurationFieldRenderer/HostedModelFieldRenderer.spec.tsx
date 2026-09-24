@@ -148,10 +148,12 @@ describe("HostedModelFieldRenderer", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "openai/gpt-5" })).not.toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
+    expect(screen.getByText("Thinking")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "openai/gpt-5" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" }));
+    await user.click(screen.getByRole("menuitem", { name: "anthropic/claude-sonnet-4-6" }));
     expect(onChange).toHaveBeenCalledWith("claude-sonnet-4-6");
   });
 
@@ -225,9 +227,9 @@ describe("HostedModelFieldRenderer", () => {
       enabled: true,
     });
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "openai/gpt-5" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "openai/gpt-5" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
   });
 
   it("selects the instance SuperPlane agent model by default", () => {
@@ -258,5 +260,67 @@ describe("HostedModelFieldRenderer", () => {
       sources: ["hosted"],
       enabled: true,
     });
+  });
+
+  it("keeps an unset SuperPlane model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createSuperPlaneField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
+  it("writes thinkingLevel next to the model", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6" }}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
+  });
+
+  it("clears thinkingLevel when Default is selected", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6", thinkingLevel: "high" }}
+        organizationId="org-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.click(screen.getByRole("menuitem", { name: "Default" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: undefined });
   });
 });

@@ -14,6 +14,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestThinkingArgsMapsEffortFlags(t *testing.T) {
+	assert.Empty(t, thinkingArgsFromScript(t, ""))
+	assert.Empty(t, thinkingArgsFromScript(t, "default"))
+	assert.Equal(t, []string{"--effort", "low"}, thinkingArgsFromScript(t, "low"))
+	assert.Equal(t, []string{"--effort", "medium"}, thinkingArgsFromScript(t, "MEDIUM"))
+	assert.Equal(t, []string{"--effort", "high"}, thinkingArgsFromScript(t, "high"))
+}
+
+func thinkingArgsFromScript(t *testing.T, thinking string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { thinkingArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(thinkingArgs(process.argv[2])));`,
+		script,
+		thinking,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
 func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
