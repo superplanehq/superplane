@@ -133,6 +133,8 @@ func (p *Productive) ListResources(resourceType string, ctx core.ListResourcesCo
 	switch resourceType {
 	case ResourceTypeProject:
 		return listProjectResources(ctx)
+	case ResourceTypeTaskList:
+		return listTaskListResources(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -155,6 +157,34 @@ func listProjectResources(ctx core.ListResourcesContext) ([]core.IntegrationReso
 			Type: ResourceTypeProject,
 			Name: project.Name,
 			ID:   project.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listTaskListResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	projectID := ""
+	if ctx.Parameters != nil {
+		projectID = ctx.Parameters["project"]
+	}
+
+	lists, err := client.ListTaskLists(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list task lists: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(lists))
+	for _, list := range lists {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeTaskList,
+			Name: list.Name,
+			ID:   list.ID,
 		})
 	}
 

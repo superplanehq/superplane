@@ -163,6 +163,16 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
   });
 
+  it("round-trips selected Productive.io task lists and drops blanks", () => {
+    const settings = intakeSettingsFromApi("Productive.io tasks", {
+      taskListIds: [" list-a ", "list-a", "", "list-b"],
+    });
+
+    expect(settings.taskListIds).toEqual(["list-a", "list-b"]);
+    expect(intakeSettingsToApi(settings).taskListIds).toEqual(["list-a", "list-b"]);
+    expect(intakeSettingsFromApi("Productive.io tasks", {}).taskListIds).toEqual([]);
+  });
+
   it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
     expect(intakeSupportsDelete("github-issues")).toBe(true);
     expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);

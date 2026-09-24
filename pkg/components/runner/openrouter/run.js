@@ -4,7 +4,7 @@
 /**
  * Run OpenCode against OpenRouter and format JSONL into live logs.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [thinking]
  */
 
 const fs = require("fs");
@@ -355,12 +355,23 @@ function writeSessionID(taskDir, sessionID) {
   fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
 }
 
-function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
+function thinkingArgs(thinking) {
+  const level = String(thinking || "")
+    .trim()
+    .toLowerCase();
+  if (level === "low" || level === "medium" || level === "high") {
+    return ["--variant", level];
+  }
+  return [];
+}
+
+function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking }) {
   const args = ["--pure", "run", "--format", "json", "--thinking", "--auto"];
   const prefixed = openRouterModelId(model);
   if (prefixed) {
     args.push("-m", prefixed);
   }
+  args.push(...thinkingArgs(thinking));
   if (cwd) {
     args.push("--dir", cwd);
   }
@@ -588,10 +599,10 @@ function ensureXdgDirs(taskDir) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    writeStderr("usage: node run.js <prompt-file> [model]\n");
+    writeStderr("usage: node run.js <prompt-file> [model] [thinking]\n");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", { thinking: args[2] || "" })
     .then((code) => process.exit(code))
     .catch((err) => {
       writeStderr(`${err && err.message ? err.message : err}\n`);
@@ -600,6 +611,7 @@ function main() {
 }
 
 async function runPrompt(promptFile, model, helpers = {}) {
+  const thinking = helpers.thinking || "";
   const env = helpers.env || process.env;
   const sp = env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -716,6 +728,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
       sessionID: sessionID || undefined,
       prompt,
       cwd,
+      thinking,
     });
     const spawnResult = await spawnOpenCodeTurn(
       args,
@@ -2079,6 +2092,7 @@ module.exports = {
   formatOpenCodeJsonLines,
   formatTurnResult,
   opencodeRunArgs,
+  thinkingArgs,
   planningEnabled,
   classifyOpenRouterError,
   openRouterModelId,

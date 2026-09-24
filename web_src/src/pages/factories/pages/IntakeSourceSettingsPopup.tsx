@@ -329,7 +329,14 @@ function IntakeGeneralTab({
             projectId={resourceId}
           />
           <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
-          <ProductiveIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <ProductiveIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            projectId={resourceId}
+          />
         </div>
       </div>
       <IntakeSourceSettingsFooter

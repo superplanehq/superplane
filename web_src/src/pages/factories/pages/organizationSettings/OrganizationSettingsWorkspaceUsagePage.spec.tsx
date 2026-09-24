@@ -1,15 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, setSystemTime, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { organizationsDescribeOrganizationSpendingReport } = vi.hoisted(() => ({
+import { unmockedSrc } from "@/test/unmockedModule";
+import type * as spendingRedesignLib from "./spending-redesign/spendingRedesignLib";
+
+const { organizationsDescribeOrganizationSpendingReport, frozenSpendingNowMs } = vi.hoisted(() => ({
   organizationsDescribeOrganizationSpendingReport: vi.fn(),
+  frozenSpendingNowMs: Date.parse("2026-09-03T12:00:00.000Z"),
 }));
 
 vi.mock("@/api-client", () => ({
   organizationsDescribeOrganizationSpendingReport,
 }));
+
+vi.mock("./spending-redesign/spendingRedesignLib", () => {
+  const actual = unmockedSrc<typeof spendingRedesignLib>(
+    "pages/factories/pages/organizationSettings/spending-redesign/spendingRedesignLib",
+  );
+  return {
+    ...actual,
+    quantizeSpendingNow: () => new Date(frozenSpendingNowMs),
+  };
+});
 
 import { OrganizationSettingsWorkspaceUsagePage } from "./OrganizationSettingsWorkspaceUsagePage";
 
@@ -77,10 +91,6 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    setSystemTime();
-  });
-
   it("shows the full-page loading state on the very first visit", async () => {
     const pending = mockPendingReports();
 
@@ -104,12 +114,11 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
    * anchor keeps the key stable across quick remounts.
    */
   it("keeps showing the previous report on a return visit while the report revalidates", async () => {
-    const now = new Date();
-    now.setUTCSeconds(30, 0);
-    setSystemTime(now);
     organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
 
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
     const { unmount } = renderPage(queryClient);
 
     await waitFor(() => expect(loadingState()).not.toBeInTheDocument());

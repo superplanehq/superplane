@@ -78,6 +78,9 @@ type intakeSettings struct {
 	SentryLevels []string
 	// Skip Productive.io key tasks (milestones). Productive task intakes only.
 	ExcludeKeyTasks bool
+	// Task list ids that still create a task. Empty means every task list.
+	// Productive task intakes only.
+	TaskListIDs []string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -147,8 +150,21 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.Labels = labels
 	s.JiraCompletionColumn = strings.TrimSpace(s.JiraCompletionColumn)
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
+	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 
 	return s
+}
+
+func normalizeTaskListIDs(ids []string) []string {
+	normalized := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || slices.Contains(normalized, id) {
+			continue
+		}
+		normalized = append(normalized, id)
+	}
+	return normalized
 }
 
 func normalizeSentryLevels(levels []string) []string {
@@ -257,10 +273,28 @@ func intakeSentryFilterExpression(settings intakeSettings) string {
 const intakeProductiveExcludeKeyTasksCondition = "root().data.data.attributes.type_id != 3"
 
 func intakeProductiveFilterExpression(settings intakeSettings) string {
+	conditions := []string{}
 	if settings.ExcludeKeyTasks {
-		return intakeProductiveExcludeKeyTasksCondition
+		conditions = append(conditions, intakeProductiveExcludeKeyTasksCondition)
 	}
-	return "true"
+	if condition := intakeProductiveTaskListCondition(settings.TaskListIDs); condition != "" {
+		conditions = append(conditions, condition)
+	}
+	if len(conditions) == 0 {
+		return "true"
+	}
+	return strings.Join(conditions, " && ")
+}
+
+func intakeProductiveTaskListCondition(ids []string) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	encoded, err := json.Marshal(ids)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
 }
 
 func intakeTriggerActionsFor(settings intakeSettings) []any {
@@ -336,6 +370,9 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 	if !slices.Equal(current.SentryLevels, updated.SentryLevels) {
 		return true
 	}
+	if !slices.Equal(current.TaskListIDs, updated.TaskListIDs) {
+		return true
+	}
 	return current.ExcludeKeyTasks != updated.ExcludeKeyTasks
 }
 
@@ -352,6 +389,10 @@ var intakeJiraLabelsPattern = regexp.MustCompile(
 
 var intakeSentryLevelsPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.data\.issue\?\.level \?\? ""\) in (\[[^\]]*\])`,
+)
+
+var intakeProductiveTaskListsPattern = regexp.MustCompile(
+	`\(root\(\)\.data\.data\.relationships\.task_list\.data\.id \?\? ""\) in (\[[^\]]*\])`,
 )
 
 // intakeSettingsFromGraph reads the settings back out of the filter
@@ -413,6 +454,12 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		settings.ExcludeKeyTasks = strings.Contains(expression, intakeProductiveExcludeKeyTasksCondition)
+		if match := intakeProductiveTaskListsPattern.FindStringSubmatch(expression); match != nil {
+			var ids []string
+			if err := json.Unmarshal([]byte(match[1]), &ids); err == nil {
+				settings.TaskListIDs = ids
+			}
+		}
 		return settings.normalized()
 	}
 
@@ -485,6 +532,7 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		serialized.ExcludeKeyTasks = proto.Bool(settings.ExcludeKeyTasks)
+		serialized.TaskListIds = settings.TaskListIDs
 	}
 	return serialized
 }
@@ -533,6 +581,7 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	if requested.ExcludeKeyTasks != nil {
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
 	}
+	updated.TaskListIDs = requested.GetTaskListIds()
 
 	return updated.normalized()
 }

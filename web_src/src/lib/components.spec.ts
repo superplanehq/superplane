@@ -104,6 +104,14 @@ describe("components visibility helpers", () => {
     });
   });
 
+  it("keeps thinkingLevel next to a hosted-model field", () => {
+    expect(
+      filterVisibleConfiguration({ model: "claude-sonnet-4-6", thinkingLevel: "high", extra: "drop" }, [
+        buildField({ name: "model", type: "hosted-model" }),
+      ]),
+    ).toEqual({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
+  });
+
   it("evaluates required conditions", () => {
     const alwaysRequired = buildField({ required: true });
     const conditionallyRequired = buildField({

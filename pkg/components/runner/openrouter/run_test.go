@@ -32,6 +32,26 @@ func TestClassifyOpenRouterErrorDetectsRateLimitsAndHardFailures(t *testing.T) {
 	assert.Equal(t, "other", jsClassify(t, "opencode crashed"))
 }
 
+func TestOpencodeRunArgsAddsVariantForThinking(t *testing.T) {
+	args := jsOpencodeArgs(t, map[string]any{
+		"model":    "x-ai/grok-4.6",
+		"prompt":   "do the work",
+		"thinking": "high",
+	})
+	assert.Contains(t, args, "--thinking")
+	assert.Contains(t, args, "--variant")
+	assert.Contains(t, args, "high")
+}
+
+func TestOpencodeRunArgsOmitsVariantForDefaultThinking(t *testing.T) {
+	args := jsOpencodeArgs(t, map[string]any{
+		"model":  "x-ai/grok-4.6",
+		"prompt": "do the work",
+	})
+	assert.Contains(t, args, "--thinking")
+	assert.NotContains(t, args, "--variant")
+}
+
 func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
 	args := jsOpencodeArgs(t, map[string]any{
 		"model":   "x-ai/grok-4.6",

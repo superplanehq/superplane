@@ -194,6 +194,12 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
+	// Productive.io task webhooks often omit the task list. The intake
+	// filter reads that relationship, so load it before the event is emitted.
+	if err := ensureTaskList(ctx, document); err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
 	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document)); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -212,6 +218,44 @@ type productiveDelivery struct {
 	Object struct {
 		Data map[string]any `json:"data"`
 	} `json:"object"`
+}
+
+const taskListFetchAttempts = 3
+
+func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) error {
+	if taskListID(document) != "" || ctx.HTTP == nil || ctx.Integration == nil {
+		return nil
+	}
+
+	id, _ := document["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+		task, err := client.GetTask(id)
+		if err == nil {
+			setTaskListID(document, task.TaskListID)
+			return nil
+		}
+		lastErr = err
+	}
+
+	if ctx.Logger != nil {
+		ctx.Logger.WithError(lastErr).Warnf(
+			"productive task %s: task list unavailable after %d attempts",
+			id,
+			taskListFetchAttempts,
+		)
+	}
+	return fmt.Errorf("productive task %s: task list unavailable: %v", id, lastErr)
 }
 
 func taskDocument(body []byte) (map[string]any, error) {
