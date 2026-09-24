@@ -120,7 +120,7 @@ func Test__Client__ListTasks(t *testing.T) {
 		]}`),
 	}}
 
-	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10, false)
+	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10, false, nil)
 	require.NoError(t, err)
 	require.Len(t, tasks, 2)
 	assert.Equal(t, Task{
@@ -145,7 +145,7 @@ func Test__Client__ListTasks_RegularOnly(t *testing.T) {
 		jsonResponse(`{"data":[]}`),
 	}}
 
-	_, err := testClient(t, httpContext).ListTasks("42", "", 10, true)
+	_, err := testClient(t, httpContext).ListTasks("42", "", 10, true, nil)
 	require.NoError(t, err)
 
 	query := httpContext.Requests[0].URL.Query()
@@ -164,7 +164,7 @@ func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
 		]}`),
 	}}
 
-	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30, false)
+	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30, false, nil)
 	require.NoError(t, err)
 	require.Len(t, documents, 1)
 
@@ -183,6 +183,35 @@ func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
 	assert.Equal(t, "1", query.Get("filter[status]"))
 	assert.Equal(t, "-created_at", query.Get("sort"))
 	assert.Equal(t, "30", query.Get("page[size]"))
+}
+
+func Test__Client__ListNewestOpenTaskDocuments_MultiListTaskListFallback(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{
+				"id":"91",
+				"type":"tasks",
+				"attributes":{"task_number":512,"title":"Fix payment retries"},
+				"relationships":{"project":{"data":{"type":"projects","id":"42"}}}
+			}
+		]}`),
+		jsonResponse(`{"data":{
+			"id":"91",
+			"type":"tasks",
+			"attributes":{"task_number":512,"title":"Fix payment retries"},
+			"relationships":{
+				"project":{"data":{"type":"projects","id":"42"}},
+				"task_list":{"data":{"type":"task_lists","id":"list-bugs"}}
+			}
+		}}`),
+	}}
+
+	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 10, false, []string{"list-bugs", "list-backlog"})
+	require.NoError(t, err)
+	require.Len(t, documents, 1)
+	assert.Equal(t, "list-bugs", taskListID(documents[0]))
+	require.Len(t, httpContext.Requests, 2)
+	assert.Contains(t, httpContext.Requests[1].URL.String(), "/tasks/91")
 }
 
 func Test__Client__GetTask(t *testing.T) {
