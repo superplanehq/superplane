@@ -175,6 +175,39 @@ function withoutWorkOrder<T extends { id?: string }>(orders: T[], orderId: strin
   return orders.filter((order) => order.id !== orderId);
 }
 
+function pageContainsWorkOrder(page: WorkOrdersPage, orderId: string): boolean {
+  return page.orders.some((order) => order.id === orderId);
+}
+
+function pageHasNextCursor(page: WorkOrdersPage | undefined): boolean {
+  return Boolean(page?.hasNextPage && page.orders.at(-1)?.id);
+}
+
+function withoutWorkOrderPages(data: InfiniteData<WorkOrdersPage>, orderId: string): InfiniteData<WorkOrdersPage> {
+  const pages = data.pages.map((page) => ({
+    ...page,
+    orders: withoutWorkOrder(page.orders, orderId),
+  }));
+  const pageParams = data.pageParams.slice(0, pages.length);
+
+  while (pages.length > 1 && (pages[pages.length - 1]?.orders.length ?? 0) === 0) {
+    const dropped = pages.pop();
+    pageParams.pop();
+    const previous = pages[pages.length - 1];
+    if (!previous || !dropped) {
+      break;
+    }
+    pages[pages.length - 1] = { ...previous, hasNextPage: dropped.hasNextPage };
+  }
+
+  return { pages, pageParams };
+}
+
+function pagedListLostNextCursor(before: InfiniteData<WorkOrdersPage>, after: InfiniteData<WorkOrdersPage>): boolean {
+  const nextPageRemains = Boolean(after.pages.at(-1)?.hasNextPage);
+  return pageHasNextCursor(before.pages.at(-1)) && !pageHasNextCursor(after.pages.at(-1)) && nextPageRemains;
+}
+
 export function removeWorkOrderFromListCaches(
   queryClient: QueryClient,
   organizationId: string,
@@ -191,18 +224,16 @@ export function removeWorkOrderFromListCaches(
   for (const query of queryClient.getQueryCache().findAll({
     queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
   })) {
-    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(query.queryKey, (data) => {
-      if (!data) {
-        return data;
-      }
-      return {
-        ...data,
-        pages: data.pages.map((page) => ({
-          ...page,
-          orders: withoutWorkOrder(page.orders, orderId),
-        })),
-      };
-    });
+    const current = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(query.queryKey);
+    if (!current || !current.pages.some((page) => pageContainsWorkOrder(page, orderId))) {
+      continue;
+    }
+
+    const next = withoutWorkOrderPages(current, orderId);
+    queryClient.setQueryData(query.queryKey, next);
+    if (pagedListLostNextCursor(current, next)) {
+      void queryClient.invalidateQueries({ queryKey: query.queryKey });
+    }
   }
 }
 
