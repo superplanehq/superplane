@@ -4,7 +4,7 @@ import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegratio
 import { usePermissions } from "@/contexts/usePermissions";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import {
@@ -97,9 +97,6 @@ export function useIntegrationCatalog(organizationId: string) {
     setConfiguration,
     isModalOpen,
     createIntegrationMutation,
-    createIntegrationNotice: createIntegrationMutation.isError
-      ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
-      : null,
     handlePrivateAppClick: (definition?: IntegrationsIntegrationDefinition) =>
       startCatalogPrivateGitHubApp({
         organizationId,
@@ -306,7 +303,7 @@ async function submitCatalogConnect({
       navigate(integrationDetailPath(integrationsBasePath, createdId));
     }
   } catch (error) {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
+    showErrorToast(getApiErrorMessage(error, "Failed to create integration"));
   }
 }
 
@@ -348,7 +345,7 @@ function startCatalogHostedGitHubConnect({
     },
     update: persistGitHubSetupReturnPath(organizationId),
   }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
   });
   return true;
 }
@@ -388,7 +385,7 @@ function startCatalogHostedJiraConnect({
       return response.data;
     },
   }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect Jira"));
+    showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
   });
   return true;
 }
@@ -426,6 +423,6 @@ function startCatalogPrivateGitHubApp({
       return response.data;
     },
   }).catch((error) => {
-    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
   });
 }
