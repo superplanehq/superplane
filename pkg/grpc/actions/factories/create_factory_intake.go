@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +24,6 @@ type IntakeDependencies struct {
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
 	WebhookBaseURL string
-	UsageService   usage.Service
 	NewItemSource  IntakeItemSourceFactory
 }
 
@@ -232,7 +230,6 @@ func createIntakeCanvas(
 		&request.FactoryID,
 		nodes,
 		edges,
-		deps.UsageService,
 	)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")

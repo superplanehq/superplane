@@ -24,7 +24,6 @@ func newTestCanvasService(r *support.ResourceRegistry) *CanvasService {
 		r.Registry,
 		r.Encryptor,
 		"http://localhost:8000",
-		nil,
 	)
 }
 

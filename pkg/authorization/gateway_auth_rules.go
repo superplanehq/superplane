@@ -404,11 +404,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/organizations/{id}/usage"}: {
-			Resource:   "org",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/workspace-usage"}: {
 			Resource:   "org",
 			Action:     "read",
