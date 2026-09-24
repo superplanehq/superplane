@@ -333,9 +333,9 @@ func seedProductiveTasks(
 	}
 
 	project, _ := binding.Configuration["project"].(string)
-	documents, err := client.ListNewestOpenTaskDocuments(
+	documents, err := newestProductiveSeedDocuments(
+		client,
 		project,
-		intakeProductiveSeedSize,
 		productiveIntakeExcludesKeyTasks(tx, canvasID),
 	)
 	if err != nil {
@@ -346,6 +346,14 @@ func seedProductiveTasks(
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(documents)}, nil
+}
+
+func newestProductiveSeedDocuments(
+	client *productive.Client,
+	project string,
+	regularOnly bool,
+) ([]map[string]any, error) {
+	return client.ListNewestOpenTaskDocuments(project, intakeProductiveSeedSize, regularOnly)
 }
 
 // productiveTaskEvents shapes each task of a newest-first page like the event
