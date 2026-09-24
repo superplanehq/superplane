@@ -34,12 +34,10 @@ func mustRunnerLiveLogServer(t *testing.T, r *support.ResourceRegistry) (*Server
 		"http://localhost",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), nil)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	return server, signer
 }
 

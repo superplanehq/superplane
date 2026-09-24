@@ -21,7 +21,6 @@ import (
 	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	tasks "github.com/superplanehq/superplane/pkg/cli/commands/tasks"
-	usage "github.com/superplanehq/superplane/pkg/cli/commands/usage"
 	workspaces "github.com/superplanehq/superplane/pkg/cli/commands/workspaces"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -69,7 +68,6 @@ func init() {
 	RootCmd.AddCommand(roles.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
 	RootCmd.AddCommand(tasks.NewCommand(options))
-	RootCmd.AddCommand(usage.NewCommand(options))
 	RootCmd.AddCommand(workspaces.NewCommand(options))
 }
 

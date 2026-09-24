@@ -160,13 +160,7 @@ CREATE TABLE public.agent_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     heartbeat_at timestamp with time zone,
     agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
-    context_replayed_at timestamp with time zone,
-    tracked_usage_input_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_output_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_cache_read_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_cache_write_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_total_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_initialized boolean DEFAULT true NOT NULL
+    context_replayed_at timestamp with time zone
 );
 
 
@@ -1063,9 +1057,7 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
-    usage_limits_synced_at timestamp with time zone,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
@@ -4508,7 +4500,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260923004505	f
+20260924104400	f
 \.
 
 
