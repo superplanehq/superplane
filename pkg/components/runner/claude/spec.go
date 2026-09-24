@@ -21,6 +21,7 @@ type RunClaudeCodeSpec struct {
 	Steps                   []ClaudeCodeStep              `mapstructure:"steps"`
 	Credentials             runner.AgentCredentials       `mapstructure:"credentials"`
 	Model                   string                        `mapstructure:"model"`
+	ThinkingLevel           string                        `mapstructure:"thinkingLevel"`
 	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
@@ -59,6 +60,9 @@ func decodeRunClaudeCodeSpec(raw any) (RunClaudeCodeSpec, error) {
 func applyRunClaudeCodeSpecDefaults(spec *RunClaudeCodeSpec) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
+	}
+	if thinking, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel); err == nil {
+		spec.ThinkingLevel = thinking
 	}
 	migrateLegacyClaudeCodeSteps(spec)
 }
@@ -112,7 +116,8 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
-	return nil
+	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
+	return err
 }
 
 // buildClaudeCodeBrokerTask builds broker commands plus task files.
@@ -121,6 +126,7 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 // each broker command starts in the configured workspace.
 func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
+	thinking := strings.TrimSpace(spec.ThinkingLevel)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
 	files := []runner.BrokerTaskFile{
@@ -136,7 +142,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, workdir)
+		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, thinking, workdir)
 		files = append(files, file)
 		stepCommands = append(stepCommands, command)
 	}
@@ -183,12 +189,13 @@ func applyPlanningFollowUp(task ClaudeCodeBrokerTask, environment []runner.Broke
 func planningFollowUpCommand(spec RunClaudeCodeSpec) runner.BrokerCommand {
 	workdir := planningFollowUpWorkingDirectory(spec)
 	model := strings.TrimSpace(spec.Model)
+	thinking := strings.TrimSpace(spec.ThinkingLevel)
 	return runner.BrokerCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
 			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
-				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
+				runner.FollowUpLoopCommand(model, thinking),
 			),
 		),
 		Kind:    runner.LiveLogKindPrompt,
@@ -205,7 +212,7 @@ func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
 	return strings.TrimSpace(spec.WorkingDirectory)
 }
 
-func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
+func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, thinking, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
 	switch runner.NormalizeAgentStepType(original.Type) {
@@ -238,7 +245,7 @@ func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, us
 			Path:    "prompts/" + promptName,
 			Content: runner.ApplyIntegrationUsage(dispatchedPrompt, usage),
 			Mode:    "0644",
-		}, claudePromptStepBrokerCommand(original.Name, promptName, prompt, model, workingDirectory)
+		}, claudePromptStepBrokerCommand(original.Name, promptName, prompt, model, thinking, workingDirectory)
 	}
 }
 
@@ -275,17 +282,13 @@ func claudeBashStepBrokerCommand(stepName, scriptName, command, workingDirectory
 	}
 }
 
-func claudePromptStepBrokerCommand(stepName, promptName, prompt, model, workingDirectory string) runner.BrokerCommand {
+func claudePromptStepBrokerCommand(stepName, promptName, prompt, model, thinking, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: runner.AgentStepLabel(stepName, promptName),
 		Command: runner.WrapAgentStepCommand(
 			runner.WrapPromptCommandInWorkingDirectory(
 				workingDirectory,
-				fmt.Sprintf(
-					`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
-					promptName,
-					runner.ShellSingleQuote(model),
-				),
+				runner.PromptNodeCommand(promptName, model, thinking),
 			),
 		),
 		Kind:    runner.LiveLogKindPrompt,

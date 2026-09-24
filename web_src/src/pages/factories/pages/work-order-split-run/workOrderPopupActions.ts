@@ -1,6 +1,7 @@
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { draftStartModelPayload } from "./draftStartModel";
+import { draftStartThinkingPayload } from "@/lib/thinkingLevel";
 import type { SplitRunFixture } from "./splitRunMocks";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
 
@@ -53,15 +54,16 @@ export function footerMutationHandlers(
 
 export function draftStartAction(
   kind: SplitRunFixture["footer"]["kind"],
-  onDispatch: ((model?: string) => Promise<void>) | undefined,
+  onDispatch: ((model?: string, thinkingLevel?: string) => Promise<void>) | undefined,
   openAutomations: () => void,
   selectedModel: string,
+  selectedThinking: string,
 ) {
   if (kind !== "draft") {
     return undefined;
   }
   return async () => {
-    await onDispatch?.(draftStartModelPayload(selectedModel));
+    await onDispatch?.(draftStartModelPayload(selectedModel), draftStartThinkingPayload(selectedThinking));
     openAutomations();
   };
 }
