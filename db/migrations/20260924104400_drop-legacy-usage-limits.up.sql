@@ -12,4 +12,10 @@ ALTER TABLE agent_sessions
     DROP COLUMN IF EXISTS tracked_usage_total_tokens,
     DROP COLUMN IF EXISTS tracked_usage_initialized;
 
+UPDATE organizations
+SET usage_retention_window_days = 180;
+
+ALTER TABLE organizations
+    ALTER COLUMN usage_retention_window_days SET DEFAULT 180;
+
 COMMIT;
