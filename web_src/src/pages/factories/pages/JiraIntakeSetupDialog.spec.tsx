@@ -367,7 +367,7 @@ describe("JiraIntakeSetupDialog", () => {
 
     await chooseProjectAndWaitForDone(user);
     await user.click(screen.getByTestId("jira-move-on-complete"));
-    expect(screen.queryByTestId("jira-completion-column-select")).not.toBeInTheDocument();
+    expect(screen.getByTestId("jira-completion-column-select")).toBeDisabled();
     await user.click(screen.getByTestId("jira-setup-finish"));
 
     await waitFor(() => {
