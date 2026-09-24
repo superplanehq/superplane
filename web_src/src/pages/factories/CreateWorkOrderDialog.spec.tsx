@@ -35,11 +35,13 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("./WorkOrderDescriptionEditor", () => ({
   WorkOrderDescriptionEditor: ({
+    organizationId,
     factoryId,
     value,
     onChange,
     onFocus,
   }: {
+    organizationId?: string;
     factoryId?: string;
     value?: string;
     onChange?: (next: string) => void;
@@ -47,6 +49,7 @@ vi.mock("./WorkOrderDescriptionEditor", () => ({
   }) => (
     <textarea
       data-testid="work-order-description-input"
+      data-organization-id={organizationId}
       data-factory-id={factoryId}
       value={value}
       onChange={(event) => onChange?.(event.target.value)}
@@ -148,6 +151,15 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.queryByText("Dialog")).not.toBeInTheDocument();
   });
 
+  it("passes the workspace to the description editor when Planning is off", () => {
+    renderDialog();
+
+    const input = screen.getByTestId("work-order-description-input");
+    expect(screen.getByTestId("create-work-order-dialog")).toBeInTheDocument();
+    expect(input).toHaveAttribute("data-organization-id", "org-1");
+    expect(input).toHaveAttribute("data-factory-id", PRIMARY_FACTORY_ID);
+  });
+
   it("keeps only expand and close controls in the header", () => {
     renderDialog();
 
@@ -201,6 +213,7 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.getByTestId("create-work-order-request-dialog")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-title-input")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: CREATE_WORK_ORDER_REQUEST_COPY.title })).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-description-input")).toHaveAttribute("data-organization-id", "org-1");
     expect(screen.getByTestId("work-order-description-input")).toHaveAttribute("data-factory-id", PRIMARY_FACTORY_ID);
 
     await user.type(screen.getByTestId("work-order-description-input"), "Refunds fail on retry.");
