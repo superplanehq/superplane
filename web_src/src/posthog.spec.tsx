@@ -22,7 +22,6 @@ vi.mock("react-router", () => ({
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({ data: { metadata: { name: "Acme Corp" } } }),
-  useOrganizationUsage: () => ({ data: null, error: null }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -39,10 +38,6 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
-}));
-
-vi.mock("@/lib/env", () => ({
-  isUsagePageForced: () => false,
 }));
 
 import { AccountProvider } from "@/contexts/AccountProvider";
