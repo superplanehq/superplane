@@ -79,8 +79,9 @@ function SuperPlaneModelField({
   }
 
   const options = selection.models.map((model) => ({ value: model.key, label: model.label }));
+  const current = normalizeSuperPlaneModelValue(typeof value === "string" ? value : "");
   const selected = superPlanePickerValue(
-    value,
+    current,
     hostedSelectableLLMModelKey(usage.data?.defaultHostedProvider ?? "", usage.data?.defaultHostedModel ?? ""),
     options,
   );
@@ -89,6 +90,7 @@ function SuperPlaneModelField({
     <ModelThinkingSelect
       fieldName={field.name}
       model={selected}
+      committedModel={current}
       thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
       placeholder={field.placeholder || "Instance SuperPlane agent model"}
       readOnly={readOnly}
@@ -100,8 +102,7 @@ function SuperPlaneModelField({
   );
 }
 
-function superPlanePickerValue(value: unknown, defaultKey: string, models: Array<{ value: string }>): string {
-  const current = normalizeSuperPlaneModelValue(typeof value === "string" ? value : "");
+function superPlanePickerValue(current: string, defaultKey: string, models: Array<{ value: string }>): string {
   if (current !== "" && models.some((model) => model.value === current)) {
     return current;
   }
@@ -144,6 +145,7 @@ function ProviderBYOKModelField({
     <ModelThinkingSelect
       fieldName={field.name}
       model={current}
+      committedModel={current}
       thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
       placeholder={field.placeholder || "Select a model"}
       readOnly={readOnly}
@@ -174,6 +176,7 @@ function commitModelAndThinking(
 function ModelThinkingSelect({
   fieldName,
   model,
+  committedModel,
   thinkingLevel,
   placeholder,
   readOnly,
@@ -182,6 +185,7 @@ function ModelThinkingSelect({
 }: {
   fieldName?: string;
   model: string;
+  committedModel: string;
   thinkingLevel: string;
   placeholder: string;
   readOnly?: boolean;
@@ -222,7 +226,7 @@ function ModelThinkingSelect({
           <DropdownMenuItem
             key={level.label}
             className={MENU_ITEM_CLASSNAME}
-            onSelect={() => onCommit(model, level.value)}
+            onSelect={() => onCommit(committedModel, level.value)}
           >
             <span className="flex-1">{level.label}</span>
             {thinkingLevel === level.value ? <Check className="size-3.5" aria-hidden /> : null}

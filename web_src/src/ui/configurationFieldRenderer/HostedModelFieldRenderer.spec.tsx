@@ -262,6 +262,27 @@ describe("HostedModelFieldRenderer", () => {
     });
   });
 
+  it("keeps an unset SuperPlane model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createSuperPlaneField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
   it("writes thinkingLevel next to the model", async () => {
     const user = userEvent.setup();
     const onValuesChange = vi.fn();
