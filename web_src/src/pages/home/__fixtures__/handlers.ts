@@ -96,7 +96,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         return null;
       },
     },
-    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
       resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
@@ -430,7 +429,7 @@ export async function matchFactorySetupFixture(
   orgIntegrations: StorybookOrgIntegration[],
 ): Promise<FixtureResult> {
   if (url.pathname === "/api/v1/integrations" && method === "GET") {
-    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS } };
+    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS, githubAppConfigured: true } };
   }
 
   const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);

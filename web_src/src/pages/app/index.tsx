@@ -1,5 +1,4 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
@@ -1913,8 +1912,7 @@ export function AppPage({
         return result;
       } catch (error: unknown) {
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
-        const displayMessage = getUsageLimitToastMessage(error, errorMessage);
-        showErrorToast(displayMessage);
+        showErrorToast(errorMessage);
         return undefined;
       } finally {
         if (focusedNoteId) {
