@@ -345,7 +345,7 @@ async function stageAgentEditOnCurrentDraft(
     await stageCurrentDraft(stageYaml, await rebuildFromStagedCanvas());
   } catch (error) {
     if (isStagedCanvasChangedError(error)) {
-      throw new Error(STAGED_CANVAS_CHANGED_NOTICE);
+      throw new Error(STAGED_CANVAS_CHANGED_NOTICE, { cause: error });
     }
     throw error;
   }
