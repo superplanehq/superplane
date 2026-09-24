@@ -415,6 +415,9 @@ message CanvasRepositoryFileOperation {
 message PutCanvasStagingRequest {
   string canvas_id = 1;
   repeated CanvasRepositoryFileOperation operations = 2;
+  // Replaces staged files only when they still use an older live version.
+  // A current draft is left unchanged.
+  bool replace_if_stale = 3;
 }
 
 message PutCanvasStagingResponse {

@@ -407,7 +407,12 @@ func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasS
 		return nil, err
 	}
 
-	state, err := canvases.PutCanvasStaging(ctx, db, canvas, req.Operations)
+	var state *pb.StagingSummary
+	if req.GetReplaceIfStale() {
+		state, err = canvases.PutCanvasStagingReplacingStale(ctx, db, canvas, req.Operations)
+	} else {
+		state, err = canvases.PutCanvasStaging(ctx, db, canvas, req.Operations)
+	}
 	if err != nil {
 		return nil, err
 	}
