@@ -32,9 +32,7 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
