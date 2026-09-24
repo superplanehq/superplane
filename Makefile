@@ -160,7 +160,7 @@ ifeq ($(strip $(CI)),)
 endif
 
 dev.setup.npm:
-	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
+	@$(COMPOSE) exec app bash -lc 'cd /app/web_src && for attempt in 1 2 3; do npm install --no-audit --no-fund --loglevel error && exit 0; rm -rf node_modules; sleep 2; done; exit 1'
 
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
