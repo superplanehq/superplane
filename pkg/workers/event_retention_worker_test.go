@@ -15,7 +15,7 @@ import (
 
 func setOrganizationRetentionWindowDays(t *testing.T, orgID uuid.UUID, days int32) {
 	t.Helper()
-	require.NoError(t, models.SetOrganizationRetentionWindowDays(orgID, &days))
+	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", orgID).Update("usage_retention_window_days", days).Error)
 }
 
 func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T) {
