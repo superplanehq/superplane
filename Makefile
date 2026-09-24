@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -195,6 +195,19 @@ ifeq ($(strip $(CI)),)
 	$(COMPOSE_RUNNER) up -d --no-build --scale runner=$(N) runner
 endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
+
+# Postgres, the `broker` database, task-broker, fleet registration, and
+# runner workers. Does not start the app or RabbitMQ.
+# Scale workers with N (default 10): N=1 make dev.runners
+dev.runners:
+	@echo "Starting Postgres for the task broker..."
+	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait db
+	@$(COMPOSE) exec -T db psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
+	  || $(COMPOSE) exec -T db psql -U postgres -c "CREATE DATABASE broker"
+	@echo "Starting task broker and $(N) runner workers..."
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build --scale runner=$(N) task-broker runner
+	@echo "Task broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
+	@echo "Runner workers: $(N)"
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
