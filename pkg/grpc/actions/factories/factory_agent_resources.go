@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -28,6 +29,9 @@ func ListFactoryAgentResources(
 	}
 
 	kind := protoKindToModel(req.GetKind())
+	if err := requireAgentResourceKindFeature(orgID, kind); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list agent resources")
+	}
 	resources, err := factory.ListAgentResources(db, kind)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list agent resources")
@@ -52,6 +56,10 @@ func CreateFactoryAgentResource(
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	}
+	kind := protoKindToModel(req.GetKind())
+	if err := requireAgentResourceKindFeature(orgID, kind); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 
@@ -95,6 +103,9 @@ func UpdateFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
+	if err := requireAgentResourceKindFeature(orgID, resource.Kind); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update agent resource")
+	}
 
 	var name *string
 	if req.Name != nil {
@@ -114,7 +125,7 @@ func UpdateFactoryAgentResource(
 			merged.Source = models.FactoryAgentResourceSourceInline
 			config = &merged
 		}
-	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 {
+	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 || req.GetReplaceDisabledTools() {
 		merged := resource.Config.Data()
 		if req.Url != nil {
 			merged.URL = req.GetUrl()
@@ -124,6 +135,9 @@ func UpdateFactoryAgentResource(
 		}
 		if len(req.GetHeaders()) > 0 || (req.Auth != nil && req.GetAuth() == pb.FactoryAgentResource_AUTH_OAUTH) {
 			merged.Headers = protoHeadersToModel(req.GetHeaders())
+		}
+		if req.GetReplaceDisabledTools() {
+			merged.DisabledTools = models.NormalizeDisabledTools(req.GetDisabledTools())
 		}
 		if err := validateMCPURL(merged.URL); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update agent resource")
@@ -165,6 +179,9 @@ func DeleteFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
+	if err := requireAgentResourceKindFeature(orgID, resource.Kind); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
+	}
 	revocation := captureOAuthRevocation(ctx, deps, db, resource)
 	if err := resource.Delete(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
@@ -176,17 +193,18 @@ func DeleteFactoryAgentResource(
 func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.FactoryAgentResource {
 	config := resource.Config.Data()
 	out := &pb.FactoryAgentResource{
-		Id:         resource.ID.String(),
-		FactoryId:  resource.FactoryID.String(),
-		Kind:       modelKindToProto(resource.Kind),
-		Name:       resource.Name,
-		Enabled:    resource.Enabled,
-		Url:        config.URL,
-		Auth:       modelAuthToProto(config.MCPAuth()),
-		Headers:    modelHeadersToProto(config.Headers),
-		OauthError: resource.OAuthError,
-		CreatedAt:  timestamppb.New(resource.CreatedAt),
-		UpdatedAt:  timestamppb.New(resource.UpdatedAt),
+		Id:            resource.ID.String(),
+		FactoryId:     resource.FactoryID.String(),
+		Kind:          modelKindToProto(resource.Kind),
+		Name:          resource.Name,
+		Enabled:       resource.Enabled,
+		Url:           config.URL,
+		Auth:          modelAuthToProto(config.MCPAuth()),
+		Headers:       modelHeadersToProto(config.Headers),
+		DisabledTools: config.DisabledTools,
+		OauthError:    resource.OAuthError,
+		CreatedAt:     timestamppb.New(resource.CreatedAt),
+		UpdatedAt:     timestamppb.New(resource.UpdatedAt),
 	}
 	if config.MCPAuth() == models.FactoryAgentResourceAuthOAuth {
 		out.OauthStatus = modelOAuthStatusToProto(resource.OAuthState())
@@ -258,6 +276,24 @@ func modelKindToProto(kind string) pb.FactoryAgentResource_Kind {
 		return pb.FactoryAgentResource_KIND_SKILL
 	}
 	return pb.FactoryAgentResource_KIND_MCP_SERVER
+}
+
+func requireAgentResourceKindFeature(orgID uuid.UUID, kind string) error {
+	featureID := features.FeatureWorkspaceMCP
+	if kind == models.FactoryAgentResourceKindSkill {
+		featureID = features.FeatureWorkspaceSkills
+	}
+	enabled, err := models.HasExperimentalFeature(orgID, featureID)
+	if err != nil {
+		return err
+	}
+	if enabled {
+		return nil
+	}
+	if kind == models.FactoryAgentResourceKindSkill {
+		return errWorkspaceSkillsDisabled
+	}
+	return errWorkspaceMCPDisabled
 }
 
 func protoAuthToModel(auth pb.FactoryAgentResource_Auth) string {

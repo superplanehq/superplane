@@ -15,6 +15,7 @@ import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
 import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
+import { WorkOrderDescriptionSkillSlash } from "./WorkOrderDescriptionSkillSlash";
 
 interface WorkOrderDescriptionEditorProps {
   value: string;
@@ -30,6 +31,8 @@ interface WorkOrderDescriptionEditorProps {
   isUploading?: boolean;
   canRemoveImages?: boolean;
   autoFocus?: boolean;
+  organizationId?: string;
+  factoryId?: string;
 }
 
 function areUrlMapsEqual(a?: Record<string, string>, b?: Record<string, string>): boolean {
@@ -66,8 +69,11 @@ export function WorkOrderDescriptionEditor({
   isUploading = false,
   canRemoveImages = false,
   autoFocus = false,
+  organizationId,
+  factoryId,
 }: WorkOrderDescriptionEditorProps) {
   const editorRef = useRef<Editor | null>(null);
+  const skillKeyDownRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const onChangeRef = useRef(onChange);
   const onFocusRef = useRef(onFocus);
   const onBlurRef = useRef(onBlur);
@@ -110,6 +116,7 @@ export function WorkOrderDescriptionEditor({
         ),
         "data-testid": "work-order-description-input",
       },
+      handleKeyDown: (_view, event) => skillKeyDownRef.current(event),
       handlePaste: (_view, event) => {
         if (tryUploadClipboardFiles(editorRef.current, event, onUploadFilesRef.current, disabled)) {
           return true;
@@ -254,7 +261,17 @@ export function WorkOrderDescriptionEditor({
           />
         </BubbleMenu>
       ) : null}
-      <EditorContent editor={editor} />
+      <div className="relative">
+        {editor && factoryId ? (
+          <WorkOrderDescriptionSkillSlash
+            editor={editor}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            keyDownRef={skillKeyDownRef}
+          />
+        ) : null}
+        <EditorContent editor={editor} />
+      </div>
     </>
   );
 }
