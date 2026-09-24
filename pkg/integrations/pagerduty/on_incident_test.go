@@ -128,6 +128,29 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
+	t.Run("signature from a secret rotation -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"event":{"event_type":"incident.triggered","agent":{"id":"agent-1"},"data":{"id":"incident-1","urgency":"high"}}}`)
+		secret := "test-secret"
+
+		// While a secret is being rotated, PagerDuty signs the delivery with every active
+		// secret and sends the signatures comma-separated in a single header.
+		headers := http.Header{}
+		headers.Set("X-PagerDuty-Signature", "v1="+signatureFor("previous-secret", body)+",v1="+signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: validConfig,
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
+			Events:        eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
 	t.Run("valid signature -> event is emitted", func(t *testing.T) {
 		body := []byte(`{"event":{"event_type":"incident.triggered","agent":{"id":"agent-1"},"data":{"id":"incident-1","urgency":"high"}}}`)
 		secret := "test-secret"
