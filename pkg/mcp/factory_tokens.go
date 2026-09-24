@@ -112,7 +112,7 @@ func MintFactoryAgentResourceAccessToken(
 	return tokens.AccessToken, nil
 }
 
-// UserFacingOAuthError returns a short error for the Agent resources page.
+// UserFacingOAuthError returns a short error for the MCP servers page.
 func UserFacingOAuthError(err error) string {
 	if err == nil {
 		return "the MCP server refused the SuperPlane OAuth client"

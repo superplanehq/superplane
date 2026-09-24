@@ -9,7 +9,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
-import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 
 import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
@@ -50,6 +50,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/hooks/useFactoryAgentResources", () => ({
   useFactoryAgentResources: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
+  useFactoryAgentResourceTools: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
 }));
 
 const superPlaneModelField: ConfigurationField = {
@@ -219,8 +220,8 @@ describe("PlanningReviewForm model options", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     vi.mocked(useExperimentalFeature).mockReturnValue({
-      has: (feature: string) => feature === FEATURE_WORKSPACE_AGENT_RESOURCES,
-      enabledExperimentalFeatures: [FEATURE_WORKSPACE_AGENT_RESOURCES],
+      has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
     });
     vi.mocked(useFactoryAgentResources).mockImplementation((_org, _factory, kind) => {

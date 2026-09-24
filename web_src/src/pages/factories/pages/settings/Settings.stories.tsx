@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_WORKSPACE_AGENT_RESOURCES, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_MODELS, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
@@ -22,7 +22,7 @@ export const Current: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
       factoriesFixture={defaultFactoriesFixture}
-      experimentalFeatures={[FEATURE_WORKSPACE_MODELS, FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      experimentalFeatures={[FEATURE_WORKSPACE_MODELS, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
     />
   ),
 };
