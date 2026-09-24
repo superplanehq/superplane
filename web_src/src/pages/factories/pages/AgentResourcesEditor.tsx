@@ -13,6 +13,7 @@ import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { ConnectionStatusDot } from "./settings/ConnectionStatusDot";
 import { connectionIsEstablished } from "./settings/agentResourceDisplay";
 import { AGENT_RESOURCES_COPY } from "./settings/agentResourceCopy";
+import { skillDisplayTitle, skillListDescription } from "./settings/skillFrontmatter";
 import { MCPToolsList } from "./settings/MCPToolsList";
 import { enabledToolCount, mcpToolItems, nextDisabledTools, workspaceDisabledTools } from "./settings/mcpTools";
 import { PLANNING_REVIEW_RESOURCES_COPY } from "./planningReviewResourcesCopy";
@@ -241,37 +242,51 @@ function SkillsAutomationSection({
         <EmptySettingsNote settingsHref={settingsHref} kind="skills" />
       ) : (
         <ul className="divide-y divide-border">
-          {resources.map((resource) => {
-            const id = resource.id ?? "";
-            const name = resource.name?.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
-            const workspaceOff = resource.enabled === false;
-            const checked = !workspaceOff && !disabledIds.includes(id);
-            return (
-              <li key={id || name} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
-                  <p className="truncate text-[12px] text-muted-foreground">
-                    {PLANNING_REVIEW_RESOURCES_COPY.kindSkill}
-                  </p>
-                  {workspaceOff ? (
-                    <p className="truncate text-[12px] text-muted-foreground">
-                      {PLANNING_REVIEW_RESOURCES_COPY.offForWorkspace}
-                    </p>
-                  ) : null}
-                </div>
-                <Switch
-                  checked={checked}
-                  disabled={workspaceOff || !id}
-                  onCheckedChange={(next) => onDisabledIdsChange(nextDisabledIds(disabledIds, id, next))}
-                  aria-label={PLANNING_REVIEW_RESOURCES_COPY.enableLabel(name)}
-                  data-testid={`planning-review-resource-${id}`}
-                />
-              </li>
-            );
-          })}
+          {resources.map((resource) => (
+            <SkillAutomationRow
+              key={resource.id || resource.name}
+              resource={resource}
+              disabledIds={disabledIds}
+              onDisabledIdsChange={onDisabledIdsChange}
+            />
+          ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function SkillAutomationRow({
+  resource,
+  disabledIds,
+  onDisabledIdsChange,
+}: {
+  resource: FactoriesFactoryAgentResource;
+  disabledIds: string[];
+  onDisabledIdsChange: (ids: string[]) => void;
+}) {
+  const id = resource.id ?? "";
+  const name = skillDisplayTitle(resource) || AGENT_RESOURCES_COPY.unnamedSkill;
+  const description = skillListDescription(resource);
+  const workspaceOff = resource.enabled === false;
+  const checked = !workspaceOff && !disabledIds.includes(id);
+  return (
+    <li className="flex flex-wrap items-center gap-3 px-5 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+        {description ? <p className="truncate text-[12px] text-muted-foreground">{description}</p> : null}
+        {workspaceOff ? (
+          <p className="truncate text-[12px] text-muted-foreground">{PLANNING_REVIEW_RESOURCES_COPY.offForWorkspace}</p>
+        ) : null}
+      </div>
+      <Switch
+        checked={checked}
+        disabled={workspaceOff || !id}
+        onCheckedChange={(next) => onDisabledIdsChange(nextDisabledIds(disabledIds, id, next))}
+        aria-label={PLANNING_REVIEW_RESOURCES_COPY.enableLabel(name)}
+        data-testid={`planning-review-resource-${id}`}
+      />
+    </li>
   );
 }
 

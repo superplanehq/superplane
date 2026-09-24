@@ -247,6 +247,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
 
   return {
     organizationId,
+    factoryId,
     session,
     sessionId: session?.id ?? "",
     queryError: query.error,

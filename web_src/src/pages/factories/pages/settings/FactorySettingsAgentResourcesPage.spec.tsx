@@ -3,10 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import {
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import {
   HEADER_MCP_RESOURCE,
   INLINE_SKILL,
@@ -329,6 +326,22 @@ describe("FactorySettingsSkillsPage", () => {
     expect(screen.getByTestId("agent-resource-skill-command")).toHaveValue("/review-copy");
   }, 10000);
 
+  it("strips spaces and punctuation from the recommended command", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${skillsPath}/new`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.type(await screen.findByTestId("agent-resource-skill-name", {}, { timeout: 8000 }), "Oy Pirate!");
+    expect(screen.getByTestId("agent-resource-skill-command")).toHaveValue("/oypirate");
+    expect(screen.getByTestId("agent-resource-skill-name")).toHaveValue("Oy Pirate!");
+    expect(screen.queryByText("The SKILL.md name does not match this skill name.")).not.toBeInTheDocument();
+  }, 10000);
+
   it("lists an inline skill", async () => {
     render(
       <FactoriesHarness
@@ -342,8 +355,27 @@ describe("FactorySettingsSkillsPage", () => {
     );
 
     expect(await screen.findByTestId("agent-resources-skills-list", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByText("review-copy")).toBeInTheDocument();
-    expect(screen.getByText("SKILL.md")).toBeInTheDocument();
+    expect(screen.getByText("Review copy")).toBeInTheDocument();
+    expect(screen.getByText("Review UI copy.")).toBeInTheDocument();
+    expect(screen.queryByText("SKILL.md")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("opens edit when the skill name is clicked", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={skillsPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.click(await screen.findByTestId(`agent-resource-edit-${INLINE_SKILL.id}`, {}, { timeout: 8000 }));
+    expect(await screen.findByTestId("factory-settings-skill-editor", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId("agent-resource-skill-name")).toHaveValue("Review copy");
   }, 10000);
 
   it("lists a GitHub skill package", async () => {

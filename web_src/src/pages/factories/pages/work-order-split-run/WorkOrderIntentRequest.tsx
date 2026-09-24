@@ -1,7 +1,8 @@
-import { useRef, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
+import { SkillSlashFieldOverlay } from "@/components/AgentSidebar/SkillSlashFieldOverlay";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
@@ -39,6 +40,7 @@ import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 export type IntentAnalysisChat = {
   organizationId: string;
+  factoryId?: string;
   view: CreateWithAgentView;
   composer: string;
   composerError?: string;
@@ -258,47 +260,15 @@ function AnalysisComposer({
             actions={analysis.closedDecision}
             modelSelect={analysis.modelSelect}
           />
-          <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
-            <InputGroupTextarea
-              id="split-run-intent-composer"
-              data-testid="split-run-intent-composer"
-              value={analysis.composer}
-              placeholder={placeholder}
-              disabled={!analysis.canSend}
-              onChange={(event) => {
-                composerRef.current = event.target.value;
-                analysis.onComposerChange(event.target.value);
-              }}
-              onPaste={images.handlePaste}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-              className="min-h-[4.2rem] py-2 text-[13px]"
-              rows={2}
-            />
-            <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
-              <AnalysisComposerAddons analysis={analysis} images={images} dictation={dictation} />
-              <div className="flex items-center gap-1.5">
-                <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
-                  {ANALYSIS_PLANNING_COPY.sendShortcut}
-                </Kbd>
-                <InputGroupButton
-                  type="submit"
-                  variant="default"
-                  size="icon-sm"
-                  className="rounded-full"
-                  disabled={!canSubmit}
-                  aria-label={ANALYSIS_PLANNING_COPY.send}
-                  data-testid="split-run-intent-composer-send"
-                >
-                  <ArrowUp className="size-4" aria-hidden />
-                </InputGroupButton>
-              </div>
-            </InputGroupAddon>
-          </InputGroup>
+          <AnalysisComposerField
+            analysis={analysis}
+            images={images}
+            dictation={dictation}
+            placeholder={placeholder}
+            canSubmit={canSubmit}
+            composerRef={composerRef}
+            onSend={() => void send()}
+          />
         </div>
         {analysis.composerError ? (
           <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
@@ -306,6 +276,103 @@ function AnalysisComposer({
           </p>
         ) : null}
       </form>
+    </div>
+  );
+}
+
+function AnalysisComposerField({
+  analysis,
+  images,
+  dictation,
+  placeholder,
+  canSubmit,
+  composerRef,
+  onSend,
+}: {
+  analysis: IntentAnalysisChat;
+  images: ReturnType<typeof useAnalysisComposerImages>;
+  dictation: UseSpeechDictationResult;
+  placeholder: string;
+  canSubmit: boolean;
+  composerRef: { current: string };
+  onSend: () => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const skillKeyboardRef = useRef<((event: KeyboardEvent) => boolean) | null>(null);
+  const [cursor, setCursor] = useState(0);
+  const insertSkill = (next: { value: string; cursor: number }) => {
+    composerRef.current = next.value;
+    analysis.onComposerChange(next.value);
+    setCursor(next.cursor);
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) {
+        return;
+      }
+      textarea.focus();
+      textarea.setSelectionRange(next.cursor, next.cursor);
+    });
+  };
+
+  return (
+    <div className="relative">
+      {analysis.factoryId ? (
+        <SkillSlashFieldOverlay
+          organizationId={analysis.organizationId}
+          factoryId={analysis.factoryId}
+          value={analysis.composer}
+          cursor={cursor}
+          onInsert={insertSkill}
+          keyboardRef={skillKeyboardRef}
+        />
+      ) : null}
+      <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
+        <InputGroupTextarea
+          ref={textareaRef}
+          id="split-run-intent-composer"
+          data-testid="split-run-intent-composer"
+          value={analysis.composer}
+          placeholder={placeholder}
+          disabled={!analysis.canSend}
+          onChange={(event) => {
+            composerRef.current = event.target.value;
+            analysis.onComposerChange(event.target.value);
+            setCursor(event.target.selectionStart);
+          }}
+          onSelect={(event) => setCursor(event.currentTarget.selectionStart)}
+          onPaste={images.handlePaste}
+          onKeyDown={(event) => {
+            if (skillKeyboardRef.current?.(event)) {
+              return;
+            }
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              onSend();
+            }
+          }}
+          className="min-h-[4.2rem] py-2 text-[13px]"
+          rows={2}
+        />
+        <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
+          <AnalysisComposerAddons analysis={analysis} images={images} dictation={dictation} />
+          <div className="flex items-center gap-1.5">
+            <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
+              {ANALYSIS_PLANNING_COPY.sendShortcut}
+            </Kbd>
+            <InputGroupButton
+              type="submit"
+              variant="default"
+              size="icon-sm"
+              className="rounded-full"
+              disabled={!canSubmit}
+              aria-label={ANALYSIS_PLANNING_COPY.send}
+              data-testid="split-run-intent-composer-send"
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </InputGroupButton>
+          </div>
+        </InputGroupAddon>
+      </InputGroup>
     </div>
   );
 }

@@ -90,8 +90,8 @@ describe("PlanningReviewResourcesCard", () => {
 
     expect(screen.getByText("docs")).toBeInTheDocument();
     expect(screen.getByText("MCP server")).toBeInTheDocument();
-    expect(screen.getByText("review-copy")).toBeInTheDocument();
-    expect(screen.getByText("Skill")).toBeInTheDocument();
+    expect(screen.getByText("Review copy")).toBeInTheDocument();
+    expect(screen.getByText("Review UI copy.")).toBeInTheDocument();
     expect(screen.getAllByTestId("planning-review-resources-manage")[0]).toHaveAttribute(
       "href",
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/mcp`,

@@ -68,6 +68,7 @@ describe("useAnalysisPlanningSession", () => {
       expect(result.current.showChat).toBe(false);
     });
     expect(result.current.organizationId).toBe("org-1");
+    expect(result.current.factoryId).toBe("factory-1");
     expect(result.current.canSend).toBe(false);
     expect(result.current.queryError).toBeNull();
     expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(1);

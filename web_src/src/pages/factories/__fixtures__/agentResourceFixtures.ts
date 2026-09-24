@@ -59,7 +59,7 @@ export const INLINE_SKILL: FactoriesFactoryAgentResource = {
   kind: "KIND_SKILL",
   name: "review-copy",
   enabled: true,
-  markdown: "# Review copy\n\nWrite STE UI copy.",
+  markdown: "---\nname: review-copy\ntitle: Review copy\ndescription: Review UI copy.\n---\n\nWrite STE copy.",
   createdAt: NOW,
   updatedAt: NOW,
 };

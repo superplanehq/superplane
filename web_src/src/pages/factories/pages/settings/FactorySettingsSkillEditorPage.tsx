@@ -11,7 +11,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
-import { setSkillFrontmatterName, useSkillEditorPage } from "./useSkillEditorPage";
+import { useSkillEditorPage } from "./useSkillEditorPage";
 
 export function FactorySettingsSkillEditorPage() {
   const editor = useSkillEditorPage();
@@ -30,6 +30,8 @@ export function FactorySettingsSkillEditorPage() {
     );
   }
 
+  const displayName = editor.name.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
+
   return (
     <FactorySettingsPageFrame
       title={editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : AGENT_RESOURCES_COPY.editSkill}
@@ -41,18 +43,17 @@ export function FactorySettingsSkillEditorPage() {
         name={editor.name}
         markdown={editor.markdown}
         command={editor.command}
-        trimmedName={editor.trimmedName}
+        commandName={editor.commandName}
         nameError={editor.nameError}
         markdownError={editor.markdownError}
-        frontmatterMismatch={editor.frontmatterMismatch}
         resolvedTheme={resolvedTheme}
         onNameChange={editor.setName}
         onMarkdownChange={editor.setMarkdown}
       />
       <FactoryDeleteDialog
         open={editor.pendingDelete}
-        factoryName={editor.resource?.name?.trim() || AGENT_RESOURCES_COPY.unnamedSkill}
-        title={`Delete "${editor.resource?.name?.trim() || AGENT_RESOURCES_COPY.unnamedSkill}"?`}
+        factoryName={displayName}
+        title={`Delete "${displayName}"?`}
         description={AGENT_RESOURCES_COPY.deleteSkillDescription}
         canDelete={editor.canUpdate}
         isDeleting={editor.isDeleting}
@@ -98,10 +99,9 @@ function SkillEditorFields({
   name,
   markdown,
   command,
-  trimmedName,
+  commandName,
   nameError,
   markdownError,
-  frontmatterMismatch,
   resolvedTheme,
   onNameChange,
   onMarkdownChange,
@@ -109,10 +109,9 @@ function SkillEditorFields({
   name: string;
   markdown: string;
   command: string;
-  trimmedName: string;
+  commandName: string;
   nameError: string;
   markdownError: string;
-  frontmatterMismatch: boolean;
   resolvedTheme: string;
   onNameChange: (value: string) => void;
   onMarkdownChange: (value: string) => void;
@@ -122,12 +121,9 @@ function SkillEditorFields({
       <SkillNameFields
         name={name}
         command={command}
-        trimmedName={trimmedName}
+        commandName={commandName}
         nameError={nameError}
-        frontmatterMismatch={frontmatterMismatch}
-        markdown={markdown}
         onNameChange={onNameChange}
-        onMarkdownChange={onMarkdownChange}
       />
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <Label>{AGENT_RESOURCES_COPY.markdownLabel}</Label>
@@ -161,21 +157,15 @@ function SkillEditorFields({
 function SkillNameFields({
   name,
   command,
-  trimmedName,
+  commandName,
   nameError,
-  frontmatterMismatch,
-  markdown,
   onNameChange,
-  onMarkdownChange,
 }: {
   name: string;
   command: string;
-  trimmedName: string;
+  commandName: string;
   nameError: string;
-  frontmatterMismatch: boolean;
-  markdown: string;
   onNameChange: (value: string) => void;
-  onMarkdownChange: (value: string) => void;
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -186,31 +176,20 @@ function SkillNameFields({
           data-testid="agent-resource-skill-name"
           value={name}
           onChange={(event) => onNameChange(event.target.value)}
-          placeholder="review-copy"
+          placeholder="Review copy"
           autoComplete="off"
         />
-        <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.nameHelper}</p>
+        <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.skillNameHelper}</p>
         {nameError ? <p className="text-[12px] text-destructive">{nameError}</p> : null}
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="skill-editor-command">{AGENT_RESOURCES_COPY.skillCommandLabel}</Label>
         <Input id="skill-editor-command" data-testid="agent-resource-skill-command" value={command} readOnly />
         <p className="text-[12px] text-muted-foreground">
-          {trimmedName ? AGENT_RESOURCES_COPY.skillCommandHelper(trimmedName) : AGENT_RESOURCES_COPY.nameHelper}
+          {commandName
+            ? AGENT_RESOURCES_COPY.skillCommandHelper(commandName)
+            : AGENT_RESOURCES_COPY.skillCommandEmptyHelper}
         </p>
-        {frontmatterMismatch ? (
-          <div className="flex items-center gap-2">
-            <p className="text-[12px] text-destructive">{AGENT_RESOURCES_COPY.skillFrontmatterMismatch}</p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onMarkdownChange(setSkillFrontmatterName(markdown, trimmedName))}
-            >
-              {AGENT_RESOURCES_COPY.skillUseRecommendedName}
-            </Button>
-          </div>
-        ) : null}
       </div>
     </div>
   );

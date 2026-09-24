@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { usePermissions } from "@/contexts/usePermissions";
@@ -14,9 +14,13 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import { sanitizeSkillCommandName, setSkillFrontmatterFields, skillDisplayTitle } from "./skillFrontmatter";
 
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
 const RESERVED_NAME = "superplane";
+const EMPTY_SKILL_MARKDOWN = "---\nname: \ntitle: \ndescription: \n---\n\n";
+
+export { sanitizeSkillCommandName };
 
 export function validateSkillName(name: string): string {
   if (!name) {
@@ -29,40 +33,6 @@ export function validateSkillName(name: string): string {
     return AGENT_RESOURCES_COPY.nameInvalid;
   }
   return "";
-}
-
-export function skillFrontmatterName(markdown: string): string | undefined {
-  const match = markdown.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (!match) {
-    return undefined;
-  }
-  const nameLine = match[1]
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith("name:"));
-  if (!nameLine) {
-    return undefined;
-  }
-  return nameLine
-    .slice("name:".length)
-    .trim()
-    .replace(/^["']|["']$/g, "");
-}
-
-export function setSkillFrontmatterName(markdown: string, name: string): string {
-  const match = markdown.match(/^---\s*\n([\s\S]*?)\n---(\n[\s\S]*)?$/);
-  if (!match) {
-    return `---\nname: ${name}\n---\n${markdown}`;
-  }
-  const body = match[2] ?? "\n";
-  const lines = match[1].split("\n");
-  const nameIndex = lines.findIndex((line) => line.trim().startsWith("name:"));
-  if (nameIndex >= 0) {
-    lines[nameIndex] = `name: ${name}`;
-  } else {
-    lines.unshift(`name: ${name}`);
-  }
-  return `---\n${lines.join("\n")}\n---${body.startsWith("\n") ? body : `\n${body}`}`;
 }
 
 export function useSkillEditorPage() {
@@ -87,33 +57,20 @@ export function useSkillEditorPage() {
   useEffect(() => {
     if (isCreate) {
       setName("");
-      setMarkdown("---\nname: \ndescription: \n---\n\n");
+      setMarkdown(EMPTY_SKILL_MARKDOWN);
       return;
     }
     if (!resource) {
       return;
     }
-    setName(resource.name ?? "");
+    setName(skillDisplayTitle(resource));
     setMarkdown(resource.markdown ?? "");
   }, [isCreate, resource]);
 
-  const trimmedName = name.trim().toLowerCase();
-  const frontmatterName = useMemo(() => skillFrontmatterName(markdown), [markdown]);
-  const actions = {
-    handleSave: () =>
-      saveSkill({
-        trimmedName,
-        markdown,
-        resourceId: resource?.id,
-        listPath,
-        navigate,
-        setNameError,
-        setMarkdownError,
-        createResource,
-        updateResource,
-      }),
-    confirmDelete: () => deleteSkill({ resourceId: resource?.id, listPath, navigate, deleteResource }),
-  };
+  const commandName = sanitizeSkillCommandName(name);
+  const taken = Boolean(
+    commandName && skills.data?.some((entry) => entry.id !== resource?.id && entry.name === commandName),
+  );
 
   return {
     isCreate,
@@ -127,22 +84,47 @@ export function useSkillEditorPage() {
     markdownError,
     pendingDelete,
     listPath,
-    trimmedName,
-    command: trimmedName ? `/${trimmedName}` : "/",
-    frontmatterMismatch: Boolean(trimmedName && frontmatterName && frontmatterName !== trimmedName),
+    commandName,
+    command: commandName ? `/${commandName}` : "/",
     isSaving: createResource.isPending || updateResource.isPending,
     isDeleting: deleteResource.isPending,
-    setName,
+    setName: (value: string) => setNameAndFrontmatter(value, setName, setMarkdown),
     setMarkdown,
     setPendingDelete,
     navigateToList: () => navigate(listPath),
-    ...actions,
+    handleSave: () =>
+      saveSkill({
+        commandName,
+        title: name.trim(),
+        markdown,
+        taken,
+        resourceId: resource?.id,
+        listPath,
+        navigate,
+        setNameError,
+        setMarkdownError,
+        createResource,
+        updateResource,
+      }),
+    confirmDelete: () => deleteSkill({ resourceId: resource?.id, listPath, navigate, deleteResource }),
   };
 }
 
+function setNameAndFrontmatter(
+  value: string,
+  setName: (value: string) => void,
+  setMarkdown: (value: string | ((current: string) => string)) => void,
+) {
+  setName(value);
+  const slug = sanitizeSkillCommandName(value);
+  setMarkdown((current) => setSkillFrontmatterFields(current, { name: slug, title: value }));
+}
+
 async function saveSkill({
-  trimmedName,
+  commandName,
+  title,
   markdown,
+  taken,
   resourceId,
   listPath,
   navigate,
@@ -151,8 +133,10 @@ async function saveSkill({
   createResource,
   updateResource,
 }: {
-  trimmedName: string;
+  commandName: string;
+  title: string;
   markdown: string;
+  taken: boolean;
   resourceId?: string;
   listPath: string;
   navigate: ReturnType<typeof useNavigate>;
@@ -161,23 +145,24 @@ async function saveSkill({
   createResource: ReturnType<typeof useCreateFactoryAgentResource>;
   updateResource: ReturnType<typeof useUpdateFactoryAgentResource>;
 }) {
-  const nextNameError = validateSkillName(trimmedName);
+  const nextNameError = taken ? AGENT_RESOURCES_COPY.nameTaken : validateSkillName(commandName);
   const nextMarkdownError = markdown.trim() ? "" : AGENT_RESOURCES_COPY.markdownRequired;
   setNameError(nextNameError);
   setMarkdownError(nextMarkdownError);
   if (nextNameError || nextMarkdownError) {
     return;
   }
+  const nextMarkdown = setSkillFrontmatterFields(markdown.trim(), { name: commandName, title }).trim();
   try {
     if (resourceId) {
-      await updateResource.mutateAsync({ resourceId, name: trimmedName, markdown: markdown.trim() });
+      await updateResource.mutateAsync({ resourceId, name: commandName, markdown: nextMarkdown });
       showSuccessToast(AGENT_RESOURCES_COPY.skillUpdated);
     } else {
       await createResource.mutateAsync({
         kind: "KIND_SKILL",
-        name: trimmedName,
+        name: commandName,
         enabled: true,
-        markdown: markdown.trim(),
+        markdown: nextMarkdown,
       });
       showSuccessToast(AGENT_RESOURCES_COPY.skillCreated);
     }

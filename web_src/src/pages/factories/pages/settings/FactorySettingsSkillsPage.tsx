@@ -21,7 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import { skillSourceLabel } from "./agentResourceDisplay";
+import { skillDisplayTitle, skillListDescription } from "./skillFrontmatter";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
@@ -63,6 +63,8 @@ export function FactorySettingsSkillsPage() {
       throw error;
     }
   };
+
+  const pendingName = pendingDelete ? skillDisplayTitle(pendingDelete) || AGENT_RESOURCES_COPY.unnamedSkill : "";
 
   return (
     <FactorySettingsPageFrame
@@ -125,8 +127,8 @@ export function FactorySettingsSkillsPage() {
       </div>
       <FactoryDeleteDialog
         open={Boolean(pendingDelete)}
-        factoryName={pendingDelete?.name?.trim() || AGENT_RESOURCES_COPY.unnamedSkill}
-        title={`Delete "${pendingDelete?.name?.trim() || AGENT_RESOURCES_COPY.unnamedSkill}"?`}
+        factoryName={pendingName}
+        title={`Delete "${pendingName}"?`}
         description={AGENT_RESOURCES_COPY.deleteSkillDescription}
         canDelete={canUpdate}
         isDeleting={deleteResource.isPending}
@@ -150,15 +152,25 @@ function SkillRow({
   onDelete: () => void;
   onToggleEnabled: (enabled: boolean) => void;
 }) {
-  const name = resource.name?.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
+  const name = skillDisplayTitle(resource) || AGENT_RESOURCES_COPY.unnamedSkill;
+  const description = skillListDescription(resource);
   return (
     <li
       className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0"
       data-testid={`agent-resource-row-${resource.id}`}
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
-        <p className="truncate text-[12px] text-muted-foreground">{skillSourceLabel(resource)}</p>
+        <button
+          type="button"
+          className="block w-full cursor-pointer truncate text-left disabled:cursor-not-allowed"
+          onClick={onEdit}
+          disabled={!canUpdate}
+          aria-label={`${AGENT_RESOURCES_COPY.edit} ${name}`}
+          data-testid={`agent-resource-edit-${resource.id}`}
+        >
+          <span className="block truncate text-[13px] font-medium text-foreground">{name}</span>
+          {description ? <span className="block truncate text-[12px] text-muted-foreground">{description}</span> : null}
+        </button>
       </div>
       <Switch
         checked={resource.enabled !== false}
