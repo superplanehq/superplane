@@ -83,15 +83,29 @@ export function resolveOnboardingAgent(args: {
   hostedModels: HostedModelsByProvider;
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
+  /** When set, a connected provider key is used before the hosted model. */
+  preferOwnKey?: boolean;
 }): OnboardingAgentPlan | undefined {
+  if (args.preferOwnKey) {
+    const ownKey = connectedProviderPlan(args);
+    if (ownKey) return ownKey;
+  }
+
   const hosted = hostedSuperPlanePlan(args);
   if (hosted) return hosted;
+  if (args.preferOwnKey) return undefined;
 
+  return connectedProviderPlan(args);
+}
+
+function connectedProviderPlan(args: {
+  connected: Set<IntegrationId>;
+  hostedModels: HostedModelsByProvider;
+}): OnboardingAgentPlan | undefined {
   for (const providerId of AGENT_PROVIDER_IDS) {
     if (!args.connected.has(providerId)) continue;
     return planForConnectedProvider(providerId, args.hostedModels);
   }
-
   return undefined;
 }
 
@@ -117,12 +131,29 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
 }
 
 /**
- * A hosted default answers the agent question for the organization, so setup
- * has nothing left to ask about the agent. Billing controls hosted runs after
- * setup. Installations without a hosted default still use the connection step.
+ * A hosted default can run the agent without a provider key. Billing controls
+ * hosted runs after setup. Installations without a hosted default still use
+ * the connection step.
  */
 export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boolean {
   return plan?.component === "runnerSuperPlane";
+}
+
+export type OnboardingAgentGate = "show" | "skip" | "pending";
+
+/**
+ * Hosted models skip the agent screen. An organization with bring-your-own-key
+ * still sees that screen, so it can connect a provider key. The choice waits
+ * until the flag has loaded, so setup does not finish on the hosted path first.
+ */
+export function onboardingAgentGate(args: {
+  hostedAgentReady: boolean;
+  bringYourOwnKey: boolean;
+  bringYourOwnKeyLoading: boolean;
+}): OnboardingAgentGate {
+  if (!args.hostedAgentReady || args.bringYourOwnKey) return "show";
+  if (args.bringYourOwnKeyLoading) return "pending";
+  return "skip";
 }
 
 export function firstWorkOrderAgentError(args: {

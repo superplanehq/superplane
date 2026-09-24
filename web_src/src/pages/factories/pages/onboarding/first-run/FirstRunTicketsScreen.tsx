@@ -18,6 +18,8 @@ type FirstRunTicketsScreenProps = {
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   continueLabel?: string;
+  /** True while this screen waits to learn whether the agent screen is next. */
+  continuePending?: boolean;
   /** True while this screen provisions the workspace, on the last screen. */
   saving?: boolean;
   savingLabel?: string;
@@ -37,11 +39,26 @@ type FirstRunTicketsScreenProps = {
   onRetryJiraProjects?: () => void;
 };
 
+function ticketContinueButton(args: {
+  canAnalyze: boolean;
+  continuePending: boolean;
+  saving: boolean;
+  savingLabel: string;
+}) {
+  const waitingForAgentChoice = args.continuePending && !args.saving;
+  return {
+    disabled: !args.canAnalyze || args.continuePending,
+    loading: args.saving || args.continuePending,
+    loadingText: waitingForAgentChoice ? FIRST_RUN_COPY.agent.loading : args.savingLabel,
+  };
+}
+
 export function FirstRunTicketsScreen({
   ticketSource,
   chrome,
   sphere,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
+  continuePending = false,
   saving = false,
   savingLabel = FIRST_RUN_COPY.finish.saving,
   jiraConnected = false,
@@ -61,6 +78,7 @@ export function FirstRunTicketsScreen({
 }: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
   const canAnalyze = canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
+  const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
 
   return (
     <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere}>
@@ -120,9 +138,9 @@ export function FirstRunTicketsScreen({
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!canAnalyze}
-            loading={saving}
-            loadingText={savingLabel}
+            disabled={continueButton.disabled}
+            loading={continueButton.loading}
+            loadingText={continueButton.loadingText}
             onClick={onAnalyzeTickets}
             data-testid="first-run-analyze-tickets"
           >
