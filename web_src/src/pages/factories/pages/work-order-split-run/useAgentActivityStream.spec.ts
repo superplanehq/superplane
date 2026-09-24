@@ -41,12 +41,18 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+function abortError() {
+  const error = new Error("Aborted");
+  error.name = "AbortError";
+  return error;
+}
+
 function hangAfterOpen(onReady?: (handlers: StreamHandlers) => void) {
   return (handlers: StreamHandlers) => {
     handlers.onOpen?.();
     onReady?.(handlers);
-    return new Promise<void>((resolve) => {
-      stopMock.mockImplementation(() => resolve());
+    return new Promise<void>((_resolve, reject) => {
+      stopMock.mockImplementation(() => reject(abortError()));
     });
   };
 }
@@ -92,6 +98,36 @@ describe("useAgentActivityStream", () => {
     expect(pumpMock).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(result.current.isConnected).toBe(true));
     expect(result.current.hasConnectedOnce).toBe(true);
+    expect(result.current.error).toBeUndefined();
+  });
+
+  it("does not stop a replacement stream with a prior quiet timer", async () => {
+    vi.useFakeTimers();
+    pumpMock
+      .mockImplementationOnce((handlers: StreamHandlers) => {
+        handlers.onOpen?.();
+        return Promise.resolve();
+      })
+      .mockImplementation(() => new Promise(() => undefined));
+
+    const { result } = renderStream();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(pumpMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    expect(pumpMock).toHaveBeenCalledTimes(2);
+    const stopsAfterReconnect = stopMock.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(13_000);
+    });
+    expect(stopMock.mock.calls.length).toBe(stopsAfterReconnect);
+    expect(result.current.error).toBeUndefined();
   });
 
   it("resets the quiet timer on a later record and does not reconnect again", async () => {

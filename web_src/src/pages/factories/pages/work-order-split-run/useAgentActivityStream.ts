@@ -147,6 +147,7 @@ export function useAgentActivityStream({
             setConnection((current) => disconnectedConnection(current, executionId, message));
           }
         } finally {
+          clearQuietTimer();
           currentStream.stop();
           if (stream === currentStream) {
             stream = undefined;
