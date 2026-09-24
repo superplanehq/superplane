@@ -52,6 +52,9 @@ type FactoryContext struct {
 	// readProductiveTaskFiles, when set, supplies Productive.io files without
 	// calling the Productive.io API.
 	readProductiveTaskFiles productiveFileRead
+	// readJiraIssueFiles, when set, supplies Jira files without calling the
+	// Jira API.
+	readJiraIssueFiles jiraFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -280,6 +283,7 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
 	c.ingestGitHubImages(order)
 	c.ingestProductiveFiles(order)
+	c.ingestJiraFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 
