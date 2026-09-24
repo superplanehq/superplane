@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
+import { JIRA_COMPLETION_COLUMN_COPY } from "../../jiraCompletionColumnCopy";
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
+    data: [
+      { id: "todo", name: "To Do" },
+      { id: "qa", name: "QA" },
+      { id: "done", name: "Done" },
+    ],
+    isLoading: false,
+    isError: false,
+  }),
+}));
 
 describe("FirstRunTicketsScreen", () => {
   it("keeps analysis stopped until a ticket system is selected", async () => {
@@ -175,7 +188,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
   });
 
-  it("does not show completion column settings during onboarding", () => {
+  it("hides completion column settings when Jira has a Done status", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
@@ -188,5 +201,34 @@ describe("FirstRunTicketsScreen", () => {
     );
 
     expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
+  });
+
+  it("shows completion column settings when Jira has no Done status", async () => {
+    const user = userEvent.setup();
+    const onJiraCompletionChange = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraConnected
+        organizationId="org-1"
+        jiraIntegrationId="jira-1"
+        jiraProjects={[{ id: "PAY", name: "Payments" }]}
+        jiraProjectId="PAY"
+        jiraCompletionNeedsManualColumn
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+        onJiraCompletionChange={onJiraCompletionChange}
+      />,
+    );
+
+    expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
+    expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
+    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
+    await user.click(screen.getByTestId("jira-move-on-complete"));
+    expect(onJiraCompletionChange).toHaveBeenCalledWith({
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "",
+    });
   });
 });
