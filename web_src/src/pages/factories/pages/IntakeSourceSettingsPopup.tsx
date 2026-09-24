@@ -1,6 +1,8 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
+import { cn } from "@/lib/utils";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
@@ -22,8 +24,8 @@ import {
   SettingsAutomationWorkspace,
 } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
+import { lineIntakeSourceById, type LineIntakeSourceId } from "./lineIntakeModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
-import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
@@ -96,7 +98,11 @@ export function IntakeSourceSettingsPopup({
 
   return (
     <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={`Intake ${settings.name}`} onClose={onClose}>
+      <PopupHeader
+        title={`Intake ${settings.name}`}
+        onClose={onClose}
+        leading={<IntakeSourceTitleLogo sourceId={sourceId} />}
+      >
         <SettingsAutomationHeaderRow
           tabs={
             <Tabs value={tab} onValueChange={(value) => setTab(value as IntakeSettingsTab)}>
@@ -147,6 +153,26 @@ export function IntakeSourceSettingsPopup({
         onClose={onClose}
       />
     </PopupShell>
+  );
+}
+
+function IntakeSourceTitleLogo({ sourceId }: { sourceId: LineIntakeSourceId }) {
+  const source = lineIntakeSourceById(sourceId);
+  if (!source?.iconSrc) {
+    return null;
+  }
+
+  return (
+    <img
+      src={source.iconSrc}
+      alt=""
+      data-testid="intake-source-settings-title-icon"
+      className={cn(
+        "size-5 shrink-0 object-contain",
+        source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+        logoDarkInvertClass(source.iconSrc),
+      )}
+    />
   );
 }
 
