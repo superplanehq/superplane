@@ -138,6 +138,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", task.Commands[2].Preview)
 	assert.Contains(t, task.Commands[2].Command, `cd '/tmp/workspace'`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`)
+	assert.NotContains(t, task.Commands[2].Command, `'high'`)
 	assert.Contains(t, task.Commands[2].Command, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
 	assert.Contains(t, task.Commands[2].Command, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
@@ -190,6 +191,37 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "mcp__superplane__say")
 	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")
+}
+
+func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model:         "sonnet",
+		ThinkingLevel: "high",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
+		},
+	}
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil)
+	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'sonnet' 'high'`)
+}
+
+func TestValidateRunClaudeCodeSpecRejectsUnknownThinking(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		MachineType: testRunnerMachineType,
+		Steps: []ClaudeCodeStep{
+			{Name: "Do the thing", Type: runner.AgentStepPrompt, Prompt: strPtr("do the thing")},
+		},
+		Credentials: runner.AgentCredentials{
+			Source: "secret",
+			Secret: secretRef("anthropic", "api_key"),
+		},
+		ThinkingLevel: "xhigh",
+	}
+	require.Error(t, validateRunClaudeCodeSpec(spec))
 }
 
 func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {

@@ -14,6 +14,7 @@ type RunOpenRouterSpec struct {
 	Steps                   []runner.AgentStep            `mapstructure:"steps"`
 	Credentials             runner.AgentCredentials       `mapstructure:"credentials"`
 	Model                   string                        `mapstructure:"model"`
+	ThinkingLevel           string                        `mapstructure:"thinkingLevel"`
 	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
@@ -35,6 +36,9 @@ func decodeRunOpenRouterSpec(raw any) (RunOpenRouterSpec, error) {
 	}
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
+	}
+	if thinking, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel); err == nil {
+		spec.ThinkingLevel = thinking
 	}
 	return spec, nil
 }
@@ -69,7 +73,8 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
-	return nil
+	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
+	return err
 }
 
 // OpenRouterBrokerTask is the ordered broker commands and task files for a run.
@@ -91,11 +96,7 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 		Setups:           setups,
 		Model:            strings.TrimSpace(spec.Model),
 		PromptCommand: func(promptName, model string) string {
-			return fmt.Sprintf(
-				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
-				promptName,
-				runner.ShellSingleQuote(model),
-			)
+			return runner.PromptNodeCommand(promptName, model, spec.ThinkingLevel)
 		},
 	})
 	return OpenRouterBrokerTask{Commands: commands, Files: files}
@@ -141,7 +142,7 @@ func planningFollowUpCommand(spec RunOpenRouterSpec) runner.BrokerCommand {
 		Command: runner.WrapAgentStepCommand(
 			runner.WrapPromptCommandInWorkingDirectory(
 				workdir,
-				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
+				runner.FollowUpLoopCommand(model, spec.ThinkingLevel),
 			),
 		),
 		Kind:    runner.LiveLogKindPrompt,
