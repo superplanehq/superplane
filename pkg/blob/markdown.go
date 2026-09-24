@@ -13,6 +13,7 @@ const FileRefScheme = "sp-file"
 var (
 	markdownLinkPattern = regexp.MustCompile(`(!?\[[^\]]*]\()([^)\s]+)(\))`)
 	htmlSrcPattern      = regexp.MustCompile(`(?i)(<img\b[^>]*?\bsrc\s*=\s*["'])([^"']+)(["'])`)
+	htmlHrefPattern     = regexp.MustCompile(`(?i)(<a\b[^>]*?\bhref\s*=\s*["'])([^"']+)(["'])`)
 )
 
 func FileRef(id uuid.UUID) string {
@@ -109,6 +110,16 @@ func ReplaceURL(markdown, from, to string) string {
 }
 
 func HTTPImageURLs(markdown string) []string {
+	return httpTargets(markdown, true)
+}
+
+// HTTPResourceURLs returns http and https targets from markdown links,
+// image tags, and anchor tags. Image-only callers use HTTPImageURLs.
+func HTTPResourceURLs(markdown string) []string {
+	return httpTargets(markdown, false)
+}
+
+func httpTargets(markdown string, imagesOnly bool) []string {
 	seen := map[string]struct{}{}
 	var urls []string
 	collect := func(raw string) {
@@ -126,12 +137,18 @@ func HTTPImageURLs(markdown string) []string {
 		urls = append(urls, raw)
 	}
 	for _, match := range markdownLinkPattern.FindAllStringSubmatch(markdown, -1) {
-		if strings.HasPrefix(match[1], "!") {
-			collect(match[2])
+		if imagesOnly && !strings.HasPrefix(match[1], "!") {
+			continue
 		}
+		collect(match[2])
 	}
 	for _, match := range htmlSrcPattern.FindAllStringSubmatch(markdown, -1) {
 		collect(match[2])
+	}
+	if !imagesOnly {
+		for _, match := range htmlHrefPattern.FindAllStringSubmatch(markdown, -1) {
+			collect(match[2])
+		}
 	}
 	return urls
 }

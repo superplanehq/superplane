@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -1538,6 +1539,89 @@ func TestFactoryContext_CreateWorkOrderIngestsGitHubImagesBeforeEmit(t *testing.
 	url, ok := item["url"].(string)
 	require.True(t, ok)
 	assert.Contains(t, url, "/api/v1/public/files/"+files[0].ID.String())
+}
+
+func TestFactoryContext_CreateWorkOrderStoresProductiveAttachments(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	inline := "https://files.productive.io/attachments/files/1/original/shot.png"
+	canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+		"type": productive.TaskPayloadType,
+		"data": map[string]any{
+			"meta": map[string]any{"event": productive.TaskCreatedEvent},
+			"data": map[string]any{"id": "20305431", "type": "tasks"},
+		},
+	})
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithProductiveTaskFiles(
+		func(context.Context, string, string) ([]productive.TaskFile, error) {
+			return []productive.TaskFile{
+				{
+					Name:        "shot.png",
+					ContentType: "image/png",
+					Body:        []byte("png-bytes"),
+					ReplaceURLs: []string{inline},
+				},
+				{
+					Name:        "notes.pdf",
+					ContentType: "application/pdf",
+					Body:        []byte("pdf-bytes"),
+				},
+			}, nil
+		},
+	)
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From Productive.io task",
+		Description: "See ![shot](" + inline + ")",
+	})
+	require.True(t, inserted)
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.NotContains(t, persisted.Description, inline)
+	assert.Contains(t, persisted.Description, "![shot]("+blob.FileRefScheme+"://")
+	assert.Contains(t, persisted.Description, "[notes.pdf]("+blob.FileRefScheme+"://")
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 2)
 }
 
 func TestFactoryContext_CreateWorkOrderDefersFileCleanupUntilCallerApplies(t *testing.T) {

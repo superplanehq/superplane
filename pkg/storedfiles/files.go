@@ -414,6 +414,133 @@ type IngestResult struct {
 	ObjectKeys []string
 }
 
+// IncomingFile is a downloaded remote file to store on a work order.
+// ReplaceURLs are exact strings in the description that become the stored
+// file reference. When none of them occur, the file is appended.
+type IncomingFile struct {
+	Filename    string
+	ContentType string
+	Body        io.Reader
+	ReplaceURLs []string
+}
+
+func AppendTaskFiles(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	createdBy *uuid.UUID,
+	markdown string,
+	files []IncomingFile,
+) (IngestResult, error) {
+	result := IngestResult{Markdown: markdown}
+	if len(files) == 0 {
+		return result, nil
+	}
+
+	next := markdown
+	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
+	if err != nil {
+		return result, err
+	}
+
+	for _, file := range files {
+		if openCount >= models.MaxFilesPerWorkOrder {
+			break
+		}
+		stored, ingested, err := storeIncomingFile(
+			ctx,
+			tx,
+			provider,
+			organizationID,
+			factoryID,
+			workOrderID,
+			createdBy,
+			file,
+		)
+		if err != nil || !ingested {
+			continue
+		}
+		result.ObjectKeys = append(result.ObjectKeys, stored.StorageKey)
+		ref := blob.FileRef(stored.ID)
+		replaced := false
+		for _, rawURL := range file.ReplaceURLs {
+			if rawURL == "" || !strings.Contains(next, rawURL) {
+				continue
+			}
+			next = blob.ReplaceURL(next, rawURL, ref)
+			replaced = true
+		}
+		if !replaced {
+			next = appendFileRef(next, stored.Filename, stored.ContentType, ref)
+		}
+		openCount++
+	}
+	result.Markdown = next
+	return result, nil
+}
+
+func storeIncomingFile(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	createdBy *uuid.UUID,
+	file IncomingFile,
+) (*models.File, bool, error) {
+	if provider == nil || file.Body == nil {
+		return nil, false, nil
+	}
+	contentType := normalizeFetchedContentType(file.ContentType, file.Filename)
+	if !models.IsAllowedFileContentType(contentType) {
+		return nil, false, nil
+	}
+
+	createdByID := uuid.Nil
+	if createdBy != nil {
+		createdByID = *createdBy
+	}
+	filename := strings.TrimSpace(file.Filename)
+	if filename == "" {
+		filename = "file"
+	}
+	stored, err := models.CreatePendingFile(tx, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		Filename:       filename,
+		ContentType:    contentType,
+		CreatedByID:    createdByID,
+	})
+	if err != nil {
+		return nil, false, nil
+	}
+
+	storeCtx, cancel := context.WithTimeout(ctx, ingestFetchTimeout)
+	defer cancel()
+	if err := CompleteUpload(storeCtx, tx, provider, stored, io.LimitReader(file.Body, models.MaxFileBytes+1)); err != nil {
+		_ = DeleteObjectAndRow(storeCtx, tx, provider, stored)
+		return nil, false, nil
+	}
+	return stored, true, nil
+}
+
+func appendFileRef(markdown, filename, contentType, ref string) string {
+	label := blob.MarkdownLinkLabel(filename)
+	var link string
+	if models.IsInlineImageContentType(contentType) {
+		link = "![" + label + "](" + ref + ")"
+	} else {
+		link = "[" + label + "](" + ref + ")"
+	}
+	markdown = strings.TrimRight(markdown, "\n")
+	if markdown == "" {
+		return link
+	}
+	return markdown + "\n\n" + link
+}
+
 func IngestRemoteImages(
 	ctx context.Context,
 	tx *gorm.DB,

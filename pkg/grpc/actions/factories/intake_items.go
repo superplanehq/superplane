@@ -473,6 +473,10 @@ func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, l
 	return items, nil
 }
 
+func (s *productiveIntakeItemSource) TaskFiles(ctx context.Context, taskID, description string) ([]productive.TaskFile, error) {
+	return s.productive.TaskFiles(ctx, taskID, description)
+}
+
 func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
 	task, err := s.productive.GetTask(strings.TrimSpace(id))
 	if err != nil {

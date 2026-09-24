@@ -35,4 +35,13 @@ func TestGitHubImageURLDetection(t *testing.T) {
 		[]string{"https://user-images.githubusercontent.com/1.png"},
 		HTTPImageURLs("![x](https://user-images.githubusercontent.com/1.png) and [docs](https://example.com/a.pdf)"),
 	)
+	assert.Equal(
+		t,
+		[]string{
+			"https://user-images.githubusercontent.com/1.png",
+			"https://example.com/a.pdf",
+			"https://files.productive.io/attachments/files/1/original/notes.pdf",
+		},
+		HTTPResourceURLs("![x](https://user-images.githubusercontent.com/1.png) and [docs](https://example.com/a.pdf) <a href=\"https://files.productive.io/attachments/files/1/original/notes.pdf\">notes</a>"),
+	)
 }
