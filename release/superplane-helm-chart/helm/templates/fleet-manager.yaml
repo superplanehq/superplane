@@ -1,0 +1,140 @@
+{{- $deploy := and .Values.taskBroker.local.enabled (eq .Values.taskBroker.secretName "") -}}
+{{- if $deploy -}}
+{{- $baseUrl := .Values.taskBroker.baseUrl | trim -}}
+{{- if eq $baseUrl "" -}}
+{{- if .Values.ingress.enabled -}}
+{{- $scheme := "http" -}}
+{{- if .Values.ingress.ssl.enabled -}}
+{{- $scheme = "https" -}}
+{{- end -}}
+{{- $baseUrl = printf "%s://%s" $scheme .Values.domain.name -}}
+{{- else -}}
+{{- $baseUrl = "http://task-broker:8081" -}}
+{{- end -}}
+{{- end -}}
+{{- $aws := .Values.fleetManager.aws -}}
+{{- if not $aws.region -}}
+{{- fail ".Values.fleetManager.aws.region is required." -}}
+{{- end -}}
+{{- if not $aws.subnetIds -}}
+{{- fail ".Values.fleetManager.aws.subnetIds is required." -}}
+{{- end -}}
+{{- if not $aws.securityGroupIds -}}
+{{- fail ".Values.fleetManager.aws.securityGroupIds is required." -}}
+{{- end -}}
+{{- if not $aws.iamInstanceProfile -}}
+{{- fail ".Values.fleetManager.aws.iamInstanceProfile is required." -}}
+{{- end -}}
+{{- if not $aws.pools -}}
+{{- fail ".Values.fleetManager.aws.pools is required." -}}
+{{- end -}}
+{{- $pools := list -}}
+{{- range $i, $pool := $aws.pools -}}
+{{- if not $pool.fleetId -}}
+{{- fail (printf ".Values.fleetManager.aws.pools[%d].fleetId is required." $i) -}}
+{{- end -}}
+{{- if not $pool.ami -}}
+{{- fail (printf ".Values.fleetManager.aws.pools[%d].ami is required." $i) -}}
+{{- end -}}
+{{- if not $pool.runnerS3Uri -}}
+{{- fail (printf ".Values.fleetManager.aws.pools[%d].runnerS3Uri is required." $i) -}}
+{{- end -}}
+{{- $pools = append $pools (dict
+  "fleet_id" $pool.fleetId
+  "ami" $pool.ami
+  "instance_type" ($pool.instanceType | default "t3.micro")
+  "arch" ($pool.arch | default "amd64")
+  "runner_s3_uri" $pool.runnerS3Uri
+  "hot_instance_count" (int ($pool.hotInstanceCount | default 0))
+  "headroom" (int ($pool.headroom | default 0))
+  "volume_size_gb" (int ($pool.volumeSizeGb | default 0))
+) -}}
+{{- end -}}
+{{- $config := dict
+  "aws_region" $aws.region
+  "task_broker_url" $baseUrl
+  "task_broker_auth_token" .Values.taskBroker.authToken
+  "listen_addr" ":8080"
+  "reconcile_interval_sec" 60
+  "subnet_ids" $aws.subnetIds
+  "security_group_ids" $aws.securityGroupIds
+  "iam_instance_profile" $aws.iamInstanceProfile
+  "volume_size_gb" (int $aws.volumeSizeGb)
+  "runner_health_port" 9090
+  "boot_grace_sec" 300
+  "pools" $pools
+-}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-fleet-manager
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+  config.json: |
+{{ $config | toJson | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-manager
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleet-manager
+  template:
+    metadata:
+      labels:
+        app: fleet-manager
+    spec:
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      containers:
+        - name: fleet-manager
+          image: {{ .Values.fleetManager.image }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: FM_CONFIG_S3_URI
+              value: ""
+            - name: FM_CONFIG_SSM_PARAM
+              value: ""
+            - name: FM_CONFIG_FILE
+              value: /tmp/fleet-manager/config.json
+          volumeMounts:
+            - name: config
+              mountPath: /tmp/fleet-manager
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ .Release.Name }}-fleet-manager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-manager
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: fleet-manager
+{{- end }}

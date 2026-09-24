@@ -63,6 +63,15 @@ spec:
   - host: "{{ $domainName }}"
     http:
       paths:
+      {{- if and .Values.taskBroker.local.enabled (eq .Values.taskBroker.secretName "") }}
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: task-broker
+            port:
+              number: 8081
+      {{- end }}
       - path: /ws
         pathType: Prefix
         backend:
@@ -131,5 +140,26 @@ spec:
     port: 8000
     type: HTTP
     requestPath: /health
+{{- if and .Values.taskBroker.local.enabled (eq .Values.taskBroker.secretName "") }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: ingress-task-broker-backend-config
+  namespace: {{ .Release.Namespace }}
+spec:
+  # Runner connections stay open on the WebSocket stream.
+  timeoutSec: 3600
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 10
+    port: 8081
+    type: HTTP
+    requestPath: /healthz
+{{- end }}
 {{- end }}
 {{- end }}

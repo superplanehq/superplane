@@ -1,0 +1,12 @@
+{{- if and .Values.internalAgent.enabled (eq .Values.internalAgent.secretName "") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.internalAgent.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  ANTHROPIC_API_KEY: {{ .Values.internalAgent.apiKey | required ".Values.internalAgent.apiKey is required." | b64enc }}
+  ANTHROPIC_AGENT_ID: {{ .Values.internalAgent.agentId | required ".Values.internalAgent.agentId is required." | b64enc }}
+  ANTHROPIC_ENVIRONMENT_ID: {{ .Values.internalAgent.environmentId | required ".Values.internalAgent.environmentId is required." | b64enc }}
+{{- end }}

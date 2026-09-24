@@ -1,0 +1,1 @@
+{{- $_ := .Values.blobStorage.provider | trim | required ".Values.blobStorage.provider is required." -}}

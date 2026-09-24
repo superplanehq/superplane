@@ -63,6 +63,22 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.internalAgent.name" }}
+{{- if eq .Values.internalAgent.secretName "" }}
+{{- printf "%s-internal-agent" .Release.Name }}
+{{- else }}
+{{- .Values.internalAgent.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "secrets.taskbroker.name" }}
+{{- if eq .Values.taskBroker.secretName "" }}
+{{- printf "%s-task-broker" .Release.Name }}
+{{- else }}
+{{- .Values.taskBroker.secretName }}
+{{- end }}
+{{- end }}
+
 {{- define "superplane.serviceAccountName" -}}
 {{- if .Values.serviceAccount.name }}
 {{- .Values.serviceAccount.name }}

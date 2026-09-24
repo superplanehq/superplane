@@ -87,6 +87,12 @@ spec:
             - secretRef:
                 name: {{ include "secrets.polar.name" . }}
             {{- end }}
+            {{- if .Values.internalAgent.enabled }}
+            - secretRef:
+                name: {{ include "secrets.internalAgent.name" . }}
+            {{- end }}
+            - secretRef:
+                name: {{ include "secrets.taskbroker.name" . }}
           env:
             - name: START_PUBLIC_API
               value: "yes"

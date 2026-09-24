@@ -1,0 +1,195 @@
+{{- $deploy := and .Values.taskBroker.local.enabled (eq .Values.taskBroker.secretName "") -}}
+{{- $baseUrl := .Values.taskBroker.baseUrl | trim -}}
+{{- if and $deploy (eq $baseUrl "") -}}
+{{- $baseUrl = "http://task-broker:8081" -}}
+{{- end -}}
+{{- $databaseUrl := .Values.taskBroker.databaseUrl | trim -}}
+{{- if and $deploy (eq $databaseUrl "") -}}
+{{- if ne .Values.database.secretName "" -}}
+{{- fail ".Values.taskBroker.databaseUrl is required when database.secretName is set." -}}
+{{- end -}}
+{{- $sslmode := "disable" -}}
+{{- if .Values.database.ssl -}}
+{{- $sslmode = "require" -}}
+{{- end -}}
+{{- $databaseUrl = printf "postgres://%s:%s@%s:%v/broker?sslmode=%s" .Values.database.username (.Values.database.password | urlquery) .Values.database.host .Values.database.port $sslmode -}}
+{{- end -}}
+{{- if eq .Values.taskBroker.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.taskbroker.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  TASK_BROKER_BASE_URL: {{ $baseUrl | b64enc }}
+  TASK_BROKER_AUTH_TOKEN: {{ .Values.taskBroker.authToken | b64enc }}
+  {{- if $deploy }}
+  DATABASE_URL: {{ $databaseUrl | b64enc }}
+  {{- end }}
+{{- end }}
+{{- if $deploy }}
+{{- $_ := .Values.taskBroker.authToken | trim | required ".Values.taskBroker.authToken is required." -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-broker
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-broker
+  template:
+    metadata:
+      labels:
+        app: task-broker
+    spec:
+      initContainers:
+        - name: create-broker-database
+          image: postgres:{{ .Values.database.local.version }}
+          env:
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: DB_HOST
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: DB_PORT
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: DB_USERNAME
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: DB_PASSWORD
+            - name: POSTGRES_DB_SSL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: POSTGRES_DB_SSL
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              if [ "$POSTGRES_DB_SSL" = "true" ]; then
+                export PGSSLMODE=require
+              else
+                export PGSSLMODE=disable
+              fi
+              until pg_isready; do
+                sleep 1
+              done
+              if ! psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1; then
+                psql -d postgres -c "CREATE DATABASE broker"
+              fi
+      containers:
+        - name: task-broker
+          image: {{ .Values.taskBroker.local.image }}
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: LISTEN_ADDR
+              value: :8081
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.taskbroker.name" . }}
+                  key: DATABASE_URL
+            - name: AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.taskbroker.name" . }}
+                  key: TASK_BROKER_AUTH_TOKEN
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-broker
+  namespace: {{ .Release.Namespace }}
+{{- if and .Values.ingress.enabled (eq .Values.ingress.className "gce") }}
+  annotations:
+    cloud.google.com/backend-config: '{"default": "ingress-task-broker-backend-config"}'
+    cloud.google.com/neg: '{"ingress": true}'
+{{- end }}
+spec:
+  type: {{ ternary "NodePort" "ClusterIP" (and .Values.ingress.enabled (eq .Values.ingress.className "gce")) }}
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+  selector:
+    app: task-broker
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: task-broker-fleets
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: register-fleets
+          image: curlimages/curl:8.11.1
+          env:
+            - name: AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.taskbroker.name" . }}
+                  key: TASK_BROKER_AUTH_TOKEN
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              i=0
+              while [ "$i" -lt 60 ]; do
+                if curl -fsS http://task-broker:8081/healthz >/dev/null; then
+                  break
+                fi
+                i=$((i + 1))
+                sleep 2
+              done
+              curl -fsS http://task-broker:8081/healthz >/dev/null
+              existing=$(curl -fsS -H "Authorization: Bearer $AUTH_TOKEN" http://task-broker:8081/v1/fleets)
+              for spec in \
+                'local amd64 local' \
+                'e1-large-amd64 amd64 e1-large' \
+                'e1-large-arm64 arm64 e1-large' \
+                'e1-tiny-amd64 amd64 e1-tiny' \
+                'e1-tiny-arm64 arm64 e1-tiny'
+              do
+                set -- $spec
+                id=$1
+                arch=$2
+                size=$3
+                echo "$existing" | grep -q "\"id\":\"$id\"" && continue
+                curl -fsS -X POST http://task-broker:8081/v1/fleets \
+                  -H "Authorization: Bearer $AUTH_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"id\":\"$id\",\"provisioner\":\"local\",\"arch\":\"$arch\",\"size\":\"$size\"}" >/dev/null
+              done
+{{- end }}

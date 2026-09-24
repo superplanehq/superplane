@@ -32,7 +32,6 @@ api:
       cpu: 100m
       memory: 128Mi
 
-# WebSocket hubs run separately from the API. Ingress sends /ws here.
 websocket:
   replicas: 1
   dbPoolSize: 5
@@ -105,6 +104,49 @@ polar:
   accessToken: ""
   environment: "sandbox"
   webhookSecret: ""
+
+#
+# Internal agent. Leave enabled false to keep it off.
+# Set enabled and the credentials to use it.
+#
+internalAgent:
+  secretName: ""
+  enabled: false
+  apiKey: ""
+  agentId: ""
+  environmentId: ""
+
+#
+# Task broker. The HTTP API is /v1/tasks.
+# local.enabled deploys the broker in this cluster.
+# It uses the chart database and creates the database broker.
+# baseUrl must not end with a slash. An empty baseUrl uses http://task-broker:8081.
+# Runners outside the cluster use https://{domain}/v1 on the same ingress.
+# Set secretName to use a broker outside this release. That skips the deployment.
+#
+taskBroker:
+  secretName: ""
+  baseUrl: ""
+  authToken: ""
+  databaseUrl: ""
+  local:
+    enabled: true
+    image: ghcr.io/superplanehq/runner/task-broker:latest
+
+#
+# Fleet manager. It runs in this cluster when the task broker deployment runs.
+# Cloud settings live under the cloud name. aws launches EC2 runner instances.
+# Set the service account annotations to a cloud identity that can manage those instances.
+#
+fleetManager:
+  image: ghcr.io/superplanehq/runner/fleet-manager:latest
+  aws:
+    region: ""
+    subnetIds: []
+    securityGroupIds: []
+    iamInstanceProfile: ""
+    volumeSizeGb: 30
+    pools: []
 
 #
 # Secret used to sign JWT session tokens
@@ -230,14 +272,15 @@ rabbitmq:
     size: 2Gi
 
 #
-# Platform blob storage. Self-host defaults to a local directory.
-# Hosted SuperPlane sets provider to gcs and a bucket name.
+# Platform blob storage. Set provider to filesystem, s3, or gcs.
+# filesystem needs localPath. s3 needs bucket and region.
+# gcs needs bucket. credentialsFile is optional.
 #
 blobStorage:
-  provider: filesystem
+  provider: ""
   bucket: ""
   region: ""
-  localPath: /var/lib/superplane/blobs
+  localPath: ""
   credentialsFile: ""
 
 #
