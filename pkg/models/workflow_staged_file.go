@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"time"
 
 	"github.com/google/uuid"
@@ -78,6 +80,12 @@ func ListStagedFilesForUser(db *gorm.DB, workflowID, userID uuid.UUID) ([]Workfl
 	}
 
 	return rows, nil
+}
+
+func LockStagedFilesForUser(tx *gorm.DB, workflowID, userID uuid.UUID) error {
+	sum := sha256.Sum256(append(append([]byte("canvas-staging:"), workflowID[:]...), userID[:]...))
+	key := int64(binary.BigEndian.Uint64(sum[:8]))
+	return tx.Exec("SELECT pg_advisory_xact_lock(?)", key).Error
 }
 
 func DiscardStagedFilesForUser(db *gorm.DB, workflowID, userID uuid.UUID, paths []string) error {
