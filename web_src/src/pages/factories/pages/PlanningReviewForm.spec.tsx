@@ -212,6 +212,42 @@ describe("PlanningReviewForm model options", () => {
     expect(screen.queryByTestId("field-model-hosted-model")).not.toBeInTheDocument();
   });
 
+  it("loads the workspace model list when the route has no canvas", () => {
+    vi.mocked(useComponent).mockReturnValue({
+      data: {
+        name: "runnerClaudeCode",
+        configuration: [
+          {
+            name: "model",
+            label: "Model",
+            type: "hosted-model",
+            typeOptions: { hostedModel: { provider: "anthropic" } },
+          },
+        ],
+      },
+    } as ReturnType<typeof useComponent>);
+    vi.mocked(useSelectableLLMModels).mockReturnValue({
+      data: [byokAnthropicModel("claude-sonnet-4-6")],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useSelectableLLMModels>);
+
+    vi.mocked(useSelectableLLMModels).mockClear();
+    renderForm(claudeCodeDraft(""), { factoryId: PRIMARY_FACTORY_ID });
+
+    const calls = vi.mocked(useSelectableLLMModels).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    for (const [, options] of calls) {
+      expect(options).toEqual(
+        expect.objectContaining({
+          factoryId: PRIMARY_FACTORY_ID,
+          sources: ["byok"],
+          enabled: true,
+        }),
+      );
+    }
+  });
+
   it("replaces the sonnet alias with a model from the organization key", () => {
     const onChange = vi.fn();
     vi.mocked(useComponent).mockReturnValue({

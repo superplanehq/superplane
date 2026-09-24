@@ -1,4 +1,4 @@
-import { useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
+import { preferredFactoryScope, useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import {
   defaultByokRunnerModel,
@@ -10,10 +10,12 @@ import {
 export function useByokRunnerModelDefault(args: {
   enabled: boolean;
   organizationId: string | undefined;
+  factoryId?: string;
   provider: string;
   current: string;
 }): string | undefined {
-  const { factoryId, waitingForCanvas } = useCanvasFactoryScope(args.organizationId);
+  const canvasScope = useCanvasFactoryScope(args.organizationId);
+  const { factoryId, waitingForCanvas } = preferredFactoryScope(args.factoryId, canvasScope);
   const query = useSelectableLLMModels(args.organizationId, {
     factoryId,
     sources: [SELECTABLE_LLM_SOURCE_BYOK],

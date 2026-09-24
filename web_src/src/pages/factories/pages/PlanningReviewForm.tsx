@@ -88,6 +88,7 @@ function AgentPanel({
     enabled:
       modelUsedField?.type === "hosted-model" && modelProvider !== "" && modelProvider !== HOSTED_MODEL_ALL_PROVIDERS,
     organizationId,
+    factoryId,
     provider: modelProvider,
     current: currentModel,
   });
@@ -148,6 +149,7 @@ function AgentPanel({
             }}
             allValues={component.configuration}
             organizationId={organizationId}
+            factoryId={factoryId}
             allowExpressions
             autocompleteExampleObj={EXPRESSION_CONTEXT}
             fieldPath="model"
