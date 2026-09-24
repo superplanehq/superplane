@@ -21,6 +21,7 @@ import type {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { analytics, type IntegrationSource } from "@/lib/analytics";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
@@ -47,12 +48,12 @@ export const integrationKeys = {
 // Hook to fetch available integrations (catalog).
 // Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
 export const useAvailableIntegrations = (options?: { enabled?: boolean; organizationId?: string }) => {
+  const organizationIdFromRoute = useOrganizationId();
+  const organizationId = options?.organizationId ?? organizationIdFromRoute ?? undefined;
   const query = useQuery({
-    queryKey: integrationKeys.available(options?.organizationId),
+    queryKey: integrationKeys.available(organizationId),
     queryFn: async () => {
-      const response = await integrationsListIntegrations(
-        withOrganizationHeader({ organizationId: options?.organizationId }),
-      );
+      const response = await integrationsListIntegrations(withOrganizationHeader({ organizationId }));
       const list: IntegrationsIntegrationDefinition[] = response.data?.integrations || [];
       return {
         integrations: list.map((integration: IntegrationsIntegrationDefinition) => {

@@ -278,7 +278,7 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
           fixture.integrations && typeof fixture.integrations === "object"
             ? fixture.integrations
             : { integrations: [] };
-        return { json: { ...payload, githubAppConfigured: true } };
+        return { json: { githubAppConfigured: true, ...payload } };
       },
     },
     { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
