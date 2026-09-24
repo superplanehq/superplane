@@ -2,17 +2,12 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_WORKSPACE_AGENT_RESOURCES,
-  FEATURE_WORKSPACE_MODELS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
-  FactorySettingsModelsPage,
   FactorySettingsAgentResourcesPage,
   FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
@@ -103,17 +98,6 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-workspace-automations"
     path="workspace/automations"
     element={<WorkspaceAutomationsSettingsRedirect />}
-  />,
-  <Route
-    key="factory-settings-workspace-models"
-    path="workspace/models"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
-          <FactorySettingsModelsPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
   />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
   <Route
