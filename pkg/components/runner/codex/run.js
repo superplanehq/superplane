@@ -257,6 +257,12 @@ function workspaceMCPConfigOverrides(env = process.env) {
       }
       args.push("-c", `mcp_servers.${serverKey}.http_headers.${tomlKey(headerName)}=${tomlString(String(headerValue))}`);
     }
+    const disabledTools = Array.isArray(server.disabledTools)
+      ? server.disabledTools.map((name) => String(name || "").trim()).filter(Boolean)
+      : [];
+    if (disabledTools.length > 0) {
+      args.push("-c", `mcp_servers.${serverKey}.disabled_tools=${tomlStringArray(disabledTools)}`);
+    }
   }
   return args;
 }

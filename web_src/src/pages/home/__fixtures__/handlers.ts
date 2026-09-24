@@ -167,9 +167,14 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the organization LLM Models settings page",
             },
             {
-              id: "workspace_agent_resources",
-              label: "Agent Resources",
+              id: "workspace_mcp",
+              label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",
+            },
+            {
+              id: "workspace_skills",
+              label: "Workspace Skills",
+              description: "Add skills for workspace agents",
             },
           ],
         },

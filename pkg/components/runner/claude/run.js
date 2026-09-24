@@ -170,6 +170,21 @@ function allowedClaudeTools(env = process.env) {
   return [BASE_ALLOWED_TOOLS, ...workspaceAllow].join(",");
 }
 
+function disallowedClaudeTools(env = process.env) {
+  const tools = [];
+  for (const [name, server] of Object.entries(workspaceMCPServers(env))) {
+    const disabled = Array.isArray(server.disabledTools) ? server.disabledTools : [];
+    for (const tool of disabled) {
+      const toolName = String(tool || "").trim();
+      if (!toolName) {
+        continue;
+      }
+      tools.push(`mcp__${name}__${toolName}`);
+    }
+  }
+  return tools.join(",");
+}
+
 function claudePermissionMode(env = process.env) {
   if (planningMCPEnabled(env)) {
     // Planning sessions stay read-only by restricting allowedClaudeTools to
@@ -254,6 +269,7 @@ function workspaceMCPServers(env = process.env) {
         type: "http",
         url: String((server && server.url) || "").trim(),
         headers: server && server.headers && typeof server.headers === "object" ? server.headers : {},
+        disabledTools: Array.isArray(server.disabledTools) ? server.disabledTools : [],
       };
     }
     return out;
@@ -263,7 +279,14 @@ function workspaceMCPServers(env = process.env) {
 }
 
 function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = false) {
-  const mcpServers = { ...workspaceMCPServers(env) };
+  const mcpServers = {};
+  for (const [name, server] of Object.entries(workspaceMCPServers(env))) {
+    mcpServers[name] = {
+      type: server.type,
+      url: server.url,
+      headers: server.headers,
+    };
+  }
   if (includeSuperplane) {
     mcpServers.superplane = {
       command: "node",
@@ -392,6 +415,10 @@ async function runPrompt(promptFile, model, thinking) {
     println(`allowed tools: ${allowedClaudeTools()}`);
   } else {
     claudeArgs.push("--allowedTools", allowedClaudeTools());
+  }
+  const disallowed = disallowedClaudeTools();
+  if (disallowed) {
+    claudeArgs.push("--disallowedTools", disallowed);
   }
   if (model) {
     claudeArgs.push("--model", model);
@@ -1320,6 +1347,7 @@ if (require.main === module) {
 
 module.exports = {
   allowedClaudeTools,
+  disallowedClaudeTools,
   claudeContinuationArgs,
   claudePermissionMode,
   claudeSessionIDFromEvent,

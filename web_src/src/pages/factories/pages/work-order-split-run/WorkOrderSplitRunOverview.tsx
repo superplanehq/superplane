@@ -119,7 +119,7 @@ export function WorkOrderSplitRunOverview({
           />
         }
         resultFooter={resultFooter}
-        analysis={analysisWithOrganization(analysis, organizationId)}
+        analysis={analysisWithWorkspace(analysis, organizationId, factoryId)}
         source={source}
         contextSidebar={overviewContextSidebar({
           showContextSidebar,
@@ -136,11 +136,15 @@ export function WorkOrderSplitRunOverview({
   );
 }
 
-function analysisWithOrganization(analysis: IntentAnalysisChat | undefined, organizationId?: string) {
-  if (!analysis || !organizationId) {
+function analysisWithWorkspace(analysis: IntentAnalysisChat | undefined, organizationId?: string, factoryId?: string) {
+  if (!analysis) {
     return analysis;
   }
-  return { ...analysis, organizationId };
+  return {
+    ...analysis,
+    ...(organizationId ? { organizationId } : {}),
+    ...(factoryId ? { factoryId } : {}),
+  };
 }
 
 function overviewContextSidebar({
