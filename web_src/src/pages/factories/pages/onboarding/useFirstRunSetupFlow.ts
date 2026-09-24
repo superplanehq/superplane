@@ -416,8 +416,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const connection = useGitHubConnectionState(model, organizationId);
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
+    hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
+    bringYourOwnKeyLookupFailed: model.bringYourOwnKeyLookupFailed,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection);
   const commands = useFirstRunCommands(model, agentGate, connection, navigation, blocking);

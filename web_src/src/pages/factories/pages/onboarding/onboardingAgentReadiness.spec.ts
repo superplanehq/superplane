@@ -226,34 +226,44 @@ describe("hasHostedDefaultModel", () => {
 });
 
 describe("onboardingAgentGate", () => {
+  const gate = (
+    overrides: Partial<Parameters<typeof onboardingAgentGate>[0]> = {},
+  ): ReturnType<typeof onboardingAgentGate> =>
+    onboardingAgentGate({
+      hostedModelsAvailable: false,
+      hostedModelsAvailableLoading: false,
+      bringYourOwnKey: false,
+      bringYourOwnKeyLoading: false,
+      bringYourOwnKeyLookupFailed: false,
+      ...overrides,
+    });
+
   it("skips the agent screen when hosted models cover the agent", () => {
-    expect(
-      onboardingAgentGate({ hostedModelsAvailable: true, bringYourOwnKey: false, bringYourOwnKeyLoading: false }),
-    ).toBe("skip");
+    expect(gate({ hostedModelsAvailable: true })).toBe("skip");
   });
 
   it("puts the agent screen before the tickets when the organization can bring its own key", () => {
-    expect(
-      onboardingAgentGate({ hostedModelsAvailable: true, bringYourOwnKey: true, bringYourOwnKeyLoading: false }),
-    ).toBe("first");
+    expect(gate({ hostedModelsAvailable: true, bringYourOwnKey: true })).toBe("first");
   });
 
   it("shows the agent screen after the tickets when only a provider key can run the agent", () => {
-    expect(
-      onboardingAgentGate({ hostedModelsAvailable: false, bringYourOwnKey: true, bringYourOwnKeyLoading: false }),
-    ).toBe("show");
+    expect(gate({ bringYourOwnKey: true })).toBe("show");
   });
 
   it("waits while the bring-your-own-key flag is still loading", () => {
-    expect(
-      onboardingAgentGate({ hostedModelsAvailable: true, bringYourOwnKey: false, bringYourOwnKeyLoading: true }),
-    ).toBe("pending");
+    expect(gate({ hostedModelsAvailable: true, bringYourOwnKeyLoading: true })).toBe("pending");
+  });
+
+  it("waits while hosted model availability is still loading", () => {
+    expect(gate({ hostedModelsAvailableLoading: true, bringYourOwnKey: true })).toBe("pending");
+  });
+
+  it("shows the model source when the feature registry lookup failed", () => {
+    expect(gate({ hostedModelsAvailable: true, bringYourOwnKeyLookupFailed: true })).toBe("first");
   });
 
   it("shows the agent screen when no hosted model is available", () => {
-    expect(
-      onboardingAgentGate({ hostedModelsAvailable: false, bringYourOwnKey: false, bringYourOwnKeyLoading: false }),
-    ).toBe("show");
+    expect(gate()).toBe("show");
   });
 });
 

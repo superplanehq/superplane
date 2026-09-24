@@ -18,7 +18,7 @@ export function useOnboardingAgentPlan(
   organizationId: string,
   connected: Set<IntegrationId>,
   remainingCreditCents: number,
-  defaultHosted?: { provider?: string; model?: string; preferOwnKey?: boolean },
+  defaultHosted?: { provider?: string; model?: string; preferOwnKey?: boolean; usageLoading?: boolean },
 ) {
   const needHostedModels = isAgentProviderConnected(connected);
   const anthropic = useHostedLLMModels(organizationId, "anthropic", needHostedModels);
@@ -30,6 +30,7 @@ export function useOnboardingAgentPlan(
       defaultHostedProvider: defaultHosted?.provider,
       defaultHostedModel: defaultHosted?.model,
     }),
+    hostedModelsAvailableLoading: defaultHosted?.usageLoading ?? false,
     hostedModelsLoading: hostedModelsQueriesLoading(needHostedModels, [anthropic, openai, openrouter]),
     plan: resolveOnboardingAgent({
       connected,
@@ -82,5 +83,6 @@ export function useOnboardingAgentContext(
     provider: spend.data?.defaultHostedProvider,
     model: spend.data?.defaultHostedModel,
     preferOwnKey,
+    usageLoading: spend.isLoading,
   });
 }
