@@ -3,7 +3,10 @@ package factories
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,10 +17,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/contexts"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
@@ -285,6 +290,31 @@ func jiraEventIssueKey(t *testing.T, event map[string]any) string {
 	require.True(t, ok)
 
 	return key
+}
+
+func Test__ProductiveSeedAsksForTenNewestTasks(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+		},
+	}}
+	client, err := productive.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiToken":       "token-1",
+			"organizationId": "org-1",
+		},
+	})
+	require.NoError(t, err)
+
+	documents, err := newestProductiveSeedDocuments(client, "42", false)
+	require.NoError(t, err)
+	assert.Empty(t, documents)
+
+	require.Len(t, httpContext.Requests, 1)
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "42", query.Get("filter[project_id]"))
+	assert.Equal(t, "10", query.Get("page[size]"))
 }
 
 func Test__ProductiveTaskEvents(t *testing.T) {
