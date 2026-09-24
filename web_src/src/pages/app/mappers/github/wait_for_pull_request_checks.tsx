@@ -17,10 +17,10 @@ import type {
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { buildGithubExecutionSubtitle } from "./utils";
 
@@ -97,8 +97,8 @@ export const waitForPullRequestChecksStateFunction: StateFunction = (execution: 
     return "running";
   }
 
-  const metadata = execution.metadata as ExecutionMetadata;
-  switch (metadata.outcome) {
+  const metadata = execution.metadata as ExecutionMetadata | undefined;
+  switch (metadata?.outcome) {
     case "failed":
       return "failed";
     case "timedOut":
@@ -263,14 +263,14 @@ function waitChecksSnapshot(execution: ExecutionInfo): {
   failed: PullRequestCheck[];
 } {
   const output = firstWaitChecksOutput(execution);
-  const metadata = execution.metadata as ExecutionMetadata;
-  const selected = firstDefinedList(output?.selectedChecks, metadata.selectedChecks, output?.checks, metadata.checks);
+  const metadata = execution.metadata as ExecutionMetadata | undefined;
+  const selected = firstDefinedList(output?.selectedChecks, metadata?.selectedChecks, output?.checks, metadata?.checks);
   return {
-    repository: output?.repository ?? metadata.repository,
-    sha: output?.sha ?? metadata.sha,
+    repository: output?.repository ?? metadata?.repository,
+    sha: output?.sha ?? metadata?.sha,
     selected,
     pending: selected.filter((check) => check.status !== "completed"),
-    failed: firstDefinedList(output?.failedChecks, metadata.failedChecks),
+    failed: firstDefinedList(output?.failedChecks, metadata?.failedChecks),
   };
 }
 

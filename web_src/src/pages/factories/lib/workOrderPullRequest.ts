@@ -2,6 +2,23 @@ import type { CanvasesCanvasRunRef, FactoriesFactoryPullRequest, FactoriesFactor
 
 export type FactoryPullRequestState = "open" | "draft" | "closed" | "merged";
 
+export function pullRequestsFromWorkOrders(
+  orders: Array<{ pullRequests?: FactoriesFactoryPullRequest[] } | undefined>,
+): FactoriesFactoryPullRequest[] {
+  return orders.flatMap((order) => order?.pullRequests ?? []);
+}
+
+export function firstWorkOrderPullRequests(
+  ...orders: Array<{ pullRequests?: FactoriesFactoryPullRequest[] } | null | undefined>
+): FactoriesFactoryPullRequest[] {
+  for (const order of orders) {
+    if (order?.pullRequests) {
+      return order.pullRequests;
+    }
+  }
+  return [];
+}
+
 export function groupPullRequestsByWorkOrderId(
   pullRequests: FactoriesFactoryPullRequest[],
 ): Map<string, FactoriesFactoryPullRequest[]> {
@@ -78,12 +95,15 @@ export function isActiveCanvasRun(run: CanvasesCanvasRunRef | undefined): boolea
   if (!run?.id) {
     return false;
   }
-  return run.state === "STATE_PENDING" || run.state === "STATE_STARTED" || run.state === "STATE_CANCELLING";
+  return run.state === "STATE_PENDING" || run.state === "STATE_STARTED";
 }
 
 export function statusForCanvasRun(run: CanvasesCanvasRunRef | undefined): "passed" | "running" | "pending" | "failed" {
-  if (run?.state === "STATE_STARTED" || run?.state === "STATE_CANCELLING") {
+  if (run?.state === "STATE_STARTED") {
     return "running";
+  }
+  if (run?.state === "STATE_CANCELLING") {
+    return run.result === "RESULT_PASSED" ? "passed" : "failed";
   }
   if (run?.state === "STATE_FINISHED") {
     if (run.result === "RESULT_PASSED") {

@@ -36,12 +36,15 @@ export function HostedGitHubInstallPicker({ installations, state, appSlug }: Hos
           ))}
         </div>
         {appSlug !== "" && (
-          <a
-            href={hostedGitHubInstallURL(appSlug, state)}
-            className="inline-block text-sm text-blue-700 dark:text-blue-400 hover:underline"
-          >
-            Install on a different account
-          </a>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Do not see your GitHub account or organization?{" "}
+            <a
+              href={hostedGitHubInstallURL(appSlug, state)}
+              className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Install the GitHub App there.
+            </a>
+          </p>
         )}
       </div>
     </div>

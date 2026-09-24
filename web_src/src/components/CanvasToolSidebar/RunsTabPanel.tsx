@@ -15,7 +15,7 @@ export interface RunsTabPanelProps {
   selectedRun?: CanvasesCanvasRun | null;
   isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
-  onSelectLiveCanvas: () => void;
+  onSelectLiveCanvas?: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
   detailDismissedForRunId?: string | null;
@@ -71,7 +71,7 @@ export interface RunsTabPanelContentProps {
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
-  onSelectLiveCanvas: () => void;
+  onSelectLiveCanvas?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
@@ -120,15 +120,9 @@ export function RunsTabPanelContent({
     [onSelectRun],
   );
 
-  const handleSelectLiveCanvas = useCallback(() => {
-    onSelectLiveCanvas();
-  }, [onSelectLiveCanvas]);
-
-  const isLiveCanvasSelected = !selectedRunId;
-
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <LiveCanvasSidebarRow isSelected={isLiveCanvasSelected} onSelect={handleSelectLiveCanvas} />
+      {onSelectLiveCanvas ? <LiveCanvasSidebarRow isSelected={!selectedRunId} onSelect={onSelectLiveCanvas} /> : null}
 
       <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
         <RunsTabListView

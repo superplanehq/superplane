@@ -76,3 +76,29 @@ func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndRequestsFinalization(
 	assert.Equal(t, event.RunID, result.DeletedQueueItems[0].RunID)
 	assert.Empty(t, result.CancelledExecutionIDs)
 }
+
+func Test__DeleteCanvasNodeWithResult__SoftDeletesOrphanedWebhook(t *testing.T) {
+	r := support.Setup(t)
+	webhookID := createWebhook(t)
+	_, node := createCanvasNodeWithWebhook(t, r, webhookID)
+
+	_, err := models.DeleteCanvasNodeWithResult(database.Conn(), node)
+	require.NoError(t, err)
+
+	var stored models.Webhook
+	require.NoError(t, database.Conn().Unscoped().First(&stored, webhookID).Error)
+	assert.True(t, stored.DeletedAt.Valid)
+}
+
+func Test__DeleteCanvasNodeWithResult__PreservesSharedWebhookAcrossCanvases(t *testing.T) {
+	r := support.Setup(t)
+	webhookID := createWebhook(t)
+	_, nodeA := createCanvasNodeWithWebhook(t, r, webhookID)
+	_, _ = createCanvasNodeWithWebhook(t, r, webhookID)
+
+	_, err := models.DeleteCanvasNodeWithResult(database.Conn(), nodeA)
+	require.NoError(t, err)
+
+	_, err = models.FindWebhook(webhookID)
+	require.NoError(t, err)
+}

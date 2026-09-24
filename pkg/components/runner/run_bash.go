@@ -315,10 +315,6 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
-
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -370,7 +366,7 @@ func (c *RunBash) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 }
 
 func (c *RunBash) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunBashFinishedEventType)
 }
 
 func (c *RunBash) Cleanup(ctx core.SetupContext) error { return nil }

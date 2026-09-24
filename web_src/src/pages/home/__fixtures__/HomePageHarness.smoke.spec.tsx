@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 
@@ -18,8 +18,8 @@ describe("HomePageHarness story smoke", () => {
 
     expect(await screen.findByRole("heading", { name: "Apps" }, { timeout: 5000 })).toBeInTheDocument();
     expect(await screen.findByText("Software Factory")).toBeInTheDocument();
-    expect(screen.getByText("Automation")).toBeInTheDocument();
-    expect(screen.getByText("Releases")).toBeInTheDocument();
+    expect(screen.getByText("PR Risk Review")).toBeInTheDocument();
+    expect(screen.getByText("Clean Code Assessment")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /create a? ?new app/i })).not.toBeInTheDocument();
   });
 

@@ -119,19 +119,35 @@ export function hydrateRunExecution(
   } as CanvasesCanvasNodeExecution;
 }
 
-export function prepareData(
-  workflow: CanvasesCanvas,
-  triggers: TriggersTrigger[],
-  components: ActionsAction[],
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  workflowId: string,
-  queryClient: QueryClient,
-  user?: SuperplaneMeUser | null,
-  canvasMode: "live" | "edit" = "live",
-  openModal?: (modal: TriggerActionModal) => void,
-): {
+export type PrepareDataArgs = {
+  workflow: CanvasesCanvas;
+  triggers: TriggersTrigger[];
+  components: ActionsAction[];
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  workflowId: string;
+  queryClient: QueryClient;
+  user?: SuperplaneMeUser | null;
+  canvasMode?: "live" | "edit";
+  openModal?: (modal: TriggerActionModal) => void;
+  organizationId?: string;
+};
+
+export function prepareData({
+  workflow,
+  triggers,
+  components,
+  nodeEventsMap,
+  nodeExecutionsMap,
+  nodeQueueItemsMap,
+  workflowId,
+  queryClient,
+  user,
+  canvasMode = "live",
+  openModal,
+  organizationId,
+}: PrepareDataArgs): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
@@ -142,8 +158,8 @@ export function prepareData(
   const nodes =
     workflowNodes
       ?.map((node) => {
-        return prepareNode(
-          workflowNodes,
+        return prepareNode({
+          nodes: workflowNodes,
           node,
           triggers,
           components,
@@ -153,10 +169,11 @@ export function prepareData(
           workflowId,
           queryClient,
           currentUser,
-          workflowEdges,
+          edges: workflowEdges,
           canvasMode,
           openModal,
-        );
+          organizationId,
+        });
       })
       .map((node) => ({
         ...node,
@@ -242,21 +259,39 @@ function componentsByDefinedName(components: ActionsAction[]): Map<string, Actio
   return componentsByName;
 }
 
-export function prepareNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  triggers: TriggersTrigger[],
-  components: ActionsAction[],
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  workflowId: string,
-  queryClient: QueryClient,
-  currentUser?: User,
-  edges?: ComponentsEdge[],
-  canvasMode: "live" | "edit" = "live",
-  openModal?: (modal: TriggerActionModal) => void,
-): CanvasNode {
+export type PrepareNodeArgs = {
+  nodes: ComponentsNode[];
+  node: ComponentsNode;
+  triggers: TriggersTrigger[];
+  components: ActionsAction[];
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  workflowId: string;
+  queryClient: QueryClient;
+  currentUser?: User;
+  edges?: ComponentsEdge[];
+  canvasMode?: "live" | "edit";
+  openModal?: (modal: TriggerActionModal) => void;
+  organizationId?: string;
+};
+
+export function prepareNode({
+  nodes,
+  node,
+  triggers,
+  components,
+  nodeEventsMap,
+  nodeExecutionsMap,
+  nodeQueueItemsMap,
+  workflowId,
+  queryClient,
+  currentUser,
+  edges,
+  canvasMode = "live",
+  openModal,
+  organizationId,
+}: PrepareNodeArgs): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode, {
@@ -275,6 +310,7 @@ export function prepareNode(
         nodeQueueItemsMap,
         canvasId: workflowId,
         queryClient,
+        organizationId,
         currentUser,
         edges,
         canvasMode,
@@ -293,17 +329,29 @@ export function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   };
 }
 
-export function prepareSidebarData(
-  node: ComponentsNode,
-  nodes: ComponentsNode[],
-  components: ActionsAction[],
-  triggers: TriggersTrigger[],
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-  totalHistoryCount?: number,
-  totalQueueCount?: number,
-): SidebarData {
+export type PrepareSidebarDataArgs = {
+  node: ComponentsNode;
+  nodes: ComponentsNode[];
+  components: ActionsAction[];
+  triggers: TriggersTrigger[];
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
+  totalHistoryCount?: number;
+  totalQueueCount?: number;
+};
+
+export function prepareSidebarData({
+  node,
+  nodes,
+  components,
+  triggers,
+  nodeExecutionsMap,
+  nodeQueueItemsMap,
+  nodeEventsMap,
+  totalHistoryCount,
+  totalQueueCount,
+}: PrepareSidebarDataArgs): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
   const events = nodeEventsMap[node.id!] || [];

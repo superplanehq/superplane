@@ -25,16 +25,6 @@ func UpdateWorkOrderStatus(
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order status")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order status")
-	}
-
 	toState, ok := workOrderStateFromProto(req.GetState())
 	if !ok {
 		return nil, factoryErrorToStatus(invalidArgument("state is required"), "failed to update work order status")
@@ -59,6 +49,18 @@ func UpdateWorkOrderStatus(
 	}
 
 	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order status")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order status")
+	}
+	orderID := resolvedOrder.ID
+
 	var order *models.FactoryWorkOrder
 	var fromState string
 	var changed bool

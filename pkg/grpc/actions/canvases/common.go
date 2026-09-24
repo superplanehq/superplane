@@ -94,6 +94,21 @@ func PublishGeneratedCanvasNodes(
 	edges []models.Edge,
 	options changesets.CanvasPublisherOptions,
 ) error {
+	return PublishGeneratedCanvasNodesWithOwner(ctx, tx, canvas, &userID, commitMessage, nodes, edges, options)
+}
+
+// PublishGeneratedCanvasNodesWithOwner publishes a server-generated graph.
+// ownerID can be nil for a system-owned template upgrade.
+func PublishGeneratedCanvasNodesWithOwner(
+	ctx context.Context,
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	ownerID *uuid.UUID,
+	commitMessage string,
+	nodes []models.Node,
+	edges []models.Edge,
+	options changesets.CanvasPublisherOptions,
+) error {
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		return err
@@ -103,7 +118,7 @@ func PublishGeneratedCanvasNodes(
 	nextVersion := &models.CanvasVersion{
 		ID:            uuid.New(),
 		WorkflowID:    canvas.ID,
-		OwnerID:       &userID,
+		OwnerID:       ownerID,
 		CommitMessage: commitMessage,
 		Nodes:         datatypes.NewJSONSlice(nodes),
 		Edges:         datatypes.NewJSONSlice(edges),

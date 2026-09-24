@@ -15,9 +15,9 @@ import {
   ACCOUNT_REDESIGN_PROFILE,
   type AccountRedesignNotifications,
   type AccountRedesignProfile,
-  type AccountRedesignSsoProvider,
 } from "./accountProfileRedesignMocks";
 import { AccountNotificationsRedesignPage } from "./AccountNotificationsRedesignPage";
+import { AccountProfileAssociatedAccountsCard } from "./AccountProfileAssociatedAccountsCard";
 import { AccountProfileRedesignPage } from "./AccountProfileRedesignPage";
 import { AccountSecurityRedesignPage } from "./AccountSecurityRedesignPage";
 
@@ -26,11 +26,9 @@ interface AccountProfileRedesignState {
   setName: (name: string) => void;
   saveName: () => void;
   setEmail: (email: string) => void;
-  connectSso: (provider: AccountRedesignSsoProvider) => void;
-  disconnectSso: (provider: AccountRedesignSsoProvider) => void;
+  linkGithub: () => void;
+  removeGithub: () => void;
   changePassword: () => void;
-  linkVelocityGithub: () => void;
-  removeVelocityGithub: () => void;
   createToken: (name: string) => string;
   revokeToken: (id: string) => void;
   setNotifications: (notifications: AccountRedesignNotifications) => void;
@@ -53,44 +51,18 @@ export function AccountProfileRedesignProvider({
     setName: (name) => setProfile((current) => ({ ...current, name })),
     saveName: () => setProfile((current) => ({ ...current, name: current.name.trim() })),
     setEmail: (email) => setProfile((current) => ({ ...current, email })),
-    connectSso: (provider) => {
+    linkGithub: () => {
       setProfile((current) => ({
         ...current,
-        ssoAccounts: current.ssoAccounts.map((account) =>
-          account.provider === provider
-            ? {
-                ...account,
-                identity: provider === "github" ? githubIdentity(current.name) : current.email,
-                email: account.email || current.email,
-              }
-            : account,
-        ),
-      }));
-      showSuccessToast(provider === "github" ? "GitHub connected." : "Google connected.");
-    },
-    disconnectSso: (provider) => {
-      setProfile((current) => {
-        const disconnected = current.ssoAccounts.find((account) => account.provider === provider);
-        const ssoAccounts = current.ssoAccounts.map((account) =>
-          account.provider === provider ? { ...account, identity: null, email: null } : account,
-        );
-        const nextEmail = nextEmailAfterDisconnect(current.email, disconnected?.email, ssoAccounts);
-        return { ...current, email: nextEmail, ssoAccounts };
-      });
-      showSuccessToast(provider === "github" ? "GitHub disconnected." : "Google disconnected.");
-    },
-    changePassword: () => undefined,
-    linkVelocityGithub: () => {
-      setProfile((current) => ({
-        ...current,
-        velocityGithubUsername: githubIdentity(current.name),
+        linkedGithubUsername: githubIdentity(current.name),
       }));
       showSuccessToast("GitHub account linked.");
     },
-    removeVelocityGithub: () => {
-      setProfile((current) => ({ ...current, velocityGithubUsername: null }));
+    removeGithub: () => {
+      setProfile((current) => ({ ...current, linkedGithubUsername: null }));
       showSuccessToast("GitHub link removed.");
     },
+    changePassword: () => undefined,
     createToken: (name) => {
       const id = `token-${profile.tokens.length + 1}`;
       const secret = `sp_pat_${id.replace("-", "")}_mock`;
@@ -123,7 +95,7 @@ function useAccountProfileRedesign() {
 }
 
 export function AccountProfileRedesignRoutePage() {
-  const { profile, setName, setEmail, saveName, linkVelocityGithub, removeVelocityGithub } =
+  const { profile, setName, setEmail, saveName, linkGithub, removeGithub, changePassword, createToken, revokeToken } =
     useAccountProfileRedesign();
   return (
     <AccountProfileRedesignPage
@@ -139,9 +111,23 @@ export function AccountProfileRedesignRoutePage() {
       onNameChange={setName}
       onEmailChange={setEmail}
       onSave={saveName}
-      velocityGithubUsername={profile.velocityGithubUsername}
-      onLinkVelocityGithub={linkVelocityGithub}
-      onRemoveVelocityGithub={removeVelocityGithub}
+      associatedAccounts={
+        <AccountProfileAssociatedAccountsCard
+          githubUsername={profile.linkedGithubUsername}
+          onLinkGithub={linkGithub}
+          onRemoveGithub={removeGithub}
+        />
+      }
+      security={
+        <AccountSecurityRedesignPage
+          passwordSet={profile.passwordSet}
+          tokens={profile.tokens}
+          embedded
+          onChangePassword={changePassword}
+          onCreateToken={createToken}
+          onRevokeToken={revokeToken}
+        />
+      }
     />
   );
 }
@@ -166,15 +152,12 @@ export function AccountNotificationsRedesignRoutePage() {
 }
 
 export function AccountSecurityRedesignRoutePage() {
-  const { profile, changePassword, connectSso, disconnectSso, createToken, revokeToken } = useAccountProfileRedesign();
+  const { profile, changePassword, createToken, revokeToken } = useAccountProfileRedesign();
   return (
     <AccountSecurityRedesignPage
       passwordSet={profile.passwordSet}
       tokens={profile.tokens}
-      ssoAccounts={profile.ssoAccounts}
       onChangePassword={changePassword}
-      onConnectSso={connectSso}
-      onDisconnectSso={disconnectSso}
       onCreateToken={createToken}
       onRevokeToken={revokeToken}
     />
@@ -198,19 +181,6 @@ export function StorybookAccountGeneralRedirect() {
   return <Navigate to={`${pathname.replace(/\/account\/general\/?$/, "/account/profile")}${search}`} replace />;
 }
 
-function nextEmailAfterDisconnect(
-  currentEmail: string,
-  disconnectedEmail: string | null | undefined,
-  remaining: { identity: string | null; email?: string | null }[],
-): string {
-  if (!disconnectedEmail || disconnectedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
-    return currentEmail;
-  }
-  const next = remaining.find((account) => account.identity && account.email && account.email !== currentEmail);
-  return next?.email || currentEmail;
-}
-
 function githubIdentity(name: string): string {
-  const handle = name.trim().split(/\s+/)[0]?.toLowerCase();
-  return handle || "user";
+  return name.trim().toLowerCase().replace(/\s+/g, "-") || "github-user";
 }

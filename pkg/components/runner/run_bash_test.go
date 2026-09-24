@@ -152,6 +152,20 @@ func TestRunBashProcessTaskStatusIncludesResult(t *testing.T) {
 	assert.Equal(t, RunBashFinishedEventType, wrapped["type"])
 }
 
+func TestRunBashProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	exit := 130
+	task := &Task{
+		Status:   "canceled",
+		ExitCode: &exit,
+	}
+	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
+	require.Equal(t, FailedOutputChannel, state.Channel)
+	assert.False(t, state.Cancelled)
+}
+
 func TestRunBashProcessTaskStatusIncludesError(t *testing.T) {
 	t.Parallel()
 

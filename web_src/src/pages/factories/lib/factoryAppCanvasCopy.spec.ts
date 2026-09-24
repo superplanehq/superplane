@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   isFactoryAppAgentPanelOpen,
@@ -45,6 +45,6 @@ describe("resolveFactoryAppCanvasSubtitle", () => {
   });
 
   it("falls back to the workspace name when the canvas has no description", () => {
-    expect(resolveFactoryAppCanvasSubtitle({ factoryName: "Refunds Factory" })).toBe("Canvas · Refunds Factory");
+    expect(resolveFactoryAppCanvasSubtitle({ factoryName: "Refunds Factory" })).toBe("Automation · Refunds Factory");
   });
 });

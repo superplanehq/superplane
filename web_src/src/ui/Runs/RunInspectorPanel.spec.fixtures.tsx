@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createEvent, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
-import { vi } from "vitest";
+import { vi } from "bun:test";
 import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,

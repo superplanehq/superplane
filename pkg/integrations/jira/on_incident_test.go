@@ -76,7 +76,8 @@ func Test__OnIncident__Setup(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 3)
 		require.Len(t, integration.WebhookRequests, 1)
 		assert.Equal(t, WebhookConfiguration{
-			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+			Events:   []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+			Projects: []string{"DEMO"},
 		}, integration.WebhookRequests[0])
 	})
 

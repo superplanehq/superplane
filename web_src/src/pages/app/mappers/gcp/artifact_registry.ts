@@ -1,6 +1,6 @@
 import type { ExecutionInfo, OutputPayload, StateFunction } from "../types";
 import type { EventState } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type { EventStateRegistry } from "../types";
 
 export type ArtifactPushData = {
@@ -67,7 +67,7 @@ export type ArtifactVersionData = {
 };
 
 type ArtifactOutputPayload = OutputPayload & {
-  data?: Record<string, any>;
+  data?: ArtifactVersionData | GetArtifactAnalysisData;
 };
 
 export function getArtifactOutputPayload(execution: ExecutionInfo): ArtifactOutputPayload | undefined {
@@ -81,9 +81,11 @@ export function getArtifactOutputPayload(execution: ExecutionInfo): ArtifactOutp
   return payload as ArtifactOutputPayload;
 }
 
-export function getArtifactData(execution: ExecutionInfo): Record<string, any> | undefined {
+export function getArtifactData<T extends ArtifactVersionData | GetArtifactAnalysisData>(
+  execution: ExecutionInfo,
+): T | undefined {
   const payload = getArtifactOutputPayload(execution);
-  return payload?.data as Record<string, any> | undefined;
+  return payload?.data as T | undefined;
 }
 
 export function buildArtifactSummaryDetails({ timestamp }: { timestamp?: string }): Record<string, string> {

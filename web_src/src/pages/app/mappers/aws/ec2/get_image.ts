@@ -10,11 +10,11 @@ import type {
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import type { Ec2Image } from "./types";
 
 interface Configuration {
@@ -52,20 +52,7 @@ export const getImageMapper: ComponentBaseMapper = {
       return {};
     }
 
-    return {
-      "Image ID": stringOrDash(output.image?.imageId),
-      Name: stringOrDash(output.image?.name),
-      Description: stringOrDash(output.image?.description),
-      State: stringOrDash(output.image?.state),
-      "Creation Date": stringOrDash(output.image?.creationDate),
-      "Owner ID": stringOrDash(output.image?.ownerId),
-      Architecture: stringOrDash(output.image?.architecture),
-      "Image Type": stringOrDash(output.image?.imageType),
-      "Root Device Type": stringOrDash(output.image?.rootDeviceType),
-      "Root Device Name": stringOrDash(output.image?.rootDeviceName),
-      "Virtualization Type": stringOrDash(output.image?.virtualizationType),
-      Hypervisor: stringOrDash(output.image?.hypervisor),
-    };
+    return imageExecutionDetails(output.image);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -76,6 +63,23 @@ export const getImageMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function imageExecutionDetails(image: Ec2Image | undefined): Record<string, string> {
+  return {
+    "Image ID": stringOrDash(image?.imageId),
+    Name: stringOrDash(image?.name),
+    Description: stringOrDash(image?.description),
+    State: stringOrDash(image?.state),
+    "Creation Date": stringOrDash(image?.creationDate),
+    "Owner ID": stringOrDash(image?.ownerId),
+    Architecture: stringOrDash(image?.architecture),
+    "Image Type": stringOrDash(image?.imageType),
+    "Root Device Type": stringOrDash(image?.rootDeviceType),
+    "Root Device Name": stringOrDash(image?.rootDeviceName),
+    "Virtualization Type": stringOrDash(image?.virtualizationType),
+    Hypervisor: stringOrDash(image?.hypervisor),
+  };
+}
 
 function getImageMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
@@ -103,7 +107,7 @@ function getImageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, comp
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }

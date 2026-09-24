@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { describe, expect, it, vi, type Mock } from "bun:test";
 
 import {
   consoleYamlHasContent,
@@ -298,5 +298,46 @@ describe("duplicateAutomationCanvas", () => {
       factoryId: "factory-1",
       method: "ui",
     });
+  });
+
+  it("keeps a Verify automation on Verify when duplicated", async () => {
+    const createAttachedAutomation = vi.fn().mockResolvedValue({ id: "canvas-copy", name: "Create env copy" });
+    const deps = baseDeps({
+      app: { id: "canvas-source", name: "Create env", columnKey: "verify" },
+      createAttachedAutomation,
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { spec: { nodes: [], edges: [] } } },
+      }),
+    });
+
+    const canvasId = await duplicateAutomationCanvas(deps);
+
+    expect(canvasId).toBe("canvas-copy");
+    expect(createAttachedAutomation).toHaveBeenCalledWith({ name: "Create env copy", columnKey: "verify" });
+    expect(deps.createCanvas).not.toHaveBeenCalled();
+    expect(deps.putCanvasStaging).not.toHaveBeenCalled();
+  });
+
+  it("stages description when duplicating an empty attached automation", async () => {
+    const createAttachedAutomation = vi.fn().mockResolvedValue({ id: "canvas-copy", name: "Create env copy" });
+    const deps = baseDeps({
+      app: {
+        id: "canvas-source",
+        name: "Create env",
+        description: "Destroys the preview environment",
+        columnKey: "verify",
+      },
+      createAttachedAutomation,
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { spec: { nodes: [], edges: [] } } },
+      }),
+    });
+
+    const canvasId = await duplicateAutomationCanvas(deps);
+
+    expect(canvasId).toBe("canvas-copy");
+    expect(createAttachedAutomation).toHaveBeenCalledWith({ name: "Create env copy", columnKey: "verify" });
+    expect(String(deps.putCanvasStaging.mock.calls[0]?.[1])).toContain("Destroys the preview environment");
+    expect(deps.commitCanvasStaging).toHaveBeenCalledWith("canvas-copy");
   });
 });

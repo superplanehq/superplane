@@ -98,6 +98,7 @@ func serializeIntegrationResources(resources []core.IntegrationResource) []*pb.I
 			Type: resource.Type,
 			Name: resource.Name,
 			Id:   resource.ID,
+			Url:  resource.URL,
 		})
 	}
 	return out

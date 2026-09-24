@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { invokeFunctionMapper } from "./invoke_function";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
@@ -133,14 +133,14 @@ describe("invokeFunctionMapper.getExecutionDetails", () => {
       },
     });
     const details = invokeFunctionMapper.getExecutionDetails(ctx);
-    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(startedAt).getTime());
+    expect(new Date(details["Executed At"] as string).getTime()).toBe(new Date(startedAt).getTime());
   });
 
   it("falls back to execution.createdAt for Executed At when metadata.startedAt is absent", () => {
     const createdAt = new Date("2026-01-01T09:00:00Z").toISOString();
     const ctx = buildDetailsCtx({ execution: { createdAt, metadata: {}, outputs: undefined } });
     const details = invokeFunctionMapper.getExecutionDetails(ctx);
-    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(createdAt).getTime());
+    expect(new Date(details["Executed At"] as string).getTime()).toBe(new Date(createdAt).getTime());
   });
 
   it("maps output fields to display labels", () => {

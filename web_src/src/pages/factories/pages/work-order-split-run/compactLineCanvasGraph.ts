@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { agentRunnerStepTitles, AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunnerSteps";
 import { factoryEdgePalette, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 import { buildStyledCanvasEdges } from "@/ui/CanvasPage/factoryCanvasEdgeStyle";
@@ -55,7 +55,7 @@ export function compactLineCanvasGraph(
     .filter((node): node is ComponentsNode & { id: string } => Boolean(node.id))
     .map((node) => {
       const presentation = componentPresentation(node.component);
-      const steps = node.component === "runnerClaudeCode" ? agentRunnerStepTitles(node.configuration) : [];
+      const steps = AGENT_HARNESS_COMPONENTS.has(node.component ?? "") ? agentRunnerStepTitles(node.configuration) : [];
       const size = factoryNodeCardSize(steps.length);
       return {
         id: node.id,

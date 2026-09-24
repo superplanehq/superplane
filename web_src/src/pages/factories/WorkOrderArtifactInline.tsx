@@ -1,11 +1,13 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import { ExternalLink, FileText, GitBranch, Link as LinkIcon } from "lucide-react";
+import { ExternalLink, FileImage, FileText, FileVideo, GitBranch, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
   type ArtifactData,
   branchTreeUrl,
+  extractArtifactContentType,
+  extractArtifactFilename,
   extractArtifactMarkdownBody,
   extractArtifactName,
   extractArtifactTitle,
@@ -102,6 +104,8 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
   const title = extractArtifactTitle(artifact.data);
   const name = extractArtifactName(artifact.data);
   const url = extractArtifactUrl(artifact.data);
+  const filename = extractArtifactFilename(artifact.data);
+  const contentType = extractArtifactContentType(artifact.data);
 
   switch (kind) {
     case "branch": {
@@ -112,6 +116,16 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
     case "url":
     case "preview":
       return presentation(LinkIcon, firstLabel(name, title, compactUrlLabel(url), "Link"));
+    case "file": {
+      const label = firstLabel(title, filename, compactUrlLabel(url), "File");
+      if (contentType?.startsWith("image/")) {
+        return presentation(FileImage, label);
+      }
+      if (contentType?.startsWith("video/")) {
+        return presentation(FileVideo, label);
+      }
+      return presentation(FileText, label);
+    }
     default:
       return presentation(url ? LinkIcon : FileText, firstLabel(title, name, compactUrlLabel(url), "Artifact"));
   }

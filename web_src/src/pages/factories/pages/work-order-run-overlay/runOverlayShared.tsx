@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { useDismissOnEscape } from "@/hooks/useDismissOnEscape";
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -74,6 +75,7 @@ export function RunOverlayFrame({
   canvas = false,
   fixed = false,
   fullPage = false,
+  className,
   onDismiss,
 }: {
   children: ReactNode;
@@ -84,12 +86,15 @@ export function RunOverlayFrame({
   fixed?: boolean;
   /** Fill the main pane. The factory sidebar stays visible. */
   fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
+  useDismissOnEscape(onDismiss);
+
   return (
     <div className={overlayLayerClassName(fixed, fullPage)} onClick={onDismiss}>
       <div
-        className={overlayDialogClassName(wide, canvas, fullPage)}
+        className={cn(overlayDialogClassName(wide, canvas, fullPage), className)}
         data-testid={testId}
         role="dialog"
         aria-modal="true"

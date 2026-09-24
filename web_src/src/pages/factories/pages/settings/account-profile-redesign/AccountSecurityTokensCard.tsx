@@ -17,6 +17,7 @@ export function AccountSecurityTokensCard({
   return (
     <FactorySettingsCard
       title="Personal tokens"
+      data-testid="account-redesign-tokens"
       action={
         <Button size="sm" onClick={onCreate} data-testid="account-redesign-create-token">
           <Plus className="size-3.5" aria-hidden />

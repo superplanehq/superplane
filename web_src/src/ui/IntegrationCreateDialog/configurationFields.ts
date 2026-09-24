@@ -1,4 +1,5 @@
 import type { ConfigurationField } from "@/api-client";
+import { isFieldRequired, isFieldVisible } from "@/lib/components";
 
 const WEBHOOK_SECRET_FIELD_NAMES = ["signingSecret", "webhookSigningSecret"];
 
@@ -28,4 +29,41 @@ export function selectWebhookStepFields(
     return visibleFields.filter((field) => !initialStepFieldNames.includes(field.name!));
   }
   return visibleFields.filter((field) => WEBHOOK_SECRET_FIELD_NAMES.includes(field.name!));
+}
+
+/** True when every visible, required create-step field has a non-empty value. */
+export function areRequiredCreateFieldsFilled(fields: ConfigurationField[], values: Record<string, unknown>): boolean {
+  return fields.every((field) => isCreateFieldReady(field, values));
+}
+
+function isCreateFieldReady(field: ConfigurationField, values: Record<string, unknown>): boolean {
+  if (!field.name || !isFieldVisible(field, values)) {
+    return true;
+  }
+
+  const value = values[field.name];
+  if (field.togglable && (value === null || value === undefined)) {
+    return true;
+  }
+  if (!isFieldRequired(field, values)) {
+    return true;
+  }
+
+  return !isConfigurationValueEmpty(value);
+}
+
+function isConfigurationValueEmpty(value: unknown): boolean {
+  if (value === null || value === undefined) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return value.trim() === "";
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value).length === 0;
+  }
+  return false;
 }

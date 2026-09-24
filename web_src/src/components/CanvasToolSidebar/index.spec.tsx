@@ -1,13 +1,13 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { CanvasToolSidebar } from ".";
 import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT } from "./events";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() => {
+const { sendMutation, resetMutation, chatState, chatRefetch, websocketState } = vi.hoisted(() => {
   const state = {
     hasChat: true,
     isError: false,
@@ -29,6 +29,9 @@ const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() =>
     },
     chatState: state,
     chatRefetch: vi.fn(async () => ({ data: { id: "chat-1", status: state.refetchStatus } })),
+    websocketState: {
+      callbacks: undefined as { onConnectionOpen?: () => void } | undefined,
+    },
   };
 });
 
@@ -80,7 +83,9 @@ vi.mock("@/hooks/useAgentChats", () => ({
 }));
 
 vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
-  useAgentSessionWebsocket: () => undefined,
+  useAgentSessionWebsocket: (_organizationId: string, _sessionId: string, callbacks: unknown) => {
+    websocketState.callbacks = callbacks as { onConnectionOpen?: () => void };
+  },
 }));
 
 vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
@@ -111,8 +116,6 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
-    agentMode: "operator" as const,
-    switchAgentMode: vi.fn(),
     ...overrides,
   };
 }
@@ -128,6 +131,7 @@ describe("CanvasToolSidebar", () => {
     chatState.refetchStatus = "idle";
     chatState.error = null;
     chatRefetch.mockClear();
+    websocketState.callbacks = undefined;
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
@@ -137,16 +141,12 @@ describe("CanvasToolSidebar", () => {
     sessionStorage.clear();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("renders the agent panel when the sidebar is open", async () => {
     const markAgentAvailable = vi.fn();
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentAvailable })} />);
 
-    expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Describe the change to build...")).toBeInTheDocument();
     await waitFor(() => expect(markAgentAvailable).toHaveBeenCalledTimes(1));
   });
 
@@ -233,7 +233,6 @@ describe("CanvasToolSidebar", () => {
     expect(sendMutation.mutateAsync).toHaveBeenCalledWith({
       chatId: "chat-1",
       content: "retry",
-      mode: "operator",
       images: [],
       autoLayoutOnUpdateEnabled: false,
     });
@@ -242,13 +241,13 @@ describe("CanvasToolSidebar", () => {
   it("does not render when managed agents are disabled", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })} />);
 
-    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
   });
 
   it("does not render while the sidebar is closed", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isToolSidebarOpen: false })} />);
 
-    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
   });
 
   it("opens the sidebar when the agent tab event is dispatched", () => {
@@ -303,7 +302,6 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("clears stale streaming state when a durable chat refetch returns idle", async () => {
-    vi.useFakeTimers();
     chatState.status = "streaming";
     chatState.refetchStatus = "streaming";
 
@@ -311,10 +309,14 @@ describe("CanvasToolSidebar", () => {
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
     expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     chatState.refetchStatus = "idle";
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
+      websocketState.callbacks?.onConnectionOpen?.();
+      await Promise.resolve();
     });
 
     expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
@@ -323,16 +325,19 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("keeps streaming state while durable chat refetches are still streaming", async () => {
-    vi.useFakeTimers();
     chatState.status = "streaming";
     chatState.refetchStatus = "streaming";
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
+      websocketState.callbacks?.onConnectionOpen?.();
+      await Promise.resolve();
     });
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();

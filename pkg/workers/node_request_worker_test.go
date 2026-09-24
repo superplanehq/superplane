@@ -23,7 +23,7 @@ import (
 func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -92,7 +92,7 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -154,7 +154,7 @@ func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEv
 func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -259,12 +259,12 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the request concurrently.
 	//
 	go func() {
-		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 		results <- worker1.LockAndProcessRequest(request)
 	}()
 
 	go func() {
-		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 		results <- worker2.LockAndProcessRequest(request)
 	}()
 
@@ -296,7 +296,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -353,7 +353,7 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -410,7 +410,7 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -466,7 +466,7 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -528,7 +528,7 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -603,7 +603,7 @@ func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, canvasNodes := support.CreateCanvas(
@@ -680,7 +680,7 @@ func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvoking
 
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -752,7 +752,7 @@ func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvoki
 
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -813,7 +813,7 @@ func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvoki
 func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExecutionFinished(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentName := "stale_execution_after_hook_" + uuid.New().String()
 	var executionID uuid.UUID
@@ -900,7 +900,7 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFa
 
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, canvasNodes := support.CreateCanvas(
@@ -1051,7 +1051,7 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 	triggerNode := "trigger-1"
 	canvas, _ := support.CreateCanvas(
 		t,

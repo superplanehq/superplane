@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__FactoryLine__ColumnColors__DefaultsToEmptyMap(t *testing.T) {
+func Test__FactoryLine__ColumnColors__DefaultsToScreenshotColors(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -21,14 +21,15 @@ func Test__FactoryLine__ColumnColors__DefaultsToEmptyMap(t *testing.T) {
 	line, err := factory.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, map[string]string{}, line.ColumnColorsValue())
+	expected := map[string]string{"phase-0": "sky", "verify": "yellow", "done": "lime"}
+	assert.Equal(t, expected, line.ColumnColorsValue())
 
 	// Round-trip through storage so we catch a NULL insert into the
 	// NOT NULL column_colors column (the DB default is not applied when
 	// GORM sends an explicit null for an unset JSONType field).
 	reloaded, err := factory.FindLine(db, line.ID)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{}, reloaded.ColumnColorsValue())
+	assert.Equal(t, expected, reloaded.ColumnColorsValue())
 }
 
 func Test__FactoryLine__Update__PersistsColumnColors(t *testing.T) {

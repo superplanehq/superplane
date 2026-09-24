@@ -22,6 +22,7 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	owner := support.CreateUser(t, r, r.Organization.ID)
 	creator := support.CreateUser(t, r, r.Organization.ID)
+	starter := support.CreateUser(t, r, r.Organization.ID)
 
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -39,40 +40,133 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		return NewFactoryNotificationConsumer("amqp://localhost:5672", emailService, "https://app.superplane.com")
 	}
 
-	commentMessage := func(actorID string) messages.FactoryWorkOrderNotificationMessage {
+	statusMessage := func() messages.FactoryWorkOrderNotificationMessage {
 		return messages.FactoryWorkOrderNotificationMessage{
 			OrganizationID: r.Organization.ID.String(),
 			FactoryID:      factoryModel.ID.String(),
 			OrderID:        order.ID.String(),
-			EventType:      factoryevents.EventTypeOrderCommentAdded,
-			ActorUserID:    actorID,
-			CommentBody:    "Looks good to me",
+			EventType:      factoryevents.EventTypeOrderStatusUpdated,
+			FromState:      models.FactoryWorkOrderStateOpen,
+			ToState:        models.FactoryWorkOrderStateClosed,
+			Result:         models.FactoryWorkOrderResultCompleted,
+		}
+	}
+
+	agentQuestionMessage := func() messages.FactoryWorkOrderNotificationMessage {
+		return messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:       r.Organization.ID.String(),
+			FactoryID:            factoryModel.ID.String(),
+			OrderID:              order.ID.String(),
+			EventType:            factoryevents.EventTypeOrderAgentQuestion,
+			QuestionPrompt:       "Which service owns retries?",
+			SessionStarterUserID: starter.ID.String(),
+		}
+	}
+
+	planReadyMessage := func() messages.FactoryWorkOrderNotificationMessage {
+		return messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:       r.Organization.ID.String(),
+			FactoryID:            factoryModel.ID.String(),
+			OrderID:              order.ID.String(),
+			EventType:            factoryevents.EventTypeOrderPlanReady,
+			SessionStarterUserID: starter.ID.String(),
 		}
 	}
 
 	t.Run("users without settings receive the default emails", func(t *testing.T) {
 		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
+		consume(t, newConsumer(emailService), agentQuestionMessage())
 
 		sent := emailService.SentWorkOrderNotificationEmails()
-		require.Len(t, sent, 1)
-		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+		}
+		assert.ElementsMatch(t, []string{creator.GetEmail(), starter.GetEmail()}, recipients)
 	})
 
 	t.Run("none scope blocks the email", func(t *testing.T) {
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeNone,
 		})
 
 		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
+		consume(t, newConsumer(emailService), agentQuestionMessage())
 
 		for _, email := range emailService.SentWorkOrderNotificationEmails() {
-			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
+			assert.NotEqual(t, creator.GetEmail(), email.ToEmail)
 		}
+
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
 	})
 
-	t.Run("comment notifies the owner but never the actor", func(t *testing.T) {
+	t.Run("agent question notifies the task creator and the session starter", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, starter.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), agentQuestionMessage())
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+			assert.Contains(t, email.Subject, "The agent has a question")
+			assert.Contains(t, email.Data.Summary, "waiting for an answer")
+			assert.Equal(t, "Which service owns retries?", email.Data.Detail)
+		}
+		assert.ElementsMatch(t, []string{creator.GetEmail(), starter.GetEmail()}, recipients)
+	})
+
+	t.Run("plan ready notifies the task creator and the session starter", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, starter.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), planReadyMessage())
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+			assert.Contains(t, email.Subject, "Plan is ready")
+			assert.Contains(t, email.Data.Summary, "plan is ready")
+		}
+		assert.ElementsMatch(t, []string{creator.GetEmail(), starter.GetEmail()}, recipients)
+	})
+
+	t.Run("plan ready without candidates from a missing starter still notifies the creator", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		message := planReadyMessage()
+		message.SessionStarterUserID = ""
+		consume(t, newConsumer(emailService), message)
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+		}
+		assert.Contains(t, recipients, creator.GetEmail())
+	})
+
+	t.Run("comment assignee and artifact messages produce no recipients", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
@@ -80,136 +174,75 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 
-		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
-
-		sent := emailService.SentWorkOrderNotificationEmails()
-		require.Len(t, sent, 1)
-		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
-		assert.Contains(t, sent[0].Subject, "New comment")
-		assert.Contains(t, sent[0].Subject, factoryModel.WorkOrderKey(order.Number))
-		assert.Equal(t, "Looks good to me", sent[0].Data.Detail)
-		assert.Contains(t, sent[0].Data.WorkOrderLink, factoryModel.Key)
-		assert.Equal(t, "Draft", sent[0].Data.StatusLabel)
-		assert.Equal(t, "Fix login flow", sent[0].Data.WorkOrderTitle)
-		assert.Equal(t, factoryModel.WorkOrderKey(order.Number), sent[0].Data.WorkOrderKey)
-		assert.NotEmpty(t, sent[0].Data.UpdatedLabel)
-		assert.NotEmpty(t, sent[0].Data.AssigneeInitials)
-	})
-
-	t.Run("mention notifies mentioned users and wins over owner comment", func(t *testing.T) {
-		mentioned := support.CreateUser(t, r, r.Organization.ID)
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-		})
-		enableNotifications(t, mentioned.ID, models.UserNotificationSettingsParams{
-			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-		})
-
-		emailService := services.NewNoopEmailService()
-		message := commentMessage(creator.ID.String())
-		message.MentionedUserIDs = []string{mentioned.ID.String(), owner.ID.String()}
-		consume(t, newConsumer(emailService), message)
-
-		sent := emailService.SentWorkOrderNotificationEmails()
-		recipients := make([]string, 0, len(sent))
-		for _, email := range sent {
-			recipients = append(recipients, email.ToEmail)
-			assert.Contains(t, email.Subject, "mentioned you")
+		dropped := []messages.FactoryWorkOrderNotificationMessage{
+			{
+				OrganizationID: r.Organization.ID.String(),
+				FactoryID:      factoryModel.ID.String(),
+				OrderID:        order.ID.String(),
+				EventType:      factoryevents.EventTypeOrderCommentAdded,
+				CommentBody:    "Looks good to me",
+			},
+			{
+				OrganizationID:  r.Organization.ID.String(),
+				FactoryID:       factoryModel.ID.String(),
+				OrderID:         order.ID.String(),
+				EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
+				AssignedUserIDs: []string{owner.ID.String()},
+			},
+			{
+				OrganizationID: r.Organization.ID.String(),
+				FactoryID:      factoryModel.ID.String(),
+				OrderID:        order.ID.String(),
+				EventType:      factoryevents.EventTypeOrderArtifactAdded,
+				ArtifactType:   factoryevents.ArtifactTypeMarkdown,
+			},
 		}
-		assert.ElementsMatch(t, []string{mentioned.GetEmail(), owner.GetEmail()}, recipients)
+
+		emailService := services.NewNoopEmailService()
+		consumer := newConsumer(emailService)
+		for _, message := range dropped {
+			consume(t, consumer, message)
+		}
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
 	})
 
-	t.Run("filtered type list without mentions blocks the mention email", func(t *testing.T) {
-		mentioned := support.CreateUser(t, r, r.Organization.ID)
-		enableNotifications(t, mentioned.ID, models.UserNotificationSettingsParams{
-			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
-			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
-				WorkspaceID: factoryModel.ID.String(),
-				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
-			}},
-		})
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+	t.Run("all scope type list without agent questions blocks the email", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     []string{models.NotificationTypeWorkOrderStatusOwned},
 		})
 
 		emailService := services.NewNoopEmailService()
-		message := commentMessage(creator.ID.String())
-		message.MentionedUserIDs = []string{mentioned.ID.String()}
-		consume(t, newConsumer(emailService), message)
+		consume(t, newConsumer(emailService), agentQuestionMessage())
 
 		for _, email := range emailService.SentWorkOrderNotificationEmails() {
-			assert.NotEqual(t, mentioned.GetEmail(), email.ToEmail)
+			assert.NotEqual(t, creator.GetEmail(), email.ToEmail)
 		}
-	})
 
-	t.Run("all scope type list without comments blocks the email", func(t *testing.T) {
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-			EventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
 		})
-
-		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
-
-		for _, email := range emailService.SentWorkOrderNotificationEmails() {
-			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
-		}
-	})
-
-	t.Run("filtered type list without comments blocks the email", func(t *testing.T) {
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
-			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
-				WorkspaceID: factoryModel.ID.String(),
-				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
-			}},
-		})
-
-		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
-
-		for _, email := range emailService.SentWorkOrderNotificationEmails() {
-			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
-		}
 	})
 
 	t.Run("filtered workspace scope excludes other factories", func(t *testing.T) {
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
 			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
 				WorkspaceID: uuid.NewString(),
-				EventTypes:  []string{models.NotificationTypeWorkOrderCommentOwned},
+				EventTypes:  []string{models.NotificationTypeWorkOrderAgentQuestion},
 			}},
 		})
 
 		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
+		consume(t, newConsumer(emailService), agentQuestionMessage())
 
 		for _, email := range emailService.SentWorkOrderNotificationEmails() {
-			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
+			assert.NotEqual(t, creator.GetEmail(), email.ToEmail)
 		}
-	})
 
-	t.Run("assignment notifies only the newly assigned user", func(t *testing.T) {
-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
-
-		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID:  r.Organization.ID.String(),
-			FactoryID:       factoryModel.ID.String(),
-			OrderID:         order.ID.String(),
-			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
-			ActorUserID:     creator.ID.String(),
-			AssignedUserIDs: []string{owner.ID.String()},
-		})
-
-		sent := emailService.SentWorkOrderNotificationEmails()
-		require.Len(t, sent, 1)
-		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
-		assert.Contains(t, sent[0].Subject, "You are now an owner")
 	})
 
 	t.Run("initial transition into draft sends nothing", func(t *testing.T) {
@@ -234,23 +267,20 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
 
 		emailService := services.NewNoopEmailService()
-		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID: r.Organization.ID.String(),
-			FactoryID:      factoryModel.ID.String(),
-			OrderID:        order.ID.String(),
-			EventType:      factoryevents.EventTypeOrderStatusUpdated,
-			FromState:      models.FactoryWorkOrderStateOpen,
-			ToState:        models.FactoryWorkOrderStateClosed,
-			Result:         models.FactoryWorkOrderResultCompleted,
-		})
+		consume(t, newConsumer(emailService), statusMessage())
 
 		sent := emailService.SentWorkOrderNotificationEmails()
 		recipients := make([]string, 0, len(sent))
 		for _, email := range sent {
 			recipients = append(recipients, email.ToEmail)
 			assert.Contains(t, email.Subject, "closed as completed")
+			assert.Contains(t, email.Subject, "Task")
+			assert.NotContains(t, email.Subject, "Work order")
 		}
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
@@ -289,15 +319,13 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
 
-	t.Run("status note setting can be turned off without affecting comments", func(t *testing.T) {
+	t.Run("status note setting can be turned off without affecting status changes", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 			EventTypes: []string{
-				models.NotificationTypeWorkOrderCommentOwned,
 				models.NotificationTypeWorkOrderStatusOwned,
-				models.NotificationTypeWorkOrderArtifactOwned,
-				models.NotificationTypeWorkOrderAssigned,
-				models.NotificationTypeWorkOrderMention,
+				models.NotificationTypeWorkOrderAgentQuestion,
+				models.NotificationTypeWorkOrderPlanReady,
 			},
 		})
 
@@ -315,8 +343,6 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
 		}
 
-		// Restore full opt-in so later subtests aren't affected by this
-		// deliberately narrowed type list.
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
@@ -324,6 +350,8 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("soft-deleted members are not emailed", func(t *testing.T) {
 		left := support.CreateUser(t, r, r.Organization.ID)
+		leftOrder, err := factoryModel.CreateWorkOrder(db, "Left member task", "", &left.ID, nil, nil)
+		require.NoError(t, err)
 		enableNotifications(t, left.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
@@ -331,12 +359,11 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 		emailService := services.NewNoopEmailService()
 		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID:  r.Organization.ID.String(),
-			FactoryID:       factoryModel.ID.String(),
-			OrderID:         order.ID.String(),
-			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
-			ActorUserID:     creator.ID.String(),
-			AssignedUserIDs: []string{left.ID.String()},
+			OrganizationID: r.Organization.ID.String(),
+			FactoryID:      factoryModel.ID.String(),
+			OrderID:        leftOrder.ID.String(),
+			EventType:      factoryevents.EventTypeOrderAgentQuestion,
+			QuestionPrompt: "Still there?",
 		})
 
 		for _, email := range emailService.SentWorkOrderNotificationEmails() {
@@ -346,12 +373,106 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("missing work order is skipped without error", func(t *testing.T) {
 		emailService := services.NewNoopEmailService()
-		message := commentMessage(creator.ID.String())
+		message := agentQuestionMessage()
 		message.OrderID = uuid.NewString()
 		consume(t, newConsumer(emailService), message)
 
 		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
 	})
+
+	t.Run("browser channel publishes title body and task path", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, starter.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, agentQuestionMessage())
+
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+		require.NotEmpty(t, *published)
+		var creatorAlert *messages.UserNotificationMessage
+		for i := range *published {
+			if (*published)[i].UserID == creator.ID.String() {
+				creatorAlert = &(*published)[i]
+				break
+			}
+		}
+		require.NotNil(t, creatorAlert)
+		assert.Contains(t, creatorAlert.Title, "The agent has a question")
+		assert.Contains(t, creatorAlert.Body, factoryModel.WorkOrderKey(order.Number))
+		assert.Equal(t, order.URLPath(factoryModel.Key), creatorAlert.URLPath)
+		assert.Equal(t, factoryModel.WorkOrderKey(order.Number), creatorAlert.OrderKey)
+		assert.Equal(t, factoryModel.Key, creatorAlert.FactoryKey)
+		assert.Equal(t, models.NotificationTypeWorkOrderAgentQuestion, creatorAlert.EventType)
+	})
+
+	t.Run("browser channel excludes the actor", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		message := statusMessage()
+		message.ActorUserID = creator.ID.String()
+		consume(t, consumer, message)
+
+		require.Len(t, *published, 1)
+		assert.Equal(t, owner.ID.String(), (*published)[0].UserID)
+	})
+
+	t.Run("email channel stays unaffected when browser is off", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+		enableNotifications(t, starter.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, agentQuestionMessage())
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		require.Len(t, sent, 1)
+		assert.Equal(t, creator.GetEmail(), sent[0].ToEmail)
+		assert.Empty(t, *published)
+	})
+
+	t.Run("browser channel off publishes nothing", func(t *testing.T) {
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeNone,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, agentQuestionMessage())
+
+		assert.Empty(t, *published)
+	})
+}
+
+func capturingConsumer(consumer *FactoryNotificationConsumer) (*FactoryNotificationConsumer, *[]messages.UserNotificationMessage) {
+	published := []messages.UserNotificationMessage{}
+	consumer.publishUserNotification = func(message messages.UserNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	}
+	return consumer, &published
 }
 
 func consume(t *testing.T, consumer *FactoryNotificationConsumer, message messages.FactoryWorkOrderNotificationMessage) {
@@ -360,4 +481,60 @@ func consume(t *testing.T, consumer *FactoryNotificationConsumer, message messag
 	payload, err := json.Marshal(message)
 	require.NoError(t, err)
 	require.NoError(t, consumer.Consume(tackle.NewFakeDelivery(payload)))
+}
+
+func TestBuildWorkOrderNotificationContent_SubjectsUseTask(t *testing.T) {
+	factoryModel := &models.Factory{Key: "SP"}
+	order := &models.FactoryWorkOrder{Number: 42, Title: "Fix login"}
+
+	t.Run("status change", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{
+				EventType: factoryevents.EventTypeOrderStatusUpdated,
+				ToState:   models.FactoryWorkOrderStateClosed,
+				Result:    models.FactoryWorkOrderResultCompleted,
+			},
+			"Ana",
+		)
+		assert.Equal(t, "[SP-42] Task closed as completed", content.Subject)
+		assert.NotContains(t, content.Subject, "Work order")
+	})
+
+	t.Run("agent question", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{
+				EventType:      factoryevents.EventTypeOrderAgentQuestion,
+				QuestionPrompt: "Which service owns retries?",
+			},
+			"An automation",
+		)
+		assert.Equal(t, "[SP-42] The agent has a question", content.Subject)
+		assert.Equal(t, "The agent is waiting for an answer on SP-42.", content.Data.Summary)
+		assert.Equal(t, "Which service owns retries?", content.Data.Detail)
+	})
+
+	t.Run("plan ready", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{EventType: factoryevents.EventTypeOrderPlanReady},
+			"An automation",
+		)
+		assert.Equal(t, "[SP-42] Plan is ready", content.Subject)
+		assert.Equal(t, "Refinement finished and the plan is ready for SP-42.", content.Data.Summary)
+	})
+
+	t.Run("unknown event type", func(t *testing.T) {
+		content := buildWorkOrderNotificationContent(
+			factoryModel,
+			order,
+			messages.FactoryWorkOrderNotificationMessage{EventType: "order.unknown"},
+			"Ana",
+		)
+		assert.Equal(t, "[SP-42] Task update", content.Subject)
+	})
 }

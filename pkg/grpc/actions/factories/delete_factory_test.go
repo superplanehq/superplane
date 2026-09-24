@@ -27,7 +27,7 @@ func Test__DeleteFactory(t *testing.T) {
 		_, err = models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
 		assert.ErrorIs(t, err, models.ErrFactoryNotFound)
 
-		_, err = DescribeFactory(context.Background(), r.Organization.ID.String(), factory.ID.String())
+		_, err = DescribeFactory(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), factory.ID.String())
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)

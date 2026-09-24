@@ -25,8 +25,9 @@ const (
 // newAuthorizedIntegration returns an IntegrationContext simulating a successfully-connected OAuth integration.
 func newAuthorizedIntegration() *contexts.IntegrationContext {
 	return newAuthorizedIntegrationWithMetadata(Metadata{
-		CloudID: testCloudID,
-		SiteURL: testSiteURL,
+		CloudID:                     testCloudID,
+		SiteURL:                     testSiteURL,
+		IssueWebhookScopesRequested: true,
 	})
 }
 
@@ -52,6 +53,11 @@ func newAuthorizedIntegrationWithMetadata(metadata Metadata) *contexts.Integrati
 // testProxyURL builds the expected OAuth API proxy URL for a REST path, mirroring Client.apiURL.
 func testProxyURL(path string) string {
 	return APIProxyHost + "/" + testCloudID + path
+}
+
+func Test__coreScopeList(t *testing.T) {
+	assert.Contains(t, coreScopeList, "read:issue-details:jira")
+	assert.Contains(t, coreScopeList, "manage:jira-webhook")
 }
 
 func Test__NewClient(t *testing.T) {
@@ -337,6 +343,95 @@ func Test__Client__GetIssue(t *testing.T) {
 	})
 }
 
+func Test__Client__SearchIssues(t *testing.T) {
+	t.Run("posts to the enhanced search/jql API", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"issues":[{"id":"100","key":"ENG-1","fields":{"summary":"First"}}],"isLast":true}`,
+					)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		hits, err := client.SearchIssues(`project = "ENG"`, 10)
+		require.NoError(t, err)
+		require.Len(t, hits, 1)
+		assert.Equal(t, "ENG-1", hits[0].Key)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/search/jql"))
+
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), `"jql":"project = \"ENG\""`)
+		assert.NotContains(t, string(body), "startAt")
+		assert.NotContains(t, string(body), "nextPageToken")
+	})
+
+	t.Run("removed search API returns an error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusGone,
+					Body: io.NopCloser(strings.NewReader(
+						`{"errorMessages":["The requested API has been removed. Please migrate to the /rest/api/3/search/jql API."]}`,
+					)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.SearchIssues(`project = "ENG"`, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "410")
+	})
+}
+
+func Test__Client__SearchIssuesUpTo(t *testing.T) {
+	t.Run("follows nextPageToken until the last page", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"issues":[{"id":"1","key":"ENG-1","fields":{"summary":"One"}}],"nextPageToken":"page-2","isLast":false}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"issues":[{"id":"2","key":"ENG-2","fields":{"summary":"Two"}}],"isLast":true}`,
+					)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		hits, err := client.SearchIssuesUpTo(`project = "ENG"`, 50)
+		require.NoError(t, err)
+		require.Len(t, hits, 2)
+		assert.Equal(t, "ENG-1", hits[0].Key)
+		assert.Equal(t, "ENG-2", hits[1].Key)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/search/jql"))
+		assert.Contains(t, httpContext.Requests[1].URL.String(), testProxyURL("/rest/api/3/search/jql"))
+
+		secondBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(secondBody), `"nextPageToken":"page-2"`)
+	})
+}
+
 func Test__Client__CreateIssue(t *testing.T) {
 	t.Run("successful issue creation", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
@@ -540,6 +635,85 @@ func Test__Client__CreateIssueWebhook(t *testing.T) {
 
 		body, _ := io.ReadAll(httpContext.Requests[0].Body)
 		assert.Contains(t, string(body), `"jqlFilter":""`)
+	})
+}
+
+func Test__Client__ListIssueWebhooks(t *testing.T) {
+	t.Run("returns a single page", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"startAt": 0,
+					"maxResults": 100,
+					"values": [{"id":1000,"url":"https://app.superplane.com/api/v1/webhooks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}]
+				}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		webhooks, err := client.ListIssueWebhooks()
+		require.NoError(t, err)
+		require.Len(t, webhooks, 1)
+		assert.Equal(t, int64(1000), webhooks[0].ID)
+		assert.Equal(t, "https://app.superplane.com/api/v1/webhooks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", webhooks[0].URL)
+		assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/webhook")
+		assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "startAt=0")
+	})
+
+	t.Run("paginates until isLast", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": false,
+					"values": [{"id":1000,"url":"https://app.superplane.com/api/v1/webhooks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}]
+				}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [{"id":1001,"url":"https://app.superplane.com/api/v1/webhooks/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}]
+				}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		webhooks, err := client.ListIssueWebhooks()
+		require.NoError(t, err)
+		require.Len(t, webhooks, 2)
+		assert.Equal(t, int64(1000), webhooks[0].ID)
+		assert.Equal(t, int64(1001), webhooks[1].ID)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.RawQuery, "startAt=1")
+	})
+
+	t.Run("empty values stops pagination", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"isLast":false,"values":[]}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		webhooks, err := client.ListIssueWebhooks()
+		require.NoError(t, err)
+		assert.Empty(t, webhooks)
+		require.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("list failure is surfaced", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["no perm"]}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.ListIssueWebhooks()
+		require.ErrorContains(t, err, "403")
 	})
 }
 

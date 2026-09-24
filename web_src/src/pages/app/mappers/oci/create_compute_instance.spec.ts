@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createComputeInstanceMapper } from "./create_compute_instance";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
@@ -140,7 +140,7 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
       },
     });
     const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(startedAt).getTime());
+    expect(new Date(details["Executed At"] as string).getTime()).toBe(new Date(startedAt).getTime());
   });
 
   it("falls back to execution.createdAt for Executed At when metadata.startedAt is absent", () => {
@@ -149,7 +149,7 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
       execution: { createdAt, metadata: {}, outputs: undefined },
     });
     const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(createdAt).getTime());
+    expect(new Date(details["Executed At"] as string).getTime()).toBe(new Date(createdAt).getTime());
   });
 
   it("maps output fields to display labels", () => {

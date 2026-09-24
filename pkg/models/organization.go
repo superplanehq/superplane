@@ -14,8 +14,12 @@ import (
 )
 
 type Organization struct {
-	ID   uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name string    `gorm:"uniqueIndex"`
+	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	// Name is a display label and is not required to be unique: two
+	// organizations may share a name (for example, onboarding keeps an
+	// organization's name equal to its GitHub owner across slug-collision
+	// retries). Only Slug is unique among active organizations.
+	Name string
 	// Slug is the URL-friendly identifier used to route to this organization
 	// in the frontend. Uniqueness among non-deleted organizations is enforced
 	// by a partial unique index added in the add-organization-slug migration,
@@ -25,9 +29,7 @@ type Organization struct {
 	CreatedByAccountID          *uuid.UUID
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
-	UsageSyncedAt               *time.Time
 	UsageRetentionWindowDays    *int32
-	UsageLimitsSyncedAt         *time.Time
 	CreatedAt                   *time.Time
 	UpdatedAt                   *time.Time
 	DeletedAt                   gorm.DeletedAt `gorm:"index"`
@@ -53,8 +55,8 @@ type OrganizationWithCounts struct {
 	MemberCount int64 `gorm:"column:member_count"`
 }
 
-func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	query := database.Conn().
+func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
+	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
 
@@ -67,26 +69,7 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 		return nil, 0, err
 	}
 
-	canvasCountsQuery := database.Conn().
-		Table("workflows").
-		Select("organization_id, COUNT(*) AS count").
-		Where("deleted_at IS NULL").
-		Group("organization_id")
-
-	memberCountsQuery := database.Conn().
-		Table("users").
-		Select("organization_id, COUNT(*) AS count").
-		Where("deleted_at IS NULL").
-		Group("organization_id")
-
-	query = query.
-		Select(`
-			organizations.*,
-			COALESCE(canvas_counts.count, 0) AS canvas_count,
-			COALESCE(member_counts.count, 0) AS member_count
-		`).
-		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
-		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
+	query = withOrganizationCounts(tx, query)
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -104,6 +87,45 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 	}
 
 	return organizations, total, nil
+}
+
+func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
+	query := withOrganizationCounts(
+		tx,
+		tx.Model(&Organization{}).Where("organizations.deleted_at IS NULL"),
+	)
+
+	var organization OrganizationWithCounts
+	err := query.Where("organizations.id = ?", id).First(&organization).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
+func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
+	canvasCountsQuery := tx.
+		Table("workflows").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	memberCountsQuery := tx.
+		Table("users").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Where("type = ?", UserTypeHuman).
+		Group("organization_id")
+
+	return query.
+		Select(`
+			organizations.*,
+			COALESCE(canvas_counts.count, 0) AS canvas_count,
+			COALESCE(member_counts.count, 0) AS member_count
+		`).
+		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
+		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
 }
 
 func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
@@ -161,6 +183,13 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	return &organization, nil
 }
 
+func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
+	return FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
+}
+
 func FindOrganizationByName(name string) (*Organization, error) {
 	organization := Organization{}
 
@@ -207,8 +236,8 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		if inviteErr != nil {
 			return nil, inviteErr
 		}
-		if grantErr := GrantWelcomeCredit(tx, organization.ID); grantErr != nil {
-			return nil, grantErr
+		if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
+			return nil, planErr
 		}
 
 		return &organization, nil
@@ -236,6 +265,7 @@ func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Orga
 	var organizations []Organization
 	err := tx.
 		Where("created_by_account_id = ?", accountID).
+		Order("created_at DESC").
 		Find(&organizations).
 		Error
 	return organizations, err
@@ -308,214 +338,6 @@ func GetActiveOrganizationIDs() ([]string, error) {
 	}
 
 	return orgIDs, nil
-}
-
-func ListOrganizationsPendingUsageSync(limit int) ([]Organization, error) {
-	return ListOrganizationsPendingUsageSyncInTransaction(database.Conn(), limit)
-}
-
-func ListOrganizationsPendingUsageSyncInTransaction(tx *gorm.DB, limit int) ([]Organization, error) {
-	var organizations []Organization
-
-	query := tx.
-		Where("deleted_at IS NULL").
-		Where("usage_synced_at IS NULL").
-		Order("created_at ASC")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&organizations).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return organizations, nil
-}
-
-func MarkOrganizationUsageSynced(orgID string, syncedAt time.Time) error {
-	return MarkOrganizationUsageSyncedInTransaction(database.Conn(), orgID, syncedAt)
-}
-
-func MarkOrganizationUsageSyncedInTransaction(tx *gorm.DB, orgID string, syncedAt time.Time) error {
-	return tx.
-		Model(&Organization{}).
-		Where("id = ?", orgID).
-		Update("usage_synced_at", syncedAt.UTC()).
-		Error
-}
-
-func MarkOrganizationUsageSyncedWithLimitsIfNoNewerThan(
-	orgID string,
-	usageSyncedAt time.Time,
-	retentionWindowDays *int32,
-	maxExistingLimitsSyncedAt time.Time,
-	limitsSyncedAt time.Time,
-) error {
-	return MarkOrganizationUsageSyncedWithLimitsIfNoNewerThanInTransaction(
-		database.Conn(),
-		orgID,
-		usageSyncedAt,
-		retentionWindowDays,
-		maxExistingLimitsSyncedAt,
-		limitsSyncedAt,
-	)
-}
-
-func MarkOrganizationUsageSyncedWithLimitsIfNoNewerThanInTransaction(
-	tx *gorm.DB,
-	orgID string,
-	usageSyncedAt time.Time,
-	retentionWindowDays *int32,
-	maxExistingLimitsSyncedAt time.Time,
-	limitsSyncedAt time.Time,
-) error {
-	return tx.Transaction(func(tx *gorm.DB) error {
-		if err := tx.
-			Model(&Organization{}).
-			Where("id = ?", orgID).
-			Update("usage_synced_at", usageSyncedAt.UTC()).
-			Error; err != nil {
-			return err
-		}
-
-		_, err := MarkOrganizationUsageLimitsSyncedIfNoNewerThanInTransaction(
-			tx,
-			orgID,
-			retentionWindowDays,
-			maxExistingLimitsSyncedAt,
-			limitsSyncedAt,
-		)
-
-		return err
-	})
-}
-
-func MarkOrganizationUsageSyncedIfUnset(orgID string, syncedAt time.Time) error {
-	return MarkOrganizationUsageSyncedIfUnsetInTransaction(database.Conn(), orgID, syncedAt)
-}
-
-func MarkOrganizationUsageSyncedIfUnsetInTransaction(tx *gorm.DB, orgID string, syncedAt time.Time) error {
-	return tx.
-		Model(&Organization{}).
-		Where("id = ?", orgID).
-		Where("usage_synced_at IS NULL").
-		Update("usage_synced_at", syncedAt.UTC()).
-		Error
-}
-
-func MarkOrganizationUsageLimitsSynced(orgID string, retentionWindowDays *int32, syncedAt time.Time) error {
-	return MarkOrganizationUsageLimitsSyncedInTransaction(database.Conn(), orgID, retentionWindowDays, syncedAt)
-}
-
-func MarkOrganizationUsageLimitsSyncedInTransaction(
-	tx *gorm.DB,
-	orgID string,
-	retentionWindowDays *int32,
-	syncedAt time.Time,
-) error {
-	return tx.
-		Model(&Organization{}).
-		Where("id = ?", orgID).
-		Updates(map[string]any{
-			"usage_retention_window_days": retentionWindowDays,
-			"usage_limits_synced_at":      syncedAt.UTC(),
-		}).
-		Error
-}
-
-func MarkOrganizationUsageLimitsSyncedIfNewer(orgID string, retentionWindowDays *int32, syncedAt time.Time) (bool, error) {
-	return MarkOrganizationUsageLimitsSyncedIfNewerInTransaction(database.Conn(), orgID, retentionWindowDays, syncedAt)
-}
-
-func MarkOrganizationUsageLimitsSyncedIfNewerInTransaction(
-	tx *gorm.DB,
-	orgID string,
-	retentionWindowDays *int32,
-	syncedAt time.Time,
-) (bool, error) {
-	result := tx.
-		Model(&Organization{}).
-		Where("id = ?", orgID).
-		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at <= ?", syncedAt.UTC()).
-		Updates(map[string]any{
-			"usage_retention_window_days": retentionWindowDays,
-			"usage_limits_synced_at":      syncedAt.UTC(),
-		})
-
-	if result.Error != nil {
-		return false, result.Error
-	}
-
-	return result.RowsAffected > 0, nil
-}
-
-func MarkOrganizationUsageLimitsSyncedIfNoNewerThan(
-	orgID string,
-	retentionWindowDays *int32,
-	maxExistingSyncedAt time.Time,
-	syncedAt time.Time,
-) (bool, error) {
-	return MarkOrganizationUsageLimitsSyncedIfNoNewerThanInTransaction(
-		database.Conn(),
-		orgID,
-		retentionWindowDays,
-		maxExistingSyncedAt,
-		syncedAt,
-	)
-}
-
-func MarkOrganizationUsageLimitsSyncedIfNoNewerThanInTransaction(
-	tx *gorm.DB,
-	orgID string,
-	retentionWindowDays *int32,
-	maxExistingSyncedAt time.Time,
-	syncedAt time.Time,
-) (bool, error) {
-	result := tx.
-		Model(&Organization{}).
-		Where("id = ?", orgID).
-		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at <= ?", maxExistingSyncedAt.UTC()).
-		Updates(map[string]any{
-			"usage_retention_window_days": retentionWindowDays,
-			"usage_limits_synced_at":      syncedAt.UTC(),
-		})
-
-	if result.Error != nil {
-		return false, result.Error
-	}
-
-	return result.RowsAffected > 0, nil
-}
-
-func ListOrganizationsPendingUsageLimitsRefresh(staleBefore time.Time, limit int) ([]Organization, error) {
-	return ListOrganizationsPendingUsageLimitsRefreshInTransaction(database.Conn(), staleBefore, limit)
-}
-
-func ListOrganizationsPendingUsageLimitsRefreshInTransaction(
-	tx *gorm.DB,
-	staleBefore time.Time,
-	limit int,
-) ([]Organization, error) {
-	var organizations []Organization
-
-	query := tx.
-		Where("deleted_at IS NULL").
-		Where("usage_synced_at IS NOT NULL").
-		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at < ?", staleBefore.UTC()).
-		Order("COALESCE(usage_limits_synced_at, to_timestamp(0)) ASC")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&organizations).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return organizations, nil
 }
 
 // EnableExperimentalFeature adds the given feature id to the organization's

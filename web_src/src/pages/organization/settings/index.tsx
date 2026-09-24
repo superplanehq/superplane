@@ -17,14 +17,10 @@ import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { APIKeys } from "./ApiKeys";
 import { APIKeyDetail } from "./ApiKeyDetail";
-import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
-import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
-  ArrowRightLeft,
-  Gauge,
   CircleUser,
   Home,
   Key,
@@ -42,7 +38,8 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
-import { useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { factoryListPath } from "@/pages/factories/lib/factoryPagePaths";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
 import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
@@ -72,14 +69,11 @@ export function OrganizationSettings() {
     matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
   );
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const canReadOrg = permissionsLoading || canAct("org", "read");
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
-  const { data: usageStatus, error: usageError } = useOrganizationUsage(
-    organizationId || "",
-    !!organizationId && canReadOrg,
-  );
 
   if (userLoading) {
     return (
@@ -124,17 +118,7 @@ export function OrganizationSettings() {
     permission?: { resource: string; action: string };
   };
 
-  const sectionIds = [
-    "profile",
-    "general",
-    "members",
-    "groups",
-    "roles",
-    "integrations",
-    "secrets",
-    "api-keys",
-    "billing",
-  ];
+  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets", "api-keys"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -150,17 +134,20 @@ export function OrganizationSettings() {
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
   const userEmail = user?.email || "";
-  const usageEnabled =
-    usageStatus?.enabled === true || !!usageError || currentSection === "billing" || isUsagePageForced();
 
+  const homeHref = factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
   const organizationLinks: NavLink[] = [
-    {
-      id: "canvases",
-      label: "Apps",
-      href: `/${organizationId}`,
-      Icon: Home,
-      permission: { resource: "canvases", action: "read" },
-    },
+    ...(factoriesEnabled
+      ? []
+      : [
+          {
+            id: "canvases",
+            label: "Apps",
+            href: `/${organizationId}`,
+            Icon: Home,
+            permission: { resource: "canvases", action: "read" },
+          },
+        ]),
     {
       id: "general",
       label: "Settings",
@@ -210,18 +197,7 @@ export function OrganizationSettings() {
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
-    { id: "change-org", label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
-
-  if (usageEnabled) {
-    organizationLinks.splice(6, 0, {
-      id: "billing",
-      label: "Usage",
-      href: `/${organizationId}/settings/billing`,
-      Icon: Gauge,
-      permission: { resource: "org", action: "read" },
-    });
-  }
 
   const userLinks: NavLink[] = [
     { id: "profile", label: "Profile", href: `/${organizationId}/settings/profile`, Icon: CircleUser },
@@ -232,7 +208,7 @@ export function OrganizationSettings() {
     if (link.id === "canvases") {
       return location.pathname === `/${organizationId}`;
     }
-    if (link.id === "change-org" || link.id === "sign-out") {
+    if (link.id === "sign-out") {
       return false;
     }
     if (link.id === "integrations" && currentSection === "integrations") {
@@ -280,10 +256,6 @@ export function OrganizationSettings() {
       title: "Integrations",
       description: "Connect external tools and services to extend SuperPlane.",
     },
-    billing: {
-      title: "Usage",
-      description: "Review organization limits and tracked usage for this organization.",
-    },
     secrets: {
       title: "Secrets",
       description: "Store and manage secrets.",
@@ -308,7 +280,11 @@ export function OrganizationSettings() {
       <Sidebar className={cn("w-60 border-r bg-white", appDarkModeClasses.sidebarEdge, appDarkModeClasses.surface)}>
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
-            <Link to={`/${organizationId}`} className="block h-7 w-7" aria-label="Go to Apps">
+            <Link
+              to={homeHref}
+              className="block h-7 w-7"
+              aria-label={factoriesEnabled ? "Go to Workspaces" : "Go to Apps"}
+            >
               <img
                 src={SuperplaneLogo}
                 alt="SuperPlane"
@@ -562,14 +538,6 @@ export function OrganizationSettings() {
                 <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
                   <Notifications />
                 </RequireExperimentalFeature>
-              }
-            />
-            <Route
-              path="billing"
-              element={
-                <RequirePermission resource="org" action="read">
-                  <Usage organizationId={organizationId || ""} />
-                </RequirePermission>
               }
             />
           </Routes>

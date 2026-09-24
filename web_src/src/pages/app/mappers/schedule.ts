@@ -33,6 +33,16 @@ interface ScheduleMetadata {
   nextTrigger?: string;
 }
 
+function formatWeeklySchedule(configuration: ScheduleConfiguration): string {
+  const interval = configuration.weeksInterval || 1;
+  const hour = configuration.hour || 0;
+  const minute = configuration.minute || 0;
+  const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+  const weekDays = configuration.weekDays || ["monday"];
+  const dayLabels = weekDays.map((day) => day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()).join(", ");
+  return `Every ${interval} week${interval === 1 ? "" : "s"} on ${dayLabels} at ${time}`;
+}
+
 function formatScheduleDescription(configuration: ScheduleConfiguration): string {
   if (!configuration.type) {
     return "";
@@ -57,13 +67,7 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
       return `Every ${interval} day${interval === 1 ? "" : "s"} at ${time}`;
     }
     case "weeks": {
-      const interval = configuration.weeksInterval || 1;
-      const hour = configuration.hour || 0;
-      const minute = configuration.minute || 0;
-      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      const weekDays = configuration.weekDays || ["monday"];
-      const dayLabels = weekDays.map((day) => day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()).join(", ");
-      return `Every ${interval} week${interval === 1 ? "" : "s"} on ${dayLabels} at ${time}`;
+      return formatWeeklySchedule(configuration);
     }
     case "months": {
       const interval = configuration.monthsInterval || 1;
@@ -338,7 +342,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     return {
-      Timestamp: (context.event?.data?.["timestamp"] as string) || "n/a",
+      Timestamp: ((context.event?.data as Record<string, unknown> | undefined)?.timestamp as string) || "n/a",
     };
   },
 

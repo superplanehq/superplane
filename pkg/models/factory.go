@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ const (
 
 	FactoryKeyMinLength = 2
 	FactoryKeyMaxLength = 5
+
+	DefaultFactoryWorkOrderListLimit = 100
 )
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
@@ -43,9 +46,28 @@ type Factory struct {
 	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
 	OnboardingCompletedAt  *time.Time
 	HostedSpendBudgetCents *int64
+	PlanningEnabled        bool
+	PlanningClarity        bool
+	PlanningConfidence     bool
+	PlanningSetupCompleted bool
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
+}
+
+// FactoryPlanning is the workspace toggle for draft chat plus the two
+// optional checks. New workspaces start with Planning and the Confidence
+// estimate on. The Clarity check is opt-in because it makes the agent ask
+// more questions before a task is ready.
+type FactoryPlanning struct {
+	Enabled        bool
+	Clarity        bool
+	Confidence     bool
+	SetupCompleted bool
+}
+
+func DefaultFactoryPlanning() FactoryPlanning {
+	return FactoryPlanning{Enabled: true, Clarity: false, Confidence: true, SetupCompleted: false}
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -109,6 +131,13 @@ func MapFactoryNameUniqueConstraintError(err error) error {
 	return MapFactoryConstraintError(err)
 }
 
+// WorkOrderKey returns the display identifier used for a work order that
+// belongs to this factory. Format matches `<KEY>-<number>` (for example
+// `SP-42`).
+func (f *Factory) WorkOrderKey(number int64) string {
+	return fmt.Sprintf("%s-%d", f.Key, number)
+}
+
 func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key string) (*Factory, error) {
 	normalizedKey := NormalizeFactoryKey(key)
 	if normalizedKey == "" {
@@ -124,18 +153,23 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		return nil, err
 	}
 
+	planning := DefaultFactoryPlanning()
 	now := time.Now()
 	factory := &Factory{
-		ID:                    uuid.New(),
-		OrganizationID:        organizationID,
-		Name:                  name,
-		Description:           description,
-		Key:                   normalizedKey,
-		NextWorkOrderNumber:   1,
-		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
-		OnboardingCompletedAt: nil,
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		ID:                     uuid.New(),
+		OrganizationID:         organizationID,
+		Name:                   name,
+		Description:            description,
+		Key:                    normalizedKey,
+		NextWorkOrderNumber:    1,
+		OnboardingConfig:       datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		OnboardingCompletedAt:  nil,
+		PlanningEnabled:        planning.Enabled,
+		PlanningClarity:        planning.Clarity,
+		PlanningConfidence:     planning.Confidence,
+		PlanningSetupCompleted: planning.SetupCompleted,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
@@ -237,6 +271,23 @@ func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Facto
 	}
 
 	return &factory, nil
+}
+
+// FindFactoryByRef resolves ref to a factory. ref is a UUID or a workspace
+// key. Workspace names are not accepted.
+//
+// Names can contain spaces, so they do not belong in `/factories/{id}`.
+// Names are also not unique in an organization.
+func FindFactoryByRef(tx *gorm.DB, organizationID uuid.UUID, ref string) (*Factory, error) {
+	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return nil, ErrFactoryNotFound
+	}
+	if id, err := uuid.Parse(trimmed); err == nil {
+		return FindFactory(tx, organizationID, id)
+	}
+
+	return FindFactoryByKey(tx, organizationID, trimmed)
 }
 
 func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
@@ -347,6 +398,38 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 		return err
 	}
 	f.HostedSpendBudgetCents = budgetCents
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) Planning() FactoryPlanning {
+	return FactoryPlanning{
+		Enabled:        f.PlanningEnabled,
+		Clarity:        f.PlanningClarity,
+		Confidence:     f.PlanningConfidence,
+		SetupCompleted: f.PlanningSetupCompleted,
+	}
+}
+
+func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("planning_enabled", "planning_clarity", "planning_confidence", "planning_setup_completed", "updated_at").
+		Updates(map[string]any{
+			"planning_enabled":         planning.Enabled,
+			"planning_clarity":         planning.Clarity,
+			"planning_confidence":      planning.Confidence,
+			"planning_setup_completed": planning.SetupCompleted,
+			"updated_at":               now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PlanningEnabled = planning.Enabled
+	f.PlanningClarity = planning.Clarity
+	f.PlanningConfidence = planning.Confidence
+	f.PlanningSetupCompleted = planning.SetupCompleted
 	f.UpdatedAt = now
 	return nil
 }
@@ -580,6 +663,12 @@ func (f *Factory) createWorkOrder(
 		return nil, err
 	}
 
+	if sourceRunID != nil {
+		if err := attachUsageEventsToWorkOrder(tx, f.ID, order.ID, *sourceRunID); err != nil {
+			return nil, err
+		}
+	}
+
 	if len(assignees) > 0 {
 		if err := order.ReplaceAssignees(tx, assignees); err != nil {
 			return nil, err
@@ -700,33 +789,47 @@ func (f *Factory) ListWorkOrdersByArtifactKeys(tx *gorm.DB, keys []string) (map[
 }
 
 func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {
-	var order FactoryWorkOrder
-	err := tx.
-		Preload("CreatedBy").
-		Preload("Assignees").
-		Preload("Assignees.User").
-		Where("organization_id = ? AND factory_id = ? AND id = ?", f.OrganizationID, f.ID, orderID).
-		First(&order).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderNotFound
-		}
-		return nil, err
-	}
+	return f.findWorkOrder(tx, "id = ?", orderID)
+}
 
-	return &order, nil
+func (f *Factory) FindWorkOrderByNumber(tx *gorm.DB, number int64) (*FactoryWorkOrder, error) {
+	return f.findWorkOrder(tx, "number = ?", number)
+}
+
+// FindWorkOrderByRef resolves ref to a work order in this factory. ref is
+// tried as a UUID first, then as the factory-scoped sequence number, then
+// as the display key (for example `SP-42`).
+func (f *Factory) FindWorkOrderByRef(tx *gorm.DB, ref string) (*FactoryWorkOrder, error) {
+	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	if id, err := uuid.Parse(trimmed); err == nil {
+		return f.FindWorkOrder(tx, id)
+	}
+	if number, err := strconv.ParseInt(trimmed, 10, 64); err == nil && number > 0 {
+		return f.FindWorkOrderByNumber(tx, number)
+	}
+	return f.findWorkOrderByKey(tx, trimmed)
 }
 
 type ListFactoryWorkOrdersFilters struct {
-	AssigneeIDs []uuid.UUID
-	States      []string
-	Results     []string
-	Unassigned  *bool
-	Mine        *uuid.UUID
+	States     []string
+	Results    []string
+	Unassigned *bool
+	UserID     *uuid.UUID
+	// Limit pages the result. Zero uses DefaultFactoryWorkOrderListLimit.
+	Limit int
+	// BeforeID is a keyset cursor. The query returns rows older than that
+	// order in updated_at DESC, id DESC order.
+	BeforeID *uuid.UUID
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	if filters.Limit <= 0 {
+		filters.Limit = DefaultFactoryWorkOrderListLimit
+	}
+
 	query := tx.
 		Model(&FactoryWorkOrder{}).
 		Preload("CreatedBy").
@@ -743,44 +846,122 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 		query = query.Where("factory_work_orders.result IN ?", filters.Results)
 	}
 
-	if filters.Unassigned != nil && *filters.Unassigned {
-		query = query.Where(`
+	query = applyWorkOrderUserFilters(query, filters)
+
+	if filters.BeforeID != nil {
+		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return []FactoryWorkOrder{}, nil
+			}
+			return nil, err
+		}
+		query = query.Where(
+			"(factory_work_orders.updated_at, factory_work_orders.id) < (?, ?)",
+			cursor.UpdatedAt,
+			cursor.ID,
+		)
+	}
+
+	query = query.
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(filters.Limit)
+
+	var orders []FactoryWorkOrder
+	err := query.Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
+	unassigned := filters.Unassigned != nil && *filters.Unassigned
+	if filters.UserID == nil && !unassigned {
+		return query
+	}
+
+	if filters.UserID != nil && unassigned {
+		return query.Where(`
+			(
+				NOT EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				)
+				OR EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+					AND factory_work_order_assignees.user_id = ?
+				)
+				OR factory_work_orders.created_by_id = ?
+			)`, *filters.UserID, *filters.UserID)
+	}
+
+	if unassigned {
+		return query.Where(`
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 			)`)
 	}
 
-	if len(filters.AssigneeIDs) > 0 {
-		query = query.Where(`
-			EXISTS (
-				SELECT 1 FROM factory_work_order_assignees
-				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-				AND factory_work_order_assignees.user_id IN ?
-			)`, filters.AssigneeIDs)
-	}
-
-	if filters.Mine != nil {
-		query = query.Where(`
+	return query.Where(`
+		(
 			EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 				AND factory_work_order_assignees.user_id = ?
 			)
-			OR factory_work_orders.created_by_id = ?`, *filters.Mine, *filters.Mine)
-	}
+			OR factory_work_orders.created_by_id = ?
+		)`, *filters.UserID, *filters.UserID)
+}
 
-	var orders []FactoryWorkOrder
-	err := query.
-		Order("factory_work_orders.created_at DESC").
-		Order("factory_work_orders.id DESC").
-		Find(&orders).
-		Error
+func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
+	var cursor FactoryWorkOrder
+	err := tx.
+		Select("id", "updated_at").
+		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
+		Where("factory_work_orders.factory_id = ?", f.ID).
+		Where("factory_work_orders.id = ?", beforeID).
+		Take(&cursor).Error
 	if err != nil {
 		return nil, err
 	}
+	return &cursor, nil
+}
 
-	return orders, nil
+func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
+	prefix := f.Key + "-"
+	if !strings.HasPrefix(strings.ToUpper(key), strings.ToUpper(prefix)) {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	number, err := strconv.ParseInt(key[len(prefix):], 10, 64)
+	if err != nil || number <= 0 {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	return f.FindWorkOrderByNumber(tx, number)
+}
+
+func (f *Factory) findWorkOrder(tx *gorm.DB, cond string, arg any) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := tx.
+		Preload("CreatedBy").
+		Preload("Assignees").
+		Preload("Assignees.User").
+		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
+		Where(cond, arg).
+		First(&order).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return &order, nil
 }
 
 // allocateNextWorkOrderNumber atomically increments the factory's counter
@@ -806,11 +987,4 @@ func (f *Factory) allocateNextWorkOrderNumber(tx *gorm.DB) (int64, error) {
 
 	f.NextWorkOrderNumber = allocated + 1
 	return allocated, nil
-}
-
-// WorkOrderKey returns the display identifier used for a work order that
-// belongs to this factory. Format matches `<KEY>-<number>` (for example
-// `SP-42`).
-func (f *Factory) WorkOrderKey(number int64) string {
-	return fmt.Sprintf("%s-%d", f.Key, number)
 }

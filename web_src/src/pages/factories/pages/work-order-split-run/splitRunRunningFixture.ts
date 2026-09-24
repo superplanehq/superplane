@@ -1,12 +1,9 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
 import { LINE_RUN_IMPLEMENT_ID } from "../../__fixtures__/factoryPageIds";
 import {
-  HOUR_AGO,
   OPEN_WORK_ORDER,
-  REVIEWER_USER,
   RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -16,18 +13,6 @@ import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopu
 import { buildSplitRunFooter } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
 import { splitRunSourceForOrder } from "./splitRunSource";
-
-const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
-  id: "art-plan-md",
-  type: "TYPE_MARKDOWN",
-  data: {
-    name: "plan.md",
-    title: "plan.md",
-    body: "Add a focused test for the refund reconciliation worker.\nCover the timeout-then-retry path.",
-  },
-  createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  createdAt: HOUR_AGO,
-};
 
 const OWNER: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
@@ -45,6 +30,8 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   startedLabel: "Started 1h ago",
   costUsd: "$0.73",
   tokensLabel: "2.7k tokens",
+  usageByModel: [{ provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" }],
+  usageByMachineType: [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
   lineName: "plan-and-implement",
   currentStepIndex: 0,
   lineStatus: "running",
@@ -77,7 +64,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "backlog-create",
           at: "12:24:02",
-          componentName: "Create Work Order",
+          componentName: "Create Task",
           status: "passed",
           duration: "2s",
           detail: "description.md",
@@ -87,59 +74,11 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "create-work-order",
           title: "Create task",
-          componentName: "Create Work Order",
+          componentName: "Create Task",
           provider: "superplane",
           status: "passed",
           detail: "description.md",
           duration: "2s",
-        },
-      ],
-    },
-    {
-      id: "plan",
-      name: "Create plan",
-      status: "passed",
-      duration: "1m 12s",
-      componentName: "Create plan",
-      artifacts: [PLAN_ARTIFACT],
-      canvasKey: "planning",
-      appId: "app-refund-planner",
-      stream: [
-        {
-          id: "plan-read",
-          at: "12:24:05",
-          componentName: "Read Task",
-          status: "passed",
-          duration: "4s",
-          detail: "description.md",
-        },
-        {
-          id: "plan-write",
-          at: "12:24:09",
-          componentName: "Planning",
-          status: "passed",
-          duration: "1m 8s",
-          detail: "plan.md",
-        },
-      ],
-      canvasSteps: [
-        {
-          id: "read-order",
-          title: "Read task",
-          componentName: "Read Task",
-          provider: "superplane",
-          status: "passed",
-          detail: "description.md",
-          duration: "4s",
-        },
-        {
-          id: "refund-planner",
-          title: "Write plan",
-          componentName: "Planning",
-          provider: "superplane",
-          status: "passed",
-          detail: "plan.md",
-          duration: "1m 8s",
         },
       ],
     },
@@ -151,6 +90,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
       canvasKey: "implementation",
+      model: "anthropic/claude-sonnet-4-6",
       appId: "app-refund-implementer",
       runId: LINE_RUN_IMPLEMENT_ID,
       stepIndex: 0,

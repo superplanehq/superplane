@@ -2,7 +2,7 @@ import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, Trig
 import { reportMetricMapper } from "./report_metric";
 import { runNRQLQueryMapper } from "./run_nrql_query";
 import { onIssueTriggerRenderer, onIssueCustomFieldRenderer } from "./on_issue";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   reportMetric: reportMetricMapper,

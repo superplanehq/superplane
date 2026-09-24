@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { acceptMergeRequestMapper } from "./accept_merge_request";
 import { addIssueLabelMapper } from "./add_issue_label";
 import { addMergeRequestReviewersMapper } from "./add_merge_request_reviewers";

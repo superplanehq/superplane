@@ -10,9 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 const AppAgentToolName = "superplane_app"
@@ -22,10 +20,8 @@ func init() {
 		return NewAppAgentTool(AppAgentToolOptions{
 			Encryptor:      deps.Encryptor,
 			Registry:       deps.ComponentRegistry,
-			GitProvider:    deps.GitProvider,
 			WebhookBaseURL: deps.WebhookBaseURL,
 			AuthService:    deps.AuthService,
-			UsageService:   deps.UsageService,
 		})
 	})
 }
@@ -39,10 +35,8 @@ type AppAgentTool struct {
 type AppAgentToolOptions struct {
 	Encryptor      crypto.Encryptor
 	Registry       *registry.Registry
-	GitProvider    gitprovider.Provider
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
-	UsageService   usage.Service
 }
 
 func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
@@ -50,10 +44,8 @@ func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
 		actions: canvasactions.NewDefaultRegistry(canvasactions.Dependencies{
 			Encryptor:      opts.Encryptor,
 			Registry:       opts.Registry,
-			GitProvider:    opts.GitProvider,
 			WebhookBaseURL: opts.WebhookBaseURL,
 			AuthService:    opts.AuthService,
-			UsageService:   opts.UsageService,
 		}),
 	}
 }
@@ -63,7 +55,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read the current SuperPlane app (including effective staged edits), stage canvas/Console/repository file changes, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never commits staging. Use patch_staging for graph edits, Console updates, or auto-layout without sending full canvas YAML."
+	return "Inspect access, read the current SuperPlane app (including effective staged edits), stage canvas and Console changes, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never commits staging. Use patch_staging for graph edits, Console updates, or auto-layout without sending full canvas YAML."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -73,7 +65,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current effective staged YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, write_file/delete_file to stage normal file changes, patch_staging to apply graph edits, Console updates, or auto-layout without sending full canvas YAML, list_integrations for connected integration IDs, and list_resources for integration-backed resource values.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current effective staged YAML, read_runtime for memory/runs/events/executions/queues, list_files and read_file for canvas.yaml and console.yaml, patch_staging to apply graph edits, Console updates, or auto-layout without sending full canvas YAML, list_integrations for connected integration IDs, and list_resources for integration-backed resource values.",
 			},
 			"canvas_id": {
 				Type:        "string",
@@ -113,20 +105,16 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"path": {
 				Type:        "string",
-				Description: "For read_file, write_file, and delete_file. Repository-relative app file path, such as AGENTS.md, README.md, or scripts/runner.py. Paths under .superplane and unsafe paths are rejected. Use patch_staging for canvas.yaml and console.yaml.",
+				Description: "For read_file. Spec file path: canvas.yaml or console.yaml. Use patch_staging to edit those files.",
 			},
 			"paths": {
 				Type:        "array",
-				Description: "For read_file. Optional repository-relative paths to read in one call.",
+				Description: "For read_file. Optional spec file paths to read in one call, for example canvas.yaml and console.yaml.",
 				Items:       &agents.CustomToolInputSchema{Type: "string"},
-			},
-			"content": {
-				Type:        "string",
-				Description: "For write_file. Complete file content to stage.",
 			},
 			"query": {
 				Type:        "string",
-				Description: "For list_files. Optional case-insensitive path filter, for example AGENTS.md or README.",
+				Description: "For list_files. Optional case-insensitive path filter, for example canvas.yaml or console.yaml.",
 			},
 			"console_yaml": {
 				Type:        "string",

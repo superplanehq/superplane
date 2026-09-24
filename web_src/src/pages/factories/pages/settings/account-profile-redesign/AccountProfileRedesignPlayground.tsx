@@ -7,11 +7,7 @@ import {
   type AccountRedesignProfile,
 } from "./accountProfileRedesignMocks";
 import { AccountProfileRedesignShell } from "./AccountProfileRedesignShell";
-import {
-  AccountProfileRedesignProvider,
-  AccountProfileRedesignRoutePage,
-  AccountSecurityRedesignRoutePage,
-} from "./AccountProfileRedesignState";
+import { AccountProfileRedesignProvider, AccountProfileRedesignRoutePage } from "./AccountProfileRedesignState";
 
 /**
  * Isolated Account settings playground for unit tests. Storybook factory
@@ -35,8 +31,7 @@ export function AccountProfileRedesignPlayground({
         onNavQueryChange={setNavQuery}
         onSelectPage={setPage}
       >
-        {page === "profile" ? <AccountProfileRedesignRoutePage /> : null}
-        {page === "security" ? <AccountSecurityRedesignRoutePage /> : null}
+        {page === "profile" || page === "security" ? <AccountProfileRedesignRoutePage /> : null}
       </AccountProfileRedesignShell>
       <Toaster position="bottom-center" closeButton />
     </AccountProfileRedesignProvider>

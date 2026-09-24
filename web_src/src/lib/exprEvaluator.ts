@@ -52,6 +52,19 @@ type ASTNode =
 
 const OPERATORS = ["??", "||", "&&", "==", "!=", ">=", "<=", "?.", ">", "<", "+", "-", "*", "/", "%", "!"];
 
+function unescapeStringChar(escaped: string): string {
+  if (escaped === "n") {
+    return "\n";
+  }
+  if (escaped === "t") {
+    return "\t";
+  }
+  if (escaped === "r") {
+    return "\r";
+  }
+  return escaped;
+}
+
 function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   let pos = 0;
@@ -74,11 +87,7 @@ function tokenize(input: string): Token[] {
       while (pos < input.length && input[pos] !== quote) {
         if (input[pos] === "\\" && pos + 1 < input.length) {
           pos++;
-          const escaped = input[pos];
-          if (escaped === "n") value += "\n";
-          else if (escaped === "t") value += "\t";
-          else if (escaped === "r") value += "\r";
-          else value += escaped;
+          value += unescapeStringChar(input[pos]);
         } else {
           value += input[pos];
         }

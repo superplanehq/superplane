@@ -61,6 +61,9 @@ export function useUpdateBYOKLLMModels(organizationId: string) {
         queryKey: ["organizations", organizationId, "byok-models", input.provider],
       });
       void queryClient.invalidateQueries({
+        queryKey: ["organizations", organizationId, "selectable-llm-models"],
+      });
+      void queryClient.invalidateQueries({
         predicate: (query) => isFactoryBYOKModelsQuery(query.queryKey, organizationId, input.provider),
       });
     },

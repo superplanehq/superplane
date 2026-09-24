@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvas } from "@/api-client";
 
 import {
@@ -6,8 +6,10 @@ import {
   canvasNodeToPlanningReviewComponent,
   findAgentNodes,
   planningReviewDraftFromCanvas,
+  PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS,
   primaryAgentNode,
   serializeColumnAgentCanvas,
+  supportsPRFeedbackVisualEvidence,
   type CanvasSpecNode,
 } from "./columnCanvasAgent";
 
@@ -66,6 +68,15 @@ describe("findAgentNodes", () => {
     const trigger = agentNode({ id: "not-an-action", type: "TYPE_TRIGGER" });
     expect(findAgentNodes({ nodes: [trigger] })).toEqual([]);
   });
+
+  it("returns SuperPlane harness actions", () => {
+    const superplane = agentNode({
+      id: "superplane-agent",
+      component: "runnerSuperPlane",
+      configuration: { machineType: "e1-large-amd64", steps: implementerSteps },
+    });
+    expect(findAgentNodes({ nodes: [triggerNode(), superplane] })).toEqual([superplane]);
+  });
 });
 
 describe("primaryAgentNode", () => {
@@ -75,8 +86,44 @@ describe("primaryAgentNode", () => {
     expect(primaryAgentNode({ nodes: [triggerNode(), planner, implementer] })?.id).toBe("planner-agent");
   });
 
+  it("returns the preferred agent when it exists", () => {
+    const analysis = agentNode({ id: "analyze", name: "Analyze intake" });
+    const refinement = agentNode({ id: "refine-task", name: "Refine Task" });
+
+    expect(primaryAgentNode({ nodes: [triggerNode(), analysis, refinement] }, "refine-task")?.id).toBe("refine-task");
+  });
+
+  it("returns the first agent when the preferred agent does not exist", () => {
+    const analysis = agentNode({ id: "analyze", name: "Analyze intake" });
+
+    expect(primaryAgentNode({ nodes: [triggerNode(), analysis] }, "refine-task")?.id).toBe("analyze");
+  });
+
   it("returns undefined when no agent exists", () => {
     expect(primaryAgentNode({ nodes: [triggerNode()] })).toBeUndefined();
+  });
+});
+
+describe("supportsPRFeedbackVisualEvidence", () => {
+  const feedbackAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) =>
+    agentNode({
+      id,
+      configuration: { ...implementerConfiguration, includeVisualEvidence: false },
+    }),
+  );
+
+  it("accepts discussion agents that expose the visual evidence setting", () => {
+    expect(supportsPRFeedbackVisualEvidence({ nodes: feedbackAgents })).toBe(true);
+  });
+
+  it("rejects legacy discussion agents without the visual evidence setting", () => {
+    const legacyAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) => agentNode({ id }));
+    expect(supportsPRFeedbackVisualEvidence({ nodes: legacyAgents })).toBe(false);
+  });
+
+  it("requires every discussion agent to expose the visual evidence setting", () => {
+    const incompleteAgents = feedbackAgents.map((node, index) => (index === 2 ? agentNode({ id: node.id }) : node));
+    expect(supportsPRFeedbackVisualEvidence({ nodes: incompleteAgents })).toBe(false);
   });
 });
 
@@ -87,6 +134,7 @@ describe("planningReviewDraftFromCanvas", () => {
 
     expect(draft?.title).toBe("Implement From Task Description");
     expect(draft?.components).toHaveLength(1);
+    expect(draft?.components[0].component).toBe("runnerClaudeCode");
     expect(draft?.components[0].configuration).toEqual(implementerConfiguration);
     expect(draft?.components[0].configuration.credentials).toEqual({
       source: "integration",
@@ -159,6 +207,17 @@ describe("canvasNodeToPlanningReviewComponent", () => {
       component: "runnerCodex",
     });
     expect(component.title).toBe("Agent");
+    expect(component.component).toBe("runnerCodex");
     expect(component.concurrency).toEqual({ max: "1", key: "" });
+  });
+
+  it("keeps the Run SuperPlane Agent runner id", () => {
+    const component = canvasNodeToPlanningReviewComponent(
+      agentNode({
+        id: "superplane-agent",
+        component: "runnerSuperPlane",
+      }),
+    );
+    expect(component.component).toBe("runnerSuperPlane");
   });
 });

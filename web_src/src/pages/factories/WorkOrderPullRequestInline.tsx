@@ -24,11 +24,14 @@ export function WorkOrderPullRequestInline({
   pullRequest,
   className,
   showTitle = false,
+  showStateIcon = true,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   className?: string;
   /** Include the PR title after the number (sidebar lists). */
   showTitle?: boolean;
+  /** Include the icon that represents the pull request state. */
+  showStateIcon?: boolean;
 }) {
   const state = pullRequestState(pullRequest.state);
   const { icon: Icon, className: iconClassName } = PR_STATE_PRESENTATION[state];
@@ -37,7 +40,7 @@ export function WorkOrderPullRequestInline({
   const safeUrl = safeExternalUrl(pullRequest.url);
   const content = (
     <>
-      <Icon className={cn("size-3.5 shrink-0", iconClassName)} aria-hidden />
+      {showStateIcon ? <Icon className={cn("size-3.5 shrink-0", iconClassName)} aria-hidden /> : null}
       <span className="truncate" title={title && title !== label ? title : undefined}>
         {label}
       </span>

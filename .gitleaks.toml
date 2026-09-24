@@ -1,0 +1,28 @@
+# Allow documented fixtures and local dummy values.
+# Scan still fails on new secrets in application source.
+
+title = "SuperPlane"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example payloads, docs, VCR cassettes, and local dummy keys"
+paths = [
+  '''(^|/)docs/''',
+  '''(^|/)fixtures/''',
+  '''(^|/)test/fixtures/''',
+  '''(^|/)test/e2e/vcr/''',
+  '''example_data_''',
+  '''example_output_''',
+  '''docker-compose(\.[^/]+)?\.yml$''',
+  '''\.env\.example$''',
+  '''oidc-keys/''',
+  '''testdata''',
+  '''_test\.go$''',
+  '''__fixtures__/''',
+  '''scripts/generate_integrations_docs\.go$''',
+  '''release/.*/templates/database\.yaml$''',
+  '''web_src/storybook-static/''',
+  '''test/e2e/test_context\.go$''',
+]

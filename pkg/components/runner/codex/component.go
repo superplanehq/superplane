@@ -56,7 +56,7 @@ func (c *RunCodex) Documentation() string {
 
 ## Prerequisites
 - The ` + "`codex`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + `.
-- An OpenAI API key stored as a SuperPlane secret, an OpenAI integration, or SuperPlane-hosted credentials.
+- An OpenAI API key stored as a SuperPlane secret or an OpenAI integration.
 
 ## Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -67,10 +67,12 @@ Configure an ordered list of **bash** and **prompt** steps:
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Credentials**: SuperPlane secret, OpenAI integration, or SuperPlane-hosted credentials used as ` + "`OPENAI_API_KEY`" + `.
-- **Model**: Optional Codex model id. SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
+- **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 ## Output channels
 - **Passed**: All steps finished with exit code **0**.
@@ -82,13 +84,11 @@ func (c *RunCodex) Configuration() []configuration.Field {
 	return []configuration.Field{
 		runner.AgentMachineTypeField(),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
-			SecretLabel:       "OpenAI API Key",
-			IntegrationName:   "openai",
-			IntegrationLabel:  "Integration",
-			AllowHosted:       true,
-			HostedDescription: "OpenAI API key, OpenAI integration, or SuperPlane-hosted credentials.",
+			SecretLabel:      "OpenAI API Key",
+			IntegrationName:  "openai",
+			IntegrationLabel: "Integration",
 		}),
-		runner.AgentModelField("openai", "Codex model id. SuperPlane-hosted credentials use the installation allowlist.", "gpt-5"),
+		runner.AgentModelField("openai"),
 		runner.AgentStepsField(
 			"Ordered bash commands and Codex prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
@@ -126,7 +126,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment, err := injectCodexCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
+	environment, err := injectCodexCredentials(ctx, resolved.Variables, spec.Credentials)
 	if err != nil {
 		return err
 	}
@@ -135,20 +135,32 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
-	if err := runner.EnsureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
 
 	broker, err := runner.NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	commands, files := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups)
+	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
+
+	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	if err != nil {
+		return err
+	}
+	dispatched = runner.AppendVisualEvidenceProtocol(dispatched, runner.HasArtifactUploadToken(environment))
+	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
+	task = applyPlanningFollowUp(task, environment, spec)
+	if runner.HasPlanningSessionToken(environment) {
+		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
+	}
+	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
+	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
+	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
-		Commands:       commands,
-		Files:          files,
+		Commands:       task.Commands,
+		Files:          task.Files,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
@@ -161,18 +173,14 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, model string) ([]runner.BrokerEnvironmentVariable, error) {
+func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
 	case runner.CredentialsSourceIntegration:
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
-		access, err := runner.PrepareHostedRun(ctx, "openai", model)
-		if err != nil {
-			return nil, err
-		}
-		return runner.InjectHostedCredentials(environment, envOpenAIAPIKey, access.APIKey, envOpenAIBaseURL, access.BaseURL), nil
+		return nil, runner.RejectHostedCredentials(credentials)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}
@@ -194,7 +202,7 @@ func (c *RunCodex) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (c *RunCodex) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx)
+	return runner.CancelBrokerTask(ctx, FinishedEventType)
 }
 
 func (c *RunCodex) Cleanup(ctx core.SetupContext) error { return nil }

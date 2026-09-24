@@ -1,0 +1,29 @@
+---
+description: OpenRouter new-account-rpm is a per-model 20 RPM cap that ages out after 7 days.
+globs:
+  - "pkg/components/runner/openrouter/**"
+  - "pkg/integrations/openrouter/**"
+  - "docs/components/OpenRouter.mdx"
+alwaysApply: false
+---
+
+# OpenRouter `new-account-rpm`
+
+OpenRouter applies a **per-model** 20 RPM cap to new accounts. It is not the `:free` daily quota.
+
+Exact error we have seen:
+
+```text
+Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Rate limit reached: new accounts are limited to 20 requests per minute for this model. Please retry shortly.
+```
+
+## Age-out
+
+- **`new-account-rpm` ages out after 7 days** from account creation.
+- Public OpenRouter docs do not state this window. Treat 7 days as the operational fact.
+- Buying **$10 lifetime credits** raises the `:free` daily cap (50 → 1000 RPD). It does **not** replace the 7-day `new-account-rpm` window.
+- Extra API keys or extra accounts do not reset globally governed limits.
+
+## SuperPlane handling
+
+Classify this as `rate_limit`. Stay on the selected OpenRouter model. Honor `Retry-After` when present. Otherwise wait 30 seconds, then 45 seconds, then 60 seconds. Fail the prompt after 4 attempts. Do not rotate to another model. Do not treat this as a hard auth or credit failure.

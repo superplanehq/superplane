@@ -77,6 +77,8 @@ interface WorkOrderBoardLaneProps {
   surfaceClassName?: string;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
+  /** Part of the header, under the title row. For example the automation rows. */
+  subheader?: ReactNode;
   /** Pinned between the header and the card list, and kept while the lane is empty. */
   banner?: ReactNode;
   /** When set, a click on the title opens an inline rename field. */
@@ -125,6 +127,7 @@ export function WorkOrderBoardLane({
   tone = "neutral",
   surfaceClassName,
   actions,
+  subheader,
   banner,
   onRename,
   canRename = false,
@@ -134,45 +137,61 @@ export function WorkOrderBoardLane({
   testId,
   children,
 }: WorkOrderBoardLaneProps) {
+  const groupedHeader = Boolean(subheader);
+
   return (
     <section
       aria-label={label ?? title}
       className={cn(
-        "flex min-h-0 flex-col self-stretch rounded-lg border border-border/70 p-2",
+        "flex min-h-0 flex-col self-stretch overflow-hidden rounded-lg border border-border/70",
+        groupedHeader ? "p-0" : "p-2",
         workOrderKanbanLaneSizeClassName,
         surfaceClassName ?? LANE_TONE_CLASSNAME[tone],
         className,
       )}
       data-testid={testId}
     >
-      <header className="flex shrink-0 items-center justify-between gap-2 px-2 pb-2">
-        <h2 className="workspace-section-title min-w-0 flex-1 overflow-visible">
-          {onRename ? (
-            <ClickToRename
-              value={title}
-              onSave={onRename}
-              canEdit={canRename}
-              testId={titleTestId ?? `${testId ?? "lane"}-title`}
-              ariaLabel={`${title} column name`}
-              inputClassName="text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"
-            />
-          ) : (
-            <span className="truncate">{title}</span>
-          )}
-        </h2>
-        {actions}
+      <header
+        className={cn(
+          "shrink-0",
+          groupedHeader ? "border-b border-border bg-background/50 dark:bg-black/25" : undefined,
+        )}
+        data-testid={testId ? `${testId}-header` : undefined}
+      >
+        <div
+          className={cn("flex items-center justify-between gap-2", groupedHeader ? "px-3 pt-2.5 pb-1" : "px-2 pb-2")}
+        >
+          <h2 className="workspace-section-title min-w-0 flex-1 overflow-visible">
+            {onRename ? (
+              <ClickToRename
+                value={title}
+                onSave={onRename}
+                canEdit={canRename}
+                testId={titleTestId ?? `${testId ?? "lane"}-title`}
+                ariaLabel={`${title} column name`}
+                inputClassName="text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"
+              />
+            ) : (
+              <span className="truncate">{title}</span>
+            )}
+          </h2>
+          {actions}
+        </div>
+        {subheader ? <div className="px-3 pb-2.5">{subheader}</div> : null}
       </header>
 
-      {banner}
+      <div className={cn("flex min-h-0 flex-1 flex-col", groupedHeader && "p-2")}>
+        {banner}
 
-      <LaneBody
-        count={count}
-        emptyContent={emptyContent}
-        emptyDescription={emptyDescription}
-        keepChildrenWhenEmpty={keepChildrenWhenEmpty}
-      >
-        {children}
-      </LaneBody>
+        <LaneBody
+          count={count}
+          emptyContent={emptyContent}
+          emptyDescription={emptyDescription}
+          keepChildrenWhenEmpty={keepChildrenWhenEmpty}
+        >
+          {children}
+        </LaneBody>
+      </div>
     </section>
   );
 }

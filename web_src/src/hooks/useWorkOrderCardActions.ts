@@ -14,14 +14,14 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
   const [dispatchingOrderIds, setDispatchingOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
 
   const onDispatch = useCallback(
-    async (orderId: string, input: { lineName: string }) => {
+    async (orderId: string, input: { lineName: string; model?: string }) => {
       setDispatchingOrderIds((current) => withOrderId(current, orderId));
       try {
         // mutateAsync runs the mutation's onMutate before the request
         // resolves, which patches the work-orders cache so the card moves
         // to the line's first phase column right away — see
         // useDispatchWorkOrder.
-        await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName });
+        await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName, model: input.model });
         showSuccessToast(`Dispatched to ${input.lineName}.`);
       } catch {
         showErrorToast("Failed to dispatch task.");

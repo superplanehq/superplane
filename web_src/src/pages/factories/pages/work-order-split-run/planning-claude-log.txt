@@ -202,7 +202,7 @@ Let me examine the key reference files in detail.
      14	import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "@/pages/home/uniqueCanvasName";
      15…
 -> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/duplicateAutomationCanvas.spec.ts
-     1	import { describe, expect, it, vi, type Mock } from "vitest";
+     1	import { describe, expect, it, vi, type Mock } from "bun:test";
      2	
      3	import {
      4	  consoleYamlHasContent,
@@ -249,7 +249,7 @@ Let me examine the key reference files in detail.
 -> [Bash] cat /home/ubuntu/superplane/web_src/src/pages/factories/pages/LineListCard.spec.tsx
      import { render, screen } from "@testing-library/react";
      import { MemoryRouter } from "react-router";
-     import { describe, expect, it } from "vitest";
+     import { describe, expect, it } from "bun:test";
      import { REFUND_FACTORY_LINES, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
      import { LINE_LIST_DESCRIPTION_BY_ID, LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
      import { LineListCard, LineListHeroSplit } from "./LineListCard";
@@ -284,7 +284,7 @@ Let me examine the key reference files in detail.
      import userEvent from "@testing-library/user-event";
      import type { ComponentProps } from "react";
      import { MemoryRouter } from "react-router";
-     import { describe, expect, it, vi } from "vitest";
+     import { describe, expect, it, vi } from "bun:test";
      import type { FactoriesWorkOrder, FactoryApp } from "@/api-client";
      import { AutomationDetail } from "./AutomationDetail";
      import { AutomationCard } from "./automationsPageParts";
@@ -654,7 +654,7 @@ Let me examine the key reference files in detail.
 -> [Bash] sed -n '1,60p' /home/ubuntu/superplane/web_src/src/pages/factories/__fixtures__/FactoriesHarness.smoke.spec.tsx
      import { render, screen, waitFor } from "@testing-library/react";
      import userEvent from "@testing-library/user-event";
-     import { beforeAll, describe, expect, it } from "vitest";
+     import { beforeAll, describe, expect, it } from "bun:test";
      import { client } from "@/api-client/client.gen";
      import {
        PRIMARY_FACTORY_ID,
@@ -676,7 +676,7 @@ Let me examine the key reference files in detail.
      import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
      import { render, screen } from "@testing-library/react";
      import { MemoryRouter } from "react-router";
-     import { describe, expect, it, vi } from "vitest";
+     import { describe, expect, it, vi } from "bun:test";
      import type { FactoriesFactory } from "@/api-client";
      import {
        PRIMARY_FACTORY_ID,

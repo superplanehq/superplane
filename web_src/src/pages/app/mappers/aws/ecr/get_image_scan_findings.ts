@@ -10,14 +10,19 @@ import type {
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { EcrImageScanFindingsResponse, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
+import type {
+  EcrImageScanFindings,
+  EcrImageScanFindingsResponse,
+  EcrRepositoryConfiguration,
+  EcrRepositoryMetadata,
+} from "./types";
 import { getRepositoryLabel } from "./utils";
-import { numberOrZero, stringOrDash } from "../../utils";
+import { numberOrZero, stringOrDash } from "../../eventDisplay";
 
 export const getImageScanFindingsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -49,26 +54,9 @@ export const getImageScanFindingsMapper: ComponentBaseMapper = {
       return {};
     }
 
-    const counts = result.imageScanFindings?.findingSeverityCounts || {};
-
     return {
-      Repository: stringOrDash(result.repositoryName),
-      "Image Digest": stringOrDash(result.imageId?.imageDigest),
-      "Image Tag": stringOrDash(result.imageId?.imageTag),
-      "Scan Status": stringOrDash(result.imageScanStatus?.status),
-      "Status Description": stringOrDash(result.imageScanStatus?.description),
-      "Scan Completed At": result.imageScanFindings?.imageScanCompletedAt
-        ? formatTimestampInUserTimezone(result.imageScanFindings.imageScanCompletedAt)
-        : "-",
-      "Vulnerability Source Updated At": result.imageScanFindings?.vulnerabilitySourceUpdatedAt
-        ? formatTimestampInUserTimezone(result.imageScanFindings.vulnerabilitySourceUpdatedAt)
-        : "-",
-      "Findings Count": numberOrZero(result.imageScanFindings?.findings?.length).toString(),
-      Critical: numberOrZero(counts.CRITICAL).toString(),
-      High: numberOrZero(counts.HIGH).toString(),
-      Medium: numberOrZero(counts.MEDIUM).toString(),
-      Low: numberOrZero(counts.LOW).toString(),
-      Undefined: numberOrZero(counts.UNDEFINED).toString(),
+      ...scanImageDetails(result),
+      ...scanFindingDetails(result.imageScanFindings),
     };
   },
 
@@ -79,6 +67,35 @@ export const getImageScanFindingsMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function scanImageDetails(result: EcrImageScanFindingsResponse): Record<string, string> {
+  return {
+    Repository: stringOrDash(result.repositoryName),
+    "Image Digest": stringOrDash(result.imageId?.imageDigest),
+    "Image Tag": stringOrDash(result.imageId?.imageTag),
+    "Scan Status": stringOrDash(result.imageScanStatus?.status),
+    "Status Description": stringOrDash(result.imageScanStatus?.description),
+  };
+}
+
+function scanFindingDetails(findings: EcrImageScanFindings | undefined): Record<string, string> {
+  const counts = findings?.findingSeverityCounts || {};
+
+  return {
+    "Scan Completed At": findings?.imageScanCompletedAt
+      ? formatTimestampInUserTimezone(findings.imageScanCompletedAt)
+      : "-",
+    "Vulnerability Source Updated At": findings?.vulnerabilitySourceUpdatedAt
+      ? formatTimestampInUserTimezone(findings.vulnerabilitySourceUpdatedAt)
+      : "-",
+    "Findings Count": numberOrZero(findings?.findings?.length).toString(),
+    Critical: numberOrZero(counts.CRITICAL).toString(),
+    High: numberOrZero(counts.HIGH).toString(),
+    Medium: numberOrZero(counts.MEDIUM).toString(),
+    Low: numberOrZero(counts.LOW).toString(),
+    Undefined: numberOrZero(counts.UNDEFINED).toString(),
+  };
+}
 
 function getScanMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
@@ -95,7 +112,7 @@ function getScanMetadataList(node: NodeInfo): MetadataItem[] {
 
 function getScanEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

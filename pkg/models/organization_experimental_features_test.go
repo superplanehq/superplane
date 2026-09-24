@@ -14,7 +14,7 @@ import (
 func Test__ExperimentalFeatures(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
-	t.Run("new org has factories enabled", func(t *testing.T) {
+	t.Run("new org has factories and task refinement enabled", func(t *testing.T) {
 		org, err := CreateOrganization("expfeat-new", "")
 		require.NoError(t, err)
 

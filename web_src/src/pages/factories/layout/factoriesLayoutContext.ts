@@ -15,9 +15,13 @@ export interface FactoriesLayoutContextValue {
 export const FactoriesLayoutContext = createContext<FactoriesLayoutContextValue | null>(null);
 
 export function useFactoriesLayout(): FactoriesLayoutContextValue {
-  const context = useContext(FactoriesLayoutContext);
+  const context = useOptionalFactoriesLayout();
   if (!context) {
     throw new Error("useFactoriesLayout must be used within FactoriesLayout");
   }
   return context;
+}
+
+export function useOptionalFactoriesLayout(): FactoriesLayoutContextValue | null {
+  return useContext(FactoriesLayoutContext);
 }

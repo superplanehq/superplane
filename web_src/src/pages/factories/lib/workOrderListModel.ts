@@ -1,10 +1,14 @@
 import type {
   FactoriesFactory,
   FactoriesLineRef,
-  FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderSummary,
 } from "@/api-client";
+import { selectWorkOrderCardPullRequest, workOrderCardPullRequestIsMergeable } from "./workOrderCardPullRequest";
+import { workOrderListSource } from "./workOrderCardSource";
+import { pullRequestState } from "./workOrderPullRequest";
+import { workOrderMatchesUser } from "./workOrderListPagination";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatDurationSeconds, formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
 import {
@@ -18,7 +22,7 @@ import {
 } from "./workOrderProgress";
 
 /**
- * Presentation model built on top of a `FactoriesWorkOrder`. It centralizes
+ * Presentation model built on top of a listed work order. It centralizes
  * every derived value the Tasks layouts need — identifiers, status,
  * latest line and step, usage, assignee summary, and search text — so
  * board/list/table stay display-only and can share the same reducers.
@@ -28,7 +32,7 @@ import {
  * everything else the reference application shows.
  */
 export interface WorkOrderListEntry {
-  order: FactoriesWorkOrder;
+  order: FactoriesWorkOrderSummary;
   id: string;
   displayKey: string;
   /** Numeric part of `displayKey`, used to order by ID. */
@@ -53,12 +57,14 @@ export interface WorkOrderListEntry {
   assigneeIds: string[];
   assigneeNames: string[];
   isUnassigned: boolean;
+  sourceId: string;
+  sourceLabel: string;
   searchHaystack: string;
   isDispatchable: boolean;
 }
 
 export function buildWorkOrderListEntry(
-  order: FactoriesWorkOrder,
+  order: FactoriesWorkOrderSummary,
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry {
   const dispatches = order.lineDispatches ?? [];
@@ -70,6 +76,7 @@ export function buildWorkOrderListEntry(
     pairs.map((pair) => pair.execution),
   );
   const { assigneeIds, assigneeNames } = collectAssignees(order);
+  const source = workOrderListSource(order);
 
   const createdAtMs = parseTimestamp(order.createdAt);
   const displayKey = getWorkOrderDisplayKey(order, factory?.key ?? null);
@@ -101,6 +108,8 @@ export function buildWorkOrderListEntry(
     assigneeIds,
     assigneeNames,
     isUnassigned: isUnassignedWorkOrder(order),
+    sourceId: source.id,
+    sourceLabel: source.label,
     searchHaystack: buildSearchHaystack([
       displayKey,
       title,
@@ -108,6 +117,7 @@ export function buildWorkOrderListEntry(
       lines.names.join(" "),
       latestStepName,
       assigneeNames.join(" "),
+      source.label,
     ]),
     isDispatchable: isDispatchableState(order.state),
   };
@@ -122,7 +132,7 @@ function trimOrNull(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function isDispatchableState(state: FactoriesWorkOrder["state"]): boolean {
+function isDispatchableState(state: FactoriesWorkOrderSummary["state"]): boolean {
   return state === "STATE_DRAFT" || state === "STATE_OPEN";
 }
 
@@ -187,7 +197,7 @@ function collectLines(dispatches: FactoriesWorkOrderLineDispatch[]): { ids: stri
  * the executions so older payloads still show usage.
  */
 function sumUsage(
-  order: FactoriesWorkOrder,
+  order: FactoriesWorkOrderSummary,
   executions: FactoriesWorkOrderExecution[],
 ): { totalTokens: number; totalCostCents: number; durationSeconds: number } {
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
@@ -206,7 +216,7 @@ function sumUsage(
   );
 }
 
-function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; assigneeNames: string[] } {
+function collectAssignees(order: FactoriesWorkOrderSummary): { assigneeIds: string[]; assigneeNames: string[] } {
   const owner = order.assignees?.[0];
   if (!owner?.id) {
     return { assigneeIds: [], assigneeNames: [] };
@@ -219,7 +229,7 @@ function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; a
 }
 
 export function buildWorkOrderListEntries(
-  orders: FactoriesWorkOrder[],
+  orders: FactoriesWorkOrderSummary[],
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry[] {
   return orders.map((order) => buildWorkOrderListEntry(order, factory));
@@ -263,15 +273,14 @@ function formatUsageTooltip(totalTokens: number, totalCostCents: number, duratio
 }
 
 /**
- * Scope pills next to the page title. `active` (Needs attention) keeps
- * drafts, waiting work, and failed runs. `my` keeps work assigned to the
- * viewer.
+ * Scope pills next to the page title. `active` keeps drafts, waiting
+ * work, and failed runs. `my` keeps work assigned to the viewer.
  */
 export type WorkOrderScope = "all" | "active" | "my";
 
 export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; tooltip: string }> = [
   { id: "all", label: "All", tooltip: "Every task in this workspace." },
-  { id: "active", label: "Needs attention", tooltip: "Tasks that need your attention." },
+  { id: "active", label: "Active", tooltip: "Draft, waiting, and failed tasks." },
   {
     id: "my",
     label: "My",
@@ -279,7 +288,7 @@ export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; toolt
   },
 ];
 
-/** Statuses that the Needs attention scope keeps. Running is in flight. */
+/** Statuses that the Active scope keeps. Running is in flight. */
 const ACTIVE_SCOPE_STATUSES: WorkOrderDisplayStatus[] = ["draft", "waiting", "failed"];
 
 /** Ordering options in the Display menu. `updated` is the default. */
@@ -304,6 +313,35 @@ export const WORK_ORDER_LAYOUTS: Array<{ id: WorkOrderLayoutId; label: string }>
 /** Sentinel assignee filter value that matches tasks with no assignee. */
 export const UNASSIGNED_FILTER_VALUE = "unassigned";
 
+export { MANUAL_FILTER_VALUE } from "./workOrderCardSource";
+
+/** Card labels the Filter menu can keep: Review (open PR) and Mergeable. */
+export const WORK_ORDER_FILTER_LABELS = ["review", "mergeable"] as const;
+
+export type WorkOrderFilterLabel = (typeof WORK_ORDER_FILTER_LABELS)[number];
+
+export const WORK_ORDER_FILTER_LABEL_META: Record<WorkOrderFilterLabel, { label: string }> = {
+  review: { label: "Review" },
+  mergeable: { label: "Mergeable" },
+};
+
+/**
+ * Labels the Filter menu can offer. Mergeable stays hidden until the
+ * pull-request merge feature is on, matching the card pill.
+ */
+export function visibleWorkOrderFilterLabels(showPullRequestMerge = false): WorkOrderFilterLabel[] {
+  return WORK_ORDER_FILTER_LABELS.filter((label) => label !== "mergeable" || showPullRequestMerge);
+}
+
+/** Drops Mergeable when that pill is not shown, so stored filters cannot hide unmatched tasks. */
+export function visibleWorkOrderFilters(filters: WorkOrderFilters, showPullRequestMerge = false): WorkOrderFilters {
+  const allowed = new Set(visibleWorkOrderFilterLabels(showPullRequestMerge));
+  return {
+    ...filters,
+    labels: filters.labels.filter((label) => allowed.has(label)),
+  };
+}
+
 /**
  * Filters chosen in the Filter menu. Each dimension narrows independently
  * (AND across dimensions, OR within one), and an empty array means the
@@ -311,14 +349,28 @@ export const UNASSIGNED_FILTER_VALUE = "unassigned";
  */
 export interface WorkOrderFilters {
   statuses: WorkOrderDisplayStatus[];
+  labels: WorkOrderFilterLabel[];
   lineIds: string[];
+  sourceIds: string[];
   assigneeIds: string[];
 }
 
-export const EMPTY_WORK_ORDER_FILTERS: WorkOrderFilters = { statuses: [], lineIds: [], assigneeIds: [] };
+export const EMPTY_WORK_ORDER_FILTERS: WorkOrderFilters = {
+  statuses: [],
+  labels: [],
+  lineIds: [],
+  sourceIds: [],
+  assigneeIds: [],
+};
 
 export function countWorkOrderFilters(filters: WorkOrderFilters): number {
-  return filters.statuses.length + filters.lineIds.length + filters.assigneeIds.length;
+  return (
+    filters.statuses.length +
+    filters.labels.length +
+    filters.lineIds.length +
+    filters.sourceIds.length +
+    filters.assigneeIds.length
+  );
 }
 
 export function applyWorkOrderScope(
@@ -335,23 +387,50 @@ export function applyWorkOrderScope(
   if (!currentUserId) {
     return [];
   }
-  return entries.filter((entry) => entry.assigneeIds.includes(currentUserId));
+  return entries.filter((entry) => workOrderMatchesUser(entry.order, currentUserId));
 }
 
-export function applyWorkOrderFilters(entries: WorkOrderListEntry[], filters: WorkOrderFilters): WorkOrderListEntry[] {
+function workOrderMatchesFilterLabel(order: FactoriesWorkOrderSummary, label: WorkOrderFilterLabel): boolean {
+  const card = selectWorkOrderCardPullRequest(order.pullRequests, order.id ?? "");
+  if (!card) {
+    return false;
+  }
+  if (label === "review") {
+    return pullRequestState(card.pullRequest.state) === "open";
+  }
+  return workOrderCardPullRequestIsMergeable(card.pullRequest);
+}
+
+export function applyWorkOrderFilters(
+  entries: WorkOrderListEntry[],
+  filters: WorkOrderFilters,
+  options: { showPullRequestMerge?: boolean } = {},
+): WorkOrderListEntry[] {
+  const { statuses, labels, lineIds, sourceIds, assigneeIds } = visibleWorkOrderFilters(
+    filters,
+    options.showPullRequestMerge ?? false,
+  );
   let result = entries;
-  if (filters.statuses.length > 0) {
-    result = result.filter((entry) => filters.statuses.includes(entry.displayStatus));
+  if (statuses.length > 0) {
+    result = result.filter((entry) => statuses.includes(entry.displayStatus));
   }
-  if (filters.lineIds.length > 0) {
-    result = result.filter((entry) => entry.lineIds.some((lineId) => filters.lineIds.includes(lineId)));
+  if (labels.length > 0) {
+    result = result.filter((entry) => labels.some((label) => workOrderMatchesFilterLabel(entry.order, label)));
   }
-  if (filters.assigneeIds.length > 0) {
+  if (lineIds.length > 0) {
+    result = result.filter((entry) => entry.lineIds.some((lineId) => lineIds.includes(lineId)));
+  }
+  if (sourceIds.length > 0) {
+    result = result.filter((entry) => sourceIds.includes(entry.sourceId));
+  }
+  if (assigneeIds.length > 0) {
+    const people = assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+    const wantsUnassigned = assigneeIds.includes(UNASSIGNED_FILTER_VALUE);
     result = result.filter((entry) => {
-      if (entry.assigneeIds.some((id) => filters.assigneeIds.includes(id))) {
+      if (wantsUnassigned && entry.assigneeIds.length === 0) {
         return true;
       }
-      return filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE) && entry.assigneeIds.length === 0;
+      return people.some((id) => workOrderMatchesUser(entry.order, id));
     });
   }
   return result;

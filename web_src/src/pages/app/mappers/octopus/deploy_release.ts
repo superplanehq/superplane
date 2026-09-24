@@ -10,10 +10,10 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";

@@ -1,8 +1,8 @@
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -70,7 +70,7 @@ export const assignReservedIPMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -78,15 +78,15 @@ export const assignReservedIPMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const action = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const action = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!action) return details;
 
-    details["Action ID"] = action.id?.toString() || "-";
-    details["Type"] = action.type || "-";
-    details["Status"] = action.status || "-";
+    details["Action ID"] = action.id != null ? String(action.id) : "-";
+    details["Type"] = action.type != null ? String(action.type) : "-";
+    details["Status"] = action.status != null ? String(action.status) : "-";
 
-    if (action.resource_id) {
-      details["Resource ID"] = action.resource_id?.toString() || "-";
+    if (action.resource_id != null) {
+      details["Resource ID"] = String(action.resource_id);
     }
 
     return details;

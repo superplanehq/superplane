@@ -18,7 +18,7 @@ fi
 all_tests=()
 while IFS= read -r file; do
   while IFS= read -r name; do
-    [[ -n "$name" ]] && all_tests+=("$name")
+    [[ -n "$name" && "$name" != "TestMain" ]] && all_tests+=("$name")
   done < <(awk '
     /^func[[:space:]]+Test[[:alnum:]_]*[[:space:]]*\(/ {
       line=$0

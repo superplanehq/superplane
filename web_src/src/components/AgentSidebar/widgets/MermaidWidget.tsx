@@ -2,58 +2,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import mermaid from "mermaid";
 
+import { useTheme } from "@/contexts/useTheme";
 import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
+import { mermaidInitializeConfig } from "./mermaidTheme";
 import { useMermaidFitToViewport, useMermaidPan } from "./useMermaidViewport";
-
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "base",
-  securityLevel: "strict",
-  fontFamily: "ui-sans-serif, system-ui, sans-serif",
-  themeVariables: {
-    // Keep the purple primary; give secondary/tertiary real mid-tone fills
-    // instead of near-white pastels that read as washed out.
-    primaryColor: "#ddd6fe",
-    primaryTextColor: "#4c1d95",
-    primaryBorderColor: "#7c3aed",
-    secondaryColor: "#67e8f9",
-    secondaryTextColor: "#164e63",
-    secondaryBorderColor: "#0891b2",
-    tertiaryColor: "#fcd34d",
-    tertiaryTextColor: "#78350f",
-    tertiaryBorderColor: "#d97706",
-    lineColor: "#64748b",
-    textColor: "#1e293b",
-    nodeBorder: "#7c3aed",
-    nodeTextColor: "#1e293b",
-    clusterBkg: "#f8fafc",
-    clusterBorder: "#cbd5e1",
-    defaultLinkColor: "#7c3aed",
-    fontSize: "13px",
-    // Pie slices: purple first, then saturated companions (opacity 1 so they
-    // don't look faded on white).
-    pie1: "#8b5cf6",
-    pie2: "#06b6d4",
-    pie3: "#f59e0b",
-    pie4: "#10b981",
-    pie5: "#f43f5e",
-    pie6: "#3b82f6",
-    pie7: "#eab308",
-    pie8: "#14b8a6",
-    pie9: "#ec4899",
-    pie10: "#6366f1",
-    pie11: "#84cc16",
-    pie12: "#f97316",
-    pieOpacity: "1",
-    pieStrokeColor: "#ffffff",
-    pieStrokeWidth: "1px",
-    pieOuterStrokeColor: "#e2e8f0",
-    pieTitleTextColor: "#1e293b",
-    pieSectionTextColor: "#0f172a",
-    pieLegendTextColor: "#334155",
-  },
-});
 
 interface MermaidWidgetProps {
   content: string;
@@ -61,6 +14,7 @@ interface MermaidWidgetProps {
 
 export function MermaidWidget({ content }: MermaidWidgetProps) {
   const id = useId().replace(/:/g, "m");
+  const { resolvedTheme } = useTheme();
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -73,6 +27,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
     async function render() {
       try {
+        mermaid.initialize(mermaidInitializeConfig(resolvedTheme));
         const { svg: rendered } = await mermaid.render(`mermaid-${id}`, content.trim());
         if (!cancelled) {
           setSvg(rendered);
@@ -91,7 +46,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
     return () => {
       cancelled = true;
     };
-  }, [content, id]);
+  }, [content, id, resolvedTheme]);
 
   if (error) {
     return (

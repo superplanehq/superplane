@@ -1,23 +1,17 @@
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 
-export const settingsCardClassName = cn("rounded-lg bg-gray-100/5 p-6", appDarkModeClasses.modalEdge);
+export const settingsCardClassName = "rounded-lg border border-border bg-card p-6";
 
-export const settingsTableCardClassName = cn(
-  "overflow-hidden rounded-lg bg-gray-100/5",
-  appDarkModeClasses.modalEdge,
-  "[&_th]:dark:border-gray-700/70 [&_td]:dark:border-gray-700/50",
-);
+export const settingsTableCardClassName =
+  "overflow-hidden rounded-lg border border-border bg-card [&_th]:border-border [&_td]:border-border";
 
 export const settingsErrorClassName =
-  "rounded border border-red-300 bg-white px-4 py-2 text-red-500 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400";
+  "rounded border border-destructive/40 bg-destructive/10 px-4 py-2 text-destructive";
 
-export const settingsInnerMetricCardClassName = cn(
-  "rounded-lg border border-slate-950/10 bg-gray-100/5 px-4 py-3",
-  "dark:border-gray-700/70",
-);
+export const settingsInnerMetricCardClassName = "rounded-lg border border-border bg-muted/40 px-4 py-3";
 
-export const settingsPanelClassName = cn("rounded-md bg-gray-100/5", appDarkModeClasses.modalEdge);
+export const settingsPanelClassName = "rounded-md border border-border bg-card";
 
 export const settingsModalClassName = cn(
   "mx-4 w-full rounded-lg bg-white shadow-xl dark:bg-gray-900",

@@ -5,7 +5,7 @@ import {
 } from "@/pages/factories/__fixtures__/factoryPageResponses";
 import { storybookAccountProviders } from "./storybookAccountState";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
-import { storybookHostedLlmModels } from "./hostedLlmModels";
+import { storybookHostedLlmModels, storybookSelectableLlmModels } from "./hostedLlmModels";
 
 export type { HomePageFixture };
 
@@ -26,6 +26,7 @@ export function buildStorybookMeUser(orgId: string) {
       "canvases",
       "integrations",
       "secrets",
+      "api_keys",
       "groups",
       "users",
       "roles",
@@ -96,37 +97,16 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       },
     },
     {
-      pattern: re("/api/v1/canvas-folders"),
-      resolve: (_m, _url, method) => {
-        if (method === "POST") {
-          return {
-            json: {
-              folder: {
-                metadata: { id: "storybook-new-folder" },
-                spec: { title: "New Folder", backgroundColor: "blue", canvases: [] },
-              },
-            },
-          };
-        }
-        return { json: { folders: fixture.folders } };
-      },
-    },
-    {
-      pattern: re("/api/v1/canvas-folders/[^/]+/position"),
-      resolve: () => ({ json: {} }),
-    },
-    {
-      pattern: re("/api/v1/canvas-folders/[^/]+"),
-      resolve: () => ({ json: {} }),
-    },
-    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
-    {
       pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
       resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
     },
     {
       pattern: re("/api/v1/organizations/[^/]+/hosted-llm-models"),
       resolve: (_m, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
+    },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/selectable-llm-models"),
+      resolve: () => ({ json: { models: storybookSelectableLlmModels() } }),
     },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
@@ -181,6 +161,16 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Workspace Models",
               description: "Show the in-progress workspace Models settings page",
             },
+            {
+              id: "organization_byok",
+              label: "Organization BYOK",
+              description: "Show the organization LLM Models settings page",
+            },
+            {
+              id: "workspace_agent_resources",
+              label: "Agent Resources",
+              description: "Add MCP servers for workspace agents",
+            },
           ],
         },
       }),
@@ -189,8 +179,8 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/organizations"),
       resolve: () => ({
         json: [
-          { id: orgId, name: fixture.organizationName },
-          { id: "org-storybook-acme", name: "Acme" },
+          { id: orgId, slug: fixture.organizationSlug ?? "superplane", name: fixture.organizationName },
+          { id: "org-storybook-acme", slug: "acme", name: "Acme" },
         ],
       }),
     },
@@ -206,13 +196,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           has_password: true,
           providers: storybookAccountProviders(meUser.email),
         },
-      }),
-    },
-    // Catalog install from FreshOrgLanding starter setup
-    {
-      pattern: re("/apps/install"),
-      resolve: () => ({
-        json: { canvasId: "storybook-installed-canvas", organizationId: orgId },
       }),
     },
   ];
@@ -319,6 +302,18 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
   ]),
 ];
 
+const STORYBOOK_SENTRY_PROJECTS = [
+  { id: "payments", name: "payments", type: "project" },
+  { id: "checkout-web", name: "checkout-web", type: "project" },
+  { id: "refund-worker", name: "refund-worker", type: "project" },
+];
+
+const STORYBOOK_SENTRY_UNRESOLVED_ISSUES = [
+  { id: "1", name: "TimeoutError: refund gateway did not answer", type: "unresolved-issue" },
+  { id: "2", name: "TypeError: cannot read amount of undefined", type: "unresolved-issue" },
+  { id: "3", name: "ValidationError: refund amount is above the limit", type: "unresolved-issue" },
+];
+
 const STORYBOOK_GITHUB_REPOSITORIES = [
   { id: "repo_acme_web", name: "acme/web", type: "repository" },
   { id: "repo_acme_api", name: "acme/api", type: "repository" },
@@ -363,7 +358,7 @@ function storybookIntegrationDefinition(
 
 export type StorybookOrgIntegration = {
   metadata: { id: string; name: string; integrationName: string };
-  status: { state: "ready" | "pending" | "error" };
+  status: { state: "ready" | "pending" | "error"; stateDescription?: string; metadata?: Record<string, unknown> };
   spec?: { configuration?: Record<string, unknown> };
 };
 
@@ -434,7 +429,7 @@ export async function matchFactorySetupFixture(
   orgIntegrations: StorybookOrgIntegration[],
 ): Promise<FixtureResult> {
   if (url.pathname === "/api/v1/integrations" && method === "GET") {
-    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS } };
+    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS, githubAppConfigured: true } };
   }
 
   const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);
@@ -450,8 +445,41 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
-    if (url.searchParams.get("type") === "default_branch") {
+    const resourceType = url.searchParams.get("type");
+    if (resourceType === "default_branch") {
       return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
+    if (resourceType === "status_check") {
+      return {
+        json: {
+          resources: [
+            { type: "status_check", id: "lint", name: "lint" },
+            { type: "status_check", id: "unit", name: "unit" },
+            {
+              type: "status_check",
+              id: "e2e",
+              name: "e2e",
+              url: "https://app.circleci.com/pipelines/github/acme/api/1",
+            },
+          ],
+        },
+      };
+    }
+    if (resourceType === "project") {
+      return { json: { resources: STORYBOOK_SENTRY_PROJECTS } };
+    }
+    if (resourceType === "unresolved-issue") {
+      return { json: { resources: STORYBOOK_SENTRY_UNRESOLVED_ISSUES } };
+    }
+    if (resourceType === "review_bot") {
+      return {
+        json: {
+          resources: [
+            { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+            { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
+          ],
+        },
+      };
     }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }

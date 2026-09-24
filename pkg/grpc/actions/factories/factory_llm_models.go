@@ -18,13 +18,11 @@ func ListFactoryLLMModels(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory models")
 	}
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	factory, err := findFactory(database.DB(ctx), orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory models")
 	}
-	if _, err := models.FindFactory(database.DB(ctx), orgID, factoryID); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory models")
-	}
+	factoryID := factory.ID
 
 	parent, err := models.ResolveSelectableLLMModels(database.DB(ctx), orgID, nil, req.GetProvider(), req.GetFundingSource())
 	if err != nil {
@@ -58,10 +56,11 @@ func UpdateFactoryLLMModels(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory models")
 	}
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	factory, err := findFactory(database.DB(ctx), orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory models")
 	}
+	factoryID := factory.ID
 
 	saved, err := models.UpsertFactoryLLMModelAllowlist(
 		database.DB(ctx),
@@ -86,6 +85,18 @@ func serializeFactoryLLMModels(ids []string) []*pb.FactoryLLMModel {
 	out := make([]*pb.FactoryLLMModel, 0, len(ids))
 	for _, id := range models.CompactModelIDs(ids) {
 		out = append(out, &pb.FactoryLLMModel{Id: id, Name: id})
+	}
+	return out
+}
+
+func serializeLineRunnerModels(ids []string) []*pb.FactoryLLMModel {
+	out := make([]*pb.FactoryLLMModel, 0, len(ids))
+	for _, id := range models.CompactModelIDs(ids) {
+		name := id
+		if parsed, err := models.ParseSelectableLLMModelKey(id); err == nil {
+			name = parsed.Label
+		}
+		out = append(out, &pb.FactoryLLMModel{Id: id, Name: name})
 	}
 	return out
 }

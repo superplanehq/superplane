@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
 import { agentChatKeys, type AgentMessagesPage } from "@/hooks/useAgentChats";
 
@@ -8,8 +8,8 @@ const { useWebSocketMock } = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
 }));
 
-vi.mock("react-use-websocket", () => ({
-  default: useWebSocketMock,
+vi.mock("@/lib/reactUseWebsocket", () => ({
+  useWebSocket: useWebSocketMock,
 }));
 
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
@@ -185,6 +185,18 @@ describe("useAgentSessionWebsocket", () => {
     expect(onStatus).toHaveBeenNthCalledWith(1, "streaming", undefined);
     expect(onStatus).toHaveBeenNthCalledWith(2, "idle", undefined);
     expect(onStatus).toHaveBeenNthCalledWith(3, "failed", "boom");
+  });
+
+  it("reconciles state when the WebSocket connection opens", () => {
+    const onConnectionOpen = vi.fn();
+    render({ onConnectionOpen });
+    const [, options] = lastCall();
+
+    act(() => {
+      options.onOpen();
+    });
+
+    expect(onConnectionOpen).toHaveBeenCalledTimes(1);
   });
 
   it("forwards a session_notice to onNotice without changing status", () => {

@@ -25,6 +25,26 @@ interface OnPRReviewEventData {
   }>;
 }
 
+function buildOnPRReviewMetadataItems(metadata?: BaseNodeMetadata, configuration?: OnPRReviewConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.repository?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.repository.name,
+    });
+  }
+
+  if (configuration?.contentFilter) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Filter: ${configuration.contentFilter}`,
+    });
+  }
+
+  return metadataItems;
+}
+
 export const onPRReviewTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPRReviewEventData;
@@ -61,28 +81,13 @@ export const onPRReviewTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnPRReviewConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.contentFilter) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Filter: ${configuration.contentFilter}`,
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildOnPRReviewMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {

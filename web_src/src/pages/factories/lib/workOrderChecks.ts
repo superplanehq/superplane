@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrderCheck, WorkOrderCheckLevel as ApiWorkOrderCheckLevel } from "@/api-client";
 
-import { CONFIDENCE_CHECK_NAME, confidenceBandForScore, type ConfidenceBand } from "./confidenceScore";
+import { confidenceBandForScore, isScoreCheckName, type ConfidenceBand } from "./confidenceScore";
 
 /** How strongly the reported score should alarm (or reassure) the reader.
  * The emitting automation decides — the UI cannot know whether a high
@@ -51,7 +51,7 @@ export const LEVEL_LABEL: Record<WorkOrderCheckLevel, { label: string; className
     badgeClassName: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
   },
   caution: {
-    label: "Needs attention",
+    label: "Caution",
     className: "text-amber-700 dark:text-amber-400",
     badgeClassName: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   },
@@ -80,9 +80,9 @@ const CONFIDENCE_BAND_LABEL: Record<ConfidenceBand, (typeof LEVEL_LABEL)[WorkOrd
   },
 };
 
-/** Confidence uses High / Medium / Low. Other checks use Healthy / Needs attention. */
+/** Clarity and Confidence use High / Medium / Low. Other checks use Healthy / Caution. */
 export function workOrderCheckStatus(check: Pick<WorkOrderCheckPresentation, "name" | "score" | "level">) {
-  if (check.name === CONFIDENCE_CHECK_NAME) {
+  if (isScoreCheckName(check.name)) {
     return CONFIDENCE_BAND_LABEL[confidenceBandForScore(check.score)];
   }
   return LEVEL_LABEL[check.level];

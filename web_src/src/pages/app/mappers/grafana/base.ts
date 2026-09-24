@@ -3,7 +3,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../types";
 
 export type BuildGrafanaEventSectionsOptions = {

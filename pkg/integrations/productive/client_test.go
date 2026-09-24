@@ -1,0 +1,289 @@
+package productive
+
+import (
+	"errors"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/test/support/contexts"
+)
+
+func testIntegration(overrides map[string]any) *contexts.IntegrationContext {
+	config := map[string]any{
+		"apiToken":       "token-1",
+		"organizationId": "org-1",
+	}
+	for k, v := range overrides {
+		config[k] = v
+	}
+	return &contexts.IntegrationContext{Configuration: config}
+}
+
+func testClient(t *testing.T, http *contexts.HTTPContext) *Client {
+	t.Helper()
+	client, err := NewClient(http, testIntegration(nil))
+	require.NoError(t, err)
+	return client
+}
+
+func Test__NewClient(t *testing.T) {
+	t.Run("missing apiToken -> error", func(t *testing.T) {
+		_, err := NewClient(&contexts.HTTPContext{}, testIntegration(map[string]any{"apiToken": ""}))
+		require.ErrorContains(t, err, "missing Productive.io API token")
+	})
+
+	t.Run("missing organizationId -> error", func(t *testing.T) {
+		_, err := NewClient(&contexts.HTTPContext{}, testIntegration(map[string]any{"organizationId": ""}))
+		require.ErrorContains(t, err, "missing Productive.io organization id")
+	})
+
+	t.Run("uses the default base URL when region is not set", func(t *testing.T) {
+		client, err := NewClient(&contexts.HTTPContext{}, testIntegration(nil))
+		require.NoError(t, err)
+		assert.Equal(t, BaseURL, client.BaseURL)
+	})
+
+	t.Run("region overrides the base URL", func(t *testing.T) {
+		client, err := NewClient(&contexts.HTTPContext{}, testIntegration(map[string]any{
+			"region": "https://eu.productive.io/api/v2/",
+		}))
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://eu.productive.io/api/v2", client.BaseURL)
+	})
+}
+
+func Test__Client__ListProjects(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{"id":"1","type":"projects","attributes":{"name":"Payments"}},
+			{"id":"2","type":"projects","attributes":{"name":"Growth"}}
+		]}`),
+	}}
+
+	client := testClient(t, httpContext)
+
+	projects, err := client.ListProjects()
+	require.NoError(t, err)
+	require.Len(t, projects, 2)
+	assert.Equal(t, Project{ID: "1", Name: "Payments"}, projects[0])
+	assert.Equal(t, Project{ID: "2", Name: "Growth"}, projects[1])
+
+	require.Len(t, httpContext.Requests, 1)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/projects?")
+	assert.Equal(t, "token-1", httpContext.Requests[0].Header.Get(AuthTokenHeader))
+	assert.Equal(t, "org-1", httpContext.Requests[0].Header.Get(OrganizationIDHeader))
+}
+
+func Test__Client__ListProjects__StopsOnShortPage(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[{"id":"1","type":"projects","attributes":{"name":"Payments"}}]}`),
+	}}
+
+	projects, err := testClient(t, httpContext).ListProjects()
+	require.NoError(t, err)
+	assert.Len(t, projects, 1)
+	assert.Len(t, httpContext.Requests, 1, "a page shorter than the page size must not be followed by another request")
+}
+
+func Test__Client__GetProject(t *testing.T) {
+	t.Run("found", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			jsonResponse(`{"data":{"id":"1","type":"projects","attributes":{"name":"Payments"}}}`),
+		}}
+
+		project, err := testClient(t, httpContext).GetProject("1")
+		require.NoError(t, err)
+		assert.Equal(t, &Project{ID: "1", Name: "Payments"}, project)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/projects/1")
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			jsonResponse(`{"data":{}}`),
+		}}
+
+		_, err := testClient(t, httpContext).GetProject("missing")
+		require.ErrorContains(t, err, "not found")
+	})
+}
+
+func Test__Client__ListTasks(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{"id":"91","type":"tasks","attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently."}},
+			{"id":"92","type":"tasks","attributes":{"task_number":"513","title":"Add retry metrics","description":null}}
+		]}`),
+	}}
+
+	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10, false)
+	require.NoError(t, err)
+	require.Len(t, tasks, 2)
+	assert.Equal(t, Task{
+		ID:          "91",
+		Number:      "512",
+		Title:       "Fix payment retries",
+		Description: "Retries fail silently.",
+	}, tasks[0])
+	assert.Equal(t, "513", tasks[1].Number)
+
+	require.Len(t, httpContext.Requests, 1)
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "42", query.Get("filter[project_id]"))
+	assert.Equal(t, "retry", query.Get("filter[query]"))
+	assert.Equal(t, "1", query.Get("filter[status]"))
+	assert.Equal(t, "10", query.Get("page[size]"))
+	assert.Empty(t, query.Get("filter[type_id]"))
+}
+
+func Test__Client__ListTasks_RegularOnly(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[]}`),
+	}}
+
+	_, err := testClient(t, httpContext).ListTasks("42", "", 10, true)
+	require.NoError(t, err)
+
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "1", query.Get("filter[type_id]"))
+}
+
+func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{
+				"id":"91",
+				"type":"tasks",
+				"attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently."},
+				"relationships":{"project":{"data":{"type":"projects","id":"42"}}}
+			}
+		]}`),
+	}}
+
+	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30, false)
+	require.NoError(t, err)
+	require.Len(t, documents, 1)
+
+	// The whole resource travels, because a seeded task is read the way the
+	// webhook delivers it.
+	assert.Equal(t, "91", documents[0]["id"])
+	assert.Equal(t, "tasks", documents[0]["type"])
+	assert.Contains(t, documents[0], "relationships")
+	attributes, ok := documents[0]["attributes"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Fix payment retries", attributes["title"])
+
+	require.Len(t, httpContext.Requests, 1)
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "42", query.Get("filter[project_id]"))
+	assert.Equal(t, "1", query.Get("filter[status]"))
+	assert.Equal(t, "-created_at", query.Get("sort"))
+	assert.Equal(t, "30", query.Get("page[size]"))
+}
+
+func Test__Client__GetTask(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":{
+			"id":"91",
+			"type":"tasks",
+			"attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently.","closed":true},
+			"relationships":{"project":{"data":{"type":"projects","id":"42"}}}
+		}}`),
+	}}
+
+	task, err := testClient(t, httpContext).GetTask("91")
+	require.NoError(t, err)
+	assert.Equal(t, &Task{
+		ID:          "91",
+		Number:      "512",
+		Title:       "Fix payment retries",
+		Description: "Retries fail silently.",
+		ProjectID:   "42",
+		Closed:      true,
+	}, task)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/tasks/91")
+}
+
+func Test__Client__GetTask_NotFound(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Not found"}]}`)),
+	}}}
+
+	_, err := testClient(t, httpContext).GetTask("missing")
+	require.Error(t, err)
+	assert.True(t, IsNotFoundError(err))
+}
+
+func Test__Client__CreateWebhook(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			jsonResponse(`{"data":{"id":"555","type":"webhooks","attributes":{"signature_token":"sig-token"}}}`),
+		}}
+
+		webhook, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: "555", SignatureToken: "sig-token"}, webhook)
+
+		require.Len(t, httpContext.Requests, 1)
+		req := httpContext.Requests[0]
+		assert.Equal(t, http.MethodPost, req.Method)
+		assert.Contains(t, req.URL.String(), "/webhooks")
+		assert.Equal(t, "token-1", req.Header.Get(AuthTokenHeader))
+		assert.Equal(t, "org-1", req.Header.Get(OrganizationIDHeader))
+
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		payload := string(body)
+		assert.Contains(t, payload, "https://superplane.example/webhooks/abc")
+		assert.Contains(t, payload, `"name":"SuperPlane"`)
+		assert.Contains(t, payload, `"event_id":1`)
+		assert.Contains(t, payload, `"target_url":"https://superplane.example/webhooks/abc"`)
+		assert.Contains(t, payload, `"type_id":1`)
+		assert.Contains(t, payload, TaskCreatedEvent)
+		assert.NotContains(t, payload, "event_types")
+		assert.NotContains(t, payload, `"secret"`)
+		assert.NotContains(t, payload, `"relationships"`)
+	})
+
+	t.Run("webhooks_limit_exceeded -> ErrWebhooksLimitExceeded", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"403","code":"webhooks_limit_exceeded","title":"Webhooks are not available on your plan"}]}`)),
+			},
+		}}
+
+		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
+		require.ErrorIs(t, err, ErrWebhooksLimitExceeded)
+	})
+
+	t.Run("other 403 -> generic error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"403","code":"not_authorized","title":"Nope"}]}`)),
+			},
+		}}
+
+		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, ErrWebhooksLimitExceeded))
+	})
+}
+
+func Test__Client__DeleteWebhook(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{jsonResponse(`{}`)}}
+
+	err := testClient(t, httpContext).DeleteWebhook("555")
+	require.NoError(t, err)
+
+	require.Len(t, httpContext.Requests, 1)
+	req := httpContext.Requests[0]
+	assert.Equal(t, http.MethodDelete, req.Method)
+	assert.Contains(t, req.URL.String(), "/webhooks/555")
+}

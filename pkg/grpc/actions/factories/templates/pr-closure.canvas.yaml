@@ -26,6 +26,15 @@ spec:
     - channel: default
       sourceId: stamp-pr-closed
       targetId: reject-work-order
+    - channel: default
+      sourceId: complete-work-order
+      targetId: has-github-issue-origin
+    - channel: "true"
+      sourceId: has-github-issue-origin
+      targetId: comment-source-issue
+    - channel: default
+      sourceId: comment-source-issue
+      targetId: close-source-issue
   nodes:
     - id: on-pr-closed
       name: On Pull Request Closed
@@ -122,4 +131,38 @@ spec:
       position:
         x: 1600
         'y': 1332
+      isCollapsed: true
+    - id: has-github-issue-origin
+      name: Has GitHub Issue Origin?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: $["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2
+      position:
+        x: 1132
+        'y': 1512
+      isCollapsed: true
+    - id: comment-source-issue
+      name: Comment on Source Issue
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      configuration:
+        repository: '{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
+        issueNumber: '{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}'
+        body: 'SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).'
+      position:
+        x: 1132
+        'y': 1692
+      isCollapsed: true
+    - id: close-source-issue
+      name: Close Source Issue
+      type: TYPE_ACTION
+      component: github.updateIssue
+      configuration:
+        repository: '{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
+        issueNumber: '{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}'
+        state: closed
+      position:
+        x: 1132
+        'y': 1872
       isCollapsed: true

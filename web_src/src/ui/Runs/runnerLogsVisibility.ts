@@ -6,6 +6,7 @@ const RUNNER_COMPONENTS = new Set([
   "runnerBash",
   "runnerJS",
   "runnerPython",
+  "runnerSuperPlane",
   "runnerClaudeCode",
   "runnerCodex",
   "runnerOpenRouter",

@@ -1,10 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
-import { groupSplitRunStream } from "./PhaseLogCard";
+import { groupSplitRunStream } from "./phaseLogStream";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
-  claudeCodeSteps,
   lineAutomationPresentation,
   parseSplitRunCanvasKey,
   richStreamForCanvas,
@@ -30,10 +29,6 @@ describe("canvasKeyForAutomation", () => {
       name: "Implement",
       componentName: "Implementation",
     });
-    expect(lineAutomationPresentation({ id: "app-refund-planner", name: "Refund Planner" }, "Plan")).toEqual({
-      name: "Plan",
-      componentName: "Planning",
-    });
     expect(lineAutomationPresentation({ id: "app-refund-verifier", name: "Refund Verifier" }, "Verify")).toEqual({
       name: "Verify",
       componentName: "Risk Assessment",
@@ -41,7 +36,6 @@ describe("canvasKeyForAutomation", () => {
   });
 
   it("maps planner, implementer, verifier, and closure apps", () => {
-    expect(canvasKeyForAutomation({ id: "app-refund-planner" })).toBe("planning");
     expect(canvasKeyForAutomation({ id: "app-refund-implementer" })).toBe("implementation");
     expect(canvasKeyForAutomation({ id: "app-refund-verifier", name: "Refund Verifier" })).toBe("risk");
     expect(canvasKeyForAutomation({ name: "Verify" })).toBe("risk");
@@ -87,7 +81,6 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.statuses["add-branch-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["create-pr"]).toBe("did_not_run");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
-    expect(canvas.statuses["set-pr-closure-note"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
   });
 
@@ -106,7 +99,6 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
     expect(canvas.statuses["create-pr"]).toBe("passed");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
-    expect(canvas.statuses["set-pr-closure-note"]).toBe("passed");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);
@@ -116,17 +108,6 @@ describe("splitRunCanvasForPhase", () => {
       action: "passed",
     });
     expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
-  });
-
-  it("opens the planning canvas for a completed plan step", () => {
-    const plan = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "plan");
-    expect(canvasKeyForPhase(plan!)).toBe("planning");
-
-    const canvas = splitRunCanvasForPhase(plan!);
-    expect(canvas.title).toBe("Plan");
-    expect(canvas.statuses["onrun-create-plan"]).toBe("triggered");
-    expect(canvas.statuses["planner-agent-no-issue"]).toBe("passed");
-    expect(canvas.statuses["add-plan-artifact"]).toBe("passed");
   });
 
   it("writes one log line per canvas node and extra Claude Code notes", () => {
@@ -239,8 +220,8 @@ describe("splitRunCanvasForPhase", () => {
       iconSlug: "funnel",
     });
     expect(created).toMatchObject({
-      componentType: "Create Work Order",
-      componentName: "Create Work Order",
+      componentType: "Create Task",
+      componentName: "Create Task",
       action: "passed",
     });
     expect(idle).toMatchObject({
@@ -248,64 +229,6 @@ describe("splitRunCanvasForPhase", () => {
       componentName: "On Issue Assignment",
       action: "did not run",
     });
-  });
-
-  it("uses catalog labels and namespaced ids for planning components", () => {
-    const canvas = splitRunCanvasForPhase({
-      id: "plan",
-      name: "Plan",
-      status: "passed",
-      duration: "1m",
-      componentName: "Planning",
-      artifacts: [],
-      stream: [],
-      canvasSteps: [],
-    });
-    const stream = richStreamForCanvas(canvas);
-    expect(stream.find((line) => line.id === "add-plan-artifact")).toMatchObject({
-      componentType: "Add Work Order Artifact",
-      componentName: "Add Plan Artifact",
-    });
-    expect(stream.find((line) => line.id === "planner-agent-no-issue")).toMatchObject({
-      componentType: "Run Claude Code",
-      componentName: "Draft Implementation Plan",
-    });
-    const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent-no-issue" && line.note);
-    expect(
-      plannerNotes
-        .filter((line) => !line.noteParentId)
-        .map((line) => ({
-          name: line.componentName,
-          type: line.componentType,
-        })),
-    ).toEqual([
-      { name: "Clone Repo", type: "bash" },
-      { name: "Provide description", type: "bash" },
-      { name: "Write Implementation Plan", type: "prompt" },
-      { name: "Use plan as output", type: "bash" },
-    ]);
-    expect(
-      plannerNotes.some(
-        (line) =>
-          line.componentName === "Clone Repo" && line.status === "passed" && line.detail?.includes("Cloning into"),
-      ),
-    ).toBe(true);
-    expect(plannerNotes.some((line) => line.componentName === "cat /tmp/ORDER.md" && line.noteParentId)).toBe(true);
-    expect(
-      plannerNotes.some(
-        (line) =>
-          line.componentType === "note" && line.componentName === "Let me examine the key reference files in detail.",
-      ),
-    ).toBe(true);
-    expect(
-      plannerNotes.some((line) => line.componentName.includes("LineListCard.tsx") && line.componentType === "read"),
-    ).toBe(true);
-    expect(plannerNotes.some((line) => line.componentName.includes("import type"))).toBe(false);
-    expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent-no-issue") ?? {})).toEqual([
-      { name: "Clone Repo", type: "bash" },
-      { name: "Write Implementation Plan", type: "prompt" },
-      { name: "Use plan as output", type: "bash" },
-    ]);
   });
 
   it("uses the implementation runner log under Claude Code", () => {
@@ -398,9 +321,9 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(sentry.title).toBe("Sentry");
-    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Work Order"]);
+    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task"]);
     expect(slack.title).toBe("Slack");
-    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Work Order"]);
+    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task"]);
   });
 
   it("returns an empty canvas when a person created the task", () => {

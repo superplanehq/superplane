@@ -96,6 +96,9 @@ func TestAdminDashboard(t *testing.T) {
 }
 
 func TestAdminOwnerSetupPromotion(t *testing.T) {
+	t.Cleanup(func() {
+		middleware.MarkOwnerSetupCompleted()
+	})
 	t.Run("owner setup promotes first account to installation admin", func(t *testing.T) {
 		steps := &adminSetupSteps{t: t}
 		steps.start()

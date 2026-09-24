@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunsTabPanel } from "./RunsTabPanel";
 
@@ -80,6 +80,14 @@ describe("RunsTabPanel", () => {
 
     fireEvent.click(liveCanvas);
     expect(onSelectLiveCanvas).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the Live Canvas row when no live-canvas handler is given", () => {
+    const { onSelectLiveCanvas: _onSelectLiveCanvas, ...props } = baseProps;
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...props} />, { wrapper: routerWrapper });
+
+    expect(screen.queryByTestId("runs-sidebar-live-canvas")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Live Canvas" })).not.toBeInTheDocument();
   });
 
   it("shows an empty state when there are no runs", () => {

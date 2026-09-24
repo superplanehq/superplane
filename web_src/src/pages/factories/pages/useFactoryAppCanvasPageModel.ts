@@ -2,6 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import type { FactoryConfigureActions } from "@/pages/app";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { setFactoryAppSelectedRun } from "../lib/factoryAppSearchParamFlag";
 import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
@@ -67,6 +68,13 @@ export function useFactoryAppCanvasPageModel() {
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
+  const setSearchParams = route.setSearchParams;
+  const handleSelectRun = useCallback(
+    (runId: string | null) => {
+      setSearchParams((current) => setFactoryAppSelectedRun(current, runId), { replace: true });
+    },
+    [setSearchParams],
+  );
   const editActions = useFactoryAppCanvasEditActions({
     organizationId: route.organizationId,
     factoryId: route.factoryId,
@@ -82,7 +90,7 @@ export function useFactoryAppCanvasPageModel() {
     canvas: route.canvas,
     canUpdateCanvas,
     configureActionsRef,
-    setSearchParams: route.setSearchParams,
+    setSearchParams,
     navigate,
   });
 
@@ -117,5 +125,6 @@ export function useFactoryAppCanvasPageModel() {
     agentOpen: route.agentOpen,
     componentsOpen: route.componentsOpen,
     ...editActions,
+    handleSelectRun,
   };
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { TriggerEventContext, TriggerRendererContext, EventInfo } from "../types";
 import { onTunnelHealthTriggerRenderer } from "./on_tunnel_health";
