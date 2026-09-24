@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import {
   INTAKE_SETTINGS_COPY,
-  intakeSupportsPause,
+  intakeSupportsDelete,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -24,81 +24,41 @@ export function IntakeSourceSettingsFooter({
   draft,
   savePending,
   saveError,
-  paused,
-  pausePending,
   deletePending,
-  pauseError,
   deleteError,
-  onPause,
-  onResume,
   onDelete,
   onSave,
   onClose,
-  saveDisabled = false,
 }: {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
-  paused: boolean;
-  pausePending: boolean;
   deletePending: boolean;
-  pauseError?: string;
   deleteError?: string;
-  onPause?: () => Promise<void> | void;
-  onResume?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
-  saveDisabled?: boolean;
 }) {
-  const pauseControls = intakeSupportsPause(sourceId);
+  const deleteControls = intakeSupportsDelete(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const footerError = saveError ?? pauseError ?? (deleteOpen ? undefined : deleteError);
-  const busy = pausePending || deletePending;
+  const footerError = saveError ?? (deleteOpen ? undefined : deleteError);
 
   return (
     <>
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {pauseControls ? (
-            <>
-              {paused ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  title={INTAKE_SETTINGS_COPY.pauseHelper}
-                  onClick={() => void ignoreFailedIntakeAction(onResume)}
-                  data-testid="intake-source-settings-resume"
-                >
-                  {pausePending ? INTAKE_SETTINGS_COPY.resuming : INTAKE_SETTINGS_COPY.resume}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  title={INTAKE_SETTINGS_COPY.pauseHelper}
-                  onClick={() => void ignoreFailedIntakeAction(onPause)}
-                  data-testid="intake-source-settings-pause"
-                >
-                  {pausePending ? INTAKE_SETTINGS_COPY.pausing : INTAKE_SETTINGS_COPY.pause}
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => setDeleteOpen(true)}
-                data-testid="intake-source-settings-delete"
-              >
-                {INTAKE_SETTINGS_COPY.delete}
-              </Button>
-            </>
+          {deleteControls ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={deletePending}
+              onClick={() => setDeleteOpen(true)}
+              data-testid="intake-source-settings-delete"
+            >
+              {INTAKE_SETTINGS_COPY.delete}
+            </Button>
           ) : null}
           {footerError ? (
             <p className="workspace-body-text text-destructive" role="alert">
@@ -108,7 +68,7 @@ export function IntakeSourceSettingsFooter({
         </div>
         <Button
           type="button"
-          disabled={savePending || saveDisabled}
+          disabled={savePending}
           onClick={async () => {
             try {
               await onSave(normalizeIntakeSourceSettings(draft));
@@ -122,7 +82,7 @@ export function IntakeSourceSettingsFooter({
           {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
         </Button>
       </footer>
-      {pauseControls ? (
+      {deleteControls ? (
         <IntakeDeleteConfirmDialog
           open={deleteOpen}
           pending={deletePending}
@@ -133,14 +93,6 @@ export function IntakeSourceSettingsFooter({
       ) : null}
     </>
   );
-}
-
-async function ignoreFailedIntakeAction(action?: () => Promise<void> | void) {
-  try {
-    await action?.();
-  } catch {
-    // The parent supplies the actionable error message.
-  }
 }
 
 function IntakeDeleteConfirmDialog({

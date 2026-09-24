@@ -56,39 +56,35 @@ export function JiraCompletionColumnFields({
     <fieldset className="min-w-0" data-testid="jira-completion-column">
       <legend className="workspace-section-title">{JIRA_COMPLETION_COLUMN_COPY.section}</legend>
       <div className="mt-2 flex flex-col gap-2">
-        <Label
-          htmlFor="jira-move-on-complete"
+        <div
           className={cn(
-            "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+            "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
             value.jiraMoveOnComplete
               ? "border-foreground/20 bg-accent/50"
               : "border-border bg-card hover:border-foreground/15",
           )}
         >
-          <Checkbox
-            id="jira-move-on-complete"
-            checked={value.jiraMoveOnComplete}
-            onChange={() => onChange({ ...value, jiraMoveOnComplete: !value.jiraMoveOnComplete })}
-            data-testid="jira-move-on-complete"
-          />
-          <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">
-            {JIRA_COMPLETION_COLUMN_COPY.move}
-          </span>
-        </Label>
-        {value.jiraMoveOnComplete ? (
-          <div className="flex flex-col gap-1.5 pl-1">
-            <Label htmlFor="jira-completion-column-select">{JIRA_COMPLETION_COLUMN_COPY.column}</Label>
-            <JiraCompletionColumnSelect
-              columns={columns}
-              selectedColumn={selectedColumn}
-              loading={statusesQuery.isLoading}
-              onChange={(column) => onChange({ ...value, jiraCompletionColumn: column })}
+          <Label htmlFor="jira-move-on-complete" className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+            <Checkbox
+              id="jira-move-on-complete"
+              checked={value.jiraMoveOnComplete}
+              onChange={() => onChange({ ...value, jiraMoveOnComplete: !value.jiraMoveOnComplete })}
+              data-testid="jira-move-on-complete"
             />
-            <p className="text-[12px] text-muted-foreground">{JIRA_COMPLETION_COLUMN_COPY.helper}</p>
-            {statusesQuery.isError ? (
-              <p className="text-[12px] text-destructive">{JIRA_COMPLETION_COLUMN_COPY.empty}</p>
-            ) : null}
-          </div>
+            <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">
+              {JIRA_COMPLETION_COLUMN_COPY.move}
+            </span>
+          </Label>
+          <JiraCompletionColumnSelect
+            columns={columns}
+            selectedColumn={selectedColumn}
+            loading={statusesQuery.isLoading}
+            disabled={!value.jiraMoveOnComplete}
+            onChange={(column) => onChange({ ...value, jiraCompletionColumn: column })}
+          />
+        </div>
+        {value.jiraMoveOnComplete && statusesQuery.isError ? (
+          <p className="text-[12px] text-destructive">{JIRA_COMPLETION_COLUMN_COPY.empty}</p>
         ) : null}
       </div>
     </fieldset>
@@ -99,11 +95,13 @@ function JiraCompletionColumnSelect({
   columns,
   selectedColumn,
   loading,
+  disabled = false,
   onChange,
 }: {
   columns: string[];
   selectedColumn: string;
   loading: boolean;
+  disabled?: boolean;
   onChange: (column: string) => void;
 }) {
   const options = columns.map((column) => (
@@ -114,10 +112,11 @@ function JiraCompletionColumnSelect({
 
   if (selectedColumn) {
     return (
-      <Select value={selectedColumn} onValueChange={onChange}>
+      <Select value={selectedColumn} disabled={disabled} onValueChange={onChange}>
         <SelectTrigger
           id="jira-completion-column-select"
-          className="w-full"
+          aria-label={JIRA_COMPLETION_COLUMN_COPY.column}
+          className="h-8 w-[min(100%,10rem)] shrink-0"
           data-testid="jira-completion-column-select"
         >
           <SelectValue />
@@ -128,8 +127,13 @@ function JiraCompletionColumnSelect({
   }
 
   return (
-    <Select disabled={columns.length === 0} onValueChange={onChange}>
-      <SelectTrigger id="jira-completion-column-select" className="w-full" data-testid="jira-completion-column-select">
+    <Select disabled={disabled || columns.length === 0} onValueChange={onChange}>
+      <SelectTrigger
+        id="jira-completion-column-select"
+        aria-label={JIRA_COMPLETION_COLUMN_COPY.column}
+        className="h-8 w-[min(100%,10rem)] shrink-0"
+        data-testid="jira-completion-column-select"
+      >
         <SelectValue placeholder={loading ? JIRA_COMPLETION_COLUMN_COPY.loading : JIRA_COMPLETION_COLUMN_COPY.column} />
       </SelectTrigger>
       {columns.length > 0 ? <SelectContent>{options}</SelectContent> : null}
