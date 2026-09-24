@@ -9,10 +9,12 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -458,13 +460,21 @@ func AppendTaskFiles(
 			createdBy,
 			file,
 		)
-		if err != nil || !ingested {
+		if err != nil {
+			log.WithError(err).Warn("failed to store task file")
+			continue
+		}
+		if !ingested {
 			continue
 		}
 		result.ObjectKeys = append(result.ObjectKeys, stored.StorageKey)
 		ref := blob.FileRef(stored.ID)
 		replaced := false
-		for _, rawURL := range file.ReplaceURLs {
+		replaceURLs := append([]string(nil), file.ReplaceURLs...)
+		slices.SortFunc(replaceURLs, func(a, b string) int {
+			return len(b) - len(a)
+		})
+		for _, rawURL := range replaceURLs {
 			if rawURL == "" || !strings.Contains(next, rawURL) {
 				continue
 			}
@@ -514,14 +524,14 @@ func storeIncomingFile(
 		CreatedByID:    createdByID,
 	})
 	if err != nil {
-		return nil, false, nil
+		return nil, false, err
 	}
 
 	storeCtx, cancel := context.WithTimeout(ctx, ingestFetchTimeout)
 	defer cancel()
 	if err := CompleteUpload(storeCtx, tx, provider, stored, io.LimitReader(file.Body, models.MaxFileBytes+1)); err != nil {
 		_ = DeleteObjectAndRow(storeCtx, tx, provider, stored)
-		return nil, false, nil
+		return nil, false, err
 	}
 	return stored, true, nil
 }

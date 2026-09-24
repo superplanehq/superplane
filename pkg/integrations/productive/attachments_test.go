@@ -36,6 +36,7 @@ func TestIsProductiveFileURL(t *testing.T) {
 
 	assert.True(t, IsProductiveFileURL("https://files.productive.io/attachments/files/1/original/shot.png?1776398568"))
 	assert.True(t, IsProductiveFileURL("https://files-test.productive.io/attachments/files/000/000/001/original/img.png"))
+	assert.False(t, IsProductiveFileURL("http://files.productive.io/attachments/files/1/original/shot.png"))
 	assert.False(t, IsProductiveFileURL("https://api.productive.io/api/v2/attachments/1"))
 	assert.False(t, IsProductiveFileURL("https://example.com/attachments/files/1/original/img.png"))
 }
@@ -55,6 +56,25 @@ func TestPlanTaskDownloadsReplacesDescriptionURLAndAppendsNewFile(t *testing.T) 
 	assert.Equal(t, []string{inline}, planned[0].replaceURLs)
 	assert.Equal(t, "notes.pdf", planned[1].name)
 	assert.Empty(t, planned[1].replaceURLs)
+}
+
+func TestPlanTaskDownloadsMatchesDescriptionURLWithDifferentQuery(t *testing.T) {
+	t.Parallel()
+
+	descriptionURL := "https://files.productive.io/attachments/files/1/original/notes.pdf?token=abc"
+	planned := planTaskDownloads(
+		`<a href="`+descriptionURL+`">notes</a>`,
+		[]Attachment{
+			{
+				Name:        "notes.pdf",
+				ContentType: "application/pdf",
+				URL:         "https://files.productive.io/attachments/files/1/original/notes.pdf?1776398568",
+			},
+		},
+	)
+
+	require.Len(t, planned, 1)
+	assert.Equal(t, []string{descriptionURL}, planned[0].replaceURLs)
 }
 
 func TestClientTaskFilesDownloadsWithToken(t *testing.T) {

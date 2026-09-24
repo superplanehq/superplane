@@ -10,7 +10,7 @@ import (
 
 func TestFileIDsAndRewrite(t *testing.T) {
 	id := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-	markdown := "See ![bug](" + FileRef(id) + ") and <img src=\"" + FileRef(id) + "\">"
+	markdown := "See ![bug](" + FileRef(id) + "), <img src=\"" + FileRef(id) + "\">, and <a href=\"" + FileRef(id) + "\">notes</a>"
 	ids := FileIDsInMarkdown(markdown)
 	require.Equal(t, []uuid.UUID{id}, ids)
 

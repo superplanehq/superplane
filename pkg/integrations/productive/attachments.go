@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
@@ -76,7 +77,7 @@ func IsProductiveFileURL(raw string) bool {
 	if err != nil || parsed.Host == "" {
 		return false
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+	if parsed.Scheme != "https" {
 		return false
 	}
 	host := strings.ToLower(parsed.Hostname())
@@ -102,6 +103,9 @@ func (c *Client) TaskFiles(ctx context.Context, taskID, description string) ([]T
 
 	files := make([]TaskFile, 0, len(planned))
 	for _, item := range planned {
+		if len(files) >= models.MaxFilesPerWorkOrder {
+			break
+		}
 		file, ok := c.downloadTaskFile(ctx, item)
 		if !ok {
 			continue
@@ -179,7 +183,7 @@ func planTaskDownloads(description string, attachments []Attachment) []plannedDo
 	byPath := map[string]*plannedDownload{}
 	var planned []*plannedDownload
 
-	add := func(rawURL, name, contentType string, replace bool) {
+	add := func(rawURL, name, contentType string, replaceURLs []string) {
 		key := filePathKey(rawURL)
 		if key == "" {
 			return
@@ -200,19 +204,23 @@ func planTaskDownloads(description string, attachments []Attachment) []plannedDo
 		if item.contentType == "" {
 			item.contentType = contentType
 		}
-		if replace && !slices.Contains(item.replaceURLs, rawURL) {
-			item.replaceURLs = append(item.replaceURLs, rawURL)
+		for _, replaceURL := range replaceURLs {
+			if replaceURL == "" || slices.Contains(item.replaceURLs, replaceURL) {
+				continue
+			}
+			item.replaceURLs = append(item.replaceURLs, replaceURL)
 		}
 	}
 
 	for _, attachment := range attachments {
-		add(attachment.URL, attachment.Name, attachment.ContentType, strings.Contains(description, attachment.URL))
+		key := filePathKey(attachment.URL)
+		add(attachment.URL, attachment.Name, attachment.ContentType, descriptionURLsWithPathKey(description, key))
 	}
 	for _, rawURL := range blob.HTTPResourceURLs(description) {
 		if !IsProductiveFileURL(rawURL) {
 			continue
 		}
-		add(rawURL, path.Base(rawURL), "", true)
+		add(rawURL, path.Base(rawURL), "", []string{rawURL})
 	}
 
 	result := make([]plannedDownload, 0, len(planned))
@@ -287,4 +295,18 @@ func filePathKey(rawURL string) string {
 		return ""
 	}
 	return strings.ToLower(parsed.Hostname()) + parsed.EscapedPath()
+}
+
+func descriptionURLsWithPathKey(description, key string) []string {
+	if key == "" {
+		return nil
+	}
+	matches := make([]string, 0, 1)
+	for _, rawURL := range blob.HTTPResourceURLs(description) {
+		if filePathKey(rawURL) != key {
+			continue
+		}
+		matches = append(matches, rawURL)
+	}
+	return matches
 }

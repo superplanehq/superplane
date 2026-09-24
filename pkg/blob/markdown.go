@@ -71,6 +71,9 @@ func FileIDsInMarkdown(markdown string) []uuid.UUID {
 	for _, match := range htmlSrcPattern.FindAllStringSubmatch(markdown, -1) {
 		collect(match[2])
 	}
+	for _, match := range htmlHrefPattern.FindAllStringSubmatch(markdown, -1) {
+		collect(match[2])
+	}
 	return ids
 }
 
@@ -93,8 +96,15 @@ func RewriteFileRefs(markdown string, urls map[uuid.UUID]string) string {
 		}
 		return parts[1] + replace(parts[2]) + parts[3]
 	})
-	return htmlSrcPattern.ReplaceAllStringFunc(out, func(match string) string {
+	out = htmlSrcPattern.ReplaceAllStringFunc(out, func(match string) string {
 		parts := htmlSrcPattern.FindStringSubmatch(match)
+		if len(parts) != 4 {
+			return match
+		}
+		return parts[1] + replace(parts[2]) + parts[3]
+	})
+	return htmlHrefPattern.ReplaceAllStringFunc(out, func(match string) string {
+		parts := htmlHrefPattern.FindStringSubmatch(match)
 		if len(parts) != 4 {
 			return match
 		}

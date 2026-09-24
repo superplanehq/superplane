@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -49,28 +48,30 @@ func (c *FactoryContext) ingestProductiveFiles(order *models.FactoryWorkOrder) {
 		order.Description,
 		incomingProductiveFiles(taskFiles),
 	)
-	if err != nil || next.Markdown == order.Description {
-		if len(next.ObjectKeys) > 0 {
-			_ = storedfiles.SweepObjects(
-				context.Background(),
-				database.Conn(),
-				blob.Current(),
-				order.OrganizationID,
-				order.FactoryID,
-				next.ObjectKeys,
-			)
-		}
+	if err != nil {
+		log.WithError(err).Warn("failed to store Productive.io task files")
+		return
+	}
+	if len(next.ObjectKeys) == 0 && next.Markdown == order.Description {
+		return
+	}
+
+	uploadCleanup := FileBindCleanup{
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		Result:         storedfiles.BindResult{CopiedKeys: next.ObjectKeys},
+	}
+	if c.onFileBindCleanup != nil {
+		c.onFileBindCleanup(uploadCleanup)
+	}
+
+	if next.Markdown == order.Description {
 		return
 	}
 	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
-		_ = storedfiles.SweepObjects(
-			context.Background(),
-			database.Conn(),
-			blob.Current(),
-			order.OrganizationID,
-			order.FactoryID,
-			next.ObjectKeys,
-		)
+		if c.onFileBindCleanup == nil {
+			ApplyFileBindCleanups([]FileBindCleanup{uploadCleanup}, err)
+		}
 	}
 }
 
