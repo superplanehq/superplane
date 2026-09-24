@@ -35,7 +35,9 @@ export function SkillSlashMenu({
             : "absolute z-30"
           : "absolute inset-x-0 bottom-full z-20 mb-1",
       )}
-      style={portal ? { left: portal.left, width: portal.width, top: portal.top } : undefined}
+      style={
+        portal ? { left: portal.left, width: portal.width, top: portal.top, maxHeight: portal.maxHeight } : undefined
+      }
     >
       {candidates.map((candidate, index) => {
         const highlighted = index === highlightIndex;
