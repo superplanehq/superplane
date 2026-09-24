@@ -1,10 +1,14 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import type { InfiniteData } from "@tanstack/react-query";
+import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { describe, expect, it } from "bun:test";
 
-import type { WorkOrdersPage } from "@/pages/factories/lib/workOrderListPagination";
+import { factoryWorkOrdersPageKey, type WorkOrdersPage } from "@/pages/factories/lib/workOrderListPagination";
 
-import { patchCachedWorkOrderList, patchCachedWorkOrderPages } from "./workOrderListCache";
+import {
+  patchCachedWorkOrderList,
+  patchCachedWorkOrderPages,
+  removeWorkOrderFromListCaches,
+} from "./workOrderListCache";
 
 function pages(
   orders: Array<{ id: string; title?: string; state?: FactoriesWorkOrder["state"] }>,
@@ -109,5 +113,31 @@ describe("patchCachedWorkOrderPages", () => {
       ["STATE_DRAFT"],
     );
     expect(next?.pages[0]?.orders).toEqual([]);
+  });
+});
+
+describe("removeWorkOrderFromListCaches", () => {
+  it("removes the task from the full list and from paged lists", () => {
+    const queryClient = new QueryClient();
+    const listKey = ["factories", "org-1", "factory-1", "work-orders"] as const;
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData(listKey, [
+      { id: "wo-1", title: "Gone" },
+      { id: "wo-2", title: "Other" },
+    ]);
+    queryClient.setQueryData(
+      pageKey,
+      pages([
+        { id: "wo-1", title: "Gone" },
+        { id: "wo-2", title: "Other" },
+      ]),
+    );
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-1");
+
+    expect(queryClient.getQueryData(listKey)).toEqual([{ id: "wo-2", title: "Other" }]);
+    expect(queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey)?.pages[0]?.orders).toEqual([
+      { id: "wo-2", title: "Other" },
+    ]);
   });
 });
