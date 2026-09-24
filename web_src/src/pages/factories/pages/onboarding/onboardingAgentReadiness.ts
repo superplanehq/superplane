@@ -166,11 +166,9 @@ export function onboardingAgentGate(args: {
   hostedModelsAvailableLoading: boolean;
   bringYourOwnKey: boolean;
   bringYourOwnKeyLoading: boolean;
-  bringYourOwnKeyLookupFailed: boolean;
 }): OnboardingAgentGate {
   if (args.hostedModelsAvailableLoading || args.bringYourOwnKeyLoading) return "pending";
   if (!args.hostedModelsAvailable) return "show";
-  if (args.bringYourOwnKeyLookupFailed) return "first";
   if (args.bringYourOwnKey) return "first";
   return "skip";
 }

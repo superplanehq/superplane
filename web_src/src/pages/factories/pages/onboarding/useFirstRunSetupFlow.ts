@@ -419,7 +419,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
-    bringYourOwnKeyLookupFailed: model.bringYourOwnKeyLookupFailed,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection);
   const commands = useFirstRunCommands(model, agentGate, connection, navigation, blocking);

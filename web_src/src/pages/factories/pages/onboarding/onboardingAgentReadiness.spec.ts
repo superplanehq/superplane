@@ -234,7 +234,6 @@ describe("onboardingAgentGate", () => {
       hostedModelsAvailableLoading: false,
       bringYourOwnKey: false,
       bringYourOwnKeyLoading: false,
-      bringYourOwnKeyLookupFailed: false,
       ...overrides,
     });
 
@@ -256,10 +255,6 @@ describe("onboardingAgentGate", () => {
 
   it("waits while hosted model availability is still loading", () => {
     expect(gate({ hostedModelsAvailableLoading: true, bringYourOwnKey: true })).toBe("pending");
-  });
-
-  it("shows the model source when the feature registry lookup failed", () => {
-    expect(gate({ hostedModelsAvailable: true, bringYourOwnKeyLookupFailed: true })).toBe("first");
   });
 
   it("shows the agent screen when no hosted model is available", () => {

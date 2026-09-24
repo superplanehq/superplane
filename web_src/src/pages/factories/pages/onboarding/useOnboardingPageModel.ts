@@ -519,7 +519,6 @@ export function useOnboardingPageModel(args: {
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
     bringYourOwnKey: bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
     bringYourOwnKeyLoading: bringYourOwnKey.isLoading,
-    bringYourOwnKeyLookupFailed: bringYourOwnKey.lookupFailed,
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,

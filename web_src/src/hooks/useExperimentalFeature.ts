@@ -8,7 +8,7 @@ export interface ExperimentalFeatureAccess {
   enabledExperimentalFeatures: string[];
   isLoading: boolean;
   /** True when the feature registry request failed. */
-  lookupFailed: boolean;
+  lookupFailed?: boolean;
 }
 
 export function useExperimentalFeature(organizationId?: string): ExperimentalFeatureAccess {
