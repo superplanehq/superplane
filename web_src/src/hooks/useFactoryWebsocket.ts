@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { factoriesDescribeWorkOrder } from "@/api-client";
+import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,6 +22,10 @@ type FactoryWebsocketMessage = {
   event?: string;
   payload?: FactoryWorkOrderUpdatedPayload;
 };
+
+function isSessionRedirectError(error: unknown): boolean {
+  return error instanceof Error && (error.message === "Unauthorized" || error.message === ACCOUNT_BLOCKED_MESSAGE);
+}
 
 function parseFactoryEvent(event: MessageEvent<unknown>): FactoryWebsocketMessage | null {
   try {
@@ -229,6 +234,9 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
         orderId,
         () => refreshVersion.current.get(orderId) === version,
       ).catch((error) => {
+        if (isSessionRedirectError(error)) {
+          return;
+        }
         console.warn("factory ws: failed to refresh work order", error);
       });
     },

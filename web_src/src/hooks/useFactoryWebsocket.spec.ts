@@ -1,5 +1,6 @@
 import * as apiClient from "@/api-client";
 import type { FactoriesWorkOrder } from "@/api-client";
+import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
@@ -180,6 +181,50 @@ describe("useFactoryWebsocket", () => {
       queryClient.getQueryData<Array<{ title?: string }>>(factoryQueryKeys.workOrders("org-1", "factory-1"))?.[0]
         ?.title,
     ).toBe("Newer");
+  });
+
+  it("does not warn when a live refresh fails because the session is over", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error("Unauthorized"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { queryClient } = renderFactoryWebsocket();
+    const cachedOrders = [{ id: "order-1", title: "Old" }];
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), cachedOrders);
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual(cachedOrders);
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"))).toBeUndefined();
+  });
+
+  it("does not warn when a live refresh fails because the account is blocked", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error(ACCOUNT_BLOCKED_MESSAGE));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderFactoryWebsocket();
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("warns when a live refresh fails for a reason other than session redirect", async () => {
+    const error = new Error("Task not found");
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(error);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderFactoryWebsocket();
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith("factory ws: failed to refresh work order", error);
   });
 
   it("ignores events for a different factory", async () => {
