@@ -264,9 +264,12 @@ describe("persistColumnAgent", () => {
     const { showSuccessToast } = await import("@/lib/toast");
     const order: string[] = [];
     const newerCanvas = canvasWithPublishedNode("version-newer");
-    const stageYaml = vi.fn(async () => {
-      order.push("stage");
-    });
+    const stageYaml = vi.fn(
+      async (input: { versionId: string; canvasYaml: string; replaceIfStale?: boolean }) => {
+        order.push("stage");
+        return input;
+      },
+    );
     const commit = vi.fn(async () => {
       order.push("commit");
     });
