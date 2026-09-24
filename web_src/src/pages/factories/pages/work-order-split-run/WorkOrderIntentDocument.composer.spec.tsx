@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +36,24 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
       id ? { id, name: name ?? "Ada Lovelace", initials: "AL" } : null,
     isLoading: false,
   }),
+}));
+
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: (
+    _organizationId: string | undefined,
+    _factoryId: string | undefined,
+    filter: string,
+    enabled: boolean,
+  ) => {
+    if (!enabled) {
+      return [];
+    }
+    const all = [{ id: "1", command: "oypirate", title: "Oy Pirate!", description: "Talk like a pirate." }];
+    const needle = filter.trim().toLowerCase();
+    return needle
+      ? all.filter((candidate) => candidate.command.includes(needle) || candidate.title.toLowerCase().includes(needle))
+      : all;
+  },
 }));
 
 describe("WorkOrderIntentDocument composer", () => {
@@ -377,5 +396,32 @@ describe("WorkOrderIntentDocument composer", () => {
     ).toHaveAttribute("href", csv.previewUrl);
     expect(screen.queryByTestId("create-work-order-request-file-chips")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-description")).not.toHaveTextContent("bug.png");
+  });
+
+  it("inserts a skill command from the slash menu", async () => {
+    const user = userEvent.setup();
+    function SkillSlashRefineHarness() {
+      const [composer, setComposer] = useState("");
+      return (
+        <WorkOrderIntentDocument
+          {...INTENT_DOC}
+          artifacts={[INTENT]}
+          analysis={analysisChat({
+            view: WAITING_COMPOSER_VIEW,
+            factoryId: "factory-1",
+            composer,
+            onComposerChange: setComposer,
+          })}
+        />
+      );
+    }
+
+    renderIntentDocument(<SkillSlashRefineHarness />);
+
+    const textarea = screen.getByTestId("split-run-intent-composer");
+    await user.type(textarea, "/oy");
+    expect(screen.getByTestId("skill-slash-menu")).toBeInTheDocument();
+    await user.click(screen.getByTestId("skill-slash-option-oypirate"));
+    expect(textarea).toHaveValue("/oypirate ");
   });
 });

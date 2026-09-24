@@ -163,6 +163,21 @@ func TestBuildOpenCodeConfigMergesWorkspaceMCP(t *testing.T) {
 	assert.Equal(t, "https://mcp.example.com/mcp", docs["url"])
 }
 
+func TestBuildOpenCodeConfigDeniesDisabledWorkspaceMCPTools(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","disabledTools":["create_issue"]}]}`), 0o644))
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	permission, _ := config["permission"].(map[string]any)
+	assert.Equal(t, "deny", permission["docs_create_issue"])
+	mcp, ok := config["mcp"].(map[string]any)
+	require.True(t, ok)
+	docs, ok := mcp["docs"].(map[string]any)
+	require.True(t, ok)
+	assert.Nil(t, docs["disabledTools"])
+}
+
 func TestBuildOpenCodeConfigReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 	taskDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))

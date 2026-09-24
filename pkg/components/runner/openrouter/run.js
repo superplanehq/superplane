@@ -146,17 +146,46 @@ function workspaceMCPServers(env = process.env) {
         continue;
       }
       const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+      const disabledTools = Array.isArray(server.disabledTools)
+        ? server.disabledTools.map((tool) => String(tool || "").trim()).filter(Boolean)
+        : [];
       out[name] = {
         type: "remote",
         url,
         enabled: true,
         headers,
+        disabledTools,
       };
     }
     return out;
   } catch (_err) {
     return {};
   }
+}
+
+function applyWorkspaceMCPDenylist(config, servers) {
+  const permission = { ...(config.permission || {}) };
+  const mcp = { ...(config.mcp || {}) };
+  let changed = Object.keys(servers).length > 0;
+  for (const [name, server] of Object.entries(servers)) {
+    const disabledTools = Array.isArray(server.disabledTools) ? server.disabledTools : [];
+    mcp[name] = {
+      type: server.type,
+      url: server.url,
+      enabled: server.enabled,
+      headers: server.headers,
+    };
+    for (const tool of disabledTools) {
+      permission[`${name}_${tool}`] = "deny";
+      changed = true;
+    }
+  }
+  if (!changed) {
+    return config;
+  }
+  config.mcp = mcp;
+  config.permission = permission;
+  return config;
 }
 
 function planningAnalysisEnabled(env = process.env) {
@@ -410,10 +439,7 @@ function buildOpenCodeConfig({
       },
     };
   }
-  const workspaceServers = workspaceMCPServers(env);
-  if (Object.keys(workspaceServers).length > 0) {
-    config.mcp = { ...(config.mcp || {}), ...workspaceServers };
-  }
+  applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");

@@ -21,6 +21,7 @@ const (
 type Tool struct {
 	Name        string
 	Description string
+	ReadOnly    bool
 }
 
 type rpcRequest struct {
@@ -58,8 +59,17 @@ type toolsListResult struct {
 }
 
 type toolPayload struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Annotations *toolAnnotations `json:"annotations"`
+}
+
+type toolAnnotations struct {
+	ReadOnlyHint *bool `json:"readOnlyHint"`
+}
+
+func (t toolPayload) ReadOnly() bool {
+	return t.Annotations != nil && t.Annotations.ReadOnlyHint != nil && *t.Annotations.ReadOnlyHint
 }
 
 // ListTools initializes a Streamable HTTP MCP session and returns tools/list.
@@ -105,7 +115,11 @@ func ListTools(ctx context.Context, httpClient HTTPDoer, mcpURL string, headers 
 			if name == "" {
 				continue
 			}
-			tools = append(tools, Tool{Name: name, Description: strings.TrimSpace(tool.Description)})
+			tools = append(tools, Tool{
+				Name:        name,
+				Description: strings.TrimSpace(tool.Description),
+				ReadOnly:    tool.ReadOnly(),
+			})
 		}
 		cursor = strings.TrimSpace(result.NextCursor)
 		if cursor == "" {

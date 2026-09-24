@@ -8,6 +8,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
+import { disabledAgentResourceTools } from "./PlanningReviewDisabledTools";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
 
@@ -147,7 +148,9 @@ function AgentPanel({
         factoryId={factoryId}
         factoryKey={factoryKey}
         disabledIds={disabledAgentResourceIds(component.configuration)}
+        disabledTools={disabledAgentResourceTools(component.configuration)}
         onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
+        onDisabledToolsChange={(tools) => setConfigurationField("disabledAgentResourceTools", tools)}
       />
     </div>
   );
