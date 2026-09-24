@@ -40,20 +40,19 @@ describe("SentryIntakeFilterFields", () => {
   it("hides Sentry event fields and level checkboxes for a GitHub intake", () => {
     render(<FilterHarness sourceId="github-issues" initial={DEFAULT_GITHUB_INTAKE_SETTINGS} />);
 
-    expect(screen.queryByRole("checkbox", { name: "An issue becomes unresolved" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "An issue is assigned" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "A new issue is created" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Fatal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Error" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeInTheDocument();
   });
 
-  it("shows Sentry event fields with no level checkboxes for a Sentry intake", () => {
+  it("shows only the new-issue trigger for a Sentry intake", () => {
     render(<FilterHarness sourceId="sentry-exceptions" initial={DEFAULT_SENTRY_INTAKE_SETTINGS} />);
 
     expect(screen.getByRole("group", { name: "Create task when:" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "An issue becomes unresolved" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "An issue is assigned" })).not.toBeChecked();
+    expect(screen.queryByText("An issue becomes unresolved")).not.toBeInTheDocument();
+    expect(screen.queryByText("An issue is assigned")).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Fatal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Error" })).not.toBeInTheDocument();
@@ -63,37 +62,44 @@ describe("SentryIntakeFilterFields", () => {
     expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
   });
 
-  it("puts Sentry event triggers on the save payload", async () => {
+  it("toggles the new-issue trigger when its label is clicked", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     render(<FilterHarness sourceId="sentry-exceptions" initial={DEFAULT_SENTRY_INTAKE_SETTINGS} onSave={onSave} />);
 
-    await user.click(screen.getByRole("checkbox", { name: "An issue is assigned" }));
+    await user.click(screen.getByText("A new issue is created"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sentryNewIssues: false }));
+    expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({
+      sentryNewIssues: false,
+    });
+  });
+
+  it("preserves stored hidden triggers on save even though the UI no longer shows them", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    const initial: IntakeSourceSettings = {
+      ...DEFAULT_SENTRY_INTAKE_SETTINGS,
+      sentryRegressedIssues: false,
+      sentryAssignedIssues: true,
+    };
+    render(<FilterHarness sourceId="sentry-exceptions" initial={initial} onSave={onSave} />);
+
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         sentryNewIssues: true,
-        sentryRegressedIssues: true,
+        sentryRegressedIssues: false,
         sentryAssignedIssues: true,
       }),
     );
     expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({
       sentryNewIssues: true,
-      sentryRegressedIssues: true,
+      sentryRegressedIssues: false,
       sentryAssignedIssues: true,
     });
-  });
-
-  it("toggles a trigger when the associated label is clicked", async () => {
-    const onSave = vi.fn();
-    const user = userEvent.setup();
-    render(<FilterHarness sourceId="sentry-exceptions" initial={DEFAULT_SENTRY_INTAKE_SETTINGS} onSave={onSave} />);
-
-    await user.click(screen.getByText("An issue is assigned"));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sentryAssignedIssues: true }));
   });
 
   it("preserves stored sentryLevels on save even though the UI no longer shows them", async () => {
