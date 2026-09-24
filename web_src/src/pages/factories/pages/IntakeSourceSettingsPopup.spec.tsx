@@ -4,6 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -13,6 +18,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_PRODUCTIVE_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
   INTAKE_SETTINGS_COPY,
   type IntakeSettingsTab,
@@ -157,7 +163,11 @@ function renderPopup(
                   ? DEFAULT_SENTRY_INTAKE_SETTINGS
                   : props.sourceId === "jira-issues"
                     ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
-                    : DEFAULT_GITHUB_INTAKE_SETTINGS)
+                    : props.sourceId === "pagerduty-incidents"
+                      ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "PagerDuty incidents" }
+                      : props.sourceId === "productive-tasks"
+                        ? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS
+                        : DEFAULT_GITHUB_INTAKE_SETTINGS)
               }
               sourceId={props.sourceId}
               organizationId={props.organizationId}
@@ -213,6 +223,22 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["github-issues", "GitHub issues", githubIcon],
+    ["jira-issues", "Jira issues", jiraIcon],
+    ["sentry-exceptions", "Sentry exceptions", sentryIcon],
+    ["pagerduty-incidents", "PagerDuty incidents", pagerdutyIcon],
+    ["productive-tasks", "Productive.io tasks", productiveIcon],
+  ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
+    renderPopup({ sourceId });
+
+    const heading = screen.getByRole("heading", { name: `Intake ${name}` });
+    const icon = screen.getByTestId("intake-source-settings-title-icon");
+    expect(icon).toHaveAttribute("alt", "");
+    expect(icon).toHaveAttribute("src", iconSrc);
+    expect(icon.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("offers the labels that exist in the repository", async () => {
