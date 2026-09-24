@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -1622,6 +1623,93 @@ func TestFactoryContext_CreateWorkOrderStoresProductiveAttachments(t *testing.T)
 	listed, ok := payload["files"].([]any)
 	require.True(t, ok)
 	require.Len(t, listed, 2)
+}
+
+func TestFactoryContext_CreateWorkOrderIngestsJiraIssueFiles(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	inline := testProxyURL("/rest/api/3/attachment/content/10001")
+	canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+		"type": jira.IssueEventPayloadType,
+		"data": map[string]any{
+			"url":   "https://acme.atlassian.net/browse/ENG-5",
+			"issue": map[string]any{"key": "ENG-5"},
+		},
+	})
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithJiraIssueFiles(
+		func(context.Context, string, string) ([]jira.IssueFile, error) {
+			return []jira.IssueFile{
+				{
+					Name:        "shot.png",
+					ContentType: "image/png",
+					Body:        []byte("png-bytes"),
+					ReplaceURLs: []string{inline},
+				},
+				{
+					Name:        "notes.pdf",
+					ContentType: "application/pdf",
+					Body:        []byte("pdf-bytes"),
+				},
+			}, nil
+		},
+	)
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From Jira issue",
+		Description: "See ![shot](" + inline + ")",
+	})
+	require.True(t, inserted)
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.NotContains(t, persisted.Description, inline)
+	assert.Contains(t, persisted.Description, "![shot]("+blob.FileRefScheme+"://")
+	assert.Contains(t, persisted.Description, "[notes.pdf]("+blob.FileRefScheme+"://")
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 2)
+}
+
+func testProxyURL(path string) string {
+	return jira.APIProxyHost + "/" + "35273b54-3f06-40d2-880f-dd28cf6daafa" + path
 }
 
 func TestFactoryContext_CreateWorkOrderDefersFileCleanupUntilCallerApplies(t *testing.T) {

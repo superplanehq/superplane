@@ -235,6 +235,10 @@ func (s *jiraIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool)
 	return issueKey, true
 }
 
+func (s *jiraIntakeItemSource) IssueFiles(ctx context.Context, issueKey, description string) ([]jira.IssueFile, error) {
+	return s.jira.IssueFiles(ctx, issueKey, description)
+}
+
 func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
 	issueKey := strings.TrimSpace(id)
 	if issueKey == "" {
