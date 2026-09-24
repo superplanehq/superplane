@@ -32,6 +32,18 @@ api:
       cpu: 100m
       memory: 128Mi
 
+# WebSocket hubs run separately from the API. Ingress sends /ws here.
+websocket:
+  replicas: 1
+  dbPoolSize: 5
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 domain:
   name: ""
   configMapName: "base-domain"
@@ -81,6 +93,18 @@ dash0Web:
   authToken: ""
   serviceName: "superplane-web"
   environment: ""
+
+posthog:
+  secretName: ""
+  enabled: false
+  key: ""
+
+polar:
+  secretName: ""
+  enabled: false
+  accessToken: ""
+  environment: "sandbox"
+  webhookSecret: ""
 
 #
 # Secret used to sign JWT session tokens
@@ -212,6 +236,7 @@ rabbitmq:
 blobStorage:
   provider: filesystem
   bucket: ""
+  region: ""
   localPath: /var/lib/superplane/blobs
   credentialsFile: ""
 
@@ -223,3 +248,13 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
+
+#
+# Kubernetes service account. create stays false.
+# Set name to use an existing account.
+# Set annotations to bind a cloud identity, for example GKE Workload Identity.
+#
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}

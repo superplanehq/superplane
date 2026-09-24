@@ -75,6 +75,7 @@ type productiveIntakeItemSource struct {
 	productive            *productive.Client
 	projectID             string
 	organizationID        string
+	excludeKeyTasks       bool
 	projectProbe          sync.Once
 	projectReadabilityErr error
 }
@@ -108,7 +109,14 @@ func newLiveIntakeItemSource(
 		return unsupportedIntakeItemSource{}, nil
 	}
 
-	return builder(ctx, deps, tx, trigger, integration)
+	source, err := builder(ctx, deps, tx, trigger, integration)
+	if err != nil {
+		return nil, err
+	}
+	if productiveSource, ok := source.(*productiveIntakeItemSource); ok {
+		productiveSource.excludeKeyTasks = productiveIntakeExcludesKeyTasks(tx, intake.CanvasID)
+	}
+	return source, nil
 }
 
 func newGitHubIntakeItemSource(
@@ -340,9 +348,10 @@ func newProductiveIntakeItemSource(
 	}
 
 	return &productiveIntakeItemSource{
-		productive:     client,
-		projectID:      projectID,
-		organizationID: client.OrganizationID,
+		productive:      client,
+		projectID:       projectID,
+		organizationID:  client.OrganizationID,
+		excludeKeyTasks: true,
 	}, nil
 }
 
@@ -452,7 +461,7 @@ func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeIte
 }
 
 func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	tasks, err := s.productive.ListTasks(s.projectID, query, limit)
+	tasks, err := s.productive.ListTasks(s.projectID, query, limit, s.excludeKeyTasks)
 	if err != nil {
 		return nil, err
 	}
@@ -464,12 +473,19 @@ func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, l
 	return items, nil
 }
 
+func (s *productiveIntakeItemSource) TaskFiles(ctx context.Context, taskID, description string) ([]productive.TaskFile, error) {
+	return s.productive.TaskFiles(ctx, taskID, description)
+}
+
 func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
 	task, err := s.productive.GetTask(strings.TrimSpace(id))
 	if err != nil {
 		return nil, err
 	}
 	if task.ProjectID != "" && task.ProjectID != s.projectID {
+		return nil, errIntakeItemNotFound
+	}
+	if s.excludeKeyTasks && task.IsKeyTask() {
 		return nil, errIntakeItemNotFound
 	}
 
@@ -502,6 +518,9 @@ func (s *productiveIntakeItemSource) IsItemAvailable(_ context.Context, id strin
 	}
 	if err != nil {
 		return false, err
+	}
+	if s.excludeKeyTasks && task.IsKeyTask() {
+		return false, nil
 	}
 	return !task.Closed, nil
 }

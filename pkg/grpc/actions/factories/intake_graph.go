@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -92,6 +93,11 @@ func intakeHealth(
 			return health
 		}
 	}
+	if intake.Source == models.FactoryIntakeSourceProductiveTasks {
+		if health := productiveIntakeWebhookHealth(tx, intake.CanvasID, graph.TriggerNodeID); health != pb.FactoryIntake_HEALTH_OK {
+			return health
+		}
+	}
 
 	return pb.FactoryIntake_HEALTH_OK
 }
@@ -108,6 +114,19 @@ func intakeSourceAllowsRebind(source string) bool {
 // ready and has a remote id. A failed webhook is reported apart from a pending
 // one, because it is out of retries and waiting does not repair it.
 func jiraIntakeWebhookHealth(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) pb.FactoryIntake_Health {
+	return intakeWebhookHealth(tx, canvasID, triggerNodeID, jiraWebhookHasRemoteID)
+}
+
+func productiveIntakeWebhookHealth(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) pb.FactoryIntake_Health {
+	return intakeWebhookHealth(tx, canvasID, triggerNodeID, productiveWebhookHasRemoteID)
+}
+
+func intakeWebhookHealth(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	triggerNodeID string,
+	hasRemoteID func(any) bool,
+) pb.FactoryIntake_Health {
 	if tx == nil || triggerNodeID == "" {
 		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
 	}
@@ -126,7 +145,7 @@ func jiraIntakeWebhookHealth(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID stri
 		return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED
 	}
 
-	if webhook.State != models.WebhookStateReady || !jiraWebhookHasRemoteID(webhook.Metadata.Data()) {
+	if webhook.State != models.WebhookStateReady || !hasRemoteID(webhook.Metadata.Data()) {
 		return pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY
 	}
 
@@ -140,6 +159,33 @@ func jiraWebhookHasRemoteID(metadata any) bool {
 	}
 	id, present := asMap["webhookId"]
 	return present && id != nil
+}
+
+func productiveWebhookHasRemoteID(metadata any) bool {
+	asMap, ok := metadata.(map[string]any)
+	if !ok || asMap == nil {
+		return false
+	}
+	if webhookRemoteIDsPresent(asMap["ids"]) {
+		return true
+	}
+	id, present := asMap["id"]
+	return present && id != nil && strings.TrimSpace(fmt.Sprint(id)) != ""
+}
+
+func webhookRemoteIDsPresent(value any) bool {
+	switch ids := value.(type) {
+	case []string:
+		return slices.ContainsFunc(ids, func(id string) bool {
+			return strings.TrimSpace(id) != ""
+		})
+	case []any:
+		return slices.ContainsFunc(ids, func(id any) bool {
+			return id != nil && strings.TrimSpace(fmt.Sprint(id)) != ""
+		})
+	default:
+		return false
+	}
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls

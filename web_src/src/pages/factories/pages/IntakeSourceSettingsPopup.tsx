@@ -4,7 +4,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
-import { IntakeConnectionFields, type IntakeConnectionFieldsProps } from "./IntakeConnectionFields";
 import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
 import {
   INTAKE_SETTINGS_COPY,
@@ -14,6 +13,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
+import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import {
@@ -24,10 +24,6 @@ import {
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
-
-export type IntakeSettingsConnection = Omit<IntakeConnectionFieldsProps, "sourceId"> & {
-  saveDisabled?: boolean;
-};
 
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
@@ -44,13 +40,8 @@ interface IntakeSourceSettingsPopupProps {
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   savePending?: boolean;
   saveError?: string;
-  paused?: boolean;
-  pausePending?: boolean;
   deletePending?: boolean;
-  pauseError?: string;
   deleteError?: string;
-  onPause?: () => Promise<void> | void;
-  onResume?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   editAutomationHref?: string;
   canvasId?: string;
@@ -59,7 +50,6 @@ interface IntakeSourceSettingsPopupProps {
   onClose: () => void;
   fixed?: boolean;
   initialTab?: IntakeSettingsTab;
-  connection?: IntakeSettingsConnection;
 }
 
 export function IntakeSourceSettingsPopup({
@@ -77,13 +67,8 @@ export function IntakeSourceSettingsPopup({
   onSave,
   savePending = false,
   saveError,
-  paused = false,
-  pausePending = false,
   deletePending = false,
-  pauseError,
   deleteError,
-  onPause,
-  onResume,
   onDelete,
   editAutomationHref,
   canvasId,
@@ -92,7 +77,6 @@ export function IntakeSourceSettingsPopup({
   onClose,
   fixed = true,
   initialTab = "general",
-  connection,
 }: IntakeSourceSettingsPopupProps) {
   const tabs = intakeSettingsTabs(Boolean(agent));
   const hasAgent = Boolean(agent);
@@ -155,18 +139,12 @@ export function IntakeSourceSettingsPopup({
         editAutomationHref={editAutomationHref}
         savePending={savePending}
         saveError={saveError}
-        paused={paused}
-        pausePending={pausePending}
         deletePending={deletePending}
-        pauseError={pauseError}
         deleteError={deleteError}
-        onPause={onPause}
-        onResume={onResume}
         onDelete={onDelete}
         onDraftChange={setDraft}
         onSave={onSave}
         onClose={onClose}
-        connection={connection}
       />
     </PopupShell>
   );
@@ -191,18 +169,12 @@ function IntakeSettingsTabPanel({
   editAutomationHref,
   savePending,
   saveError,
-  paused,
-  pausePending,
   deletePending,
-  pauseError,
   deleteError,
-  onPause,
-  onResume,
   onDelete,
   onDraftChange,
   onSave,
   onClose,
-  connection,
 }: {
   tab: IntakeSettingsTab;
   sourceId: LineIntakeSourceId;
@@ -222,18 +194,12 @@ function IntakeSettingsTabPanel({
   editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
-  paused: boolean;
-  pausePending: boolean;
   deletePending: boolean;
-  pauseError?: string;
   deleteError?: string;
-  onPause?: () => Promise<void> | void;
-  onResume?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
-  connection?: IntakeSettingsConnection;
 }) {
   if (tab === "automation") {
     return (
@@ -274,18 +240,12 @@ function IntakeSettingsTabPanel({
       draft={draft}
       savePending={savePending}
       saveError={saveError}
-      paused={paused}
-      pausePending={pausePending}
       deletePending={deletePending}
-      pauseError={pauseError}
       deleteError={deleteError}
-      onPause={onPause}
-      onResume={onResume}
       onDelete={onDelete}
       onDraftChange={onDraftChange}
       onSave={onSave}
       onClose={onClose}
-      connection={connection}
     />
   );
 }
@@ -300,18 +260,12 @@ function IntakeGeneralTab({
   draft,
   savePending,
   saveError,
-  paused,
-  pausePending,
   deletePending,
-  pauseError,
   deleteError,
-  onPause,
-  onResume,
   onDelete,
   onDraftChange,
   onSave,
   onClose,
-  connection,
 }: {
   sourceId: LineIntakeSourceId;
   organizationId?: string;
@@ -322,41 +276,17 @@ function IntakeGeneralTab({
   draft: IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
-  paused: boolean;
-  pausePending: boolean;
   deletePending: boolean;
-  pauseError?: string;
   deleteError?: string;
-  onPause?: () => Promise<void> | void;
-  onResume?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
-  connection?: IntakeSettingsConnection;
 }) {
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-          {connection ? (
-            <IntakeConnectionFields
-              sourceId={sourceId}
-              health={connection.health}
-              binding={connection.binding}
-              integrations={connection.integrations}
-              integrationsLoading={connection.integrationsLoading}
-              projects={connection.projects}
-              projectsLoading={connection.projectsLoading}
-              projectsError={connection.projectsError}
-              connecting={connection.connecting}
-              connectError={connection.connectError}
-              onBindingChange={connection.onBindingChange}
-              onConnect={connection.onConnect}
-              onReconnect={connection.onReconnect}
-              onRetryProjects={connection.onRetryProjects}
-            />
-          ) : null}
           <GitHubIntakeFilterFields
             sourceId={sourceId}
             settings={draft}
@@ -373,6 +303,7 @@ function IntakeGeneralTab({
             projectId={resourceId}
           />
           <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <ProductiveIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
         </div>
       </div>
       <IntakeSourceSettingsFooter
@@ -380,17 +311,11 @@ function IntakeGeneralTab({
         draft={draft}
         savePending={savePending}
         saveError={saveError}
-        paused={paused}
-        pausePending={pausePending}
         deletePending={deletePending}
-        pauseError={pauseError}
         deleteError={deleteError}
-        onPause={onPause}
-        onResume={onResume}
         onDelete={onDelete}
         onSave={onSave}
         onClose={onClose}
-        saveDisabled={connection?.saveDisabled}
       />
     </>
   );

@@ -3,6 +3,7 @@ import { integrationDetailPath } from "@/lib/integrationSettingsPaths";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
+import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
 import { ProductiveConnectionStep, ProductiveProjectStep } from "./ProductiveIntakeSetupSteps";
 import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
 import { type ProductiveIntakeSetupModel, useProductiveIntakeSetup } from "./useProductiveIntakeSetup";
@@ -25,7 +26,9 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
   const helper =
     setup.step === "connection"
       ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : setup.skipInitialImport
+        ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
+        : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const onConnectionStep = setup.step === "connection" && !setup.connectedQuery.isLoading;
   const hasConnections = setup.productiveIntegrations.length > 0;
   // A broken account is only replaceable while Connect stays reachable, so the
@@ -142,22 +145,29 @@ function SetupFooter({ setup, onCreated }: { setup: ProductiveIntakeSetupModel; 
   }
 
   return (
-    <Button
-      type="button"
-      className="w-full"
-      disabled={!setup.projectId || setup.createIntake.isPending}
-      onClick={() => {
-        void setup.createBoundIntake().then((created) => {
-          if (created) {
-            onCreated();
-          }
-        });
-      }}
-      data-testid="productive-setup-finish"
-    >
-      {setup.createIntake.isPending
-        ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardFinishing
-        : PRODUCTIVE_INTAKE_SETUP_COPY.wizardFinish}
-    </Button>
+    <div className="space-y-3">
+      <IntakeSkipInitialImportField
+        checked={setup.skipInitialImport}
+        onCheckedChange={setup.setSkipInitialImport}
+        testId="productive-skip-initial-import"
+      />
+      <Button
+        type="button"
+        className="w-full"
+        disabled={!setup.projectId || setup.createIntake.isPending}
+        onClick={() => {
+          void setup.createBoundIntake().then((created) => {
+            if (created) {
+              onCreated();
+            }
+          });
+        }}
+        data-testid="productive-setup-finish"
+      >
+        {setup.createIntake.isPending
+          ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardFinishing
+          : PRODUCTIVE_INTAKE_SETUP_COPY.wizardFinish}
+      </Button>
+    </div>
   );
 }

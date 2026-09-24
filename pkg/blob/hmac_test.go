@@ -70,6 +70,16 @@ func TestFileIDFromSignedURLReadsHMACAndGCSPaths(t *testing.T) {
 
 	_, ok = FileIDFromSignedURL("https://example.test/" + fileID.String() + "?sp_file=1")
 	assert.False(t, ok)
+
+	s3URL := "https://superplane-files.s3.us-west-2.amazonaws.com/install/orgs/org/workspaces/ws/tasks/" + workOrderID.String() + "/" + fileID.String() + "?X-Amz-Algorithm=AWS4-HMAC-SHA256&sp_file=1"
+	id, ok = FileIDFromSignedURL(s3URL)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
+
+	pathStyle := "https://s3.us-west-2.amazonaws.com/superplane-files/install/" + fileID.String() + "?sp_file=1"
+	id, ok = FileIDFromSignedURL(pathStyle)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
 }
 
 func TestRewriteSignedFileURLsRestoresRefsAndDropsUnknown(t *testing.T) {

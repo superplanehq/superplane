@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import type {
   FactoriesFactory,
+  FactoriesFactoryPullRequest,
   FactoriesLineRef,
   FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
@@ -19,6 +20,9 @@ import {
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
+  countWorkOrderFilters,
+  visibleWorkOrderFilterLabels,
+  visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -46,6 +50,21 @@ function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
     updatedAt: "2024-06-02T00:00:00Z",
     lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
     ...rest,
+  };
+}
+
+function pullRequest(
+  workOrderId: string,
+  overrides: Partial<FactoriesFactoryPullRequest> = {},
+): FactoriesFactoryPullRequest {
+  return {
+    id: `pr-${workOrderId}`,
+    workOrderId,
+    number: "12",
+    url: `https://github.com/acme/payments/pull/12`,
+    title: "Ship refund retries",
+    state: "STATE_OPEN",
+    ...overrides,
   };
 }
 
@@ -289,10 +308,10 @@ describe("scope + filter + search + ordering", () => {
 
   const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, running, draft, failed, closed], factory);
 
-  it("labels the attention scope and describes My as work you started", () => {
+  it("labels the active scope and describes My as work you started", () => {
     const attention = WORK_ORDER_SCOPES.find((scope) => scope.id === "active");
-    expect(attention?.label).toBe("Needs attention");
-    expect(attention?.tooltip).toBe("Tasks that need your attention.");
+    expect(attention?.label).toBe("Active");
+    expect(attention?.tooltip).toBe("Draft, waiting, and failed tasks.");
     expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
       "Tasks you created or started. SuperPlane assigns those to you.",
     );
@@ -408,6 +427,35 @@ describe("scope + filter + search + ordering", () => {
       { ...EMPTY_WORK_ORDER_FILTERS, statuses: ["waiting"], sourceIds: ["github-issues"] },
     );
     expect(githubWaiting.map((e) => e.id)).toEqual(["github-wait"]);
+  });
+
+  it("label filter keeps Review, and Mergeable only when that pill is on", () => {
+    const withPullRequests = buildWorkOrderListEntries(
+      [
+        order({ id: "open-review", pullRequests: [pullRequest("open-review")] }),
+        order({ id: "open-mergeable", pullRequests: [pullRequest("open-mergeable", { mergeable: true })] }),
+        order({ id: "draft-pr", pullRequests: [pullRequest("draft-pr", { state: "STATE_DRAFT" })] }),
+        order({ id: "idle-wait" }),
+      ],
+      factory,
+    );
+    const ids = (labels: Array<"review" | "mergeable">, showPullRequestMerge?: boolean) =>
+      applyWorkOrderFilters(withPullRequests, { ...EMPTY_WORK_ORDER_FILTERS, labels }, { showPullRequestMerge }).map(
+        (entry) => entry.id,
+      );
+
+    expect(ids(["review"])).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["mergeable"], true)).toEqual(["open-mergeable"]);
+    expect(ids(["review", "mergeable"], true)).toEqual(["open-review", "open-mergeable"]);
+    expect(ids(["mergeable"])).toEqual(["open-review", "open-mergeable", "draft-pr", "idle-wait"]);
+    expect(visibleWorkOrderFilterLabels()).toEqual(["review"]);
+    expect(visibleWorkOrderFilterLabels(true)).toEqual(["review", "mergeable"]);
+    expect(countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }))).toBe(
+      0,
+    );
+    expect(
+      countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }, true)),
+    ).toBe(1);
   });
 
   it("search matches on title, description, line, and assignee names", () => {

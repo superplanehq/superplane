@@ -202,6 +202,11 @@ type Task struct {
 	Description string
 	ProjectID   string
 	Closed      bool
+	TypeID      int
+}
+
+func (t Task) IsKeyTask() bool {
+	return t.TypeID == TaskTypeMilestone
 }
 
 func projectFromDocument(doc resourceDocument) Project {
@@ -221,6 +226,7 @@ func taskFromDocument(doc resourceDocument) Task {
 		Description: description,
 		ProjectID:   projectID,
 		Closed:      closed,
+		TypeID:      numberAttribute(doc.Attributes["type_id"]),
 	}
 }
 
@@ -288,21 +294,24 @@ func (c *Client) GetProject(id string) (*Project, error) {
 
 // taskListOptions describes one page of a project's tasks.
 type taskListOptions struct {
-	projectID string
-	query     string
-	openOnly  bool
-	sort      string
-	pageSize  int
+	projectID   string
+	query       string
+	openOnly    bool
+	regularOnly bool
+	sort        string
+	pageSize    int
 }
 
 // ListTasks returns open tasks from one project, optionally filtered by text.
-func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
+// When regularOnly is set, key tasks (milestones) are omitted.
+func (c *Client) ListTasks(projectID, query string, limit int, regularOnly bool) ([]Task, error) {
 	url := c.taskListURL(taskListOptions{
-		projectID: projectID,
-		query:     query,
-		openOnly:  true,
-		sort:      sortNewestCreated,
-		pageSize:  limit,
+		projectID:   projectID,
+		query:       query,
+		openOnly:    true,
+		regularOnly: regularOnly,
+		sort:        sortNewestCreated,
+		pageSize:    limit,
 	})
 
 	body, err := c.execRequest(http.MethodGet, url, nil)
@@ -326,12 +335,13 @@ func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
 // open task in the project, newest first. Seeding an intake replays these
 // through the graph the trigger feeds, and that graph reads attributes Task
 // does not keep.
-func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int) ([]map[string]any, error) {
+func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int, regularOnly bool) ([]map[string]any, error) {
 	return c.listTaskDocuments(taskListOptions{
-		projectID: projectID,
-		openOnly:  true,
-		sort:      sortNewestCreated,
-		pageSize:  limit,
+		projectID:   projectID,
+		openOnly:    true,
+		regularOnly: regularOnly,
+		sort:        sortNewestCreated,
+		pageSize:    limit,
 	})
 }
 
@@ -362,6 +372,10 @@ func (c *Client) taskListURL(options taskListOptions) string {
 		params.Set("filter[status]", "1")
 	}
 
+	if options.regularOnly {
+		params.Set("filter[type_id]", strconv.Itoa(TaskTypeRegular))
+	}
+
 	if query := strings.TrimSpace(options.query); query != "" {
 		params.Set("filter[query]", query)
 	}
@@ -388,29 +402,34 @@ func (c *Client) GetTask(id string) (*Task, error) {
 	return &task, nil
 }
 
-// Webhook is a Productive.io webhook subscription, scoped to one project.
+// Webhook is a Productive.io webhook subscription. Productive.io webhooks
+// are organization-wide and fire for one event_id each.
 type Webhook struct {
-	ID string `json:"id"`
+	ID             string
+	SignatureToken string
 }
 
-// CreateWebhook registers a webhook that forwards task created and task
-// updated events for one project to url, signed with secret. Productive.io
-// answers 403 webhooks_limit_exceeded (surfaced as ErrWebhooksLimitExceeded)
-// on plans that do not include webhooks.
-func (c *Client) CreateWebhook(projectID, webhookURL, secret string) (*Webhook, error) {
+// CreateWebhook registers an organization webhook that POSTs eventID
+// deliveries to webhookURL. eventName is sent back on each delivery as
+// EventHeader. Productive.io answers 403 webhooks_limit_exceeded (surfaced
+// as ErrWebhooksLimitExceeded) on plans that do not include webhooks.
+func (c *Client) CreateWebhook(webhookURL string, eventID int, eventName string) (*Webhook, error) {
+	attributes := map[string]any{
+		"name":       "SuperPlane",
+		"event_id":   eventID,
+		"target_url": webhookURL,
+		"type_id":    WebhookTypeStandard,
+	}
+	if eventName != "" {
+		attributes["custom_headers"] = map[string]string{
+			EventHeader: eventName,
+		}
+	}
+
 	payload := map[string]any{
 		"data": map[string]any{
-			"type": "webhooks",
-			"attributes": map[string]any{
-				"url":         webhookURL,
-				"secret":      secret,
-				"event_types": []string{TaskCreatedEvent, TaskUpdatedEvent},
-			},
-			"relationships": map[string]any{
-				"project": map[string]any{
-					"data": map[string]any{"type": "projects", "id": projectID},
-				},
-			},
+			"type":       "webhooks",
+			"attributes": attributes,
 		},
 	}
 
@@ -433,7 +452,8 @@ func (c *Client) CreateWebhook(projectID, webhookURL, secret string) (*Webhook, 
 		return nil, fmt.Errorf("productive.io did not return a webhook id")
 	}
 
-	return &Webhook{ID: response.Data.ID}, nil
+	token, _ := response.Data.Attributes["signature_token"].(string)
+	return &Webhook{ID: response.Data.ID, SignatureToken: token}, nil
 }
 
 // DeleteWebhook removes a webhook by its Productive.io resource id.

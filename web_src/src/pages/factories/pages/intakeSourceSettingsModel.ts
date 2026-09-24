@@ -41,6 +41,8 @@ export interface IntakeSourceSettings {
   sentryAssignedIssues: boolean;
   /** Issue levels that still create a task. Empty means every level. */
   sentryLevels: string[];
+  /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
+  excludeKeyTasks: boolean;
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -60,6 +62,7 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryRegressedIssues: true,
   sentryAssignedIssues: false,
   sentryLevels: [],
+  excludeKeyTasks: true,
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
@@ -71,6 +74,12 @@ export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryRegressedIssues: true,
   sentryAssignedIssues: false,
   sentryLevels: [],
+};
+
+export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Productive.io tasks",
+  excludeKeyTasks: true,
 };
 
 export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
@@ -106,22 +115,16 @@ export const INTAKE_SETTINGS_COPY = {
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
-  pause: "Pause intake",
-  resume: "Resume intake",
-  pausing: "Pausing",
-  resuming: "Resuming",
-  pauseHelper: "SuperPlane stops new items. Tasks in Backlog stay.",
   delete: "Delete intake",
   deleteTitle: "Delete this intake?",
   deleteDescription:
     "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
   deleteCancel: "Keep intake",
   deleteConfirm: "Delete intake",
-  pauseError: "SuperPlane could not change the intake. Try again.",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
 
-export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
+export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
   return (
     sourceId === "github-issues" ||
     sourceId === "sentry-exceptions" ||
@@ -190,6 +193,7 @@ export function intakeSettingsFromApi(
     jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    excludeKeyTasks: settings?.excludeKeyTasks ?? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS.excludeKeyTasks,
   };
 }
 
@@ -215,6 +219,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     sentryRegressedIssues: settings.sentryRegressedIssues,
     sentryAssignedIssues: settings.sentryAssignedIssues,
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
+    excludeKeyTasks: settings.excludeKeyTasks,
   };
 }
 

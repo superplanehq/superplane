@@ -51,13 +51,14 @@ import {
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
   normalizeWorkOrdersPageQuery,
+  uniqueWorkOrdersById,
   WORK_ORDER_LIST_PAGE_SIZE,
   workOrdersPageFromResponse,
   type WorkOrdersPageCursor,
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -240,11 +241,13 @@ export function useFactoryWorkOrdersPage(
     initialPageParam: undefined as WorkOrdersPageCursor | undefined,
     enabled: Boolean(organizationId && factoryId) && (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 
   return {
     orders: flattenWorkOrdersPages(query.data?.pages),
     isLoading: query.isLoading,
+    isPlaceholderData: query.isPlaceholderData,
     hasNextPage: Boolean(query.hasNextPage),
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
@@ -260,6 +263,7 @@ export type FactoryBoardColumnPage = {
 export type FactoryBoardWorkOrders = {
   workOrders: FactoriesWorkOrderSummary[];
   isLoading: boolean;
+  isPlaceholderData: boolean;
   backlog: FactoryBoardColumnPage;
   open: FactoryBoardColumnPage;
   done: FactoryBoardColumnPage;
@@ -273,6 +277,14 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
       void page.fetchNextPage();
     },
   };
+}
+
+export function mergeFactoryBoardWorkOrders(
+  backlog: FactoriesWorkOrderSummary[],
+  open: FactoriesWorkOrderSummary[],
+  done: FactoriesWorkOrderSummary[],
+): FactoriesWorkOrderSummary[] {
+  return uniqueWorkOrdersById([...backlog, ...open, ...done]);
 }
 
 export function useFactoryBoardWorkOrders(
@@ -291,8 +303,9 @@ export function useFactoryBoardWorkOrders(
   const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, options);
 
   return {
-    workOrders: [...backlog.orders, ...open.orders, ...closed.orders],
+    workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
     isLoading: backlog.isLoading || open.isLoading || closed.isLoading,
+    isPlaceholderData: backlog.isPlaceholderData || open.isPlaceholderData || closed.isPlaceholderData,
     backlog: boardColumnPage(backlog),
     open: boardColumnPage(open),
     done: boardColumnPage(closed),

@@ -1,0 +1,58 @@
+# -----------------------------------------------------------------------------
+# Required Variables
+# -----------------------------------------------------------------------------
+
+# Domain name for SuperPlane
+domain_name = "superplane.example.com"
+
+# Email for Let's Encrypt certificate notifications
+letsencrypt_email = "admin@example.com"
+
+# -----------------------------------------------------------------------------
+# SuperPlane
+# -----------------------------------------------------------------------------
+
+# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+# superplane_namespace = "superplane"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - AWS Region
+# -----------------------------------------------------------------------------
+
+# region = "us-east-1"
+
+# Availability zones (minimum 2 required by AWS for EKS/RDS)
+# availability_zones = ["us-east-1a", "us-east-1b"]
+
+# -----------------------------------------------------------------------------
+# Optional Variables - EKS Cluster
+# -----------------------------------------------------------------------------
+
+# cluster_name    = "superplane"
+# cluster_version = "1.36"
+# node_count      = 2
+# instance_type   = "t3.medium"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - RDS
+# -----------------------------------------------------------------------------
+
+# db_instance_identifier = "superplane-db"
+# db_engine_version      = "17"
+# db_instance_class      = "db.t3.medium"
+# db_allocated_storage   = 20
+# db_name                = "superplane"
+# db_username            = "postgres"
+
+# Set to false and apply before terraform destroy
+# rds_deletion_protection = true
+
+# Optionally provide a database password (otherwise one will be generated)
+# db_password = "your-secure-password"
+
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Network
+# -----------------------------------------------------------------------------
+
+# vpc_cidr = "10.0.0.0/16"

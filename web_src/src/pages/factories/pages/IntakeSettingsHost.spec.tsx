@@ -10,9 +10,7 @@ import { unmockedSrc } from "@/test/unmockedModule";
 
 import {
   connectedJiraIntake,
-  GITHUB_INTAKE,
   GITHUB_INTAKE_CANVAS,
-  JIRA_INTAKE,
   PRODUCTIVE_INTAKE,
   renderHost,
   SENTRY_INTAKE,
@@ -24,29 +22,23 @@ const {
   useTriggers,
   useComponents,
   useAvailableIntegrations,
-  useConnectedIntegrations,
-  useCreateIntegration,
   useIntegrationResources,
   updateIntake,
   deleteIntake,
   useInfiniteCanvasRuns,
   useDescribeRun,
   useEventExecutions,
-  startDirectJiraConnect,
 } = vi.hoisted(() => ({
   useCanvas: vi.fn(),
   useTriggers: vi.fn(),
   useComponents: vi.fn(),
   useAvailableIntegrations: vi.fn(),
-  useConnectedIntegrations: vi.fn(),
-  useCreateIntegration: vi.fn(),
   useIntegrationResources: vi.fn(),
   updateIntake: vi.fn(),
   deleteIntake: vi.fn(),
   useInfiniteCanvasRuns: vi.fn(),
   useDescribeRun: vi.fn(),
   useEventExecutions: vi.fn(),
-  startDirectJiraConnect: vi.fn(),
 }));
 
 vi.mock("@monaco-editor/react", () => {
@@ -73,23 +65,7 @@ vi.mock("@/hooks/useComponentData", () => ({
 vi.mock("@/hooks/useIntegrations", () => ({
   ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useAvailableIntegrations,
-  useConnectedIntegrations,
-  useCreateIntegration,
   useIntegrationResources,
-}));
-
-vi.mock("@/lib/startDirectJiraConnect", () => ({
-  startDirectJiraConnect,
-}));
-
-vi.mock("@/ui/IntegrationCreateDialog", () => ({
-  IntegrationCreateDialog: ({ open, setupReturnTo }: { open: boolean; setupReturnTo?: string }) =>
-    open ? <div data-testid="intake-connect-dialog">{setupReturnTo}</div> : null,
-}));
-
-vi.mock("@/ui/ConfigureIntegrationDialog", () => ({
-  ConfigureIntegrationDialog: ({ integrationId }: { integrationId: string | null }) =>
-    integrationId ? <div data-testid="intake-configure-dialog">{integrationId}</div> : null,
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -118,25 +94,6 @@ describe("IntakeSettingsHost", () => {
       data: [{ name: "jira", label: "Jira", hostedAppInstall: true }],
       isLoading: false,
     });
-    useConnectedIntegrations.mockReturnValue({
-      data: [
-        {
-          metadata: { id: "jira-1", name: "Atlassian", integrationName: "jira" },
-          status: { state: "ready" },
-        },
-        {
-          metadata: { id: "jira-2", name: "Other Jira", integrationName: "jira" },
-          status: { state: "ready" },
-        },
-        {
-          metadata: { id: "jira-broken", name: "Broken Jira", integrationName: "jira" },
-          status: { state: "error", stateDescription: "Authorization revoked, please reconnect the account" },
-        },
-      ],
-      isLoading: false,
-      refetch: vi.fn(),
-    });
-    useCreateIntegration.mockReturnValue({ mutateAsync: vi.fn(), reset: vi.fn() });
     useIntegrationResources.mockImplementation(
       (_organizationId: string, _integrationId: string, resourceType: string) => {
         if (resourceType === "issueStatus") {
@@ -169,8 +126,6 @@ describe("IntakeSettingsHost", () => {
     useEventExecutions.mockReturnValue({ data: { executions: [] }, isLoading: false });
     updateIntake.mockResolvedValue({ id: "intake-github" });
     deleteIntake.mockResolvedValue(undefined);
-    startDirectJiraConnect.mockReset();
-    startDirectJiraConnect.mockResolvedValue(true);
     localStorage.clear();
     useInfiniteCanvasRuns.mockReturnValue({
       data: {
@@ -228,7 +183,7 @@ describe("IntakeSettingsHost", () => {
         .map((tab) => tab.textContent),
     ).toEqual(["General", "Automation"]);
     expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("intake-source-settings-pause")).toHaveTextContent(INTAKE_SETTINGS_COPY.pause);
+    expect(within(dialog).queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
   });
 
@@ -308,6 +263,8 @@ describe("IntakeSettingsHost", () => {
       }),
     });
 
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
     expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
     await user.click(screen.getByTestId("jira-completion-column-select"));
@@ -323,13 +280,10 @@ describe("IntakeSettingsHost", () => {
     });
   });
 
-  it("pauses, resumes, and deletes a GitHub intake from settings", async () => {
+  it("deletes a GitHub intake from settings", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({ onClose });
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-github", paused: true });
 
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
@@ -339,27 +293,13 @@ describe("IntakeSettingsHost", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("resumes a paused GitHub intake from settings", async () => {
-    const user = userEvent.setup();
-    renderHost({
-      intake: { ...GITHUB_INTAKE, paused: true },
-    });
-
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-source-settings-resume"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-github", paused: false });
-  });
-
-  it("pauses and deletes a Sentry intake from settings", async () => {
+  it("deletes a Sentry intake from settings", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({
       intake: SENTRY_INTAKE,
       onClose,
     });
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-sentry", paused: true });
 
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
@@ -368,7 +308,7 @@ describe("IntakeSettingsHost", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("pauses, resumes, and deletes a Jira intake from settings", async () => {
+  it("deletes a Jira intake from settings", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({
@@ -376,9 +316,7 @@ describe("IntakeSettingsHost", () => {
       onClose,
     });
 
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-jira", paused: true });
-
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
@@ -387,18 +325,7 @@ describe("IntakeSettingsHost", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("resumes a paused Jira intake from settings", async () => {
-    const user = userEvent.setup();
-    renderHost({
-      intake: connectedJiraIntake({ paused: true }),
-    });
-
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-source-settings-resume"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-jira", paused: false });
-  });
-
-  it("pauses, resumes, and deletes a Productive.io intake from settings", async () => {
+  it("deletes a Productive.io intake from settings", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderHost({
@@ -406,39 +333,13 @@ describe("IntakeSettingsHost", () => {
       onClose,
     });
 
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-productive", paused: true });
-
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-productive");
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("resumes a paused Productive.io intake from settings", async () => {
-    const user = userEvent.setup();
-    renderHost({
-      intake: { ...PRODUCTIVE_INTAKE, paused: true },
-    });
-
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-source-settings-resume"));
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-productive", paused: false });
-  });
-
-  it("shows a pause error in settings when pause fails", async () => {
-    updateIntake.mockRejectedValue(new Error("pause failed"));
-    const user = userEvent.setup();
-    renderHost({
-      intake: SENTRY_INTAKE,
-    });
-
-    await user.click(screen.getByTestId("intake-source-settings-pause"));
-
-    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-sentry", paused: true });
-    expect(screen.getByRole("alert")).toHaveTextContent("pause failed");
   });
 
   it("shows a delete error in the confirmation dialog when delete fails", async () => {
@@ -456,72 +357,5 @@ describe("IntakeSettingsHost", () => {
     const dialog = screen.getByTestId("intake-delete-dialog");
     expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent("delete failed");
     expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("saves a new Jira connection and project", async () => {
-    const user = userEvent.setup();
-    renderHost({ intake: JIRA_INTAKE });
-
-    expect(screen.getByTestId("intake-connection")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent("This intake has no live connection.");
-    await user.click(screen.getByTestId("intake-connection-jira-2"));
-    await user.click(screen.getByTestId("intake-connection-project-OPS"));
-    await user.click(screen.getByTestId("intake-source-settings-save"));
-
-    expect(updateIntake).toHaveBeenCalledWith({
-      intakeId: "intake-jira",
-      settings: intakeSettingsToApi({
-        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-        name: "Jira issues",
-        jiraCompletionColumn: "Done",
-      }),
-      integrationId: "jira-2",
-      resourceId: "OPS",
-    });
-  });
-
-  it("selects the Jira connection returned from OAuth", () => {
-    renderHost({
-      intake: JIRA_INTAKE,
-      path: "/org-1/workspaces/rf/lines/line-plan?intake=1&intakeId=intake-jira&settings=general&jiraIntegrationId=jira-2",
-    });
-
-    expect(screen.getByTestId("intake-connection-jira-2")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-connection-project-OPS")).toBeInTheDocument();
-  });
-
-  it("returns to intake settings after Connect Jira", async () => {
-    startDirectJiraConnect.mockResolvedValue(true);
-    useConnectedIntegrations.mockReturnValue({
-      data: [],
-      isLoading: false,
-      refetch: vi.fn(),
-    });
-    const user = userEvent.setup();
-    renderHost({ intake: JIRA_INTAKE });
-
-    await user.click(screen.getByTestId("intake-connection-connect"));
-
-    expect(startDirectJiraConnect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        organizationId: "org-1",
-        returnTo: "/org-1/workspaces/rf/lines/line-plan?intake=1&intakeId=intake-jira&settings=general",
-      }),
-    );
-  });
-
-  it("opens configure for a Jira connection that is not ready", async () => {
-    const user = userEvent.setup();
-    renderHost({
-      intake: {
-        ...JIRA_INTAKE,
-        health: "HEALTH_INTEGRATION_NOT_READY",
-        integrationId: "jira-broken",
-      },
-    });
-
-    expect(screen.getByTestId("intake-connection-banner")).toHaveTextContent("This connection cannot receive items.");
-    await user.click(screen.getByTestId("intake-connection-reconnect"));
-    expect(screen.getByTestId("intake-configure-dialog")).toHaveTextContent("jira-broken");
   });
 });

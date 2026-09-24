@@ -1,19 +1,19 @@
 import { useRef, type FormEvent, type ReactNode } from "react";
-import { ArrowUp, FileText, X } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
-import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
-import { useSpeechDictation, type UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
+import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
+import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
-import { appendSpokenPhrase } from "@/lib/appendSpokenPhrase";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
 import { DictateButton } from "../../DictateButton";
+import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -179,6 +179,23 @@ function AnalysisRequestChat({
   );
 }
 
+function useAnalysisComposerDictation(composer: string, onComposerChange: (next: string) => void) {
+  const composerRef = useRef(composer);
+  composerRef.current = composer;
+  const fieldRef = useRef<SpokenPhraseField>({
+    getValue: () => composerRef.current,
+    setValue: onComposerChange,
+  });
+  fieldRef.current = {
+    getValue: () => composerRef.current,
+    setValue: (next) => {
+      composerRef.current = next;
+      onComposerChange(next);
+    },
+  };
+  return { composerRef, dictation: useSpokenPhraseDictation(fieldRef) };
+}
+
 function AnalysisComposer({
   analysis,
   images,
@@ -195,15 +212,7 @@ function AnalysisComposer({
   chatColumnClass: string;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
-  const composerRef = useRef(analysis.composer);
-  composerRef.current = analysis.composer;
-  const dictation = useSpeechDictation({
-    onFinalPhrase: (phrase) => {
-      const next = appendSpokenPhrase(composerRef.current, phrase);
-      composerRef.current = next;
-      analysis.onComposerChange(next);
-    },
-  });
+  const { composerRef, dictation } = useAnalysisComposerDictation(analysis.composer, analysis.onComposerChange);
   const send = async () => {
     if (!canSubmit) {
       return;
@@ -256,7 +265,10 @@ function AnalysisComposer({
               value={analysis.composer}
               placeholder={placeholder}
               disabled={!analysis.canSend}
-              onChange={(event) => analysis.onComposerChange(event.target.value)}
+              onChange={(event) => {
+                composerRef.current = event.target.value;
+                analysis.onComposerChange(event.target.value);
+              }}
               onPaste={images.handlePaste}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -323,42 +335,6 @@ function AnalysisComposerAddons({
       {images.pendingFiles.length > 0 ? (
         <PendingWorkOrderFileChips files={images.pendingFiles} onRemove={images.remove} />
       ) : null}
-    </div>
-  );
-}
-
-function PendingWorkOrderFileChips({
-  files,
-  onRemove,
-}: {
-  files: UploadedWorkOrderFile[];
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <div className="flex min-w-0 flex-wrap items-end gap-1.5" data-testid="create-work-order-request-file-chips">
-      {files.map((file) => (
-        <span
-          key={file.id}
-          className="flex max-w-44 items-center gap-1 rounded-md border bg-card px-1.5 py-1 text-[12px] text-foreground"
-          data-testid={`create-work-order-request-file-${file.id}`}
-        >
-          <FileText className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="truncate" title={file.filename}>
-            {file.filename}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="size-4 shrink-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Remove ${file.filename}`}
-            data-testid={`create-work-order-request-file-remove-${file.id}`}
-            onClick={() => onRemove(file.id)}
-          >
-            <X className="size-3" aria-hidden />
-          </Button>
-        </span>
-      ))}
     </div>
   );
 }

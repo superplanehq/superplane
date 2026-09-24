@@ -12,6 +12,7 @@ Read more only when the task needs it:
   [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
   [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
 - `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
+- If changing Terraform, look at [release/terraform/AGENTS.md](release/terraform/AGENTS.md).
 - Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
 
 ## Read this first
@@ -30,7 +31,12 @@ them as tracked changes. Do not commit them. Do not hand-edit them. Edit
 
 A clean clone does not contain these files until `make dev.setup` or
 `make pb.gen` runs. CI is Semaphore (`.semaphore/`), not GitHub Actions. CI
-runs `make dev.setup`, which includes `pb.gen`.
+runs `make dev.setup`, which includes `pb.gen`. App blocks skip `/runner/**`.
+Runner tests and publish pipelines run when `/runner` changes. Create
+deployment target `runner-prod` on the SuperPlane Semaphore project and
+attach `GHCR_TOKEN` plus the AWS keys used for S3, ECS, and AMI jobs.
+Auto-promote those pipelines only from `main`. Do not put runner jobs on
+`production`.
 
 ### Do not rediscover the build system
 
@@ -65,6 +71,9 @@ approvals, and an operational UI.
 - `scripts/` — codegen, DB, and CI helper scripts.
 - `test/` — backend and end-to-end tests.
 - `docs/` — Markdown documentation (see `docs/contributing/`).
+- `runner/` — task-broker, runner worker, and fleet-manager. Own Go module
+  (`github.com/superplane/runner`). Local start uses the root `make` targets.
+  Image publish and deploy stay on runner Semaphore pipelines.
 - `Makefile` — the entrypoint for all common tasks.
 - `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
@@ -80,16 +89,24 @@ or Node installed on the host, only Docker.
 
 Run these three steps once, in order:
 
-1. `make dev.up` — builds the dev-base image and starts containers (app, db,
-   rabbitmq). The first run builds the image (~3-5 min); later runs reuse it.
+1. `make dev.up` — builds the app and runner images and starts dependency
+   containers (app shell, db, rabbitmq). The first run builds the
+   images (~3-5 min); later runs reuse them. After you change
+   `runner/runner/Dockerfile.local`, run `make dev.up` again. If a sibling
+   `../runner` Compose project still holds port `8091`, stop it first.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
-   codegen, and creates + migrates the databases. Re-run when protos, Go
-   modules, or frontend deps change. By default only `superplane_dev` is
-   migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also
-   need `superplane_test` (E2E; backend CI sets this via the environment).
-3. `make dev.server` — starts the API (Go hot-reload via `air`) and the Vite dev
-   server. UI at http://localhost:8000; health check at
-   http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
+   codegen, creates + migrates `superplane_dev`, creates database `broker`
+   on that Postgres, starts task-broker so GORM migrates it, and registers
+   local fleets. Re-run when
+   protos, Go modules, or frontend deps change. By
+   default only `superplane_dev` is migrated; use
+   `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need
+   `superplane_test` (E2E; backend CI sets this via the environment).
+3. `make dev.server` — starts the API (Go hot-reload via `air`), the Vite
+   dev server, and 10 runner workers. UI at http://localhost:8000; health
+   check at http://localhost:8000/health. Task broker at
+   http://127.0.0.1:8091. Use `N=1 make dev.server` to scale workers. Use
+   `make dev.server.fg` for foreground logs.
 
 Factory workspace onboarding needs a public SuperPlane GitHub App on a
 stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
@@ -98,18 +115,21 @@ Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
 for a personal token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
-To run Runner nodes locally, start `make dev` in the runner repository.
-Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
-only for a remote broker (see `.env.example`).
+`make dev.up`, `make dev.setup`, and `make dev.server` start the local
+task-broker and runner workers. Set `TASK_BROKER_*` in `.env` only for a
+remote broker (see `.env.example`).
 
-The runner `make dev` image includes Claude Code, Codex, OpenCode, git, `gh`, and `jq`.
-Factory line apps run on that worker. Do not install those CLIs on the host.
-Connect GitHub and Claude integrations in the organization before you dispatch
-a factory line. Factory nodes use those integrations, not `.env`
-`ANTHROPIC_API_KEY`. After you change the runner Dockerfile, run `make dev`
-again so Compose rebuilds the worker. Check tools with `make doctor-local` in
-the runner repository. OpenCode must be on the runner `PATH` for Run OpenRouter
-Agent. SuperPlane does not download OpenCode in the prompt prepare step.
+The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
+`jq`. Factory line apps run on that worker. Do not install those CLIs on the
+host. Connect GitHub and Claude integrations in the organization before you
+dispatch a factory line. Factory nodes use those integrations, not `.env`
+`ANTHROPIC_API_KEY`. Check tools with `make doctor-local` after `make
+dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
+SuperPlane does not download OpenCode in the prompt prepare step.
+
+Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
+in `.env` only when you need the SuperPlane-hosted provider. See
+[docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
@@ -130,8 +150,10 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
-  Do not run `go build ./...` — `scripts/` has more than one `main` package.
-  Use `make check.build.app`.
+  After editing `runner/` Go code: `make format.runner`, then
+  `$(MAKE) -C runner test`. Do not run `go build ./...` — `scripts/` has more
+  than one `main` package. Use `make check.build.app`. App `gofmt` excludes
+  `runner/`.
 - After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
   `make check.build.ui`. Run `make check.lint.ui` locally before you open a
   pull request. CI fails when the ESLint budget grows.

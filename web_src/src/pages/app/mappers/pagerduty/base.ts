@@ -56,12 +56,18 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
     details["Resolved At"] = new Date(incident.resolved_at).toLocaleString();
   }
 
-  if (agent) {
-    details["Agent"] = agent.summary || "-";
-    details["Agent URL"] = agent.html_url || "-";
-  }
+  assignAgentDetails(details, agent);
 
   return details;
+}
+
+function assignAgentDetails(details: Record<string, string>, agent?: ResourceRef) {
+  if (!agent) {
+    return;
+  }
+
+  details["Agent"] = agent.summary || "-";
+  details["Agent URL"] = agent.html_url || "-";
 }
 
 /**
