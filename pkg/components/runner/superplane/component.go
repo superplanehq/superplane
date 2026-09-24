@@ -298,6 +298,7 @@ func buildSuperPlaneBrokerTask(
 			MachineType:             spec.MachineType,
 			Steps:                   spec.Steps,
 			Model:                   model,
+			ThinkingLevel:           spec.ThinkingLevel,
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
@@ -308,6 +309,7 @@ func buildSuperPlaneBrokerTask(
 			MachineType:             spec.MachineType,
 			Steps:                   spec.Steps,
 			Model:                   model,
+			ThinkingLevel:           spec.ThinkingLevel,
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
@@ -318,6 +320,7 @@ func buildSuperPlaneBrokerTask(
 			MachineType:             spec.MachineType,
 			Steps:                   spec.Steps,
 			Model:                   model,
+			ThinkingLevel:           spec.ThinkingLevel,
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}

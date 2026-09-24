@@ -1,15 +1,17 @@
-import { Bot, ChevronDown } from "lucide-react";
+import { Bot, Check, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
+import { DRAFT_START_THINKING_AUTO, DRAFT_START_THINKING_DEFAULT, THINKING_LEVELS } from "@/lib/thinkingLevel";
 
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 
@@ -27,16 +29,28 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
   ghost: "gap-1.5 text-muted-foreground hover:text-foreground",
 };
 
+const MENU_LABEL_CLASSNAME = "text-[11px] font-medium tracking-[0.04em] text-muted-foreground";
+const MENU_ITEM_CLASSNAME = "cursor-pointer text-[13px]";
+
+const START_THINKING_LEVELS = [
+  { value: DRAFT_START_THINKING_AUTO, label: "Auto" },
+  ...THINKING_LEVELS.map((level) => ({
+    value: level.value === "" ? DRAFT_START_THINKING_DEFAULT : level.value,
+    label: level.label,
+  })),
+];
+
 /**
- * Picks the runner model for Start. `icon` is the chevron fused to Start,
+ * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
- * strip settings row.
+ * strip settings row. Closed labeled and ghost triggers show the model name.
  */
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
   lineName,
-  value,
+  model,
+  thinkingLevel,
   onChange,
   disabled = false,
   appearance = "icon",
@@ -44,14 +58,15 @@ export function DraftStartModelSelect({
   organizationId?: string;
   factoryId?: string;
   lineName?: string;
-  value: string;
-  onChange: (next: string) => void;
+  model: string;
+  thinkingLevel: string;
+  onChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled?: boolean;
   appearance?: Appearance;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
   const selectedName =
-    value === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((model) => model.id === value)?.name || value;
+    model === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((item) => item.id === model)?.name || model;
   const showName = appearance !== "icon";
 
   return (
@@ -72,20 +87,42 @@ export function DraftStartModelSelect({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" className="min-w-44">
-        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
-          <DropdownMenuRadioItem value={DRAFT_START_MODEL_AUTO}>Auto</DropdownMenuRadioItem>
-          {(models.data ?? []).map((model) => {
-            const id = model.id ?? "";
-            if (id === "") {
-              return null;
-            }
-            return (
-              <DropdownMenuRadioItem key={id} value={id}>
-                {model.name || id}
-              </DropdownMenuRadioItem>
-            );
-          })}
-        </DropdownMenuRadioGroup>
+        <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>Model</DropdownMenuLabel>
+        <DropdownMenuItem
+          className={MENU_ITEM_CLASSNAME}
+          onSelect={() => onChange({ model: DRAFT_START_MODEL_AUTO, thinkingLevel })}
+        >
+          <span className="flex-1">Auto</span>
+          {model === DRAFT_START_MODEL_AUTO ? <Check className="size-3.5" aria-hidden /> : null}
+        </DropdownMenuItem>
+        {(models.data ?? []).map((item) => {
+          const id = item.id ?? "";
+          if (id === "") {
+            return null;
+          }
+          return (
+            <DropdownMenuItem
+              key={id}
+              className={MENU_ITEM_CLASSNAME}
+              onSelect={() => onChange({ model: id, thinkingLevel })}
+            >
+              <span className="flex-1">{item.name || id}</span>
+              {model === id ? <Check className="size-3.5" aria-hidden /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>Thinking</DropdownMenuLabel>
+        {START_THINKING_LEVELS.map((level) => (
+          <DropdownMenuItem
+            key={level.value}
+            className={MENU_ITEM_CLASSNAME}
+            onSelect={() => onChange({ model, thinkingLevel: level.value })}
+          >
+            <span className="flex-1">{level.label}</span>
+            {thinkingLevel === level.value ? <Check className="size-3.5" aria-hidden /> : null}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
