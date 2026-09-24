@@ -271,7 +271,16 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re("/api/v1/triggers"), resolve: () => ({ json: fixture.triggers ?? { triggers: [] } }) },
     { pattern: re("/api/v1/actions"), resolve: () => ({ json: fixture.actions ?? { actions: [] } }) },
     { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets ?? { widgets: [] } }) },
-    { pattern: re("/api/v1/integrations"), resolve: () => ({ json: fixture.integrations ?? { integrations: [] } }) },
+    {
+      pattern: re("/api/v1/integrations"),
+      resolve: () => {
+        const payload =
+          fixture.integrations && typeof fixture.integrations === "object"
+            ? fixture.integrations
+            : { integrations: [] };
+        return { json: { githubAppConfigured: true, ...payload } };
+      },
+    },
     { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
 
     // Draft-version listing must stay empty (no open drafts); every other version

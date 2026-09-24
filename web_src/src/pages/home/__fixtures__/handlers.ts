@@ -430,7 +430,7 @@ export async function matchFactorySetupFixture(
   orgIntegrations: StorybookOrgIntegration[],
 ): Promise<FixtureResult> {
   if (url.pathname === "/api/v1/integrations" && method === "GET") {
-    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS } };
+    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS, githubAppConfigured: true } };
   }
 
   const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);
