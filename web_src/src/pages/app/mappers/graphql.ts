@@ -306,6 +306,47 @@ function getGraphQLMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
+function graphQLRunningEventSubtitle(createdAt: string | undefined): string {
+  if (!createdAt) {
+    return "Running...";
+  }
+
+  const startTime = new Date(createdAt);
+  const now = new Date();
+  const durationMs = now.getTime() - startTime.getTime();
+
+  if (durationMs < 60000) {
+    return `Running for: ${Math.floor(durationMs / 1000)}s`;
+  }
+
+  const minutes = Math.floor(durationMs / 60000);
+  return `Running for: ${minutes}m`;
+}
+
+function graphQLResponseEventSubtitle(execution: ExecutionInfo): string | React.ReactNode {
+  const metadata = execution.metadata as Record<string, unknown> | undefined;
+  let responseCode: string | null;
+
+  if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
+    responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;
+  } else {
+    const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+    responseCode = getGraphQLResponseStatusString(outputs);
+  }
+
+  if (responseCode && execution.updatedAt) {
+    return renderWithTimeAgo(`Response: ${responseCode}`, new Date(execution.updatedAt));
+  }
+  if (responseCode) {
+    return `Response: ${responseCode}`;
+  }
+  if (execution.updatedAt) {
+    return renderTimeAgo(new Date(execution.updatedAt));
+  }
+
+  return "";
+}
+
 function getGraphQLEventSections(
   nodes: NodeInfo[],
   execution: ExecutionInfo,
@@ -319,39 +360,11 @@ function getGraphQLEventSections(
     const state = stateFunction(execution);
 
     if (state === "running") {
-      if (execution.createdAt) {
-        const startTime = new Date(execution.createdAt);
-        const now = new Date();
-        const durationMs = now.getTime() - startTime.getTime();
-
-        if (durationMs < 60000) {
-          return `Running for: ${Math.floor(durationMs / 1000)}s`;
-        } else {
-          const minutes = Math.floor(durationMs / 60000);
-          return `Running for: ${minutes}m`;
-        }
-      }
-      return "Running...";
+      return graphQLRunningEventSubtitle(execution.createdAt);
     }
 
     if (state === "success" || state === "failed") {
-      const metadata = execution.metadata as Record<string, unknown> | undefined;
-      let responseCode: string | null;
-
-      if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
-        responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;
-      } else {
-        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
-        responseCode = getGraphQLResponseStatusString(outputs);
-      }
-
-      if (responseCode && execution.updatedAt) {
-        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(execution.updatedAt));
-      } else if (responseCode) {
-        return `Response: ${responseCode}`;
-      } else if (execution.updatedAt) {
-        return renderTimeAgo(new Date(execution.updatedAt));
-      }
+      return graphQLResponseEventSubtitle(execution);
     }
 
     if (execution.updatedAt) {

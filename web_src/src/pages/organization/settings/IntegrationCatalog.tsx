@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/lib/errors";
-import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -328,9 +327,6 @@ function ConnectFields({ catalog }: { catalog: CatalogState }) {
 function ConnectErrors({ catalog }: { catalog: CatalogState }) {
   if (!catalog.createIntegrationMutation.isError) {
     return null;
-  }
-  if (catalog.createIntegrationNotice) {
-    return <UsageLimitAlert notice={catalog.createIntegrationNotice} className="mt-4" />;
   }
   return (
     <Alert variant="destructive" className="mt-4">

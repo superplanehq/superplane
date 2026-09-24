@@ -58,6 +58,19 @@ function formatSyntheticCheckLabels(labels?: SyntheticCheckLabelTuple[]): string
     .join(", ");
 }
 
+function issueRootEventValues(issue: SyntheticCheckNotificationIssue | undefined): Record<string, string> {
+  return {
+    "Issue ID": stringOrDash(issue?.id),
+    "Issue Identifier": stringOrDash(issue?.issueIdentifier),
+    URL: stringOrDash(issue?.url),
+    Status: stringOrDash(issue?.status),
+    Summary: stringOrDash(issue?.summary),
+    Dataset: stringOrDash(issue?.dataset),
+    Start: stringOrDash(issue?.start),
+    Labels: stringOrDash(formatSyntheticCheckLabels(issue?.labels)),
+  };
+}
+
 function syntheticCheckSubtitle(subtitleParts: string, createdAt?: string): string | React.ReactNode {
   return subtitleParts && createdAt
     ? renderWithTimeAgo(subtitleParts, new Date(createdAt))
@@ -80,17 +93,7 @@ export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as SyntheticCheckNotificationEventData | undefined;
-
-    return {
-      "Issue ID": stringOrDash(eventData?.issue?.id),
-      "Issue Identifier": stringOrDash(eventData?.issue?.issueIdentifier),
-      URL: stringOrDash(eventData?.issue?.url),
-      Status: stringOrDash(eventData?.issue?.status),
-      Summary: stringOrDash(eventData?.issue?.summary),
-      Dataset: stringOrDash(eventData?.issue?.dataset),
-      Start: stringOrDash(eventData?.issue?.start),
-      Labels: stringOrDash(formatSyntheticCheckLabels(eventData?.issue?.labels)),
-    };
+    return issueRootEventValues(eventData?.issue);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

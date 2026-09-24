@@ -55,27 +55,14 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     const eventData = (context.event?.data as { data?: OnIncidentStatusUpdateEventData } | undefined)?.data;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
-
     const values: Record<string, string> = {};
 
-    if (incident?.id) {
-      values["Incident ID"] = incident.id;
-    }
-    if (incident?.summary) {
-      values["Incident Summary"] = incident.summary;
-    }
-    if (incident?.html_url) {
-      values["Incident URL"] = incident.html_url;
-    }
-    if (statusUpdate?.message) {
-      values["Status Update Message"] = statusUpdate.message;
-    }
-    if (context.event?.createdAt) {
-      values["Updated At"] = new Date(context.event?.createdAt || "").toLocaleString();
-    }
-    if (eventData?.agent?.summary) {
-      values["Agent"] = eventData.agent.summary;
-    }
+    addDetail(values, "Incident ID", incident?.id);
+    addDetail(values, "Incident Summary", incident?.summary);
+    addDetail(values, "Incident URL", incident?.html_url);
+    addDetail(values, "Status Update Message", statusUpdate?.message);
+    addUpdatedAt(values, context.event?.createdAt);
+    addDetail(values, "Agent", eventData?.agent?.summary);
 
     return values;
   },
@@ -117,6 +104,18 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = value;
+  }
+}
+
+function addUpdatedAt(details: Record<string, string>, createdAt?: string) {
+  if (createdAt) {
+    details["Updated At"] = new Date(createdAt || "").toLocaleString();
+  }
+}
 
 function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
   if (content && createdAt) {

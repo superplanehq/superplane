@@ -91,15 +91,36 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
   },
 };
 
-/**
- * Approval-specific state logic function
- */
-export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
+function isApprovalExecutionError(execution: ExecutionInfo): boolean {
   if (
     execution.resultMessage &&
     (execution.resultReason === "RESULT_REASON_ERROR" ||
       (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
   ) {
+    return true;
+  }
+
+  return execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED";
+}
+
+function approvalPassedState(execution: ExecutionInfo): EventState {
+  const metadata = execution.metadata as ExecutionMetadata | undefined;
+  if (metadata?.result === "approved") {
+    return "approved";
+  }
+
+  if (metadata?.result === "rejected") {
+    return "rejected";
+  }
+
+  return "approved";
+}
+
+/**
+ * Approval-specific state logic function
+ */
+export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
+  if (isApprovalExecutionError(execution)) {
     return "error";
   }
 
@@ -111,32 +132,14 @@ export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): 
     return "cancelling";
   }
 
-  // Error state - component could not evaluate or apply approval logic
-  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
-    return "error";
-  }
-
-  // Waiting state - some or all required actors have not yet responded
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "waiting";
   }
 
-  // Check execution outputs for approval/rejection decision
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const metadata = execution.metadata as ExecutionMetadata | undefined;
-    if (metadata?.result === "approved") {
-      return "approved";
-    }
-
-    if (metadata?.result === "rejected") {
-      return "rejected";
-    }
-
-    // Default to success if finished and passed but no specific result
-    return "approved";
+    return approvalPassedState(execution);
   }
 
-  // Default fallback
   return "error";
 };
 
