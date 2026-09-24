@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasesCanvas } from "@/api-client";
+import { dematerializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 
 import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS } from "../lib/columnCanvasAgent";
 import {
@@ -54,7 +55,7 @@ describe("persistColumnAgent", () => {
       canvasYaml: expect.stringContaining("opus"),
     });
     expect(stageYaml.mock.calls[0][0].canvasYaml).toContain("git clone --depth 1");
-    expect(stageYaml.mock.calls[0][0].canvasYaml).toContain('"includeVisualEvidence":true');
+    expect(stageYaml.mock.calls[0][0].canvasYaml).toContain("includeVisualEvidence: true");
     expect(commit).toHaveBeenCalledWith("Update agent");
     expect(invalidate).toHaveBeenCalled();
     expect(staging.refreshCanvas).not.toHaveBeenCalled();
@@ -102,7 +103,10 @@ describe("persistColumnAgent", () => {
       ...stagingSaveDeps(),
     });
 
-    const serialized = JSON.parse(stageYaml.mock.calls[0][0].canvasYaml) as NonNullable<CanvasesCanvas["spec"]>;
+    const serialized = dematerializeCanvasSpec(stageYaml.mock.calls[0][0].canvasYaml);
+    if (!serialized) {
+      throw new Error("staged canvas yaml is not a canvas");
+    }
     const synchronizedIds = new Set<string>(PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS);
     const runners = serialized.nodes?.filter((node) => node.id && synchronizedIds.has(node.id)) ?? [];
     expect(runners).toHaveLength(3);
@@ -157,7 +161,7 @@ describe("persistColumnAgent", () => {
     expect(staged.replaceIfStale).toBe(true);
     expect(staged.canvasYaml).toContain("published-elsewhere");
     expect(staged.canvasYaml).toContain("opus");
-    expect(staged.canvasYaml).not.toContain('"model":"sonnet"');
+    expect(staged.canvasYaml).not.toContain("model: sonnet");
     expect(commit).toHaveBeenCalledWith("Update agent");
     expect(readStagedCanvas).not.toHaveBeenCalled();
     expect(showSuccessToast).toHaveBeenCalledWith(
