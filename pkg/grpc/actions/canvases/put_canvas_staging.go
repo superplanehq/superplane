@@ -15,16 +15,21 @@ import (
 )
 
 const CurrentStagingCannotBeDiscardedMessage = "current staging cannot be discarded"
+const StagedCanvasChangedMessage = "staged canvas changed"
 
 func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
-	return putCanvasStaging(ctx, db, canvas, operations, false)
+	return putCanvasStaging(ctx, db, canvas, operations, false, "")
 }
 
 func PutCanvasStagingReplacingStale(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
-	return putCanvasStaging(ctx, db, canvas, operations, true)
+	return putCanvasStaging(ctx, db, canvas, operations, true, "")
 }
 
-func putCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation, replaceIfStale bool) (*pb.StagingSummary, error) {
+func PutCanvasStagingMatchingCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation, expectedCanvasYAML string) (*pb.StagingSummary, error) {
+	return putCanvasStaging(ctx, db, canvas, operations, false, expectedCanvasYAML)
+}
+
+func putCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation, replaceIfStale bool, expectedCanvasYAML string) (*pb.StagingSummary, error) {
 	user, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -40,6 +45,12 @@ func putCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := models.LockStagedFilesForUser(tx, canvas.ID, userID); err != nil {
 			return grpcerrors.Internal(err, "failed to stage")
+		}
+
+		if expectedCanvasYAML != "" {
+			if err := requireCanvasYAMLUnchanged(tx, canvas, userID, expectedCanvasYAML); err != nil {
+				return err
+			}
 		}
 
 		baseVersionID, err := stagingBaseVersionID(tx, canvas, userID, replaceIfStale)
@@ -77,6 +88,28 @@ func putCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 	}
 
 	return buildStagingSummary(canvas, rows), nil
+}
+
+func requireCanvasYAMLUnchanged(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID, expectedCanvasYAML string) error {
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	if err != nil {
+		return grpcerrors.Internal(err, "failed to load live version")
+	}
+
+	stagedFiles, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
+	if err != nil {
+		return grpcerrors.Internal(err, "failed to load staging")
+	}
+
+	current, err := effectiveSpecYAML(canvas, liveVersion, canvas.OrganizationID.String(), stagedFiles, CanvasYAMLRepositoryPath)
+	if err != nil {
+		return err
+	}
+	if current != expectedCanvasYAML {
+		return grpcerrors.FailedPrecondition(nil, StagedCanvasChangedMessage)
+	}
+
+	return nil
 }
 
 func stagingBaseVersionID(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID, replaceIfStale bool) (uuid.UUID, error) {

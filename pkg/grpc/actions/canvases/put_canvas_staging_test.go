@@ -158,3 +158,63 @@ func Test__PutCanvasStagingReplacingStale__KeepsCurrentDraft(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, current, rows[0].Content)
 }
+
+func Test__PutCanvasStagingMatchingCanvas__UpdatesWhenContentMatches(t *testing.T) {
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
+	defer r.Close()
+
+	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	current := baseline + "\n# current draft\n"
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(current)},
+	})
+	require.NoError(t, err)
+
+	updated := current + "model: opus\n"
+	_, err = PutCanvasStagingMatchingCanvas(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(updated)},
+	}, current)
+	require.NoError(t, err)
+
+	rows, err := models.ListStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, updated, rows[0].Content)
+}
+
+func Test__PutCanvasStagingMatchingCanvas__RejectsWhenContentChanges(t *testing.T) {
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
+	defer r.Close()
+
+	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	current := baseline + "\n# current draft\n"
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(current)},
+	})
+	require.NoError(t, err)
+
+	_, err = PutCanvasStagingMatchingCanvas(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(current + "model: opus\n")},
+	}, baseline)
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Equal(t, StagedCanvasChangedMessage, msg)
+
+	rows, err := models.ListStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, current, rows[0].Content)
+
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(current + "model: opus\n")},
+	})
+	require.NoError(t, err)
+
+	rows, err = models.ListStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, current+"model: opus\n", rows[0].Content)
+}
