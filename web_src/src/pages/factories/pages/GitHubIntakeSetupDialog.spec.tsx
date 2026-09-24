@@ -58,6 +58,30 @@ describe("GitHubIntakeSetupDialog", () => {
     expect(onCreated).toHaveBeenCalled();
   });
 
+  it("creates a GitHub intake when no backlog repository is set", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/github"]}>
+        <GitHubIntakeSetupDialog
+          organizationId="org-1"
+          factoryId="factory-1"
+          backlogRepository=""
+          onClose={vi.fn()}
+          onCreated={onCreated}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("github-setup-repository-missing")).toBeInTheDocument();
+    await user.click(screen.getByTestId("github-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
   it("creates a GitHub intake without importing existing issues", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();

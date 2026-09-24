@@ -43,7 +43,7 @@ export function GitHubIntakeSetupDialog(props: GitHubIntakeSetupDialogProps) {
             </p>
           </div>
         ) : (
-          <p className="text-[13px] text-destructive" role="alert">
+          <p className="text-[13px] text-muted-foreground" data-testid="github-setup-repository-missing">
             {GITHUB_INTAKE_SETUP_COPY.repositoryMissing}
           </p>
         )}
@@ -52,21 +52,13 @@ export function GitHubIntakeSetupDialog(props: GitHubIntakeSetupDialogProps) {
             {setup.error}
           </p>
         ) : null}
-        <SetupFooter setup={setup} disabled={repository.length === 0} onCreated={props.onCreated} />
+        <SetupFooter setup={setup} onCreated={props.onCreated} />
       </div>
     </FirstRunShell>
   );
 }
 
-function SetupFooter({
-  setup,
-  disabled,
-  onCreated,
-}: {
-  setup: GitHubIntakeSetupModel;
-  disabled: boolean;
-  onCreated: () => void;
-}) {
+function SetupFooter({ setup, onCreated }: { setup: GitHubIntakeSetupModel; onCreated: () => void }) {
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
@@ -82,7 +74,7 @@ function SetupFooter({
       <Button
         type="button"
         className="w-full"
-        disabled={disabled || setup.createIntake.isPending}
+        disabled={setup.createIntake.isPending}
         onClick={() => {
           void setup.createGithubIntake().then((created) => {
             if (created) {
