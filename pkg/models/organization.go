@@ -29,6 +29,7 @@ type Organization struct {
 	CreatedByAccountID          *uuid.UUID
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
+	UsageRetentionWindowDays    *int32
 	CreatedAt                   *time.Time
 	UpdatedAt                   *time.Time
 	DeletedAt                   gorm.DeletedAt `gorm:"index"`
@@ -415,6 +416,14 @@ func DisableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featu
 // HasExperimentalFeature reports whether the given feature id is active for
 // the organization with the given id. Released features are reported true
 // without loading the organization from the database.
+func SetOrganizationRetentionWindowDays(orgID uuid.UUID, windowDays *int32) error {
+	return database.Conn().
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Update("usage_retention_window_days", windowDays).
+		Error
+}
+
 func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
 	if features.IsReleased(featureID) {
 		return true, nil

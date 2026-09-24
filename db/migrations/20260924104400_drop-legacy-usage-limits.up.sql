@@ -2,7 +2,6 @@ BEGIN;
 
 ALTER TABLE organizations
     DROP COLUMN IF EXISTS usage_synced_at,
-    DROP COLUMN IF EXISTS usage_retention_window_days,
     DROP COLUMN IF EXISTS usage_limits_synced_at;
 
 ALTER TABLE agent_sessions

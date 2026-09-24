@@ -284,12 +284,9 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" {
-		windowDays := config.EventRetentionWindowDays()
-		if windowDays > 0 {
-			log.Println("Starting Event Retention Worker")
-			w := workers.NewEventRetentionWorker(windowDays)
-			go w.Start(context.Background())
-		}
+		log.Println("Starting Event Retention Worker")
+		w := workers.NewEventRetentionWorker()
+		go w.Start(context.Background())
 	}
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {

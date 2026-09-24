@@ -19,23 +19,16 @@ const (
 )
 
 type EventRetentionWorker struct {
-	logger     *log.Entry
-	windowDays int
+	logger *log.Entry
 }
 
-func NewEventRetentionWorker(windowDays int) *EventRetentionWorker {
+func NewEventRetentionWorker() *EventRetentionWorker {
 	return &EventRetentionWorker{
-		logger:     log.WithFields(log.Fields{"worker": "EventRetentionWorker"}),
-		windowDays: windowDays,
+		logger: log.WithFields(log.Fields{"worker": "EventRetentionWorker"}),
 	}
 }
 
 func (w *EventRetentionWorker) Start(ctx context.Context) {
-	if w.windowDays <= 0 {
-		w.logger.Info("Event retention worker not started because EVENT_RETENTION_WINDOW_DAYS is 0")
-		return
-	}
-
 	w.tick(ctx)
 
 	ticker := time.NewTicker(eventRetentionEvery)
@@ -83,7 +76,7 @@ func (w *EventRetentionWorker) tick(ctx context.Context) {
 }
 
 func (w *EventRetentionWorker) cleanRuns(referenceTime time.Time, limit int) (int, error) {
-	runs, err := models.ListExpiredFinishedRuns(database.Conn(), referenceTime, w.windowDays, limit)
+	runs, err := models.ListExpiredFinishedRuns(database.Conn(), referenceTime, limit)
 	if err != nil {
 		return 0, err
 	}
@@ -100,7 +93,7 @@ func (w *EventRetentionWorker) cleanRuns(referenceTime time.Time, limit int) (in
 
 		var summary *models.RunDeletionSummary
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
-			locked, err := models.LockExpiredFinishedRun(tx, referenceTime, w.windowDays, run.ID)
+			locked, err := models.LockExpiredFinishedRun(tx, referenceTime, run.ID)
 			if err != nil {
 				return fmt.Errorf("lock run %s: %w", run.ID, err)
 			}
