@@ -51,6 +51,11 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    hostedModelsAvailable: false,
+    bringYourOwnKey: false,
+    bringYourOwnKeyLoading: false,
+    agentCredentialChoice: null,
+    setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),

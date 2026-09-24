@@ -17,7 +17,6 @@ export {
   FactorySettingsSoonPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
-  FactorySettingsModelsPage,
   FactorySettingsAgentResourcesPage,
   FACTORY_SETTINGS_NAV_GROUPS,
   FACTORY_SETTINGS_NAV_ITEMS,

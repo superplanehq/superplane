@@ -28,6 +28,11 @@ import {
   ticketSourceFromIssuesChoice,
 } from "./first-run/firstRunTicketSource";
 import { type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import {
+  onboardingAgentGate,
+  type OnboardingAgentCredentialChoice,
+  type OnboardingAgentGate,
+} from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -69,8 +74,19 @@ function startConnectOnPicker(searchParams: URLSearchParams): boolean {
   return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
 }
 
-function screenWithoutAgent(screen: FirstRunScreen, skipAgentScreen: boolean): FirstRunScreen {
-  return screen === "agent" && skipAgentScreen ? "tickets" : screen;
+function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
+  if (screen !== "agent" || agentGate === "show" || agentGate === "first") return screen;
+  return "tickets";
+}
+
+// The model source comes before the backlog, so the ticket screen waits for it.
+function screenWithModelSource(
+  screen: FirstRunScreen,
+  agentGate: OnboardingAgentGate,
+  credentialChoice: OnboardingAgentCredentialChoice | null,
+): FirstRunScreen {
+  if (screen !== "tickets" || agentGate !== "first" || credentialChoice) return screen;
+  return "agent";
 }
 
 function useFirstRunBlockingAction() {
@@ -176,17 +192,18 @@ function requestedOrganizations(
 
 function screenWithoutIncompleteJira(
   screen: FirstRunScreen,
+  agentGate: OnboardingAgentGate,
   issuesChoice: IssuesChoiceId | null,
   jiraProjectId: string,
 ): FirstRunScreen {
-  if (screen !== "agent") return screen;
+  if (screen !== "agent" || agentGate !== "show") return screen;
   if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
   return screen;
 }
 
 function useFirstRunNavigation(
   model: OnboardingPageModel,
-  skipAgentScreen: boolean,
+  agentGate: OnboardingAgentGate,
   connection: ReturnType<typeof useGitHubConnectionState>,
 ) {
   const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(connection.initialScreen);
@@ -211,7 +228,8 @@ function useFirstRunNavigation(
 
   return {
     screen: screenWithoutIncompleteJira(
-      screenWithoutAgent(openedScreen, skipAgentScreen),
+      screenWithModelSource(screenWithoutAgent(openedScreen, agentGate), agentGate, model.agentCredentialChoice),
+      agentGate,
       model.setup.issuesChoice,
       model.jiraProjectId,
     ),
@@ -244,7 +262,7 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
 
 function useFirstRunCommands(
   model: OnboardingPageModel,
-  skipAgentScreen: boolean,
+  agentGate: OnboardingAgentGate,
   connection: ReturnType<typeof useGitHubConnectionState>,
   navigation: ReturnType<typeof useFirstRunNavigation>,
   blocking: ReturnType<typeof useFirstRunBlockingAction>,
@@ -254,7 +272,7 @@ function useFirstRunCommands(
       const repository = model.setup.selectedRepo;
       if (!repository) return;
       model.setup.commitRepoStep();
-      if (await model.saveRepository(repository)) navigation.goToScreen("tickets");
+      if (await model.saveRepository(repository)) navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
     });
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
@@ -263,7 +281,8 @@ function useFirstRunCommands(
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
       if (!(await model.saveIssues(issuesChoice))) return;
-      if (!skipAgentScreen) return navigation.goToScreen("agent");
+      if (agentGate === "pending") return;
+      if (agentGate === "show") return navigation.goToScreen("agent");
       blocking.setAction("finishing-setup");
       await model.finish(issuesChoice);
     });
@@ -283,6 +302,10 @@ function useFirstRunCommands(
     blocking.run("finishing-setup", async () => {
       await model.finish();
     });
+  const continueFromAgent = () => {
+    if (agentGate === "first") return navigation.goToScreen("tickets");
+    return finishSetup();
+  };
   const installOnAnotherAccount = () => {
     const state = connection.accountPicker?.state;
     const slug = connection.accountPicker?.appSlug;
@@ -302,7 +325,7 @@ function useFirstRunCommands(
     connectJira,
     continueFromRepository,
     continueFromTickets,
-    finishSetup,
+    continueFromAgent,
     installOnAnotherAccount,
     selectTicketSource,
   };
@@ -389,11 +412,15 @@ export function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refre
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
-  const skipAgentScreen = model.hostedAgentReady;
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(model, organizationId);
-  const navigation = useFirstRunNavigation(model, skipAgentScreen, connection);
-  const commands = useFirstRunCommands(model, skipAgentScreen, connection, navigation, blocking);
+  const agentGate = onboardingAgentGate({
+    hostedModelsAvailable: model.hostedModelsAvailable,
+    bringYourOwnKey: model.bringYourOwnKey,
+    bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
+  });
+  const navigation = useFirstRunNavigation(model, agentGate, connection);
+  const commands = useFirstRunCommands(model, agentGate, connection, navigation, blocking);
   const binding = useGitHubInstallationBinding(
     organizationId,
     model,
@@ -415,7 +442,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...navigation,
     ...commands,
     ...binding,
-    skipAgentScreen,
+    // The ticket screen is the last screen, so it finishes setup.
+    ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
+    skipAgentScreen: agentGate === "skip",
+    agentBeforeTickets: agentGate === "first",
+    credentialChoice: model.agentCredentialChoice,
+    selectCredentialChoice: model.setAgentCredentialChoice,
+    agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,
