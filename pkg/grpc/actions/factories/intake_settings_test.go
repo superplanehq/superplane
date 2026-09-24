@@ -377,8 +377,8 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 }
 
 func Test__intakeSentryActionsFor(t *testing.T) {
-	t.Run("listens for created and unresolved issues by default", func(t *testing.T) {
-		assert.Equal(t, []any{"created", "unresolved"}, intakeSentryActionsFor(defaultSentryIntakeSettings()))
+	t.Run("listens for created issues by default", func(t *testing.T) {
+		assert.Equal(t, []any{"created"}, intakeSentryActionsFor(defaultSentryIntakeSettings()))
 	})
 
 	t.Run("maps each event checkbox to its webhook action", func(t *testing.T) {
@@ -433,6 +433,7 @@ func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 
 	t.Run("reads the trigger actions and level list", func(t *testing.T) {
 		settings := defaultSentryIntakeSettings()
+		settings.SentryRegressedIssues = true
 		settings.SentryAssignedIssues = true
 		settings.SentryLevels = []string{"warning", "error"}
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, settings)
@@ -470,7 +471,7 @@ func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 				Nodes: []models.Node{
 					{
 						ID:            intakeTriggerNodeID,
-						Configuration: map[string]any{"actions": []any{"created", "unresolved"}},
+						Configuration: map[string]any{"actions": []any{"created"}},
 					},
 				},
 			},
