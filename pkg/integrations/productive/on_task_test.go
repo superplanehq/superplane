@@ -405,6 +405,28 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		require.ErrorContains(t, err, "missing task data")
 	})
 
+	t.Run("task list fetch failure still emits the event", func(t *testing.T) {
+		body := taskWebhookBody("91", "1", "Fix payment retries")
+		events := &contexts.EventContext{}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: http.StatusServiceUnavailable, Body: io.NopCloser(strings.NewReader(`{"errors":[{"title":"Unavailable"}]}`))},
+		}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskCreatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: createdTaskConfiguration(),
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+			HTTP:          httpContext,
+			Integration:   integrationWithProject(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+	})
+
 	t.Run("delivery for another project -> ignored", func(t *testing.T) {
 		body := taskWebhookBody("91", "other-project", "Fix payment retries")
 		events := &contexts.EventContext{}
