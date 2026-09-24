@@ -125,7 +125,7 @@ func UpdateFactoryAgentResource(
 			merged.Source = models.FactoryAgentResourceSourceInline
 			config = &merged
 		}
-	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 || req.GetSetDisabledTools() {
+	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 || req.GetReplaceDisabledTools() {
 		merged := resource.Config.Data()
 		if req.Url != nil {
 			merged.URL = req.GetUrl()
@@ -136,7 +136,7 @@ func UpdateFactoryAgentResource(
 		if len(req.GetHeaders()) > 0 || (req.Auth != nil && req.GetAuth() == pb.FactoryAgentResource_AUTH_OAUTH) {
 			merged.Headers = protoHeadersToModel(req.GetHeaders())
 		}
-		if req.GetSetDisabledTools() {
+		if req.GetReplaceDisabledTools() {
 			merged.DisabledTools = models.NormalizeDisabledTools(req.GetDisabledTools())
 		}
 		if err := validateMCPURL(merged.URL); err != nil {

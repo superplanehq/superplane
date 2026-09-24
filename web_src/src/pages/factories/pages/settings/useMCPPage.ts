@@ -190,7 +190,7 @@ function toggleTools(mutations: MCPMutations, resource: FactoriesFactoryAgentRes
     return;
   }
   void mutations.updateResource
-    .mutateAsync({ resourceId: resource.id, disabledTools, setDisabledTools: true })
+    .mutateAsync({ resourceId: resource.id, disabledTools, replaceDisabledTools: true })
     .catch((error) => {
       showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.updateFailed));
     });

@@ -219,12 +219,12 @@ func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {
 		Auth:      models.FactoryAgentResourceAuthHeaders,
 	})
 	require.NoError(t, err)
-	setDisabled := true
+	replaceDisabled := true
 	response, err := UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
-		FactoryId:        factory.ID.String(),
-		ResourceId:       resource.ID.String(),
-		DisabledTools:    []string{"create_issue", " search "},
-		SetDisabledTools: &setDisabled,
+		FactoryId:            factory.ID.String(),
+		ResourceId:           resource.ID.String(),
+		DisabledTools:        []string{"create_issue", " search "},
+		ReplaceDisabledTools: &replaceDisabled,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"create_issue", "search"}, response.GetResource().GetDisabledTools())

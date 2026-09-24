@@ -2498,7 +2498,7 @@ message UpdateFactoryAgentResourceRequest {
   repeated FactoryAgentResource.Header headers = 7;
   optional string markdown = 8;
   repeated string disabled_tools = 9;
-  optional bool set_disabled_tools = 10;
+  optional bool replace_disabled_tools = 10;
 }
 
 message UpdateFactoryAgentResourceResponse {

@@ -471,7 +471,7 @@ function toolsForAgentResource(
 function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
   const request = (body ?? {}) as FactoriesFactoryAgentResource & {
     disabledTools?: string[];
-    setDisabledTools?: boolean;
+    replaceDisabledTools?: boolean;
   };
   if (typeof request.name === "string" && request.name.trim()) {
     resource.name = request.name.trim();
@@ -491,7 +491,7 @@ function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unkno
   if (typeof request.markdown === "string") {
     resource.markdown = request.markdown;
   }
-  if (request.setDisabledTools) {
+  if (request.replaceDisabledTools) {
     resource.disabledTools = Array.isArray(request.disabledTools) ? request.disabledTools : [];
   }
   resource.updatedAt = new Date().toISOString();
