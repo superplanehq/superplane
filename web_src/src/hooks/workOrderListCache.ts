@@ -171,6 +171,41 @@ export function applyWorkOrderToListCaches(
   }
 }
 
+function withoutWorkOrder<T extends { id?: string }>(orders: T[], orderId: string): T[] {
+  return orders.filter((order) => order.id !== orderId);
+}
+
+export function removeWorkOrderFromListCaches(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+): void {
+  queryClient.setQueryData<FactoriesWorkOrderSummary[]>(workOrdersListKey(organizationId, factoryId), (orders) => {
+    if (!orders) {
+      return orders;
+    }
+    return withoutWorkOrder(orders, orderId);
+  });
+
+  for (const query of queryClient.getQueryCache().findAll({
+    queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
+  })) {
+    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(query.queryKey, (data) => {
+      if (!data) {
+        return data;
+      }
+      return {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          orders: withoutWorkOrder(page.orders, orderId),
+        })),
+      };
+    });
+  }
+}
+
 export function cachedWorkOrderFromLists(
   queryClient: QueryClient,
   organizationId: string,
