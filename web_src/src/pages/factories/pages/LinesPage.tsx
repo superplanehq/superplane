@@ -1130,7 +1130,7 @@ function LineBoardSplitRunPopup({
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
-  onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
+  onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
   onClose: () => void;
@@ -1170,7 +1170,9 @@ function LineBoardSplitRunPopup({
       canUpdate={canUpdate}
       isDispatching={isDispatching}
       onDispatch={
-        resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined
+        resolvedLineName
+          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+          : undefined
       }
       onClose={onClose}
       fixed

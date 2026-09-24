@@ -9,6 +9,7 @@ import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPag
 import { SplitRunReview } from "./SplitRunReview";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO, draftStartModelPayload } from "./draftStartModel";
+import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
@@ -52,7 +53,8 @@ function renderDraftFooter(
               organizationId="org-1"
               factoryId="factory-1"
               lineName="ship"
-              value={selectedModel}
+              model={selectedModel}
+              thinkingLevel={DRAFT_START_THINKING_AUTO}
               onChange={onChange}
             />
           }
@@ -95,9 +97,21 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
     await user.click(screen.getByRole("button", { name: "Model: Auto" }));
-    expect(await screen.findByRole("menuitemradio", { name: "Auto" })).toHaveAttribute("aria-checked", "true");
-    await user.click(screen.getByRole("menuitemradio", { name: "claude-opus-4-6" }));
-    expect(onChange).toHaveBeenCalledWith("claude-opus-4-6");
+    expect(screen.getByText("Model")).toBeInTheDocument();
+    expect(screen.getByText("Thinking")).toBeInTheDocument();
+    expect(screen.getAllByRole("menuitem", { name: "Auto" })).toHaveLength(2);
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: DRAFT_START_THINKING_AUTO });
+  });
+
+  it("lists thinking levels the user can pick", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    expect(onChange).toHaveBeenCalledWith({ model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
   });
 
   it("disables the model chevron when Start is disabled", () => {
