@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -138,6 +139,28 @@ func ImportFactoryIntakeItem(
 				}
 			}
 		}
+		if reader, ok := source.(interface {
+			IssueFiles(context.Context, string, string) ([]jira.IssueFile, error)
+		}); ok {
+			issueFiles, readErr := reader.IssueFiles(ctx, item.ID, body)
+			if readErr == nil && len(issueFiles) > 0 {
+				ingested, ingestErr := storedfiles.AppendTaskFiles(
+					ctx,
+					tx,
+					blob.Current(),
+					orgID,
+					factory.ID,
+					order.ID,
+					&createdByID,
+					body,
+					incomingJiraFiles(issueFiles),
+				)
+				bound.CopiedKeys = append(bound.CopiedKeys, ingested.ObjectKeys...)
+				if ingestErr == nil {
+					body = ingested.Markdown
+				}
+			}
+		}
 		if body != order.Description {
 			if err := order.UpdateContent(tx, nil, &body); err != nil {
 				return err
@@ -171,6 +194,19 @@ func ImportFactoryIntakeItem(
 	}
 
 	return &pb.ImportFactoryIntakeItemResponse{Order: serialized}, nil
+}
+
+func incomingJiraFiles(files []jira.IssueFile) []storedfiles.IncomingFile {
+	incoming := make([]storedfiles.IncomingFile, 0, len(files))
+	for _, file := range files {
+		incoming = append(incoming, storedfiles.IncomingFile{
+			Filename:    file.Name,
+			ContentType: file.ContentType,
+			Body:        bytes.NewReader(file.Body),
+			ReplaceURLs: file.ReplaceURLs,
+		})
+	}
+	return incoming
 }
 
 func incomingProductiveFiles(files []productive.TaskFile) []storedfiles.IncomingFile {
