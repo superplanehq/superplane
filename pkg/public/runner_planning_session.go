@@ -563,53 +563,100 @@ func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *mod
 }
 
 func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	switch {
-	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound),
-		errors.Is(err, gorm.ErrRecordNotFound):
-		http.Error(w, "planning session not found", http.StatusNotFound)
-	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
-		http.Error(w, "planning session has ended", http.StatusConflict)
-	case isPlanningRequestCanceled(r, err):
+	if status, message, ok := runnerPlanningClientError(err); ok {
+		http.Error(w, message, status)
+		return
+	}
+	if isPlanningRequestCanceled(r, err) {
 		log.WithError(err).WithField("route", resolveCriticalHTTPRoute(r)).Info("runner planning session client disconnected")
 		w.WriteHeader(statusClientClosedRequest)
+		return
+	}
+	fields := runnerPlanningErrorFields(r, session, err)
+	log.WithError(err).WithFields(fields).Error("runner planning session failed")
+	captureRunnerPlanningErrorToSentry(r, fields, err)
+	http.Error(w, "Lookup failed", http.StatusInternalServerError)
+}
+
+func runnerPlanningClientError(err error) (int, string, bool) {
+	switch {
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid),
+		errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
+		return http.StatusBadRequest, err.Error(), true
+	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound),
+		errors.Is(err, gorm.ErrRecordNotFound):
+		return http.StatusNotFound, "planning session not found", true
+	case errors.Is(err, models.ErrFactoryNotFound),
+		errors.Is(err, models.ErrFactoryWorkOrderNotFound):
+		return http.StatusNotFound, err.Error(), true
+	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
+		return http.StatusConflict, "planning session has ended", true
+	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
+		return http.StatusConflict, "planning session has no draft", true
+	case errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound),
+		errors.Is(err, models.ErrFactoryWorkOrderArtifactKeyAlreadyExists):
+		return http.StatusConflict, err.Error(), true
 	default:
-		log.WithError(err).Error("runner planning session failed")
-		captureRunnerPlanningErrorToSentry(r, session, err)
-		http.Error(w, "Lookup failed", http.StatusInternalServerError)
+		return 0, "", false
 	}
 }
 
-func captureRunnerPlanningErrorToSentry(r *http.Request, session *models.FactoryPlanningSession, err error) {
+func captureRunnerPlanningErrorToSentry(r *http.Request, fields log.Fields, err error) {
 	hub := sentry.CurrentHub()
 	if hub == nil || hub.Client() == nil {
 		return
 	}
 	hub.WithScope(func(scope *sentry.Scope) {
-		applyRunnerPlanningErrorTags(scope, r, session, err)
+		if r != nil {
+			scope.SetRequest(r)
+		}
+		applyRunnerPlanningErrorTags(scope, fields)
 		hub.CaptureException(err)
 	})
 }
 
-func applyRunnerPlanningErrorTags(scope *sentry.Scope, r *http.Request, session *models.FactoryPlanningSession, err error) {
+func applyRunnerPlanningErrorTags(scope *sentry.Scope, fields log.Fields) {
+	for key, value := range fields {
+		if key == "path" {
+			continue
+		}
+		text, ok := value.(string)
+		if !ok || text == "" {
+			continue
+		}
+		scope.SetTag(key, text)
+	}
+}
+
+func runnerPlanningErrorFields(r *http.Request, session *models.FactoryPlanningSession, err error) log.Fields {
+	fields := log.Fields{}
 	if r != nil {
+		if r.Method != "" {
+			fields["method"] = r.Method
+		}
+		if r.URL != nil && r.URL.Path != "" {
+			fields["path"] = r.URL.Path
+		}
 		if route := resolveCriticalHTTPRoute(r); route != "" {
-			scope.SetTag("route", route)
+			fields["route"] = route
 		}
 	}
 	if session != nil {
 		if session.ID != uuid.Nil {
-			scope.SetTag("planning_session_id", session.ID.String())
+			fields["planning_session_id"] = session.ID.String()
+		}
+		if session.CanvasRunID != nil && *session.CanvasRunID != uuid.Nil {
+			fields["canvas_run_id"] = session.CanvasRunID.String()
 		}
 		if session.DraftWorkOrderID != nil && *session.DraftWorkOrderID != uuid.Nil {
-			scope.SetTag("draft_work_order_id", session.DraftWorkOrderID.String())
+			fields["draft_work_order_id"] = session.DraftWorkOrderID.String()
 		}
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code != "" {
-		scope.SetTag("postgres_error_code", pgErr.Code)
+		fields["postgres_error_code"] = pgErr.Code
 	}
+	return fields
 }
 
 func clampPlanningHoldSeconds(raw string) int {
