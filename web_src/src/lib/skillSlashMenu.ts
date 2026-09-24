@@ -6,6 +6,7 @@ export type SkillSlashMenuPortal = {
   left: number;
   width: number;
   top: number;
+  maxHeight: number;
   root: HTMLElement;
 };
 
@@ -26,17 +27,17 @@ export function skillSlashMenuPortalFromRects(
   caret: { left: number; top: number; bottom: number },
   origin: { left: number; top: number; bottom: number },
 ): Omit<SkillSlashMenuPortal, "root"> {
-  const hostHeight = origin.bottom - origin.top;
-  const maxTop = Math.max(SKILL_SLASH_MENU_OFFSET, hostHeight - SKILL_SLASH_MENU_MAX_HEIGHT - SKILL_SLASH_MENU_OFFSET);
-  const below = caret.bottom - origin.top + SKILL_SLASH_MENU_OFFSET;
-  const above = caret.top - origin.top - SKILL_SLASH_MENU_MAX_HEIGHT - SKILL_SLASH_MENU_OFFSET;
-  const spaceBelow = origin.bottom - caret.bottom;
-  const spaceAbove = caret.top - origin.top;
-  const top =
-    spaceBelow < SKILL_SLASH_MENU_MAX_HEIGHT + SKILL_SLASH_MENU_OFFSET && spaceAbove > spaceBelow ? above : below;
+  const spaceBelow = origin.bottom - caret.bottom - SKILL_SLASH_MENU_OFFSET;
+  const spaceAbove = caret.top - origin.top - SKILL_SLASH_MENU_OFFSET;
+  const placeAbove = spaceBelow < SKILL_SLASH_MENU_MAX_HEIGHT && spaceAbove > spaceBelow;
+  const maxHeight = Math.min(SKILL_SLASH_MENU_MAX_HEIGHT, Math.max(0, placeAbove ? spaceAbove : spaceBelow));
+  const top = placeAbove
+    ? caret.top - origin.top - maxHeight - SKILL_SLASH_MENU_OFFSET
+    : caret.bottom - origin.top + SKILL_SLASH_MENU_OFFSET;
   return {
     left: Math.max(12, caret.left - origin.left),
     width: Math.min(320, Math.max(0, box.width)),
-    top: Math.min(Math.max(top, SKILL_SLASH_MENU_OFFSET), maxTop),
+    top,
+    maxHeight,
   };
 }

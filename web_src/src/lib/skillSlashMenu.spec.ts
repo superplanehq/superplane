@@ -20,6 +20,7 @@ describe("skillSlashMenuPortalFromRects", () => {
       left: 36,
       width: 320,
       top: 124,
+      maxHeight: SKILL_SLASH_MENU_MAX_HEIGHT,
     });
   });
 
@@ -34,6 +35,22 @@ describe("skillSlashMenuPortalFromRects", () => {
       left: 36,
       width: 320,
       top: 430 - 80 - SKILL_SLASH_MENU_MAX_HEIGHT - SKILL_SLASH_MENU_OFFSET,
+      maxHeight: SKILL_SLASH_MENU_MAX_HEIGHT,
+    });
+  });
+
+  it("shrinks to the larger side when neither side fits a full list", () => {
+    expect(
+      skillSlashMenuPortalFromRects(
+        { left: 40, width: 480 },
+        { left: 56, top: 180, bottom: 198 },
+        { left: 20, top: 0, bottom: 400 },
+      ),
+    ).toEqual({
+      left: 36,
+      width: 320,
+      top: 202,
+      maxHeight: 198,
     });
   });
 });
