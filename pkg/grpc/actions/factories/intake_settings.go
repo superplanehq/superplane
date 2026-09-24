@@ -391,6 +391,10 @@ var intakeSentryLevelsPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.data\.issue\?\.level \?\? ""\) in (\[[^\]]*\])`,
 )
 
+var intakeProductiveTaskListsPattern = regexp.MustCompile(
+	`\(root\(\)\.data\.data\.relationships\.task_list\.data\.id \?\? ""\) in (\[[^\]]*\])`,
+)
+
 // intakeSettingsFromGraph reads the settings back out of the filter
 // expression. A hand-edited expression that no longer matches reports defaults
 // rather than a wrong value.

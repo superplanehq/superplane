@@ -333,10 +333,12 @@ func seedProductiveTasks(
 	}
 
 	project, _ := binding.Configuration["project"].(string)
+	settings := productiveIntakeSettings(tx, canvasID)
 	documents, err := newestProductiveSeedDocuments(
 		client,
 		project,
-		productiveIntakeExcludesKeyTasks(tx, canvasID),
+		settings.ExcludeKeyTasks,
+		settings.TaskListIDs,
 	)
 	if err != nil {
 		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
@@ -352,8 +354,9 @@ func newestProductiveSeedDocuments(
 	client *productive.Client,
 	project string,
 	regularOnly bool,
+	taskListIDs []string,
 ) ([]map[string]any, error) {
-	return client.ListNewestOpenTaskDocuments(project, intakeProductiveSeedSize, regularOnly)
+	return client.ListNewestOpenTaskDocuments(project, intakeProductiveSeedSize, regularOnly, taskListIDs)
 }
 
 // productiveTaskEvents shapes each task of a newest-first page like the event
@@ -372,17 +375,18 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	return events
 }
 
-func productiveIntakeExcludesKeyTasks(tx *gorm.DB, canvasID uuid.UUID) bool {
+func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
+	settings := defaultProductiveIntakeSettings()
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{canvasID})
 	if err != nil {
-		return true
+		return settings
 	}
 	spec, ok := specs[canvasID]
 	if !ok {
-		return true
+		return settings
 	}
 	source := models.FactoryIntakeSourceProductiveTasks
-	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec).ExcludeKeyTasks
+	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 }
 
 func seedSentryIssues(

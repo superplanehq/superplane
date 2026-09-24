@@ -307,7 +307,7 @@ func Test__ProductiveSeedAsksForTenNewestTasks(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	documents, err := newestProductiveSeedDocuments(client, "42", false)
+	documents, err := newestProductiveSeedDocuments(client, "42", false, []string{"list-a", "list-b"})
 	require.NoError(t, err)
 	assert.Empty(t, documents)
 
@@ -315,6 +315,7 @@ func Test__ProductiveSeedAsksForTenNewestTasks(t *testing.T) {
 	query := httpContext.Requests[0].URL.Query()
 	assert.Equal(t, "42", query.Get("filter[project_id]"))
 	assert.Equal(t, "10", query.Get("page[size]"))
+	assert.Equal(t, "list-a,list-b", query.Get("filter[task_list_id]"))
 }
 
 func Test__ProductiveTaskEvents(t *testing.T) {
