@@ -91,11 +91,7 @@ function TaskListField({
 
   return (
     <div className="mb-1 ml-6 flex flex-col gap-2" data-testid="intake-task-list-options">
-      <TaskListStatus
-        loading={taskListsQuery.isLoading}
-        error={taskListsQuery.isError}
-        empty={options.length === 0}
-      />
+      <TaskListStatus loading={taskListsQuery.isLoading} error={taskListsQuery.isError} empty={options.length === 0} />
       {options.length > 0 ? (
         <ul className="flex flex-wrap items-center gap-1.5">
           {options.map((option) => {
@@ -110,11 +106,7 @@ function TaskListField({
                       : "border-border bg-card text-muted-foreground hover:border-foreground/15",
                   )}
                 >
-                  <Checkbox
-                    checked={checked}
-                    onChange={() => toggleTaskList(option.id)}
-                    aria-label={option.name}
-                  />
+                  <Checkbox checked={checked} onChange={() => toggleTaskList(option.id)} aria-label={option.name} />
                   <span className="min-w-0 truncate">{option.name}</span>
                 </label>
               </li>
@@ -126,15 +118,7 @@ function TaskListField({
   );
 }
 
-function TaskListStatus({
-  loading,
-  error,
-  empty,
-}: {
-  loading: boolean;
-  error: boolean;
-  empty: boolean;
-}) {
+function TaskListStatus({ loading, error, empty }: { loading: boolean; error: boolean; empty: boolean }) {
   let message: string | null = null;
   if (loading) {
     message = PRODUCTIVE_INTAKE_SETTINGS_COPY.taskListsLoading;
