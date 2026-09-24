@@ -26,6 +26,7 @@ import {
   shouldNameOrganizationFromGitHub,
 } from "./initialOnboardingOrganization";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
+import { useOnboardingModelSource } from "./onboardingModelSource";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
@@ -463,13 +464,11 @@ export function useOnboardingPageModel(args: {
 }) {
   const { canAct } = usePermissions();
   const bringYourOwnKey = useExperimentalFeature(args.organizationId);
+  const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
-  const agent = useOnboardingAgentContext(
-    args.organizationId,
-    integrations.connected,
-    bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
-  );
+  const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
+  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey);
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
     remainingCreditCents: agent.remainingCreditCents,
@@ -515,11 +514,12 @@ export function useOnboardingPageModel(args: {
 
   return {
     setup,
-    // True when a hosted model can run the agent. Bring-your-own-key
-    // organizations still see the agent screen and can connect a provider key.
     hostedAgentReady: isHostedAgentReady(agent.plan),
+    hostedModelsAvailable: agent.hostedModelsAvailable,
     bringYourOwnKey: bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
     bringYourOwnKeyLoading: bringYourOwnKey.isLoading,
+    agentCredentialChoice,
+    setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
     openSection,
     setOpenSection,

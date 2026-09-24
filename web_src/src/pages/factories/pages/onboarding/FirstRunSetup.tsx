@@ -8,6 +8,7 @@ import { useNavigate } from "react-router";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
+import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
 import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
@@ -17,6 +18,11 @@ import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { sphereFor } from "./first-run/firstRunSphereFor";
+import {
+  agentFinishReady,
+  isAgentProviderConnected,
+  type OnboardingAgentCredentialChoice,
+} from "./onboardingAgentReadiness";
 import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import {
@@ -37,6 +43,13 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   agent: 4,
 };
 
+// A bring-your-own-key organization chooses the model source before the backlog.
+const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
+  ...STEP_INDEX_FOR_SCREEN,
+  agent: 3,
+  tickets: 4,
+};
+
 // The reverse path walks the exact screens in reverse order, back to the
 // welcome screen. The connect screen has two pages (the Connect GitHub page
 // and the account picker), so `backActionFor` in FirstRunSetup handles the
@@ -45,6 +58,12 @@ const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "welcome",
   tickets: "choose",
   agent: "tickets",
+};
+
+const BACK_SCREEN_AGENT_FIRST: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
+  ...BACK_SCREEN,
+  agent: "choose",
+  tickets: "agent",
 };
 
 /**
@@ -63,6 +82,18 @@ function signOut() {
   window.location.href = "/logout";
 }
 
+type AgentModelSource = {
+  offered: boolean;
+  choice: OnboardingAgentCredentialChoice | null;
+  onSelect: (choice: OnboardingAgentCredentialChoice) => void;
+};
+
+function agentScreenBody(modelSource: AgentModelSource): string {
+  if (modelSource.choice === "own-key") return FIRST_RUN_COPY.agent.ownKeyBody;
+  if (modelSource.offered) return FIRST_RUN_COPY.agent.modelSourceBody;
+  return AGENT_STEP.purpose;
+}
+
 function AgentScreen({
   organizationId,
   setup,
@@ -71,6 +102,7 @@ function AgentScreen({
   saving,
   loading,
   hostedAgentReady,
+  modelSource,
   onRequestConnect,
   onContinue,
 }: {
@@ -81,13 +113,22 @@ function AgentScreen({
   saving: boolean;
   loading: boolean;
   hostedAgentReady: boolean;
+  modelSource: AgentModelSource;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
+  const canFinish = agentFinishReady({
+    modelSourceChoice: modelSource.offered,
+    credentialChoice: modelSource.choice,
+    providerConnected: isAgentProviderConnected(setup.connected),
+    agentReady: setup.agentReady,
+    hostedAgentReady,
+  });
+  const showProviders = !modelSource.offered || modelSource.choice === "own-key";
   return (
     <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{AGENT_STEP.purpose}</p>
+        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource)}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
@@ -96,21 +137,37 @@ function AgentScreen({
             {FIRST_RUN_COPY.agent.loading}
           </p>
         ) : null}
-        <fieldset disabled={saving || loading} className="contents">
+        {modelSource.offered ? (
           <FirstRunPanel>
-            <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={onRequestConnect} />
+            <FirstRunModelSourceChoice
+              disabled={saving || loading}
+              modelSource={modelSource.choice}
+              onSelectModelSource={modelSource.onSelect}
+            />
           </FirstRunPanel>
-        </fieldset>
+        ) : null}
+        {showProviders ? (
+          <fieldset disabled={saving || loading} className="contents">
+            <FirstRunPanel>
+              <AgentStep
+                organizationId={organizationId}
+                setup={setup}
+                showHostedCredit={modelSource.choice !== "own-key"}
+                onRequestConnect={onRequestConnect}
+              />
+            </FirstRunPanel>
+          </fieldset>
+        ) : null}
         <LoadingButton
           type="button"
           className="w-full"
-          disabled={(!setup.agentReady && !hostedAgentReady) || loading}
+          disabled={!canFinish || loading}
           loading={saving}
           loadingText={FIRST_RUN_COPY.finish.saving}
           onClick={onContinue}
           data-testid="first-run-finish-setup"
         >
-          {FIRST_RUN_COPY.finish.action}
+          {modelSource.offered ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
         </LoadingButton>
       </div>
     </FirstRunShell>
@@ -129,7 +186,7 @@ function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => 
   if (target === "choose") {
     return () => flow.goToScreen("connect", "picker");
   }
-  const backScreen = BACK_SCREEN[target];
+  const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
@@ -147,6 +204,10 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
 }
 
 /** Hosted credentials provision from this screen, so it shows finish progress. */
+function ticketsContinueLabel(ticketsFinishSetup: boolean): string {
+  return ticketsFinishSetup ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue;
+}
+
 function TicketsScreenHost({
   organizationId,
   flow,
@@ -162,13 +223,13 @@ function TicketsScreenHost({
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
-  const finishing = flow.blockingAction === "finishing-setup" || (flow.skipAgentScreen && saving);
+  const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
   return (
     <FirstRunTicketsScreen
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
+      continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
       savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
@@ -220,7 +281,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex: STEP_INDEX_FOR_SCREEN[target],
+      stepIndex: (flow.agentBeforeTickets ? STEP_INDEX_FOR_SCREEN_AGENT_FIRST : STEP_INDEX_FOR_SCREEN)[target],
       stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
       onBack: backActionFor(target, flow),
       busy: flow.busy,
@@ -304,11 +365,16 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       setup={setup}
       chrome={chromeFor("agent")}
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
-      saving={flow.blockingAction === "finishing-setup" || model.saving}
+      saving={!flow.agentBeforeTickets && (flow.blockingAction === "finishing-setup" || model.saving)}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
+      modelSource={{
+        offered: flow.agentBeforeTickets,
+        choice: flow.credentialChoice,
+        onSelect: flow.selectCredentialChoice,
+      }}
       onRequestConnect={model.requestConnect}
-      onContinue={() => void flow.finishSetup()}
+      onContinue={() => void flow.continueFromAgent()}
     />
   );
 }

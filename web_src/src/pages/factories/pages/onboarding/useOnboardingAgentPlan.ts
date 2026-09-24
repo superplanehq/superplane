@@ -6,6 +6,7 @@ import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 
 import {
+  hasHostedDefaultModel,
   hostedModelsQueriesLoading,
   isAgentProviderConnected,
   resolveOnboardingAgent,
@@ -25,6 +26,10 @@ export function useOnboardingAgentPlan(
   const openrouter = useHostedLLMModels(organizationId, "openrouter", needHostedModels);
   return {
     remainingCreditCents,
+    hostedModelsAvailable: hasHostedDefaultModel({
+      defaultHostedProvider: defaultHosted?.provider,
+      defaultHostedModel: defaultHosted?.model,
+    }),
     hostedModelsLoading: hostedModelsQueriesLoading(needHostedModels, [anthropic, openai, openrouter]),
     plan: resolveOnboardingAgent({
       connected,
