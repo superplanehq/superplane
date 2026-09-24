@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 const MaxWebhookPayloadSize = 512 * 1024
@@ -22,6 +23,21 @@ func MaxEmitCount() int {
 
 func MaxPayloadSize() int {
 	return intFromEnv("SUPERPLANE_MAX_PAYLOAD_SIZE", 512*1024)
+}
+
+const defaultEventRetentionWindowDays = 30
+
+// EventRetentionWindowDays is how long finished canvas runs stay before
+// EventRetentionWorker deletes them. Set EVENT_RETENTION_WINDOW_DAYS=0
+// to keep finished runs. Invalid values fall back to 30 days.
+func EventRetentionWindowDays() int {
+	if v := os.Getenv("EVENT_RETENTION_WINDOW_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
+	}
+
+	return defaultEventRetentionWindowDays
 }
 
 // AnthropicAgentConfig holds the credentials and identifiers needed to talk

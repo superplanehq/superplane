@@ -1,5 +1,6 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryAutomations, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -62,7 +63,7 @@ export function useAutomationsPageModel() {
       showSuccessToast("Automation created.");
       navigate(factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "automations" }));
     } catch (error) {
-      showErrorToast("Failed to create automation");
+      showErrorToast(getApiErrorMessage(error, "Failed to create automation"));
       throw error;
     }
   };

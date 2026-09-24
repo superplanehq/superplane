@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useParams } from "react-router";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useUpdateCanvas } from "@/hooks/useCanvasData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { CanvasCardData } from "./types";
 
@@ -35,7 +36,7 @@ export function useEditApp() {
         });
         closeEdit();
       } catch (error) {
-        showErrorToast("Failed to update app");
+        showErrorToast(getApiErrorMessage(error, "Failed to update app"));
         throw error;
       }
     },

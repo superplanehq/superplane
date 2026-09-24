@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { PLACEHOLDER_NODE_CONTEXT_KEY, setAgentBootContext } from "@/lib/agentBootContext";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
@@ -49,7 +50,7 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         applyBlankAppBootContext(canvasId);
         navigate(appPath(organizationId, canvasId, "?edit=1"));
       } catch (error) {
-        showErrorToast("Failed to create app");
+        showErrorToast(getApiErrorMessage(error, "Failed to create app"));
         throw error;
       }
     },

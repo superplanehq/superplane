@@ -532,8 +532,8 @@ export function LinesPage() {
           }),
         );
       })
-      .catch(() => {
-        showErrorToast("Failed to create intake automation");
+      .catch((error) => {
+        showErrorToast(getApiErrorMessage(error, "Failed to create intake automation"));
       });
   };
 

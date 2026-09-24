@@ -234,6 +234,70 @@ func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	return runs, nil
 }
 
+func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, windowDays int, limit int) ([]CanvasRun, error) {
+	if windowDays <= 0 {
+		return nil, nil
+	}
+
+	var runs []CanvasRun
+
+	query := expiredFinishedRunsQuery(db, referenceTime, windowDays).
+		Scopes(
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+			oldestCanvasRunsFirst,
+		)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, windowDays int, runID uuid.UUID) (*CanvasRun, error) {
+	if windowDays <= 0 {
+		return nil, nil
+	}
+
+	var run CanvasRun
+
+	err := expiredFinishedRunsQuery(db, referenceTime, windowDays).
+		Scopes(
+			lockCanvasRunsForUpdate,
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+		).
+		Where("workflow_runs.id = ?", runID).
+		First(&run).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time, windowDays int) *gorm.DB {
+	return tx.
+		Table("workflow_runs").
+		Select("workflow_runs.*").
+		Where("workflow_runs.state = ?", CanvasRunStateFinished).
+		Where("workflow_runs.finished_at IS NOT NULL").
+		Where("workflow_runs.finished_at + (? * INTERVAL '1 day') < ?", windowDays, referenceTime.UTC())
+}
+
 func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 

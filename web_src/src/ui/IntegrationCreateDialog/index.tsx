@@ -274,7 +274,7 @@ export function IntegrationCreateDialog({
       }
     } catch (error) {
       setCreateError(error);
-      showErrorToast("Failed to create integration");
+      showErrorToast(getApiErrorMessage(error, "Failed to create integration"));
     } finally {
       setIsCreatePending(false);
     }

@@ -1,6 +1,7 @@
 import type { FactoryAutomation } from "@/api-client";
 import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
 import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
@@ -134,8 +135,8 @@ export function useAutomationCardMutations(args: {
           invalidateFactoryApps,
           navigate,
         });
-      } catch {
-        showErrorToast("Failed to duplicate automation");
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to duplicate automation"));
       } finally {
         setIsDuplicating(false);
       }

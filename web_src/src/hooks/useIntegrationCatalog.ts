@@ -4,6 +4,7 @@ import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegratio
 import { usePermissions } from "@/contexts/usePermissions";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import {
@@ -301,8 +302,8 @@ async function submitCatalogConnect({
     if (createdId) {
       navigate(integrationDetailPath(integrationsBasePath, createdId));
     }
-  } catch {
-    showErrorToast("Failed to create integration");
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "Failed to create integration"));
   }
 }
 
@@ -343,8 +344,8 @@ function startCatalogHostedGitHubConnect({
       return response.data;
     },
     update: persistGitHubSetupReturnPath(organizationId),
-  }).catch(() => {
-    showErrorToast("Failed to connect GitHub");
+  }).catch((error) => {
+    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
   });
   return true;
 }
@@ -383,8 +384,8 @@ function startCatalogHostedJiraConnect({
       const response = await createIntegrationMutation.mutateAsync(payload);
       return response.data;
     },
-  }).catch(() => {
-    showErrorToast("Failed to connect Jira");
+  }).catch((error) => {
+    showErrorToast(getApiErrorMessage(error, "Failed to connect Jira"));
   });
   return true;
 }
@@ -421,7 +422,7 @@ function startCatalogPrivateGitHubApp({
       const response = await createIntegrationMutation.mutateAsync(payload);
       return response.data;
     },
-  }).catch(() => {
-    showErrorToast("Failed to connect GitHub");
+  }).catch((error) => {
+    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
   });
 }

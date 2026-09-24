@@ -4,6 +4,7 @@ import { useCanvases, useCreateCanvas } from "@/hooks/useCanvasData";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { appPath } from "@/lib/appPaths";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { buildAdminActions, buildOrganizationSettingsActions, buildRootActions } from "./actions";
 import { buildCanvasNodeSearchActions, useCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
@@ -207,8 +208,8 @@ function useCreateCanvasCommand(
       if (!nextCanvasId) return;
       closePalette();
       navigate(appPath(organizationId, nextCanvasId));
-    } catch {
-      showErrorToast("Failed to create app");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to create app"));
     }
   }, [closePalette, data.canCreateCanvas, data.createCanvasMutation, navigate, organizationId]);
 }
