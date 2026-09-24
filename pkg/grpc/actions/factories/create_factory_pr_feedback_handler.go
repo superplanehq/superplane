@@ -149,7 +149,6 @@ func createPRFeedbackCanvas(
 		&factory.ID,
 		nodes,
 		edges,
-		deps.UsageService,
 	)
 	if err != nil {
 		return uuid.Nil, err

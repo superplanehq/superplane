@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 type AcceptStatus = "idle" | "loading" | "error";
@@ -76,7 +74,7 @@ export default function InviteLinkAccept() {
         const message = err instanceof Error ? err.message : "Unable to accept invite link.";
         setStatus("error");
         setErrorMessage(message);
-        showErrorToast(getUsageLimitToastMessage(err, message));
+        showErrorToast(message);
       }
     };
 
@@ -84,19 +82,13 @@ export default function InviteLinkAccept() {
   }, [account, loading, navigate, token]);
 
   if (status === "error") {
-    const usageLimitNotice = getUsageLimitNotice(errorMessage);
-
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
         <div className="max-w-md w-full">
-          {usageLimitNotice ? (
-            <UsageLimitAlert notice={usageLimitNotice} />
-          ) : (
-            <Alert variant="destructive">
-              <AlertTitle>Invite link not available</AlertTitle>
-              <AlertDescription>{errorMessage || "This invite link is invalid or has been disabled."}</AlertDescription>
-            </Alert>
-          )}
+          <Alert variant="destructive">
+            <AlertTitle>Invite link not available</AlertTitle>
+            <AlertDescription>{errorMessage || "This invite link is invalid or has been disabled."}</AlertDescription>
+          </Alert>
         </div>
       </div>
     );

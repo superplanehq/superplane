@@ -23,6 +23,28 @@ func TestMaxEmitCount(t *testing.T) {
 	})
 }
 
+func TestEventRetentionWindowDays(t *testing.T) {
+	t.Run("defaults to 30", func(t *testing.T) {
+		t.Setenv("EVENT_RETENTION_WINDOW_DAYS", "")
+		assert.Equal(t, 30, EventRetentionWindowDays())
+	})
+
+	t.Run("reads EVENT_RETENTION_WINDOW_DAYS", func(t *testing.T) {
+		t.Setenv("EVENT_RETENTION_WINDOW_DAYS", "90")
+		assert.Equal(t, 90, EventRetentionWindowDays())
+	})
+
+	t.Run("allows zero to disable retention", func(t *testing.T) {
+		t.Setenv("EVENT_RETENTION_WINDOW_DAYS", "0")
+		assert.Equal(t, 0, EventRetentionWindowDays())
+	})
+
+	t.Run("ignores invalid env values", func(t *testing.T) {
+		t.Setenv("EVENT_RETENTION_WINDOW_DAYS", "not-a-number")
+		assert.Equal(t, 30, EventRetentionWindowDays())
+	})
+}
+
 func TestMaxPayloadSize(t *testing.T) {
 	t.Run("defaults to 512 KiB", func(t *testing.T) {
 		t.Setenv("SUPERPLANE_MAX_PAYLOAD_SIZE", "")
