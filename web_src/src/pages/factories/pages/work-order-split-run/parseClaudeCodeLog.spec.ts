@@ -7,7 +7,10 @@ import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 
 const SAMPLE = `$ Prepare Claude Code
 Claude Code ready
+$ Fetch task attachments
+$ Set up GitHub
 $ Clone Repo
+~ 3s
 Cloning into 'superplane'...
 remote: Enumerating objects: 7181, done.
 $ Provide description
@@ -45,6 +48,7 @@ describe("parseClaudeCodeLog", () => {
       { name: "Use plan as output", type: "bash", status: "passed" },
       { name: "Run Tests", type: "bash", status: "failed" },
     ]);
+    expect(steps[0].duration).toBe("3s");
     expect(steps[0]).toMatchObject({
       commands: [],
       output: "Cloning into 'superplane'...\nremote: Enumerating objects: 7181, done.",
@@ -71,6 +75,20 @@ describe("parseClaudeCodeLog", () => {
         status: "passed",
       },
     ]);
+  });
+
+  it("marks a failed tool call without failing the step", () => {
+    const steps = parseClaudeCodeLog(`$ Implementation
+-> [edit] /tmp/opencode/capture-dictation.cjs
+    oldString cannot be empty
+✗ tool failed
+-> [write] /tmp/opencode/capture-dictation.cjs
+    Wrote file successfully.
+✓ done
+`, [{ name: "Implementation", type: "prompt" }]);
+
+    expect(steps[0].status).toBe("passed");
+    expect(steps[0].commands.map((command) => command.status)).toEqual(["failed", "passed"]);
   });
 
   it("reads the planning runner example without keeping file dumps", () => {
