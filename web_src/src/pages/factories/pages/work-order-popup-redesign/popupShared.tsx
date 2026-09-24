@@ -84,6 +84,7 @@ export function PopupHeader({
   onClose,
   actions,
   accessory,
+  leading,
   expanded = false,
   onToggleExpanded,
   canEditTitle = false,
@@ -97,6 +98,7 @@ export function PopupHeader({
   onClose?: () => void;
   actions?: ReactNode;
   accessory?: ReactNode;
+  leading?: ReactNode;
   expanded?: boolean;
   onToggleExpanded?: () => void;
   canEditTitle?: boolean;
@@ -110,6 +112,7 @@ export function PopupHeader({
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-3">
+            {leading}
             <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
               {canEditTitle && onTitleSave ? (
                 <ClickToRename
