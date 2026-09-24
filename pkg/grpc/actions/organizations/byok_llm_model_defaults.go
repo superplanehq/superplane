@@ -22,17 +22,12 @@ func enableAllBYOKModelsByDefault(
 	if len(candidates) == 0 {
 		return nil
 	}
-	exists, err := models.OrganizationBYOKModelAllowlistExists(tx, orgID, provider)
-	if err != nil || exists {
-		return err
-	}
 
 	ids := make(datatypes.JSONSlice[string], 0, len(candidates))
 	for _, candidate := range candidates {
 		ids = append(ids, candidate.GetId())
 	}
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(tx, orgID, provider, ids)
-	return err
+	return models.CreateOrganizationBYOKModelAllowlistIfAbsent(tx, orgID, provider, ids)
 }
 
 // enableAllConnectedBYOKModelsByDefault applies the default for every

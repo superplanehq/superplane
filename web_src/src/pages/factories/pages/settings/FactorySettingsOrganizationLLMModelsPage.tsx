@@ -45,7 +45,10 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   const openai = useBYOKLLMModels(organizationId, "openai", true);
   const openrouter = useBYOKLLMModels(organizationId, "openrouter", true);
   const byokQueries: Record<string, BYOKQuery> = { anthropic, openai, openrouter };
-  const connected = BYOK_PROVIDERS.filter((provider) => byokQueries[provider].data?.connected);
+  const connected = BYOK_PROVIDERS.filter((provider) => {
+    const query = byokQueries[provider];
+    return query.data?.connected || (query.isError && !query.isLoading);
+  });
   const byokLoading = BYOK_PROVIDERS.some((provider) => byokQueries[provider].isLoading);
 
   const hosted = useSelectableLLMModels(organizationId, { factoryId, sources: [SELECTABLE_LLM_SOURCE_HOSTED] });

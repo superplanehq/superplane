@@ -24,6 +24,7 @@ type BYOKQuery = {
     candidates?: Array<{ id: string; name: string }>;
   };
   isLoading: boolean;
+  isError: boolean;
   error: Error | null;
 };
 
@@ -39,6 +40,7 @@ vi.mock("@/hooks/useLLMModelAllowlists", () => ({
     byokByProvider[provider] ?? {
       data: { connected: false, selected: [], candidates: [] },
       isLoading: false,
+      isError: false,
       error: null,
     },
   useUpdateBYOKLLMModels: () => ({ mutateAsync: saveModels, isPending: false }),
@@ -65,6 +67,7 @@ function setDisconnected(provider: string) {
   byokByProvider[provider] = {
     data: { connected: false, selected: [], candidates: [] },
     isLoading: false,
+    isError: false,
     error: null,
   };
 }
@@ -78,6 +81,7 @@ function setConnected(provider: string, candidateIds: string[], selectedIds = ca
       candidates: models(candidateIds),
     },
     isLoading: false,
+    isError: false,
     error: null,
   };
 }
@@ -159,6 +163,7 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     byokByProvider.anthropic = {
       data: { connected: true, integrationId: "int-anthropic" },
       isLoading: false,
+      isError: true,
       error: new Error("list failed"),
     };
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
@@ -167,6 +172,20 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(message.className).toContain("text-muted-foreground");
     expect(message.className).not.toMatch(/text-destructive|text-red/);
     expect(screen.queryByText("0 of 0 models selected")).not.toBeInTheDocument();
+  });
+
+  it("shows a connected key when the catalog request fails before data loads", () => {
+    byokByProvider.anthropic = {
+      data: {},
+      isLoading: false,
+      isError: true,
+      error: new Error("list failed"),
+    };
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    expect(screen.getByTestId("llm-models-provider-anthropic")).toBeInTheDocument();
+    expect(screen.getByText("Unable to list models from the connected key.")).toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
   });
 
   it("saves the models that the user enables", async () => {
