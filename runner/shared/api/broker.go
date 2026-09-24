@@ -17,7 +17,6 @@ type RegisterFleetRequest struct {
 	Provisioner                string `json:"provisioner,omitempty"`
 	Arch                       string `json:"arch,omitempty"`
 	Size                       string `json:"size,omitempty"`
-	DispatchTarget             string `json:"dispatch_target,omitempty"`
 	MaxExecutionTimeoutSeconds *int   `json:"max_execution_timeout_seconds,omitempty"`
 	SupportsDocker             *bool  `json:"supports_docker,omitempty"`
 }
@@ -29,7 +28,6 @@ type FleetResponse struct {
 	Arch                       string `json:"arch,omitempty"`
 	Size                       string `json:"size,omitempty"`
 	CreatedAt                  int64  `json:"created_at_unix,omitempty"`
-	DispatchTarget             string `json:"dispatch_target,omitempty"`
 	MaxExecutionTimeoutSeconds *int   `json:"max_execution_timeout_seconds,omitempty"`
 	SupportsDocker             *bool  `json:"supports_docker,omitempty"`
 }
