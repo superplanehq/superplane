@@ -98,6 +98,42 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	assert.Equal(t, 4.0, scores[models.PlanningConfidenceCheckKey])
 }
 
+func TestRunnerPlanningSessionSpecMissingDraftWorkOrderReturnsNotFound(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).
+		Where("id = ?", *session.DraftWorkOrderID).
+		Update("factory_id", otherFactory.ID).Error)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader([]byte(
+		`{"body":"# Retry refunds\n\nStop double charges.\n"}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+	assert.Equal(t, models.ErrFactoryWorkOrderNotFound.Error()+"\n", rec.Body.String())
+}
+
+func TestRunnerPlanningSessionSpecOversizedBodyReturnsBadRequest(t *testing.T) {
+	r := support.Setup(t)
+	server, _, _, token := mustPlanningRunnerSession(t, r)
+	payload, err := json.Marshal(planningSpecRequest{Body: strings.Repeat("a", models.MaxFactoryWorkOrderArtifactDataBytes)})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), models.ErrFactoryWorkOrderArtifactInvalid.Error())
+}
+
 func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
@@ -130,8 +166,10 @@ func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 func TestWriteRunnerPlanningError(t *testing.T) {
 	sessionID := uuid.New()
 	draftID := uuid.New()
+	canvasRunID := uuid.New()
 	session := &models.FactoryPlanningSession{
 		ID:               sessionID,
+		CanvasRunID:      &canvasRunID,
 		DraftWorkOrderID: &draftID,
 	}
 	deadlock := fmt.Errorf("save score: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"})
@@ -177,29 +215,59 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			body:    "planning session has ended\n",
 		},
 		{
-			name:        "no draft stays 500",
-			err:         models.ErrFactoryPlanningSessionNoDraft,
-			session:     session,
-			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
-			wantCapture: true,
-			wantTags: map[string]string{
-				"route":               "/api/v1/runner/planning-sessions/clarity",
-				"planning_session_id": sessionID.String(),
-				"draft_work_order_id": draftID.String(),
-			},
-			wantMessage: models.ErrFactoryPlanningSessionNoDraft.Error(),
+			name:    "factory not found",
+			err:     models.ErrFactoryNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    models.ErrFactoryNotFound.Error() + "\n",
 		},
 		{
-			name:        "rejected check stays 500",
+			name:    "work order not found",
+			err:     models.ErrFactoryWorkOrderNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    models.ErrFactoryWorkOrderNotFound.Error() + "\n",
+		},
+		{
+			name:    "no draft",
+			err:     models.ErrFactoryPlanningSessionNoDraft,
+			session: session,
+			status:  http.StatusConflict,
+			body:    "planning session has no draft\n",
+		},
+		{
+			name:    "invalid artifact",
+			err:     fmt.Errorf("%w: artifact data exceeds %d bytes", models.ErrFactoryWorkOrderArtifactInvalid, models.MaxFactoryWorkOrderArtifactDataBytes),
+			session: session,
+			status:  http.StatusBadRequest,
+			body:    fmt.Sprintf("%s: artifact data exceeds %d bytes\n", models.ErrFactoryWorkOrderArtifactInvalid.Error(), models.MaxFactoryWorkOrderArtifactDataBytes),
+		},
+		{
+			name:    "artifact not found",
+			err:     models.ErrFactoryWorkOrderArtifactNotFound,
+			session: session,
+			status:  http.StatusConflict,
+			body:    models.ErrFactoryWorkOrderArtifactNotFound.Error() + "\n",
+		},
+		{
+			name:    "artifact key already exists",
+			err:     models.ErrFactoryWorkOrderArtifactKeyAlreadyExists,
+			session: session,
+			status:  http.StatusConflict,
+			body:    models.ErrFactoryWorkOrderArtifactKeyAlreadyExists.Error() + "\n",
+		},
+		{
+			name:        "unknown error stays 500",
 			err:         fmt.Errorf("%w: key is required", models.ErrFactoryWorkOrderCheckInvalid),
 			session:     session,
 			status:      http.StatusInternalServerError,
 			body:        "Lookup failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
+				"method":              http.MethodPost,
 				"route":               "/api/v1/runner/planning-sessions/clarity",
 				"planning_session_id": sessionID.String(),
+				"canvas_run_id":       canvasRunID.String(),
 				"draft_work_order_id": draftID.String(),
 			},
 			wantMessage: models.ErrFactoryWorkOrderCheckInvalid.Error(),
@@ -212,8 +280,10 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			body:        "Lookup failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
+				"method":              http.MethodPost,
 				"route":               "/api/v1/runner/planning-sessions/clarity",
 				"planning_session_id": sessionID.String(),
+				"canvas_run_id":       canvasRunID.String(),
 				"draft_work_order_id": draftID.String(),
 				"postgres_error_code": "40P01",
 			},
@@ -226,9 +296,10 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			body:        "Lookup failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
-				"route": "/api/v1/runner/planning-sessions/clarity",
+				"method": http.MethodPost,
+				"route":  "/api/v1/runner/planning-sessions/clarity",
 			},
-			omitTags:    []string{"planning_session_id", "draft_work_order_id", "postgres_error_code"},
+			omitTags:    []string{"planning_session_id", "canvas_run_id", "draft_work_order_id", "postgres_error_code"},
 			wantMessage: "lookup timeout",
 		},
 		{
@@ -253,8 +324,10 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			body:        "Lookup failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
+				"method":              http.MethodPost,
 				"route":               "/api/v1/runner/planning-sessions/clarity",
 				"planning_session_id": sessionID.String(),
+				"canvas_run_id":       canvasRunID.String(),
 				"draft_work_order_id": draftID.String(),
 			},
 			wantMessage: context.Canceled.Error(),
@@ -267,8 +340,10 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			body:        "Lookup failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
+				"method":              http.MethodPost,
 				"route":               "/api/v1/runner/planning-sessions/clarity",
 				"planning_session_id": sessionID.String(),
+				"canvas_run_id":       canvasRunID.String(),
 				"draft_work_order_id": draftID.String(),
 			},
 			wantMessage: context.DeadlineExceeded.Error(),
@@ -299,14 +374,27 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			require.Equal(t, tt.status, rec.Code)
 			assert.Equal(t, tt.body, rec.Body.String())
 
+			var errorEntry *log.Entry
 			errorLogs := 0
 			for _, entry := range hook.AllEntries() {
 				if entry.Level == log.ErrorLevel {
 					errorLogs++
+					errorEntry = entry
 				}
 			}
 			if tt.status >= http.StatusInternalServerError {
-				assert.NotZero(t, errorLogs)
+				require.NotNil(t, errorEntry)
+				assert.Equal(t, 1, errorLogs)
+				assert.Equal(t, "runner planning session failed", errorEntry.Message)
+				assert.Equal(t, http.MethodPost, errorEntry.Data["method"])
+				assert.Equal(t, "/api/v1/runner/planning-sessions/clarity", errorEntry.Data["path"])
+				for key, value := range tt.wantTags {
+					assert.Equal(t, value, errorEntry.Data[key], "log field %s", key)
+				}
+				for _, key := range tt.omitTags {
+					_, present := errorEntry.Data[key]
+					assert.False(t, present, "log field %s should be omitted", key)
+				}
 			} else {
 				assert.Zero(t, errorLogs)
 			}
@@ -318,6 +406,9 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			}
 
 			event := requireCapturedException(t, events)
+			require.NotNil(t, event.Request)
+			assert.Equal(t, http.MethodPost, event.Request.Method)
+			assert.Contains(t, event.Request.URL, "/api/v1/runner/planning-sessions/clarity")
 			for key, value := range tt.wantTags {
 				assert.Equal(t, value, event.Tags[key], "tag %s", key)
 			}
@@ -325,6 +416,8 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 				_, present := event.Tags[key]
 				assert.False(t, present, "tag %s should be omitted", key)
 			}
+			_, hasPathTag := event.Tags["path"]
+			assert.False(t, hasPathTag)
 			assert.Contains(t, capturedExceptionText(event), tt.wantMessage)
 		})
 	}
@@ -424,7 +517,7 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 	assert.False(t, present)
 }
 
-func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
+func TestRunnerPlanningSessionClarityWithoutDraftReturnsConflict(t *testing.T) {
 	r := support.Setup(t)
 	transport := bindTestSentryHub(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
@@ -442,15 +535,9 @@ func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
-	assert.Equal(t, "Lookup failed\n", rec.Body.String())
-
-	event := requireCapturedException(t, transport.Events())
-	assert.Equal(t, "/api/v1/runner/planning-sessions/clarity", event.Tags["route"])
-	assert.Equal(t, session.ID.String(), event.Tags["planning_session_id"])
-	_, hasDraft := event.Tags["draft_work_order_id"]
-	assert.False(t, hasDraft)
-	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Equal(t, "planning session has no draft\n", rec.Body.String())
+	assert.Empty(t, transport.Events())
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
