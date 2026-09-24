@@ -238,7 +238,10 @@ func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) err
 
 	task, err := client.GetTask(id)
 	if err != nil {
-		return fmt.Errorf("error reading task %s: %v", id, err)
+		if ctx.Logger != nil {
+			ctx.Logger.WithError(err).Warnf("productive task %s: task list unavailable, continuing without it", id)
+		}
+		return nil
 	}
 
 	setTaskListID(document, task.TaskListID)

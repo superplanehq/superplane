@@ -372,12 +372,27 @@ func (c *Client) listTaskDocuments(options taskListOptions) ([]map[string]any, e
 	}
 
 	for i := range response.Data {
-		if taskListID(response.Data[i]) != "" || len(options.taskListIDs) != 1 {
+		if taskListID(response.Data[i]) != "" {
 			continue
 		}
-		// A list filtered to one task list can omit the relationship.
-		// The intake filter reads that id, so write the only possible value.
-		setTaskListID(response.Data[i], options.taskListIDs[0])
+		if len(options.taskListIDs) == 1 {
+			// A list filtered to one task list can omit the relationship.
+			// The intake filter reads that id, so write the only possible value.
+			setTaskListID(response.Data[i], options.taskListIDs[0])
+			continue
+		}
+		if len(options.taskListIDs) > 1 {
+			id, _ := response.Data[i]["id"].(string)
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			task, err := c.GetTask(id)
+			if err != nil || task.TaskListID == "" {
+				continue
+			}
+			setTaskListID(response.Data[i], task.TaskListID)
+		}
 	}
 
 	return response.Data, nil
