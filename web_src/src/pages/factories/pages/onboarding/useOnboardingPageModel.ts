@@ -1,14 +1,14 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { fetchFactoryAutomations, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
-import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast } from "@/lib/toast";
-import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -26,6 +26,7 @@ import {
   shouldNameOrganizationFromGitHub,
 } from "./initialOnboardingOrganization";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
+import { useOnboardingModelSource } from "./onboardingModelSource";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
@@ -41,7 +42,7 @@ import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
-import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
+import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
 import { useOnboardingGithubRepos } from "./useOnboardingGithubRepos";
 import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import {
@@ -172,15 +173,6 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
     canAct("canvases", "create") &&
     canAct("canvases", "update")
   );
-}
-
-function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
-  const spend = useOrganizationWorkspaceUsage(organizationId);
-  const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents, {
-    provider: spend.data?.defaultHostedProvider,
-    model: spend.data?.defaultHostedModel,
-  });
 }
 
 /**
@@ -471,9 +463,12 @@ export function useOnboardingPageModel(args: {
   reresolveWorkspace?: OnboardingWorkspaceResolution | null;
 }) {
   const { canAct } = usePermissions();
+  const bringYourOwnKey = useExperimentalFeature(args.organizationId);
+  const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
-  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected);
+  const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
+  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey);
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
     remainingCreditCents: agent.remainingCreditCents,
@@ -519,9 +514,12 @@ export function useOnboardingPageModel(args: {
 
   return {
     setup,
-    // True when hosted credentials cover the agent, so setup can skip the
-    // agent screen and provision from the ticket screen.
     hostedAgentReady: isHostedAgentReady(agent.plan),
+    hostedModelsAvailable: agent.hostedModelsAvailable,
+    bringYourOwnKey: bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
+    bringYourOwnKeyLoading: bringYourOwnKey.isLoading,
+    agentCredentialChoice,
+    setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
     openSection,
     setOpenSection,
