@@ -100,6 +100,7 @@ describe("ProductiveIntakeFilterFields", () => {
       { enabled: true },
     );
     expect(screen.getByTestId("intake-task-list-options")).toBeInTheDocument();
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETTINGS_COPY.taskListsNoneSelected)).toBeInTheDocument();
 
     await user.click(screen.getByRole("checkbox", { name: "Bugs" }));
     await user.click(screen.getByRole("button", { name: "Save" }));

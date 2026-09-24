@@ -92,6 +92,9 @@ function TaskListField({
   return (
     <div className="mb-1 ml-6 flex flex-col gap-2" data-testid="intake-task-list-options">
       <TaskListStatus loading={taskListsQuery.isLoading} error={taskListsQuery.isError} empty={options.length === 0} />
+      {options.length > 0 && taskListIds.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground">{PRODUCTIVE_INTAKE_SETTINGS_COPY.taskListsNoneSelected}</p>
+      ) : null}
       {options.length > 0 ? (
         <ul className="flex flex-wrap items-center gap-1.5">
           {options.map((option) => {
