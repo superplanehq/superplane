@@ -8,7 +8,7 @@ import {
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
-  intakeSupportsPause,
+  intakeSupportsDelete,
   jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
@@ -163,11 +163,11 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
   });
 
-  it("offers pause for GitHub, Sentry, Jira, and Productive.io intakes", () => {
-    expect(intakeSupportsPause("github-issues")).toBe(true);
-    expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
-    expect(intakeSupportsPause("jira-issues")).toBe(true);
-    expect(intakeSupportsPause("productive-tasks")).toBe(true);
-    expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
+  it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
+    expect(intakeSupportsDelete("github-issues")).toBe(true);
+    expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
+    expect(intakeSupportsDelete("jira-issues")).toBe(true);
+    expect(intakeSupportsDelete("productive-tasks")).toBe(true);
+    expect(intakeSupportsDelete("pagerduty-incidents")).toBe(false);
   });
 });
