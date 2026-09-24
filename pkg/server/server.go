@@ -23,7 +23,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -39,7 +38,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
 )
@@ -243,35 +241,6 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
-	var workerUsageService usage.Service
-	initWorkerUsageService := func() (usage.Service, error) {
-		if workerUsageService != nil {
-			return workerUsageService, nil
-		}
-
-		service, err := usage.NewServiceFromEnv()
-		if err != nil {
-			return nil, err
-		}
-		workerUsageService = service
-		return workerUsageService, nil
-	}
-	getRequiredWorkerUsageService := func() usage.Service {
-		service, err := initWorkerUsageService()
-		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
-		}
-		return service
-	}
-	getOptionalWorkerUsageService := func() usage.Service {
-		service, err := initWorkerUsageService()
-		if err != nil {
-			log.Printf("usage service unavailable for agent canvas tool: %v", err)
-			return nil
-		}
-		return service
-	}
-
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
@@ -314,6 +283,12 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" {
+		log.Println("Starting Event Retention Worker")
+		w := workers.NewEventRetentionWorker()
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
@@ -321,31 +296,13 @@ func startWorkers(
 			ComponentRegistry: registry,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
-			UsageService:      getOptionalWorkerUsageService(),
 		})
-		w := workers.NewAgentStreamWorkerWithUsageService(
+		w := workers.NewAgentStreamWorker(
 			agentProvider,
 			rabbitMQURL,
-			getOptionalWorkerUsageService(),
 			agentToolRegistry,
 		)
 		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService := getRequiredWorkerUsageService()
-
-		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
-			log.Println("Starting Event Retention Worker")
-			w := workers.NewEventRetentionWorker(usageService)
-			go w.Start(context.Background())
-		}
-
-		if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" && usageService.Enabled() {
-			log.Println("Starting Usage Sync Worker")
-			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
-			go w.Start(context.Background())
-		}
 	}
 
 }
@@ -405,11 +362,6 @@ func buildGRPCServices(
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
 ) (*grpc.Services, error) {
-	usageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		return nil, fmt.Errorf("initialize usage service: %w", err)
-	}
-
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
@@ -418,7 +370,6 @@ func buildGRPCServices(
 		Registry:        registry,
 		OIDCProvider:    oidcProvider,
 		AgentService:    agentService,
-		UsageService:    usageService,
 	})
 }
 
@@ -436,10 +387,6 @@ func startPublicAPI(
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
-	usageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		log.Panicf("failed to initialize usage service for public api: %v", err)
-	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	server, err := public.NewServer(
@@ -453,7 +400,6 @@ func startPublicAPI(
 		appEnv,
 		templateDir,
 		authService,
-		usageService,
 		blockSignup,
 	)
 	if err != nil {
@@ -700,14 +646,6 @@ func Start() {
 	}
 
 	agentProvider, agentService := buildAgentService(authService)
-
-	runnerUsageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		log.Fatalf("failed to initialize usage service for runner limits: %v", err)
-	}
-	runner.SetRunnerMinutesLimitChecker(func(organizationID string) error {
-		return usage.EnsureCanStartRunnerTask(context.Background(), runnerUsageService, organizationID)
-	})
 
 	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
