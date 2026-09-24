@@ -83,25 +83,44 @@ export function resolveOnboardingAgent(args: {
   hostedModels: HostedModelsByProvider;
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
+  /** When set, a connected provider key is used before the hosted model. */
+  preferOwnKey?: boolean;
 }): OnboardingAgentPlan | undefined {
+  if (args.preferOwnKey) {
+    const ownKey = connectedProviderPlan(args);
+    if (ownKey) return ownKey;
+  }
+
   const hosted = hostedSuperPlanePlan(args);
   if (hosted) return hosted;
+  if (args.preferOwnKey) return undefined;
 
+  return connectedProviderPlan(args);
+}
+
+function connectedProviderPlan(args: {
+  connected: Set<IntegrationId>;
+  hostedModels: HostedModelsByProvider;
+}): OnboardingAgentPlan | undefined {
   for (const providerId of AGENT_PROVIDER_IDS) {
     if (!args.connected.has(providerId)) continue;
     return planForConnectedProvider(providerId, args.hostedModels);
   }
-
   return undefined;
+}
+
+/** True when the installation sets a default SuperPlane-hosted model. */
+export function hasHostedDefaultModel(args: { defaultHostedProvider?: string; defaultHostedModel?: string }): boolean {
+  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
+  const defaultModel = args.defaultHostedModel?.trim() ?? "";
+  return Boolean(defaultProvider && defaultModel);
 }
 
 function hostedSuperPlanePlan(args: {
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
 }): OnboardingAgentPlan | undefined {
-  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
-  const defaultModel = args.defaultHostedModel?.trim() ?? "";
-  if (!defaultProvider || !defaultModel) return undefined;
+  if (!hasHostedDefaultModel(args)) return undefined;
 
   return {
     component: "runnerSuperPlane",
@@ -117,12 +136,59 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
 }
 
 /**
- * A hosted default answers the agent question for the organization, so setup
- * has nothing left to ask about the agent. Billing controls hosted runs after
- * setup. Installations without a hosted default still use the connection step.
+ * A hosted default can run the agent without a provider key. Billing controls
+ * hosted runs after setup. Installations without a hosted default still use
+ * the connection step.
  */
 export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boolean {
   return plan?.component === "runnerSuperPlane";
+}
+
+export type OnboardingAgentCredentialChoice = "own-key" | "hosted";
+
+/**
+ * Where the agent screen goes in the wizard:
+ * - `show`: after the ticket screen, to connect a provider key.
+ * - `first`: before the ticket screen, to choose a model source.
+ * - `skip`: nowhere. Hosted models run the agent.
+ * - `pending`: not known until the bring-your-own-key flag loads.
+ */
+export type OnboardingAgentGate = "show" | "first" | "skip" | "pending";
+
+/**
+ * Hosted models skip the agent screen. Only an organization with the
+ * bring-your-own-key flag chooses its own provider key or SuperPlane-hosted
+ * models, before it chooses the backlog. The gate waits until the flag has
+ * loaded, so setup does not finish on the hosted path first.
+ */
+export function onboardingAgentGate(args: {
+  hostedModelsAvailable: boolean;
+  hostedModelsAvailableLoading: boolean;
+  bringYourOwnKey: boolean;
+  bringYourOwnKeyLoading: boolean;
+  bringYourOwnKeyLookupFailed: boolean;
+}): OnboardingAgentGate {
+  if (args.hostedModelsAvailableLoading || args.bringYourOwnKeyLoading) return "pending";
+  if (!args.hostedModelsAvailable) return "show";
+  if (args.bringYourOwnKeyLookupFailed) return "first";
+  if (args.bringYourOwnKey) return "first";
+  return "skip";
+}
+
+/**
+ * A model source choice must be made before setup finishes. Own-key setup
+ * finishes only after a provider key is connected.
+ */
+export function agentFinishReady(args: {
+  modelSourceChoice: boolean;
+  credentialChoice: OnboardingAgentCredentialChoice | null;
+  providerConnected: boolean;
+  agentReady: boolean;
+  hostedAgentReady: boolean;
+}): boolean {
+  if (args.modelSourceChoice && !args.credentialChoice) return false;
+  if (args.credentialChoice === "own-key") return args.providerConnected;
+  return args.agentReady || args.hostedAgentReady;
 }
 
 export function firstWorkOrderAgentError(args: {

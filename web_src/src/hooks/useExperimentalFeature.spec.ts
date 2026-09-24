@@ -13,6 +13,7 @@ vi.mock("./useOrganizationId", () => ({
 }));
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import * as experimentalFeaturesModule from "@/hooks/useExperimentalFeatures";
 import {
   experimentalFeaturesKeys,
   type ExperimentalFeature,
@@ -78,7 +79,12 @@ describe("useExperimentalFeature", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(Object.keys(result.current).sort()).toEqual(["enabledExperimentalFeatures", "has", "isLoading"]);
+    expect(Object.keys(result.current).sort()).toEqual([
+      "enabledExperimentalFeatures",
+      "has",
+      "isLoading",
+      "lookupFailed",
+    ]);
     expect(result.current.has).toEqual(expect.any(Function));
     expect(result.current.enabledExperimentalFeatures).toEqual(expect.any(Array));
   });
@@ -251,6 +257,29 @@ describe("useExperimentalFeature", () => {
     });
 
     expect(result.current.enabledExperimentalFeatures).toEqual(["alpha", "beta"]);
+  });
+
+  it("returns organization-enabled features when the registry lookup fails", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      organization: {
+        spec: { enabledExperimentalFeatures: ["organization_byok"] },
+      } as OrganizationsOrganization,
+    });
+    const registrySpy = vi.spyOn(experimentalFeaturesModule, "useExperimentalFeaturesRegistry").mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as ReturnType<typeof experimentalFeaturesModule.useExperimentalFeaturesRegistry>);
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.lookupFailed).toBe(true);
+    expect(result.current.has("organization_byok")).toBe(true);
+    expect(result.current.enabledExperimentalFeatures).toEqual(["organization_byok"]);
+    registrySpy.mockRestore();
   });
 
   it("returns an empty list while the registry has not loaded yet", () => {

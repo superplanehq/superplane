@@ -79,6 +79,25 @@ func FindOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider s
 	return &row, nil
 }
 
+// OrganizationBYOKModelAllowlistExists is false until the organization saves
+// a model list for the provider. An empty saved list still counts as saved.
+func OrganizationBYOKModelAllowlistExists(tx *gorm.DB, orgID uuid.UUID, provider string) (bool, error) {
+	normalized, err := NormalizeHostedLLMProvider(provider)
+	if err != nil {
+		return false, err
+	}
+
+	var count int64
+	err = tx.Model(&OrganizationBYOKModelAllowlist{}).
+		Where("organization_id = ? AND provider = ?", orgID, normalized).
+		Count(&count).
+		Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func UpsertOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider string, models datatypes.JSONSlice[string]) (*OrganizationBYOKModelAllowlist, error) {
 	normalized, err := NormalizeHostedLLMProvider(provider)
 	if err != nil {

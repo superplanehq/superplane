@@ -1,6 +1,5 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input, InputGroup } from "@/components/Input/input";
-import { Text } from "@/components/Text/text";
 import { filterModelIds } from "@/lib/hostedLLMModels";
 import { Search } from "lucide-react";
 import { useMemo } from "react";
@@ -43,9 +42,9 @@ export function ModelAllowlistEditor({
         />
       </InputGroup>
       {showCount ? (
-        <Text className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {selected.length} of {modelIds.length} models selected
-        </Text>
+        </p>
       ) : null}
       <div className="max-h-56 space-y-2 overflow-auto">
         {visibleModels.map((model) => (
