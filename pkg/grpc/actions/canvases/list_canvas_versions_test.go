@@ -31,7 +31,7 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		firstCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "First", "", r.AuthService)
+		firstCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "First", "", r.AuthService)
 		require.NoError(t, err)
 
 		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
@@ -39,7 +39,7 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		secondCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), nil, r.Encryptor, r.Registry, canvas, "Second", "", r.AuthService)
+		secondCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.Encryptor, r.Registry, canvas, "Second", "", r.AuthService)
 		require.NoError(t, err)
 
 		response, err := ListCanvasVersionsPaginated(ctx, database.DB(t.Context()), canvas, 0, nil)
