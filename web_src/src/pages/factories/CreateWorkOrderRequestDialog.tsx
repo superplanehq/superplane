@@ -40,6 +40,8 @@ export interface CreateWorkOrderRequestDialogProps {
   onCreate: (draft: CreateWorkOrderRequestDraft) => void;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   initialAttachedFiles?: UploadedWorkOrderFile[];
+  organizationId?: string;
+  factoryId?: string;
 }
 
 export function CreateWorkOrderRequestDialog({
@@ -54,6 +56,8 @@ export function CreateWorkOrderRequestDialog({
   onCreate,
   onUploadFiles,
   initialAttachedFiles = [],
+  organizationId,
+  factoryId,
 }: CreateWorkOrderRequestDialogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -127,6 +131,8 @@ export function CreateWorkOrderRequestDialog({
           isUploading={isUploading}
           maxLength={maxLength}
           showAttach={Boolean(onUploadFiles)}
+          organizationId={organizationId}
+          factoryId={factoryId}
           onDescriptionChange={onDescriptionChange}
         />
       </DialogContent>
@@ -144,6 +150,8 @@ function RequestDialogForm({
   isUploading,
   maxLength,
   showAttach,
+  organizationId,
+  factoryId,
   onDescriptionChange,
 }: {
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
@@ -155,6 +163,8 @@ function RequestDialogForm({
   isUploading: boolean;
   maxLength: number;
   showAttach: boolean;
+  organizationId?: string;
+  factoryId?: string;
   onDescriptionChange: (next: string) => void;
 }) {
   return (
@@ -192,6 +202,8 @@ function RequestDialogForm({
             onUploadFiles={form.uploadAcceptedFiles}
             isUploading={isUploading}
             canRemoveImages
+            organizationId={organizationId}
+            factoryId={factoryId}
             onChange={onDescriptionChange}
             onFocus={dictation.rememberDescription}
           />

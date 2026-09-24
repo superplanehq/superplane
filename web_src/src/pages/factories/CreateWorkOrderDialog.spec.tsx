@@ -35,16 +35,19 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("./WorkOrderDescriptionEditor", () => ({
   WorkOrderDescriptionEditor: ({
+    factoryId,
     value,
     onChange,
     onFocus,
   }: {
+    factoryId?: string;
     value?: string;
     onChange?: (next: string) => void;
     onFocus?: () => void;
   }) => (
     <textarea
       data-testid="work-order-description-input"
+      data-factory-id={factoryId}
       value={value}
       onChange={(event) => onChange?.(event.target.value)}
       onFocus={() => onFocus?.()}
@@ -198,6 +201,7 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.getByTestId("create-work-order-request-dialog")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-title-input")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: CREATE_WORK_ORDER_REQUEST_COPY.title })).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-description-input")).toHaveAttribute("data-factory-id", PRIMARY_FACTORY_ID);
 
     await user.type(screen.getByTestId("work-order-description-input"), "Refunds fail on retry.");
     await user.click(screen.getByTestId("create-work-order-request-create"));

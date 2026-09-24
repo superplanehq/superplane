@@ -103,6 +103,7 @@ export function AgentResourceConnectionDialog({
   open,
   organizationId,
   resource,
+  defaults,
   isSaving,
   onClose,
   onSave,
@@ -110,6 +111,7 @@ export function AgentResourceConnectionDialog({
   open: boolean;
   organizationId: string;
   resource?: FactoriesFactoryAgentResource;
+  defaults?: Partial<AgentResourceConnectionDraft>;
   isSaving: boolean;
   onClose: () => void;
   onSave: (draft: AgentResourceConnectionDraft) => Promise<void>;
@@ -127,14 +129,16 @@ export function AgentResourceConnectionDialog({
     if (!open) {
       return;
     }
-    setName(resource?.name ?? "");
-    setUrl(resource?.url ?? "");
-    setAuth(resource ? (resource.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS") : "AUTH_OAUTH");
+    setName(resource?.name ?? defaults?.name ?? "");
+    setUrl(resource?.url ?? defaults?.url ?? "");
+    setAuth(
+      resource ? (resource.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS") : (defaults?.auth ?? "AUTH_OAUTH"),
+    );
     setHeaders(headersFromResource(resource));
     setNameError("");
     setUrlError("");
     setHeaderError("");
-  }, [open, resource]);
+  }, [open, resource, defaults]);
 
   const handleSave = async () => {
     const trimmedName = name.trim().toLowerCase();
