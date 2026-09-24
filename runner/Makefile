@@ -2,21 +2,19 @@ DOCKER_SERVICES := fleet-manager task-broker runner
 
 # Local dev defaults (override on the command line)
 LOCAL_TMP ?= /tmp
-# Reachable from a container on the Compose network. The dev Postgres
-# port is not published on the host.
-LOCAL_BROKER_DATABASE_URL ?= postgres://postgres:the-cake-is-a-lie@db:5432/broker?sslmode=disable
+# Reachable from a container on the Compose network.
+LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@broker-db:5432/broker?sslmode=disable
 
 # Run integration tests that require Postgres.
-# Uses a separate Compose project so it does not share or stop the dev Postgres.
+# Uses a separate Compose project and host port so it does not share or
+# stop the local broker-db.
 .PHONY: test-integration
 test-integration:
 	@set -eu; \
-	compose() { docker compose -p runner-integration -f ../docker-compose.dev.yml "$$@"; }; \
+	compose() { BROKER_DB_PORT=5433 docker compose -p runner-integration -f ../docker-compose.dev.yml --profile local-runner "$$@"; }; \
 	cleanup() { compose down -v; }; \
 	trap cleanup EXIT; \
-	compose up -d --wait db; \
-	compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
-	  || compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
+	compose up -d --wait broker-db; \
 	net=$$(docker network ls --filter label=com.docker.compose.project=runner-integration --format '{{.Name}}'); \
 	docker run --rm --network "$$net" \
 	  -v "$$(pwd):/src" -w /src \
@@ -86,21 +84,19 @@ fleet-manager: build
 	./bin/fleet-manager
 
 # Long-running: run in its own terminal.
-# The broker runs on the dev Compose network so it can open Postgres at
-# db:5432. That port stays unpublished. The listen port is published on
-# 127.0.0.1 so register-local-fleet and make runner can connect.
+# The broker runs on the dev Compose network so it can open broker-db.
+# The listen port is published on 127.0.0.1 so register-local-fleet and
+# make runner can connect.
 task-broker:
 	@set -eu; \
 	project_dir="$(CURDIR)/.."; \
 	compose_file="$(CURDIR)/../docker-compose.dev.yml"; \
-	compose() { docker compose --project-directory "$$project_dir" -f "$$compose_file" "$$@"; }; \
-	cid=$$(compose ps -q db); \
+	compose() { docker compose --project-directory "$$project_dir" -f "$$compose_file" --profile local-runner "$$@"; }; \
+	cid=$$(compose ps -q broker-db); \
 	if [ -z "$$cid" ]; then \
-	  echo "Postgres is not running. From the SuperPlane repo root, run: make dev.up" >&2; \
+	  echo "broker-db is not running. From the SuperPlane repo root, run: make dev.up" >&2; \
 	  exit 1; \
 	fi; \
-	compose exec -T db psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = 'broker'" | grep -q 1 \
-	  || compose exec -T db psql -U postgres -c "CREATE DATABASE broker"; \
 	net=$$(docker inspect -f '{{range $$name, $$conf := .NetworkSettings.Networks}}{{$$name}}{{end}}' "$$cid"); \
 	port=$$(printf '%s' "$(LOCAL_BROKER_LISTEN)" | sed 's/.*://'); \
 	docker run --rm -it --init --network "$$net" \
