@@ -12,11 +12,9 @@ import { hiddenFieldsForHostedJira } from "@/lib/integrations";
 import { configurationWithSetupReturnPath } from "@/lib/integrationSetupReturn";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { getApiErrorMessage } from "@/lib/errors";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUpdateIntegration } from "@/hooks/useIntegrations";
-import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import {
   areRequiredCreateFieldsFilled,
@@ -276,7 +274,7 @@ export function IntegrationCreateDialog({
       }
     } catch (error) {
       setCreateError(error);
-      showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
+      showErrorToast("Failed to create integration");
     } finally {
       setIsCreatePending(false);
     }
@@ -316,7 +314,6 @@ export function IntegrationCreateDialog({
 
   const displayName =
     getIntegrationTypeDisplayName(undefined, integrationDefinition.name) || integrationDefinition.name;
-  const createErrorNotice = createError ? getUsageLimitNotice(createError, organizationId) : null;
   const resolvedHomeHref =
     resolvedIntegrationId && organizationId
       ? `/${organizationId}/settings/integrations/${resolvedIntegrationId}`
@@ -466,8 +463,7 @@ export function IntegrationCreateDialog({
           onClose={handleClose}
         />
 
-        {createError && createErrorNotice ? <UsageLimitAlert notice={createErrorNotice} className="mt-4" /> : null}
-        {createError && !createErrorNotice ? (
+        {createError ? (
           <Alert variant="destructive" className="mt-4">
             <AlertTitle>Unable to create integration</AlertTitle>
             <AlertDescription>Failed to create integration: {getApiErrorMessage(createError)}</AlertDescription>

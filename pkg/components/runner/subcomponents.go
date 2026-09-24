@@ -44,6 +44,3 @@ func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finis
 	return processBrokerTaskStatus(state, task, finishedEventType, organizationID, nil, nil, nil)
 }
 
-func EnsureRunnerMinutesAvailable(ctx core.ExecutionContext) error {
-	return ensureRunnerMinutesAvailable(ctx)
-}

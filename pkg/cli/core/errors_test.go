@@ -13,19 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-func TestFormatGoogleRPCStatusErrorForUsageLimit(t *testing.T) {
-	message := "organization canvas limit exceeded"
-	status := openapi_client.GooglerpcStatus{Message: &message}
-
-	err := formatGoogleRPCStatusError(&status)
-	require.Error(t, err)
-	require.Equal(
-		t,
-		"usage limit reached: this organization has reached its canvas limit\nSee current limits with: superplane usage get",
-		err.Error(),
-	)
-}
-
 func TestFormatGoogleRPCStatusErrorSurfacesUnknownMessage(t *testing.T) {
 	message := "something else"
 	status := openapi_client.GooglerpcStatus{Message: &message}
@@ -131,16 +118,6 @@ func TestFormatGoogleRPCStatusErrorReturnsNilForEmptyMessage(t *testing.T) {
 func TestFormatGoogleRPCStatusErrorReturnsNilForNilStatus(t *testing.T) {
 	err := formatGoogleRPCStatusError(nil)
 	require.NoError(t, err)
-}
-
-func TestFormatGoogleRPCStatusErrorUsageLimitTakesPrecedence(t *testing.T) {
-	message := "organization canvas limit exceeded"
-	code := int32(3)
-	status := openapi_client.GooglerpcStatus{Message: &message, Code: &code}
-
-	err := formatGoogleRPCStatusError(&status)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "usage limit reached")
 }
 
 func TestFormatCommandErrorPassesThroughNonAPIErrors(t *testing.T) {

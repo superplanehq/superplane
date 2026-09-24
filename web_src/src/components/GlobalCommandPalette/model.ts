@@ -1,12 +1,10 @@
 import type { CanvasesCanvasSummary } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { useCanvases, useCreateCanvas } from "@/hooks/useCanvasData";
-import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { appPath } from "@/lib/appPaths";
-import { isUsagePageForced } from "@/lib/env";
 import { showErrorToast } from "@/lib/toast";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { buildAdminActions, buildOrganizationSettingsActions, buildRootActions } from "./actions";
 import { buildCanvasNodeSearchActions, useCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { useCommandPaletteShortcuts, usePalettePermissions } from "./hooks";
@@ -107,7 +105,6 @@ type PaletteData = {
   currentCanvasName: string;
   organizationName: string;
   permissionState: ReturnType<typeof usePalettePermissions>;
-  usageEnabled: boolean;
 };
 
 function useCommandPaletteData(
@@ -126,7 +123,6 @@ function useCommandPaletteData(
   const canUpdateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "update");
   const queriesEnabled = paletteOpen && hasOrganization;
   const { data: organization } = useOrganization(queryOrganizationId, queriesEnabled);
-  const { data: usageStatus, error: usageError } = useOrganizationUsage(queryOrganizationId, queriesEnabled);
   const { data: canvases = [], isLoading: canvasesLoading } = useCanvases(queryOrganizationId, {
     enabled: paletteOpen && canReadCanvas,
   });
@@ -147,7 +143,6 @@ function useCommandPaletteData(
     currentCanvasName: currentCanvasNameFor(currentCanvas),
     organizationName: organization?.metadata?.name ?? "Current organization",
     permissionState,
-    usageEnabled: isUsageEnabled(usageStatus?.enabled === true, usageError),
   };
 }
 
@@ -163,10 +158,6 @@ function canUsePermission(
 
 function currentCanvasNameFor(canvas: CanvasesCanvasSummary | undefined) {
   return canvas?.name ?? "Current app";
-}
-
-function isUsageEnabled(enabled: boolean, error: unknown) {
-  return enabled || !!error || isUsagePageForced();
 }
 
 function useClosePalette(
@@ -216,8 +207,8 @@ function useCreateCanvasCommand(
       if (!nextCanvasId) return;
       closePalette();
       navigate(appPath(organizationId, nextCanvasId));
-    } catch (error) {
-      showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
+    } catch {
+      showErrorToast("Failed to create app");
     }
   }, [closePalette, data.canCreateCanvas, data.createCanvasMutation, navigate, organizationId]);
 }
@@ -299,7 +290,6 @@ function buildModel({
       canAct: data.permissionState.canAct,
       goTo: navigation.goTo,
       organizationId,
-      usageEnabled: data.usageEnabled,
     }),
   };
 }
