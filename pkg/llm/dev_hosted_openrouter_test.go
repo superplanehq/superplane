@@ -60,6 +60,7 @@ func TestSeedDevHostedOpenRouterFromEnv(t *testing.T) {
 func TestSeedDevHostedOpenRouter(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
+	resetInstallationDefaultHostedModel(t, db)
 	t.Cleanup(func() {
 		clearHostedLLMProviders(t, db)
 		resetInstallationDefaultHostedModel(t, db)

@@ -69,6 +69,122 @@ func Test__Build__OverlaysLineDispatchModelOnMatchingRunner(t *testing.T) {
 	assert.Equal(t, "claude-opus-4-6", resolved["model"])
 }
 
+func Test__Build__OverlaysLineDispatchThinkingOnMatchingRunner(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerClaudeCode")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, order.ID, line.ID, line.Name, nil)
+	require.NoError(t, db.Model(dispatch).Update("thinking_level", "high").Error)
+
+	now := time.Now()
+	require.NoError(t, db.Create(&models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      0,
+		StepName:       "agent",
+		RunID:          &run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error)
+
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	resolved, err := builder.Build(map[string]any{
+		"model":         "claude-sonnet-4-6",
+		"thinkingLevel": "low",
+		"credentials": map[string]any{
+			"source": "hosted",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "high", resolved["thinkingLevel"])
+}
+
+func Test__Build__KeepsCanvasThinkingWhenDispatchIsAuto(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerClaudeCode")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	resolved, err := builder.Build(map[string]any{
+		"model":         "claude-sonnet-4-6",
+		"thinkingLevel": "medium",
+		"credentials": map[string]any{
+			"source": "hosted",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "medium", resolved["thinkingLevel"])
+}
+
+func Test__Build__OverlaysDispatchDefaultThinkingOntoEmpty(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerClaudeCode")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, order.ID, line.ID, line.Name, nil)
+	require.NoError(t, db.Model(dispatch).Update("thinking_level", "default").Error)
+
+	now := time.Now()
+	require.NoError(t, db.Create(&models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      0,
+		StepName:       "agent",
+		RunID:          &run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error)
+
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	resolved, err := builder.Build(map[string]any{
+		"model":         "claude-sonnet-4-6",
+		"thinkingLevel": "high",
+		"credentials": map[string]any{
+			"source": "hosted",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "", resolved["thinkingLevel"])
+}
+
 func Test__Build__KeepsCanvasModelWhenDispatchIsAuto(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

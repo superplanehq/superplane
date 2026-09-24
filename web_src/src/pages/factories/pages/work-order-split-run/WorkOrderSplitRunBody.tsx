@@ -34,7 +34,7 @@ type WorkOrderSplitRunBodyProps = {
 export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   onClose?: () => void;
   fixed?: boolean;
-  onDispatch?: (model?: string) => Promise<void>;
+  onDispatch?: (model?: string, thinkingLevel?: string) => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
