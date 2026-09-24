@@ -58,6 +58,8 @@ func (s *PostgresStore) migrate() error {
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS auth_token`,
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS labels`,
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS type`,
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS dispatch_target`,
+		`ALTER TABLE tasks DROP COLUMN IF EXISTS dispatch_requested_at`,
 		`DROP TABLE IF EXISTS broker_tasks`,
 		`DROP TABLE IF EXISTS runner_registrations`,
 	} {
@@ -88,7 +90,7 @@ func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) 
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"provisioner", "arch", "size", "created_at",
-			"dispatch_target", "max_execution_timeout_seconds", "supports_docker",
+			"max_execution_timeout_seconds", "supports_docker",
 		}),
 	}).Create(f).Error
 }
