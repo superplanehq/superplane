@@ -57,6 +57,7 @@ import {
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
+  GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
@@ -166,6 +167,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
+              <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />

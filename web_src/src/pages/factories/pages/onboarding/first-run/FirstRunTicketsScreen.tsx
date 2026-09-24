@@ -27,6 +27,7 @@ type FirstRunTicketsScreenProps = {
   jiraProjectsError?: boolean;
   jiraProjectId?: string;
   jiraCompletion?: JiraCompletionColumnValue;
+  jiraCompletionNeedsManualColumn?: boolean;
   organizationId?: string;
   jiraIntegrationId?: string;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
@@ -50,6 +51,7 @@ export function FirstRunTicketsScreen({
   jiraProjectsError = false,
   jiraProjectId = "",
   jiraCompletion = DEFAULT_JIRA_COMPLETION_SETTINGS,
+  jiraCompletionNeedsManualColumn = false,
   organizationId = "",
   jiraIntegrationId = "",
   onSelectTicketSource,
@@ -108,6 +110,7 @@ export function FirstRunTicketsScreen({
             jiraProjectsError={jiraProjectsError}
             jiraProjectId={jiraProjectId}
             jiraCompletion={jiraCompletion}
+            jiraCompletionNeedsManualColumn={jiraCompletionNeedsManualColumn}
             organizationId={organizationId}
             jiraIntegrationId={jiraIntegrationId}
             onSelectJiraProject={onSelectJiraProject}
@@ -143,6 +146,7 @@ function FirstRunJiraProjectFields({
   jiraProjectsError,
   jiraProjectId,
   jiraCompletion,
+  jiraCompletionNeedsManualColumn,
   organizationId,
   jiraIntegrationId,
   onSelectJiraProject,
@@ -157,6 +161,7 @@ function FirstRunJiraProjectFields({
   jiraProjectsError: boolean;
   jiraProjectId: string;
   jiraCompletion: JiraCompletionColumnValue;
+  jiraCompletionNeedsManualColumn: boolean;
   organizationId: string;
   jiraIntegrationId: string;
   onSelectJiraProject?: (id: string) => void;
@@ -179,7 +184,7 @@ function FirstRunJiraProjectFields({
           onSelect={(id) => onSelectJiraProject?.(id)}
           onRetry={() => onRetryJiraProjects?.()}
         />
-        {jiraProjectId && organizationId && jiraIntegrationId ? (
+        {jiraCompletionNeedsManualColumn && jiraProjectId && organizationId && jiraIntegrationId ? (
           <div className="mt-4">
             <JiraCompletionColumnFields
               organizationId={organizationId}

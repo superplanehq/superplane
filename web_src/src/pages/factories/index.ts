@@ -45,6 +45,7 @@ export {
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
   DiscussionPRFeedbackSetupPage,
+  GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
