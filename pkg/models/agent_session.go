@@ -18,19 +18,19 @@ const (
 )
 
 type AgentSession struct {
-	ID                           uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	OrganizationID               uuid.UUID
-	UserID                       uuid.UUID
-	CanvasID                     uuid.UUID
+	ID                      uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	OrganizationID          uuid.UUID
+	UserID                  uuid.UUID
+	CanvasID                uuid.UUID
 	Provider                string
 	ProviderSessionID       string
 	AgentToolSchemaRevision string
 	Status                  string
-	LastActiveAt                 *time.Time
-	HeartbeatAt                  *time.Time
-	ContextReplayedAt            *time.Time
-	CreatedAt                    *time.Time
-	UpdatedAt                    *time.Time
+	LastActiveAt            *time.Time
+	HeartbeatAt             *time.Time
+	ContextReplayedAt       *time.Time
+	CreatedAt               *time.Time
+	UpdatedAt               *time.Time
 }
 
 func (AgentSession) TableName() string { return "agent_sessions" }

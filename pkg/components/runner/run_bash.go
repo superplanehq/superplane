@@ -315,7 +315,6 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
