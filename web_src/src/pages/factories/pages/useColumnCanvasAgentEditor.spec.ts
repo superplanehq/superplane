@@ -15,7 +15,9 @@ const hookState = vi.hoisted(() => ({
 vi.mock("@/hooks/useCanvasData", () => ({
   canvasKeys: { detail: (organizationId: string, canvasId: string) => ["canvas", organizationId, canvasId] },
   useCanvas: () => ({ data: hookState.canvas.current, isPending: false }),
+  useCanvasStaging: () => ({ refetch: vi.fn() }),
   useCommitCanvasStaging: () => ({ mutateAsync: vi.fn() }),
+  useDiscardCanvasStaging: () => ({ mutateAsync: vi.fn() }),
   useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn() }),
 }));
 
@@ -94,6 +96,13 @@ function createWrapper() {
   };
 }
 
+function stagingSaveDeps(summary?: { hasStaging?: boolean; stale?: boolean }) {
+  return {
+    readStagingSummary: vi.fn().mockResolvedValue(summary),
+    discardStaging: vi.fn().mockResolvedValue({}),
+  };
+}
+
 describe("useColumnCanvasAgentEditor", () => {
   beforeEach(() => {
     hookState.canvas.current = backlogCanvas;
@@ -144,10 +153,17 @@ describe("useColumnCanvasAgentEditor", () => {
 });
 
 describe("persistColumnAgent", () => {
+  beforeEach(async () => {
+    const toast = await import("@/lib/toast");
+    vi.mocked(toast.showErrorToast).mockClear();
+    vi.mocked(toast.showSuccessToast).mockClear();
+  });
+
   it("stages the patched canvas yaml and commits", async () => {
     const stageYaml = vi.fn().mockResolvedValue({});
     const commit = vi.fn().mockResolvedValue({});
     const invalidate = vi.fn().mockResolvedValue({});
+    const staging = stagingSaveDeps();
 
     await persistColumnAgent({
       appId: "app-refund-implementer",
@@ -157,6 +173,7 @@ describe("persistColumnAgent", () => {
       stageYaml,
       commit,
       invalidate,
+      ...staging,
     });
 
     expect(stageYaml).toHaveBeenCalledWith({
@@ -167,12 +184,14 @@ describe("persistColumnAgent", () => {
     expect(stageYaml.mock.calls[0][0].canvasYaml).toContain('"includeVisualEvidence":true');
     expect(commit).toHaveBeenCalledWith("Update agent");
     expect(invalidate).toHaveBeenCalled();
+    expect(staging.discardStaging).not.toHaveBeenCalled();
   });
 
   it("does not commit when staging fails", async () => {
     const { showErrorToast } = await import("@/lib/toast");
     const stageYaml = vi.fn().mockRejectedValue(new Error("stage failed"));
     const commit = vi.fn();
+    const staging = stagingSaveDeps({ hasStaging: true, stale: false });
 
     await expect(
       persistColumnAgent({
@@ -183,10 +202,12 @@ describe("persistColumnAgent", () => {
         stageYaml,
         commit,
         invalidate: vi.fn(),
+        ...staging,
       }),
     ).rejects.toThrow("stage failed");
 
     expect(commit).not.toHaveBeenCalled();
+    expect(staging.discardStaging).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalled();
   });
 
@@ -203,6 +224,7 @@ describe("persistColumnAgent", () => {
       stageYaml,
       commit,
       invalidate,
+      ...stagingSaveDeps(),
     });
 
     const serialized = JSON.parse(stageYaml.mock.calls[0][0].canvasYaml) as NonNullable<CanvasesCanvas["spec"]>;
@@ -216,5 +238,129 @@ describe("persistColumnAgent", () => {
     const customRunner = serialized.nodes?.find((node) => node.id === "custom-runner");
     expect(customRunner?.configuration?.includeVisualEvidence).toBeUndefined();
     expect(customRunner?.configuration?.model).toBe("sonnet");
+  });
+
+  it("discards a stale draft before it commits the agent model", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    const order: string[] = [];
+    const stageYaml = vi.fn(async () => {
+      order.push("stage");
+    });
+    const commit = vi.fn(async () => {
+      order.push("commit");
+    });
+    const discardStaging = vi.fn(async () => {
+      order.push("discard");
+    });
+
+    await persistColumnAgent({
+      appId: "app-refund-implementer",
+      canvas,
+      agentNodeId: "implementation-agent",
+      draft,
+      stageYaml,
+      commit,
+      invalidate: vi.fn().mockResolvedValue({}),
+      readStagingSummary: vi.fn().mockResolvedValue({
+        hasStaging: true,
+        stale: true,
+        stagedPaths: ["canvas.yaml"],
+      }),
+      discardStaging,
+    });
+
+    expect(order).toEqual(["discard", "stage", "commit"]);
+    expect(stageYaml).toHaveBeenCalledWith({
+      versionId: "version-live",
+      canvasYaml: expect.stringContaining("opus"),
+    });
+    expect(commit).toHaveBeenCalledWith("Update agent");
+    expect(showSuccessToast).toHaveBeenCalledWith(
+      "Agent saved. Earlier canvas edits were discarded because the live canvas changed.",
+    );
+  });
+
+  it("does not discard a draft that still matches the live canvas", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    const stageYaml = vi.fn().mockResolvedValue({});
+    const commit = vi.fn().mockResolvedValue({});
+    const discardStaging = vi.fn();
+
+    await persistColumnAgent({
+      appId: "app-refund-implementer",
+      canvas,
+      agentNodeId: "implementation-agent",
+      draft,
+      stageYaml,
+      commit,
+      invalidate: vi.fn().mockResolvedValue({}),
+      readStagingSummary: vi.fn().mockResolvedValue({
+        hasStaging: true,
+        stale: false,
+        stagedPaths: ["canvas.yaml"],
+      }),
+      discardStaging,
+    });
+
+    expect(discardStaging).not.toHaveBeenCalled();
+    expect(stageYaml).toHaveBeenCalledTimes(1);
+    expect(commit).toHaveBeenCalledWith("Update agent");
+    expect(showSuccessToast).toHaveBeenCalledWith("Agent saved.");
+  });
+
+  it("discards once and retries when staging is still stale", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    const stageYaml = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("stale staging cannot be updated"))
+      .mockResolvedValueOnce({});
+    const commit = vi.fn().mockResolvedValue({});
+    const discardStaging = vi.fn().mockResolvedValue({});
+
+    await persistColumnAgent({
+      appId: "app-refund-implementer",
+      canvas,
+      agentNodeId: "implementation-agent",
+      draft,
+      stageYaml,
+      commit,
+      invalidate: vi.fn().mockResolvedValue({}),
+      ...stagingSaveDeps({ hasStaging: true, stale: false }),
+      discardStaging,
+    });
+
+    expect(discardStaging).toHaveBeenCalledTimes(1);
+    expect(stageYaml).toHaveBeenCalledTimes(2);
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(showSuccessToast).toHaveBeenCalledWith(
+      "Agent saved. Earlier canvas edits were discarded because the live canvas changed.",
+    );
+  });
+
+  it("does not retry a stale stage more than once", async () => {
+    const { showErrorToast, showSuccessToast } = await import("@/lib/toast");
+    const stageYaml = vi.fn().mockRejectedValue(new Error("stale staging cannot be updated"));
+    const commit = vi.fn();
+    const discardStaging = vi.fn().mockResolvedValue({});
+
+    await expect(
+      persistColumnAgent({
+        appId: "app-refund-implementer",
+        canvas,
+        agentNodeId: "implementation-agent",
+        draft,
+        stageYaml,
+        commit,
+        invalidate: vi.fn(),
+        ...stagingSaveDeps({ hasStaging: false }),
+        discardStaging,
+      }),
+    ).rejects.toThrow("stale staging cannot be updated");
+
+    expect(discardStaging).toHaveBeenCalledTimes(1);
+    expect(stageYaml).toHaveBeenCalledTimes(2);
+    expect(commit).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalled();
   });
 });
