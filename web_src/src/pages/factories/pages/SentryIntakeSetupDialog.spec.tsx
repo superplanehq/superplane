@@ -82,7 +82,9 @@ describe("SentryIntakeSetupDialog", () => {
       await screen.findByRole("heading", { name: SENTRY_INTAKE_SETUP_COPY.wizardStepProject }),
     ).toBeInTheDocument();
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent("10 newest");
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
+      "adds the newest unresolved issues",
+    );
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
       "listens for new issues",
     );

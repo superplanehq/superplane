@@ -43,14 +43,14 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "jira-issues",
     name: "Jira issues",
-    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
+    description: "Creates tasks from Jira issues.",
     iconSrc: jiraIcon,
     featureId: FEATURE_FACTORY_JIRA_INTAKE,
   },
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
+    description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     featureId: FEATURE_FACTORY_SENTRY_INTAKE,
   },

@@ -102,7 +102,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "jira-issues",
     name: "Jira issues",
-    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
+    description: "Creates tasks from Jira issues.",
     iconSrc: jiraIcon,
     iconAlt: "Jira",
     listen: {
@@ -121,7 +121,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
+    description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
     listen: {
