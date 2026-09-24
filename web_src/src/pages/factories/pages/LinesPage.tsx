@@ -31,7 +31,6 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
@@ -534,7 +533,7 @@ export function LinesPage() {
         );
       })
       .catch((error) => {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to create intake automation"));
+        showErrorToast(getApiErrorMessage(error, "Failed to create intake automation"));
       });
   };
 

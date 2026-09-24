@@ -8,23 +8,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
 func AcceptInviteLink(ctx context.Context, authService authorization.Authorization, accountID string, token string) (*structpb.Struct, error) {
-	return AcceptInviteLinkWithUsage(ctx, authService, nil, accountID, token)
-}
-
-func AcceptInviteLinkWithUsage(
-	ctx context.Context,
-	authService authorization.Authorization,
-	usageService usage.Service,
-	accountID string,
-	token string,
-) (*structpb.Struct, error) {
 	if token == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "invite link token is required")
 	}
@@ -57,19 +45,6 @@ func AcceptInviteLinkWithUsage(
 			return nil, grpcerrors.Internal(err, "failed to accept invite")
 		}
 
-		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
-		if countErr != nil {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(countErr, "failed to accept invite")
-		}
-
-		if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, org.ID.String(), &usagepb.OrganizationState{
-			Users: int32(userCount + 1),
-		}, nil); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-
 		user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
 		if err != nil {
 			tx.Rollback()
@@ -80,19 +55,6 @@ func AcceptInviteLinkWithUsage(
 		statusValue = "already_member"
 		return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
 	} else {
-		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
-		if countErr != nil {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(countErr, "failed to accept invite")
-		}
-
-		if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, org.ID.String(), &usagepb.OrganizationState{
-			Users: int32(userCount + 1),
-		}, nil); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-
 		err = user.RestoreInTransaction(tx)
 		if err != nil {
 			tx.Rollback()

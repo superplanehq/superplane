@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 // Dependencies are backend services shared by canvas actions.
@@ -18,7 +17,6 @@ type Dependencies struct {
 	Registry       *componentregistry.Registry
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
-	UsageService   usage.Service
 }
 
 // Action executes one superplane_app action value.
