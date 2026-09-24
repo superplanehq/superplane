@@ -143,6 +143,7 @@ import {
   factoryAppRunPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
@@ -507,6 +508,12 @@ export function LinesPage() {
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
     if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
+      return;
+    }
+    if (template.id === "github-issues") {
+      if (selectedLine.id) {
+        navigate(factoryGitHubIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
       return;
     }
     if (template.id === "sentry-exceptions") {
