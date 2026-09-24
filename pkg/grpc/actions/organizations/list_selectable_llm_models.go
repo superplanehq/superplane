@@ -8,10 +8,12 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func ListSelectableLLMModels(
 	ctx context.Context,
+	reg *registry.Registry,
 	orgID string,
 	req *pb.ListSelectableLLMModelsRequest,
 ) (*pb.ListSelectableLLMModelsResponse, error) {
@@ -31,6 +33,10 @@ func ListSelectableLLMModels(
 			}
 			return nil, grpcerrors.Internal(err, "failed to list selectable models")
 		}
+	}
+
+	if reg != nil {
+		enableAllConnectedBYOKModelsByDefault(tx, reg, organization.ID)
 	}
 
 	listed, err := models.ListSelectableLLMModels(tx, organization.ID, factoryID)

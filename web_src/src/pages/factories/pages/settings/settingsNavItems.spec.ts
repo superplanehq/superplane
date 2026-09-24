@@ -45,7 +45,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "General",
       "Repository",
       "Agent resources",
-      "Models",
       "Usage",
       "General",
       "Members",
@@ -84,7 +83,6 @@ describe("filterFactorySettingsNavGroups", () => {
       "workspace-general",
       "workspace-repository",
       "workspace-agent-resources",
-      "workspace-models",
       "workspace-usage",
     ]);
   });
