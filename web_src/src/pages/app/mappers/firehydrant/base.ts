@@ -48,7 +48,7 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
   return outputs.default[0].data as Incident;
 }
 
-export function getDetailsForIncident(incident: Incident | undefined): Record<string, string> {
+function incidentIdentityDetails(incident: Incident | undefined): Record<string, string> {
   const details: Record<string, string> = {};
 
   details.ID = incident?.id || "-";
@@ -57,6 +57,12 @@ export function getDetailsForIncident(incident: Incident | undefined): Record<st
   if (incident?.number != null) {
     details.Number = String(incident.number);
   }
+
+  return details;
+}
+
+function incidentStatusDetails(incident: Incident | undefined): Record<string, string> {
+  const details: Record<string, string> = {};
 
   details.Summary = incident?.summary || "-";
   details.Severity = incident?.severity || "-";
@@ -70,6 +76,13 @@ export function getDetailsForIncident(incident: Incident | undefined): Record<st
   }
 
   return details;
+}
+
+export function getDetailsForIncident(incident: Incident | undefined): Record<string, string> {
+  return {
+    ...incidentIdentityDetails(incident),
+    ...incidentStatusDetails(incident),
+  };
 }
 
 /**
