@@ -29,7 +29,7 @@ function FilterHarness({
     <div>
       <GitHubIntakeFilterFields sourceId={sourceId} settings={settings} onSettingsChange={setSettings} />
       <SentryIntakeFilterFields sourceId={sourceId} settings={settings} onSettingsChange={setSettings} />
-      <button type="button" onClick={() => onSave?.(normalizeIntakeSourceSettings(settings))}>
+      <button type="button" onClick={() => onSave?.(normalizeIntakeSourceSettings(settings, sourceId))}>
         Save
       </button>
     </div>
@@ -76,12 +76,12 @@ describe("SentryIntakeFilterFields", () => {
     });
   });
 
-  it("preserves stored hidden triggers on save even though the UI no longer shows them", async () => {
+  it("turns off hidden triggers on save so they cannot keep creating tasks", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     const initial: IntakeSourceSettings = {
       ...DEFAULT_SENTRY_INTAKE_SETTINGS,
-      sentryRegressedIssues: false,
+      sentryRegressedIssues: true,
       sentryAssignedIssues: true,
     };
     render(<FilterHarness sourceId="sentry-exceptions" initial={initial} onSave={onSave} />);
@@ -92,13 +92,13 @@ describe("SentryIntakeFilterFields", () => {
       expect.objectContaining({
         sentryNewIssues: true,
         sentryRegressedIssues: false,
-        sentryAssignedIssues: true,
+        sentryAssignedIssues: false,
       }),
     );
     expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({
       sentryNewIssues: true,
       sentryRegressedIssues: false,
-      sentryAssignedIssues: true,
+      sentryAssignedIssues: false,
     });
   });
 
