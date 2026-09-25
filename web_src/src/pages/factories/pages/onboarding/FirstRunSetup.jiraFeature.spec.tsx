@@ -175,9 +175,9 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
@@ -207,7 +207,7 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupFailed,

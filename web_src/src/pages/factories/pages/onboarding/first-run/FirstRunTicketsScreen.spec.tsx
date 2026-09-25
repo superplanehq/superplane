@@ -83,21 +83,27 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
   });
 
-  it("hides Jira and keeps GitHub Issues and Linear when Jira is unavailable", () => {
+  it("shows Jira and Linear as coming soon when Jira is unavailable", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
     render(
       <FirstRunTicketsScreen
         ticketSource={null}
-        onSelectTicketSource={vi.fn()}
+        onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={vi.fn()}
       />,
     );
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
   });
 
   it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
@@ -115,7 +121,8 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-projects")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupFailed,

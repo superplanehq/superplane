@@ -19,11 +19,11 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Hides Jira when false. */
+  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false. */
   jiraAvailable?: boolean;
   /**
    * A saved Jira choice cannot continue because the feature lookup has not
-   * confirmed Jira. The row stays hidden. The notice explains the block.
+   * confirmed Jira. The row shows as coming soon. The notice explains the block.
    */
   jiraChoiceBlock?: FirstRunJiraChoiceBlock | null;
   continueLabel?: string;
@@ -196,10 +196,19 @@ function FirstRunJiraTicketRow({
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onConnectJira?: () => void;
 }) {
-  if (!jiraAvailable) {
-    return null;
-  }
   const copy = FIRST_RUN_COPY.tickets;
+  if (!jiraAvailable) {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="jira" />}
+        title={copy.jira}
+        detail={copy.jiraHelper}
+        soon
+        disabled={saving}
+        onSelect={() => undefined}
+      />
+    );
+  }
   return (
     <ConnectOptionRow
       icon={<IntegrationChoiceIcon name="jira" />}
