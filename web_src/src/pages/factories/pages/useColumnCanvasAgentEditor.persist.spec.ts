@@ -164,9 +164,7 @@ describe("persistColumnAgent", () => {
     expect(staged.canvasYaml).not.toContain("model: sonnet");
     expect(commit).toHaveBeenCalledWith("Update agent");
     expect(readStagedCanvas).not.toHaveBeenCalled();
-    expect(showSuccessToast).toHaveBeenCalledWith(
-      "Agent saved. Earlier canvas edits were discarded because the live canvas changed.",
-    );
+    expect(showSuccessToast).toHaveBeenCalledWith("Agent saved.");
   });
 
   it("keeps a current draft that replaces a stale draft before save", async () => {
@@ -276,9 +274,7 @@ describe("persistColumnAgent", () => {
     });
     expect(stageYaml.mock.calls[1][0].canvasYaml).toContain("opus");
     expect(commit).toHaveBeenCalledTimes(1);
-    expect(showSuccessToast).toHaveBeenCalledWith(
-      "Agent saved. Earlier canvas edits were discarded because the live canvas changed.",
-    );
+    expect(showSuccessToast).toHaveBeenCalledWith("Agent saved.");
   });
 
   it("does not retry a stale stage more than once", async () => {

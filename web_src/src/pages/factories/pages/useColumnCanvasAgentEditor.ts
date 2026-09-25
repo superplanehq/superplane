@@ -25,8 +25,6 @@ import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
 const AGENT_SAVED_NOTICE = "Agent saved.";
-const AGENT_SAVED_AFTER_DISCARD_NOTICE =
-  "Agent saved. Earlier canvas edits were discarded because the live canvas changed.";
 const STALE_STAGING_UPDATE_MESSAGE = "stale staging cannot be updated";
 const CURRENT_STAGING_KEPT_MESSAGE = "current staging cannot be discarded";
 const STAGED_CANVAS_CHANGED_MESSAGE = "staged canvas changed";
@@ -185,18 +183,17 @@ export async function persistColumnAgent(args: {
 
   try {
     const summary = await readStagingSummary();
-    let discardedEarlierEdits = false;
     let stagedEdit = agentEditFromCanvas(canvas, targetNodeIds, draft);
     if (canvasDraftIsStale(summary)) {
       stagedEdit = await editFromLiveCanvas();
-      discardedEarlierEdits = await stageReplacingStaleDraft({
+      await stageReplacingStaleDraft({
         stageYaml,
         versionId: stagedEdit.versionId,
         canvasYaml: stagedEdit.canvasYaml,
         rebuildFromStagedCanvas: editFromStagedCanvas,
       });
     } else {
-      discardedEarlierEdits = await stageColumnAgentDiscardingStaleDraft({
+      await stageColumnAgentDiscardingStaleDraft({
         stageYaml,
         versionId: stagedEdit.versionId,
         canvasYaml: stagedEdit.canvasYaml,
@@ -206,7 +203,7 @@ export async function persistColumnAgent(args: {
     }
     await commit(UPDATE_AGENT_COMMIT_MESSAGE);
     await invalidate();
-    showSuccessToast(discardedEarlierEdits ? AGENT_SAVED_AFTER_DISCARD_NOTICE : AGENT_SAVED_NOTICE);
+    showSuccessToast(AGENT_SAVED_NOTICE);
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Failed to save agent"));
     throw error;
@@ -285,10 +282,10 @@ async function stageColumnAgentDiscardingStaleDraft(args: {
   canvasYaml: string;
   rebuildFromLiveCanvas: () => Promise<AgentCanvasEdit>;
   rebuildFromStagedCanvas: () => Promise<AgentCanvasEdit>;
-}): Promise<boolean> {
+}): Promise<void> {
   try {
     await args.stageYaml({ versionId: args.versionId, canvasYaml: args.canvasYaml });
-    return false;
+    return;
   } catch (error) {
     if (!isStaleStagingUpdateError(error)) {
       throw error;
@@ -296,7 +293,7 @@ async function stageColumnAgentDiscardingStaleDraft(args: {
   }
 
   const refreshedEdit = await args.rebuildFromLiveCanvas();
-  return stageReplacingStaleDraft({
+  await stageReplacingStaleDraft({
     stageYaml: args.stageYaml,
     versionId: refreshedEdit.versionId,
     canvasYaml: refreshedEdit.canvasYaml,
@@ -309,22 +306,19 @@ async function stageReplacingStaleDraft(args: {
   versionId: string;
   canvasYaml: string;
   rebuildFromStagedCanvas: () => Promise<AgentCanvasEdit>;
-}): Promise<boolean> {
+}): Promise<void> {
   try {
     await args.stageYaml({
       versionId: args.versionId,
       canvasYaml: args.canvasYaml,
       replaceIfStale: true,
     });
-    return true;
   } catch (error) {
     if (!isCurrentStagingKeptError(error)) {
       throw error;
     }
+    await stageAgentEditOnCurrentDraft(args.stageYaml, args.rebuildFromStagedCanvas);
   }
-
-  await stageAgentEditOnCurrentDraft(args.stageYaml, args.rebuildFromStagedCanvas);
-  return false;
 }
 
 async function stageAgentEditOnCurrentDraft(
