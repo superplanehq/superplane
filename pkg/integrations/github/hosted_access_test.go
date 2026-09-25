@@ -3,12 +3,15 @@ package github
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestFilterWritableRepositories(t *testing.T) {
@@ -67,4 +70,45 @@ func TestRetainInstalledRepositoriesDoesNotGrantNewRepositories(t *testing.T) {
 	installed := []common.Repository{{ID: 2, Name: "web"}, {ID: 3, Name: "new"}}
 
 	assert.Equal(t, []common.Repository{{ID: 2, Name: "acme/web"}}, retainInstalledRepositories(granted, installed))
+}
+
+func TestInstallationRepositoryEventRestoresSelectedRepository(t *testing.T) {
+	t.Cleanup(resetBindClientHooks)
+	selected := common.Repository{ID: 1, Name: "acme/api"}
+	integration := &contexts.IntegrationContext{
+		State: "ready",
+		Metadata: common.Metadata{
+			InstallationID:       "11",
+			Owner:                "acme",
+			Repositories:         []common.Repository{selected},
+			SelectedRepositories: []common.Repository{selected},
+			RepositoryScoped:     true,
+			GitHubApp:            common.GitHubAppMetadata{ID: 99},
+		},
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	installed := []common.Repository{}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return installed, nil
+	}
+	ctx, recorder := hostedRequestContext(integration, "/api/v1/github/app/webhook", nil)
+	event := &gh.InstallationRepositoriesEvent{}
+
+	(&GitHub{}).handleInstallationRepositoriesEvent(ctx, event)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, "error", integration.State)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.Repositories)
+	assert.Equal(t, []common.Repository{selected}, metadata.SelectedRepositories)
+
+	installed = []common.Repository{{ID: 1, Name: "api"}}
+	(&GitHub{}).handleInstallationRepositoriesEvent(ctx, event)
+
+	assert.Equal(t, "ready", integration.State)
+	metadata = integration.Metadata.(common.Metadata)
+	assert.Equal(t, []common.Repository{selected}, metadata.Repositories)
+	assert.Equal(t, []common.Repository{selected}, metadata.SelectedRepositories)
 }

@@ -730,7 +730,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
-	tokenOptions, err := scopedInstallationTokenOptions(metadata)
+	tokenOptions, err := ScopedInstallationTokenOptions(metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -746,7 +746,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 	}, nil
 }
 
-func scopedInstallationTokenOptions(metadata Metadata) (*githubv75.InstallationTokenOptions, error) {
+func ScopedInstallationTokenOptions(metadata Metadata) (*githubv75.InstallationTokenOptions, error) {
 	if !metadata.RepositoryScoped {
 		return nil, nil
 	}

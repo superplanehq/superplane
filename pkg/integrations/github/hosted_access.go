@@ -80,27 +80,34 @@ func discoverAccessibleInstallations(
 	}
 
 	accessible := make([]common.PendingInstallation, 0, len(installations))
+	failedChecks := make([]error, 0)
+	completedChecks := 0
 	for _, installation := range installations {
 		client, err := newInstallationClient(integration, app.ID, installation.ID)
 		if err != nil {
-			return nil, fmt.Errorf("create client for installation %s: %w", installation.ID, err)
+			failedChecks = append(failedChecks, fmt.Errorf("create client for installation %s: %w", installation.ID, err))
+			continue
 		}
 
 		user, _, err := client.Users.GetByID(ctx, identity.ID)
 		if err != nil {
 			var responseError *gh.ErrorResponse
 			if errors.As(err, &responseError) && responseError.Response != nil && responseError.Response.StatusCode == 404 {
+				completedChecks++
 				continue
 			}
-			return nil, fmt.Errorf("resolve GitHub identity for installation %s: %w", installation.ID, err)
+			failedChecks = append(failedChecks, fmt.Errorf("resolve GitHub identity for installation %s: %w", installation.ID, err))
+			continue
 		}
 		if user.GetID() != identity.ID || user.GetLogin() == "" {
+			completedChecks++
 			continue
 		}
 
 		repositories, err := listInstallationRepos(ctx, client)
 		if err != nil {
-			return nil, fmt.Errorf("list repositories for installation %s: %w", installation.ID, err)
+			failedChecks = append(failedChecks, fmt.Errorf("list repositories for installation %s: %w", installation.ID, err))
+			continue
 		}
 
 		writable, err := filterWritableRepositories(
@@ -114,14 +121,19 @@ func discoverAccessibleInstallations(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("check repository access for installation %s: %w", installation.ID, err)
+			failedChecks = append(failedChecks, fmt.Errorf("check repository access for installation %s: %w", installation.ID, err))
+			continue
 		}
+		completedChecks++
 		if len(writable) == 0 {
 			continue
 		}
 
 		installation.Repositories = writable
 		accessible = append(accessible, installation)
+	}
+	if completedChecks == 0 && len(failedChecks) > 0 {
+		return nil, errors.Join(failedChecks...)
 	}
 
 	return accessible, nil

@@ -10,6 +10,9 @@ type Metadata struct {
 	State          string       `mapstructure:"state" json:"state"`
 	Owner          string       `mapstructure:"owner" json:"owner"`
 	Repositories   []Repository `mapstructure:"repositories" json:"repositories"`
+	// SelectedRepositories preserves the user's repository selection when an
+	// installation temporarily loses access to one of those repositories.
+	SelectedRepositories []Repository `mapstructure:"selectedRepositories" json:"selectedRepositories,omitempty"`
 	// RepositoryScoped distinguishes new hosted connections from legacy
 	// installation-wide connections. Runtime tokens for scoped connections are
 	// restricted to the repository IDs in Repositories.

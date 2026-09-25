@@ -264,7 +264,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) {
-	if metadata.InstallationID != "" {
+	if !requiresHostedInstallationDiscovery(*metadata) {
 		return
 	}
 
@@ -282,6 +282,10 @@ func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app 
 		return
 	}
 	metadata.SetPendingInstallations(installations)
+}
+
+func requiresHostedInstallationDiscovery(metadata common.Metadata) bool {
+	return metadata.InstallationID == "" && len(metadata.PendingInstallations) == 0
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
@@ -585,14 +589,14 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		return
 	}
 
-	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := newInstallationClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	repos, err := listInstallationRepositories(context.Background(), client)
+	repos, err := listInstallationRepos(context.Background(), client)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -613,9 +617,14 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 	}
 
 	if metadata.RepositoryScoped {
-		metadata.Repositories = retainInstalledRepositories(metadata.Repositories, repos)
+		if len(metadata.SelectedRepositories) == 0 {
+			metadata.SelectedRepositories = slices.Clone(metadata.Repositories)
+		}
+		metadata.Repositories = retainInstalledRepositories(metadata.SelectedRepositories, repos)
 		if len(metadata.Repositories) == 0 {
 			ctx.Integration.Error("No authorized repositories remain in the GitHub App installation")
+		} else {
+			ctx.Integration.Ready()
 		}
 	} else {
 		metadata.Repositories = repos

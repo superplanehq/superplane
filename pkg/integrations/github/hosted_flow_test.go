@@ -101,6 +101,7 @@ func TestBindHostedInstallationRepositoriesScopesConnection(t *testing.T) {
 	assert.Equal(t, "11", bound.InstallationID)
 	assert.Equal(t, "acme", bound.Owner)
 	assert.Equal(t, repositories, bound.Repositories)
+	assert.Equal(t, repositories, bound.SelectedRepositories)
 	assert.True(t, bound.RepositoryScoped)
 }
 
@@ -137,6 +138,18 @@ func TestSyncHostedAppKeepsVerifiedPickerMetadata(t *testing.T) {
 	assert.Equal(t, "/onboarding?attempt=new&step=vcs", metadata.SetupReturnPath)
 	require.Len(t, metadata.PendingInstallations, 1)
 	assert.Nil(t, integration.BrowserAction)
+}
+
+func TestRequiresHostedInstallationDiscovery(t *testing.T) {
+	cached := common.Metadata{
+		PendingInstallations: []common.PendingInstallation{
+			{ID: "11", AccountLogin: "acme", Repositories: []common.Repository{{ID: 101, Name: "acme/api"}}},
+		},
+	}
+
+	assert.False(t, requiresHostedInstallationDiscovery(cached))
+	assert.False(t, requiresHostedInstallationDiscovery(common.Metadata{InstallationID: "11"}))
+	assert.True(t, requiresHostedInstallationDiscovery(common.Metadata{}))
 }
 
 func TestSyncHostedAppReconcilesInstallationRequests(t *testing.T) {

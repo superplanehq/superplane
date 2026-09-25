@@ -39,6 +39,7 @@ func (g *GitHub) bindHostedInstallationRepositories(
 	metadata.InstallationID = installation.ID
 	metadata.Owner = installation.AccountLogin
 	metadata.Repositories = slices.Clone(repositories)
+	metadata.SelectedRepositories = slices.Clone(repositories)
 	metadata.RepositoryScoped = true
 	remainingRequests := slices.DeleteFunc(metadata.CurrentInstallRequests(), func(request common.InstallRequest) bool {
 		return request.AccountLogin == "" || strings.EqualFold(request.AccountLogin, metadata.Owner)

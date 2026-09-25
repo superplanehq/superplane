@@ -10,15 +10,16 @@ import (
 
 func TestAccountLinkedAccount(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
 
 	t.Run("links an identity to an account", func(t *testing.T) {
 		account, err := CreateAccount("Linker", "linker@example.com")
 		require.NoError(t, err)
 
 		linked := NewAccountLinkedAccount(account.ID, ProviderGitHub, "1234", "Shiroyasha", "Igor", "https://avatar")
-		require.NoError(t, SaveAccountLinkedAccount(database.Conn(), linked))
+		require.NoError(t, SaveAccountLinkedAccount(db, linked))
 
-		found, err := FindAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub)
+		found, err := FindAccountLinkedAccount(db, account.ID, ProviderGitHub)
 		require.NoError(t, err)
 		assert.Equal(t, "Shiroyasha", found.Username)
 		assert.Equal(t, "shiroyasha", found.NormalizedUsername())
@@ -30,12 +31,12 @@ func TestAccountLinkedAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		first := NewAccountLinkedAccount(account.ID, ProviderGitHub, "1", "wrong-login", "", "")
-		require.NoError(t, SaveAccountLinkedAccount(database.Conn(), first))
+		require.NoError(t, SaveAccountLinkedAccount(db, first))
 
 		second := NewAccountLinkedAccount(account.ID, ProviderGitHub, "2", "right-login", "", "")
-		require.NoError(t, SaveAccountLinkedAccount(database.Conn(), second))
+		require.NoError(t, SaveAccountLinkedAccount(db, second))
 
-		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
+		linked, err := ListAccountLinkedAccounts(db, account.ID)
 		require.NoError(t, err)
 		require.Len(t, linked, 1)
 		assert.Equal(t, "right-login", linked[0].Username)
@@ -49,12 +50,12 @@ func TestAccountLinkedAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, SaveAccountLinkedAccount(
-			database.Conn(),
+			db,
 			NewAccountLinkedAccount(owner.ID, ProviderGitHub, "9", "shared-login", "", ""),
 		))
 
 		require.NoError(t, SaveAccountLinkedAccount(
-			database.Conn(),
+			db,
 			NewAccountLinkedAccount(other.ID, ProviderGitHub, "9", "shared-login", "", ""),
 		))
 	})
@@ -73,12 +74,12 @@ func TestAccountLinkedAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, SaveAccountLinkedAccount(
-			database.Conn(),
+			db,
 			NewAccountLinkedAccount(owner.ID, ProviderGitHub, "10", "taken-login", "", ""),
 		))
 
 		err = SaveAccountLinkedAccount(
-			database.Conn(),
+			db,
 			NewAccountLinkedAccount(other.ID, ProviderGitHub, "10", "taken-login", "", ""),
 		)
 		assert.ErrorIs(t, err, ErrLinkedAccountInUse)
@@ -89,13 +90,13 @@ func TestAccountLinkedAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, SaveAccountLinkedAccount(
-			database.Conn(),
+			db,
 			NewAccountLinkedAccount(account.ID, ProviderGitHub, "77", "gone", "", ""),
 		))
 
-		require.NoError(t, DeleteAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub))
+		require.NoError(t, DeleteAccountLinkedAccount(db, account.ID, ProviderGitHub))
 
-		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
+		linked, err := ListAccountLinkedAccounts(db, account.ID)
 		require.NoError(t, err)
 		assert.Empty(t, linked)
 	})
@@ -103,18 +104,18 @@ func TestAccountLinkedAccount(t *testing.T) {
 	t.Run("prefers a linked GitHub identity", func(t *testing.T) {
 		account, err := CreateAccount("Identity", "identity@example.com")
 		require.NoError(t, err)
-		require.NoError(t, database.Conn().Create(&AccountProvider{
+		require.NoError(t, db.Create(&AccountProvider{
 			AccountID:  account.ID,
 			Provider:   ProviderGitHub,
 			ProviderID: "10",
 			Username:   "sign-in-login",
 		}).Error)
 		require.NoError(t, SaveAccountLinkedAccount(
-			database.Conn(),
+			db,
 			NewAccountLinkedAccount(account.ID, ProviderGitHub, "20", "linked-login", "", ""),
 		))
 
-		identity, err := FindAccountGitHubIdentity(database.Conn(), account.ID)
+		identity, err := FindAccountGitHubIdentity(db, account.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "20", identity.ProviderID)
 		assert.Equal(t, "linked-login", identity.Username)
@@ -123,14 +124,14 @@ func TestAccountLinkedAccount(t *testing.T) {
 	t.Run("falls back to the GitHub sign-in identity", func(t *testing.T) {
 		account, err := CreateAccount("Signed in", "signed-in@example.com")
 		require.NoError(t, err)
-		require.NoError(t, database.Conn().Create(&AccountProvider{
+		require.NoError(t, db.Create(&AccountProvider{
 			AccountID:  account.ID,
 			Provider:   ProviderGitHub,
 			ProviderID: "30",
 			Username:   "provider-login",
 		}).Error)
 
-		identity, err := FindAccountGitHubIdentity(database.Conn(), account.ID)
+		identity, err := FindAccountGitHubIdentity(db, account.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "30", identity.ProviderID)
 		assert.Equal(t, "provider-login", identity.Username)

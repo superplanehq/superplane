@@ -9,7 +9,7 @@ import (
 
 func TestScopedInstallationTokenOptions(t *testing.T) {
 	t.Run("keeps legacy connections installation-wide", func(t *testing.T) {
-		options, err := scopedInstallationTokenOptions(Metadata{
+		options, err := ScopedInstallationTokenOptions(Metadata{
 			Repositories: []Repository{{ID: 10, Name: "acme/api"}},
 		})
 
@@ -18,7 +18,7 @@ func TestScopedInstallationTokenOptions(t *testing.T) {
 	})
 
 	t.Run("limits new connections to selected repositories", func(t *testing.T) {
-		options, err := scopedInstallationTokenOptions(Metadata{
+		options, err := ScopedInstallationTokenOptions(Metadata{
 			RepositoryScoped: true,
 			Repositories:     []Repository{{ID: 10, Name: "acme/api"}, {ID: 20, Name: "acme/web"}},
 		})
@@ -29,14 +29,14 @@ func TestScopedInstallationTokenOptions(t *testing.T) {
 	})
 
 	t.Run("rejects an empty repository scope", func(t *testing.T) {
-		options, err := scopedInstallationTokenOptions(Metadata{RepositoryScoped: true})
+		options, err := ScopedInstallationTokenOptions(Metadata{RepositoryScoped: true})
 
 		assert.Error(t, err)
 		assert.Nil(t, options)
 	})
 
 	t.Run("rejects an invalid repository ID", func(t *testing.T) {
-		options, err := scopedInstallationTokenOptions(Metadata{
+		options, err := ScopedInstallationTokenOptions(Metadata{
 			RepositoryScoped: true,
 			Repositories:     []Repository{{Name: "acme/api"}},
 		})
