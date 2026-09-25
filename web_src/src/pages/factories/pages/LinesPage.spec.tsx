@@ -13,6 +13,7 @@ import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
@@ -28,6 +29,7 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryJiraIntakeSetupPath,
   factoryPlanningPath,
@@ -1182,6 +1184,22 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Dependabot setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DEPENDABOT_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-dependabot-alerts"));
+
+    expect(screen.getByTestId("dependabot-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryDependabotIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });

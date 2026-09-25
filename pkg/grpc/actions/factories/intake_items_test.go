@@ -33,6 +33,22 @@ func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
 	}, gitHubIssueItem(issue))
 }
 
+func TestDependabotAlertItem_OnlyAcceptsOpenAlerts(t *testing.T) {
+	alert := &github.DependabotAlert{
+		Number:  github.Ptr(7),
+		State:   github.Ptr("open"),
+		HTMLURL: github.Ptr("https://github.com/acme/payments/security/dependabot/7"),
+	}
+
+	item, ok := dependabotAlertItem(alert)
+	assert.True(t, ok)
+	assert.Equal(t, "7", item.ID)
+
+	alert.State = github.Ptr("fixed")
+	_, ok = dependabotAlertItem(alert)
+	assert.False(t, ok)
+}
+
 func TestIntakeItemLimit(t *testing.T) {
 	assert.Equal(t, defaultLatestIntakeItems, intakeItemLimit("", 0))
 	assert.Equal(t, defaultSearchIntakeItems, intakeItemLimit("refund", 0))

@@ -5,6 +5,7 @@ import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
@@ -39,6 +40,13 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "GitHub issues",
     description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
+  },
+  {
+    id: "dependabot-alerts",
+    name: "Dependabot alerts",
+    description: "Creates tasks from Dependabot alerts.",
+    iconSrc: githubIcon,
+    featureId: FEATURE_FACTORY_DEPENDABOT_INTAKE,
   },
   {
     id: "jira-issues",

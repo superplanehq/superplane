@@ -17,6 +17,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
 			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
+			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
