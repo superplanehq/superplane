@@ -11,29 +11,103 @@ import {
   pickResumePath,
   readLastVisitedOrganization,
 } from "@/lib/lastVisitedOrganization";
+import { pathBelongsToOrganization } from "@/lib/safeRedirectPath";
 import { Navigate } from "react-router";
 
-import { incompleteWorkspaceSetupPath } from "../factories/pages/onboarding/onboardingResumePath";
+import { factoryDetailPath, factoryListPath, factorySetupPath } from "../factories/lib/factoryPagePaths";
+import { pickReadyFactory, readLastVisitedFactory } from "../factories/lib/lastVisitedFactory";
 
 type AccountOrganization = NonNullable<ReturnType<typeof useAccountOrganizations>["data"]>[number];
 type Account = NonNullable<ReturnType<typeof useAccount>["account"]>;
+type WorkspaceHomeCandidate = {
+  id?: string;
+  key?: string;
+  onboarding?: { completedAt?: string };
+};
+type SavedScreen = {
+  accountId: string;
+  routeId: string;
+  lastLocation: { data?: string | null; isError: boolean };
+  listPath?: string;
+};
 
 function LoadingView() {
   return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading...</div>;
 }
 
-function resolveResumePath(
-  accountId: string,
-  routeId: string,
-  lastLocation: { data?: string | null; isError: boolean },
-  listPath?: string,
-): string | null {
-  const localPath = readLastVisitedLocation(accountId, routeId);
-  if (lastLocation.isError) {
-    return pickResumePath(routeId, listPath, localPath);
+function resolveResumePath(screen: SavedScreen): string | null {
+  return pickResumePath(screen.routeId, ...savedScreenCandidates(screen));
+}
+
+function savedScreenCandidates(screen: SavedScreen): Array<string | null | undefined> {
+  const localPath = readLastVisitedLocation(screen.accountId, screen.routeId);
+  if (screen.lastLocation.isError) {
+    return [screen.listPath, localPath];
+  }
+  return [screen.lastLocation.data, screen.listPath, localPath];
+}
+
+function workspaceKeyFromPath(path: string, routeId: string): string | null {
+  const pathname = path.split(/[?#]/, 1)[0] ?? "";
+  const prefix = `/${routeId}/workspaces/`;
+  if (!pathname.startsWith(prefix)) {
+    return null;
   }
 
-  return pickResumePath(routeId, lastLocation.data, listPath, localPath);
+  const segment = pathname.slice(prefix.length).split("/")[0] ?? "";
+  if (!segment || segment.toLowerCase() === "new") {
+    return null;
+  }
+  return segment;
+}
+
+function workspaceIdForKey(workspaces: WorkspaceHomeCandidate[], key: string): string | null {
+  const match = workspaces.find(
+    (workspace) => workspace.id && workspace.key && workspace.key.toLowerCase() === key.toLowerCase(),
+  );
+  return match?.id ?? null;
+}
+
+function workspaceIdFromSavedScreen(screen: SavedScreen, workspaces: WorkspaceHomeCandidate[]): string | null {
+  for (const candidate of savedScreenCandidates(screen)) {
+    if (!candidate || !pathBelongsToOrganization(candidate, screen.routeId)) {
+      continue;
+    }
+    const key = workspaceKeyFromPath(candidate, screen.routeId);
+    if (!key) {
+      continue;
+    }
+    const id = workspaceIdForKey(workspaces, key);
+    if (id) {
+      return id;
+    }
+  }
+  return null;
+}
+
+function preferredWorkspaceId(screen: SavedScreen, workspaces: WorkspaceHomeCandidate[]): string | null {
+  const lastVisitedId = readLastVisitedFactory(screen.accountId, screen.routeId);
+  if (lastVisitedId && workspaces.some((workspace) => workspace.id === lastVisitedId)) {
+    return lastVisitedId;
+  }
+
+  return workspaceIdFromSavedScreen(screen, workspaces);
+}
+
+function pathForChosenWorkspace(routeId: string, workspace: WorkspaceHomeCandidate): string | null {
+  if (!workspace.key) {
+    return null;
+  }
+  if (workspace.onboarding?.completedAt) {
+    return factoryDetailPath(routeId, workspace.key);
+  }
+  return factorySetupPath(routeId, workspace.key);
+}
+
+function pickWorkspaceHomePath(args: SavedScreen & { workspaces?: WorkspaceHomeCandidate[] }): string {
+  const workspaces = args.workspaces ?? [];
+  const chosen = pickReadyFactory(workspaces, preferredWorkspaceId(args, workspaces));
+  return (chosen && pathForChosenWorkspace(args.routeId, chosen)) || factoryListPath(args.routeId);
 }
 
 function isWaitingForRedirect(args: {
@@ -48,19 +122,14 @@ function isWaitingForRedirect(args: {
   return args.canLoadWorkspaces && args.workspacesLoading;
 }
 
-function pickRootRedirectPath(args: {
-  accountId: string;
-  routeId: string;
-  lastLocation: { data?: string | null; isError: boolean };
-  listPath?: string;
-  factoriesEnabled: boolean;
-  workspaces?: Parameters<typeof incompleteWorkspaceSetupPath>[1];
-}): string {
-  return (
-    resolveResumePath(args.accountId, args.routeId, args.lastLocation, args.listPath) ??
-    incompleteWorkspaceSetupPath(args.routeId, args.workspaces) ??
-    (args.factoriesEnabled ? `/${args.routeId}/workspaces` : `/${args.routeId}`)
-  );
+function pickRootRedirectPath(
+  args: SavedScreen & { factoriesEnabled: boolean; workspaces?: WorkspaceHomeCandidate[] },
+): string {
+  if (args.factoriesEnabled) {
+    return pickWorkspaceHomePath(args);
+  }
+
+  return resolveResumePath(args) ?? `/${args.routeId}`;
 }
 
 function selectedOrganization(
@@ -89,7 +158,7 @@ function classifyRootRedirect(args: {
   lastLocation: { data?: string | null; isError: boolean };
   listPath?: string;
   factoriesEnabled: boolean;
-  workspaces?: Parameters<typeof incompleteWorkspaceSetupPath>[1];
+  workspaces?: WorkspaceHomeCandidate[];
 }): { kind: "loading" } | { kind: "error" } | { kind: "ready"; path: string } {
   if (args.organizationsLoading || !args.account) return { kind: "loading" };
   if (args.organizationsError) return { kind: "error" };

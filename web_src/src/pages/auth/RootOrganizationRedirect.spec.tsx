@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { LAST_VISITED_FACTORY_STORAGE_KEY } from "../factories/lib/lastVisitedFactory";
 import { RootOrganizationRedirect } from "./RootOrganizationRedirect";
 
 const accountState = vi.hoisted(() => ({ account: { id: "account-1" } as { id: string } | null }));
@@ -28,7 +29,7 @@ const experimentalState = vi.hoisted(() => ({
   isLoading: false,
 }));
 const workspacesState = vi.hoisted(() => ({
-  data: [] as Array<{ key?: string; onboarding?: { completedAt?: string } }>,
+  data: [] as Array<{ id?: string; key?: string; onboarding?: { completedAt?: string } }>,
   isLoading: false,
 }));
 
@@ -56,6 +57,30 @@ function LocationDisplay() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
+
+function expectPath(path: string) {
+  expect(screen.getByTestId("location").textContent).toBe(path);
+}
+
+function rememberLastWorkspace(factoryId: string, organizationRoute = "acme") {
+  window.localStorage.setItem(
+    LAST_VISITED_FACTORY_STORAGE_KEY,
+    JSON.stringify({ "account-1": { [organizationRoute]: factoryId } }),
+  );
+}
+
+const finishedPay = {
+  id: "factory-pay",
+  key: "PAY",
+  onboarding: { completedAt: "2026-09-01T00:00:00.000Z" },
+};
+const finishedShip = {
+  id: "factory-ship",
+  key: "SHIP",
+  onboarding: { completedAt: "2026-09-02T00:00:00.000Z" },
+};
+const unfinishedPay = { id: "factory-pay", key: "PAY", onboarding: {} };
+const unfinishedOther = { id: "factory-other", key: "OTHER", onboarding: {} };
 
 function renderRedirect() {
   return render(
@@ -157,26 +182,191 @@ describe("RootOrganizationRedirect", () => {
     });
   });
 
-  it("sends an incomplete workspace to setup when factories are on", async () => {
+  it("shows an error when organizations fail to load", () => {
+    organizationsState.isError = true;
+
+    renderRedirect();
+
+    expect(
+      screen.getByText("We could not load your organizations. Refresh the page and try again."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("location")).not.toBeInTheDocument();
+  });
+
+  it("opens setup for the only unfinished workspace when factories are on", async () => {
     experimentalState.has = () => true;
-    workspacesState.data = [{ key: "PAY", onboarding: {} }];
+    workspacesState.data = [unfinishedPay];
 
     renderRedirect();
 
     await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent("/acme/workspaces/pay/setup");
+      expectPath("/acme/workspaces/pay/setup");
     });
   });
 
-  it("prefers a saved screen over incomplete workspace setup", async () => {
+  it("opens the last visited workspace and drops the saved task query", async () => {
     experimentalState.has = () => true;
-    lastLocationState.data = "/acme/apps/deploy?run=42";
-    workspacesState.data = [{ key: "PAY", onboarding: {} }];
+    lastLocationState.data = "/acme/workspaces/pay/task/12?tab=notes";
+    workspacesState.data = [finishedPay, finishedShip];
+    rememberLastWorkspace("factory-ship");
 
     renderRedirect();
 
     await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent("/acme/apps/deploy?run=42");
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("opens the workspace from a saved velocity path when no last workspace is stored", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/Pay/velocity?range=30d";
+    workspacesState.data = [finishedPay, finishedShip];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/pay");
+    });
+  });
+
+  it("recovers the workspace key from local storage when the saved screen request fails", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.isError = true;
+    window.localStorage.setItem(
+      "superplane:last-visited-location",
+      JSON.stringify({ "account-1:acme": "/acme/workspaces/ship/velocity" }),
+    );
+    workspacesState.data = [finishedPay, finishedShip];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("skips an unfinished last workspace when another finished workspace exists", async () => {
+    experimentalState.has = () => true;
+    workspacesState.data = [unfinishedPay, finishedShip];
+    rememberLastWorkspace("factory-pay");
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("opens setup for the chosen unfinished workspace, not the first unfinished one", async () => {
+    experimentalState.has = () => true;
+    workspacesState.data = [unfinishedOther, unfinishedPay];
+    rememberLastWorkspace("factory-pay");
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/pay/setup");
+    });
+  });
+
+  it("does not reopen a saved app screen when factories are on", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/apps/deploy?run=42";
+    workspacesState.data = [finishedPay];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/pay");
+    });
+  });
+
+  it("ignores a saved new-workspace path and opens a finished workspace", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/new";
+    workspacesState.data = [finishedShip];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("recovers the workspace key from the organization saved path when the server screen is empty", async () => {
+    experimentalState.has = () => true;
+    organizationsState.data = [
+      {
+        id: "org-uuid-1",
+        slug: "acme",
+        name: "Acme",
+        lastLocationPath: "/acme/workspaces/ship/tasks",
+      },
+    ];
+    workspacesState.data = [finishedPay, finishedShip];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("ignores a deleted last workspace and opens the workspace from the saved screen", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/ship/task/12";
+    workspacesState.data = [finishedPay, finishedShip];
+    rememberLastWorkspace("deleted-factory");
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("skips a deleted workspace path and uses a later saved workspace path", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/gone/tasks";
+    organizationsState.data = [
+      {
+        id: "org-uuid-1",
+        slug: "acme",
+        name: "Acme",
+        lastLocationPath: "/acme/workspaces/ship/velocity",
+      },
+    ];
+    workspacesState.data = [finishedPay, finishedShip];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("opens the first workspace when every saved workspace is gone", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/gone/tasks";
+    workspacesState.data = [finishedPay, finishedShip];
+    rememberLastWorkspace("deleted-factory");
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/pay");
+    });
+  });
+
+  it("opens the workspace list when the organization has no workspace", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/pay/task/4";
+    workspacesState.data = [];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces");
     });
   });
 });
