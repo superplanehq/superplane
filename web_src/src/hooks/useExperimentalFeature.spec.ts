@@ -20,6 +20,7 @@ import {
   type ExperimentalFeaturesRegistry,
 } from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";
+import * as organizationDataModule from "@/hooks/useOrganizationData";
 
 const ORG_ID = "org-1";
 
@@ -84,6 +85,7 @@ describe("useExperimentalFeature", () => {
       "has",
       "isLoading",
       "lookupFailed",
+      "organizationReady",
     ]);
     expect(result.current.has).toEqual(expect.any(Function));
     expect(result.current.enabledExperimentalFeatures).toEqual(expect.any(Array));
@@ -234,6 +236,7 @@ describe("useExperimentalFeature", () => {
     });
 
     expect(result.current.isLoading).toBe(false);
+    expect(result.current.organizationReady).toBe(true);
     expect(result.current.has("alpha")).toBe(true);
   });
 
@@ -295,5 +298,29 @@ describe("useExperimentalFeature", () => {
     });
 
     expect(result.current.enabledExperimentalFeatures).toEqual([]);
+  });
+
+  it("does not mark the organization ready when the organization lookup fails", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      registry: {
+        features: [makeFeature({ id: "factory_jira_intake" })],
+      },
+    });
+    const organizationSpy = vi.spyOn(organizationDataModule, "useOrganization").mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isSuccess: false,
+      isError: true,
+    } as ReturnType<typeof organizationDataModule.useOrganization>);
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.organizationReady).toBe(false);
+    expect(result.current.has("factory_jira_intake")).toBe(false);
+    organizationSpy.mockRestore();
   });
 });

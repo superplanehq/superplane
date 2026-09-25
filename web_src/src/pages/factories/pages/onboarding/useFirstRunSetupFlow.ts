@@ -417,6 +417,16 @@ export function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refre
   }, [screen, refresh]);
 }
 
+export function shouldClearSavedJiraChoice(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  jiraAvailable: boolean;
+  organizationReady: boolean;
+}): boolean {
+  if (args.featureLoading || args.jiraAvailable || args.issuesChoice !== "jira") return false;
+  return args.organizationReady;
+}
+
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
   const blocking = useFirstRunBlockingAction();
@@ -440,14 +450,21 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   );
   useRepositoryErrorToast(model.repositoriesError);
   // A saved Jira choice is not valid when the organization does not have the
-  // Jira intake feature. Clear it once the lookup finishes so setup does not
-  // connect Jira or provision a Jira intake from that stale choice.
+  // Jira intake feature. Clear it only after the organization lookup confirms
+  // the feature is off. A failed lookup has no organization data and must not
+  // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
+  const clearSavedJiraChoice = shouldClearSavedJiraChoice({
+    issuesChoice,
+    featureLoading: jiraFeature.isLoading,
+    jiraAvailable,
+    organizationReady: jiraFeature.organizationReady,
+  });
   useEffect(() => {
-    if (jiraFeature.isLoading || jiraAvailable || issuesChoice !== "jira") return;
+    if (!clearSavedJiraChoice) return;
     setIssuesChoice(null);
-  }, [jiraFeature.isLoading, jiraAvailable, issuesChoice, setIssuesChoice]);
+  }, [clearSavedJiraChoice, setIssuesChoice]);
   // Recheck while a request waits, and also while the picker is open: an
   // install request made on GitHub without a callback (for example when the
   // callback URL was unreachable) only surfaces through this sync.

@@ -1,4 +1,4 @@
-import { render, renderHook, screen } from "@testing-library/react";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -7,17 +7,19 @@ import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
+import { shouldClearSavedJiraChoice } from "./useFirstRunSetupFlow";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
-const feature = vi.hoisted(() => ({ jiraIntake: true }));
+const feature = vi.hoisted(() => ({ jiraIntake: true, organizationReady: true }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (id: string) => id === FEATURE_FACTORY_JIRA_INTAKE && feature.jiraIntake,
     isLoading: false,
+    organizationReady: feature.organizationReady,
   }),
 }));
 
@@ -135,6 +137,7 @@ function renderSetup(model: OnboardingPageModel) {
 describe("FirstRunSetup Jira intake feature", () => {
   beforeEach(() => {
     feature.jiraIntake = true;
+    feature.organizationReady = true;
   });
 
   it("does not show Jira or provision a Jira intake when the feature is off", async () => {
@@ -162,7 +165,65 @@ describe("FirstRunSetup Jira intake feature", () => {
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
-    expect(model.saveIssues).not.toHaveBeenCalledWith("jira");
-    expect(model.finish).not.toHaveBeenCalledWith("jira");
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(model.saveIssues).toHaveBeenCalledTimes(1);
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("keeps a saved Jira choice when the organization lookup fails", async () => {
+    feature.jiraIntake = false;
+    feature.organizationReady = false;
+    const user = userEvent.setup();
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments Service", {
+        simulateDiscovery: false,
+        connected: new Set(["jira"]),
+        initial: { issuesChoice: "jira" },
+      }),
+    );
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      setup: result.current,
+      jiraIntegrationId: "jira-1",
+      jiraProjectId: "PAY",
+      jiraProjects: [{ id: "PAY", name: "Payments" }],
+    });
+
+    renderSetup(model);
+
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(result.current.issuesChoice).toBe("jira");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    expect(result.current.issuesChoice).toBe("jira");
+    expect(model.saveIssues).not.toHaveBeenCalled();
+    expect(model.finish).not.toHaveBeenCalled();
+  });
+});
+
+describe("shouldClearSavedJiraChoice", () => {
+  it("clears a saved Jira choice only after the organization lookup confirms the feature is off", () => {
+    expect(
+      shouldClearSavedJiraChoice({
+        issuesChoice: "jira",
+        featureLoading: false,
+        jiraAvailable: false,
+        organizationReady: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not clear a saved Jira choice when the organization lookup has not succeeded", () => {
+    expect(
+      shouldClearSavedJiraChoice({
+        issuesChoice: "jira",
+        featureLoading: false,
+        jiraAvailable: false,
+        organizationReady: false,
+      }),
+    ).toBe(false);
   });
 });
