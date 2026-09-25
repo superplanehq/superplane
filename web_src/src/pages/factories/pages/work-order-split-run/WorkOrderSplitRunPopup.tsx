@@ -9,6 +9,8 @@ import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from 
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
+import { PlanningHeaderSpendCollector } from "./PlanningHeaderSpendCollector";
+import { planningHeaderSpendActive } from "./planningHeaderSpend";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
@@ -207,6 +209,7 @@ function AnalysisWorkOrderPopup({
             mutations,
             footerBusy: footerActions.busy,
             reviewActions,
+            planningSpend: planningHeaderSpendActive(fixture.footer.kind, analysis.view) ? analysis.view : undefined,
           })}
         />
         {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
@@ -248,6 +251,7 @@ function analysisPopupHeader(args: {
   mutations: ReturnType<typeof footerMutationHandlers>;
   footerBusy: boolean;
   reviewActions: ReactNode;
+  planningSpend?: ReturnType<typeof useAnalysisPlanningSession>["view"];
 }) {
   return (views: ReactNode) => (
     <PopupHeader
@@ -268,6 +272,9 @@ function analysisPopupHeader(args: {
       }
       accessory={views}
     >
+      {args.planningSpend ? (
+        <PlanningHeaderSpendCollector organizationId={args.organizationId} view={args.planningSpend} />
+      ) : null}
       <LiveOwnerTimeCostRow
         fixture={{ ...args.fixture, owner: args.edits.owner }}
         assigneeIds={args.edits.assigneeIds}
