@@ -73,6 +73,7 @@ function TablePanelDataBound({ content, canvasId }: { content: TablePanelContent
       render={content.render}
       rows={rows}
       isLoading={isLoading}
+      dataSourceKind={content.dataSource.kind}
       hasMore={hasMore}
       isFetchingMore={isFetchingMore}
       onLoadMore={loadMore}

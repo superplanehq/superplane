@@ -1,18 +1,22 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 
 import { Avatar } from "@/components/Avatar/avatar";
 import { Timestamp, type TimestampDisplay } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { applyRunInspectionNavigationSearchParams } from "@/pages/app/viewState";
 
 import { ConsoleBadge } from "../ConsoleBadge";
+import { useConsoleContext } from "../ConsoleContext";
 import { resolveConsoleAvatar } from "../consoleAvatar";
 import { CONSOLE_CODE_BADGE_CLASSES } from "../consoleCodeStyles";
 import { CONSOLE_LINK_CLASSES } from "../consoleLinkStyles";
 import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
 import { resolveHref } from "./resolveHref";
-import type { WidgetTableRender } from "./types";
+import { isRunIdColumn } from "./runLink";
+import type { WidgetDataSourceKind, WidgetTableRender } from "./types";
 import { columnSupportsShowTrend } from "./types";
 import { coerceWidgetTimestamp, computeProgress, formatPercentageDisplay, formatValue } from "./widgetFormat";
 import { computeTrend, formatTrendLabel, formatTrendTooltip, type TrendResult } from "./widgetTrend";
@@ -37,9 +41,11 @@ export interface WidgetTableCellProps {
    * those via `nextRow` instead.
    */
   hasMoreBelow?: boolean;
+  /** Data source behind `row`; lets run-id cells link to the run inspector. */
+  dataSourceKind?: WidgetDataSourceKind;
 }
 
-export function WidgetTableCell({ col, row, nextRow, hasMoreBelow }: WidgetTableCellProps) {
+export function WidgetTableCell({ col, row, nextRow, hasMoreBelow, dataSourceKind }: WidgetTableCellProps) {
   const visible = evaluateRowShow(col.show, row);
   if (!visible) return <EmptyCell />;
 
@@ -71,9 +77,34 @@ export function WidgetTableCell({ col, row, nextRow, hasMoreBelow }: WidgetTable
     case "progress":
       return <ProgressCell col={col} row={row} value={value} />;
     default:
-      if (col.href) return <LinkCell col={col} row={row} value={value} label={formatted} />;
-      return <TextCell label={formatted} />;
+      return <PlainCell col={col} row={row} value={value} label={formatted} dataSourceKind={dataSourceKind} />;
   }
+}
+
+/** Cells with no format of their own: plain text unless the column links. */
+function PlainCell({
+  col,
+  row,
+  value,
+  label,
+  dataSourceKind,
+}: {
+  col: WidgetTableColumn;
+  row: Record<string, unknown>;
+  value: unknown;
+  label: string;
+  dataSourceKind?: WidgetDataSourceKind;
+}) {
+  // Gated on the host offering run selection, like row actions are on
+  // `onTriggerNode`: the canvas withdraws run inspection during an edit
+  // session, so the id stays plain text rather than linking nowhere.
+  const onSelectRun = useConsoleContext()?.onSelectRun;
+
+  if (col.href) return <LinkCell col={col} row={row} value={value} label={label} />;
+  if (onSelectRun && label && isRunIdColumn(col, dataSourceKind)) {
+    return <RunLinkCell runId={String(value)} label={label} onSelectRun={onSelectRun} />;
+  }
+  return <TextCell label={label} />;
 }
 
 function EmptyCell() {
@@ -161,6 +192,44 @@ function LinkCell({
       <a href={href} target="_blank" rel="noopener noreferrer" className={CONSOLE_LINK_CLASSES}>
         {label || href}
       </a>
+    </td>
+  );
+}
+
+/**
+ * Run id linked to that run's detail view. The console shares the canvas route,
+ * so the target is just search params — `run=<id>` set, the non-canvas `view`
+ * dropped. A plain click defers to the host's `onSelectRun` (the runs sidebar's
+ * own callback) because the canvas has state to reset first; modified clicks
+ * fall through to the href so new-tab still works.
+ */
+function RunLinkCell({
+  runId,
+  label,
+  onSelectRun,
+}: {
+  runId: string;
+  label: string;
+  onSelectRun: (runId: string) => void;
+}) {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const search = applyRunInspectionNavigationSearchParams(searchParams, { runId }).toString();
+
+  return (
+    <td className="px-3 py-1.5">
+      <Link
+        to={{ pathname: location.pathname, search: `?${search}` }}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+          onSelectRun(runId);
+        }}
+        className={CONSOLE_LINK_CLASSES}
+        data-testid="widget-table-run-link"
+      >
+        {label}
+      </Link>
     </td>
   );
 }

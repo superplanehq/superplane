@@ -55,6 +55,12 @@ export interface ConsoleContextValue {
    * the corresponding canvas node into view). Falls back to navigation.
    */
   onOpenNode?: (nodeId: string) => void;
+  /**
+   * Open a run in the canvas run inspector, reusing the runs sidebar's own
+   * transition. Undefined when the canvas can't inspect runs (e.g. mid-edit),
+   * which keeps run ids as plain text.
+   */
+  onSelectRun?: (runId: string) => void;
 }
 
 export const ConsoleContext = createContext<ConsoleContextValue | undefined>(undefined);
