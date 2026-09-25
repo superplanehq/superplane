@@ -19,8 +19,18 @@ func DeleteCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	if err := models.DiscardStagedFilesForUser(db, canvas.ID, uuid.MustParse(userID), paths); err != nil {
-		return nil, grpcerrors.Internal(err, "failed to discard staging")
+	userUUID := uuid.MustParse(userID)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockStagedFilesForUser(tx, canvas.ID, userUUID); err != nil {
+			return grpcerrors.Internal(err, "failed to discard staging")
+		}
+		if err := models.DiscardStagedFilesForUser(tx, canvas.ID, userUUID, paths); err != nil {
+			return grpcerrors.Internal(err, "failed to discard staging")
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	if err := messages.NewCanvasStagingMessage(canvas.ID.String(), userID).Publish(); err != nil {

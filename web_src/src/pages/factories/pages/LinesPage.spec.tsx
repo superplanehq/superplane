@@ -264,6 +264,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
+const canvasStagingRefetch = vi.hoisted(() => vi.fn());
+const discardCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useCanvasData", () => {
   const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
@@ -271,8 +273,14 @@ vi.mock("@/hooks/useCanvasData", () => {
     ...actual,
     useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>
       useCanvasMock(organizationId, canvasId, options),
+    useCanvasStaging: () => ({
+      data: { hasStaging: false, stale: false },
+      isPending: false,
+      refetch: canvasStagingRefetch,
+    }),
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
+    useDiscardCanvasStaging: () => ({ mutateAsync: discardCanvasStagingMutateAsync, isPending: false }),
   };
 });
 
@@ -318,6 +326,8 @@ async function resetLinesBoardMocks() {
   });
   updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
   commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+  canvasStagingRefetch.mockReset().mockResolvedValue({ data: { hasStaging: false, stale: false } });
+  discardCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
 }
 
 describe("LinesPage board", () => {
