@@ -83,7 +83,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
   });
 
-  it("shows Jira as coming soon and keeps GitHub Issues and Linear when Jira is unavailable", () => {
+  it("hides Jira and keeps GitHub Issues and Linear when Jira is unavailable", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource={null}
@@ -93,11 +93,11 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
+    expect(screen.getByText("Coming soon")).toBeInTheDocument();
   });
 
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {
