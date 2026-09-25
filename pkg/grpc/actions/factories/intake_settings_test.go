@@ -181,6 +181,15 @@ func Test__intakeSettingsChangeTrigger(t *testing.T) {
 
 		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceGitHubIssues, current, current))
 	})
+
+	t.Run("sees a Productive task list filter turn on", func(t *testing.T) {
+		current := defaultProductiveIntakeSettings()
+		updated := current
+		updated.TaskListIDs = []string{"list-bugs"}
+
+		assert.True(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceProductiveTasks, current, updated))
+		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceProductiveTasks, updated, updated))
+	})
 }
 
 func Test__intakeFilterExpressionFor_SuperplaneLabelAdded(t *testing.T) {
@@ -764,5 +773,55 @@ func Test__applyIntakeSettingsToGraph_Productive(t *testing.T) {
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
 			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
 		}, edges)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("listens for updates when a task list is selected", func(t *testing.T) {
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceProductiveTasks,
+			legacyGraph,
+			models.LiveCanvasSpec{Nodes: legacyNodes(), Edges: legacyEdges},
+			&pb.FactoryIntake_Settings{TaskListIds: []string{"list-bugs"}},
+			legacyNodes(),
+			append([]models.Edge{}, legacyEdges...),
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("stops listening for updates when the task list filter is cleared", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"actions": []any{"created", "updated"}},
+			},
+			{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": `(root().data.data.relationships.task_list.data.id ?? "") in ["list-bugs"]`},
+			},
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		graph := intakeGraph{
+			TriggerNodeID: intakeTriggerNodeID,
+			FilterNodeID:  intakeFilterNodeID,
+			CreateNodeID:  intakeCreateNodeID,
+		}
+
+		updated, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceProductiveTasks,
+			graph,
+			models.LiveCanvasSpec{Nodes: nodes},
+			&pb.FactoryIntake_Settings{TaskListIds: []string{}},
+			append([]models.Node{}, nodes...),
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, updated, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
 	})
 }
