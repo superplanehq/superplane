@@ -110,14 +110,14 @@ func (p *Productive) Sync(ctx core.SyncContext) error {
 	}
 
 	if err := deleteRetainedProbeWebhook(client, ctx.Integration); err != nil {
-		return err
+		return fmt.Errorf("%w. The next sync will try again", err)
 	}
 
 	if err := client.ValidateWebhookPermission(); err != nil {
 		var cleanupErr *probeWebhookCleanupError
 		if errors.As(err, &cleanupErr) {
 			retainProbeWebhook(ctx.Integration, cleanupErr.webhookID)
-			return fmt.Errorf("SuperPlane could not delete webhook %s from the permission check. The next sync will delete it before it creates another webhook: %w", cleanupErr.webhookID, cleanupErr.err)
+			return fmt.Errorf("SuperPlane could not delete webhook %s from the permission check. SuperPlane will try to delete that webhook again: %w", cleanupErr.webhookID, cleanupErr.err)
 		}
 		if errors.Is(err, ErrMissingWritePermission) {
 			return ErrMissingWritePermission
@@ -135,20 +135,24 @@ func (p *Productive) Sync(ctx core.SyncContext) error {
 const probeWebhookMetadataKey = "probeWebhookId"
 
 func deleteRetainedProbeWebhook(client *Client, integration core.IntegrationContext) error {
-	metadata := integrationMetadata(integration)
-	webhookID, _ := metadata[probeWebhookMetadataKey].(string)
-	webhookID = strings.TrimSpace(webhookID)
+	webhookID := retainedProbeWebhookID(integration)
 	if webhookID == "" {
 		return nil
 	}
 
 	if err := client.DeleteWebhook(webhookID); err != nil && !IsNotFoundError(err) {
-		return fmt.Errorf("SuperPlane could not delete webhook %s from the previous permission check. The next sync will try again: %w", webhookID, err)
+		return fmt.Errorf("could not delete webhook %s from the previous permission check: %w", webhookID, err)
 	}
 
+	metadata := integrationMetadata(integration)
 	delete(metadata, probeWebhookMetadataKey)
 	integration.SetMetadata(metadata)
 	return nil
+}
+
+func retainedProbeWebhookID(integration core.IntegrationContext) string {
+	webhookID, _ := integrationMetadata(integration)[probeWebhookMetadataKey].(string)
+	return strings.TrimSpace(webhookID)
 }
 
 func retainProbeWebhook(integration core.IntegrationContext, webhookID string) {
@@ -170,7 +174,16 @@ func webhooksUnavailableError(err error) error {
 }
 
 func (p *Productive) Cleanup(ctx core.IntegrationCleanupContext) error {
-	return nil
+	if retainedProbeWebhookID(ctx.Integration) == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %w", err)
+	}
+
+	return deleteRetainedProbeWebhook(client, ctx.Integration)
 }
 
 func (p *Productive) Hooks() []core.Hook {

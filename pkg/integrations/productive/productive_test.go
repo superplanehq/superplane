@@ -414,6 +414,86 @@ func Test__Productive__ListResources(t *testing.T) {
 	})
 }
 
+func Test__Productive__Cleanup(t *testing.T) {
+	p := &Productive{}
+
+	t.Run("deletes a retained probe webhook", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{jsonResponse(`{}`)},
+		}
+		appCtx := authorizedIntegration()
+		appCtx.Metadata = map[string]any{probeWebhookMetadataKey: "probe-1", "other": "kept"}
+
+		err := p.Cleanup(core.IntegrationCleanupContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, probeWebhookID(appCtx))
+		assert.Equal(t, "kept", appCtx.Metadata.(map[string]any)["other"])
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/webhooks/probe-1")
+	})
+
+	t.Run("no retained webhook is a no-op", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		appCtx := authorizedIntegration()
+
+		err := p.Cleanup(core.IntegrationCleanupContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("delete failure keeps the webhook id", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Server Error"}]}`)),
+				},
+			},
+		}
+		appCtx := authorizedIntegration()
+		appCtx.Metadata = map[string]any{probeWebhookMetadataKey: "probe-1"}
+
+		err := p.Cleanup(core.IntegrationCleanupContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "probe-1")
+		assert.Equal(t, "probe-1", probeWebhookID(appCtx))
+	})
+
+	t.Run("missing webhook is already removed", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Not Found"}]}`)),
+				},
+			},
+		}
+		appCtx := authorizedIntegration()
+		appCtx.Metadata = map[string]any{probeWebhookMetadataKey: "probe-1"}
+
+		err := p.Cleanup(core.IntegrationCleanupContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, probeWebhookID(appCtx))
+	})
+}
+
 func Test__Productive__Instructions(t *testing.T) {
 	p := &Productive{}
 
