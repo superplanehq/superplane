@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,20 +65,16 @@ func taskWebhookBodyWithList(id, projectID, title, listID, created string) []byt
 
 // updatedTaskDelivery is a task.updated body whose title edit matches
 // updatedTaskActivity. Signature tests use it so routing still emits.
-func updatedTaskDelivery(id, projectID, title string) []byte {
-	return taskWebhookBodyWithList(id, projectID, title, "20", "2026-09-25T16:00:00Z")
+func updatedTaskDelivery(id, projectID, title string, created time.Time) []byte {
+	return taskWebhookBodyWithList(id, projectID, title, "20", created.Format(time.RFC3339Nano))
 }
 
-func updatedTaskActivity() *http.Response {
-	return jsonResponse(`{"data":[{
-		"id":"1",
-		"type":"activities",
-		"attributes":{
-			"event":"update",
-			"created_at":"2026-09-25T16:00:00Z",
-			"changeset":{"title":["Previous title","Fix payment retries"]}
-		}
-	}]}`)
+func updatedTaskActivity(created time.Time) *http.Response {
+	return activitiesResponse([]activityRecord{{
+		id:        "1",
+		at:        created,
+		changeset: map[string]any{"title": []any{"Previous title", "Fix payment retries"}},
+	}})
 }
 
 // taskWebhookBody builds the envelope Productive.io posts for a task webhook.
@@ -317,7 +314,8 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("labeled signature tokens identify task.updated without an event header", func(t *testing.T) {
-		body := updatedTaskDelivery("91", "1", "Fix payment retries")
+		created := testClock()
+		body := updatedTaskDelivery("91", "1", "Fix payment retries", created)
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
@@ -329,7 +327,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 				Secret: TaskCreatedEvent + "=created-token\n" + TaskUpdatedEvent + "=updated-token",
 			},
 			Events:      events,
-			HTTP:        &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity()}},
+			HTTP:        &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity(created)}},
 			Integration: integrationWithProject(),
 		})
 
@@ -344,7 +342,8 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("one legacy token with an updated query emits an update", func(t *testing.T) {
-		body := updatedTaskDelivery("91", "1", "Fix payment retries")
+		created := testClock()
+		body := updatedTaskDelivery("91", "1", "Fix payment retries", created)
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
@@ -355,7 +354,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "shared-token"},
 			Events:        events,
-			HTTP:          &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity()}},
+			HTTP:          &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity(created)}},
 			Integration:   integrationWithProject(),
 		})
 
@@ -387,7 +386,8 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("shared signature token uses the event query", func(t *testing.T) {
-		body := updatedTaskDelivery("91", "1", "Fix payment retries")
+		created := testClock()
+		body := updatedTaskDelivery("91", "1", "Fix payment retries", created)
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
@@ -400,7 +400,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 				Secret: TaskCreatedEvent + "=shared-token\n" + TaskUpdatedEvent + "=shared-token",
 			},
 			Events:      events,
-			HTTP:        &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity()}},
+			HTTP:        &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity(created)}},
 			Integration: integrationWithProject(),
 		})
 
@@ -526,30 +526,15 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("task update uses the activity for this delivery, not a later edit", func(t *testing.T) {
-		const deliveredAt = "2026-09-25T16:00:00Z"
-		activities := jsonResponse(`{"data":[
-			{
-				"id":"2",
-				"type":"activities",
-				"attributes":{
-					"event":"update",
-					"created_at":"2026-09-25T16:00:30Z",
-					"changeset":{"title":["Fix payment retries","Renamed"]}
-				}
-			},
-			{
-				"id":"1",
-				"type":"activities",
-				"attributes":{
-					"event":"update",
-					"created_at":"2026-09-25T16:00:00Z",
-					"changeset":{"task_list_id":[10,20]}
-				}
-			}
-		]}`)
-		moveBody := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", deliveredAt)
+		delivered := testClock()
+		later := delivered.Add(30 * time.Second)
+		activities := []activityRecord{
+			{id: "2", at: later, changeset: map[string]any{"title": []any{"Fix payment retries", "Renamed"}}},
+			{id: "1", at: delivered, changeset: map[string]any{"task_list_id": []any{float64(10), float64(20)}}},
+		}
+		moveBody := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", delivered.Format(time.RFC3339Nano))
 		events := &contexts.EventContext{}
-		httpContext := &contexts.HTTPContext{Responses: []*http.Response{activities}}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{activitiesResponse(activities)}}
 
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", moveBody)),
@@ -570,30 +555,9 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{"from": "10", "to": "20"}, meta["task_list_move"])
 
-		editBody := taskWebhookBodyWithList("91", "1", "Renamed", "20", "2026-09-25T16:00:30Z")
+		editBody := taskWebhookBodyWithList("91", "1", "Renamed", "20", later.Format(time.RFC3339Nano))
 		editEvents := &contexts.EventContext{}
-		editHTTP := &contexts.HTTPContext{Responses: []*http.Response{
-			jsonResponse(`{"data":[
-				{
-					"id":"2",
-					"type":"activities",
-					"attributes":{
-						"event":"update",
-						"created_at":"2026-09-25T16:00:30Z",
-						"changeset":{"title":["Fix payment retries","Renamed"]}
-					}
-				},
-				{
-					"id":"1",
-					"type":"activities",
-					"attributes":{
-						"event":"update",
-						"created_at":"2026-09-25T16:00:00Z",
-						"changeset":{"task_list_id":[10,20]}
-					}
-				}
-			]}`),
-		}}
+		editHTTP := &contexts.HTTPContext{Responses: []*http.Response{activitiesResponse(activities)}}
 		code, _, err = trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", editBody)),
 			Configuration: map[string]any{"project": "1", "actions": []string{ActionUpdated}},
@@ -615,7 +579,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("task update is retried when the activity lookup fails", func(t *testing.T) {
-		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", "2026-09-25T16:00:00Z")
+		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", testClock().Format(time.RFC3339Nano))
 		events := &contexts.EventContext{}
 		unavailable := &http.Response{
 			StatusCode: http.StatusServiceUnavailable,
@@ -642,18 +606,15 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("task update is retried when only a later activity is available", func(t *testing.T) {
-		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", "2026-09-25T16:00:00Z")
+		delivered := testClock()
+		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", delivered.Format(time.RFC3339Nano))
 		events := &contexts.EventContext{}
 		laterActivity := func() *http.Response {
-			return jsonResponse(`{"data":[{
-				"id":"9",
-				"type":"activities",
-				"attributes":{
-					"event":"update",
-					"created_at":"2026-09-25T16:10:00Z",
-					"changeset":{"task_list_id":[20,30]}
-				}
-			}]}`)
+			return activitiesResponse([]activityRecord{{
+				id:        "9",
+				at:        delivered.Add(10 * time.Minute),
+				changeset: map[string]any{"task_list_id": []any{float64(20), float64(30)}},
+			}})
 		}
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{laterActivity(), laterActivity(), laterActivity()}}
 

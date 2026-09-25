@@ -18,10 +18,19 @@ type TaskListMove struct {
 	To   string
 }
 
-// taskActivityMatchWindow is how far an activity may sit from the webhook
-// timestamp and still belong to that delivery. A later edit must not replace
-// the change this delivery reported.
-const taskActivityMatchWindow = 2 * time.Minute
+const (
+	// taskActivityMatchWindow is how far an activity may sit from the webhook
+	// timestamp and still belong to that delivery. A later edit must not replace
+	// the change this delivery reported.
+	taskActivityMatchWindow = 2 * time.Minute
+
+	// taskActivityPageSize is how many activities each page requests.
+	taskActivityPageSize = 20
+
+	// maxTaskActivityPages bounds how many pages the lookup walks, so a
+	// misbehaving pagination cursor cannot loop forever.
+	maxTaskActivityPages = 20
+)
 
 // errTaskUpdateActivityUnavailable means this delivery's changeset is not
 // available yet. The webhook handler returns an error so Productive.io retries.
@@ -42,6 +51,30 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 		return nil, false, nil
 	}
 
+	activities := []taskActivity{}
+	for page := 1; page <= maxTaskActivityPages; page++ {
+		body, err := c.execRequest(http.MethodGet, c.taskActivityURL(taskID, deliveredAt, page), nil)
+		if err != nil {
+			return nil, false, err
+		}
+
+		response := resourceListResponse{}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, false, fmt.Errorf("error parsing task activities: %v", err)
+		}
+
+		pageActivities := taskActivitiesFromDocuments(response.Data)
+		activities = append(activities, pageActivities...)
+		if len(response.Data) < taskActivityPageSize || activityPageBeforeWindow(pageActivities, deliveredAt) {
+			break
+		}
+	}
+
+	changeset, ok := activityForDelivery(activities, deliveredAt, document)
+	return changeset, ok, nil
+}
+
+func (c *Client) taskActivityURL(taskID string, deliveredAt time.Time, page int) string {
 	params := url.Values{}
 	params.Set("filter[task_id]", taskID)
 	params.Set("filter[event]", "update")
@@ -50,29 +83,37 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 	params.Set("filter[after]", deliveredAt.Add(-taskActivityMatchWindow).Format(time.RFC3339Nano))
 	params.Set("filter[before]", deliveredAt.Add(taskActivityMatchWindow).Format(time.RFC3339Nano))
 	params.Set("sort", "-created_at")
-	params.Set("page[size]", "20")
+	params.Set("page[number]", strconv.Itoa(page))
+	params.Set("page[size]", strconv.Itoa(taskActivityPageSize))
+	return fmt.Sprintf("%s/activities?%s", c.BaseURL, params.Encode())
+}
 
-	body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/activities?%s", c.BaseURL, params.Encode()), nil)
-	if err != nil {
-		return nil, false, err
-	}
-
-	response := resourceListResponse{}
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, false, fmt.Errorf("error parsing task activities: %v", err)
-	}
-
-	activities := make([]taskActivity, 0, len(response.Data))
-	for _, activity := range response.Data {
+func taskActivitiesFromDocuments(documents []resourceDocument) []taskActivity {
+	activities := make([]taskActivity, 0, len(documents))
+	for _, activity := range documents {
 		at, ok := parseActivityTime(stringAttribute(activity.Attributes["created_at"]))
 		if !ok {
 			continue
 		}
 		activities = append(activities, taskActivity{at: at, changeset: activity.Attributes["changeset"]})
 	}
+	return activities
+}
 
-	changeset, ok := activityForDelivery(activities, deliveredAt, document)
-	return changeset, ok, nil
+// activityPageBeforeWindow reports that this page is older than the match
+// window. Later pages are older because the query sorts newest first.
+func activityPageBeforeWindow(activities []taskActivity, deliveredAt time.Time) bool {
+	if len(activities) == 0 {
+		return false
+	}
+
+	newest := activities[0].at
+	for _, activity := range activities[1:] {
+		if activity.at.After(newest) {
+			newest = activity.at
+		}
+	}
+	return newest.Before(deliveredAt.Add(-taskActivityMatchWindow))
 }
 
 func activityForDelivery(activities []taskActivity, deliveredAt time.Time, document map[string]any) (any, bool) {
