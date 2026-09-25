@@ -228,6 +228,39 @@ func TestSyncHostedAppRetriesDiscoveryWithoutOpeningInstallPage(t *testing.T) {
 	assert.NotEmpty(t, metadata.InstallationsRefreshedAt)
 }
 
+func TestSyncHostedAppRecordsRequestBaselineBeforeOpeningGitHub(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return nil, nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return []common.InstallRequest{{ID: "existing-request"}}, nil
+	}
+	integration := &contexts.IntegrationContext{State: "pending"}
+
+	err := (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		ActorUserID:    "user-1",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	})
+
+	require.NoError(t, err)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Equal(t, []string{"existing-request"}, metadata.ObservedInstallRequestIDs)
+	assert.True(t, metadata.InstallRequestBaselineCaptured)
+	require.NotNil(t, integration.BrowserAction)
+}
+
 func TestBindHostedInstallationRepositoriesScopesConnection(t *testing.T) {
 	integration := &contexts.IntegrationContext{State: "pending"}
 	ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/bind", nil)

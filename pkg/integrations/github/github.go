@@ -224,18 +224,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
 		discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &existing)
-		// A member can request an installation without the request callback
-		// reaching this server, so a known GitHub login is enough to ask
-		// GitHub for that member's open install requests.
-		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
-			// Reconciliation records requests found on GitHub and clears a
-			// request only after repository discovery verifies access;
-			// refreshHostedPendingAction below persists both results.
-			if err := g.reconcileInstallRequests(ctx, app, &existing); err != nil {
-				// The connection stays pending; the next sync retries.
-				ctx.Logger.Errorf("failed to reconcile GitHub App install requests: %v", err)
-			}
-		}
+		g.refreshHostedInstallRequests(ctx, app, &existing)
 		if discoveryErr != nil {
 			g.clearHostedPendingAction(ctx, existing)
 			return discoveryErr
@@ -265,12 +254,34 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 		},
 	}
 	discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &metadata)
+	g.refreshHostedInstallRequests(ctx, app, &metadata)
 	if discoveryErr != nil {
 		g.clearHostedPendingAction(ctx, metadata)
 		return discoveryErr
 	}
 	g.refreshHostedPendingAction(ctx, app, metadata)
 	return nil
+}
+
+func (g *GitHub) refreshHostedInstallRequests(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	metadata *common.Metadata,
+) {
+	// A member can request an installation without the request callback
+	// reaching this server, so a known GitHub login is enough to ask GitHub for
+	// that member's open install requests. The first call also records the local
+	// development baseline before the browser opens GitHub.
+	if !metadata.HasInstallRequests() && strings.TrimSpace(metadata.StartedByGitHubLogin) == "" {
+		return
+	}
+
+	if err := g.reconcileInstallRequests(ctx, app, metadata); err != nil {
+		// The connection stays pending; the next sync retries.
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to reconcile GitHub App install requests: %v", err)
+		}
+	}
 }
 
 func (g *GitHub) refreshHostedAccessibleInstallations(
