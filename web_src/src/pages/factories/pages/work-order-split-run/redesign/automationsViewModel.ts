@@ -4,7 +4,13 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
-import { groupClaudeSteps, groupSplitRunStream, toolCallSummary, type ClaudeStepGroup } from "../phaseLogStream";
+import {
+  groupClaudeSteps,
+  groupSplitRunStream,
+  toolCallSummary,
+  type ClaudeStepGroup,
+  type StreamNodeGroup,
+} from "../phaseLogStream";
 import {
   splitRunStatusLabel,
   type SplitRunFixture,
@@ -46,16 +52,22 @@ export type AgentStepEvent =
   | { kind: "note"; id: string; text: string }
   | { kind: "tools"; id: string; label: string; tools: AgentToolRow[] };
 
+/**
+ * One row in a run's step list. `prompt` and `bash` come from the agent
+ * transcript. `node` is a canvas node without a transcript, such as a
+ * trigger or a wait-for-checks action.
+ */
 export interface AgentStep {
   id: string;
   title: string;
-  type: "prompt" | "bash";
+  type: "prompt" | "bash" | "node";
   status: SplitRunPhaseStatus;
   duration?: string;
   summary: string;
   toolCount: number;
   output?: string;
   events: AgentStepEvent[];
+  iconSlug?: string;
 }
 
 export interface PlumbingNode {
@@ -79,6 +91,8 @@ export interface AutomationStage {
   name: string;
   description?: string;
   componentName: string;
+  /** Automation that ran. Empty for rows no automation made, such as task creation. */
+  appId?: string;
   status: SplitRunPhaseStatus;
   statusLabel: string;
   startedAt?: string;
@@ -89,7 +103,13 @@ export interface AutomationStage {
   checks: WorkOrderCheckPresentation[];
   outputs: StageOutputs;
   plumbing: PlumbingNode[];
+  /** Agent transcript steps only. Empty for plumbing-only runs. */
   agentSteps: AgentStep[];
+  /**
+   * Every step of the run in order: canvas nodes as `node` steps, with the
+   * agent node replaced by its transcript steps.
+   */
+  steps: AgentStep[];
   rawLog: string;
   pullRequestActivity?: SplitRunPhase["pullRequestActivity"];
 }
@@ -145,6 +165,7 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
   const nodes = groupSplitRunStream(phase.stream);
   const agentNotes = phase.stream.filter((line) => line.note);
   const agentSteps = groupClaudeSteps(agentNotes).map(agentStepFromGroup);
+  const plumbing = nodes.map(plumbingNodeFromGroup);
   const cost = parseWorkOrderMetric(phase.costCents);
   const tokens = parseWorkOrderMetric(phase.totalTokens);
   return {
@@ -152,6 +173,7 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
     name: phase.name,
     description: phase.description,
     componentName: phase.componentName,
+    appId: phase.appId,
     status: phase.status,
     statusLabel: splitRunStatusLabel(phase.status),
     startedAt: phase.startedAt,
@@ -164,19 +186,49 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
       pullRequests: uniquePullRequests(nodes.map((node) => node.pullRequest)),
       artifacts: uniqueArtifacts([...phase.artifacts, ...nodes.map((node) => node.artifact)]),
     },
-    plumbing: nodes.map(({ line }) => ({
-      id: line.id,
-      at: line.at,
-      name: line.componentName,
-      componentType: line.componentType ?? "",
-      kind: line.kind === "trigger" ? "trigger" : "action",
-      status: line.status,
-      duration: line.duration,
-      iconSlug: line.iconSlug,
-    })),
+    plumbing,
     agentSteps,
+    steps: runSteps(nodes),
     rawLog: rawLogFromSteps(agentSteps),
     pullRequestActivity: phase.pullRequestActivity,
+  };
+}
+
+function plumbingNodeFromGroup({ line }: StreamNodeGroup): PlumbingNode {
+  return {
+    id: line.id,
+    at: line.at,
+    name: line.componentName,
+    componentType: line.componentType ?? "",
+    kind: line.kind === "trigger" ? "trigger" : "action",
+    status: line.status,
+    duration: line.duration,
+    iconSlug: line.iconSlug,
+  };
+}
+
+/**
+ * Flattens a run into one step list. A node with a transcript contributes
+ * its transcript steps in its place. Any other node is one `node` step.
+ */
+function runSteps(nodes: StreamNodeGroup[]): AgentStep[] {
+  return nodes.flatMap((node) => {
+    const transcript = groupClaudeSteps(node.notes).map(agentStepFromGroup);
+    return transcript.length > 0 ? transcript : [nodeStep(node)];
+  });
+}
+
+function nodeStep({ line }: StreamNodeGroup): AgentStep {
+  return {
+    id: line.id,
+    title: line.componentName,
+    type: "node",
+    status: line.status,
+    duration: line.duration,
+    summary: "",
+    toolCount: 0,
+    events: [],
+    iconSlug: line.iconSlug,
   };
 }
 

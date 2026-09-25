@@ -75,8 +75,10 @@ function streamLine(input: {
   component?: string;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
+  /** Defaults to `passed`. */
+  status?: SplitRunPhaseStatus;
 }): SplitRunStreamLine {
-  const status: SplitRunPhaseStatus = "passed";
+  const status: SplitRunPhaseStatus = input.status ?? "passed";
   const trigger = input.componentType.startsWith("On ");
   return {
     id: input.id,
@@ -133,21 +135,22 @@ export function super503AnalysisStream(plan: FactoriesWorkOrderArtifact): SplitR
   ];
 }
 
+const IMPLEMENT_AGENT_NODE_ID = "implementation-agent-no-issue";
+
+/**
+ * Real log cut inside the "Implementation" step, right after the agent
+ * wrote `DictateButton.tsx`. Feeds the running fixture.
+ */
+const IMPLEMENT_RUNNING_LOG_LINES = 530;
+
 export function super503ImplementStream(
   branch: FactoriesWorkOrderArtifact,
   pullRequest: FactoriesFactoryPullRequest,
 ): SplitRunStreamLine[] {
-  const agentNodeId = "implementation-agent-no-issue";
   return [
+    implementTrigger(),
     streamLine({
-      id: "onrun-implement",
-      at: "11:37:08",
-      componentType: "On Run",
-      componentName: "Start Implementation",
-      iconSlug: "play",
-    }),
-    streamLine({
-      id: agentNodeId,
+      id: IMPLEMENT_AGENT_NODE_ID,
       at: "11:37:09",
       componentType: AGENT_COMPONENT_TYPE,
       componentName: "Implementation Agent",
@@ -155,7 +158,60 @@ export function super503ImplementStream(
       duration: "19m 44s",
       component: AGENT_COMPONENT,
     }),
-    ...claudeLogToStreamNotes(agentNodeId, implementLog, IMPLEMENT_STEPS),
+    ...claudeLogToStreamNotes(IMPLEMENT_AGENT_NODE_ID, implementLog, IMPLEMENT_STEPS),
+    ...implementOutputNodes({ branch, pullRequest }),
+  ];
+}
+
+/**
+ * The same Implement run about eight minutes in. The agent is still in
+ * its "Implementation" step. The stream ends there: the canvas branches
+ * after the agent, so no later node is known until it runs.
+ */
+export function super503ImplementRunningStream(): SplitRunStreamLine[] {
+  const partialLog = implementLog.split(/\r?\n/).slice(0, IMPLEMENT_RUNNING_LOG_LINES).join("\n");
+  const notes = claudeLogToStreamNotes(IMPLEMENT_AGENT_NODE_ID, partialLog, IMPLEMENT_STEPS);
+  return [
+    implementTrigger(),
+    streamLine({
+      id: IMPLEMENT_AGENT_NODE_ID,
+      at: "11:37:09",
+      componentType: AGENT_COMPONENT_TYPE,
+      componentName: "Implementation Agent",
+      iconSlug: "code",
+      duration: "8m 12s",
+      component: AGENT_COMPONENT,
+      status: "running",
+    }),
+    ...markLastStepRunning(notes),
+  ];
+}
+
+function implementTrigger(): SplitRunStreamLine {
+  return streamLine({
+    id: "onrun-implement",
+    at: "11:37:08",
+    componentType: "On Run",
+    componentName: "Start Implementation",
+    iconSlug: "play",
+  });
+}
+
+/** The last top-level step in a cut log is still running and has no duration yet. */
+function markLastStepRunning(notes: SplitRunStreamLine[]): SplitRunStreamLine[] {
+  const last = notes.filter((note) => !note.noteParentId).at(-1);
+  if (!last) {
+    return notes;
+  }
+  return notes.map((note) => (note === last ? { ...note, status: "running", duration: undefined } : note));
+}
+
+/** Nodes that ran after the agent: branch artifact, pull request, evidence comment. */
+function implementOutputNodes(input: {
+  branch: FactoriesWorkOrderArtifact;
+  pullRequest: FactoriesFactoryPullRequest;
+}): SplitRunStreamLine[] {
+  return [
     streamLine({
       id: "add-branch-artifact",
       at: "11:56:54",
@@ -163,7 +219,7 @@ export function super503ImplementStream(
       componentName: "Add Branch Artifact",
       iconSlug: "factory",
       duration: "1s",
-      artifact: branch,
+      artifact: input.branch,
     }),
     streamLine({
       id: "find-pr",
@@ -180,7 +236,7 @@ export function super503ImplementStream(
       componentName: "Create Pull Request",
       iconSlug: "github",
       duration: "2s",
-      pullRequest,
+      pullRequest: input.pullRequest,
     }),
     streamLine({
       id: "attach-pr-artifact",
@@ -261,9 +317,10 @@ export function super503StorybookStream(input: {
   prefix: string;
   at: string;
   duration: string;
-  link: FactoriesWorkOrderArtifact;
+  /** Set on the first deploy only; production adds the link artifact once. */
+  link?: FactoriesWorkOrderArtifact;
 }): SplitRunStreamLine[] {
-  return [
+  const lines = [
     streamLine({
       id: `${input.prefix}-pr-trigger`,
       at: input.at,
@@ -279,11 +336,17 @@ export function super503StorybookStream(input: {
       iconSlug: "box",
       duration: input.duration,
     }),
+  ];
+  if (!input.link) {
+    return lines;
+  }
+  return [
+    ...lines,
     streamLine({
       id: `${input.prefix}-add-link-artifact`,
       at: input.at,
       componentType: "Add Task Artifact",
-      componentName: "Add Preview Link",
+      componentName: "addWorkOrderArtifact",
       iconSlug: "factory",
       duration: "1s",
       artifact: input.link,
@@ -298,12 +361,13 @@ export function super503ReviewStream(input: {
   log: Super503ReviewLogKey;
 }): SplitRunStreamLine[] {
   const agentNodeId = `${input.prefix}-address-pr-review-feedback`;
+  const trigger = "On Pull Request Review";
   return [
     streamLine({
       id: `${input.prefix}-on-pr-review`,
       at: input.at,
-      componentType: "On Pull Request Review",
-      componentName: "On Pull Request Review",
+      componentType: trigger,
+      componentName: trigger,
       iconSlug: "github",
     }),
     streamLine({
@@ -335,7 +399,8 @@ export function super503ReviewStream(input: {
   ];
 }
 
-export function super503ClosureStream(pullRequest: FactoriesFactoryPullRequest): SplitRunStreamLine[] {
+/** The merged pull request is this run's trigger, not its output. */
+export function super503ClosureStream(): SplitRunStreamLine[] {
   return [
     streamLine({
       id: "closure-on-pr-merged",
@@ -351,7 +416,6 @@ export function super503ClosureStream(pullRequest: FactoriesFactoryPullRequest):
       componentName: "PR Closure",
       iconSlug: "factory",
       duration: "2s",
-      pullRequest,
     }),
   ];
 }

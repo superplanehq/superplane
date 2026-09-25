@@ -10,6 +10,7 @@ import { WorkOrderStatusIcon } from "../../../workOrders/WorkOrderStatusIcon";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../../work-order-popup-redesign/popupShared";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { SPLIT_RUN_SUPER503 } from "../splitRunSuper503Fixture";
+import { SPLIT_RUN_SUPER503_RUNNING } from "../splitRunSuper503RunningFixture";
 import { displayStatusForLineStatus } from "../splitRunWorkOrderDisplay";
 import { AutomationsConsoleVariant } from "./AutomationsConsoleVariant";
 import { AutomationsTimelineVariant } from "./AutomationsTimelineVariant";
@@ -114,6 +115,19 @@ export const RunConsole: Story = {
   render: () => (
     <RedesignPopup fixture={SPLIT_RUN_SUPER503} testId="redesign-b-super503">
       <AutomationsConsoleVariant fixture={SPLIT_RUN_SUPER503} />
+    </RedesignPopup>
+  ),
+};
+
+/**
+ * Run console 16 minutes in. Implement is running with its live step list
+ * open. Verify and Done have not started.
+ */
+export const RunConsoleRunning: Story = {
+  name: "Run console (running)",
+  render: () => (
+    <RedesignPopup fixture={SPLIT_RUN_SUPER503_RUNNING} testId="redesign-b-super503-running">
+      <AutomationsConsoleVariant fixture={SPLIT_RUN_SUPER503_RUNNING} />
     </RedesignPopup>
   ),
 };

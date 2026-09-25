@@ -56,7 +56,7 @@ export function AutomationsTimelineVariant({
             key={stage.id}
             stage={stage}
             step={index + 1}
-            defaultOpen={stage.id === initialOpenStageId}
+            defaultOpen={stage.id === initialOpenStageId && stage.status !== "passed"}
             onViewLog={() => setLogStage(stage)}
           />
         ))}
