@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -68,7 +69,7 @@ func TestTaskCreatorUploadsWorkspaceFileWithoutFactoryUpdate(t *testing.T) {
 	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	t.Run("task creator stores a csv", func(t *testing.T) {
+	t.Run("task creator stores a csv and the task keeps it", func(t *testing.T) {
 		creator, account := createOrgMember(t, r, models.RoleOrgOperator)
 		requireOrganizationPermission(t, r, creator.ID, "work_orders", "create", true)
 		requireOrganizationPermission(t, r, creator.ID, "factories", "update", false)
@@ -76,13 +77,43 @@ func TestTaskCreatorUploadsWorkspaceFileWithoutFactoryUpdate(t *testing.T) {
 		fileID := createWorkspaceFile(t, server, signer, r.Organization.ID, account.ID, factoryModel.ID, "rows.csv", "text/csv")
 		putFileContent(t, server, signer, r.Organization.ID, account.ID, fileID, []byte("a,b\n1,2\n"), http.StatusNoContent)
 
+		orderID := createTaskWithFile(t, server, signer, r.Organization.ID, account.ID, factoryModel.ID, fileID)
+		attached, err := models.FindFile(database.Conn(), fileID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FileStateReady, attached.State)
+		assert.Equal(t, blob.ScopeTask, attached.Scope)
+		assert.Equal(t, "text/csv", attached.ContentType)
+		require.NotNil(t, attached.WorkOrderID)
+		assert.Equal(t, orderID, *attached.WorkOrderID)
+		require.NotNil(t, attached.CreatedByID)
+		assert.Equal(t, creator.ID, *attached.CreatedByID)
+	})
+
+	t.Run("factory update without task create still stores a file", func(t *testing.T) {
+		editor, account := createOrgMember(t, r, "")
+		roleName := "factory-editor-" + uuid.NewString()[:8]
+		require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{
+			Name:        roleName,
+			DisplayName: "Factory editor",
+			DomainType:  models.DomainTypeOrganization,
+			Description: "Updates a workspace",
+			Permissions: []*authorization.Permission{{
+				Resource:   "factories",
+				Action:     "update",
+				DomainType: models.DomainTypeOrganization,
+			}},
+		}))
+		require.NoError(t, r.AuthService.AssignRole(editor.ID.String(), roleName, r.Organization.ID.String(), models.DomainTypeOrganization))
+		requireOrganizationPermission(t, r, editor.ID, "factories", "update", true)
+		requireOrganizationPermission(t, r, editor.ID, "work_orders", "create", false)
+
+		fileID := createWorkspaceFile(t, server, signer, r.Organization.ID, account.ID, factoryModel.ID, "note.txt", "text/plain")
+		putFileContent(t, server, signer, r.Organization.ID, account.ID, fileID, []byte("hello"), http.StatusNoContent)
+
 		ready, err := models.FindFile(database.Conn(), fileID)
 		require.NoError(t, err)
 		assert.Equal(t, models.FileStateReady, ready.State)
 		assert.Equal(t, blob.ScopeWorkspace, ready.Scope)
-		assert.Equal(t, "text/csv", ready.ContentType)
-		require.NotNil(t, ready.CreatedByID)
-		assert.Equal(t, creator.ID, *ready.CreatedByID)
 	})
 
 	t.Run("admin still attaches", func(t *testing.T) {
@@ -97,6 +128,7 @@ func TestTaskCreatorUploadsWorkspaceFileWithoutFactoryUpdate(t *testing.T) {
 	t.Run("user who cannot create tasks is denied", func(t *testing.T) {
 		reader, account := createOrgMember(t, r, "")
 		requireOrganizationPermission(t, r, reader.ID, "work_orders", "create", false)
+		requireOrganizationPermission(t, r, reader.ID, "factories", "update", false)
 
 		denied := postWorkspaceFile(t, server, signer, r.Organization.ID, account.ID, factoryModel.ID, "rows.csv", "text/csv")
 		assert.Equal(t, http.StatusNotFound, denied.Code)
@@ -116,13 +148,13 @@ func TestTaskCreatorUploadsWorkspaceFileWithoutFactoryUpdate(t *testing.T) {
 }
 
 func TestFileUploadPermissionUsesTaskCreateForWorkspaceFiles(t *testing.T) {
-	resource, action := fileUploadPermission(blob.ScopeWorkspace)
-	assert.Equal(t, "work_orders", resource)
-	assert.Equal(t, "create", action)
-
-	resource, action = fileUploadPermission(blob.ScopeTask)
-	assert.Equal(t, "work_orders", resource)
-	assert.Equal(t, "update", action)
+	assert.Equal(t, []authorization.PermissionGrant{
+		{Resource: "work_orders", Action: "create"},
+		{Resource: "factories", Action: "update"},
+	}, fileUploadPermissions(blob.ScopeWorkspace))
+	assert.Equal(t, []authorization.PermissionGrant{
+		{Resource: "work_orders", Action: "update"},
+	}, fileUploadPermissions(blob.ScopeTask))
 }
 
 func newFileHTTPTestServer(t *testing.T, r *support.ResourceRegistry) (*Server, *jwt.Signer) {
@@ -196,6 +228,44 @@ func createWorkspaceFile(
 	fileID, err := uuid.Parse(body.File.ID)
 	require.NoError(t, err)
 	return fileID
+}
+
+func createTaskWithFile(
+	t *testing.T,
+	server *Server,
+	signer *jwt.Signer,
+	organizationID uuid.UUID,
+	accountID uuid.UUID,
+	factoryID uuid.UUID,
+	fileID uuid.UUID,
+) uuid.UUID {
+	t.Helper()
+	payload, err := json.Marshal(map[string]string{
+		"title":       "Import rows",
+		"description": "See [rows.csv](" + blob.FileRef(fileID) + ")",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/factories/"+factoryID.String()+"/orders", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := serveAuthenticated(t, server, signer, organizationID, accountID, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var body struct {
+		Order struct {
+			ID    string `json:"id"`
+			Files []struct {
+				ID string `json:"id"`
+			} `json:"files"`
+		} `json:"order"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.NotEmpty(t, body.Order.Files)
+	assert.Equal(t, fileID.String(), body.Order.Files[0].ID)
+
+	orderID, err := uuid.Parse(body.Order.ID)
+	require.NoError(t, err)
+	return orderID
 }
 
 func postWorkspaceFile(

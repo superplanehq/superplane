@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -53,14 +55,7 @@ func (s *Server) handleFileContentUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resource, action := fileUploadPermission(file.Scope)
-	allowed, err := s.authService.CheckOrganizationPermission(
-		r.Context(),
-		user.ID.String(),
-		user.OrganizationID.String(),
-		resource,
-		action,
-	)
+	allowed, err := s.callerMayUploadFile(r.Context(), user, file.Scope)
 	if err != nil {
 		log.Errorf("Failed to check file upload permission: %v", err)
 		http.Error(w, "Unauthorized", http.StatusForbidden)
@@ -166,10 +161,31 @@ func parseFileIDParam(r *http.Request) (uuid.UUID, error) {
 	return uuid.Parse(raw)
 }
 
-func fileUploadPermission(scope string) (resource, action string) {
-	if scope == blob.ScopeTask {
-		return "work_orders", "update"
+func (s *Server) callerMayUploadFile(ctx context.Context, user *models.User, scope string) (bool, error) {
+	for _, permission := range fileUploadPermissions(scope) {
+		allowed, err := s.authService.CheckOrganizationPermission(
+			ctx,
+			user.ID.String(),
+			user.OrganizationID.String(),
+			permission.Resource,
+			permission.Action,
+		)
+		if err != nil {
+			return false, err
+		}
+		if allowed {
+			return true, nil
+		}
 	}
-	// Workspace files are attached from the new-task dialog.
-	return "work_orders", "create"
+	return false, nil
+}
+
+func fileUploadPermissions(scope string) []authorization.PermissionGrant {
+	if scope == blob.ScopeTask {
+		return []authorization.PermissionGrant{{Resource: "work_orders", Action: "update"}}
+	}
+	return []authorization.PermissionGrant{
+		{Resource: "work_orders", Action: "create"},
+		{Resource: "factories", Action: "update"},
+	}
 }

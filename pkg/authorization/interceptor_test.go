@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -426,6 +427,7 @@ func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "work_orders", createWorkspace.Resource)
 	assert.Equal(t, "create", createWorkspace.Action)
+	assert.Equal(t, []PermissionGrant{{Resource: "factories", Action: "update"}}, createWorkspace.AlsoAllow)
 	assert.Equal(t, []string{features.FeatureFactories}, createWorkspace.RequiredExperimentalFeatures)
 
 	listWorkspace, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/files"}]
@@ -442,6 +444,41 @@ func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "work_orders", listTask.Resource)
 	assert.Equal(t, "read", listTask.Action)
+}
+
+func TestWorkspaceFileCreateAcceptsTaskCreateOrFactoryUpdate(t *testing.T) {
+	rule := DefaultAuthorizationRules()[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/files"}]
+	assert.Equal(t, []PermissionGrant{
+		{Resource: "work_orders", Action: "create"},
+		{Resource: "factories", Action: "update"},
+	}, rule.Grants())
+
+	userID := uuid.NewString()
+	orgID := uuid.NewString()
+	clearOrganizationPermissionCacheForTest()
+	t.Cleanup(clearOrganizationPermissionCacheForTest)
+
+	allowed, err := checkOrganizationRulePermission(context.Background(), actionPermissionChecker{
+		"factories:update": true,
+	}, userID, orgID, rule)
+	require.NoError(t, err)
+	assert.True(t, allowed)
+
+	clearOrganizationPermissionCacheForTest()
+	allowed, err = checkOrganizationRulePermission(context.Background(), actionPermissionChecker{
+		"work_orders:create": true,
+	}, userID, orgID, rule)
+	require.NoError(t, err)
+	assert.True(t, allowed)
+
+	clearOrganizationPermissionCacheForTest()
+	allowed, err = checkOrganizationRulePermission(context.Background(), actionPermissionChecker{}, userID, orgID, rule)
+	require.NoError(t, err)
+	assert.False(t, allowed)
+
+	assert.True(t, hasRequiredScopedTokenPermissionForScopes(marshalScopes(t, []string{"factories:update"}), nil, rule))
+	assert.True(t, hasRequiredScopedTokenPermissionForScopes(marshalScopes(t, []string{"work_orders:create"}), nil, rule))
+	assert.False(t, hasRequiredScopedTokenPermissionForScopes(marshalScopes(t, []string{"factories:read"}), nil, rule))
 }
 
 func TestListOrganizationCreditGrantsUsesOrgRead(t *testing.T) {
