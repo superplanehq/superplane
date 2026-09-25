@@ -231,6 +231,8 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
+      jiraAvailable={flow.jiraAvailable}
+      jiraChoiceBlock={flow.jiraChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}

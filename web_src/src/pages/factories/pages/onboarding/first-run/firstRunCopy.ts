@@ -69,6 +69,8 @@ export const FIRST_RUN_COPY = {
     githubIssuesHelper: "Issues on this repository. No extra setup.",
     jiraHelper: "Connect Jira and choose a project.",
     jiraProjectHeading: "Choose a Jira project",
+    jiraLookupLoading: "Checking whether Jira is available…",
+    jiraLookupFailed: "SuperPlane could not confirm that Jira is available. Choose GitHub Issues to continue.",
     linearHelper: "Scan your Linear backlog.",
     analyze: "Scan my backlog",
     continue: "Continue",

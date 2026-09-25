@@ -13,10 +13,19 @@ import type { FirstRunChrome, FirstRunTicketSource } from "./firstRunTypes";
 
 export type FirstRunJiraProject = { id?: string; name?: string };
 
+export type FirstRunJiraChoiceBlock = "loading" | "lookup-failed";
+
 type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
+  /** True when the organization has the Jira intake feature. Hides Jira when false. */
+  jiraAvailable?: boolean;
+  /**
+   * A saved Jira choice cannot continue because the feature lookup has not
+   * confirmed Jira. The row stays hidden. The notice explains the block.
+   */
+  jiraChoiceBlock?: FirstRunJiraChoiceBlock | null;
   continueLabel?: string;
   /** True while this screen waits to learn whether the agent screen is next. */
   continuePending?: boolean;
@@ -57,6 +66,8 @@ export function FirstRunTicketsScreen({
   ticketSource,
   chrome,
   sphere,
+  jiraAvailable = false,
+  jiraChoiceBlock = null,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   continuePending = false,
   saving = false,
@@ -77,8 +88,10 @@ export function FirstRunTicketsScreen({
   onRetryJiraProjects,
 }: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
-  const canAnalyze = canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
+  const jiraSelectionBlocked = Boolean(jiraChoiceBlock) || (ticketSource === "jira" && !jiraAvailable);
+  const canAnalyze = !jiraSelectionBlocked && canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
+  const jiraChoiceNotice = jiraChoiceNoticeCopy(jiraChoiceBlock);
 
   return (
     <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere}>
@@ -97,16 +110,13 @@ export function FirstRunTicketsScreen({
               disabled={saving}
               onSelect={() => onSelectTicketSource("github-issues")}
             />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="jira" />}
-              title={copy.jira}
-              detail={copy.jiraHelper}
-              selected={ticketSource === "jira"}
-              connectLabel={copy.jira}
-              connected={jiraConnected}
-              disabled={saving}
-              onSelect={() => onSelectTicketSource("jira")}
-              onConnect={onConnectJira}
+            <FirstRunJiraTicketRow
+              jiraAvailable={jiraAvailable}
+              ticketSource={ticketSource}
+              saving={saving}
+              jiraConnected={jiraConnected}
+              onSelectTicketSource={onSelectTicketSource}
+              onConnectJira={onConnectJira}
             />
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="linear" />}
@@ -118,6 +128,7 @@ export function FirstRunTicketsScreen({
             />
           </div>
           <FirstRunJiraProjectFields
+            jiraAvailable={jiraAvailable}
             visible={ticketSource === "jira" && jiraConnected}
             copy={copy}
             saving={saving}
@@ -133,6 +144,18 @@ export function FirstRunTicketsScreen({
             onRetryJiraProjects={onRetryJiraProjects}
           />
         </FirstRunPanel>
+
+        {jiraChoiceNotice ? (
+          <p
+            className={
+              jiraChoiceBlock === "lookup-failed" ? "text-[13px] text-destructive" : "text-[13px] text-muted-foreground"
+            }
+            role={jiraChoiceBlock === "lookup-failed" ? "alert" : "status"}
+            data-testid="first-run-jira-choice-notice"
+          >
+            {jiraChoiceNotice}
+          </p>
+        ) : null}
 
         <div className="space-y-3">
           <LoadingButton
@@ -152,7 +175,48 @@ export function FirstRunTicketsScreen({
   );
 }
 
+function jiraChoiceNoticeCopy(block: FirstRunJiraChoiceBlock | null): string | null {
+  if (block === "lookup-failed") return FIRST_RUN_COPY.tickets.jiraLookupFailed;
+  if (block === "loading") return FIRST_RUN_COPY.tickets.jiraLookupLoading;
+  return null;
+}
+
+function FirstRunJiraTicketRow({
+  jiraAvailable,
+  ticketSource,
+  saving,
+  jiraConnected,
+  onSelectTicketSource,
+  onConnectJira,
+}: {
+  jiraAvailable: boolean;
+  ticketSource: FirstRunTicketSource | null;
+  saving: boolean;
+  jiraConnected: boolean;
+  onSelectTicketSource: (source: FirstRunTicketSource) => void;
+  onConnectJira?: () => void;
+}) {
+  if (!jiraAvailable) {
+    return null;
+  }
+  const copy = FIRST_RUN_COPY.tickets;
+  return (
+    <ConnectOptionRow
+      icon={<IntegrationChoiceIcon name="jira" />}
+      title={copy.jira}
+      detail={copy.jiraHelper}
+      selected={ticketSource === "jira"}
+      connectLabel={copy.jira}
+      connected={jiraConnected}
+      disabled={saving}
+      onSelect={() => onSelectTicketSource("jira")}
+      onConnect={onConnectJira}
+    />
+  );
+}
+
 function FirstRunJiraProjectFields({
+  jiraAvailable,
   visible,
   copy,
   saving,
@@ -167,6 +231,7 @@ function FirstRunJiraProjectFields({
   onJiraCompletionChange,
   onRetryJiraProjects,
 }: {
+  jiraAvailable: boolean;
   visible: boolean;
   copy: (typeof FIRST_RUN_COPY)["tickets"];
   saving: boolean;
@@ -181,7 +246,7 @@ function FirstRunJiraProjectFields({
   onJiraCompletionChange?: (next: JiraCompletionColumnValue) => void;
   onRetryJiraProjects?: () => void;
 }) {
-  if (!visible) {
+  if (!jiraAvailable || !visible) {
     return null;
   }
 
