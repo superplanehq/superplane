@@ -3,6 +3,7 @@ import { integrationKeys } from "@/hooks/useIntegrations";
 import { meKeys } from "@/hooks/useMe";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLocation } from "react-router";
 
 import type { OnboardingWorkspaceResolution } from "../factories/pages/onboarding/onboardingWorkspaceResolutionContext";
 import { organizationNameFromAccount } from "./organizationNameFromAccount";
@@ -44,6 +45,13 @@ interface OrganizationOnboardingRedirectProps {
     entryPath: string,
     reresolveWorkspace: OnboardingWorkspaceResolution,
   ) => ReactNode;
+}
+
+/** Remounts onboarding when the route changes to a different provisioning attempt. */
+export function OrganizationOnboardingAttemptBoundary(props: OrganizationOnboardingRedirectProps) {
+  const location = useLocation();
+  const attemptID = new URLSearchParams(location.search).get("attempt") ?? "";
+  return <OrganizationOnboardingRedirect key={attemptID} {...props} />;
 }
 
 /** Provisions the internal workspace and renders its existing setup wizard at /onboarding. */
