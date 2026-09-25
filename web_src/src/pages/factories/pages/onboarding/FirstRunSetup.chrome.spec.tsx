@@ -37,6 +37,10 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "user-1" } }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
+}));
+
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
 vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
