@@ -144,7 +144,7 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
   });
 
-  it("keeps the connect screen locked after GitHub navigation starts", async () => {
+  it("keeps the connect screen locked while GitHub navigation starts", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
@@ -163,16 +163,43 @@ describe("FirstRunSetup reliability", () => {
       await navigation.promise;
     });
 
-    expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.openingGitHub);
-    expect(connect).toBeDisabled();
-    expect(screen.getByTestId("first-run-back")).toBeDisabled();
+    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(connect).toBeEnabled();
+    expect(screen.getByTestId("first-run-back")).toBeEnabled();
+  });
+
+  it("releases a browser-action lock before a later intake action", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      openSection: "vcs",
+      requestConnect: vi.fn().mockResolvedValue(true),
+    });
+    const view = renderSetup(model, "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByTestId("first-run-connect-github"));
+    await waitFor(() => expect(model.requestConnect).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+        <FirstRunSetup model={{ ...model, openSection: "issues" }} />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByTestId("first-run-analyze-tickets"));
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });
 
   it("unlocks the connect screen when GitHub navigation does not start", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
-    renderSetup(pageModel({ openSection: "vcs", requestConnect }), "/org-1/workspaces/PAY/setup?step=vcs");
+    const refreshGithubConnections = vi.fn().mockResolvedValue(undefined);
+    renderSetup(
+      pageModel({ openSection: "vcs", requestConnect, refreshGithubConnections }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+    await waitFor(() => expect(refreshGithubConnections).toHaveBeenCalledTimes(1));
 
     const connect = screen.getByTestId("first-run-connect-github");
     await user.click(connect);
@@ -182,6 +209,7 @@ describe("FirstRunSetup reliability", () => {
     });
 
     await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(refreshGithubConnections).toHaveBeenCalledTimes(2);
     expect(connect).toBeEnabled();
     expect(screen.getByTestId("first-run-back")).toBeEnabled();
   });

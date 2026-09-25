@@ -132,13 +132,16 @@ function connectScreenState({
   githubState: string;
 }) {
   const showAccountPicker = pendingInstallations.length >= 1 && githubState !== "";
-  // A picker that offers the requested organization means the request is
-  // approved, so the waiting state must not show next to it.
+  // A requested organization is ready only after the server verifies at
+  // least one repository that the member can use. An installation row with
+  // no repositories can be stale and must not clear the waiting state.
   const requestApproved =
     githubOrganizations.length > 0 &&
     githubOrganizations.every((organization) =>
       pendingInstallations.some(
-        (installation) => installation.accountLogin.toLowerCase() === organization.toLowerCase(),
+        (installation) =>
+          installation.accountLogin.toLowerCase() === organization.toLowerCase() &&
+          installation.repositories.length > 0,
       ),
     );
   return {

@@ -84,7 +84,7 @@ describe("FirstRunConnectScreen", () => {
   it("names the GitHub login that authorized the connect when the picker shows", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         githubLogin="forestileao"
@@ -101,7 +101,7 @@ describe("FirstRunConnectScreen", () => {
   it("hides the signed-in line when the picker has no GitHub login", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -115,7 +115,7 @@ describe("FirstRunConnectScreen", () => {
   it("asks which GitHub account to use when one install is pending", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -137,8 +137,8 @@ describe("FirstRunConnectScreen", () => {
     render(
       <FirstRunConnectScreen
         pendingInstallations={[
-          { id: "11", accountLogin: "acme" },
-          { id: "22", accountLogin: "octo" },
+          { id: "11", accountLogin: "acme", repositories: [] },
+          { id: "22", accountLogin: "octo", repositories: [] },
         ]}
         githubState="csrf"
         githubAppSlug="superplane"
@@ -155,7 +155,7 @@ describe("FirstRunConnectScreen", () => {
     );
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
-    expect(onUseInstallation).toHaveBeenCalledWith({ id: "11", accountLogin: "acme" });
+    expect(onUseInstallation).toHaveBeenCalledWith({ id: "11", accountLogin: "acme", repositories: [] });
   });
 
   it("hides the waiting chip when the picker offers the requested organization", () => {
@@ -163,7 +163,7 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganization="Acme"
-        pendingInstallations={[{ id: "11", accountLogin: "acme" }]}
+        pendingInstallations={[{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -175,12 +175,28 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.queryByTestId("first-run-github-install-requested")).not.toBeInTheDocument();
   });
 
+  it("keeps the waiting chip until the requested organization has repository access", () => {
+    render(
+      <FirstRunConnectScreen
+        installRequested
+        githubOrganization="acme"
+        pendingInstallations={[{ id: "11", accountLogin: "acme", repositories: [] }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("acme");
+  });
+
   it("keeps the waiting chip when the picker lacks the requested organization", () => {
     render(
       <FirstRunConnectScreen
         installRequested
         githubOrganization="acme"
-        pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
+        pendingInstallations={[{ id: "22", accountLogin: "octo", repositories: [] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -196,8 +212,8 @@ describe("FirstRunConnectScreen", () => {
     render(
       <FirstRunConnectScreen
         pendingInstallations={[
-          { id: "11", accountLogin: "acme" },
-          { id: "22", accountLogin: "octo" },
+          { id: "11", accountLogin: "acme", repositories: [] },
+          { id: "22", accountLogin: "octo", repositories: [] },
         ]}
         githubState="csrf"
         githubAppSlug="superplane"
@@ -259,7 +275,7 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganizations={["kittens-inc-1"]}
-        pendingInstallations={[{ id: "11", accountLogin: "puppies-inc" }]}
+        pendingInstallations={[{ id: "11", accountLogin: "puppies-inc", repositories: [] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -296,7 +312,13 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganizations={["kittens-inc-1"]}
-        pendingInstallations={[{ id: "11", accountLogin: "kittens-inc-1" }]}
+        pendingInstallations={[
+          {
+            id: "11",
+            accountLogin: "kittens-inc-1",
+            repositories: [{ id: "101", name: "kittens-inc-1/api" }],
+          },
+        ]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -311,7 +333,7 @@ describe("FirstRunConnectScreen", () => {
   it("marks connect done and asks the organization question on the stepper picker", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "puppies-inc" }]}
+        pendingInstallations={[{ id: "11", accountLogin: "puppies-inc", repositories: [] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         githubLogin="ada"
