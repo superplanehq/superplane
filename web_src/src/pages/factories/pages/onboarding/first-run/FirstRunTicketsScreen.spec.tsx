@@ -68,6 +68,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
+        jiraAvailable
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={onConnectJira}
@@ -82,6 +83,67 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
   });
 
+  it("hides Jira and keeps GitHub Issues and Linear when Jira is unavailable", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+        onConnectJira={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
+    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+  });
+
+  it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraChoiceBlock="lookup-failed"
+        jiraConnected
+        jiraProjectId="PAY"
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-jira-projects")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupFailed,
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
+    expect(onSelectTicketSource).toHaveBeenCalledWith("github-issues");
+  });
+
+  it("explains a saved Jira choice while the feature lookup is still loading", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraChoiceBlock="loading"
+        jiraConnected
+        jiraProjectId="PAY"
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupLoading,
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+  });
+
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {
     const user = userEvent.setup();
     const onSelectJiraProject = vi.fn();
@@ -90,6 +152,7 @@ describe("FirstRunTicketsScreen", () => {
     const { rerender } = render(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onConnectJira={vi.fn()}
@@ -103,6 +166,7 @@ describe("FirstRunTicketsScreen", () => {
     rerender(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId=""
@@ -123,6 +187,7 @@ describe("FirstRunTicketsScreen", () => {
     rerender(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
@@ -163,6 +228,7 @@ describe("FirstRunTicketsScreen", () => {
       <FirstRunTicketsScreen
         ticketSource="jira"
         saving
+        jiraAvailable
         jiraConnected
         jiraProjects={[
           { id: "PAY", name: "Payments" },
@@ -201,6 +267,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         jiraConnected
         organizationId="org-1"
         jiraIntegrationId="jira-1"

@@ -13,7 +13,7 @@ import (
 const installationInstructions = `
 To configure Productive to work with SuperPlane:
 
-1. **Get an API token**: In Productive, open your profile, go to **API integrations**, and create a personal access token.
+1. **Get an API token**: In Productive, go to **Settings > API Integrations**. Create a personal access token with read and write permissions.
 2. **Get the organization id**: The organization id is the numeric id in your Productive URL, e.g. ` + "`app.productive.io/<organization-id>-name`" + `.
 3. **Enter credentials**: Provide the API token and organization id in the integration configuration.
 `
@@ -52,7 +52,7 @@ func (p *Productive) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Personal access token from Productive > API integrations",
+			Description: "Personal access token from Productive Settings > API Integrations, with read and write permissions.",
 		},
 		{
 			Name:        "organizationId",
