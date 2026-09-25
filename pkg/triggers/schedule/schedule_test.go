@@ -74,6 +74,102 @@ func TestNextMinutesTrigger(t *testing.T) {
 	}
 }
 
+func TestNextMonthsTrigger(t *testing.T) {
+	tests := []struct {
+		name       string
+		interval   int
+		dayOfMonth int
+		now        string
+		expectNext string
+	}{
+		{
+			name:       "mid-month tick advances one month",
+			interval:   1,
+			dayOfMonth: 15,
+			now:        "2025-01-10T10:00:00Z",
+			expectNext: "2025-02-15T09:00:00Z",
+		},
+		{
+			name:       "tick on Jan 31 must not skip February",
+			interval:   1,
+			dayOfMonth: 15,
+			now:        "2025-01-31T10:00:00Z",
+			expectNext: "2025-02-15T09:00:00Z",
+		},
+		{
+			name:       "tick on Mar 30 must not skip April",
+			interval:   1,
+			dayOfMonth: 15,
+			now:        "2025-03-30T10:00:00Z",
+			expectNext: "2025-04-15T09:00:00Z",
+		},
+		{
+			name:       "dayOfMonth 31 clamps to Apr 30",
+			interval:   1,
+			dayOfMonth: 31,
+			now:        "2025-03-10T10:00:00Z",
+			expectNext: "2025-04-30T09:00:00Z",
+		},
+		{
+			name:       "dayOfMonth 31 clamps to Feb 28",
+			interval:   1,
+			dayOfMonth: 31,
+			now:        "2025-01-10T10:00:00Z",
+			expectNext: "2025-02-28T09:00:00Z",
+		},
+		{
+			name:       "dayOfMonth 30 clamps to Feb 28",
+			interval:   1,
+			dayOfMonth: 30,
+			now:        "2025-01-10T10:00:00Z",
+			expectNext: "2025-02-28T09:00:00Z",
+		},
+		{
+			name:       "dayOfMonth 31 clamps to Feb 29 on leap years",
+			interval:   1,
+			dayOfMonth: 31,
+			now:        "2024-01-10T10:00:00Z",
+			expectNext: "2024-02-29T09:00:00Z",
+		},
+		{
+			name:       "December wraps into the next year",
+			interval:   1,
+			dayOfMonth: 15,
+			now:        "2025-12-10T10:00:00Z",
+			expectNext: "2026-01-15T09:00:00Z",
+		},
+		{
+			name:       "multi-month interval crosses the year boundary",
+			interval:   6,
+			dayOfMonth: 31,
+			now:        "2025-11-10T10:00:00Z",
+			expectNext: "2026-05-31T09:00:00Z",
+		},
+		{
+			name:       "24 month interval",
+			interval:   24,
+			dayOfMonth: 15,
+			now:        "2025-01-31T10:00:00Z",
+			expectNext: "2027-01-15T09:00:00Z",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := nextMonthsTrigger(tt.interval, tt.dayOfMonth, 9, 0, mustParseTime(tt.now))
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if !result.Equal(mustParseTime(tt.expectNext)) {
+				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
+			}
+		})
+	}
+}
+
 func TestGetNextTrigger(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -158,6 +254,30 @@ func TestGetNextTrigger(t *testing.T) {
 			},
 			now:        mustParseTime("2025-01-01T10:00:00Z"),
 			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
+		},
+		{
+			name: "months configuration when now is on a day the next month does not have",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(15),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-01-31T10:00:00Z"),
+			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
+		},
+		{
+			name: "months configuration with dayOfMonth beyond the target month's length",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(31),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-03-10T10:00:00Z"),
+			expectNext: mustParseTime("2025-04-30T14:30:00Z"),
 		},
 		{
 			name: "cron configuration",
