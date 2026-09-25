@@ -34,6 +34,33 @@ func nodeMetadata(t *testing.T, metadata *contexts.MetadataContext) NodeMetadata
 	return stored
 }
 
+func taskWebhookBodyWithList(id, projectID, title, listID string) []byte {
+	body, _ := json.Marshal(map[string]any{
+		"event":     "update_task",
+		"item_type": "task",
+		"item_id":   id,
+		"object": map[string]any{
+			"data": map[string]any{
+				"id":   id,
+				"type": "tasks",
+				"attributes": map[string]any{
+					"title":   title,
+					"type_id": 1,
+				},
+				"relationships": map[string]any{
+					"project": map[string]any{
+						"data": map[string]any{"type": "projects", "id": projectID},
+					},
+					"task_list": map[string]any{
+						"data": map[string]any{"type": "task_lists", "id": listID},
+					},
+				},
+			},
+		},
+	})
+	return body
+}
+
 // taskWebhookBody builds the envelope Productive.io posts for a task webhook.
 // The task resource is the JSON:API document under object.data.
 func taskWebhookBody(id, projectID, title string) []byte {
@@ -471,6 +498,102 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		document, ok := envelope["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "list-bugs", taskListID(document))
+	})
+
+	t.Run("task update stamps a list move and ignores a title edit", func(t *testing.T) {
+		moveBody := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20")
+		events := &contexts.EventContext{}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			jsonResponse(`{"data":[{
+				"id":"1",
+				"type":"activities",
+				"attributes":{
+					"event":"update",
+					"created_at":"2026-09-25T16:00:00Z",
+					"changeset":{"task_list_id":[10,20]}
+				}
+			}]}`),
+		}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", moveBody)),
+			Configuration: map[string]any{"project": "1", "actions": []string{ActionUpdated}},
+			Body:          moveBody,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+			HTTP:          httpContext,
+			Integration:   integrationWithProject(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		envelope, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		meta, ok := envelope["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"from": "10", "to": "20"}, meta["task_list_move"])
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.Path, "/activities")
+
+		editBody := taskWebhookBodyWithList("91", "1", "Renamed", "20")
+		editEvents := &contexts.EventContext{}
+		editHTTP := &contexts.HTTPContext{Responses: []*http.Response{
+			jsonResponse(`{"data":[{
+				"id":"2",
+				"type":"activities",
+				"attributes":{
+					"event":"update",
+					"created_at":"2026-09-25T16:05:00Z",
+					"changeset":{"title":["Fix payment retries","Renamed"]}
+				}
+			}]}`),
+		}}
+		code, _, err = trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", editBody)),
+			Configuration: map[string]any{"project": "1", "actions": []string{ActionUpdated}},
+			Body:          editBody,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        editEvents,
+			HTTP:          editHTTP,
+			Integration:   integrationWithProject(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, editEvents.Count())
+		editEnvelope, ok := editEvents.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		editMeta, ok := editEnvelope["meta"].(map[string]any)
+		require.True(t, ok)
+		_, hasMove := editMeta["task_list_move"]
+		assert.False(t, hasMove)
+	})
+
+	t.Run("task update is emitted when the activity lookup fails", func(t *testing.T) {
+		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20")
+		events := &contexts.EventContext{}
+		unavailable := &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Unavailable"}]}`)),
+		}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			unavailable, unavailable, unavailable,
+		}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: map[string]any{"project": "1", "actions": []string{ActionUpdated}},
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+			HTTP:          httpContext,
+			Integration:   integrationWithProject(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 1, events.Count())
+		require.Len(t, httpContext.Requests, taskListFetchAttempts)
 	})
 
 	t.Run("delivery for another project -> ignored", func(t *testing.T) {

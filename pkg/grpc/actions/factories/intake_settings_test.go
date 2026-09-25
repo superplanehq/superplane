@@ -673,26 +673,39 @@ func Test__intakeFilterExpressionFor_ProductiveKeyTasks(t *testing.T) {
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceProductiveTasks, settings)
 		assert.Equal(
 			t,
-			`(root().data.data.relationships.task_list.data.id ?? "") in ["list-a","list-b"]`,
+			`((root().data.meta?.event ?? "") != "task.updated" && (root().data.data.relationships.task_list.data.id ?? "") in ["list-a","list-b"] || (root().data.meta?.event ?? "") == "task.updated" && (root().data.meta?.task_list_move?.to ?? "") in ["list-a","list-b"] && (root().data.meta?.task_list_move?.from ?? "") != (root().data.meta?.task_list_move?.to ?? ""))`,
 			expression,
 		)
 
-		inList := map[string]any{
-			"data": map[string]any{
-				"relationships": map[string]any{
-					"task_list": map[string]any{"data": map[string]any{"id": "list-a"}},
+		taskOnList := func(event string, listID string, move map[string]any) map[string]any {
+			meta := map[string]any{"event": event}
+			if move != nil {
+				meta["task_list_move"] = move
+			}
+			return map[string]any{
+				"meta": meta,
+				"data": map[string]any{
+					"relationships": map[string]any{
+						"task_list": map[string]any{"data": map[string]any{"id": listID}},
+					},
 				},
-			},
+			}
 		}
-		otherList := map[string]any{
-			"data": map[string]any{
-				"relationships": map[string]any{
-					"task_list": map[string]any{"data": map[string]any{"id": "list-c"}},
-				},
-			},
-		}
-		assert.Equal(t, true, evalRootDataExpression(t, expression, inList))
-		assert.Equal(t, false, evalRootDataExpression(t, expression, otherList))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, taskOnList("task.created", "list-a", nil)))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.created", "list-c", nil)))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-a", nil)))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-a", map[string]any{
+			"from": "list-c",
+			"to":   "list-a",
+		})))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-a", map[string]any{
+			"from": "list-a",
+			"to":   "list-a",
+		})))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-c", map[string]any{
+			"from": "list-a",
+			"to":   "list-c",
+		})))
 
 		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, intakeGraph{FilterNodeID: intakeFilterNodeID}, models.LiveCanvasSpec{
 			Nodes: []models.Node{{

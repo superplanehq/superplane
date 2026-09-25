@@ -336,6 +336,9 @@ func intakeProductiveFilterExpression(settings intakeSettings) string {
 	return strings.Join(conditions, " && ")
 }
 
+// intakeProductiveTaskListCondition keeps a task that is created on a
+// selected list, or an update that moves the task onto one. An edit that
+// leaves the task on the same list does not match.
 func intakeProductiveTaskListCondition(ids []string) string {
 	if len(ids) == 0 {
 		return ""
@@ -344,7 +347,14 @@ func intakeProductiveTaskListCondition(ids []string) string {
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
+
+	onList := fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
+	createdOnList := fmt.Sprintf(`(root().data.meta?.event ?? "") != "task.updated" && %s`, onList)
+	movedOntoList := fmt.Sprintf(
+		`(root().data.meta?.event ?? "") == "task.updated" && (root().data.meta?.task_list_move?.to ?? "") in %s && (root().data.meta?.task_list_move?.from ?? "") != (root().data.meta?.task_list_move?.to ?? "")`,
+		encoded,
+	)
+	return fmt.Sprintf(`(%s || %s)`, createdOnList, movedOntoList)
 }
 
 func intakeTriggerActionsFor(settings intakeSettings) []any {
@@ -362,7 +372,9 @@ func intakeTriggerActionsFor(settings intakeSettings) []any {
 }
 
 // intakeProductiveTriggerActions listens for new tasks, and also for updates
-// when a task list filter is set so a move onto that list can create a task.
+// when a task list filter is set. The filter keeps an update only when the
+// task list changed, so an edit of a task already on the list does not
+// create a task.
 func intakeProductiveTriggerActions(settings intakeSettings) []any {
 	actions := []any{"created"}
 	if len(settings.TaskListIDs) > 0 {
