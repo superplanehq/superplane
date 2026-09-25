@@ -135,6 +135,14 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		// reports next to it.
 		createDescription: `{{ root().data.description }}`,
 	},
+	models.FactoryIntakeSourceDatadog: {
+		name:              "Datadog errors",
+		description:       "Create a work order when Datadog reports a new Error Tracking issue.",
+		triggerComponent:  "datadog.onErrorTrackingAlert",
+		triggerName:       "On Error Tracking Alert",
+		createTitle:       "{{ root().data.title }}",
+		createDescription: "{{ root().data.body }}\n\n{{ root().data.link }}",
+	},
 }
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {

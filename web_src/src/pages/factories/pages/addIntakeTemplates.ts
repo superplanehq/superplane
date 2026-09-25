@@ -63,10 +63,9 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   },
   {
     id: "datadog",
-    name: "DataDog",
-    description: "Creates tasks from DataDog monitors.",
+    name: "Datadog errors",
+    description: "Creates tasks from Datadog Error Tracking alerts.",
     iconSrc: datadogIcon,
-    soon: true,
   },
   {
     id: "notion",

@@ -1,0 +1,10 @@
+{
+  "id": "1234567",
+  "event_type": "error_tracking_alert",
+  "title": "[Triggered] checkout new issues",
+  "body": "InventoryTimeout: checkout failed: inventory timeout",
+  "alert_id": "98765",
+  "alert_transition": "Triggered",
+  "tags": "service:checkout,monitor",
+  "link": "https://app.datadoghq.com/monitors/98765"
+}

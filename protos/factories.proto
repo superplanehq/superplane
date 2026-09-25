@@ -1074,6 +1074,7 @@ message FactoryIntake {
     SOURCE_PAGERDUTY_INCIDENTS = 3;
     SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
+    SOURCE_DATADOG = 6;
   }
 
   enum InitialImportStatus {

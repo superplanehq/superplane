@@ -13,6 +13,7 @@ const INTAKE_NAME_BY_SOURCE: Record<string, string> = {
   SOURCE_JIRA_ISSUES: "Jira issues",
   SOURCE_SENTRY_EXCEPTIONS: "Sentry exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "PagerDuty incidents",
+  SOURCE_DATADOG: "Datadog errors",
 };
 
 function route(pattern: string): RegExp {

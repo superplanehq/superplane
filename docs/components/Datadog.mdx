@@ -2,9 +2,15 @@
 title: "Datadog"
 ---
 
-Create events in Datadog
+React to Error Tracking alerts and create events in Datadog
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Error Tracking Alert" href="#on-error-tracking-alert" description="Listen to Datadog Error Tracking monitor alerts" />
+</CardGrid>
 
 ## Actions
 
@@ -17,9 +23,47 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 To configure Datadog to work with SuperPlane:
 
 1. **Get API Keys**: In Datadog, go to Organization Settings > API Keys to get your API Key
-2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key
+2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key with **Webhooks Write** permission
 3. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
 4. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
+5. **Add the webhook to a monitor**: In an Error Tracking New Issue monitor, add `@webhook-superplane` to the notification message
+
+<a id="on-error-tracking-alert"></a>
+
+## On Error Tracking Alert
+
+**Trigger key:** `datadog.onErrorTrackingAlert`
+
+The On Error Tracking Alert trigger starts a workflow when Datadog sends a Triggered Error Tracking monitor alert to SuperPlane.
+
+### Setup
+
+Connect Datadog in SuperPlane. SuperPlane creates a webhook named `superplane`. Add `@webhook-superplane` to the notification message of an Error Tracking New Issue monitor.
+
+### Event Data
+
+The trigger emits:
+- **title**: monitor alert title
+- **body**: monitor notification text
+- **link**: Datadog link from the alert
+- **alert_id**: alerting monitor ID
+- **tags**: comma-separated tags from the alert
+- **alert_transition**: alert transition, such as Triggered
+
+### Example Data
+
+```json
+{
+  "alert_id": "98765",
+  "alert_transition": "Triggered",
+  "body": "InventoryTimeout: checkout failed: inventory timeout",
+  "event_type": "error_tracking_alert",
+  "id": "1234567",
+  "link": "https://app.datadoghq.com/monitors/98765",
+  "tags": "service:checkout,monitor",
+  "title": "[Triggered] checkout new issues"
+}
+```
 
 <a id="create-event"></a>
 
