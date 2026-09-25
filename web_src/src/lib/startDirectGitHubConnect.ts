@@ -298,7 +298,10 @@ async function resumePendingGitHubConnect(
   if (connection.status?.state === "error") {
     throw new Error(connection.status.stateDescription || "SuperPlane could not connect to GitHub. Try again.");
   }
-  return { handled: true, navigationStarted: false };
+  if (connection.status?.state === "ready") {
+    return { handled: true, navigationStarted: false };
+  }
+  throw new Error("SuperPlane could not connect to GitHub. Try again.");
 }
 
 export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
