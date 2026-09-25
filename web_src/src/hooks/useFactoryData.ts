@@ -665,7 +665,13 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
+    // The server already returns the order's next state here, so patch the
+    // cached lists with it immediately instead of waiting on the invalidated
+    // ListWorkOrders refetch below — otherwise a reopened or rejected card
+    // lingers in its old column for several seconds. Same pattern as
+    // useDispatchWorkOrder's onSuccess patch.
+    onSuccess: (order, variables) => {
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, variables.orderId, order);
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
@@ -740,7 +746,13 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
+    // The server already returns the closed order here, so patch the cached
+    // lists with it immediately instead of waiting on the invalidated
+    // ListWorkOrders refetch below — otherwise the card lingers in Backlog
+    // for several seconds after the trashcan click. Same pattern as
+    // useDispatchWorkOrder's onSuccess patch.
+    onSuccess: (order, variables) => {
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, variables.orderId, order);
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
