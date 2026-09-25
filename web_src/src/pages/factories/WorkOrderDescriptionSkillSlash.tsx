@@ -1,10 +1,10 @@
 import type { Editor } from "@tiptap/react";
-import { useCallback, useEffect, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, type MutableRefObject } from "react";
 
 import { SkillSlashMenu } from "@/components/AgentSidebar/SkillSlashMenu";
 import { useSkillSlashCandidates } from "@/hooks/useSkillSlashCandidates";
 import type { SkillSlashCandidate } from "@/lib/skillSlash";
-import { skillSlashMenuHost, skillSlashMenuPortalFromRects } from "@/lib/skillSlashMenu";
+import { skillSlashMenuHost, skillSlashMenuPortalFromRects, type SkillSlashMenuPortal } from "@/lib/skillSlashMenu";
 
 import {
   applySkillSlashMenuKeyDown,
@@ -35,11 +35,11 @@ export function WorkOrderDescriptionSkillSlash({
 
   useEffect(() => {
     setDismissed(false);
-  }, [query?.start]);
+  }, [query?.from]);
 
   useEffect(() => {
     setHighlightIndex(0);
-  }, [query?.query, query?.start]);
+  }, [query?.query, query?.from]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): boolean =>
@@ -65,20 +65,14 @@ export function WorkOrderDescriptionSkillSlash({
   }, [candidates, handleSelect, highlightIndex, keyDownRef, open]);
 
   const host = skillSlashMenuHost(editor.view.dom);
+  const portal = useSkillSlashMenuPortal(editor, host, open);
   return (
     <SkillSlashMenu
       candidates={open ? candidates : []}
       highlightIndex={highlightIndex}
       onHighlight={setHighlightIndex}
       onSelect={handleSelect}
-      portal={{
-        root: host,
-        ...skillSlashMenuPortalFromRects(
-          editor.view.dom.getBoundingClientRect(),
-          editor.view.coordsAtPos(editor.state.selection.from),
-          host.getBoundingClientRect(),
-        ),
-      }}
+      portal={portal}
     />
   );
 }
@@ -97,4 +91,42 @@ function useEditorSkillQuery(editor: Editor) {
   }, [editor]);
 
   return query;
+}
+
+function useSkillSlashMenuPortal(editor: Editor, host: HTMLElement, open: boolean): SkillSlashMenuPortal | undefined {
+  const [box, setBox] = useState<Omit<SkillSlashMenuPortal, "root"> | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setBox(null);
+      return;
+    }
+    const sync = () => {
+      setBox(
+        skillSlashMenuPortalFromRects(
+          editor.view.dom.getBoundingClientRect(),
+          editor.view.coordsAtPos(editor.state.selection.from),
+          host.getBoundingClientRect(),
+        ),
+      );
+    };
+    sync();
+    host.addEventListener("scroll", sync, true);
+    window.addEventListener("resize", sync);
+    window.addEventListener("scroll", sync, true);
+    editor.on("update", sync);
+    editor.on("selectionUpdate", sync);
+    return () => {
+      host.removeEventListener("scroll", sync, true);
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("scroll", sync, true);
+      editor.off("update", sync);
+      editor.off("selectionUpdate", sync);
+    };
+  }, [editor, host, open]);
+
+  if (!open || !box) {
+    return undefined;
+  }
+  return { root: host, ...box };
 }

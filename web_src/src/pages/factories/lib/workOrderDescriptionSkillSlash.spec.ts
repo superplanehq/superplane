@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { skillSlashQueryAtCursor } from "@/lib/skillSlash";
 
-import { applySkillSlashMenuKeyDown } from "./workOrderDescriptionSkillSlash";
+import { applySkillSlashMenuKeyDown, skillSlashQueryInBlock } from "./workOrderDescriptionSkillSlash";
 
 describe("skill slash query in a description block", () => {
   it("matches a slash query in the current block", () => {
@@ -12,6 +12,13 @@ describe("skill slash query in a description block", () => {
 
   it("closes after whitespace so Enter can create the task", () => {
     expect(skillSlashQueryAtCursor("/oypirate ", 10)).toBeNull();
+  });
+
+  it("identifies a slash by document position, not paragraph offset", () => {
+    expect(skillSlashQueryInBlock("/", 1)?.from).toBe(1);
+    expect(skillSlashQueryInBlock("/", 12)?.from).toBe(12);
+    expect(skillSlashQueryInBlock("/", 1)?.start).toBe(0);
+    expect(skillSlashQueryInBlock("/", 12)?.start).toBe(0);
   });
 });
 
