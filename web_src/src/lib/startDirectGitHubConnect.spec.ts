@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
   hostedGitHubConnectUserGate,
-  isOnboardingSetupReturnPath,
   pendingGitHubAccountPicker,
   pendingGitHubBrowserAction,
   pendingGitHubInstallPicker,
@@ -113,9 +112,8 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
-      authorizeUrl: "",
       githubLogin: "forestileao",
-      installations: [{ id: "11", accountLogin: "acme" }],
+      installations: [{ id: "11", accountLogin: "acme", repositories: [] }],
     });
   });
 
@@ -165,11 +163,10 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
-      authorizeUrl: "",
       githubLogin: "",
       installations: [
-        { id: "11", accountLogin: "acme" },
-        { id: "22", accountLogin: "octo" },
+        { id: "11", accountLogin: "acme", repositories: [] },
+        { id: "22", accountLogin: "octo", repositories: [] },
       ],
     });
   });
@@ -232,25 +229,13 @@ describe("pendingGitHubInstallPicker", () => {
   });
 });
 
-describe("isOnboardingSetupReturnPath", () => {
-  it("accepts onboarding and workspace setup paths", () => {
-    expect(isOnboardingSetupReturnPath("/onboarding?attempt=1&step=vcs")).toBe(true);
-    expect(isOnboardingSetupReturnPath("/org-1/workspaces/ws/setup?step=vcs")).toBe(true);
-    expect(isOnboardingSetupReturnPath("/org-1/settings/integrations")).toBe(false);
-    expect(isOnboardingSetupReturnPath(undefined)).toBe(false);
-  });
-});
-
 describe("startDirectGitHubConnect", () => {
   beforeEach(() => {
     remember.mockClear();
     follow.mockClear();
   });
 
-  // Onboarding asks again which GitHub account to use on every Connect
-  // click. Many people stay signed in to two GitHub accounts, so the click
-  // must open GitHub authorization instead of reusing the stored picker.
-  it("opens GitHub authorization again on onboarding when a picker is pending", async () => {
+  it("opens the repository picker on onboarding when installations are ready", async () => {
     const create = vi.fn();
     const goTo = vi.fn();
 
@@ -265,7 +250,6 @@ describe("startDirectGitHubConnect", () => {
             state: "pending",
             metadata: {
               startedByUserID: "user-1",
-              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
               pendingInstallations: [
                 { id: "11", accountLogin: "acme" },
                 { id: "22", accountLogin: "octo" },
@@ -281,44 +265,9 @@ describe("startDirectGitHubConnect", () => {
 
     expect(started).toBe(true);
     expect(create).not.toHaveBeenCalled();
-    expect(follow).toHaveBeenCalledWith({
-      method: "GET",
-      url: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
-    });
-    expect(goTo).not.toHaveBeenCalled();
+    expect(follow).not.toHaveBeenCalled();
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1?setupStay=1");
     expect(remember).toHaveBeenCalledWith("org-1", "/onboarding?attempt=1&step=vcs");
-  });
-
-  // A connection from before the authorize URL was stored cannot restart
-  // OAuth in place, so the click starts a fresh connect. The new connection
-  // also opens GitHub authorization.
-  it("starts a fresh connect on onboarding when the picker kept no authorize URL", async () => {
-    const action = { method: "GET", url: "https://github.com/login/oauth/authorize?client_id=new" };
-    const create = vi.fn().mockResolvedValue({ integration: { status: { browserAction: action } } });
-
-    const started = await startDirectGitHubConnect({
-      organizationId: "org-1",
-      returnTo: "/onboarding?attempt=1&step=vcs",
-      existingNames: new Set(),
-      connected: [
-        {
-          metadata: { id: "int-1", integrationName: "github" },
-          status: {
-            state: "pending",
-            metadata: {
-              startedByUserID: "user-1",
-              pendingInstallations: [{ id: "11", accountLogin: "acme" }],
-            },
-          },
-        },
-      ],
-      currentUserId: "user-1",
-      create,
-    });
-
-    expect(started).toBe(true);
-    expect(create).toHaveBeenCalledTimes(1);
-    expect(follow).toHaveBeenCalledWith(action);
   });
 
   it("opens the picker page when pending installs exist", async () => {

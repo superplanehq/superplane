@@ -99,4 +99,40 @@ func TestAccountLinkedAccount(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, linked)
 	})
+
+	t.Run("prefers a linked GitHub identity", func(t *testing.T) {
+		account, err := CreateAccount("Identity", "identity@example.com")
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Create(&AccountProvider{
+			AccountID:  account.ID,
+			Provider:   ProviderGitHub,
+			ProviderID: "10",
+			Username:   "sign-in-login",
+		}).Error)
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "20", "linked-login", "", ""),
+		))
+
+		identity, err := FindAccountGitHubIdentity(database.Conn(), account.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "20", identity.ProviderID)
+		assert.Equal(t, "linked-login", identity.Username)
+	})
+
+	t.Run("falls back to the GitHub sign-in identity", func(t *testing.T) {
+		account, err := CreateAccount("Signed in", "signed-in@example.com")
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Create(&AccountProvider{
+			AccountID:  account.ID,
+			Provider:   ProviderGitHub,
+			ProviderID: "30",
+			Username:   "provider-login",
+		}).Error)
+
+		identity, err := FindAccountGitHubIdentity(database.Conn(), account.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "30", identity.ProviderID)
+		assert.Equal(t, "provider-login", identity.Username)
+	})
 }

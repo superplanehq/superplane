@@ -26,7 +26,7 @@ export const FIRST_RUN_COPY = {
   },
   connect: {
     headline: "Connect SuperPlane to GitHub",
-    body: "SuperPlane reads your code and tickets, and returns finished work as pull requests.",
+    body: "SuperPlane reads code and tickets in the repositories you choose, and returns finished work as pull requests.",
     signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
     connectGitHub: "Connect GitHub",
     connectAction: "Connect",
@@ -58,7 +58,7 @@ export const FIRST_RUN_COPY = {
     continueReady: "Continue",
     saving: "Saving repository…",
     loading: "Loading repositories…",
-    moreLater: "You can add more repositories later.",
+    moreLater: "SuperPlane will use only this repository.",
   },
   tickets: {
     headline: "Choose the backlog to scan",

@@ -48,8 +48,8 @@ describe("startDirectGitHubConnect request selection", () => {
   });
 
   it("reuses an exact ready connection that has another installation request", async () => {
-    const authorizeAction = "https://github.com/login/oauth/authorize?state=csrf";
     const create = vi.fn();
+    const goTo = vi.fn();
 
     await startDirectGitHubConnect({
       organizationId: "org-1",
@@ -63,9 +63,8 @@ describe("startDirectGitHubConnect request selection", () => {
             metadata: {
               startedByUserID: "user-1",
               state: "csrf",
-              authorizeURL: authorizeAction,
               installRequested: true,
-              pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+              pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [] }],
             },
           },
         },
@@ -73,14 +72,17 @@ describe("startDirectGitHubConnect request selection", () => {
       currentUserId: "user-1",
       preferredIntegrationId: "int-ready",
       create,
+      goTo,
     });
 
     expect(create).not.toHaveBeenCalled();
-    expect(follow).toHaveBeenCalledWith({ method: "GET", url: authorizeAction });
+    expect(follow).not.toHaveBeenCalled();
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-ready?setupStay=1");
   });
 
-  it("repairs a stale authorize URL after GitHub access is revoked", async () => {
+  it("opens the verified repository picker after GitHub access changes", async () => {
     const create = vi.fn();
+    const goTo = vi.fn();
 
     const started = await startDirectGitHubConnect({
       organizationId: "org-1",
@@ -98,21 +100,19 @@ describe("startDirectGitHubConnect request selection", () => {
             metadata: {
               state: "current-state",
               startedByUserID: "user-1",
-              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=revoked-state",
-              pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+              pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [] }],
             },
           },
         },
       ],
       currentUserId: "user-1",
       create,
+      goTo,
     });
 
     expect(started).toBe(true);
     expect(create).not.toHaveBeenCalled();
-    expect(follow).toHaveBeenCalledWith({
-      method: "GET",
-      url: "https://github.com/login/oauth/authorize?client_id=abc&state=current-state",
-    });
+    expect(follow).not.toHaveBeenCalled();
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1?setupStay=1");
   });
 });
