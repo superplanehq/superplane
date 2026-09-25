@@ -170,5 +170,6 @@ func fileUploadPermission(scope string) (resource, action string) {
 	if scope == blob.ScopeTask {
 		return "work_orders", "update"
 	}
-	return "factories", "update"
+	// Workspace files are attached from the new-task dialog.
+	return "work_orders", "create"
 }

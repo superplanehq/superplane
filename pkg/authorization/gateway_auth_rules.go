@@ -713,9 +713,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		// New-task attachments are created before the task exists.
+		// Anyone who can create a task can attach a file, so this uses
+		// task create instead of workspace update.
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/files"}: {
-			Resource:                     "factories",
-			Action:                       "update",
+			Resource:                     "work_orders",
+			Action:                       "create",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},

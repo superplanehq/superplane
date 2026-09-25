@@ -106,7 +106,7 @@ Proto: [protos/files.proto](../../protos/files.proto).
 
 | RPC | HTTP | Auth |
 | --- | --- | --- |
-| `CreateFactoryFile` | `POST /api/v1/factories/{factory_id}/files` | `factories:update` |
+| `CreateFactoryFile` | `POST /api/v1/factories/{factory_id}/files` | `work_orders:create` |
 | `ListFactoryFiles` | `GET /api/v1/factories/{factory_id}/files` | `factories:read` |
 | `CreateWorkOrderFile` | `POST /api/v1/factories/{factory_id}/orders/{order_id}/files` | `work_orders:update` |
 | `ListWorkOrderFiles` | `GET /api/v1/factories/{factory_id}/orders/{order_id}/files` | `work_orders:read` |
