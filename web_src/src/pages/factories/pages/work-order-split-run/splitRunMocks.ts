@@ -1,5 +1,6 @@
 import type {
   FactoriesAutomationRef,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
   FactoriesFactoryPullRequestRevision,
   FactoriesWorkOrder,
@@ -57,6 +58,7 @@ import {
   doneFooterForStatus,
   SPLIT_RUN_DRAFT_NOTE,
   SPLIT_RUN_FAILED_NOTE_TEXT,
+  toFooterNote,
   type SplitRunFooter,
   type SplitRunFooterKind,
   type SplitRunFooterTone,
@@ -73,6 +75,7 @@ import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases"
 import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
 import { withNotifyImplementLog } from "./splitRunNotifyFixture";
 import { trackedPullRequestReviewNote } from "./splitRunPullRequestReview";
+import { pullRequestMentionNote } from "../../lib/pullRequestMentionNote";
 
 export type SplitRunPhaseId = string;
 
@@ -354,6 +357,8 @@ export type SplitRunFixtureOptions = {
   analysisRuns?: BacklogAnalysisRun[];
   /** Task files used to decide if a cancelled analysis already delivered a plan. */
   artifacts?: FactoriesWorkOrderArtifact[];
+  /** The factory's PR feedback handlers, used to tell a waiting reviewer when a mention restarts the agent. */
+  prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
   /**
    * Whether the Backlog automation is still scoring this draft. Covers the
    * optimistic window where a fresh draft is known to be analyzing before its
@@ -409,6 +414,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       demoArtifacts,
       hideWaitingDecision: shouldHideWaitingDecision(options?.prFeedbackRuns),
       fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
+      prFeedbackHandlers: options?.prFeedbackHandlers,
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
       analysisRuns: options?.analysisRuns,
@@ -431,6 +437,7 @@ function reviewSurfaces(
     demoArtifacts?: boolean;
     hideWaitingDecision?: boolean;
     fixesPaused?: boolean;
+    prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
     analysisRuns?: BacklogAnalysisRun[];
@@ -467,7 +474,11 @@ function reviewSurfaces(
     return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
+    return waitingReviewSurface(order, displayStatus, checks, {
+      hideWaitingDecision: input.hideWaitingDecision,
+      fixesPaused: input.fixesPaused,
+      prFeedbackHandlers: input.prFeedbackHandlers,
+    });
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -533,14 +544,17 @@ function waitingReviewSurface(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
-  hideWaitingDecision?: boolean,
-  fixesPaused?: boolean,
+  options: {
+    hideWaitingDecision?: boolean;
+    fixesPaused?: boolean;
+    prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
+  } = {},
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  if (hideWaitingDecision) {
+  if (options.hideWaitingDecision) {
     return surfaces(buildSplitRunFooter({ kind: "waiting", status: displayStatus, decision: false }), [], checks);
   }
   const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
-  if (fixesPaused) {
+  if (options.fixesPaused) {
     const note = pauseFooterNote(notes);
     return surfaces(
       buildSplitRunFooter({
@@ -553,15 +567,13 @@ function waitingReviewSurface(
     );
   }
   const note = notes[0] ?? trackedPullRequestReviewNote(order.pullRequests, order.id);
-  return surfaces(
-    buildSplitRunFooter({
-      kind: "waiting",
-      note,
-      status: displayStatus,
-    }),
-    notes,
-    checks,
-  );
+  const mentionNote = pullRequestMentionNote(order.pullRequests, order.id, options.prFeedbackHandlers);
+  const footer = buildSplitRunFooter({
+    kind: "waiting",
+    note,
+    status: displayStatus,
+  });
+  return surfaces(mentionNote ? { ...footer, mentionNote: toFooterNote(mentionNote) } : footer, notes, checks);
 }
 
 function pauseFooterNote(notes: WorkOrderStatusNotePresentation[]): WorkOrderStatusNotePresentation {

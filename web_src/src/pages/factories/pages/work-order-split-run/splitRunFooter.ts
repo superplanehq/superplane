@@ -139,6 +139,13 @@ export interface SplitRunFooter {
   sentence: string;
   actions: SplitRunFooterAction[];
   note?: SplitRunFooterNote;
+  /**
+   * A task waiting on an open pull request whose repository already has a
+   * healthy PR feedback handler: how to ask for changes. Shown beside
+   * `note` rather than folded into it, since a pull-request `note` renders
+   * through its own review strip that does not show `note.text`.
+   */
+  mentionNote?: SplitRunFooterNote;
   /** When true, the decision note renders as a sticky strip. */
   attentionCard?: boolean;
   run?: { appId: string; runId: string };

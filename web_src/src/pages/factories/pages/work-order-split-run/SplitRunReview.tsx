@@ -178,6 +178,7 @@ export function SplitRunReview({
     >
       <SplitRunAttentionNote
         note={footer.note}
+        mentionNote={footer.mentionNote}
         tone={splitRunDecisionTone(footer)}
         actions={actions}
         runHref={runHref}

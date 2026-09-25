@@ -23,6 +23,7 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { StartEmphasis } from "../../lib/draftReadiness";
+import { PullRequestMentionNote } from "./PullRequestMentionNote";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
 import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
@@ -97,6 +98,7 @@ function StoppedHeadline({ note }: { note: SplitRunFooterNote }) {
 
 export function SplitRunAttentionNote({
   note,
+  mentionNote,
   tone = "waiting",
   actions = [],
   runHref,
@@ -115,6 +117,8 @@ export function SplitRunAttentionNote({
   onAction,
 }: {
   note: SplitRunFooterNote;
+  /** How to ask for changes, shown under the note. Absent unless the repository has a healthy handler for it. */
+  mentionNote?: SplitRunFooterNote;
   tone?: SplitRunDecisionTone;
   actions?: SplitRunFooterAction[];
   runHref?: string | null;
@@ -148,11 +152,8 @@ export function SplitRunAttentionNote({
     canAct,
     onAction,
   });
-  if (pullRequestNote) {
-    return pullRequestNote;
-  }
 
-  return (
+  const primaryNote = pullRequestNote ?? (
     <StandardAttentionNote
       note={note}
       tone={tone}
@@ -167,6 +168,17 @@ export function SplitRunAttentionNote({
       startEmphasis={startEmphasis}
       onAction={onAction}
     />
+  );
+
+  if (actionsOnly || !mentionNote?.text) {
+    return primaryNote;
+  }
+
+  return (
+    <>
+      {primaryNote}
+      <PullRequestMentionNote text={mentionNote.text} compact={compact} />
+    </>
   );
 }
 

@@ -1179,6 +1179,7 @@ function LineBoardSplitRunPopup({
         lineName: resolvedLineName,
         demoArtifacts: false,
         prFeedbackRuns,
+        prFeedbackHandlers: peekHandlers,
         analysisRuns,
         isAnalyzing,
         stoppedBy: closer.actor,
