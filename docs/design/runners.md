@@ -841,7 +841,7 @@ The response does not contain an acknowledged sequence.
 Use deterministic temporary keys:
 
 ```text
-runner-logs/v1/temporary/{organization_id}/{task_id}/chunks/{sequence}.ndjson
+runner-logs/v1/{organization_id}/{task_id}/chunks/{sequence}.ndjson
 ```
 
 PostgreSQL stores only transient upload state:
@@ -889,7 +889,7 @@ It does not delay task completion, runner exit, or provider deletion.
 Use one deterministic final key:
 
 ```text
-runner-logs/v1/final/{organization_id}/{task_id}/logs.ndjson.gz
+runner-logs/v1/{organization_id}/{task_id}/logs.ndjson.gz
 ```
 
 The final object is a gzip-compressed NDJSON stream.
