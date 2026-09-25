@@ -308,7 +308,7 @@ function useSelectOnboardingVcsConnection(args: {
   setup: OnboardingSetupApi;
   updateOnboarding: UpdateOnboarding;
   currentId: string;
-  selectInstance: (integrationName: string, integrationId: string) => void;
+  selectInstance: (integrationName: string, integrationId: string) => boolean;
 }) {
   const queryClient = useQueryClient();
   return async (integrationId: string): Promise<boolean> => {
@@ -326,8 +326,7 @@ function useSelectOnboardingVcsConnection(args: {
       });
       if (!saved) return false;
     }
-    args.selectInstance("github", integrationId);
-    return true;
+    return args.selectInstance("github", integrationId);
   };
 }
 

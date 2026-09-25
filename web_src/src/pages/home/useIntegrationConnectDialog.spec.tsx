@@ -9,6 +9,7 @@ import { unmockedPackage, unmockedSrc } from "@/test/unmockedModule";
 import type * as StartDirectJiraConnectModule from "@/lib/startDirectJiraConnect";
 
 import {
+  selectLatestReadyIntegrationInstance,
   selectReadyIntegrationInstance,
   useHostedGitHubConnect,
   useHostedJiraConnect,
@@ -145,6 +146,25 @@ describe("selectReadyIntegrationInstance", () => {
 
     expect(selectReadyIntegrationInstance(connected, {}, "openrouter")).toEqual({
       openrouter: { id: "openrouter-1", name: "openrouter", ready: true },
+    });
+  });
+
+  it("uses the refreshed connection after a pending GitHub installation becomes ready", () => {
+    const pending = [
+      {
+        metadata: { id: "github-1", integrationName: "github" },
+        status: { state: "pending" },
+      },
+    ];
+    const refreshed = [
+      {
+        metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+        status: { state: "ready" },
+      },
+    ];
+
+    expect(selectLatestReadyIntegrationInstance(refreshed, pending, {}, "github", "github-1")).toEqual({
+      github: { id: "github-1", name: "github-acme", ready: true },
     });
   });
 });
