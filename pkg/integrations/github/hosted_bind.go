@@ -154,10 +154,9 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		lookupRequester := requester
 		if localUnverifiedDiscovery {
 			// Local discovery has no linked GitHub identity. Query all App
-			// requests, then retain only requests already tracked by this
-			// connection. This keeps an open organization request from being
-			// mistaken for an approved installation without attaching another
-			// developer's request to this connection.
+			// requests. The pre-redirect baseline and callback timestamp below
+			// can associate one new request without attaching a request that was
+			// already open for another developer.
 			lookupRequester = ""
 		}
 		openRequests, err = listAppInstallationRequests(requestContext, client, lookupRequester)
@@ -165,6 +164,10 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 			return fmt.Errorf("failed to list app installation requests: %w", err)
 		}
 		if localUnverifiedDiscovery {
+			if len(trackedRequests) == 0 {
+				metadata.ObservedInstallRequestIDs = installRequestIDs(openRequests)
+				metadata.InstallRequestBaselineCaptured = true
+			}
 			openRequests = trackedOpenInstallRequests(trackedRequests, openRequests)
 		}
 	}
@@ -233,18 +236,31 @@ func trackedOpenInstallRequests(tracked, open []common.InstallRequest) []common.
 		return !installRequestIsOpen(candidate, tracked)
 	})
 	for _, request := range tracked {
-		if request.AccountLogin != "" {
+		if request.AccountLogin != "" || !request.BaselineCaptured {
 			continue
 		}
 
 		candidates := slices.DeleteFunc(slices.Clone(open), func(candidate common.InstallRequest) bool {
-			return installRequestIsOpen(candidate, matched) || !installRequestsAreContemporaneous(request, candidate)
+			return candidate.ID == "" ||
+				slices.Contains(request.ExistingRequestIDs, candidate.ID) ||
+				installRequestIsOpen(candidate, matched) ||
+				!installRequestsAreContemporaneous(request, candidate)
 		})
 		if len(candidates) == 1 {
 			matched = append(matched, candidates[0])
 		}
 	}
 	return matched
+}
+
+func installRequestIDs(requests []common.InstallRequest) []string {
+	ids := make([]string, 0, len(requests))
+	for _, request := range requests {
+		if request.ID != "" {
+			ids = append(ids, request.ID)
+		}
+	}
+	return ids
 }
 
 func installRequestsAreContemporaneous(first, second common.InstallRequest) bool {

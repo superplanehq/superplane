@@ -676,12 +676,20 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
 	createdAt := time.Now().UTC()
-	openRequests := []common.InstallRequest{{
-		ID:             "1",
-		AccountLogin:   "approved",
-		RequesterLogin: "member",
-		CreatedAt:      createdAt.Format(time.RFC3339Nano),
-	}}
+	openRequests := []common.InstallRequest{
+		{
+			ID:             "existing-request",
+			AccountLogin:   "other",
+			RequesterLogin: "other-member",
+			CreatedAt:      createdAt.Format(time.RFC3339Nano),
+		},
+		{
+			ID:             "1",
+			AccountLogin:   "approved",
+			RequesterLogin: "member",
+			CreatedAt:      createdAt.Format(time.RFC3339Nano),
+		},
+	}
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
 		return slices.Clone(openRequests), nil
 	}
@@ -695,8 +703,10 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 				{ID: "11", AccountLogin: "existing", Repositories: []common.Repository{{ID: 101, Name: "existing/api"}}},
 			},
 			InstallRequests: []common.InstallRequest{{
-				RequesterLogin: "development",
-				CreatedAt:      createdAt.Format(time.RFC3339Nano),
+				RequesterLogin:     "development",
+				CreatedAt:          createdAt.Format(time.RFC3339Nano),
+				ExistingRequestIDs: []string{"existing-request"},
+				BaselineCaptured:   true,
 			}},
 			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 		},
@@ -731,13 +741,48 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 
 func TestTrackedOpenInstallRequestsDoesNotGuessBetweenConcurrentRequests(t *testing.T) {
 	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
-	tracked := []common.InstallRequest{{CreatedAt: createdAt}}
+	tracked := []common.InstallRequest{{CreatedAt: createdAt, BaselineCaptured: true}}
 	open := []common.InstallRequest{
 		{ID: "1", AccountLogin: "acme", CreatedAt: createdAt},
 		{ID: "2", AccountLogin: "octo", CreatedAt: createdAt},
 	}
 
 	assert.Empty(t, trackedOpenInstallRequests(tracked, open))
+}
+
+func TestTrackedOpenInstallRequestsIgnoresRequestObservedBeforeRedirect(t *testing.T) {
+	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
+	tracked := []common.InstallRequest{{
+		CreatedAt:          createdAt,
+		ExistingRequestIDs: []string{"1"},
+		BaselineCaptured:   true,
+	}}
+	open := []common.InstallRequest{{ID: "1", AccountLogin: "other", CreatedAt: createdAt}}
+
+	assert.Empty(t, trackedOpenInstallRequests(tracked, open))
+}
+
+func TestReconcileInstallRequestsRecordsDevelopmentBaseline(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return []common.InstallRequest{{ID: "1"}, {ID: "2"}}, nil
+	}
+	metadata := common.Metadata{StartedByGitHubLogin: "development"}
+
+	err := (&GitHub{}).reconcileInstallRequests(
+		core.SyncContext{Context: context.Background(), Integration: &contexts.IntegrationContext{}},
+		common.HostedApp{ID: 99},
+		&metadata,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1", "2"}, metadata.ObservedInstallRequestIDs)
+	assert.True(t, metadata.InstallRequestBaselineCaptured)
 }
 
 func TestSyncHostedAppKeepsDevelopmentInstallRequestWithUnverifiedRepositories(t *testing.T) {

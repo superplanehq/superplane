@@ -218,6 +218,10 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		NewSetupFlow:  true,
 		IntegrationID: "11111111-1111-1111-1111-111111111111",
+		Metadata: common.Metadata{
+			ObservedInstallRequestIDs:      []string{"existing-request"},
+			InstallRequestBaselineCaptured: true,
+		},
 		CurrentProperties: map[string]any{
 			common.PropertyAppState: "csrf",
 		},
@@ -237,8 +241,12 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 		rec.Header().Get("Location"),
 	)
 	require.NotNil(t, integration.Metadata)
-	assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
-	assert.Empty(t, integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.True(t, metadata.InstallRequested)
+	assert.Empty(t, metadata.InstallRequestedAccount)
+	require.Len(t, metadata.InstallRequests, 1)
+	assert.Equal(t, []string{"existing-request"}, metadata.InstallRequests[0].ExistingRequestIDs)
+	assert.True(t, metadata.InstallRequests[0].BaselineCaptured)
 }
 
 func Test__afterAppInstallation_installRequest_persistsAccount(t *testing.T) {

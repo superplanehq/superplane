@@ -48,6 +48,11 @@ type Metadata struct {
 	// after a closed request leaves the waiting UI. This covers an approval
 	// that becomes visible after GitHub removes it from the open request list.
 	InstallRequestDiscoveryUntil string `mapstructure:"installRequestDiscoveryUntil" json:"installRequestDiscoveryUntil,omitempty"`
+	// ObservedInstallRequestIDs records App requests visible before the local
+	// development flow opens GitHub. The request callback uses this baseline to
+	// exclude requests that belong to another developer.
+	ObservedInstallRequestIDs      []string `mapstructure:"observedInstallRequestIds" json:"observedInstallRequestIds,omitempty"`
+	InstallRequestBaselineCaptured bool     `mapstructure:"installRequestBaselineCaptured" json:"installRequestBaselineCaptured,omitempty"`
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
@@ -65,6 +70,9 @@ type InstallRequest struct {
 	AccountLogin   string `mapstructure:"accountLogin" json:"accountLogin,omitempty"`
 	RequesterLogin string `mapstructure:"requesterLogin" json:"requesterLogin,omitempty"`
 	CreatedAt      string `mapstructure:"createdAt" json:"createdAt,omitempty"`
+	// ExistingRequestIDs is the local development request baseline.
+	ExistingRequestIDs []string `mapstructure:"existingRequestIds" json:"existingRequestIds,omitempty"`
+	BaselineCaptured   bool     `mapstructure:"baselineCaptured" json:"baselineCaptured,omitempty"`
 }
 
 type GitHubAppMetadata struct {
