@@ -232,6 +232,7 @@ function TicketsScreenHost({
       chrome={chrome}
       sphere={sphere}
       jiraAvailable={flow.jiraAvailable}
+      jiraFeatureLoading={flow.jiraFeatureLoading}
       jiraChoiceBlock={flow.jiraChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}

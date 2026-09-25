@@ -80,24 +80,58 @@ describe("FirstRunTicketsScreen", () => {
     expect(onConnectJira).toHaveBeenCalledTimes(1);
 
     expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
   });
 
-  it("hides Jira and keeps GitHub Issues and Linear when Jira is unavailable", () => {
+  it("shows Jira and Linear as coming soon when Jira is unavailable", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
     render(
       <FirstRunTicketsScreen
         ticketSource={null}
-        onSelectTicketSource={vi.fn()}
+        onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={vi.fn()}
       />,
     );
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
+  });
+
+  it("does not mark Jira as coming soon while the feature lookup is loading", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        jiraFeatureLoading
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+        onConnectJira={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
   });
 
   it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
@@ -115,7 +149,8 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-projects")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupFailed,
@@ -130,6 +165,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraFeatureLoading
         jiraChoiceBlock="loading"
         jiraConnected
         jiraProjectId="PAY"
@@ -141,6 +177,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupLoading,
     );
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 

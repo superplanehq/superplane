@@ -13,12 +13,12 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
-const feature = vi.hoisted(() => ({ jiraIntake: true, organizationReady: true }));
+const feature = vi.hoisted(() => ({ jiraIntake: true, organizationReady: true, isLoading: false }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (id: string) => id === FEATURE_FACTORY_JIRA_INTAKE && feature.jiraIntake,
-    isLoading: false,
+    isLoading: feature.isLoading,
     organizationReady: feature.organizationReady,
   }),
 }));
@@ -156,6 +156,7 @@ describe("FirstRunSetup Jira intake feature", () => {
   beforeEach(() => {
     feature.jiraIntake = true;
     feature.organizationReady = true;
+    feature.isLoading = false;
   });
 
   it("hides Jira and does not provision a Jira intake when the feature is off", async () => {
@@ -175,9 +176,11 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
@@ -207,7 +210,7 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupFailed,
@@ -223,6 +226,19 @@ describe("FirstRunSetup Jira intake feature", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.saveIssues).toHaveBeenCalledWith("vcs");
     expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("does not mark Jira as coming soon while the feature lookup is loading", () => {
+    feature.isLoading = true;
+    feature.jiraIntake = true;
+
+    renderLiveSetup(pageModel(), { simulateDiscovery: false });
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
   });
 });
 
