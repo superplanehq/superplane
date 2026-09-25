@@ -221,7 +221,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
-		g.refreshHostedAccessibleInstallations(ctx, app, &existing)
+		discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &existing)
 		// A member can request an installation without the request callback
 		// reaching this server, so a known GitHub login is enough to ask
 		// GitHub for that member's open install requests.
@@ -233,6 +233,10 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 				// The connection stays pending; the next sync retries.
 				ctx.Logger.Errorf("failed to adopt requested GitHub App installation: %v", err)
 			}
+		}
+		if discoveryErr != nil {
+			g.clearHostedPendingAction(ctx, existing)
+			return discoveryErr
 		}
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
@@ -258,24 +262,30 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 			Slug: app.Slug,
 		},
 	}
-	g.refreshHostedAccessibleInstallations(ctx, app, &metadata)
+	discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &metadata)
+	if discoveryErr != nil {
+		g.clearHostedPendingAction(ctx, metadata)
+		return discoveryErr
+	}
 	g.refreshHostedPendingAction(ctx, app, metadata)
-
 	return nil
 }
 
-func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) {
+func (g *GitHub) refreshHostedAccessibleInstallations(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	metadata *common.Metadata,
+) error {
 	now := time.Now().UTC()
 	if !requiresHostedInstallationDiscovery(*metadata, now) {
-		return
+		return nil
 	}
 
 	identity, err := hostedGitHubDiscoveryIdentity(ctx.OrganizationID, metadata.StartedByUserID)
 	if err != nil {
-		return
+		return nil
 	}
 	metadata.StartedByGitHubLogin = identity.Login
-	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 
 	installations, err := discoverAccessibleInstallations(context.Background(), ctx.Integration, app, *identity)
 	if err != nil {
@@ -283,9 +293,16 @@ func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app 
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
 		}
-		return
+		if len(metadata.PendingInstallations) == 0 {
+			metadata.InstallationsRefreshedAt = ""
+			return fmt.Errorf("failed to discover GitHub App installations: %w", err)
+		}
+		metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+		return nil
 	}
 	metadata.SetPendingInstallations(installations)
+	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+	return nil
 }
 
 func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation) []common.PendingInstallation {
@@ -324,7 +341,6 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
-
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
 	if metadata.StartedByGitHubLogin == "" {
@@ -339,6 +355,11 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 		URL:         actionURL,
 		Method:      "GET",
 	})
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func (g *GitHub) clearHostedPendingAction(ctx core.SyncContext, metadata common.Metadata) {
+	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.SetMetadata(metadata)
 }
 

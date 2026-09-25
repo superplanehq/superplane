@@ -297,15 +297,27 @@ export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArg
   });
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  const picker = githubAccountPickerFromConnection(result.integration, args.currentUserId);
+  const connection = await retryFailedGitHubDiscovery(args, result.integration);
+  const picker = githubAccountPickerFromConnection(connection, args.currentUserId);
   if (picker) {
     return openGitHubAccountPicker(args, picker.id);
   }
-  const action = result.integration?.status?.browserAction;
+  const action = connection?.status?.browserAction;
   if (!action?.url) {
-    throw new Error("The GitHub App install page did not open.");
+    throw new Error(connection?.status?.stateDescription || "The GitHub App install page did not open.");
   }
   return followBrowserAction(action);
+}
+
+async function retryFailedGitHubDiscovery(
+  args: StartDirectGitHubConnectArgs,
+  connection: OrganizationsIntegration | undefined,
+): Promise<OrganizationsIntegration | undefined> {
+  if (connection?.status?.browserAction?.url || connection?.status?.state !== "error") {
+    return connection;
+  }
+
+  return (await persistSetupReturnPath(args.update, connection.metadata?.id, args.returnTo)) ?? connection;
 }
 
 async function persistSetupReturnPath(

@@ -176,6 +176,57 @@ func TestHostedBindIgnoresUnrelatedInstallationFailure(t *testing.T) {
 	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}}, metadata.Repositories)
 }
 
+func TestSyncHostedAppRetriesDiscoveryWithoutOpeningInstallPage(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme"}}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return nil, assert.AnError
+	}
+	integration := &contexts.IntegrationContext{State: "pending"}
+	syncCtx := core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		ActorUserID:    "user-1",
+		BaseURL:        "https://app.example",
+		Configuration:  Configuration{SetupReturnPath: "/onboarding?step=vcs"},
+		Integration:    integration,
+	}
+
+	err := (&GitHub{}).Sync(syncCtx)
+	require.ErrorContains(t, err, "failed to discover GitHub App installations")
+	assert.Nil(t, integration.BrowserAction)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.PendingInstallations)
+	assert.Empty(t, metadata.InstallationsRefreshedAt)
+
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(syncCtx))
+	assert.Nil(t, integration.BrowserAction)
+	metadata = integration.Metadata.(common.Metadata)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "acme/api", metadata.PendingInstallations[0].Repositories[0].Name)
+	assert.NotEmpty(t, metadata.InstallationsRefreshedAt)
+}
+
 func TestBindHostedInstallationRepositoriesScopesConnection(t *testing.T) {
 	integration := &contexts.IntegrationContext{State: "pending"}
 	ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/bind", nil)
@@ -363,4 +414,15 @@ func resetBindClientHooks() {
 	listInstallationRepos = listInstallationRepositories
 	listAppInstallations = listAppInstallationsFromGitHub
 	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
+}
+
+func stubEmptyHostedDiscovery(t *testing.T) {
+	t.Helper()
+	t.Cleanup(resetBindClientHooks)
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return nil, nil
+	}
 }

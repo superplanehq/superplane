@@ -473,6 +473,48 @@ describe("startDirectGitHubConnect", () => {
     expect(follow).toHaveBeenCalledWith(action);
   });
 
+  it("retries failed discovery and keeps a recovered picker in onboarding", async () => {
+    const created = {
+      metadata: { id: "int-1", integrationName: "github" },
+      status: {
+        state: "error",
+        stateDescription: "failed to discover GitHub App installations",
+        metadata: { startedByUserID: "user-1" },
+      },
+    };
+    const recovered = {
+      ...created,
+      status: {
+        state: "pending",
+        metadata: {
+          startedByUserID: "user-1",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+          pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: 101, name: "acme/api" }] }],
+        },
+      },
+    };
+    const create = vi.fn().mockResolvedValue({ integration: created });
+    const update = vi.fn().mockResolvedValue(recovered);
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [],
+      currentUserId: "user-1",
+      create,
+      update,
+    });
+
+    expect(started).toBe(false);
+    expect(update).toHaveBeenCalledWith({
+      id: "int-1",
+      configuration: { setupReturnPath: "/onboarding?attempt=1&step=vcs" },
+    });
+    expect(follow).not.toHaveBeenCalled();
+  });
+
   it("throws when create does not return a browser action", async () => {
     const create = vi.fn().mockResolvedValue({
       integration: { status: { setupState: { currentStep: { name: "selectOwner" } } } },

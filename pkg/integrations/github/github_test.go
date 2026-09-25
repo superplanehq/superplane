@@ -73,6 +73,7 @@ func Test__GitHub__Sync(t *testing.T) {
 
 	t.Run("hosted public app", func(t *testing.T) {
 		setHostedAppEnv(t)
+		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
@@ -102,6 +103,7 @@ func Test__GitHub__Sync(t *testing.T) {
 
 	t.Run("hosted public app stores a safe setup return path", func(t *testing.T) {
 		setHostedAppEnv(t)
+		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
@@ -119,6 +121,7 @@ func Test__GitHub__Sync(t *testing.T) {
 
 	t.Run("hosted public app ignores an unsafe setup return path", func(t *testing.T) {
 		setHostedAppEnv(t)
+		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
