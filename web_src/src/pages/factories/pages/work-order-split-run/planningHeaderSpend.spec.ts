@@ -110,4 +110,53 @@ describe("planningHeaderSpendToReport", () => {
     );
     expect(saved.spend).toEqual({ tokens: 3000, cents: 30 });
   });
+
+  it("keeps earlier usage when the live run already exceeds that saved total", () => {
+    const first = planningHeaderSpendToReport(
+      undefined,
+      "exec-2",
+      { tokens: 0, cents: 0 },
+      { tokens: 2500, cents: 25 },
+    );
+    const saved = planningHeaderSpendToReport(
+      first.memory,
+      "exec-2",
+      { tokens: 2000, cents: 20 },
+      { tokens: 2500, cents: 25 },
+    );
+    expect(saved.spend).toEqual({ tokens: 4500, cents: 45 });
+  });
+
+  it("does not treat a saved total as the current run only because the token counts match", () => {
+    const first = planningHeaderSpendToReport(
+      undefined,
+      "exec-2",
+      { tokens: 0, cents: 0 },
+      { tokens: 2000, cents: 20 },
+    );
+    const saved = planningHeaderSpendToReport(
+      first.memory,
+      "exec-2",
+      { tokens: 2000, cents: 20 },
+      { tokens: 2000, cents: 20 },
+    );
+    expect(saved.spend).toEqual({ tokens: 4000, cents: 40 });
+  });
+
+  it("does not add the live run again after that run grows and is saved", () => {
+    const started = planningHeaderSpendToReport(undefined, "exec-1", { tokens: 0, cents: 0 }, { tokens: 0, cents: 0 });
+    const grown = planningHeaderSpendToReport(
+      started.memory,
+      "exec-1",
+      { tokens: 0, cents: 0 },
+      { tokens: 2100, cents: 45 },
+    );
+    const saved = planningHeaderSpendToReport(
+      grown.memory,
+      "exec-1",
+      { tokens: 2100, cents: 50 },
+      { tokens: 2100, cents: 45 },
+    );
+    expect(saved.spend).toEqual({ tokens: 2100, cents: 45 });
+  });
 });
