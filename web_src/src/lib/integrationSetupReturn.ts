@@ -142,6 +142,13 @@ function pathnameOf(path: string): string {
   return path.split("?")[0] ?? path;
 }
 
+export function isOnboardingSetupReturnPath(path: string | null | undefined): boolean {
+  if (!path) return false;
+
+  const pathname = pathnameOf(path);
+  return pathname === "/onboarding" || (pathname.includes("/workspaces/") && pathname.endsWith("/setup"));
+}
+
 /** Deletes the marker after the browser lands on the stored return page. */
 export function consumeIntegrationSetupReturnIfArrived(organizationId: string, currentPathname: string): void {
   const stored = peekIntegrationSetupReturn(organizationId);

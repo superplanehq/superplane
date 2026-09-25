@@ -53,8 +53,6 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
 }));
 
-// The install-request recheck and the in-place bind need a query client and
-// the network; the flow tests cover the screens only.
 vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
   useRecheckGitHubInstallRequest: vi.fn(),
 }));
@@ -76,7 +74,6 @@ vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: accountOrganizations, refetch: vi.fn() }),
 }));
 
-// The agent step reports organization spend, which this flow test does not use.
 vi.mock("./AgentStep", () => ({
   AgentStep: () => <div data-testid="agent-step" />,
 }));
@@ -285,8 +282,8 @@ describe("FirstRunSetup", () => {
           state: "csrf",
           githubApp: { slug: "superplane" },
           pendingInstallations: [
-            { id: "11", accountLogin: "acme" },
-            { id: "22", accountLogin: "octo" },
+            { id: "11", accountLogin: "acme", repositories: [{ id: 1, name: "acme/api" }] },
+            { id: "22", accountLogin: "octo", repositories: [{ id: 2, name: "octo/web" }] },
           ],
         },
       },
@@ -330,8 +327,6 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
   });
 
-  // Back walks the exact pages in reverse order: account picker, Connect
-  // GitHub page, welcome.
   it("walks back from the picker to the Connect GitHub page and then to welcome", async () => {
     const user = userEvent.setup();
 
@@ -347,22 +342,6 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
   });
 
-  it("reopens the account picker when the user goes back from the repository screen", async () => {
-    const user = userEvent.setup();
-    const selectVcsConnection = vi.fn().mockResolvedValue(true);
-    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
-      options.onSuccess?.();
-    });
-
-    renderSetup(boundConnectionModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
-
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
-    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("first-run-back"));
-    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
-  });
-
   it("moves the bound connection to another account through the picker", async () => {
     const user = userEvent.setup();
     const selectVcsConnection = vi.fn().mockResolvedValue(true);
@@ -373,13 +352,19 @@ describe("FirstRunSetup", () => {
     renderSetup(boundConnectionModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
+    await user.click(await screen.findByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
+
+    await user.click(await screen.findByRole("option", { name: "octo/web" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
 
     expect(bindMutate).toHaveBeenCalledWith(
-      { state: "csrf", installationId: "22" },
+      { state: "csrf", installationId: "22", repositoryId: "2" },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
     await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("github-1"));
-    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
   });
 
   function bindablePageModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {
@@ -391,12 +376,10 @@ describe("FirstRunSetup", () => {
           startedByUserID: "user-1",
           state: "csrf",
           githubApp: { slug: "superplane" },
-          pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+          pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: 1, name: "acme/api" }] }],
         },
       },
     };
-    // The static test model shows the post-bind refetch already applied: the
-    // bound connection reports ready.
     const readyInstance = {
       metadata: { id: "int-new", name: "github-acme", integrationName: "github" },
       status: { state: "ready", metadata: { owner: "acme" } },
@@ -424,8 +407,11 @@ describe("FirstRunSetup", () => {
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
 
+    await user.click(await screen.findByRole("option", { name: "acme/api" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+
     await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
-    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
   });
 
   it("saves the bound GitHub connection for the initial organization", async () => {
@@ -440,14 +426,14 @@ describe("FirstRunSetup", () => {
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
 
+    await user.click(await screen.findByRole("option", { name: "acme/api" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+
     await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
-    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
   });
 
-  // Regression: the repository screen opened before the bound connection was
-  // saved, so a fast repository pick stored the repository on the prior
-  // connection. The screen must stay on connect when the save fails.
-  it("keeps the connect screen when the bound connection does not save", async () => {
+  it("keeps the repository screen when the bound connection does not save", async () => {
     const user = userEvent.setup();
     const selectVcsConnection = vi.fn().mockResolvedValue(false);
     factory = { id: "factory-1", onboarding: {} };
@@ -459,9 +445,11 @@ describe("FirstRunSetup", () => {
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
 
+    await user.click(await screen.findByRole("option", { name: "acme/api" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+
     await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
-    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {
