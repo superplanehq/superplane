@@ -283,6 +283,7 @@ func Test__CreateIntegration(t *testing.T) {
 	})
 
 	t.Run("github requests a linked identity before hosted install", func(t *testing.T) {
+		t.Setenv("APP_ENV", "production")
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))

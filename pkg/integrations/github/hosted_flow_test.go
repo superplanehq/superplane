@@ -85,6 +85,49 @@ func TestHostedBindRequiresRepository(t *testing.T) {
 	assert.Equal(t, "pending", integration.State)
 }
 
+func TestHostedBindUsesLocalInstallationAccessWithoutIdentity(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	setHostedAppEnv(t)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			StartedByUserID: "missing-local-user",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+	ctx, rec := hostedRequestContext(
+		integration,
+		"/api/v1/github/app/bind?state=csrf&installation_id=11&repository_id=101",
+		nil,
+	)
+	ctx.Request.Method = http.MethodPost
+
+	(&GitHub{}).afterHostedAppBind(ctx)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Equal(t, "ready", integration.State)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Equal(t, "11", metadata.InstallationID)
+	assert.Equal(t, "acme", metadata.Owner)
+	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}}, metadata.Repositories)
+}
+
 func TestBindHostedInstallationRepositoriesScopesConnection(t *testing.T) {
 	integration := &contexts.IntegrationContext{State: "pending"}
 	ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/bind", nil)
@@ -109,6 +152,7 @@ func TestBindHostedInstallationRepositoriesScopesConnection(t *testing.T) {
 }
 
 func TestSyncHostedAppKeepsVerifiedPickerMetadata(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
 	t.Cleanup(restore)
@@ -173,6 +217,7 @@ func TestMergeVerifiedInstallationsPreservesPriorResults(t *testing.T) {
 }
 
 func TestSyncHostedAppReconcilesInstallationRequests(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
 	t.Cleanup(restore)

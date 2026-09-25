@@ -113,20 +113,7 @@ function useFirstRunBlockingAction() {
     },
     [begin, finish],
   );
-  const runUntilNavigation = useCallback(
-    async (next: FirstRunBlockingAction, operation: () => Promise<boolean>) => {
-      if (!begin(next)) return;
-      try {
-        const navigationStarted = await operation();
-        if (!navigationStarted) finish();
-      } catch (error) {
-        finish();
-        throw error;
-      }
-    },
-    [begin, finish],
-  );
-  return { action, busy: action !== null, setAction, run, runUntilNavigation };
+  return { action, busy: action !== null, setAction, run };
 }
 
 function useGitHubConnectionState(model: OnboardingPageModel, organizationId: string) {
@@ -299,18 +286,25 @@ function useFirstRunCommands(args: {
       navigation.goToScreen("connect", "picker");
       return Promise.resolve();
     }
-    return blocking.runUntilNavigation("opening-github", async () => {
+    return blocking.run("opening-github", async () => {
       await waitForBrowserPaint();
-      return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
+      const navigationStarted = await model.requestConnect(
+        "github",
+        connection.requestConnection?.id ?? connection.callbackIntegrationId,
+      );
+      if (navigationStarted) return;
+
+      await model.refreshGithubConnections();
+      navigation.goToScreen("connect", "picker");
     });
   };
   const connectJira = () =>
-    blocking.runUntilNavigation("connecting-jira", async () => {
-      if (!jiraAvailable) return false;
+    blocking.run("connecting-jira", async () => {
+      if (!jiraAvailable) return;
       model.setup.setIssuesChoice("jira");
-      if (!(await model.saveIssues("jira"))) return false;
+      if (!(await model.saveIssues("jira"))) return;
       await waitForBrowserPaint();
-      return model.requestConnect("jira");
+      await model.requestConnect("jira");
     });
   const finishSetup = () =>
     blocking.run("finishing-setup", async () => {
@@ -324,10 +318,9 @@ function useFirstRunCommands(args: {
     const state = connection.accountPicker?.state;
     const slug = connection.accountPicker?.appSlug;
     if (!state || !slug) return Promise.resolve();
-    return blocking.runUntilNavigation("opening-github", async () => {
+    return blocking.run("opening-github", async () => {
       await waitForBrowserPaint();
       window.location.assign(hostedGitHubInstallURL(slug, state));
-      return true;
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {

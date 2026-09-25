@@ -14,6 +14,8 @@ const follow = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/lib/integrationSetupReturn", () => ({
   rememberIntegrationSetupReturn: remember,
   INTEGRATION_SETUP_STAY_PARAM: "setupStay",
+  isOnboardingSetupReturnPath: (path?: string) =>
+    path?.split("?")[0] === "/onboarding" || path?.split("?")[0]?.endsWith("/setup") === true,
 }));
 
 vi.mock("@/lib/browserAction", () => ({
@@ -235,7 +237,7 @@ describe("startDirectGitHubConnect", () => {
     follow.mockClear();
   });
 
-  it("opens the repository picker on onboarding when installations are ready", async () => {
+  it("keeps the repository picker inside onboarding when installations are ready", async () => {
     const create = vi.fn();
     const goTo = vi.fn();
 
@@ -263,10 +265,10 @@ describe("startDirectGitHubConnect", () => {
       goTo,
     });
 
-    expect(started).toBe(true);
+    expect(started).toBe(false);
     expect(create).not.toHaveBeenCalled();
     expect(follow).not.toHaveBeenCalled();
-    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1?setupStay=1");
+    expect(goTo).not.toHaveBeenCalled();
     expect(remember).toHaveBeenCalledWith("org-1", "/onboarding?attempt=1&step=vcs");
   });
 

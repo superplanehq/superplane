@@ -7,6 +7,8 @@ const follow = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/lib/integrationSetupReturn", () => ({
   rememberIntegrationSetupReturn: vi.fn(),
   INTEGRATION_SETUP_STAY_PARAM: "setupStay",
+  isOnboardingSetupReturnPath: (path?: string) =>
+    path?.split("?")[0] === "/onboarding" || path?.split("?")[0]?.endsWith("/setup") === true,
 }));
 vi.mock("@/lib/browserAction", () => ({ followBrowserAction: follow }));
 
@@ -47,11 +49,11 @@ describe("startDirectGitHubConnect request selection", () => {
     expect(follow).toHaveBeenCalledWith(requestedAction);
   });
 
-  it("reuses an exact ready connection that has another installation request", async () => {
+  it("keeps an exact ready connection with an installation request inside onboarding", async () => {
     const create = vi.fn();
     const goTo = vi.fn();
 
-    await startDirectGitHubConnect({
+    const started = await startDirectGitHubConnect({
       organizationId: "org-1",
       returnTo: "/org-1/workspaces/ws/setup?step=vcs",
       existingNames: new Set(),
@@ -77,10 +79,11 @@ describe("startDirectGitHubConnect request selection", () => {
 
     expect(create).not.toHaveBeenCalled();
     expect(follow).not.toHaveBeenCalled();
-    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-ready?setupStay=1");
+    expect(started).toBe(false);
+    expect(goTo).not.toHaveBeenCalled();
   });
 
-  it("opens the verified repository picker after GitHub access changes", async () => {
+  it("keeps the verified repository picker inside onboarding after GitHub access changes", async () => {
     const create = vi.fn();
     const goTo = vi.fn();
 
@@ -110,9 +113,67 @@ describe("startDirectGitHubConnect request selection", () => {
       goTo,
     });
 
-    expect(started).toBe(true);
+    expect(started).toBe(false);
     expect(create).not.toHaveBeenCalled();
     expect(follow).not.toHaveBeenCalled();
-    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1?setupStay=1");
+    expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it("keeps a picker returned while refreshing a pending connection inside onboarding", async () => {
+    const staleAction = { method: "GET", url: "/auth/github?intent=connect" };
+    const goTo = vi.fn();
+    const update = vi.fn().mockResolvedValue(pickerConnection());
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: { state: "pending", browserAction: staleAction, metadata: { startedByUserID: "user-1" } },
+        },
+      ],
+      currentUserId: "user-1",
+      create: vi.fn(),
+      update,
+      goTo,
+    });
+
+    expect(started).toBe(false);
+    expect(follow).not.toHaveBeenCalled();
+    expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it("keeps a picker returned while creating a connection inside onboarding", async () => {
+    const goTo = vi.fn();
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [],
+      currentUserId: "user-1",
+      create: vi.fn().mockResolvedValue({ integration: pickerConnection() }),
+      goTo,
+    });
+
+    expect(started).toBe(false);
+    expect(follow).not.toHaveBeenCalled();
+    expect(goTo).not.toHaveBeenCalled();
   });
 });
+
+function pickerConnection() {
+  return {
+    metadata: { id: "int-1", integrationName: "github" },
+    status: {
+      state: "pending",
+      metadata: {
+        state: "csrf",
+        startedByUserID: "user-1",
+        pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
+      },
+    },
+  };
+}

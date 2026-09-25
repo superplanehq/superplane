@@ -58,6 +58,44 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 	assert.Empty(t, writable)
 }
 
+func TestDiscoverAccessibleInstallationsUsesDevelopmentIdentity(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}, {ID: 102, Name: "web"}}, nil
+	}
+
+	installations, err := discoverAccessibleInstallations(
+		context.Background(),
+		&contexts.IntegrationContext{},
+		common.HostedApp{ID: 99},
+		hostedGitHubIdentity{Login: "devuser", Development: true},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, installations, 1)
+	assert.Equal(t, "acme", installations[0].AccountLogin)
+	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}, {ID: 102, Name: "acme/web"}}, installations[0].Repositories)
+}
+
+func TestDevelopmentGitHubDiscoveryIsLocalOnly(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	assert.True(t, useDevelopmentGitHubDiscovery())
+
+	t.Setenv("APP_ENV", "production")
+	assert.False(t, useDevelopmentGitHubDiscovery())
+}
+
 func TestHasRepositoryWritePermission(t *testing.T) {
 	assert.True(t, hasRepositoryWritePermission("admin"))
 	assert.True(t, hasRepositoryWritePermission("write"))

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -17,8 +18,9 @@ import (
 )
 
 type hostedGitHubIdentity struct {
-	ID    int64
-	Login string
+	ID          int64
+	Login       string
+	Development bool
 }
 
 type repositoryPermissionLookup func(context.Context, string, string, string) (*gh.RepositoryPermissionLevel, error)
@@ -47,6 +49,18 @@ func findStartedByGitHubIdentity(organizationID, userID string) (*hostedGitHubId
 	}
 
 	return &hostedGitHubIdentity{ID: id, Login: strings.TrimSpace(identity.Username)}, nil
+}
+
+func useDevelopmentGitHubDiscovery() bool {
+	return os.Getenv("APP_ENV") == "development"
+}
+
+func hostedGitHubDiscoveryIdentity(organizationID, userID string) (*hostedGitHubIdentity, error) {
+	if useDevelopmentGitHubDiscovery() {
+		return &hostedGitHubIdentity{Login: "development", Development: true}, nil
+	}
+
+	return findStartedByGitHubIdentity(organizationID, userID)
 }
 
 func hostedIdentityConnectURL(baseURL, returnPath string) string {
@@ -87,6 +101,18 @@ func discoverAccessibleInstallations(
 			failedChecks = append(failedChecks, fmt.Errorf("create client for installation %s: %w", installation.ID, err))
 			continue
 		}
+		if identity.Development {
+			repositories, err := listInstallationRepos(ctx, client)
+			if err != nil {
+				failedChecks = append(failedChecks, fmt.Errorf("list repositories for installation %s: %w", installation.ID, err))
+				continue
+			}
+			installation.Repositories = qualifyRepositoryNames(installation.AccountLogin, repositories)
+			if len(installation.Repositories) > 0 {
+				accessible = append(accessible, installation)
+			}
+			continue
+		}
 
 		user, _, err := client.Users.GetByID(ctx, identity.ID)
 		if err != nil {
@@ -106,7 +132,6 @@ func discoverAccessibleInstallations(
 			failedChecks = append(failedChecks, fmt.Errorf("list repositories for installation %s: %w", installation.ID, err))
 			continue
 		}
-
 		writable, err := filterWritableRepositories(
 			ctx,
 			installation.AccountLogin,
@@ -133,6 +158,15 @@ func discoverAccessibleInstallations(
 	}
 
 	return accessible, nil
+}
+
+func qualifyRepositoryNames(owner string, repositories []common.Repository) []common.Repository {
+	qualified := make([]common.Repository, 0, len(repositories))
+	for _, repository := range repositories {
+		repository.Name = owner + "/" + repository.Name
+		qualified = append(qualified, repository)
+	}
+	return qualified
 }
 
 func filterWritableRepositories(

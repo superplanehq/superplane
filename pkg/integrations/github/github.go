@@ -270,7 +270,7 @@ func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app 
 		return
 	}
 
-	identity, err := findStartedByGitHubIdentity(ctx.OrganizationID, metadata.StartedByUserID)
+	identity, err := hostedGitHubDiscoveryIdentity(ctx.OrganizationID, metadata.StartedByUserID)
 	if err != nil {
 		return
 	}

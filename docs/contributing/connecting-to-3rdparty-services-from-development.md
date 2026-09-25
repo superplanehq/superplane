@@ -153,7 +153,12 @@ value is set and that the App ID is a positive integer. Then restart
 
 1. Open `/onboarding` or create a workspace.
 2. SuperPlane must show the workspace wizard, not the GitHub App notice.
-3. Connect GitHub. The browser must open your public app install page.
+3. Connect GitHub. The browser opens the public app install page or shows the
+   repositories from an existing installation.
+
+In development, SuperPlane lists the repositories that are available to the
+configured GitHub App. Production continues to verify the signed-in member's
+write access before it shows a repository.
 
 If setup stays blocked, the installation still has no complete
 `SUPERPLANE_GITHUB_APP_*` set. Check `.env` and restart the server.
