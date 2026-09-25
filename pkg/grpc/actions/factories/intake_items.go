@@ -471,12 +471,18 @@ func newDependabotIntakeItemSource(
 }
 
 func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	alerts, err := s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
+	query = strings.ToLower(strings.TrimSpace(query))
+	var alerts []*github.DependabotAlert
+	var err error
+	if query == "" {
+		alerts, _, err = s.github.ListOpenDependabotAlerts(ctx, s.repository, limit)
+	} else {
+		alerts, err = s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
+	}
 	if err != nil {
 		return nil, ghdependabot.UnavailableError(err)
 	}
 
-	query = strings.ToLower(strings.TrimSpace(query))
 	items := make([]IntakeItem, 0, len(alerts))
 	for _, alert := range alerts {
 		item, ok := dependabotAlertItem(alert)

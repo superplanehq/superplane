@@ -77,25 +77,29 @@ func (a *OnAlert) Color() string {
 
 func (a *OnAlert) ExampleData() map[string]any {
 	return map[string]any{
-		"action": "created",
-		"alert": map[string]any{
-			"number":   7,
-			"html_url": "https://github.com/acme/payments/security/dependabot/7",
-			"dependency": map[string]any{
-				"package": map[string]any{
-					"name":      "lodash",
-					"ecosystem": "npm",
+		"type":      PayloadType,
+		"timestamp": "2026-09-25T09:00:00Z",
+		"data": map[string]any{
+			"action": "created",
+			"alert": map[string]any{
+				"number":   7,
+				"html_url": "https://github.com/acme/payments/security/dependabot/7",
+				"dependency": map[string]any{
+					"package": map[string]any{
+						"name":      "lodash",
+						"ecosystem": "npm",
+					},
+					"manifest_path": "package.json",
 				},
-				"manifest_path": "package.json",
-			},
-			"security_advisory": map[string]any{
-				"summary":  "Prototype pollution in lodash",
-				"severity": "high",
-			},
-			"security_vulnerability": map[string]any{
-				"vulnerable_version_range": "< 4.17.21",
-				"first_patched_version": map[string]any{
-					"identifier": "4.17.21",
+				"security_advisory": map[string]any{
+					"summary":  "Prototype pollution in lodash",
+					"severity": "high",
+				},
+				"security_vulnerability": map[string]any{
+					"vulnerable_version_range": "< 4.17.21",
+					"first_patched_version": map[string]any{
+						"identifier": "4.17.21",
+					},
 				},
 			},
 		},
