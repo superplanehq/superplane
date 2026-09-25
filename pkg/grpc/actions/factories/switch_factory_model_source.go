@@ -187,11 +187,22 @@ func rewriteCanvasAgents(
 
 	now := time.Now()
 	for _, node := range rewritten {
-		err := tx.Model(&models.CanvasNode{}).
+		busy, err := nodeHasActiveExecution(tx, canvas.ID, node.ID)
+		if err != nil {
+			return false, err
+		}
+		// An active execution copies configuration and reads the runner from
+		// the runtime node when it starts. Leave that node until it is idle.
+		if busy {
+			continue
+		}
+		err = tx.Model(&models.CanvasNode{}).
 			Where("workflow_id = ? AND node_id = ?", canvas.ID, node.ID).
 			Updates(map[string]any{
 				"ref":           datatypes.NewJSONType(node.Ref),
 				"configuration": datatypes.NewJSONType(node.Configuration),
+				"state":         models.CanvasNodeStateReady,
+				"state_reason":  nil,
 				"updated_at":    now,
 			}).Error
 		if err != nil {
@@ -199,6 +210,17 @@ func rewriteCanvasAgents(
 		}
 	}
 	return true, nil
+}
+
+func nodeHasActiveExecution(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (bool, error) {
+	var count int64
+	err := tx.Model(&models.CanvasNodeExecution{}).
+		Where("workflow_id = ? AND node_id = ? AND state IN ?", canvasID, nodeID, models.CanvasNodeExecutionActiveStates).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func ensureWorkspaceProviderIntegration(
@@ -214,11 +236,6 @@ func ensureWorkspaceProviderIntegration(
 		return nil, err
 	}
 	if existing != nil {
-		if strings.TrimSpace(apiKey) != "" {
-			if err := storeIntegrationAPIKey(ctx, tx, encryptor, existing, apiKey); err != nil {
-				return nil, err
-			}
-		}
 		return existing, nil
 	}
 
@@ -256,31 +273,6 @@ func ensureWorkspaceProviderIntegration(
 		return nil, err
 	}
 	return integration, nil
-}
-
-func storeIntegrationAPIKey(
-	ctx context.Context,
-	tx *gorm.DB,
-	encryptor crypto.Encryptor,
-	integration *models.Integration,
-	apiKey string,
-) error {
-	encrypted, err := encryptAPIKey(ctx, encryptor, integration.ID, apiKey)
-	if err != nil {
-		return err
-	}
-	config := integration.Configuration.Data()
-	if config == nil {
-		config = map[string]any{}
-	}
-	config["apiKey"] = encrypted
-	now := time.Now()
-	integration.Configuration = datatypes.NewJSONType(config)
-	integration.UpdatedAt = &now
-	return tx.Model(integration).Updates(map[string]any{
-		"configuration": integration.Configuration,
-		"updated_at":    now,
-	}).Error
 }
 
 func encryptAPIKey(ctx context.Context, encryptor crypto.Encryptor, integrationID uuid.UUID, apiKey string) (string, error) {

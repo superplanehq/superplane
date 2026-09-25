@@ -46,6 +46,9 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 	hostedLive := *hosted.LiveVersionID
 	providerLive := *provider.LiveVersionID
 	untouchedLive := *untouched.LiveVersionID
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", hosted.ID, "agent").
+		Update("state", models.CanvasNodeStateError).Error)
 
 	changed, _, err := SwitchFactoryModelSourceInTransaction(
 		t.Context(),
@@ -60,6 +63,7 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 
 	assertAgentNode(t, db, hosted.ID, "runnerClaudeCode", "sonnet", "claude")
 	assertAgentNode(t, db, provider.ID, "runnerClaudeCode", "sonnet", "claude")
+	assertCanvasNodeReady(t, db, hosted.ID, "agent")
 	assertCanvasLiveVersion(t, db, untouched.ID, untouchedLive)
 	assertCanvasLiveVersionChanged(t, db, hosted.ID, hostedLive)
 	assertCanvasLiveVersionChanged(t, db, provider.ID, providerLive)
@@ -174,4 +178,38 @@ func assertCanvasLiveVersionChanged(t *testing.T, db *gorm.DB, canvasID, previou
 	require.NoError(t, db.First(&canvas, "id = ?", canvasID).Error)
 	require.NotNil(t, canvas.LiveVersionID)
 	assert.NotEqual(t, previous, *canvas.LiveVersionID)
+}
+
+func assertCanvasNodeReady(t *testing.T, db *gorm.DB, canvasID uuid.UUID, nodeID string) {
+	t.Helper()
+	var node models.CanvasNode
+	require.NoError(t, db.Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).First(&node).Error)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
+	assert.Nil(t, node.StateReason)
+}
+
+func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	installation, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", "claude", map[string]any{"apiKey": "kept"})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(installation).Update("state", models.IntegrationStateReady).Error)
+	createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+
+	_, integrationID, err := SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		crypto.NewNoOpEncryptor(),
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceAnthropic,
+		"sk-new",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, installation.ID.String(), integrationID)
+
+	var saved models.Integration
+	require.NoError(t, db.First(&saved, "id = ?", installation.ID).Error)
+	assert.Equal(t, "kept", saved.Configuration.Data()["apiKey"])
 }

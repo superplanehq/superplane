@@ -41,16 +41,23 @@ function SwitchFlow({
       dialog={dialog}
       switchedNotice={switchedNotice}
       onChoose={(target) => {
+        console.log("choose model source", target);
         setDialog({ target, step: "warn" });
       }}
-      onCancel={() => setDialog(null)}
+      onCancel={() => {
+        console.log("cancel model source switch");
+        setDialog(null);
+      }}
       onContinueToKey={() => {
+        console.log("continue to model source key");
         setDialog((current) => (current && current.target !== "hosted" ? { ...current, step: "key" } : current));
       }}
       onBackToWarning={() => {
+        console.log("back to model source warning");
         setDialog((current) => (current ? { ...current, step: "warn" } : current));
       }}
       onSaveKey={() => {
+        console.log("save model source key");
         if (!dialog || dialog.target === "hosted") {
           return;
         }
@@ -59,6 +66,7 @@ function SwitchFlow({
         setDialog(null);
       }}
       onSwitchToHosted={() => {
+        console.log("switch model source to SuperPlane");
         setSource("hosted");
         setSwitchedNotice(true);
         setDialog(null);

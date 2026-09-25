@@ -148,9 +148,14 @@ export function FactorySettingsOrganizationLLMModelsPage() {
         dialog={dialog}
         onCancel={() => setDialog(null)}
         onContinueToKey={() => {
-          if (dialog && dialog.target !== "hosted") {
-            setDialog({ target: dialog.target, step: "key" });
+          if (!dialog || dialog.target === "hosted") {
+            return;
           }
+          if (connected.includes(dialog.target)) {
+            void saveSwitch(dialog.target);
+            return;
+          }
+          setDialog({ target: dialog.target, step: "key" });
         }}
         onBackToWarning={() => {
           if (dialog) {

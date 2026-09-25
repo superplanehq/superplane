@@ -240,6 +240,20 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(switchSource).toHaveBeenCalledWith({ source: "anthropic", apiKey: "sk-test" });
   });
 
+  it("switches to a connected provider without asking for a key", async () => {
+    const user = userEvent.setup();
+    setConnected("anthropic", ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+
+    await user.click(
+      within(screen.getByTestId("llm-models-connect-anthropic")).getByRole("button", { name: "Connect" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Switch to Claude" }));
+
+    expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
+    expect(switchSource).toHaveBeenCalledWith({ source: "anthropic", apiKey: undefined });
+  });
+
   it("returns to SuperPlane from the provider page and still edits the model checklist", async () => {
     const user = userEvent.setup();
     setConnected("anthropic", ["claude-opus-4-6", "claude-sonnet-4-6"], ["claude-opus-4-6"]);
