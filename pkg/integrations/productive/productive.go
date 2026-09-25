@@ -11,10 +11,10 @@ import (
 )
 
 const installationInstructions = `
-To configure Productive.io to work with SuperPlane:
+To configure Productive to work with SuperPlane:
 
-1. **Get an API token**: In Productive.io, go to **Settings > API Integrations**. Create a personal access token with read and write permissions.
-2. **Get the organization id**: The organization id is the numeric id in your Productive.io URL, e.g. ` + "`app.productive.io/<organization-id>-name`" + `.
+1. **Get an API token**: In Productive, go to **Settings > API Integrations**. Create a personal access token with read and write permissions.
+2. **Get the organization id**: The organization id is the numeric id in your Productive URL, e.g. ` + "`app.productive.io/<organization-id>-name`" + `.
 3. **Enter credentials**: Provide the API token and organization id in the integration configuration.
 `
 
@@ -37,7 +37,7 @@ func (p *Productive) Icon() string {
 }
 
 func (p *Productive) Description() string {
-	return "Create backlog items from tasks in Productive.io"
+	return "Create backlog items from tasks in Productive"
 }
 
 func (p *Productive) Instructions() string {
@@ -52,14 +52,14 @@ func (p *Productive) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Personal access token from Productive.io Settings > API Integrations, with read and write permissions.",
+			Description: "Personal access token from Productive Settings > API Integrations, with read and write permissions.",
 		},
 		{
 			Name:        "organizationId",
 			Label:       "Organization ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The numeric organization id in your Productive.io URL",
+			Description: "The numeric organization id in your Productive URL",
 		},
 		{
 			Name:        "region",

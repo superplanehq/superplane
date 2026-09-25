@@ -40,7 +40,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
     <>
       <IntakeSetupWizard
         testId="productive-intake-setup"
-        integrationName="Productive.io"
+        integrationName="Productive"
         step={setup.step}
         title={title}
         helper={helper}

@@ -43,8 +43,8 @@ func Test__Get(t *testing.T) {
 		f, ok := Get(FeatureFactoryProductiveIntake)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
-		assert.Equal(t, "Factory Productive.io Intake", f.Label)
-		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
+		assert.Equal(t, "Factory Productive Intake", f.Label)
+		assert.Equal(t, "Add Productive intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
