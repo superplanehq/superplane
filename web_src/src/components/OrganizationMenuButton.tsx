@@ -6,7 +6,6 @@ import { organizationMatchesRoute, organizationRouteId, readyAccountOrganization
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
-  Bug,
   CircleUser,
   Factory,
   Key,
@@ -15,7 +14,6 @@ import {
   LogOut,
   Mail,
   Menu,
-  MessageSquare,
   Plug,
   Settings,
   Shield,
@@ -32,8 +30,6 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { posthog } from "@/posthog";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
-import { FeedbackDialog } from "@/components/FeedbackDialog";
-import type { FeedbackCategory } from "@/lib/submitFeedback";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { factoryListPath } from "@/pages/factories/lib/factoryPagePaths";
@@ -51,8 +47,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isOrganizationSwitchOpen, setIsOrganizationSwitchOpen] = useState(false);
-  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory | undefined>();
   const accountOrganizationsQuery = useAccountOrganizations();
   const listedOrganizations = accountOrganizationsQuery.data ?? [];
   const accountOrganizations = readyAccountOrganizations(listedOrganizations);
@@ -93,12 +87,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const organizationName = organization?.metadata?.name || "Organization";
   const logoHref = !organizationId ? "/" : factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
 
-  const openFeedback = (category?: FeedbackCategory) => {
-    setIsMenuOpen(false);
-    setFeedbackCategory(category);
-    setIsFeedbackOpen(true);
-  };
-
   const sidebarUserLinks = [
     ...(organizationId
       ? [
@@ -106,20 +94,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             label: "Profile",
             href: `/${organizationId}/settings/profile`,
             Icon: CircleUser,
-          },
-        ]
-      : []),
-    ...(organizationId
-      ? [
-          {
-            label: "Report issue",
-            Icon: Bug,
-            onClick: () => openFeedback("bug"),
-          },
-          {
-            label: "Send feedback",
-            Icon: MessageSquare,
-            onClick: () => openFeedback("other"),
           },
         ]
       : []),
@@ -448,12 +422,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             </div>
           </HoverCardContent>
         </HoverCard>
-        <FeedbackDialog
-          open={isFeedbackOpen}
-          onOpenChange={setIsFeedbackOpen}
-          organizationId={organizationId}
-          initialCategory={feedbackCategory}
-        />
       </div>
     </TooltipProvider>
   );

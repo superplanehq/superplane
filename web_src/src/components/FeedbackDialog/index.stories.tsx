@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import type { FeedbackCategory } from "@/lib/submitFeedback";
 
 /**
- * Start-menu feedback form. Report issue opens Report a bug. Send feedback
+ * Workspace feedback form. Report issue opens Report a bug. Send feedback
  * opens Something else. Submit posts to POST /api/v1/me/feedback.
  */
 const meta = {
@@ -21,7 +21,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The organization start menu opens this form. Report issue selects Report a bug. Send feedback selects Something else. The user can attach one allowed file up to 5 MB.",
+          "The workspace user menu opens this form. Report issue selects Report a bug. Send feedback selects Something else. The user can attach one allowed file up to 5 MB.",
       },
     },
   },
@@ -153,9 +153,9 @@ const dialogCanvas = () => within(document.body);
 
 const darkGlobals = { theme: "dark" as const };
 
-/** Start-menu actions. Select Report issue or Send feedback to open the form. */
-export const StartMenu: Story = {
-  name: "0 Start menu",
+/** Workspace menu actions. Select Report issue or Send feedback to open the form. */
+export const WorkspaceMenu: Story = {
+  name: "0 Workspace menu",
   args: {
     open: false,
     onOpenChange: () => undefined,

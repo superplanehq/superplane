@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 
 const { submitFeedback, showSuccessToast, showErrorToast } = vi.hoisted(() => ({
@@ -10,9 +10,24 @@ const { submitFeedback, showSuccessToast, showErrorToast } = vi.hoisted(() => ({
   showErrorToast: vi.fn(),
 }));
 
-vi.mock("@/lib/submitFeedback", () => ({
-  submitFeedback,
-}));
+vi.mock("@/lib/submitFeedback", () => {
+  class FeedbackRequestError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "FeedbackRequestError";
+    }
+  }
+
+  return {
+    submitFeedback,
+    FeedbackRequestError,
+    isAllowedFeedbackAttachment: (file: File) =>
+      file.size <= 5 * 1024 * 1024 &&
+      ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", "text/plain", "text/markdown"].includes(
+        file.type,
+      ),
+  };
+});
 
 vi.mock("@/lib/toast", () => ({
   showSuccessToast,
