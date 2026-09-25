@@ -1,0 +1,8 @@
+Category: {{.CategoryLabel}}
+From: {{.FromLine}}
+{{if .OrganizationName}}Organization: {{.OrganizationName}} ({{.OrganizationID}})
+{{else if .OrganizationID}}Organization ID: {{.OrganizationID}}
+{{end}}{{if .PagePath}}Page: {{.PagePath}}
+{{end}}{{if .AttachmentName}}Attachment: {{.AttachmentName}}
+{{end}}
+{{.Details}}

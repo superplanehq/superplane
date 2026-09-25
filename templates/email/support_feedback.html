@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.CategoryLabel}}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            color: #000000;
+            background-color: #ffffff;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .text {
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .details {
+            white-space: pre-wrap;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <p class="text"><strong>{{.CategoryLabel}}</strong></p>
+    <p class="text">From: {{.FromLine}}</p>
+    {{if .OrganizationName}}
+    <p class="text">Organization: {{.OrganizationName}} ({{.OrganizationID}})</p>
+    {{else if .OrganizationID}}
+    <p class="text">Organization ID: {{.OrganizationID}}</p>
+    {{end}}
+    {{if .PagePath}}
+    <p class="text">Page: {{.PagePath}}</p>
+    {{end}}
+    {{if .AttachmentName}}
+    <p class="text">Attachment: {{.AttachmentName}}</p>
+    {{end}}
+    <div class="details">{{.Details}}</div>
+</body>
+</html>
