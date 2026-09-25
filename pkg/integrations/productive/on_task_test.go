@@ -247,6 +247,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Webhook:       &contexts.NodeWebhookContext{Secret: taskWebhookSecret()},
 			Events:        events,
+			Integration:   integrationWithProject(),
 		})
 
 		require.NoError(t, err)
@@ -266,6 +267,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		document, ok := envelope["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "20295734", document["id"])
+		assert.Equal(t, "https://app.productive.io/org-1/tasks/20295734", envelope["url"])
 	})
 
 	t.Run("labeled signature tokens identify task.updated without an event header", func(t *testing.T) {

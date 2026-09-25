@@ -664,6 +664,143 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_CreateWorkOrder_SkipsDuplicateProductiveTask(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	productivePayload := func(taskID string, pageURL string) map[string]any {
+		envelope := map[string]any{
+			"type": productive.TaskPayloadType,
+			"data": map[string]any{
+				"meta": map[string]any{"event": productive.TaskUpdatedEvent},
+				"data": map[string]any{"id": taskID, "type": "tasks"},
+			},
+		}
+		if pageURL != "" {
+			data, ok := envelope["data"].(map[string]any)
+			require.True(t, ok)
+			data["url"] = pageURL
+		}
+		return envelope
+	}
+
+	countOrders := func(factoryModel *models.Factory) int {
+		t.Helper()
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 100})
+		require.NoError(t, err)
+		return len(orders)
+	}
+
+	t.Run("skips a Productive task that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing productive task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://app.productive.io/12345/tasks/91", Label: "91"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", "https://app.productive.io/12345/tasks/91"),
+		)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Existing productive task"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("skips when the existing task has no origin URL", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		_, _, sourceRun := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", ""),
+		)
+		_, err = factoryModel.CreateWorkOrder(database.Conn(), "Existing productive task", "", nil, nil, &sourceRun.ID)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", "https://app.productive.io/12345/tasks/91"),
+		)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Moved onto Bugs"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("does not skip task 9 when task 91 already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Task 91",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://app.productive.io/12345/tasks/91", Label: "91"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("9", "https://app.productive.io/12345/tasks/9"),
+		)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Task 9"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("creates a task when the Productive task has none", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		pageURL := "https://app.productive.io/12345/tasks/77"
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("77", pageURL),
+		)
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceProductiveTasks)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New productive task"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		require.NotNil(t, order.Origin)
+		assert.Equal(t, pageURL, order.Origin.URL)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

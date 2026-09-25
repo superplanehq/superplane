@@ -200,7 +200,7 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, err
 	}
 
-	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document)); err != nil {
+	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document, webhookOrganizationID(ctx))); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
@@ -209,6 +209,17 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func webhookOrganizationID(ctx core.WebhookRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+	value, err := ctx.Integration.GetConfig("organizationId")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(value))
 }
 
 // productiveDelivery is the body Productive.io posts for a task webhook.

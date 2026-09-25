@@ -361,6 +361,16 @@ func intakeTriggerActionsFor(settings intakeSettings) []any {
 	return actions
 }
 
+// intakeProductiveTriggerActions listens for new tasks, and also for updates
+// when a task list filter is set so a move onto that list can create a task.
+func intakeProductiveTriggerActions(settings intakeSettings) []any {
+	actions := []any{"created"}
+	if len(settings.TaskListIDs) > 0 {
+		actions = append(actions, "updated")
+	}
+	return actions
+}
+
 func intakeTriggerEventsFor(settings intakeSettings) []any {
 	events := []any{}
 	if settings.NewIssues {
@@ -395,6 +405,9 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 		return current.SentryNewIssues != updated.SentryNewIssues ||
 			current.SentryRegressedIssues != updated.SentryRegressedIssues ||
 			current.SentryAssignedIssues != updated.SentryAssignedIssues
+	}
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		return (len(current.TaskListIDs) == 0) != (len(updated.TaskListIDs) == 0)
 	}
 	return current.NewIssues != updated.NewIssues ||
 		current.ReopenedIssues != updated.ReopenedIssues ||
