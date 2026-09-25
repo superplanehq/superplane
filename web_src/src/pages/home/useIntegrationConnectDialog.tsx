@@ -169,7 +169,9 @@ export function useIntegrationConnectDialog({
     const existingSelection = selectReadyIntegrationInstance(connected, selections, integrationName);
     if (existingSelection) {
       onSelectionsChange(existingSelection);
-      return true;
+      // Selecting an in-memory connection does not navigate away. Callers
+      // must be able to finish their current action and render the selection.
+      return false;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
       return hostedConnect.jira();
