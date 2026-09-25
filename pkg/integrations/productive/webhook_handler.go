@@ -82,6 +82,10 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
+	if err := client.ValidateCredentials(); err != nil {
+		return nil, fmt.Errorf("invalid credentials: %v", err)
+	}
+
 	config := WebhookConfiguration{}
 	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
 		return nil, fmt.Errorf("failed to decode webhook config: %v", err)

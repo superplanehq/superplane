@@ -42,6 +42,7 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 	t.Run("creates one remote webhook per task event and stores the signature token", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
 				jsonResponse(`{"data":{"id":"555","type":"webhooks","attributes":{"signature_token":"sig-token"}}}`),
 				jsonResponse(`{"data":{"id":"556","type":"webhooks","attributes":{"signature_token":"sig-token"}}}`),
 			},
@@ -63,9 +64,11 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, []string{"555", "556"}, webhookMetadata.IDs)
 		assert.Equal(t, []byte("task.created=sig-token\ntask.updated=sig-token"), webhook.Secret)
 
-		require.Len(t, httpContext.Requests, 2)
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "organization_memberships")
 		bodies := []string{}
-		for _, req := range httpContext.Requests {
+		for _, req := range httpContext.Requests[1:] {
 			assert.Equal(t, http.MethodPost, req.Method)
 			body, err := io.ReadAll(req.Body)
 			require.NoError(t, err)
@@ -83,6 +86,7 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 	t.Run("webhooks_limit_exceeded is surfaced as a plan limitation", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
 				{
 					StatusCode: http.StatusForbidden,
 					Body: io.NopCloser(strings.NewReader(
@@ -109,6 +113,7 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 	t.Run("plain 403 returns the write permission message", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
 				{
 					StatusCode: http.StatusForbidden,
 					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"403","title":"Forbidden"}]}`)),
@@ -129,6 +134,33 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 		assert.ErrorIs(t, err, ErrMissingWritePermission)
 		assert.Contains(t, err.Error(), "read and write access")
 		assert.NotContains(t, err.Error(), "error creating webhook")
+	})
+
+	t.Run("revoked token returns an authentication failure", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusUnauthorized,
+					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"401","title":"Unauthenticated","detail":"You are not authenticated"}]}`)),
+				},
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: authorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/hook",
+				Configuration: WebhookConfiguration{ProjectID: "1"},
+			},
+		})
+
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrMissingWritePermission)
+		assert.ErrorContains(t, err, "invalid credentials")
+		assert.NotContains(t, err.Error(), "read and write access")
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "organization_memberships")
 	})
 }
 

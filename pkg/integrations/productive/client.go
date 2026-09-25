@@ -147,12 +147,20 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	return responseBody, nil
 }
 
+// apiError is one JSON:API error from a failed Productive.io request.
+type apiError struct {
+	Code   string `json:"code"`
+	Title  string `json:"title"`
+	Detail string `json:"detail"`
+	Source struct {
+		Pointer string `json:"pointer"`
+	} `json:"source"`
+}
+
 // apiErrorResponse is the JSON:API error shape Productive.io answers a failed
-// request with, trimmed to the field that classifies the error.
+// request with, trimmed to the fields that classify the error.
 type apiErrorResponse struct {
-	Errors []struct {
-		Code string `json:"code"`
-	} `json:"errors"`
+	Errors []apiError `json:"errors"`
 }
 
 // hasErrorCode reports whether one of a JSON:API error response's errors
@@ -212,13 +220,29 @@ func (c *Client) ValidateWebhookPermission() error {
 		return err
 	}
 	switch code {
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusForbidden:
 		return fmt.Errorf("%w: %v", ErrMissingWritePermission, err)
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
-		return nil
+		if webhookProbeValidationError(err) {
+			return nil
+		}
+		return err
 	default:
 		return err
 	}
+}
+
+type probeWebhookCleanupError struct {
+	webhookID string
+	err       error
+}
+
+func (e *probeWebhookCleanupError) Error() string {
+	return fmt.Sprintf("error deleting probe webhook %s: %v", e.webhookID, e.err)
+}
+
+func (e *probeWebhookCleanupError) Unwrap() error {
+	return e.err
 }
 
 func (c *Client) deleteCreatedWebhook(responseBody []byte) error {
@@ -230,9 +254,64 @@ func (c *Client) deleteCreatedWebhook(responseBody []byte) error {
 		return fmt.Errorf("productive.io created a webhook without an id")
 	}
 	if err := c.DeleteWebhook(response.Data.ID); err != nil {
-		return fmt.Errorf("error deleting webhook: %v", err)
+		if IsNotFoundError(err) {
+			return nil
+		}
+		return &probeWebhookCleanupError{webhookID: response.Data.ID, err: err}
 	}
 	return nil
+}
+
+var webhookProbeAttributes = []string{"event_id", "type_id", "target_url"}
+
+func webhookProbeValidationError(err error) bool {
+	var responseErr *responseError
+	if !errors.As(err, &responseErr) {
+		return false
+	}
+
+	response := apiErrorResponse{}
+	if json.Unmarshal([]byte(responseErr.body), &response) != nil || len(response.Errors) == 0 {
+		return false
+	}
+
+	for _, apiErr := range response.Errors {
+		if !probeAttributeValidation(apiErr) {
+			return false
+		}
+	}
+	return true
+}
+
+func probeAttributeValidation(apiErr apiError) bool {
+	pointer := strings.ToLower(apiErr.Source.Pointer)
+	if pointer != "" {
+		return referencesWebhookProbeAttribute(pointer)
+	}
+
+	title := strings.ToLower(strings.TrimSpace(apiErr.Title))
+	code := strings.ToLower(strings.TrimSpace(apiErr.Code))
+	if title != "invalid attribute" && code != "invalid_attribute" {
+		return false
+	}
+
+	detail := strings.ToLower(apiErr.Detail)
+	if detail == "" {
+		return true
+	}
+	if referencesWebhookProbeAttribute(detail) {
+		return true
+	}
+	return strings.Contains(detail, "blank") || strings.Contains(detail, "required") || strings.Contains(detail, "filled")
+}
+
+func referencesWebhookProbeAttribute(value string) bool {
+	for _, attribute := range webhookProbeAttributes {
+		if strings.Contains(value, attribute) {
+			return true
+		}
+	}
+	return false
 }
 
 func webhookCreateError(err error) error {
@@ -240,7 +319,7 @@ func webhookCreateError(err error) error {
 		return err
 	}
 	code, ok := responseStatusCode(err)
-	if ok && (code == http.StatusUnauthorized || code == http.StatusForbidden) {
+	if ok && code == http.StatusForbidden {
 		return fmt.Errorf("%w: %v", ErrMissingWritePermission, err)
 	}
 	return err

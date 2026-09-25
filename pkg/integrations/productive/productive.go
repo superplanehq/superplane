@@ -109,7 +109,16 @@ func (p *Productive) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("invalid credentials: %v", err)
 	}
 
+	if err := deleteRetainedProbeWebhook(client, ctx.Integration); err != nil {
+		return err
+	}
+
 	if err := client.ValidateWebhookPermission(); err != nil {
+		var cleanupErr *probeWebhookCleanupError
+		if errors.As(err, &cleanupErr) {
+			retainProbeWebhook(ctx.Integration, cleanupErr.webhookID)
+			return fmt.Errorf("SuperPlane could not delete webhook %s from the permission check. The next sync will delete it before it creates another webhook: %w", cleanupErr.webhookID, cleanupErr.err)
+		}
 		if errors.Is(err, ErrMissingWritePermission) {
 			return ErrMissingWritePermission
 		}
@@ -121,6 +130,39 @@ func (p *Productive) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.Ready()
 	return nil
+}
+
+const probeWebhookMetadataKey = "probeWebhookId"
+
+func deleteRetainedProbeWebhook(client *Client, integration core.IntegrationContext) error {
+	metadata := integrationMetadata(integration)
+	webhookID, _ := metadata[probeWebhookMetadataKey].(string)
+	webhookID = strings.TrimSpace(webhookID)
+	if webhookID == "" {
+		return nil
+	}
+
+	if err := client.DeleteWebhook(webhookID); err != nil && !IsNotFoundError(err) {
+		return fmt.Errorf("SuperPlane could not delete webhook %s from the previous permission check. The next sync will try again: %w", webhookID, err)
+	}
+
+	delete(metadata, probeWebhookMetadataKey)
+	integration.SetMetadata(metadata)
+	return nil
+}
+
+func retainProbeWebhook(integration core.IntegrationContext, webhookID string) {
+	metadata := integrationMetadata(integration)
+	metadata[probeWebhookMetadataKey] = webhookID
+	integration.SetMetadata(metadata)
+}
+
+func integrationMetadata(integration core.IntegrationContext) map[string]any {
+	metadata := map[string]any{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil || metadata == nil {
+		return map[string]any{}
+	}
+	return metadata
 }
 
 func webhooksUnavailableError(err error) error {

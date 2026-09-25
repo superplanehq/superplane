@@ -56,7 +56,7 @@ func Test__Productive__Sync(t *testing.T) {
 				},
 				{
 					StatusCode: http.StatusUnprocessableEntity,
-					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"422","title":"Invalid"}]}`)),
+					Body:       io.NopCloser(strings.NewReader(webhookProbeValidationBody)),
 				},
 			},
 		}
@@ -90,7 +90,7 @@ func Test__Productive__Sync(t *testing.T) {
 				jsonResponse(`{"data":[]}`),
 				{
 					StatusCode: http.StatusUnprocessableEntity,
-					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"422","title":"Invalid"}]}`)),
+					Body:       io.NopCloser(strings.NewReader(webhookProbeValidationBody)),
 				},
 			},
 		}
@@ -187,6 +187,171 @@ func Test__Productive__Sync(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[2].URL.String(), "/webhooks/probe-1")
 	})
 
+	t.Run("webhook probe delete failure retains the webhook id", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"data":{"id":"probe-1","type":"webhooks","attributes":{}}}`)),
+				},
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Server Error"}]}`)),
+				},
+			},
+		}
+
+		appCtx := authorizedIntegration()
+		err := p.Sync(core.SyncContext{
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "could not delete webhook probe-1")
+		assert.NotEqual(t, "ready", appCtx.State)
+		assert.Equal(t, "probe-1", probeWebhookID(appCtx))
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[2].Method)
+	})
+
+	t.Run("retained probe webhook is deleted before another probe", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
+				jsonResponse(`{}`),
+				{
+					StatusCode: http.StatusUnprocessableEntity,
+					Body:       io.NopCloser(strings.NewReader(webhookProbeValidationBody)),
+				},
+			},
+		}
+
+		appCtx := authorizedIntegration()
+		appCtx.Metadata = map[string]any{probeWebhookMetadataKey: "probe-1", "other": "kept"}
+		err := p.Sync(core.SyncContext{
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", appCtx.State)
+		assert.Empty(t, probeWebhookID(appCtx))
+		assert.Equal(t, "kept", appCtx.Metadata.(map[string]any)["other"])
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/webhooks/probe-1")
+		assert.Equal(t, http.MethodPost, httpContext.Requests[2].Method)
+	})
+
+	t.Run("retained probe webhook delete failure does not create another", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Server Error"}]}`)),
+				},
+			},
+		}
+
+		appCtx := authorizedIntegration()
+		appCtx.Metadata = map[string]any{probeWebhookMetadataKey: "probe-1"}
+		err := p.Sync(core.SyncContext{
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "previous permission check")
+		assert.NotEqual(t, "ready", appCtx.State)
+		assert.Equal(t, "probe-1", probeWebhookID(appCtx))
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
+		assert.NotEqual(t, http.MethodPost, httpContext.Requests[1].Method)
+	})
+
+	t.Run("webhook probe 422 for another attribute is not ready", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
+				{
+					StatusCode: http.StatusUnprocessableEntity,
+					Body: io.NopCloser(strings.NewReader(
+						`{"errors":[{"status":"422","title":"Invalid Attribute","detail":"is invalid","source":{"pointer":"data/attributes/custom_headers"}}]}`,
+					)),
+				},
+			},
+		}
+
+		appCtx := authorizedIntegration()
+		err := p.Sync(core.SyncContext{
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "error checking webhook permission")
+		assert.NotErrorIs(t, err, ErrMissingWritePermission)
+		assert.NotEqual(t, "ready", appCtx.State)
+	})
+
+	t.Run("webhook probe 400 is not ready", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
+				{
+					StatusCode: http.StatusBadRequest,
+					Body: io.NopCloser(strings.NewReader(
+						`{"errors":[{"status":"400","title":"Unsupported Filter","detail":"filter is not supported on this endpoint"}]}`,
+					)),
+				},
+			},
+		}
+
+		appCtx := authorizedIntegration()
+		err := p.Sync(core.SyncContext{
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "error checking webhook permission")
+		assert.NotEqual(t, "ready", appCtx.State)
+	})
+
+	t.Run("webhook probe 401 is an authentication failure", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":[]}`),
+				{
+					StatusCode: http.StatusUnauthorized,
+					Body: io.NopCloser(strings.NewReader(
+						`{"errors":[{"status":"401","title":"Unauthenticated","detail":"You are not authenticated"}]}`,
+					)),
+				},
+			},
+		}
+
+		appCtx := authorizedIntegration()
+		err := p.Sync(core.SyncContext{
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
+		})
+
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrMissingWritePermission)
+		assert.NotContains(t, err.Error(), "read and write access")
+		assert.NotEqual(t, "ready", appCtx.State)
+	})
+
 	t.Run("invalid credentials -> error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -280,6 +445,21 @@ func authorizedIntegration() *contexts.IntegrationContext {
 			"organizationId": "org-1",
 		},
 	}
+}
+
+const webhookProbeValidationBody = `{"errors":[
+	{"status":"422","title":"Invalid Attribute","detail":"can't be blank","source":{"pointer":"data/attributes/event_id"}},
+	{"status":"422","title":"Invalid Attribute","detail":"can't be blank","source":{"pointer":"data/attributes/type_id"}},
+	{"status":"422","title":"Invalid Attribute","detail":"can't be blank","source":{"pointer":"data/attributes/target_url"}}
+]}`
+
+func probeWebhookID(integration *contexts.IntegrationContext) string {
+	metadata, _ := integration.Metadata.(map[string]any)
+	if metadata == nil {
+		return ""
+	}
+	id, _ := metadata[probeWebhookMetadataKey].(string)
+	return id
 }
 
 func jsonResponse(body string) *http.Response {
