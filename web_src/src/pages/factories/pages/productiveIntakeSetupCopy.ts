@@ -20,4 +20,5 @@ export const PRODUCTIVE_INTAKE_SETUP_COPY = {
   wizardRetry: "Try again",
   wizardCheckConnection: "Check connection",
   wizardCreateError: "SuperPlane could not create the Productive intake.",
+  connectionError: "SuperPlane could not connect Productive. Check the token and try again.",
 } as const;

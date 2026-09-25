@@ -301,6 +301,7 @@ func Test__Client__CreateWebhook(t *testing.T) {
 
 		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
 		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrMissingWritePermission)
 		assert.False(t, errors.Is(err, ErrWebhooksLimitExceeded))
 	})
 }

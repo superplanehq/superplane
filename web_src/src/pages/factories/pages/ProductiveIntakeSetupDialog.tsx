@@ -1,5 +1,10 @@
+import { organizationsDeleteIntegration } from "@/api-client/sdk.gen";
+import type { OrganizationsIntegration } from "@/api-client";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { integrationKeys } from "@/hooks/useIntegrations";
 import { integrationDetailPath } from "@/lib/integrationSettingsPaths";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
@@ -19,6 +24,7 @@ interface ProductiveIntakeSetupDialogProps {
 
 export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogProps) {
   const setup = useProductiveIntakeSetup(props.organizationId, props.factoryId);
+  const queryClient = useQueryClient();
   const title =
     setup.step === "connection"
       ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnect
@@ -86,6 +92,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
         organizationId={props.organizationId}
         onCreateIntegration={async (payload) => {
           const response = await setup.createIntegration.mutateAsync(payload);
+          await rejectErroredProductiveConnection(queryClient, props.organizationId, response.data?.integration);
           return response.data;
         }}
         onReset={setup.createIntegration.reset}
@@ -96,6 +103,38 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
       />
     </>
   );
+}
+
+async function rejectErroredProductiveConnection(
+  queryClient: QueryClient,
+  organizationId: string,
+  integration: OrganizationsIntegration | undefined,
+): Promise<void> {
+  if (integration?.status?.state !== "error") {
+    return;
+  }
+
+  const integrationId = integration.metadata?.id?.trim();
+  if (integrationId) {
+    await organizationsDeleteIntegration(
+      withOrganizationHeader({
+        organizationId,
+        path: { id: organizationId, integrationId },
+      }),
+    );
+    await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+    queryClient.removeQueries({ queryKey: integrationKeys.integration(organizationId, integrationId) });
+  }
+
+  throw new Error(productiveConnectionError(integration.status?.stateDescription));
+}
+
+function productiveConnectionError(stateDescription: string | undefined): string {
+  const description = stateDescription?.trim();
+  if (description) {
+    return description;
+  }
+  return PRODUCTIVE_INTAKE_SETUP_COPY.connectionError;
 }
 
 function SetupStepBody({
