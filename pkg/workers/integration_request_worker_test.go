@@ -266,6 +266,39 @@ func Test__IntegrationRequestWorker_SyncError(t *testing.T) {
 	assert.Contains(t, integration.StateDescription, "Sync failed: sync failed")
 }
 
+func Test__IntegrationRequestWorker_SyncRecovery(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	syncCount := 0
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		OnSync: func(core.SyncContext) error {
+			syncCount++
+			if syncCount == 1 {
+				return errors.New("temporary sync failure")
+			}
+			return nil
+		},
+	})
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
+
+	for range 2 {
+		runAt := time.Now().Add(-time.Second)
+		require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
+		request, err := models.FindPendingRequestForIntegration(database.Conn(), integration.ID)
+		require.NoError(t, err)
+		require.NoError(t, worker.LockAndProcessRequest(*request))
+	}
+
+	recovered, err := models.FindIntegration(r.Organization.ID, integration.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.IntegrationStatePending, recovered.State)
+	assert.Empty(t, recovered.StateDescription)
+}
+
 func Test__AppInstallationRequestWorker_InvokeHook(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

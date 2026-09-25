@@ -1,13 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { MemoryRouter, useNavigate } from "react-router";
 
 import type { AccountContextType } from "@/contexts/accountContextState";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 import { integrationKeys } from "@/hooks/useIntegrations";
 import { meKeys } from "@/hooks/useMe";
 
-import { OrganizationOnboardingRedirect } from "./OrganizationOnboardingRedirect";
+import {
+  OrganizationOnboardingAttemptBoundary,
+  OrganizationOnboardingRedirect,
+} from "./OrganizationOnboardingRedirect";
 
 const accountState = vi.hoisted(() => ({
   account: {
@@ -63,6 +67,27 @@ function renderOnboardingWithReresolve(queryClient = new QueryClient()) {
   return { ...utils, reresolve: () => reresolve!() };
 }
 
+function RoutableOnboarding() {
+  const navigate = useNavigate();
+  const changeAttempt = () => {
+    window.location.search = "?attempt=attempt-2&step=vcs";
+    navigate("/onboarding?attempt=attempt-2&step=vcs");
+  };
+
+  return (
+    <>
+      <button onClick={changeAttempt}>Change attempt</button>
+      <OrganizationOnboardingAttemptBoundary
+        renderWorkspace={(workspace, entryPath) => (
+          <div data-entry-path={entryPath} data-testid="routable-workspace">
+            {workspace.workspaceKey}
+          </div>
+        )}
+      />
+    </>
+  );
+}
+
 describe("OrganizationOnboardingRedirect", () => {
   beforeEach(() => {
     accountState.account = {
@@ -110,6 +135,46 @@ describe("OrganizationOnboardingRedirect", () => {
       expect.objectContaining({
         body: expect.stringContaining('"owner":"Dev User"'),
       }),
+    );
+  });
+
+  it("uses the current onboarding attempt after in-place navigation", async () => {
+    window.location.search = "?attempt=attempt-1&step=vcs";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ organizationSlug: "first", workspaceKey: "FIRST" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ organizationSlug: "second", workspaceKey: "SECOND" }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?attempt=attempt-1&step=vcs"]}>
+        <QueryClientProvider client={new QueryClient()}>
+          <RoutableOnboarding />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("FIRST")).toHaveAttribute(
+      "data-entry-path",
+      "/onboarding?attempt=attempt-1&step=vcs",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Change attempt" }));
+
+    expect(await screen.findByText("SECOND")).toHaveAttribute(
+      "data-entry-path",
+      "/onboarding?attempt=attempt-2&step=vcs",
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/account/onboarding",
+      expect.objectContaining({ body: expect.stringContaining('"attemptID":"attempt-2"') }),
     );
   });
 

@@ -8,6 +8,7 @@ import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import {
   hasGitHubSetupRequest,
   hasIntegrationSetupStay,
+  isOnboardingSetupReturnPath,
   peekIntegrationSetupReturn,
   withGitHubSetupRequest,
 } from "@/lib/integrationSetupReturn";
@@ -35,12 +36,12 @@ export function IntegrationSetupReturn({ organizationId, children }: Integration
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const stayOnPage = hasIntegrationSetupStay(searchParams.toString());
   const { has, isLoading: featuresLoading } = useExperimentalFeature(organizationId);
   // Peek on each render because provider callbacks use the organization UID.
   // OrganizationScope later replaces that UID with the slug that keys storage.
   // The destination page deletes the marker after navigation.
   const storedReturn = peekIntegrationSetupReturn(organizationId);
+  const stayOnPage = hasIntegrationSetupStay(searchParams.toString()) && !isOnboardingSetupReturnPath(storedReturn);
   const search = searchParams.toString();
   const factoriesOnboardingFallback =
     !featuresLoading &&
