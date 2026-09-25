@@ -64,23 +64,31 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		http.Error(ctx.Response, "hosted GitHub App is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	installations, err := discoverAccessibleInstallations(ctx.Request.Context(), ctx.Integration, app, *identity)
-	if err != nil {
-		ctx.Logger.Errorf("failed to verify GitHub repository access: %v", err)
-		http.Error(ctx.Response, "failed to verify GitHub repository access", http.StatusBadGateway)
-		return
-	}
+	installations, discoveryErr := discoverAccessibleInstallations(ctx.Request.Context(), ctx.Integration, app, *identity)
 	metadata.SetPendingInstallations(installations)
 	repositories, allowed := metadata.SelectPendingRepositories(installationID, repositoryIDs)
 	if !allowed {
+		if discoveryErr != nil {
+			ctx.Logger.Errorf("failed to verify GitHub repository access: %v", discoveryErr)
+			http.Error(ctx.Response, "failed to verify GitHub repository access", http.StatusBadGateway)
+			return
+		}
 		http.Error(ctx.Response, "repository is not allowed", http.StatusForbidden)
 		return
 	}
 
 	installation, found := pendingInstallationByID(installations, installationID)
 	if !found {
+		if discoveryErr != nil {
+			ctx.Logger.Errorf("failed to verify GitHub installation access: %v", discoveryErr)
+			http.Error(ctx.Response, "failed to verify GitHub installation access", http.StatusBadGateway)
+			return
+		}
 		http.Error(ctx.Response, "installation is not allowed", http.StatusForbidden)
 		return
+	}
+	if discoveryErr != nil {
+		ctx.Logger.Warnf("verified selected GitHub repository despite unrelated installation errors: %v", discoveryErr)
 	}
 	if err := g.bindHostedInstallationRepositories(ctx, metadata, installation, repositories); err != nil {
 		ctx.Logger.Errorf("%v", err)
