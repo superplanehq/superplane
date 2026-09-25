@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/checks"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
@@ -153,6 +154,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&contents.OnBranchCreated{},
 		&issues.OnIssue{},
 		&issues.OnIssueComment{},
+		&dependabot.OnAlert{},
 		&pulls.OnPullRequest{},
 		&pulls.OnPRComment{},
 		&pulls.OnPRReview{},
@@ -1036,6 +1038,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"statuses":                    "write",
 			"deployments":                 "write",
 			"organization_administration": "read",
+			"vulnerability_alerts":        "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),

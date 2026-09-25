@@ -56,6 +56,7 @@ import {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
+  DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
@@ -167,6 +168,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+              <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
             </Route>

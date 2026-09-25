@@ -414,6 +414,29 @@ func Test__intakeFilterExpressionFor_SentryLevels(t *testing.T) {
 	})
 }
 
+func Test__intakeFilterExpressionFor_DependabotSeverities(t *testing.T) {
+	t.Run("accepts every severity when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, defaultDependabotIntakeSettings())
+		assert.Equal(t, "true", expression)
+	})
+
+	t.Run("builds a severity membership check in a stable order", func(t *testing.T) {
+		settings := defaultDependabotIntakeSettings()
+		settings.DependabotSeverities = []string{"low", "critical", "unknown"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, settings)
+
+		assert.Equal(t, `(root().data.alert.security_advisory.severity ?? "") in ["critical","low"]`, expression)
+	})
+
+	t.Run("treats every known severity as all severities", func(t *testing.T) {
+		settings := defaultDependabotIntakeSettings()
+		settings.DependabotSeverities = []string{"low", "medium", "high", "critical"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, settings)
+
+		assert.Equal(t, "true", expression)
+	})
+}
+
 func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 	newSpec := func(actions []any, expression string) models.LiveCanvasSpec {
 		return models.LiveCanvasSpec{

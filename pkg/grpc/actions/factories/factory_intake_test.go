@@ -458,6 +458,19 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.NotContains(t, trigger.Configuration, "repository")
 	})
 
+	t.Run("a Dependabot intake requires workspace GitHub setup", func(t *testing.T) {
+		factory := newFactory(t)
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryIntake_SOURCE_DEPENDABOT_ALERTS,
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, err.Error(), "GitHub connection and backlog repository are required")
+	})
+
 	t.Run("creating an intake also creates Backlog template version 3", func(t *testing.T) {
 		factory := newFactory(t)
 		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})

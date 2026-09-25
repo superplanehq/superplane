@@ -141,6 +141,7 @@ import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFoote
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
   factoryJiraIntakeSetupPath,
@@ -512,6 +513,12 @@ export function LinesPage() {
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
         navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "dependabot-alerts") {
+      if (selectedLine.id) {
+        navigate(factoryDependabotIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       }
       return;
     }

@@ -45,6 +45,7 @@ export {
 
 export type LineIntakeSourceId =
   | "github-issues"
+  | "dependabot-alerts"
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
@@ -93,6 +94,25 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     evaluate: {
       label: "Create a task",
       rule: "A matching GitHub issue becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "dependabot-alerts",
+    name: "Dependabot alerts",
+    description: "Creates tasks from Dependabot alerts.",
+    iconSrc: githubIcon,
+    iconAlt: "GitHub",
+    listen: {
+      kind: "webhook",
+      label: "On Dependabot alert",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Dependabot alert becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
@@ -220,6 +240,7 @@ export interface ConfiguredLineIntakeSource {
 
 const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
   SOURCE_GITHUB_ISSUES: "github-issues",
+  SOURCE_DEPENDABOT_ALERTS: "dependabot-alerts",
   SOURCE_JIRA_ISSUES: "jira-issues",
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
@@ -228,6 +249,7 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
   "github-issues": "SOURCE_GITHUB_ISSUES",
+  "dependabot-alerts": "SOURCE_DEPENDABOT_ALERTS",
   "jira-issues": "SOURCE_JIRA_ISSUES",
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",

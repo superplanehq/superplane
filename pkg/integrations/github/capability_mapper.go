@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/checks"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
@@ -21,14 +22,15 @@ const (
 	//
 	// Repository-scoped permissions
 	//
-	PermissionIssues         = "Issues"
-	PermissionContents       = "Contents"
-	PermissionPullRequests   = "Pull Requests"
-	PermissionActions        = "Actions"
-	PermissionChecks         = "Checks"
-	PermissionCommitStatuses = "Commit Statuses"
-	PermissionDeployments    = "Deployments"
-	PermissionMetadata       = "Metadata"
+	PermissionIssues              = "Issues"
+	PermissionContents            = "Contents"
+	PermissionPullRequests        = "Pull Requests"
+	PermissionActions             = "Actions"
+	PermissionChecks              = "Checks"
+	PermissionCommitStatuses      = "Commit Statuses"
+	PermissionDeployments         = "Deployments"
+	PermissionMetadata            = "Metadata"
+	PermissionVulnerabilityAlerts = "Dependabot alerts"
 
 	//
 	// Organization-scoped permissions
@@ -118,6 +120,12 @@ func NewCapabilityMapper() *CapabilityMapper {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &metadata.GetRepositoryPermission{}},
+				},
+			},
+			PermissionVulnerabilityAlerts: {
+				PermissionScope: PermissionScopeRepository,
+				Capabilities: []CapabilityDef{
+					{ReadOnly: true, Trigger: &dependabot.OnAlert{}},
 				},
 			},
 			PermissionAdministration: {
@@ -381,6 +389,8 @@ func (p *PermissionSet) permissionForAppManifest(r string) string {
 		return "organization_administration"
 	case PermissionMetadata:
 		return "metadata"
+	case PermissionVulnerabilityAlerts:
+		return "vulnerability_alerts"
 	default:
 		return ""
 	}
