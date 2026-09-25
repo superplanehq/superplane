@@ -226,12 +226,12 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 		// reaching this server, so a known GitHub login is enough to ask
 		// GitHub for that member's open install requests.
 		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
-			// Adopt records the requested account it found on GitHub and
-			// moves an approved installation into the account picker;
-			// refreshHostedPendingAction below persists both.
-			if err := g.adoptRequestedInstallation(ctx, app, &existing); err != nil {
+			// Reconciliation records requests found on GitHub and clears a
+			// request only after repository discovery verifies access;
+			// refreshHostedPendingAction below persists both results.
+			if err := g.reconcileInstallRequests(ctx, app, &existing); err != nil {
 				// The connection stays pending; the next sync retries.
-				ctx.Logger.Errorf("failed to adopt requested GitHub App installation: %v", err)
+				ctx.Logger.Errorf("failed to reconcile GitHub App install requests: %v", err)
 			}
 		}
 		if discoveryErr != nil {

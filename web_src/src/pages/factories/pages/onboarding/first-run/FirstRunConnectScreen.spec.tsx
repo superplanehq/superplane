@@ -163,7 +163,7 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganization="Acme"
-        pendingInstallations={[{ id: "11", accountLogin: "acme", repositories: [] }]}
+        pendingInstallations={[{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -173,6 +173,22 @@ describe("FirstRunConnectScreen", () => {
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-install-requested")).not.toBeInTheDocument();
+  });
+
+  it("keeps the waiting chip until the requested organization has repository access", () => {
+    render(
+      <FirstRunConnectScreen
+        installRequested
+        githubOrganization="acme"
+        pendingInstallations={[{ id: "11", accountLogin: "acme", repositories: [] }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("acme");
   });
 
   it("keeps the waiting chip when the picker lacks the requested organization", () => {
@@ -296,7 +312,13 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganizations={["kittens-inc-1"]}
-        pendingInstallations={[{ id: "11", accountLogin: "kittens-inc-1", repositories: [] }]}
+        pendingInstallations={[
+          {
+            id: "11",
+            accountLogin: "kittens-inc-1",
+            repositories: [{ id: "101", name: "kittens-inc-1/api" }],
+          },
+        ]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
