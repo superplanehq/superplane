@@ -6,19 +6,26 @@ import (
 )
 
 type Metadata struct {
-	InstallationID string            `mapstructure:"installationId" json:"installationId"`
-	State          string            `mapstructure:"state" json:"state"`
-	Owner          string            `mapstructure:"owner" json:"owner"`
-	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
-	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
+	InstallationID string       `mapstructure:"installationId" json:"installationId"`
+	State          string       `mapstructure:"state" json:"state"`
+	Owner          string       `mapstructure:"owner" json:"owner"`
+	Repositories   []Repository `mapstructure:"repositories" json:"repositories"`
+	// SelectedRepositories preserves the user's repository selection when an
+	// installation temporarily loses access to one of those repositories.
+	SelectedRepositories []Repository `mapstructure:"selectedRepositories" json:"selectedRepositories,omitempty"`
+	// RepositoryScoped distinguishes new hosted connections from legacy
+	// installation-wide connections. Runtime tokens for scoped connections are
+	// restricted to the repository IDs in Repositories.
+	RepositoryScoped bool              `mapstructure:"repositoryScoped" json:"repositoryScoped,omitempty"`
+	GitHubApp        GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
 	// HostedApp is true when this connection installs SuperPlane's public
 	// GitHub App. Credentials stay on the process, not on the integration.
 	HostedApp bool `mapstructure:"hostedApp" json:"hostedApp"`
 	// StartedByUserID is the SuperPlane user who started this hosted install.
-	// Setup, OAuth, and bind must run as this user when the field is set.
+	// Repository discovery and bind use this user's linked GitHub identity.
 	StartedByUserID string `mapstructure:"startedByUserID" json:"startedByUserID,omitempty"`
-	// PendingInstallations is the user-scoped allowlist written after GitHub
-	// App user OAuth. Picker bind accepts only these installation ids.
+	// PendingInstallations is the server-verified list of installations and
+	// writable repositories available to the linked GitHub identity.
 	PendingInstallations []PendingInstallation `mapstructure:"pendingInstallations" json:"pendingInstallations,omitempty"`
 	// InstallRequested is true when a non-admin asked a GitHub org admin to
 	// install the app. Setup then returned setup_action=request.
@@ -30,24 +37,20 @@ type Metadata struct {
 	// the member who started this connection. The legacy scalar fields above
 	// mirror this collection for compatibility with older clients.
 	InstallRequests []InstallRequest `mapstructure:"installRequests" json:"installRequests,omitempty"`
-	// StartedByGitHubLogin is the GitHub login of the member who authorized
-	// the connect OAuth. The request callback from GitHub does not name the
-	// requested organization, so Sync finds that member's App install request
-	// through this login.
+	// StartedByGitHubLogin is the current login for the linked GitHub identity.
+	// The request callback does not name the requested organization, so Sync
+	// uses this login to find the member's App install request.
 	StartedByGitHubLogin string `mapstructure:"startedByGitHubLogin" json:"startedByGitHubLogin,omitempty"`
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
-	// AuthorizeURL is the GitHub user OAuth authorize URL for this connect.
-	// The OAuth callback removes the browser action, so the connect screen
-	// uses this URL to ask again which GitHub account to use.
-	AuthorizeURL string `mapstructure:"authorizeURL" json:"authorizeURL,omitempty"`
 }
 
 type PendingInstallation struct {
-	ID           string `mapstructure:"id" json:"id"`
-	AccountLogin string `mapstructure:"accountLogin" json:"accountLogin"`
-	AccountType  string `mapstructure:"accountType" json:"accountType"`
+	ID           string       `mapstructure:"id" json:"id"`
+	AccountLogin string       `mapstructure:"accountLogin" json:"accountLogin"`
+	AccountType  string       `mapstructure:"accountType" json:"accountType"`
+	Repositories []Repository `mapstructure:"repositories" json:"repositories,omitempty"`
 }
 
 type InstallRequest struct {
@@ -71,6 +74,37 @@ func (m Metadata) AllowsPendingInstallation(installationID string) bool {
 	return slices.ContainsFunc(m.PendingInstallations, func(pending PendingInstallation) bool {
 		return pending.ID == installationID
 	})
+}
+
+func (m Metadata) PendingRepositories(installationID string) ([]Repository, bool) {
+	index := slices.IndexFunc(m.PendingInstallations, func(installation PendingInstallation) bool {
+		return installation.ID == installationID
+	})
+	if index == -1 {
+		return nil, false
+	}
+
+	return slices.Clone(m.PendingInstallations[index].Repositories), true
+}
+
+func (m Metadata) SelectPendingRepositories(installationID string, repositoryIDs []int64) ([]Repository, bool) {
+	available, ok := m.PendingRepositories(installationID)
+	if !ok || len(repositoryIDs) == 0 {
+		return nil, false
+	}
+
+	selected := make([]Repository, 0, len(repositoryIDs))
+	for _, repositoryID := range repositoryIDs {
+		index := slices.IndexFunc(available, func(repository Repository) bool {
+			return repository.ID == repositoryID
+		})
+		if index == -1 {
+			return nil, false
+		}
+		selected = append(selected, available[index])
+	}
+
+	return selected, true
 }
 
 func (m Metadata) AllowsStartedBy(userID string) bool {
