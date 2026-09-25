@@ -63,7 +63,7 @@ func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.Up
 
 func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.SwitchFactoryModelSourceRequest) (*pb.SwitchFactoryModelSourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.SwitchFactoryModelSource(ctx, s.intakeDeps.Encryptor, organizationID, req)
+	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {

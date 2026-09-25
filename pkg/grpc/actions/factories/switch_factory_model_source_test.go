@@ -1,19 +1,24 @@
 package factories
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 )
 
 func Test__RewriteWorkspaceAgentNode__PlanningNodeKeepsPlanningModel(t *testing.T) {
@@ -27,11 +32,15 @@ func Test__RewriteWorkspaceAgentNode__PlanningNodeKeepsPlanningModel(t *testing.
 			"model": "old",
 		},
 	}
-	rewrite, err := workspaceAgentRewriteFor(modelSourceAnthropic, "claude")
+	rewrite, err := workspaceAgentRewriteFor(modelSourceAnthropic, "claude", []string{
+		"claude-haiku-4-5",
+		"claude-opus-4-6",
+		"claude-sonnet-4-6",
+	})
 	require.NoError(t, err)
 	require.True(t, rewriteWorkspaceAgentNode(&node, rewrite))
 	assert.Equal(t, "runnerClaudeCode", node.ComponentName())
-	assert.Equal(t, "opus", node.Configuration["model"])
+	assert.Equal(t, "claude-opus-4-6", node.Configuration["model"])
 }
 
 func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
@@ -49,10 +58,15 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 	require.NoError(t, db.Model(&models.CanvasNode{}).
 		Where("workflow_id = ? AND node_id = ?", hosted.ID, "agent").
 		Update("state", models.CanvasNodeStateError).Error)
+	stubProviderModels(r.Registry, "claude", []string{
+		"claude-haiku-4-5",
+		"claude-opus-4-6",
+		"claude-sonnet-4-6",
+	})
 
 	changed, _, err := SwitchFactoryModelSourceInTransaction(
 		t.Context(),
-		crypto.NewNoOpEncryptor(),
+		r.Registry,
 		r.Organization.ID.String(),
 		factory.ID.String(),
 		modelSourceAnthropic,
@@ -61,8 +75,8 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []uuid.UUID{hosted.ID, provider.ID}, changed)
 
-	assertAgentNode(t, db, hosted.ID, "runnerClaudeCode", "sonnet", "claude")
-	assertAgentNode(t, db, provider.ID, "runnerClaudeCode", "sonnet", "claude")
+	assertAgentNode(t, db, hosted.ID, "runnerClaudeCode", "claude-sonnet-4-6", "claude")
+	assertAgentNode(t, db, provider.ID, "runnerClaudeCode", "claude-sonnet-4-6", "claude")
 	assertCanvasNodeReady(t, db, hosted.ID, "agent")
 	assertCanvasLiveVersion(t, db, untouched.ID, untouchedLive)
 	assertCanvasLiveVersionChanged(t, db, hosted.ID, hostedLive)
@@ -75,7 +89,7 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 
 	_, _, err = SwitchFactoryModelSourceInTransaction(
 		t.Context(),
-		crypto.NewNoOpEncryptor(),
+		r.Registry,
 		r.Organization.ID.String(),
 		factory.ID.String(),
 		modelSourceHosted,
@@ -180,6 +194,51 @@ func assertCanvasLiveVersionChanged(t *testing.T, db *gorm.DB, canvasID, previou
 	assert.NotEqual(t, previous, *canvas.LiveVersionID)
 }
 
+func stubProviderModels(reg *registry.Registry, appName string, ids []string) {
+	reg.Integrations[appName] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			if resourceType != "model" {
+				return nil, nil
+			}
+			out := make([]core.IntegrationResource, 0, len(ids))
+			for _, id := range ids {
+				out = append(out, core.IntegrationResource{Type: "model", ID: id, Name: id})
+			}
+			return out, nil
+		},
+	})
+}
+
+func Test__SwitchFactoryModelSource__StopsWhenTheKeyCannotListModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	live := *canvas.LiveVersionID
+	r.Registry.Integrations["claude"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			return nil, core.NewProviderAPIError(401, "credentials are invalid", errors.New("unauthorized"))
+		},
+	})
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceAnthropic,
+		"sk-bad",
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	assertCanvasLiveVersion(t, db, canvas.ID, live)
+
+	var integrations []models.Integration
+	require.NoError(t, db.Where("organization_id = ? AND app_name = ?", r.Organization.ID, "claude").Find(&integrations).Error)
+	assert.Empty(t, integrations)
+}
+
 func assertCanvasNodeReady(t *testing.T, db *gorm.DB, canvasID uuid.UUID, nodeID string) {
 	t.Helper()
 	var node models.CanvasNode
@@ -197,10 +256,11 @@ func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Model(installation).Update("state", models.IntegrationStateReady).Error)
 	createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	stubProviderModels(r.Registry, "claude", []string{"claude-sonnet-4-6", "claude-opus-4-6"})
 
 	_, integrationID, err := SwitchFactoryModelSourceInTransaction(
 		t.Context(),
-		crypto.NewNoOpEncryptor(),
+		r.Registry,
 		r.Organization.ID.String(),
 		factory.ID.String(),
 		modelSourceAnthropic,

@@ -13,8 +13,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -38,7 +40,7 @@ type workspaceAgentRewrite struct {
 	Provider        string
 }
 
-func workspaceAgentRewriteFor(source, integrationName string) (workspaceAgentRewrite, error) {
+func workspaceAgentRewriteFor(source, integrationName string, modelIDs []string) (workspaceAgentRewrite, error) {
 	switch strings.TrimSpace(source) {
 	case modelSourceHosted:
 		return workspaceAgentRewrite{
@@ -46,28 +48,31 @@ func workspaceAgentRewriteFor(source, integrationName string) (workspaceAgentRew
 			Harness:   models.FactoryOnboardingAgentHarnessSuperPlane,
 		}, nil
 	case modelSourceAnthropic:
+		model, planning := agentModelsForSource(modelSourceAnthropic, modelIDs)
 		return workspaceAgentRewrite{
 			Component:       "runnerClaudeCode",
-			Model:           "sonnet",
-			PlanningModel:   "opus",
+			Model:           model,
+			PlanningModel:   planning,
 			IntegrationName: integrationName,
 			Harness:         models.FactoryOnboardingAgentHarnessClaudeCode,
 			Provider:        models.UsageProviderAnthropic,
 		}, nil
 	case modelSourceOpenAI:
+		model, planning := agentModelsForSource(modelSourceOpenAI, modelIDs)
 		return workspaceAgentRewrite{
 			Component:       "runnerCodex",
-			Model:           "gpt-5",
-			PlanningModel:   "gpt-5",
+			Model:           model,
+			PlanningModel:   planning,
 			IntegrationName: integrationName,
 			Harness:         models.FactoryOnboardingAgentHarnessCodex,
 			Provider:        models.UsageProviderOpenAI,
 		}, nil
 	case modelSourceOpenRouter:
+		model, planning := agentModelsForSource(modelSourceOpenRouter, modelIDs)
 		return workspaceAgentRewrite{
 			Component:       "runnerOpenRouter",
-			Model:           "anthropic/claude-sonnet-4-6",
-			PlanningModel:   "anthropic/claude-opus-4-6",
+			Model:           model,
+			PlanningModel:   planning,
 			IntegrationName: integrationName,
 			Harness:         models.FactoryOnboardingAgentHarnessClaudeCode,
 			Provider:        models.UsageProviderOpenRouter,
@@ -326,7 +331,7 @@ func nextInstallationName(tx *gorm.DB, orgID uuid.UUID, appName string) (string,
 func switchFactoryModelSource(
 	ctx context.Context,
 	tx *gorm.DB,
-	encryptor crypto.Encryptor,
+	reg *registry.Registry,
 	factory *models.Factory,
 	source string,
 	apiKey string,
@@ -334,7 +339,7 @@ func switchFactoryModelSource(
 	var integration *models.Integration
 	if strings.TrimSpace(source) != modelSourceHosted {
 		provider := strings.TrimSpace(source)
-		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, encryptor, factory.OrganizationID, provider, apiKey)
+		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey)
 		if err != nil {
 			return nil, "", err
 		}
@@ -343,11 +348,17 @@ func switchFactoryModelSource(
 
 	integrationName := ""
 	integrationID := ""
+	var modelIDs []string
 	if integration != nil {
 		integrationName = integration.InstallationName
 		integrationID = integration.ID.String()
+		ids, err := organizations.ListConnectedBYOKModelIDs(tx, reg, integration)
+		if err != nil {
+			return nil, "", err
+		}
+		modelIDs = ids
 	}
-	rewrite, err := workspaceAgentRewriteFor(source, integrationName)
+	rewrite, err := workspaceAgentRewriteFor(source, integrationName, modelIDs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -387,12 +398,16 @@ func versionOwnerID(ctx context.Context) uuid.UUID {
 
 func SwitchFactoryModelSourceInTransaction(
 	ctx context.Context,
-	encryptor crypto.Encryptor,
+	reg *registry.Registry,
 	organizationID string,
 	factoryID string,
 	source string,
 	apiKey string,
 ) ([]uuid.UUID, string, error) {
+	if reg == nil {
+		return nil, "", fmt.Errorf("integration registry is required")
+	}
+
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, "", err
@@ -406,7 +421,7 @@ func SwitchFactoryModelSourceInTransaction(
 			return err
 		}
 		var savedID string
-		changed, savedID, err = switchFactoryModelSource(ctx, tx, encryptor, factory, source, apiKey)
+		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey)
 		integrationID = savedID
 		return err
 	})

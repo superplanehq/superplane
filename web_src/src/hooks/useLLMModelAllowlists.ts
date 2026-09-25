@@ -9,10 +9,11 @@ import {
   organizationsListHostedCreditProducts,
   organizationsUpdateByokllmModels,
 } from "@/api-client";
-import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
+import { getResponseErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { factoryQueryKeys } from "./useFactoryData";
+import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
 
 const BYOK_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
 
@@ -213,7 +214,7 @@ export function useSwitchFactoryModelSource(organizationId: string, factoryId: s
         }),
       });
       if (!response.ok) {
-        throw new Error("Unable to switch the model source.");
+        throw new Error(await getResponseErrorMessage(response, "Unable to switch the model source."));
       }
       return response.json();
     },

@@ -4,16 +4,16 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func SwitchFactoryModelSource(
 	ctx context.Context,
-	encryptor crypto.Encryptor,
+	reg *registry.Registry,
 	organizationID string,
 	req *pb.SwitchFactoryModelSourceRequest,
 ) (*pb.SwitchFactoryModelSourceResponse, error) {
@@ -23,7 +23,7 @@ func SwitchFactoryModelSource(
 
 	changed, integrationID, err := SwitchFactoryModelSourceInTransaction(
 		ctx,
-		encryptor,
+		reg,
 		organizationID,
 		req.GetId(),
 		req.GetSource(),
