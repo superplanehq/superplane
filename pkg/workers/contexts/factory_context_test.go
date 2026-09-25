@@ -329,6 +329,41 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Equal(t, 2, countOrders(factoryModel))
 	})
 
+	t.Run("skips a Dependabot alert that already has a task", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Bump lodash",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{
+				URL:   "https://github.com/acme/payments/security/dependabot/7",
+				Label: "acme/payments dependabot #7",
+			},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.dependabotAlert",
+			"data": map[string]any{
+				"action": "created",
+				"alert": map[string]any{
+					"html_url": "https://github.com/acme/payments/security/dependabot/7",
+				},
+			},
+		})
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Bump lodash"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
 	t.Run("serializes concurrent creates for the same Sentry issue", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
