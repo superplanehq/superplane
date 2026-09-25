@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
@@ -23,6 +24,7 @@ describe("lineIntakeModel", () => {
   it("defines GitHub, Jira, Sentry, PagerDuty, and Productive.io as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
+      "dependabot-alerts",
       "jira-issues",
       "sentry-exceptions",
       "pagerduty-incidents",
@@ -335,9 +337,10 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists GitHub, Jira, Sentry, Productive.io, and coming-soon DataDog and Notion add-intake sources", () => {
+  it("lists GitHub, Dependabot, Jira, Sentry, Productive.io, and coming-soon DataDog and Notion add-intake sources", () => {
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
       "github-issues",
+      "dependabot-alerts",
       "jira-issues",
       "sentry-exceptions",
       "productive-tasks",
@@ -354,6 +357,7 @@ describe("lineIntakeModel", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
@@ -363,11 +367,15 @@ describe("lineIntakeModel", () => {
 
   it("keeps Jira, Sentry, and Productive.io live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
-      [FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(
-        featureId,
-      ),
+      [
+        FEATURE_FACTORY_DEPENDABOT_INTAKE,
+        FEATURE_FACTORY_JIRA_INTAKE,
+        FEATURE_FACTORY_SENTRY_INTAKE,
+        FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+      ].includes(featureId),
     );
 
+    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
@@ -383,5 +391,6 @@ describe("lineIntakeModel", () => {
     }
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
+    expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
   });
 });

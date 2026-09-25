@@ -221,8 +221,16 @@ func githubOriginLabel(parsed *url.URL) string {
 		return ""
 	}
 
-	owner, repo, kind, number := parts[0], parts[1], parts[2], parts[3]
-	if owner == "" || repo == "" || number == "" {
+	owner, repo := parts[0], parts[1]
+	if owner == "" || repo == "" {
+		return ""
+	}
+	if len(parts) >= 5 && parts[2] == "security" && parts[3] == "dependabot" && parts[4] != "" {
+		return owner + "/" + repo + " dependabot #" + parts[4]
+	}
+
+	kind, number := parts[2], parts[3]
+	if number == "" {
 		return ""
 	}
 	if kind != "issues" && kind != "pull" {

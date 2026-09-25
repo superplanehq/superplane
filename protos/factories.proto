@@ -1074,6 +1074,7 @@ message FactoryIntake {
     SOURCE_PAGERDUTY_INCIDENTS = 3;
     SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
+    SOURCE_DEPENDABOT_ALERTS = 6;
   }
 
   enum InitialImportStatus {
@@ -1153,6 +1154,9 @@ message FactoryIntake {
     // Task list ids that still create a task. Empty means every task list.
     // Productive task intakes only.
     repeated string task_list_ids = 16;
+    // Severities that still create a task. Empty means every severity.
+    // Dependabot alert intakes only. Values: critical, high, medium, low.
+    repeated string dependabot_severities = 17;
   }
 
   string id = 1;

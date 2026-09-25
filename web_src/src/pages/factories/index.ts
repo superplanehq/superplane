@@ -43,6 +43,7 @@ export {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
+  DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
