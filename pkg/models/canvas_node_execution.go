@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -95,6 +96,16 @@ type CanvasNodeExecution struct {
 
 func (e *CanvasNodeExecution) TableName() string {
 	return "workflow_node_executions"
+}
+
+const CanvasNodeExecutionFrozenComponentKey = "frozenComponent"
+
+func (e *CanvasNodeExecution) FrozenComponentName() string {
+	if e == nil {
+		return ""
+	}
+	name, _ := e.Metadata.Data()[CanvasNodeExecutionFrozenComponentKey].(string)
+	return strings.TrimSpace(name)
 }
 
 func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
