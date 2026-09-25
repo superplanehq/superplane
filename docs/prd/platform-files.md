@@ -106,7 +106,7 @@ Proto: [protos/files.proto](../../protos/files.proto).
 
 | RPC | HTTP | Auth |
 | --- | --- | --- |
-| `CreateFactoryFile` | `POST /api/v1/factories/{factory_id}/files` | `factories:update` |
+| `CreateFactoryFile` | `POST /api/v1/factories/{factory_id}/files` | `work_orders:create` or `factories:update` |
 | `ListFactoryFiles` | `GET /api/v1/factories/{factory_id}/files` | `factories:read` |
 | `CreateWorkOrderFile` | `POST /api/v1/factories/{factory_id}/orders/{order_id}/files` | `work_orders:update` |
 | `ListWorkOrderFiles` | `GET /api/v1/factories/{factory_id}/orders/{order_id}/files` | `work_orders:read` |
@@ -115,7 +115,7 @@ Raw HTTP (not gRPC gateway):
 
 | Method | Path | Auth |
 | --- | --- | --- |
-| `PUT` | `/api/v1/files/{file_id}/content` | Org JWT. Caller must be `created_by_id`. |
+| `PUT` | `/api/v1/files/{file_id}/content` | Org JWT. Caller must be `created_by_id`. Workspace scope uses the create-file permissions. Task scope uses `work_orders:update`. |
 | `GET` | `/api/v1/public/files/{file_id}` | HMAC `expires` + `sig`. No session. |
 
 Handlers: [pkg/grpc/actions/files/files.go](../../pkg/grpc/actions/files/files.go),

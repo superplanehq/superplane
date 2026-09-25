@@ -713,9 +713,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		// Task create attaches a file before the task exists.
+		// Workspace update remains so existing factory roles keep access.
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/files"}: {
-			Resource:                     "factories",
-			Action:                       "update",
+			Resource:                     "work_orders",
+			Action:                       "create",
+			AlsoAllow:                    []PermissionGrant{{Resource: "factories", Action: "update"}},
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},

@@ -69,7 +69,7 @@ func (a accessAction) apiAccess(ctx context.Context, session agents.AgentSession
 	for _, route := range routes {
 		rule := rules[route]
 		tokenAllowed, resources, tokenReason := scopedTokenAllowsRule(rule, permissions, session.CanvasID)
-		rbacAllowed, rbacReason, err := rbac.allowsAny(rule.Resource, rule.AllowedActions())
+		rbacAllowed, rbacReason, err := rbac.allowsGrants(rule.Grants())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -146,9 +146,27 @@ func sortedAuthorizationRoutes(rules map[authorization.HTTPRoute]authorization.A
 }
 
 func scopedTokenAllowsRule(rule authorization.AuthorizationRule, permissions []jwt.Permission, canvasID string) (bool, []string, string) {
-	actions := rule.AllowedActions()
+	deniedReason := "agent token does not grant this resource and operation"
+	for _, grant := range rule.Grants() {
+		allowed, resources, reason := scopedTokenAllowsGrant(grant, rule.ResourcePathParams, permissions, canvasID)
+		if allowed {
+			return true, resources, ""
+		}
+		if reason != "" {
+			deniedReason = reason
+		}
+	}
+	return false, nil, deniedReason
+}
+
+func scopedTokenAllowsGrant(
+	grant authorization.PermissionGrant,
+	pathParamKeys []string,
+	permissions []jwt.Permission,
+	canvasID string,
+) (bool, []string, string) {
 	for _, permission := range permissions {
-		if permission.ResourceType != rule.Resource || !slices.Contains(actions, permission.Action) {
+		if permission.ResourceType != grant.Resource || permission.Action != grant.Action {
 			continue
 		}
 
@@ -160,14 +178,14 @@ func scopedTokenAllowsRule(rule authorization.AuthorizationRule, permissions []j
 			continue
 		}
 
-		if len(rule.ResourcePathParams) == 0 {
+		if len(pathParamKeys) == 0 {
 			return false, nil, "agent token is resource-scoped, but this API route is not resource-scoped by authorization rules"
 		}
 
 		return true, []string{canvasID}, ""
 	}
 
-	return false, nil, "agent token does not grant this resource and operation"
+	return false, nil, ""
 }
 
 func permissionAllows(permissions []jwt.Permission, resource, operation string, scoped bool, canvasID string) bool {
@@ -239,9 +257,17 @@ func (c *rbacCache) allows(resource, operation string) (bool, string, error) {
 }
 
 func (c *rbacCache) allowsAny(resource string, operations []string) (bool, string, error) {
-	var fallbackReason string
+	grants := make([]authorization.PermissionGrant, 0, len(operations))
 	for _, operation := range operations {
-		allowed, reason, err := c.allows(resource, operation)
+		grants = append(grants, authorization.PermissionGrant{Resource: resource, Action: operation})
+	}
+	return c.allowsGrants(grants)
+}
+
+func (c *rbacCache) allowsGrants(grants []authorization.PermissionGrant) (bool, string, error) {
+	var fallbackReason string
+	for _, grant := range grants {
+		allowed, reason, err := c.allows(grant.Resource, grant.Action)
 		if err != nil || allowed {
 			return allowed, reason, err
 		}
