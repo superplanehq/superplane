@@ -14,6 +14,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestThinkingArgsMapsEffortFlags(t *testing.T) {
+	assert.Empty(t, thinkingArgsFromScript(t, ""))
+	assert.Empty(t, thinkingArgsFromScript(t, "default"))
+	assert.Equal(t, []string{"--effort", "low"}, thinkingArgsFromScript(t, "low"))
+	assert.Equal(t, []string{"--effort", "medium"}, thinkingArgsFromScript(t, "MEDIUM"))
+	assert.Equal(t, []string{"--effort", "high"}, thinkingArgsFromScript(t, "high"))
+}
+
+func thinkingArgsFromScript(t *testing.T, thinking string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { thinkingArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(thinkingArgs(process.argv[2])));`,
+		script,
+		thinking,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
 func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
@@ -89,6 +115,15 @@ func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 	})
 	assert.Contains(t, tools, "mcp__docs")
 	assert.Contains(t, tools, "mcp__superplane")
+}
+
+func TestDisallowedClaudeToolsIncludesWorkspaceMCPTools(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","disabledTools":["create_issue"]}]}`), 0o644))
+	tools := disallowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	assert.Equal(t, "mcp__docs__create_issue", tools)
 }
 
 func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
@@ -646,6 +681,18 @@ func allowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
 	payload, err := json.Marshal(env)
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { allowedClaudeTools } = require(process.argv[1]); process.stdout.write(allowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func disallowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { disallowedClaudeTools } = require(process.argv[1]); process.stdout.write(disallowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)

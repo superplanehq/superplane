@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -52,6 +53,9 @@ type FactoryContext struct {
 	// readProductiveTaskFiles, when set, supplies Productive.io files without
 	// calling the Productive.io API.
 	readProductiveTaskFiles productiveFileRead
+	// readJiraIssueFiles, when set, supplies Jira files without calling the
+	// Jira API.
+	readJiraIssueFiles jiraFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -172,6 +176,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateDependabotWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
@@ -244,6 +256,35 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 	return hasOrder, nil
 }
 
+func (c *FactoryContext) skipDuplicateDependabotWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := ghdependabot.AlertRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := ghdependabot.LockAlertWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := ghdependabot.AlertHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Dependabot alert %s#%d: work order already exists", ref.Repository, ref.Number)
+	}
+	return hasOrder, nil
+}
+
 func (c *FactoryContext) createFactoryWorkOrder(
 	factoryModel *models.Factory,
 	params core.WorkOrderParams,
@@ -280,6 +321,7 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
 	c.ingestGitHubImages(order)
 	c.ingestProductiveFiles(order)
+	c.ingestJiraFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 

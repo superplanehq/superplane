@@ -85,6 +85,10 @@ export function LinesBoardSpecHarness({
                     element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
                   />
                   <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/dependabot"
+                    element={<div data-testid="dependabot-intake-setup">Dependabot setup page</div>}
+                  />
+                  <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/jira"
                     element={<div data-testid="jira-intake-setup">Jira setup page</div>}
                   />

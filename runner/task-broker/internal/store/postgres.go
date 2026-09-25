@@ -88,7 +88,7 @@ func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) 
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"provisioner", "arch", "size", "created_at",
-			"dispatch_target", "max_execution_timeout_seconds", "supports_docker",
+			"max_execution_timeout_seconds", "supports_docker",
 		}),
 	}).Create(f).Error
 }

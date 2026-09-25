@@ -141,6 +141,7 @@ import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFoote
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
   factoryGitHubIntakeSetupPath,
@@ -519,6 +520,12 @@ export function LinesPage() {
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
         navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "dependabot-alerts") {
+      if (selectedLine.id) {
+        navigate(factoryDependabotIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       }
       return;
     }
@@ -1149,7 +1156,7 @@ function LineBoardSplitRunPopup({
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
-  onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
+  onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
   onClose: () => void;
@@ -1189,7 +1196,9 @@ function LineBoardSplitRunPopup({
       canUpdate={canUpdate}
       isDispatching={isDispatching}
       onDispatch={
-        resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined
+        resolvedLineName
+          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+          : undefined
       }
       onClose={onClose}
       fixed

@@ -1,7 +1,9 @@
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import { getApiErrorMessage } from "@/lib/errors";
+import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 import {
   GITHUB_SETUP_INTEGRATION_PARAM,
@@ -28,6 +30,11 @@ import {
   ticketSourceFromIssuesChoice,
 } from "./first-run/firstRunTicketSource";
 import { type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import {
+  onboardingAgentGate,
+  type OnboardingAgentCredentialChoice,
+  type OnboardingAgentGate,
+} from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -69,8 +76,19 @@ function startConnectOnPicker(searchParams: URLSearchParams): boolean {
   return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
 }
 
-function screenWithoutAgent(screen: FirstRunScreen, skipAgentScreen: boolean): FirstRunScreen {
-  return screen === "agent" && skipAgentScreen ? "tickets" : screen;
+function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
+  if (screen !== "agent" || agentGate === "show" || agentGate === "first") return screen;
+  return "tickets";
+}
+
+// The model source comes before the backlog, so the ticket screen waits for it.
+function screenWithModelSource(
+  screen: FirstRunScreen,
+  agentGate: OnboardingAgentGate,
+  credentialChoice: OnboardingAgentCredentialChoice | null,
+): FirstRunScreen {
+  if (screen !== "tickets" || agentGate !== "first" || credentialChoice) return screen;
+  return "agent";
 }
 
 function useFirstRunBlockingAction() {
@@ -176,17 +194,18 @@ function requestedOrganizations(
 
 function screenWithoutIncompleteJira(
   screen: FirstRunScreen,
+  agentGate: OnboardingAgentGate,
   issuesChoice: IssuesChoiceId | null,
   jiraProjectId: string,
 ): FirstRunScreen {
-  if (screen !== "agent") return screen;
+  if (screen !== "agent" || agentGate !== "show") return screen;
   if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
   return screen;
 }
 
 function useFirstRunNavigation(
   model: OnboardingPageModel,
-  skipAgentScreen: boolean,
+  agentGate: OnboardingAgentGate,
   connection: ReturnType<typeof useGitHubConnectionState>,
 ) {
   const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(connection.initialScreen);
@@ -211,7 +230,8 @@ function useFirstRunNavigation(
 
   return {
     screen: screenWithoutIncompleteJira(
-      screenWithoutAgent(openedScreen, skipAgentScreen),
+      screenWithModelSource(screenWithoutAgent(openedScreen, agentGate), agentGate, model.agentCredentialChoice),
+      agentGate,
       model.setup.issuesChoice,
       model.jiraProjectId,
     ),
@@ -226,9 +246,10 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
+function selectedIssuesChoice(model: OnboardingPageModel, jiraAvailable: boolean): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
+  if (issuesChoice === "jira" && !jiraAvailable) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({
@@ -242,28 +263,31 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
   return issuesChoice;
 }
 
-function useFirstRunCommands(
-  model: OnboardingPageModel,
-  skipAgentScreen: boolean,
-  connection: ReturnType<typeof useGitHubConnectionState>,
-  navigation: ReturnType<typeof useFirstRunNavigation>,
-  blocking: ReturnType<typeof useFirstRunBlockingAction>,
-) {
+function useFirstRunCommands(args: {
+  model: OnboardingPageModel;
+  agentGate: OnboardingAgentGate;
+  connection: ReturnType<typeof useGitHubConnectionState>;
+  navigation: ReturnType<typeof useFirstRunNavigation>;
+  blocking: ReturnType<typeof useFirstRunBlockingAction>;
+  jiraAvailable: boolean;
+}) {
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
       const repository = model.setup.selectedRepo;
       if (!repository) return;
       model.setup.commitRepoStep();
-      if (await model.saveRepository(repository)) navigation.goToScreen("tickets");
+      if (await model.saveRepository(repository)) navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
     });
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model);
+      const issuesChoice = selectedIssuesChoice(model, jiraAvailable);
       if (!issuesChoice) return;
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
       if (!(await model.saveIssues(issuesChoice))) return;
-      if (!skipAgentScreen) return navigation.goToScreen("agent");
+      if (agentGate === "pending") return;
+      if (agentGate === "show") return navigation.goToScreen("agent");
       blocking.setAction("finishing-setup");
       await model.finish(issuesChoice);
     });
@@ -274,6 +298,7 @@ function useFirstRunCommands(
     });
   const connectJira = () =>
     blocking.runUntilNavigation("connecting-jira", async () => {
+      if (!jiraAvailable) return false;
       model.setup.setIssuesChoice("jira");
       if (!(await model.saveIssues("jira"))) return false;
       await waitForBrowserPaint();
@@ -283,6 +308,10 @@ function useFirstRunCommands(
     blocking.run("finishing-setup", async () => {
       await model.finish();
     });
+  const continueFromAgent = () => {
+    if (agentGate === "first") return navigation.goToScreen("tickets");
+    return finishSetup();
+  };
   const installOnAnotherAccount = () => {
     const state = connection.accountPicker?.state;
     const slug = connection.accountPicker?.appSlug;
@@ -294,6 +323,7 @@ function useFirstRunCommands(
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
+    if (source === "jira" && !jiraAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
@@ -302,7 +332,7 @@ function useFirstRunCommands(
     connectJira,
     continueFromRepository,
     continueFromTickets,
-    finishSetup,
+    continueFromAgent,
     installOnAnotherAccount,
     selectTicketSource,
   };
@@ -387,13 +417,46 @@ export function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refre
   }, [screen, refresh]);
 }
 
+export function shouldClearSavedJiraChoice(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  jiraAvailable: boolean;
+  organizationReady: boolean;
+}): boolean {
+  if (args.featureLoading || args.jiraAvailable || args.issuesChoice !== "jira") return false;
+  return args.organizationReady;
+}
+
+export type SavedJiraChoiceBlock = "loading" | "lookup-failed";
+
+/** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
+export function savedJiraChoiceBlock(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  jiraAvailable: boolean;
+  organizationReady: boolean;
+}): SavedJiraChoiceBlock | null {
+  if (args.jiraAvailable || args.issuesChoice !== "jira") return null;
+  if (args.featureLoading) return "loading";
+  if (!args.organizationReady) return "lookup-failed";
+  return null;
+}
+
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
-  const skipAgentScreen = model.hostedAgentReady;
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(model, organizationId);
-  const navigation = useFirstRunNavigation(model, skipAgentScreen, connection);
-  const commands = useFirstRunCommands(model, skipAgentScreen, connection, navigation, blocking);
+  const jiraFeature = useExperimentalFeature(organizationId);
+  const jiraFeatureLoading = jiraFeature.isLoading;
+  const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
+  const agentGate = onboardingAgentGate({
+    hostedModelsAvailable: model.hostedModelsAvailable,
+    hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
+    bringYourOwnKey: model.bringYourOwnKey,
+    bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
+  });
+  const navigation = useFirstRunNavigation(model, agentGate, connection);
+  const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
   const binding = useGitHubInstallationBinding(
     organizationId,
     model,
@@ -402,6 +465,24 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     blocking,
   );
   useRepositoryErrorToast(model.repositoriesError);
+  // A saved Jira choice is not valid when the organization does not have the
+  // Jira intake feature. Clear it only after the organization lookup confirms
+  // the feature is off. A failed lookup has no organization data and must not
+  // replace the saved choice with the GitHub Issues default.
+  const issuesChoice = model.setup.issuesChoice;
+  const setIssuesChoice = model.setup.setIssuesChoice;
+  const jiraChoiceArgs = {
+    issuesChoice,
+    featureLoading: jiraFeatureLoading,
+    jiraAvailable,
+    organizationReady: jiraFeature.organizationReady,
+  };
+  const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
+  const jiraChoiceBlock = savedJiraChoiceBlock(jiraChoiceArgs);
+  useEffect(() => {
+    if (!clearSavedJiraChoice) return;
+    setIssuesChoice(null);
+  }, [clearSavedJiraChoice, setIssuesChoice]);
   // Recheck while a request waits, and also while the picker is open: an
   // install request made on GitHub without a callback (for example when the
   // callback URL was unreachable) only surfaces through this sync.
@@ -415,8 +496,17 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...navigation,
     ...commands,
     ...binding,
-    skipAgentScreen,
+    // The ticket screen is the last screen, so it finishes setup.
+    ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
+    skipAgentScreen: agentGate === "skip",
+    agentBeforeTickets: agentGate === "first",
+    credentialChoice: model.agentCredentialChoice,
+    selectCredentialChoice: model.setAgentCredentialChoice,
+    agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
+    jiraAvailable,
+    jiraFeatureLoading,
+    jiraChoiceBlock,
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,
     requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,

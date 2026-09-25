@@ -33,5 +33,4 @@ type Task struct {
 	CancelRequested              bool       `gorm:"not null;default:false"`
 	WebhookPayloadSizeLimit      int        `gorm:"not null;default:0"`
 	RunnerTerminationRequestedAt *time.Time `gorm:""`
-	DispatchRequestedAt          *time.Time `gorm:""`
 }

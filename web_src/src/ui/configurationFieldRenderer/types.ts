@@ -10,9 +10,11 @@ export interface FieldRendererProps {
   field: ConfigurationField;
   value: unknown;
   onChange: (value: unknown) => void;
+  onValuesChange?: (patch: Record<string, unknown>) => void;
   allValues?: Record<string, unknown>;
   integrationId?: string;
   organizationId?: string;
+  factoryId?: string;
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;

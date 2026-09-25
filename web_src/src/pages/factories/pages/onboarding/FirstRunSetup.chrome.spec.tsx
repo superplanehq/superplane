@@ -1,6 +1,7 @@
-import { render, renderHook, screen } from "@testing-library/react";
+import { render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
+import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -9,6 +10,7 @@ import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
+import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -33,6 +35,10 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "user-1" } }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
@@ -74,6 +80,12 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    hostedModelsAvailable: false,
+    hostedModelsAvailableLoading: false,
+    bringYourOwnKey: false,
+    bringYourOwnKeyLoading: false,
+    agentCredentialChoice: null,
+    setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
@@ -113,9 +125,26 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
-function renderSetup(model: OnboardingPageModel) {
+function withRepository(): OnboardingSetupApi {
+  return { ...setupState(), selectedRepo: "acme/payments-service" };
+}
+
+function StatefulSetup({ model }: { model: OnboardingPageModel }) {
+  const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>(null);
+  return <FirstRunSetup model={{ ...model, agentCredentialChoice: choice, setAgentCredentialChoice: setChoice }} />;
+}
+
+function renderStatefulSetup(overrides: Partial<OnboardingPageModel>) {
   render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
+      <StatefulSetup model={pageModel({ openSection: "agent", ...overrides })} />
+    </MemoryRouter>,
+  );
+}
+
+function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
+  render(
+    <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
   );
@@ -217,5 +246,110 @@ describe("FirstRunSetup chrome", () => {
     );
 
     expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
+  });
+
+  it("shows the model source before the backlog for a bring-your-own-key organization", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      openSection: "repo",
+      setup: withRepository(),
+    });
+
+    renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.continueReady }));
+
+    expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it("lists SuperPlane-hosted models before Your key in the model source choice", () => {
+    renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
+
+    const source = screen.getByTestId("first-run-model-source");
+    const buttons = within(source).getAllByRole("button");
+    expect(buttons[0]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.hostedModels));
+    expect(buttons[1]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.ownKey));
+  });
+
+  it("opens the backlog when the organization chooses SuperPlane-hosted models", async () => {
+    const user = userEvent.setup();
+    renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
+
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze })).toBeInTheDocument();
+  });
+
+  it("shows provider keys when the organization chooses its own key", async () => {
+    const user = userEvent.setup();
+    renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
+
+    expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBody)).toBeInTheDocument();
+    expect(screen.getByTestId("agent-step")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it("sends a bring-your-own-key organization back to the model source when none is chosen", () => {
+    renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
+
+    expect(screen.getByTestId("first-run-model-source")).toBeInTheDocument();
+  });
+
+  it("scans the backlog after a saved model source", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      agentCredentialChoice: "hosted",
+    });
+
+    renderSetup(model);
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+  });
+
+  it("hides the model source from an organization without the bring-your-own-key flag", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      openSection: "repo",
+      setup: withRepository(),
+    });
+
+    renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.continueReady }));
+
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+    await waitFor(() => expect(model.finish).toHaveBeenCalled());
+    expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
+  });
+
+  it("hides the model source when only a provider key can run the agent", () => {
+    renderSetup(pageModel({ bringYourOwnKey: true, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
+
+    expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
+  });
+
+  it("waits to choose the agent screen while the bring-your-own-key flag is loading", () => {
+    renderSetup(pageModel({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKeyLoading: true }));
+
+    const continueButton = screen.getByTestId("first-run-analyze-tickets");
+    expect(continueButton).toBeDisabled();
+    expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.agent.loading);
+    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 });

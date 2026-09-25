@@ -4,7 +4,7 @@
 /**
  * Run Claude Code and format stream-json into readable live logs.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [thinking]
  */
 
 const fs = require("fs");
@@ -170,6 +170,21 @@ function allowedClaudeTools(env = process.env) {
   return [BASE_ALLOWED_TOOLS, ...workspaceAllow].join(",");
 }
 
+function disallowedClaudeTools(env = process.env) {
+  const tools = [];
+  for (const [name, server] of Object.entries(workspaceMCPServers(env))) {
+    const disabled = Array.isArray(server.disabledTools) ? server.disabledTools : [];
+    for (const tool of disabled) {
+      const toolName = String(tool || "").trim();
+      if (!toolName) {
+        continue;
+      }
+      tools.push(`mcp__${name}__${toolName}`);
+    }
+  }
+  return tools.join(",");
+}
+
 function claudePermissionMode(env = process.env) {
   if (planningMCPEnabled(env)) {
     // Planning sessions stay read-only by restricting allowedClaudeTools to
@@ -254,6 +269,7 @@ function workspaceMCPServers(env = process.env) {
         type: "http",
         url: String((server && server.url) || "").trim(),
         headers: server && server.headers && typeof server.headers === "object" ? server.headers : {},
+        disabledTools: Array.isArray(server.disabledTools) ? server.disabledTools : [],
       };
     }
     return out;
@@ -263,7 +279,14 @@ function workspaceMCPServers(env = process.env) {
 }
 
 function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = false) {
-  const mcpServers = { ...workspaceMCPServers(env) };
+  const mcpServers = {};
+  for (const [name, server] of Object.entries(workspaceMCPServers(env))) {
+    mcpServers[name] = {
+      type: server.type,
+      url: server.url,
+      headers: server.headers,
+    };
+  }
   if (includeSuperplane) {
     mcpServers.superplane = {
       command: "node",
@@ -312,13 +335,23 @@ function claudeSessionIDFromEvent(event) {
   return String((event && event.session_id) || "").trim();
 }
 
+function thinkingArgs(thinking) {
+  const level = String(thinking || "")
+    .trim()
+    .toLowerCase();
+  if (level === "low" || level === "medium" || level === "high") {
+    return ["--effort", level];
+  }
+  return [];
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    writeStderr("usage: node run.js <prompt-file> [model]\n");
+    writeStderr("usage: node run.js <prompt-file> [model] [thinking]\n");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", args[2] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
       writeStderr(`${err && err.message ? err.message : err}\n`);
@@ -326,7 +359,7 @@ function main() {
     });
 }
 
-async function runPrompt(promptFile, model) {
+async function runPrompt(promptFile, model, thinking) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
     throw new Error("SUPERPLANE_TASK_DIR is required");
@@ -383,9 +416,14 @@ async function runPrompt(promptFile, model) {
   } else {
     claudeArgs.push("--allowedTools", allowedClaudeTools());
   }
+  const disallowed = disallowedClaudeTools();
+  if (disallowed) {
+    claudeArgs.push("--disallowedTools", disallowed);
+  }
   if (model) {
     claudeArgs.push("--model", model);
   }
+  claudeArgs.push(...thinkingArgs(thinking));
   claudeArgs.push(...continuationArgs);
   claudeArgs.push("--", prompt);
 
@@ -1309,11 +1347,13 @@ if (require.main === module) {
 
 module.exports = {
   allowedClaudeTools,
+  disallowedClaudeTools,
   claudeContinuationArgs,
   claudePermissionMode,
   claudeSessionIDFromEvent,
   formatStreamJsonLines,
   planningSystemPrompt,
+  thinkingArgs,
   workspaceMCPServers,
   writeClaudeMCPConfig,
 };

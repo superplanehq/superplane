@@ -33,6 +33,9 @@ vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
 }));
 vi.mock("@/hooks/useMe", () => ({ useMe: () => ({ data: { id: "user-1" } }) }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
+}));
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
 }));
@@ -51,6 +54,12 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    hostedModelsAvailable: false,
+    hostedModelsAvailableLoading: false,
+    bringYourOwnKey: false,
+    bringYourOwnKeyLoading: false,
+    agentCredentialChoice: null,
+    setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),

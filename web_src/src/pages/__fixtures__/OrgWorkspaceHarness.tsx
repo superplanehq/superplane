@@ -20,6 +20,7 @@ import {
   AutomationsPage,
   ChecksPRFeedbackSetupPage,
   CreateWorkOrderComposeRedirect,
+  DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
@@ -303,6 +304,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
                 <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
                 <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+                <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
                 <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
                 <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}

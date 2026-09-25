@@ -20,6 +20,14 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.issue.body }}",
     title: "GitHub issue intake",
   },
+  "dependabot-alerts": {
+    triggerComponent: "github.onDependabotAlert",
+    triggerName: "On Dependabot Alert",
+    createTitle:
+      'Bump {{ root().data.alert.dependency.package.name ?? "dependency" }} in {{ root().data.alert.dependency.manifest_path ?? "the manifest" }}',
+    createDescription: "{{ root().data.alert.html_url }}",
+    title: "Dependabot alert intake",
+  },
   "jira-issues": {
     triggerComponent: "jira.onIssue",
     triggerName: "On Issue",
@@ -48,7 +56,7 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerName: "On Task",
     createTitle: "{{ root().data.data.attributes.title }}",
     createDescription: "{{ root().data.data.attributes.description }}",
-    title: "Productive.io task intake",
+    title: "Productive task intake",
   },
 };
 

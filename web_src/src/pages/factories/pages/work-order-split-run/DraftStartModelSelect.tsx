@@ -1,15 +1,11 @@
 import { Bot, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
+import { DRAFT_START_THINKING_AUTO, DRAFT_START_THINKING_DEFAULT, THINKING_LEVELS } from "@/lib/thinkingLevel";
 
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 
@@ -27,16 +23,25 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
   ghost: "gap-1.5 text-muted-foreground hover:text-foreground",
 };
 
+const START_THINKING_LEVELS = [
+  { value: DRAFT_START_THINKING_AUTO, label: "Auto" },
+  ...THINKING_LEVELS.map((level) => ({
+    value: level.value === "" ? DRAFT_START_THINKING_DEFAULT : level.value,
+    label: level.label,
+  })),
+];
+
 /**
- * Picks the runner model for Start. `icon` is the chevron fused to Start,
+ * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
- * strip settings row.
+ * strip settings row. Closed labeled and ghost triggers show the model name.
  */
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
   lineName,
-  value,
+  model,
+  thinkingLevel,
   onChange,
   disabled = false,
   appearance = "icon",
@@ -44,14 +49,15 @@ export function DraftStartModelSelect({
   organizationId?: string;
   factoryId?: string;
   lineName?: string;
-  value: string;
-  onChange: (next: string) => void;
+  model: string;
+  thinkingLevel: string;
+  onChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled?: boolean;
   appearance?: Appearance;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
   const selectedName =
-    value === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((model) => model.id === value)?.name || value;
+    model === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((item) => item.id === model)?.name || model;
   const showName = appearance !== "icon";
 
   return (
@@ -72,20 +78,25 @@ export function DraftStartModelSelect({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" className="min-w-44">
-        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
-          <DropdownMenuRadioItem value={DRAFT_START_MODEL_AUTO}>Auto</DropdownMenuRadioItem>
-          {(models.data ?? []).map((model) => {
-            const id = model.id ?? "";
-            if (id === "") {
-              return null;
-            }
-            return (
-              <DropdownMenuRadioItem key={id} value={id}>
-                {model.name || id}
-              </DropdownMenuRadioItem>
-            );
-          })}
-        </DropdownMenuRadioGroup>
+        <DropdownMenuValueSub
+          label="Model"
+          testId="split-run-draft-model-list"
+          value={model}
+          options={[
+            { value: DRAFT_START_MODEL_AUTO, label: "Auto" },
+            ...(models.data ?? [])
+              .filter((item) => (item.id ?? "") !== "")
+              .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),
+          ]}
+          onValueChange={(nextModel) => onChange({ model: nextModel, thinkingLevel })}
+        />
+        <DropdownMenuValueSub
+          label="Thinking"
+          testId="split-run-draft-thinking"
+          value={thinkingLevel}
+          options={START_THINKING_LEVELS}
+          onValueChange={(nextThinking) => onChange({ model, thinkingLevel: nextThinking })}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

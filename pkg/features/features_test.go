@@ -31,12 +31,20 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory dependabot intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryDependabotIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryDependabotIntake, f.ID)
+		assert.Equal(t, "Factory Dependabot Intake", f.Label)
+		assert.Equal(t, "Add Dependabot alert intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryProductiveIntake)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
-		assert.Equal(t, "Factory Productive.io Intake", f.Label)
-		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
+		assert.Equal(t, "Factory Productive Intake", f.Label)
+		assert.Equal(t, "Add Productive intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
@@ -64,12 +72,20 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
-	t.Run("known id returns workspace agent resources feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceAgentResources)
+	t.Run("known id returns workspace MCP feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceMCP)
 		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceAgentResources, f.ID)
-		assert.Equal(t, "Agent Resources", f.Label)
+		assert.Equal(t, FeatureWorkspaceMCP, f.ID)
+		assert.Equal(t, "Workspace MCP", f.Label)
 		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
+	})
+
+	t.Run("known id returns workspace skills feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceSkills)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceSkills, f.ID)
+		assert.Equal(t, "Workspace Skills", f.Label)
+		assert.Equal(t, "Add skills for workspace agents", f.Description)
 	})
 
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
@@ -99,10 +115,12 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactorySentryIntake))
 	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
+	assert.True(t, Exists(FeatureFactoryDependabotIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
-	assert.True(t, Exists(FeatureWorkspaceAgentResources))
+	assert.True(t, Exists(FeatureWorkspaceMCP))
+	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))

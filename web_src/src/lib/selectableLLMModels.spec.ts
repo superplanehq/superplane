@@ -11,6 +11,7 @@ import {
   selectableLLMModelsFromResponse,
   selectableLLMModelsForProvider,
   byokRunnerModelOptions,
+  defaultByokRunnerModel,
   sortSelectableLLMModels,
   type SelectableLLMModel,
 } from "./selectableLLMModels";
@@ -64,6 +65,34 @@ describe("selectableLLMModelsForProvider", () => {
     expect(selectableLLMModelsForProvider(listed, "anthropic").map((item) => item.model.id)).toEqual([
       "claude-sonnet-4-6",
     ]);
+  });
+});
+
+describe("defaultByokRunnerModel", () => {
+  const allowlist = ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"];
+
+  it("prefers Claude Opus 5.5 from the organization key over a Claude alias", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", [...allowlist, "claude-opus-5-5"])).toBe("claude-opus-5-5");
+  });
+
+  it("prefers a Sonnet id when the organization key has no Opus 5.5 model", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", allowlist)).toBe("claude-sonnet-4-6");
+    expect(defaultByokRunnerModel("", "anthropic", allowlist)).toBe("claude-sonnet-4-6");
+  });
+
+  it("uses the first allowlisted id when the key has no Sonnet model", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", ["claude-opus-4-6", "claude-haiku-4-5"])).toBe(
+      "claude-haiku-4-5",
+    );
+  });
+
+  it("keeps an allowlisted id and any other explicit id", () => {
+    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", allowlist)).toBeUndefined();
+    expect(defaultByokRunnerModel("claude-custom", "anthropic", allowlist)).toBeUndefined();
+  });
+
+  it("leaves the alias in place when the organization key has no models", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", [])).toBeUndefined();
   });
 });
 

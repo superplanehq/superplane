@@ -113,8 +113,8 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
 	models.FactoryIntakeSourceProductiveTasks: {
-		name:                 "Productive.io tasks",
-		description:          "Create a work order when a Productive.io task is created.",
+		name:                 "Productive tasks",
+		description:          "Create a work order when a Productive task is created.",
 		triggerComponent:     "productive.onTask",
 		triggerName:          "On Task",
 		triggerConfiguration: map[string]any{"actions": []any{"created"}},
@@ -135,7 +135,26 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		// reports next to it.
 		createDescription: `{{ root().data.description }}`,
 	},
+	models.FactoryIntakeSourceDependabotAlerts: {
+		name:             "Dependabot alerts",
+		description:      "Create a task when GitHub reports a Dependabot alert. Turn on Dependabot alerts for the repository.",
+		triggerComponent: "github.onDependabotAlert",
+		triggerName:      "On Dependabot Alert",
+		triggerConfiguration: map[string]any{
+			"actions": dependabotIntakeActions(),
+		},
+		createTitle:       dependabotAlertCreateTitle,
+		createDescription: dependabotAlertCreateDescription,
+	},
 }
+
+// dependabotAlertCreateTitle names the package and the manifest file.
+const dependabotAlertCreateTitle = `Bump {{ root().data.alert.dependency.package.name ?? "dependency" }} in {{ root().data.alert.dependency.manifest_path ?? "the manifest" }}`
+
+// dependabotAlertCreateDescription carries the fields an agent needs to
+// apply the patched version. One expression keeps a missing field from
+// failing the whole description.
+const dependabotAlertCreateDescription = `{{ (root().data.alert.security_advisory.summary ?? "") + "\n\nPackage: " + (root().data.alert.dependency.package.name ?? "") + " (" + (root().data.alert.dependency.package.ecosystem ?? "") + ")\nManifest: " + (root().data.alert.dependency.manifest_path ?? "") + "\nVulnerable versions: " + (root().data.alert.security_vulnerability.vulnerable_version_range ?? "") + "\nPatched version: " + (root().data.alert.security_vulnerability.first_patched_version?.identifier ?? "") + "\nSeverity: " + (root().data.alert.security_advisory.severity ?? "") + "\n" + (root().data.alert.html_url ?? "") }}`
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {
 	for source, spec := range intakeSpecsBySource {
@@ -428,6 +447,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		return defaultProductiveIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceDependabotAlerts {
+		return defaultDependabotIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

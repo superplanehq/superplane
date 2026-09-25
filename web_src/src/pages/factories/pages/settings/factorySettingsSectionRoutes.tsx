@@ -2,18 +2,15 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_WORKSPACE_AGENT_RESOURCES,
-  FEATURE_WORKSPACE_MODELS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
-  FactorySettingsModelsPage,
-  FactorySettingsAgentResourcesPage,
+  FactorySettingsMCPPage,
+  FactorySettingsSkillsPage,
+  FactorySettingsSkillEditorPage,
   FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
 } from "@/pages/factories";
@@ -41,6 +38,7 @@ import {
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
+import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 
 export const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
@@ -90,10 +88,48 @@ export const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-workspace-agent-resources"
     path="workspace/agent-resources"
+    element={<LegacyAgentResourcesRedirect />}
+  />,
+  <Route
+    key="factory-settings-workspace-mcp"
+    path="workspace/mcp"
     element={
       <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT_RESOURCES}>
-          <FactorySettingsAgentResourcesPage />
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
+          <FactorySettingsMCPPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-skills-new"
+    path="workspace/skills/new"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
+          <FactorySettingsSkillEditorPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-skills-edit"
+    path="workspace/skills/:resourceId"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
+          <FactorySettingsSkillEditorPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-skills"
+    path="workspace/skills"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
+          <FactorySettingsSkillsPage />
         </RequireExperimentalFeature>
       </RequirePermission>
     }
@@ -103,17 +139,6 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-workspace-automations"
     path="workspace/automations"
     element={<WorkspaceAutomationsSettingsRedirect />}
-  />,
-  <Route
-    key="factory-settings-workspace-models"
-    path="workspace/models"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
-          <FactorySettingsModelsPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
   />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
   <Route

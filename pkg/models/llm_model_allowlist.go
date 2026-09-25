@@ -79,6 +79,61 @@ func FindOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider s
 	return &row, nil
 }
 
+// OrganizationBYOKModelAllowlistExists is false until the organization saves
+// a model list for the provider. An empty saved list still counts as saved.
+func OrganizationBYOKModelAllowlistExists(tx *gorm.DB, orgID uuid.UUID, provider string) (bool, error) {
+	normalized, err := NormalizeHostedLLMProvider(provider)
+	if err != nil {
+		return false, err
+	}
+
+	var count int64
+	err = tx.Model(&OrganizationBYOKModelAllowlist{}).
+		Where("organization_id = ? AND provider = ?", orgID, normalized).
+		Count(&count).
+		Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// CreateOrganizationBYOKModelAllowlistIfAbsent inserts the allowlist only when
+// the organization has not saved one yet. An existing row, including an empty
+// list, stays unchanged.
+func CreateOrganizationBYOKModelAllowlistIfAbsent(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	provider string,
+	models datatypes.JSONSlice[string],
+) error {
+	normalized, err := NormalizeHostedLLMProvider(provider)
+	if err != nil {
+		return err
+	}
+	normalizedModels, err := normalizeAllowedModels(models)
+	if err != nil {
+		return err
+	}
+	if len(normalizedModels) == 0 {
+		return nil
+	}
+
+	row := OrganizationBYOKModelAllowlist{
+		OrganizationID: orgID,
+		Provider:       normalized,
+		AllowedModels:  normalizedModels,
+		UpdatedAt:      time.Now(),
+	}
+	return tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "organization_id"},
+			{Name: "provider"},
+		},
+		DoNothing: true,
+	}).Create(&row).Error
+}
+
 func UpsertOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider string, models datatypes.JSONSlice[string]) (*OrganizationBYOKModelAllowlist, error) {
 	normalized, err := NormalizeHostedLLMProvider(provider)
 	if err != nil {

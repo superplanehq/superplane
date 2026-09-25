@@ -45,6 +45,8 @@ export interface IntakeSourceSettings {
   excludeKeyTasks: boolean;
   /** Productive.io task list ids that still create a task. Empty means every task list. */
   taskListIds: string[];
+  /** Severities that still create a task. Empty means every severity. */
+  dependabotSeverities: string[];
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -66,9 +68,22 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryLevels: [],
   excludeKeyTasks: true,
   taskListIds: [],
+  dependabotSeverities: [],
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
+
+export const DEPENDABOT_INTAKE_SEVERITIES = ["critical", "high", "medium", "low"] as const;
+
+export const DEPENDABOT_INTAKE_SETTINGS_COPY = {
+  severitySection: "Create a task for these severities:",
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  severityHelp:
+    "All severities create a task when every box is selected. Turn on Dependabot alerts for the repository. A repository with alerts turned off gives no tasks.",
+} as const;
 
 export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
   ...DEFAULT_GITHUB_INTAKE_SETTINGS,
@@ -81,7 +96,7 @@ export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
 
 export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
   ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-  name: "Productive.io tasks",
+  name: "Productive tasks",
   excludeKeyTasks: true,
 };
 
@@ -130,6 +145,7 @@ export const INTAKE_SETTINGS_COPY = {
 export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
   return (
     sourceId === "github-issues" ||
+    sourceId === "dependabot-alerts" ||
     sourceId === "sentry-exceptions" ||
     sourceId === "jira-issues" ||
     sourceId === "productive-tasks"
@@ -153,6 +169,7 @@ export function normalizeIntakeSourceSettings(
 ): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
   const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
+  const dependabotSeverities = normalizeDependabotSeverities(draft.dependabotSeverities);
   const hiddenSentryTriggers =
     sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
   const taskListIds = normalizeTaskListIds(draft.taskListIds);
@@ -164,10 +181,32 @@ export function normalizeIntakeSourceSettings(
       labels: [],
       labelFilterMode: "include",
       sentryLevels,
+      dependabotSeverities,
       taskListIds,
     };
   }
-  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels, taskListIds };
+  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels, dependabotSeverities, taskListIds };
+}
+
+export function normalizeDependabotSeverities(severities: string[]): string[] {
+  const selected = DEPENDABOT_INTAKE_SEVERITIES.filter((severity) => severities.includes(severity));
+  if (selected.length === 0 || selected.length === DEPENDABOT_INTAKE_SEVERITIES.length) {
+    return [];
+  }
+  return [...selected];
+}
+
+export function dependabotSeveritySelected(severities: string[], severity: string): boolean {
+  if (severities.length === 0) {
+    return true;
+  }
+  return severities.includes(severity);
+}
+
+export function toggleDependabotSeverity(severities: string[], severity: string): string[] {
+  const current = severities.length === 0 ? [...DEPENDABOT_INTAKE_SEVERITIES] : [...severities];
+  const next = current.includes(severity) ? current.filter((entry) => entry !== severity) : [...current, severity];
+  return normalizeDependabotSeverities(next);
 }
 
 function normalizeTaskListIds(ids: string[]): string[] {
@@ -222,6 +261,7 @@ export function intakeSettingsFromApi(
     jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    dependabotSeverities: normalizeDependabotSeverities(settings?.dependabotSeverities ?? []),
     ...productiveFiltersFromApi(settings),
   };
 }
@@ -257,6 +297,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     sentryRegressedIssues: false,
     sentryAssignedIssues: false,
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
+    dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
     excludeKeyTasks: settings.excludeKeyTasks,
     taskListIds: normalizeTaskListIds(settings.taskListIds),
   };

@@ -4,7 +4,7 @@
 /**
  * Run OpenCode against OpenRouter and format JSONL into live logs.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [thinking]
  */
 
 const fs = require("fs");
@@ -146,17 +146,46 @@ function workspaceMCPServers(env = process.env) {
         continue;
       }
       const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+      const disabledTools = Array.isArray(server.disabledTools)
+        ? server.disabledTools.map((tool) => String(tool || "").trim()).filter(Boolean)
+        : [];
       out[name] = {
         type: "remote",
         url,
         enabled: true,
         headers,
+        disabledTools,
       };
     }
     return out;
   } catch (_err) {
     return {};
   }
+}
+
+function applyWorkspaceMCPDenylist(config, servers) {
+  const permission = { ...(config.permission || {}) };
+  const mcp = { ...(config.mcp || {}) };
+  let changed = Object.keys(servers).length > 0;
+  for (const [name, server] of Object.entries(servers)) {
+    const disabledTools = Array.isArray(server.disabledTools) ? server.disabledTools : [];
+    mcp[name] = {
+      type: server.type,
+      url: server.url,
+      enabled: server.enabled,
+      headers: server.headers,
+    };
+    for (const tool of disabledTools) {
+      permission[`${name}_${tool}`] = "deny";
+      changed = true;
+    }
+  }
+  if (!changed) {
+    return config;
+  }
+  config.mcp = mcp;
+  config.permission = permission;
+  return config;
 }
 
 function planningAnalysisEnabled(env = process.env) {
@@ -326,12 +355,23 @@ function writeSessionID(taskDir, sessionID) {
   fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
 }
 
-function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
+function thinkingArgs(thinking) {
+  const level = String(thinking || "")
+    .trim()
+    .toLowerCase();
+  if (level === "low" || level === "medium" || level === "high") {
+    return ["--variant", level];
+  }
+  return [];
+}
+
+function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking }) {
   const args = ["--pure", "run", "--format", "json", "--thinking", "--auto"];
   const prefixed = openRouterModelId(model);
   if (prefixed) {
     args.push("-m", prefixed);
   }
+  args.push(...thinkingArgs(thinking));
   if (cwd) {
     args.push("--dir", cwd);
   }
@@ -399,10 +439,7 @@ function buildOpenCodeConfig({
       },
     };
   }
-  const workspaceServers = workspaceMCPServers(env);
-  if (Object.keys(workspaceServers).length > 0) {
-    config.mcp = { ...(config.mcp || {}), ...workspaceServers };
-  }
+  applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
@@ -562,10 +599,10 @@ function ensureXdgDirs(taskDir) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    writeStderr("usage: node run.js <prompt-file> [model]\n");
+    writeStderr("usage: node run.js <prompt-file> [model] [thinking]\n");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", { thinking: args[2] || "" })
     .then((code) => process.exit(code))
     .catch((err) => {
       writeStderr(`${err && err.message ? err.message : err}\n`);
@@ -574,6 +611,7 @@ function main() {
 }
 
 async function runPrompt(promptFile, model, helpers = {}) {
+  const thinking = helpers.thinking || "";
   const env = helpers.env || process.env;
   const sp = env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -690,6 +728,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
       sessionID: sessionID || undefined,
       prompt,
       cwd,
+      thinking,
     });
     const spawnResult = await spawnOpenCodeTurn(
       args,
@@ -2053,6 +2092,7 @@ module.exports = {
   formatOpenCodeJsonLines,
   formatTurnResult,
   opencodeRunArgs,
+  thinkingArgs,
   planningEnabled,
   classifyOpenRouterError,
   openRouterModelId,

@@ -12,6 +12,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
   <LinkCard title="On Check Run" href="#on-check-run" description="Listen to GitHub Checks API check run events" />
   <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to GitHub commit status events from the Commit Statuses API" />
+  <LinkCard title="On Dependabot Alert" href="#on-dependabot-alert" description="Listen to Dependabot alert events" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
   <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
@@ -295,6 +296,72 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.status"
+}
+```
+
+<a id="on-dependabot-alert"></a>
+
+## On Dependabot Alert
+
+**Trigger key:** `github.onDependabotAlert`
+
+The On Dependabot Alert trigger starts a workflow execution when GitHub reports a Dependabot alert in a repository.
+
+### Use Cases
+
+- **Security intake**: Create a task when a new vulnerability is reported
+- **Reopened alerts**: Start work again when a fixed alert comes back
+- **Severity routing**: Filter alerts by severity before they become tasks
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which alert actions to listen for (created, reopened, reintroduced, and so on)
+
+### Event Data
+
+Each alert event includes:
+- **action**: The action that triggered the event (created, reopened, reintroduced, fixed, dismissed)
+- **alert**: The Dependabot alert, including the package, manifest, severity, and advisory
+- **repository**: Repository information
+- **sender**: User or app that triggered the event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+The repository must have Dependabot alerts turned on. The GitHub App needs permission to read Dependabot alerts.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "alert": {
+      "dependency": {
+        "manifest_path": "package.json",
+        "package": {
+          "ecosystem": "npm",
+          "name": "lodash"
+        }
+      },
+      "html_url": "https://github.com/acme/payments/security/dependabot/7",
+      "number": 7,
+      "security_advisory": {
+        "severity": "high",
+        "summary": "Prototype pollution in lodash"
+      },
+      "security_vulnerability": {
+        "first_patched_version": {
+          "identifier": "4.17.21"
+        },
+        "vulnerable_version_range": "\u003c 4.17.21"
+      }
+    }
+  },
+  "timestamp": "2026-09-25T09:00:00Z",
+  "type": "github.dependabotAlert"
 }
 ```
 

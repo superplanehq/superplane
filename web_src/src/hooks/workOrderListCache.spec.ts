@@ -1,10 +1,18 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import type { InfiniteData } from "@tanstack/react-query";
+import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { describe, expect, it } from "bun:test";
 
-import type { WorkOrdersPage } from "@/pages/factories/lib/workOrderListPagination";
+import {
+  factoryWorkOrdersPageKey,
+  getWorkOrdersNextPageParam,
+  type WorkOrdersPage,
+} from "@/pages/factories/lib/workOrderListPagination";
 
-import { patchCachedWorkOrderList, patchCachedWorkOrderPages } from "./workOrderListCache";
+import {
+  patchCachedWorkOrderList,
+  patchCachedWorkOrderPages,
+  removeWorkOrderFromListCaches,
+} from "./workOrderListCache";
 
 function pages(
   orders: Array<{ id: string; title?: string; state?: FactoriesWorkOrder["state"] }>,
@@ -109,5 +117,114 @@ describe("patchCachedWorkOrderPages", () => {
       ["STATE_DRAFT"],
     );
     expect(next?.pages[0]?.orders).toEqual([]);
+  });
+});
+
+describe("removeWorkOrderFromListCaches", () => {
+  it("removes the task from the full list and from paged lists", () => {
+    const queryClient = new QueryClient();
+    const listKey = ["factories", "org-1", "factory-1", "work-orders"] as const;
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData(listKey, [
+      { id: "wo-1", title: "Gone" },
+      { id: "wo-2", title: "Other" },
+    ]);
+    queryClient.setQueryData(
+      pageKey,
+      pages([
+        { id: "wo-1", title: "Gone" },
+        { id: "wo-2", title: "Other" },
+      ]),
+    );
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-1");
+
+    expect(queryClient.getQueryData(listKey)).toEqual([{ id: "wo-2", title: "Other" }]);
+    expect(queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey)?.pages[0]?.orders).toEqual([
+      { id: "wo-2", title: "Other" },
+    ]);
+    expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(false);
+  });
+
+  it("keeps the previous page cursor when the last loaded page becomes empty", () => {
+    const queryClient = new QueryClient();
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(pageKey, {
+      pageParams: [undefined, { beforeId: "wo-1" }],
+      pages: [
+        {
+          orders: [
+            { id: "wo-2", title: "Earlier" },
+            { id: "wo-1", title: "Previous" },
+          ],
+          hasNextPage: true,
+        },
+        { orders: [{ id: "wo-gone", title: "Gone" }], hasNextPage: true },
+      ],
+    });
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-gone");
+
+    const next = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey);
+    expect(next).toEqual({
+      pageParams: [undefined],
+      pages: [
+        {
+          orders: [
+            { id: "wo-2", title: "Earlier" },
+            { id: "wo-1", title: "Previous" },
+          ],
+          hasNextPage: true,
+        },
+      ],
+    });
+    expect(getWorkOrdersNextPageParam(next?.pages.at(-1))).toEqual({ beforeId: "wo-1" });
+    expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(false);
+  });
+
+  it("stops paging when the removed task was the last loaded row", () => {
+    const queryClient = new QueryClient();
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(pageKey, {
+      pageParams: [undefined, { beforeId: "wo-1" }],
+      pages: [
+        { orders: [{ id: "wo-1", title: "Previous" }], hasNextPage: true },
+        { orders: [{ id: "wo-gone", title: "Gone" }], hasNextPage: false },
+      ],
+    });
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-gone");
+
+    const next = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey);
+    expect(next?.pages).toEqual([{ orders: [{ id: "wo-1", title: "Previous" }], hasNextPage: false }]);
+    expect(getWorkOrdersNextPageParam(next?.pages.at(-1))).toBeUndefined();
+    expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(false);
+  });
+
+  it("refetches when the only loaded page loses its next cursor", () => {
+    const queryClient = new QueryClient();
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(pageKey, {
+      pageParams: [undefined],
+      pages: [{ orders: [{ id: "wo-gone", title: "Gone" }], hasNextPage: true }],
+    });
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-gone");
+
+    expect(queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey)?.pages[0]?.orders).toEqual([]);
+    expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(true);
+  });
+
+  it("does not refetch when no further page exists", () => {
+    const queryClient = new QueryClient();
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(pageKey, {
+      pageParams: [undefined],
+      pages: [{ orders: [{ id: "wo-gone", title: "Gone" }], hasNextPage: false }],
+    });
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-gone");
+
+    expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(false);
   });
 });

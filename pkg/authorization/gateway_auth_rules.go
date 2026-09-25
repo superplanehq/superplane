@@ -60,7 +60,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
@@ -208,13 +208,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		// Self-scoped: members read their own notification settings.
-		// Note: /api/v1/me, /api/v1/me/token, /api/v1/me/tokens*, and
-		// /api/v1/me/last-location have no entry here on purpose. They
-		// only ever act on the calling user's own record, so
-		// GatewayAuthorizer.AuthorizeHTTP's no-rule-found path (allow
-		// without an org permission check) is the correct behavior; the
-		// authenticated gRPC handler already requires a valid session or
-		// personal token before reaching them.
+		// Note: /api/v1/me, /api/v1/me/token, /api/v1/me/tokens*,
+		// /api/v1/me/last-location, and POST /api/v1/me/feedback have no
+		// entry here on purpose. They only ever act on the calling user's
+		// own record, so GatewayAuthorizer.AuthorizeHTTP's no-rule-found
+		// path (allow without an org permission check) is the correct
+		// behavior. Authenticated handlers already require a valid session
+		// or personal token before reaching them. Feedback also rejects
+		// API keys in the HTTP handler.
 		{Method: "GET", Pattern: "/api/v1/me/notification-settings"}: {
 			Resource:                     "notifications",
 			Action:                       "read",
@@ -345,13 +346,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"}: {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/line-runner-models"}: {
 			Resource:                     "factories",
@@ -559,7 +560,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/executions/resolve"}: {
 			Resource:           "canvases",
@@ -821,19 +822,19 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:start"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:disconnect"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceAgentResources},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {
 			Resource:   "groups",

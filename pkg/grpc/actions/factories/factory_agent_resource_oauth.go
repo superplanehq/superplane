@@ -48,6 +48,9 @@ func StartFactoryAgentResourceOAuth(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start MCP OAuth")
 	}
+	if err := requireAgentResourceKindFeature(orgID, resource.Kind); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to start MCP OAuth")
+	}
 	if resource.Config.Data().MCPAuth() != models.FactoryAgentResourceAuthOAuth {
 		return nil, factoryErrorToStatus(invalidArgument("this connection uses a header, not sign-in"), "failed to start MCP OAuth")
 	}
@@ -140,6 +143,9 @@ func DisconnectFactoryAgentResourceOAuth(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to disconnect MCP OAuth")
 	}
+	if err := requireAgentResourceKindFeature(orgID, resource.Kind); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to disconnect MCP OAuth")
+	}
 
 	captureOAuthRevocation(ctx, deps, db, resource).run(ctx, deps)
 	if err := resource.DeleteSecrets(db); err != nil {
@@ -199,7 +205,7 @@ func persistOAuthStart(
 }
 
 func FactoryAgentResourceSettingsPath(orgSlug, factoryKey string) string {
-	return "/" + strings.Trim(orgSlug, "/") + "/workspaces/" + factoryKey + "/settings/workspace/agent-resources"
+	return "/" + strings.Trim(orgSlug, "/") + "/workspaces/" + factoryKey + "/settings/workspace/mcp"
 }
 
 func CompleteFactoryAgentResourceOAuth(

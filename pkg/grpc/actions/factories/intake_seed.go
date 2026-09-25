@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -89,6 +90,8 @@ func seedIntake(
 		return seedSentryIssues(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceJiraIssues:
 		return seedJiraIssues(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return seedDependabotAlerts(ctx, deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -199,6 +202,41 @@ func seedGitHubIssues(
 	}
 
 	if err := emitIntakeEvents(tx, canvasID, intakeGitHubIssuePayloadType, payloads); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(payloads)}, nil
+}
+
+func seedDependabotAlerts(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeGitHubClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	repository, _ := binding.Configuration["repository"].(string)
+	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeSeedSize)
+	if err != nil {
+		return intakeSeedResult{}, ghdependabot.UnavailableError(fmt.Errorf("failed to list Dependabot alerts of %s: %w", repository, err))
+	}
+
+	payloads := make([]map[string]any, 0, len(alerts))
+	for _, alert := range alerts {
+		event, err := ghdependabot.AlertEvent(alert)
+		if err != nil {
+			return intakeSeedResult{}, err
+		}
+		payloads = append(payloads, event)
+	}
+	slices.Reverse(payloads)
+
+	if err := emitIntakeEvents(tx, canvasID, ghdependabot.AlertPayloadType, payloads); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(payloads)}, nil
@@ -609,7 +647,7 @@ func newIntakeProductiveClient(
 	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
 	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
+		return nil, fmt.Errorf("failed to build Productive client: %w", err)
 	}
 
 	return client, nil
