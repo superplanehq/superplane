@@ -185,13 +185,12 @@ func Test__isInstallationRequestSetupAction(t *testing.T) {
 	assert.False(t, isInstallationRequestSetupAction(""))
 }
 
-func Test__handleInstallationDeletion_refreshesHostedOAuthState(t *testing.T) {
-	setHostedAppOAuthEnv(t)
+func Test__handleInstallationDeletion_refreshesHostedInstallState(t *testing.T) {
+	setHostedAppEnv(t)
 	integration := &contexts.IntegrationContext{
 		Metadata: common.Metadata{
 			State:          "old-state",
 			HostedApp:      true,
-			AuthorizeURL:   common.HostedAppAuthorizeURL("Iv1.abc", common.HostedAppOAuthCallbackURL("https://app.example"), "old-state"),
 			InstallationID: "11",
 			GitHubApp:      common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 			PendingInstallations: []common.PendingInstallation{
@@ -206,11 +205,9 @@ func Test__handleInstallationDeletion_refreshesHostedOAuthState(t *testing.T) {
 
 	metadata := integration.Metadata.(common.Metadata)
 	assert.NotEqual(t, "old-state", metadata.State)
-	assert.Contains(t, metadata.AuthorizeURL, "state="+url.QueryEscape(metadata.State))
-	assert.NotContains(t, metadata.AuthorizeURL, "state=old-state")
 	require.NotNil(t, integration.BrowserAction)
-	assert.Equal(t, metadata.AuthorizeURL, integration.BrowserAction.URL)
-	assert.Equal(t, hostedOAuthDescription, integration.BrowserAction.Description)
+	assert.Contains(t, integration.BrowserAction.URL, "https://github.com/apps/superplane/installations/new?state=")
+	assert.Equal(t, appInstallationDescription, integration.BrowserAction.Description)
 	assert.Equal(t, []common.PendingInstallation{{ID: "22", AccountLogin: "octo"}}, metadata.PendingInstallations)
 }
 
