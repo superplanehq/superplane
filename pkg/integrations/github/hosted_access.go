@@ -81,7 +81,6 @@ func discoverAccessibleInstallations(
 
 	accessible := make([]common.PendingInstallation, 0, len(installations))
 	failedChecks := make([]error, 0)
-	completedChecks := 0
 	for _, installation := range installations {
 		client, err := newInstallationClient(integration, app.ID, installation.ID)
 		if err != nil {
@@ -93,14 +92,12 @@ func discoverAccessibleInstallations(
 		if err != nil {
 			var responseError *gh.ErrorResponse
 			if errors.As(err, &responseError) && responseError.Response != nil && responseError.Response.StatusCode == 404 {
-				completedChecks++
 				continue
 			}
 			failedChecks = append(failedChecks, fmt.Errorf("resolve GitHub identity for installation %s: %w", installation.ID, err))
 			continue
 		}
 		if user.GetID() != identity.ID || user.GetLogin() == "" {
-			completedChecks++
 			continue
 		}
 
@@ -124,7 +121,6 @@ func discoverAccessibleInstallations(
 			failedChecks = append(failedChecks, fmt.Errorf("check repository access for installation %s: %w", installation.ID, err))
 			continue
 		}
-		completedChecks++
 		if len(writable) == 0 {
 			continue
 		}
@@ -132,8 +128,8 @@ func discoverAccessibleInstallations(
 		installation.Repositories = writable
 		accessible = append(accessible, installation)
 	}
-	if completedChecks == 0 && len(failedChecks) > 0 {
-		return nil, errors.Join(failedChecks...)
+	if len(failedChecks) > 0 {
+		return accessible, errors.Join(failedChecks...)
 	}
 
 	return accessible, nil

@@ -279,12 +279,26 @@ func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app 
 
 	installations, err := discoverAccessibleInstallations(context.Background(), ctx.Integration, app, *identity)
 	if err != nil {
+		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
 		}
 		return
 	}
 	metadata.SetPendingInstallations(installations)
+}
+
+func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation) []common.PendingInstallation {
+	merged := slices.Clone(refreshed)
+	for _, installation := range existing {
+		if slices.ContainsFunc(merged, func(candidate common.PendingInstallation) bool {
+			return candidate.ID == installation.ID
+		}) {
+			continue
+		}
+		merged = append(merged, installation)
+	}
+	return merged
 }
 
 func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time) bool {

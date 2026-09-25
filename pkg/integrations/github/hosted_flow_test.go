@@ -158,6 +158,20 @@ func TestRequiresHostedInstallationDiscovery(t *testing.T) {
 	assert.True(t, requiresHostedInstallationDiscovery(common.Metadata{}, now))
 }
 
+func TestMergeVerifiedInstallationsPreservesPriorResults(t *testing.T) {
+	refreshed := []common.PendingInstallation{
+		{ID: "11", AccountLogin: "renamed", Repositories: []common.Repository{{ID: 101, Name: "renamed/api"}}},
+	}
+	existing := []common.PendingInstallation{
+		{ID: "11", AccountLogin: "acme", Repositories: []common.Repository{{ID: 101, Name: "acme/api"}}},
+		{ID: "22", AccountLogin: "octo", Repositories: []common.Repository{{ID: 202, Name: "octo/web"}}},
+	}
+
+	merged := mergeVerifiedInstallations(refreshed, existing)
+
+	assert.Equal(t, []common.PendingInstallation{refreshed[0], existing[1]}, merged)
+}
+
 func TestSyncHostedAppReconcilesInstallationRequests(t *testing.T) {
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
