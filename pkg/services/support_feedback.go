@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -185,12 +186,34 @@ func NormalizeFeedbackAttachment(filename, contentType string, content []byte) (
 	if !slices.Contains(allowedFeedbackAttachmentTypes, normalizedType) {
 		return nil, ErrFeedbackAttachmentType
 	}
+	if !feedbackAttachmentBytesMatch(normalizedType, content) {
+		return nil, ErrFeedbackAttachmentType
+	}
 
 	return &SupportFeedbackAttachment{
 		Filename:    name,
 		ContentType: normalizedType,
 		Content:     content,
 	}, nil
+}
+
+func feedbackAttachmentBytesMatch(contentType string, content []byte) bool {
+	switch contentType {
+	case "image/png":
+		return bytes.HasPrefix(content, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+	case "image/jpeg":
+		return len(content) >= 3 && content[0] == 0xff && content[1] == 0xd8 && content[2] == 0xff
+	case "image/gif":
+		return bytes.HasPrefix(content, []byte("GIF87a")) || bytes.HasPrefix(content, []byte("GIF89a"))
+	case "image/webp":
+		return len(content) >= 12 && bytes.Equal(content[:4], []byte("RIFF")) && bytes.Equal(content[8:12], []byte("WEBP"))
+	case "application/pdf":
+		return bytes.HasPrefix(content, []byte("%PDF-"))
+	case "text/plain", "text/markdown":
+		return utf8.Valid(content) && !bytes.Contains(content, []byte{0})
+	default:
+		return false
+	}
 }
 
 func sanitizeAttachmentFilename(filename string) string {

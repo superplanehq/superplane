@@ -1,6 +1,8 @@
 package workers
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,6 +12,8 @@ import (
 	"github.com/renderedtext/go-tackle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/services"
 )
@@ -109,6 +113,38 @@ func Test__SupportFeedbackConsumer(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, emailService.SentSupportFeedbackEmails())
 		assert.Equal(t, 1, discordCalls)
+	})
+
+	t.Run("loads the attachment from blob storage and deletes it after delivery", func(t *testing.T) {
+		store, err := filesystem.New(t.TempDir())
+		require.NoError(t, err)
+		blob.SetCurrent(store)
+		t.Cleanup(func() { blob.SetCurrent(nil) })
+
+		content := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+		key := "support-feedback/shot"
+		require.NoError(t, store.Put(context.Background(), key, bytes.NewReader(content), blob.PutOptions{ContentType: "image/png"}))
+
+		emailService := services.NewNoopEmailService()
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(""))
+		err = consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:  services.FeedbackCategoryBug,
+			Details:   "The canvas did not load.",
+			UserEmail: "ada@example.com",
+			Attachment: &messages.SupportFeedbackAttachment{
+				Filename:    "shot.png",
+				ContentType: "image/png",
+				BlobKey:     key,
+			},
+		})))
+		require.NoError(t, err)
+
+		sent := emailService.SentSupportFeedbackEmails()
+		require.Len(t, sent, 1)
+		require.NotNil(t, sent[0].Feedback.Attachment)
+		assert.Equal(t, content, sent[0].Feedback.Attachment.Content)
+		_, err = store.Get(context.Background(), key)
+		assert.ErrorIs(t, err, blob.ErrNotFound)
 	})
 }
 

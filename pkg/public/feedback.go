@@ -1,32 +1,51 @@
 package public
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/services"
 )
 
+var errFeedbackOrganization = errors.New("feedback organization is not available")
+
 var publishSupportFeedback = func(message messages.SupportFeedbackRequestedMessage) error {
 	return message.Publish()
 }
 
-var organizationNameForFeedback = func(organizationID string) string {
-	if organizationID == "" {
-		return ""
+var resolveFeedbackOrganization = func(r *http.Request, user *models.User) (string, string, error) {
+	ref := strings.TrimSpace(r.Header.Get("x-organization-id"))
+	if ref == "" {
+		ref = strings.TrimSpace(r.URL.Query().Get("organization_id"))
 	}
-	organization, err := models.FindOrganizationByID(organizationID)
+	if ref == "" || strings.TrimSpace(user.GetEmail()) == "" {
+		return "", "", errFeedbackOrganization
+	}
+
+	db := database.DB(r.Context())
+	organization, err := models.FindOrganizationByIDOrSlug(db, ref)
 	if err != nil || organization == nil {
-		return ""
+		return "", "", errFeedbackOrganization
 	}
-	return organization.Name
+
+	member, err := models.FindActiveUserByEmailInTransaction(db, organization.ID.String(), user.GetEmail())
+	if err != nil || member == nil || !member.IsHuman() {
+		return "", "", errFeedbackOrganization
+	}
+
+	return organization.ID.String(), organization.Name, nil
 }
 
 func (s *Server) handleSubmitFeedback(w http.ResponseWriter, r *http.Request) {
@@ -68,25 +87,40 @@ func (s *Server) handleSubmitFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	organizationID, organizationName, err := resolveFeedbackOrganization(r, user)
+	if err != nil {
+		writeFeedbackError(w, http.StatusForbidden, "Feedback is available only for an organization you belong to.")
+		return
+	}
+
 	message := messages.SupportFeedbackRequestedMessage{
 		Category:         category,
 		Details:          details,
 		UserName:         user.Name,
 		UserEmail:        user.GetEmail(),
-		OrganizationID:   user.OrganizationID.String(),
-		OrganizationName: organizationNameForFeedback(user.OrganizationID.String()),
+		OrganizationID:   organizationID,
+		OrganizationName: organizationName,
 		PagePath:         services.NormalizeFeedbackPagePath(r.FormValue("page_path")),
 	}
 	if attachment != nil {
+		blobKey := "support-feedback/" + uuid.NewString()
+		if err := putFeedbackAttachment(r.Context(), blobKey, attachment.Content, attachment.ContentType); err != nil {
+			log.Errorf("Failed to store support feedback attachment: %v", err)
+			writeFeedbackError(w, http.StatusInternalServerError, "SuperPlane could not send your feedback. Try again.")
+			return
+		}
 		message.Attachment = &messages.SupportFeedbackAttachment{
 			Filename:    attachment.Filename,
 			ContentType: attachment.ContentType,
-			Content:     attachment.Content,
+			BlobKey:     blobKey,
 		}
 	}
 
 	if err := publishSupportFeedback(message); err != nil {
 		log.Errorf("Failed to publish support feedback: %v", err)
+		if message.Attachment != nil {
+			deleteFeedbackAttachment(r.Context(), message.Attachment.BlobKey)
+		}
 		writeFeedbackError(w, http.StatusInternalServerError, "SuperPlane could not send your feedback. Try again.")
 		return
 	}
@@ -136,6 +170,24 @@ func feedbackAttachmentErrorMessage(err error) string {
 		return "Attach a PNG, JPEG, GIF, WebP, PDF, or text file."
 	default:
 		return "SuperPlane could not read the attached file."
+	}
+}
+
+func putFeedbackAttachment(ctx context.Context, key string, content []byte, contentType string) error {
+	provider := blob.Current()
+	if provider == nil {
+		return blob.ErrProviderNotConfigured
+	}
+	return provider.Put(ctx, key, bytes.NewReader(content), blob.PutOptions{ContentType: contentType})
+}
+
+func deleteFeedbackAttachment(ctx context.Context, key string) {
+	provider := blob.Current()
+	if provider == nil || key == "" {
+		return
+	}
+	if err := provider.Delete(ctx, key); err != nil {
+		log.Errorf("Failed to delete support feedback attachment %s: %v", key, err)
 	}
 }
 

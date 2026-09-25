@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -14,11 +15,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/services"
 )
+
+var feedbackPNG = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
 
 func TestHandleSubmitFeedback(t *testing.T) {
 	email := "ada@example.com"
@@ -33,28 +38,35 @@ func TestHandleSubmitFeedback(t *testing.T) {
 	t.Run("publishes a valid feedback form", func(t *testing.T) {
 		var published messages.SupportFeedbackRequestedMessage
 		originalPublish := publishSupportFeedback
-		originalOrgName := organizationNameForFeedback
+		originalOrg := resolveFeedbackOrganization
 		publishSupportFeedback = func(message messages.SupportFeedbackRequestedMessage) error {
 			published = message
 			return nil
 		}
-		organizationNameForFeedback = func(organizationID string) string {
-			assert.Equal(t, user.OrganizationID.String(), organizationID)
-			return "Acme"
+		requestedOrg := uuid.NewString()
+		resolveFeedbackOrganization = func(r *http.Request, current *models.User) (string, string, error) {
+			assert.Equal(t, requestedOrg, r.Header.Get("x-organization-id"))
+			assert.NotEqual(t, current.OrganizationID.String(), requestedOrg)
+			return requestedOrg, "Acme", nil
 		}
+		store, err := filesystem.New(t.TempDir())
+		require.NoError(t, err)
+		blob.SetCurrent(store)
 		t.Cleanup(func() {
 			publishSupportFeedback = originalPublish
-			organizationNameForFeedback = originalOrgName
+			resolveFeedbackOrganization = originalOrg
+			blob.SetCurrent(nil)
 		})
 
 		body, contentType := multipartFeedback(t, map[string]string{
 			"category":  services.FeedbackCategoryBug,
 			"details":   "The canvas did not load.",
 			"page_path": "/acme/apps/deploy",
-		}, "shot.png", "image/png", []byte("png-bytes"))
+		}, "shot.png", "image/png", feedbackPNG)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/me/feedback", body)
 		req.Header.Set("Content-Type", contentType)
+		req.Header.Set("x-organization-id", requestedOrg)
 		req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey, user))
 		rec := httptest.NewRecorder()
 
@@ -65,13 +77,49 @@ func TestHandleSubmitFeedback(t *testing.T) {
 		assert.Equal(t, "The canvas did not load.", published.Details)
 		assert.Equal(t, "Ada Lovelace", published.UserName)
 		assert.Equal(t, "ada@example.com", published.UserEmail)
-		assert.Equal(t, user.OrganizationID.String(), published.OrganizationID)
+		assert.Equal(t, requestedOrg, published.OrganizationID)
 		assert.Equal(t, "Acme", published.OrganizationName)
 		assert.Equal(t, "/acme/apps/deploy", published.PagePath)
 		require.NotNil(t, published.Attachment)
 		assert.Equal(t, "shot.png", published.Attachment.Filename)
 		assert.Equal(t, "image/png", published.Attachment.ContentType)
-		assert.Equal(t, []byte("png-bytes"), published.Attachment.Content)
+		assert.NotEmpty(t, published.Attachment.BlobKey)
+		reader, err := store.Get(context.Background(), published.Attachment.BlobKey)
+		require.NoError(t, err)
+		defer reader.Close()
+		stored, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, feedbackPNG, stored)
+	})
+
+	t.Run("rejects feedback for an organization the user does not belong to", func(t *testing.T) {
+		originalPublish := publishSupportFeedback
+		originalOrg := resolveFeedbackOrganization
+		publishSupportFeedback = func(message messages.SupportFeedbackRequestedMessage) error {
+			t.Fatal("publish must not run")
+			return nil
+		}
+		resolveFeedbackOrganization = func(r *http.Request, _ *models.User) (string, string, error) {
+			return "", "", errFeedbackOrganization
+		}
+		t.Cleanup(func() {
+			publishSupportFeedback = originalPublish
+			resolveFeedbackOrganization = originalOrg
+		})
+
+		body, contentType := multipartFeedback(t, map[string]string{
+			"category": services.FeedbackCategoryBug,
+			"details":  "The canvas did not load.",
+		}, "", "", nil)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/me/feedback", body)
+		req.Header.Set("Content-Type", contentType)
+		req.Header.Set("x-organization-id", uuid.NewString())
+		req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey, user))
+		rec := httptest.NewRecorder()
+
+		(&Server{}).handleSubmitFeedback(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
 	})
 
 	t.Run("rejects a request that exceeds the body limit", func(t *testing.T) {

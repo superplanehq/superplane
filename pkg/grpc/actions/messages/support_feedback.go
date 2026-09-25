@@ -20,7 +20,7 @@ type SupportFeedbackRequestedMessage struct {
 type SupportFeedbackAttachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
-	Content     []byte `json:"content"`
+	BlobKey     string `json:"blob_key"`
 }
 
 func (m SupportFeedbackRequestedMessage) Publish() error {

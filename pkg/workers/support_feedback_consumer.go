@@ -1,16 +1,21 @@
 package workers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/services"
 )
+
+var errFeedbackAttachmentUnavailable = errors.New("support feedback attachment is unavailable")
 
 const SupportFeedbackServiceName = "superplane" + "." + messages.CanvasExchange + "." + messages.SupportFeedbackRequestedRoutingKey + ".worker-consumer"
 const SupportFeedbackConnectionName = "superplane"
@@ -93,7 +98,14 @@ func (c *SupportFeedbackConsumer) Consume(delivery tackle.Delivery) error {
 
 	feedback, err := supportFeedbackFromMessage(data)
 	if err != nil {
+		if errors.Is(err, errFeedbackAttachmentUnavailable) {
+			log.Errorf("Support feedback attachment is unavailable: %v", err)
+			outcome = executorOutcomeFailed
+			reason = emailWorkerReasonSendError
+			return err
+		}
 		log.Errorf("Invalid support feedback message: %v", err)
+		deleteSupportFeedbackAttachment(data)
 		outcome = executorOutcomeSkipped
 		reason = emailWorkerReasonInvalidMessage
 		return nil
@@ -144,6 +156,7 @@ func (c *SupportFeedbackConsumer) finishSupportFeedbackDelivery(
 	emailFailed := sendEmail && emailErr != nil
 	discordFailed := sendDiscord && discordErr != nil
 	if !emailFailed && !discordFailed {
+		deleteSupportFeedbackAttachment(data)
 		log.Infof("Delivered support feedback from %s", data.UserEmail)
 		return nil
 	}
@@ -193,14 +206,54 @@ func supportFeedbackFromMessage(data messages.SupportFeedbackRequestedMessage) (
 		return feedback, nil
 	}
 
+	content, err := readSupportFeedbackAttachment(data.Attachment.BlobKey)
+	if err != nil {
+		return services.SupportFeedback{}, err
+	}
+
 	attachment, err := services.NormalizeFeedbackAttachment(
 		data.Attachment.Filename,
 		data.Attachment.ContentType,
-		data.Attachment.Content,
+		content,
 	)
 	if err != nil {
 		return services.SupportFeedback{}, err
 	}
 	feedback.Attachment = attachment
 	return feedback, nil
+}
+
+func readSupportFeedbackAttachment(key string) ([]byte, error) {
+	if key == "" {
+		return nil, errFeedbackAttachmentUnavailable
+	}
+	provider := blob.Current()
+	if provider == nil {
+		return nil, errFeedbackAttachmentUnavailable
+	}
+
+	reader, err := provider.Get(context.Background(), key)
+	if err != nil {
+		return nil, errors.Join(errFeedbackAttachmentUnavailable, err)
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(io.LimitReader(reader, int64(services.MaxSupportFeedbackAttachmentBytes)+1))
+	if err != nil {
+		return nil, errors.Join(errFeedbackAttachmentUnavailable, err)
+	}
+	return content, nil
+}
+
+func deleteSupportFeedbackAttachment(data messages.SupportFeedbackRequestedMessage) {
+	if data.Attachment == nil || data.Attachment.BlobKey == "" {
+		return
+	}
+	provider := blob.Current()
+	if provider == nil {
+		return
+	}
+	if err := provider.Delete(context.Background(), data.Attachment.BlobKey); err != nil && !errors.Is(err, blob.ErrNotFound) {
+		log.Errorf("Failed to delete support feedback attachment %s: %v", data.Attachment.BlobKey, err)
+	}
 }

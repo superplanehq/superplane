@@ -63,13 +63,26 @@ func TestNormalizeFeedbackAttachment(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFeedbackAttachmentType)
 	})
 
+	t.Run("rejects a file whose bytes do not match the declared type", func(t *testing.T) {
+		_, err := NormalizeFeedbackAttachment("shot.png", "image/png", []byte("not a png"))
+		assert.ErrorIs(t, err, ErrFeedbackAttachmentType)
+	})
+
 	t.Run("sanitizes the filename and content type", func(t *testing.T) {
-		attachment, err := NormalizeFeedbackAttachment(`C:\tmp\shot.png`, "image/png; charset=binary", []byte("png"))
+		content := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+		attachment, err := NormalizeFeedbackAttachment(`C:\tmp\shot.png`, "image/png; charset=binary", content)
 		require.NoError(t, err)
 		require.NotNil(t, attachment)
 		assert.Equal(t, "shot.png", attachment.Filename)
 		assert.Equal(t, "image/png", attachment.ContentType)
-		assert.Equal(t, []byte("png"), attachment.Content)
+		assert.Equal(t, content, attachment.Content)
+	})
+
+	t.Run("accepts markdown when the bytes are text", func(t *testing.T) {
+		attachment, err := NormalizeFeedbackAttachment("note.md", "text/markdown", []byte("# Hello"))
+		require.NoError(t, err)
+		require.NotNil(t, attachment)
+		assert.Equal(t, "text/markdown", attachment.ContentType)
 	})
 }
 
