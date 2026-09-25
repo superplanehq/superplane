@@ -178,8 +178,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 			unresolved = append(unresolved, request)
 			continue
 		}
-		installation, found := installationForAccount(metadata.PendingInstallations, request.AccountLogin)
-		if found && len(installation.Repositories) > 0 {
+		if installRequestHasVerifiedInstallation(request, metadata.PendingInstallations) {
 			continue
 		}
 		if installRequestMayStillResolve(request, now) {
@@ -195,6 +194,33 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		metadata.InstallRequestDiscoveryUntil = ""
 	}
 	return nil
+}
+
+func pendingInstallationIDs(installations []common.PendingInstallation) []string {
+	ids := make([]string, 0, len(installations))
+	for _, installation := range installations {
+		if installation.ID != "" {
+			ids = append(ids, installation.ID)
+		}
+	}
+	return ids
+}
+
+func installRequestHasVerifiedInstallation(
+	request common.InstallRequest,
+	installations []common.PendingInstallation,
+) bool {
+	if strings.TrimSpace(request.AccountLogin) != "" {
+		installation, found := installationForAccount(installations, request.AccountLogin)
+		return found && len(installation.Repositories) > 0
+	}
+	if request.ExistingInstallationIDs == nil {
+		return false
+	}
+
+	return slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
+		return len(installation.Repositories) > 0 && !slices.Contains(request.ExistingInstallationIDs, installation.ID)
+	})
 }
 
 func installRequestMayStillResolve(request common.InstallRequest, now time.Time) bool {

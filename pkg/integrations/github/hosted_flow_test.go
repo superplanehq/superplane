@@ -655,6 +655,83 @@ func TestSyncHostedAppKeepsOpenInstallRequestAfterRepositoryAccessIsVerified(t *
 	assert.Equal(t, "acme", metadata.InstallRequestedAccount)
 }
 
+func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return []common.PendingInstallation{
+			{ID: "11", AccountLogin: "existing", AccountType: "User"},
+			{ID: "22", AccountLogin: "approved", AccountType: "Organization"},
+		}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return []common.InstallRequest{{ID: "1", AccountLogin: "approved", RequesterLogin: "member"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByGitHubLogin: "development",
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "existing", Repositories: []common.Repository{{ID: 101, Name: "existing/api"}}},
+			},
+			InstallRequests: []common.InstallRequest{{
+				RequesterLogin:          "development",
+				CreatedAt:               time.Now().UTC().Format(time.RFC3339Nano),
+				ExistingInstallationIDs: []string{"11"},
+			}},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	err := (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	})
+
+	require.NoError(t, err)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.InstallRequests)
+	assert.False(t, metadata.InstallRequested)
+	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+		return installation.ID == "22" && len(installation.Repositories) > 0
+	}))
+}
+
+func TestInstallRequestHasVerifiedInstallationUsesRequestSnapshot(t *testing.T) {
+	request := common.InstallRequest{ExistingInstallationIDs: []string{"11"}}
+	existing := common.PendingInstallation{
+		ID:           "11",
+		AccountLogin: "existing",
+		Repositories: []common.Repository{{ID: 101, Name: "existing/api"}},
+	}
+	approved := common.PendingInstallation{
+		ID:           "22",
+		AccountLogin: "approved",
+		Repositories: []common.Repository{{ID: 202, Name: "approved/api"}},
+	}
+
+	assert.False(t, installRequestHasVerifiedInstallation(request, []common.PendingInstallation{existing}))
+	assert.True(t, installRequestHasVerifiedInstallation(request, []common.PendingInstallation{existing, approved}))
+	assert.False(t, installRequestHasVerifiedInstallation(common.InstallRequest{}, []common.PendingInstallation{approved}))
+}
+
 func TestSyncHostedAppKeepsDevelopmentInstallRequestWithUnverifiedRepositories(t *testing.T) {
 	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
