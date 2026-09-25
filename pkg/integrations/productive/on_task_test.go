@@ -34,11 +34,12 @@ func nodeMetadata(t *testing.T, metadata *contexts.MetadataContext) NodeMetadata
 	return stored
 }
 
-func taskWebhookBodyWithList(id, projectID, title, listID string) []byte {
+func taskWebhookBodyWithList(id, projectID, title, listID, created string) []byte {
 	body, _ := json.Marshal(map[string]any{
 		"event":     "update_task",
 		"item_type": "task",
 		"item_id":   id,
+		"created":   created,
 		"object": map[string]any{
 			"data": map[string]any{
 				"id":   id,
@@ -59,6 +60,24 @@ func taskWebhookBodyWithList(id, projectID, title, listID string) []byte {
 		},
 	})
 	return body
+}
+
+// updatedTaskDelivery is a task.updated body whose title edit matches
+// updatedTaskActivity. Signature tests use it so routing still emits.
+func updatedTaskDelivery(id, projectID, title string) []byte {
+	return taskWebhookBodyWithList(id, projectID, title, "20", "2026-09-25T16:00:00Z")
+}
+
+func updatedTaskActivity() *http.Response {
+	return jsonResponse(`{"data":[{
+		"id":"1",
+		"type":"activities",
+		"attributes":{
+			"event":"update",
+			"created_at":"2026-09-25T16:00:00Z",
+			"changeset":{"title":["Previous title","Fix payment retries"]}
+		}
+	}]}`)
 }
 
 // taskWebhookBody builds the envelope Productive.io posts for a task webhook.
@@ -298,7 +317,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("labeled signature tokens identify task.updated without an event header", func(t *testing.T) {
-		body := taskWebhookBody("91", "1", "Fix payment retries")
+		body := updatedTaskDelivery("91", "1", "Fix payment retries")
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
@@ -309,7 +328,9 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{
 				Secret: TaskCreatedEvent + "=created-token\n" + TaskUpdatedEvent + "=updated-token",
 			},
-			Events: events,
+			Events:      events,
+			HTTP:        &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity()}},
+			Integration: integrationWithProject(),
 		})
 
 		require.NoError(t, err)
@@ -323,7 +344,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("one legacy token with an updated query emits an update", func(t *testing.T) {
-		body := taskWebhookBody("91", "1", "Fix payment retries")
+		body := updatedTaskDelivery("91", "1", "Fix payment retries")
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
@@ -334,6 +355,8 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "shared-token"},
 			Events:        events,
+			HTTP:          &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity()}},
+			Integration:   integrationWithProject(),
 		})
 
 		require.NoError(t, err)
@@ -364,7 +387,7 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("shared signature token uses the event query", func(t *testing.T) {
-		body := taskWebhookBody("91", "1", "Fix payment retries")
+		body := updatedTaskDelivery("91", "1", "Fix payment retries")
 		events := &contexts.EventContext{}
 		configuration := map[string]any{"project": "1", "actions": []string{ActionUpdated}}
 
@@ -376,7 +399,9 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{
 				Secret: TaskCreatedEvent + "=shared-token\n" + TaskUpdatedEvent + "=shared-token",
 			},
-			Events: events,
+			Events:      events,
+			HTTP:        &contexts.HTTPContext{Responses: []*http.Response{updatedTaskActivity()}},
+			Integration: integrationWithProject(),
 		})
 
 		require.NoError(t, err)
@@ -500,11 +525,19 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "list-bugs", taskListID(document))
 	})
 
-	t.Run("task update stamps a list move and ignores a title edit", func(t *testing.T) {
-		moveBody := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20")
-		events := &contexts.EventContext{}
-		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-			jsonResponse(`{"data":[{
+	t.Run("task update uses the activity for this delivery, not a later edit", func(t *testing.T) {
+		const deliveredAt = "2026-09-25T16:00:00Z"
+		activities := jsonResponse(`{"data":[
+			{
+				"id":"2",
+				"type":"activities",
+				"attributes":{
+					"event":"update",
+					"created_at":"2026-09-25T16:00:30Z",
+					"changeset":{"title":["Fix payment retries","Renamed"]}
+				}
+			},
+			{
 				"id":"1",
 				"type":"activities",
 				"attributes":{
@@ -512,8 +545,11 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 					"created_at":"2026-09-25T16:00:00Z",
 					"changeset":{"task_list_id":[10,20]}
 				}
-			}]}`),
-		}}
+			}
+		]}`)
+		moveBody := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", deliveredAt)
+		events := &contexts.EventContext{}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{activities}}
 
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", moveBody)),
@@ -533,21 +569,30 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		meta, ok := envelope["meta"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{"from": "10", "to": "20"}, meta["task_list_move"])
-		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.Path, "/activities")
 
-		editBody := taskWebhookBodyWithList("91", "1", "Renamed", "20")
+		editBody := taskWebhookBodyWithList("91", "1", "Renamed", "20", "2026-09-25T16:00:30Z")
 		editEvents := &contexts.EventContext{}
 		editHTTP := &contexts.HTTPContext{Responses: []*http.Response{
-			jsonResponse(`{"data":[{
-				"id":"2",
-				"type":"activities",
-				"attributes":{
-					"event":"update",
-					"created_at":"2026-09-25T16:05:00Z",
-					"changeset":{"title":["Fix payment retries","Renamed"]}
+			jsonResponse(`{"data":[
+				{
+					"id":"2",
+					"type":"activities",
+					"attributes":{
+						"event":"update",
+						"created_at":"2026-09-25T16:00:30Z",
+						"changeset":{"title":["Fix payment retries","Renamed"]}
+					}
+				},
+				{
+					"id":"1",
+					"type":"activities",
+					"attributes":{
+						"event":"update",
+						"created_at":"2026-09-25T16:00:00Z",
+						"changeset":{"task_list_id":[10,20]}
+					}
 				}
-			}]}`),
+			]}`),
 		}}
 		code, _, err = trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", editBody)),
@@ -569,8 +614,8 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 		assert.False(t, hasMove)
 	})
 
-	t.Run("task update is emitted when the activity lookup fails", func(t *testing.T) {
-		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20")
+	t.Run("task update is retried when the activity lookup fails", func(t *testing.T) {
+		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", "2026-09-25T16:00:00Z")
 		events := &contexts.EventContext{}
 		unavailable := &http.Response{
 			StatusCode: http.StatusServiceUnavailable,
@@ -590,9 +635,41 @@ func Test__OnTask__HandleWebhook(t *testing.T) {
 			Integration:   integrationWithProject(),
 		})
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, code)
-		assert.Equal(t, 1, events.Count())
+		assert.Equal(t, http.StatusInternalServerError, code)
+		require.ErrorContains(t, err, "task update activity unavailable")
+		assert.Zero(t, events.Count())
+		require.Len(t, httpContext.Requests, taskListFetchAttempts)
+	})
+
+	t.Run("task update is retried when only a later activity is available", func(t *testing.T) {
+		body := taskWebhookBodyWithList("91", "1", "Fix payment retries", "20", "2026-09-25T16:00:00Z")
+		events := &contexts.EventContext{}
+		laterActivity := func() *http.Response {
+			return jsonResponse(`{"data":[{
+				"id":"9",
+				"type":"activities",
+				"attributes":{
+					"event":"update",
+					"created_at":"2026-09-25T16:10:00Z",
+					"changeset":{"task_list_id":[20,30]}
+				}
+			}]}`)
+		}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{laterActivity(), laterActivity(), laterActivity()}}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       webhookHeaders(TaskUpdatedEvent, signWebhookBody("s3cr3t", "1710000000", body)),
+			Configuration: map[string]any{"project": "1", "actions": []string{ActionUpdated}},
+			Body:          body,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Events:        events,
+			HTTP:          httpContext,
+			Integration:   integrationWithProject(),
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, code)
+		require.ErrorContains(t, err, "task update activity unavailable")
+		assert.Zero(t, events.Count())
 		require.Len(t, httpContext.Requests, taskListFetchAttempts)
 	})
 

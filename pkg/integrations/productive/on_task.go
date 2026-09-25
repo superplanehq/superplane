@@ -202,12 +202,11 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 	envelope := TaskEnvelope(event, document, webhookOrganizationID(ctx))
 	if event == TaskUpdatedEvent {
-		// A failed lookup must not fail the webhook. Productive.io deactivates
-		// a webhook after repeated errors, and other workflows still need the
-		// update. Intake then ignores the update because it has no list move.
-		if err := stampTaskListMove(ctx, document, envelope); err != nil && ctx.Logger != nil {
-			id, _ := document["id"].(string)
-			ctx.Logger.WithError(err).Warnf("productive task %s: task list move unavailable", strings.TrimSpace(id))
+		// Do not emit until the changeset for this delivery is known. A 200
+		// without that changeset makes Productive.io drop the delivery, and
+		// intake then cannot tell a list move from an edit.
+		if err := stampTaskListMove(ctx, document, envelope); err != nil {
+			return http.StatusInternalServerError, nil, err
 		}
 	}
 
@@ -223,14 +222,15 @@ func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 }
 
 func stampTaskListMove(ctx core.WebhookRequestContext, document map[string]any, envelope map[string]any) error {
-	if ctx.HTTP == nil || ctx.Integration == nil {
-		return nil
-	}
-
 	id, _ := document["id"].(string)
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil
+	}
+
+	deliveredAt, ok := deliveryCreatedAt(ctx.Body)
+	if !ok || ctx.HTTP == nil || ctx.Integration == nil {
+		return fmt.Errorf("productive task %s: %w", id, errTaskUpdateActivityUnavailable)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -240,9 +240,13 @@ func stampTaskListMove(ctx core.WebhookRequestContext, document map[string]any, 
 
 	var lastErr error
 	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
-		changeset, err := client.latestTaskUpdateChangeset(id)
+		changeset, found, err := client.taskUpdateChangesetAt(id, deliveredAt, document)
 		if err != nil {
-			lastErr = err
+			lastErr = fmt.Errorf("%w: %v", errTaskUpdateActivityUnavailable, err)
+			continue
+		}
+		if !found {
+			lastErr = errTaskUpdateActivityUnavailable
 			continue
 		}
 		move, ok := taskListMoveFromChangeset(changeset)
@@ -251,7 +255,7 @@ func stampTaskListMove(ctx core.WebhookRequestContext, document map[string]any, 
 		}
 		return nil
 	}
-	return lastErr
+	return fmt.Errorf("productive task %s: %w", id, lastErr)
 }
 
 func setTaskListMove(envelope map[string]any, move TaskListMove) {
