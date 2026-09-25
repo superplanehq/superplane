@@ -447,7 +447,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(model, organizationId);
   const jiraFeature = useExperimentalFeature(organizationId);
-  const jiraAvailable = !jiraFeature.isLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
+  const jiraFeatureLoading = jiraFeature.isLoading;
+  const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
@@ -472,7 +473,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const setIssuesChoice = model.setup.setIssuesChoice;
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: jiraFeature.isLoading,
+    featureLoading: jiraFeatureLoading,
     jiraAvailable,
     organizationReady: jiraFeature.organizationReady,
   };
@@ -504,6 +505,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
+    jiraFeatureLoading,
     jiraChoiceBlock,
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,

@@ -19,11 +19,13 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Hides Jira when false. */
+  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false and the lookup is done. */
   jiraAvailable?: boolean;
+  /** True while the feature lookup has not finished. The row does not show Coming soon. */
+  jiraFeatureLoading?: boolean;
   /**
-   * A saved Jira choice cannot continue because the feature lookup has not
-   * confirmed Jira. The row stays hidden. The notice explains the block.
+   * A saved Jira choice cannot continue until the feature lookup confirms Jira.
+   * The notice explains the block.
    */
   jiraChoiceBlock?: FirstRunJiraChoiceBlock | null;
   continueLabel?: string;
@@ -67,6 +69,7 @@ export function FirstRunTicketsScreen({
   chrome,
   sphere,
   jiraAvailable = false,
+  jiraFeatureLoading = false,
   jiraChoiceBlock = null,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   continuePending = false,
@@ -112,6 +115,7 @@ export function FirstRunTicketsScreen({
             />
             <FirstRunJiraTicketRow
               jiraAvailable={jiraAvailable}
+              jiraFeatureLoading={jiraFeatureLoading}
               ticketSource={ticketSource}
               saving={saving}
               jiraConnected={jiraConnected}
@@ -183,6 +187,7 @@ function jiraChoiceNoticeCopy(block: FirstRunJiraChoiceBlock | null): string | n
 
 function FirstRunJiraTicketRow({
   jiraAvailable,
+  jiraFeatureLoading,
   ticketSource,
   saving,
   jiraConnected,
@@ -190,16 +195,37 @@ function FirstRunJiraTicketRow({
   onConnectJira,
 }: {
   jiraAvailable: boolean;
+  jiraFeatureLoading: boolean;
   ticketSource: FirstRunTicketSource | null;
   saving: boolean;
   jiraConnected: boolean;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onConnectJira?: () => void;
 }) {
-  if (!jiraAvailable) {
-    return null;
-  }
   const copy = FIRST_RUN_COPY.tickets;
+  if (jiraFeatureLoading) {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="jira" />}
+        title={copy.jira}
+        detail={copy.jiraLookupLoading}
+        disabled
+        onSelect={() => undefined}
+      />
+    );
+  }
+  if (!jiraAvailable) {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="jira" />}
+        title={copy.jira}
+        detail={copy.jiraSoonHelper}
+        soon
+        disabled={saving}
+        onSelect={() => undefined}
+      />
+    );
+  }
   return (
     <ConnectOptionRow
       icon={<IntegrationChoiceIcon name="jira" />}
