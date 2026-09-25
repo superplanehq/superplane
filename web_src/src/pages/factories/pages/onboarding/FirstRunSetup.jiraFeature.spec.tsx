@@ -78,6 +78,22 @@ function setupState(): OnboardingSetupApi {
   return result.current;
 }
 
+type SetupOptions = NonNullable<Parameters<typeof useOnboardingSetupState>[1]>;
+
+function LiveJiraSetup({
+  model,
+  setupOptions,
+  setupRef,
+}: {
+  model: OnboardingPageModel;
+  setupOptions: SetupOptions;
+  setupRef: { current: OnboardingSetupApi | null };
+}) {
+  const setup = useOnboardingSetupState("Payments Service", setupOptions);
+  setupRef.current = setup;
+  return <FirstRunSetup model={{ ...model, setup }} />;
+}
+
 function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
   return {
     setup: setupState(),
@@ -126,12 +142,14 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
-function renderSetup(model: OnboardingPageModel) {
-  return render(
+function renderLiveSetup(model: OnboardingPageModel, setupOptions: SetupOptions) {
+  const setupRef = { current: null as OnboardingSetupApi | null };
+  const view = render(
     <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
-      <FirstRunSetup model={model} />
+      <LiveJiraSetup model={model} setupOptions={setupOptions} setupRef={setupRef} />
     </MemoryRouter>,
   );
+  return { ...view, setupRef };
 }
 
 describe("FirstRunSetup Jira intake feature", () => {
@@ -143,25 +161,22 @@ describe("FirstRunSetup Jira intake feature", () => {
   it("does not show Jira or provision a Jira intake when the feature is off", async () => {
     feature.jiraIntake = false;
     const user = userEvent.setup();
-    const { result } = renderHook(() =>
-      useOnboardingSetupState("Payments Service", {
-        simulateDiscovery: false,
-        connected: new Set(["jira"]),
-        initial: { issuesChoice: "jira" },
-      }),
-    );
     const model = pageModel({
       hostedAgentReady: true,
       hostedModelsAvailable: true,
-      setup: result.current,
       jiraIntegrationId: "jira-1",
       jiraProjectId: "PAY",
       jiraProjects: [{ id: "PAY", name: "Payments" }],
     });
 
-    renderSetup(model);
+    const { setupRef } = renderLiveSetup(model, {
+      simulateDiscovery: false,
+      connected: new Set(["jira"]),
+      initial: { issuesChoice: "jira" },
+    });
 
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
@@ -175,30 +190,26 @@ describe("FirstRunSetup Jira intake feature", () => {
     feature.jiraIntake = false;
     feature.organizationReady = false;
     const user = userEvent.setup();
-    const { result } = renderHook(() =>
-      useOnboardingSetupState("Payments Service", {
-        simulateDiscovery: false,
-        connected: new Set(["jira"]),
-        initial: { issuesChoice: "jira" },
-      }),
-    );
     const model = pageModel({
       hostedAgentReady: true,
       hostedModelsAvailable: true,
-      setup: result.current,
       jiraIntegrationId: "jira-1",
       jiraProjectId: "PAY",
       jiraProjects: [{ id: "PAY", name: "Payments" }],
     });
 
-    renderSetup(model);
+    const { setupRef } = renderLiveSetup(model, {
+      simulateDiscovery: false,
+      connected: new Set(["jira"]),
+      initial: { issuesChoice: "jira" },
+    });
 
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(result.current.issuesChoice).toBe("jira");
+    expect(setupRef.current?.issuesChoice).toBe("jira");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
-    expect(result.current.issuesChoice).toBe("jira");
+    expect(setupRef.current?.issuesChoice).toBe("jira");
     expect(model.saveIssues).not.toHaveBeenCalled();
     expect(model.finish).not.toHaveBeenCalled();
   });
