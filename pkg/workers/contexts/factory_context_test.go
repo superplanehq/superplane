@@ -777,6 +777,92 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateProductiveTask(t *testing.
 		assert.Equal(t, 2, countOrders(factoryModel))
 	})
 
+	t.Run("creates a task when the same id belongs to another organization", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Org A task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://app.productive.io/111/tasks/91", Label: "91"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", "https://app.productive.io/222/tasks/91"),
+		)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Org B task"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("skips a slug URL for the same organization", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Existing productive task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: "https://app.productive.io/12345-acme/tasks/91", Label: "91"},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", "https://app.productive.io/12345/tasks/91"),
+		)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Same organization"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("creates a task when an origin-less task belongs to another organization", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		_, _, sourceRun := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", "https://app.productive.io/111/tasks/91"),
+		)
+		_, err = factoryModel.CreateWorkOrder(database.Conn(), "Org A task", "", nil, nil, &sourceRun.ID)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(
+			t,
+			r,
+			factoryModel.ID,
+			productivePayload("91", "https://app.productive.io/222/tasks/91"),
+		)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Org B task"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
 	t.Run("creates a task when the Productive task has none", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)

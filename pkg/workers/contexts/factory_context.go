@@ -275,21 +275,21 @@ func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.F
 		return false, nil
 	}
 
-	taskID, ok := productive.TaskIDFromEventData(event.Data.Data())
+	ref, ok := productive.TaskRefFromEventData(event.Data.Data())
 	if !ok {
 		return false, nil
 	}
 
-	if err := productive.LockTaskWorkOrder(c.tx, factoryModel, taskID); err != nil {
+	if err := productive.LockTaskWorkOrder(c.tx, factoryModel, ref); err != nil {
 		return false, err
 	}
 
-	hasOrder, err := productive.TaskHasWorkOrder(c.tx, factoryModel, taskID)
+	hasOrder, err := productive.TaskHasWorkOrder(c.tx, factoryModel, ref)
 	if err != nil {
 		return false, err
 	}
 	if hasOrder {
-		log.Infof("skipping Productive task %s: work order already exists", taskID)
+		log.Infof("skipping Productive task %s in organization %s: work order already exists", ref.TaskID, ref.OrganizationID)
 	}
 	return hasOrder, nil
 }
