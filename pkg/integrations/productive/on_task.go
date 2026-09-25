@@ -200,7 +200,18 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, err
 	}
 
-	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document)); err != nil {
+	envelope := TaskEnvelope(event, document, webhookOrganizationID(ctx))
+	if event == TaskUpdatedEvent {
+		// A failed lookup must not fail the webhook. Productive.io deactivates
+		// a webhook after repeated errors, and other workflows still need the
+		// update. Intake then ignores the update because it has no list move.
+		if err := stampTaskListMove(ctx, document, envelope); err != nil && ctx.Logger != nil {
+			id, _ := document["id"].(string)
+			ctx.Logger.WithError(err).Warnf("productive task %s: task list move unavailable", strings.TrimSpace(id))
+		}
+	}
+
+	if err := ctx.Events.Emit(TaskPayloadType, envelope); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
@@ -209,6 +220,61 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func stampTaskListMove(ctx core.WebhookRequestContext, document map[string]any, envelope map[string]any) error {
+	if ctx.HTTP == nil || ctx.Integration == nil {
+		return nil
+	}
+
+	id, _ := document["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+		changeset, err := client.latestTaskUpdateChangeset(id)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		move, ok := taskListMoveFromChangeset(changeset)
+		if ok {
+			setTaskListMove(envelope, move)
+		}
+		return nil
+	}
+	return lastErr
+}
+
+func setTaskListMove(envelope map[string]any, move TaskListMove) {
+	meta, _ := envelope["meta"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+		envelope["meta"] = meta
+	}
+	meta["task_list_move"] = map[string]any{
+		"from": move.From,
+		"to":   move.To,
+	}
+}
+
+func webhookOrganizationID(ctx core.WebhookRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+	value, err := ctx.Integration.GetConfig("organizationId")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(value))
 }
 
 // productiveDelivery is the body Productive.io posts for a task webhook.
