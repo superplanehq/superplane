@@ -20,13 +20,14 @@ import {
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
-  it("defines GitHub, Jira, Sentry, PagerDuty, and Productive.io as automations that feed Backlog", () => {
+  it("defines GitHub, Jira, Sentry, PagerDuty, Productive.io, and Datadog as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
       "jira-issues",
       "sentry-exceptions",
       "pagerduty-incidents",
       "productive-tasks",
+      "datadog",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -335,7 +336,7 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists GitHub, Jira, Sentry, Productive.io, and coming-soon DataDog and Notion add-intake sources", () => {
+  it("lists GitHub, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion add-intake sources", () => {
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
       "github-issues",
       "jira-issues",
@@ -344,10 +345,7 @@ describe("lineIntakeModel", () => {
       "datadog",
       "notion",
     ]);
-    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual([
-      "datadog",
-      "notion",
-    ]);
+    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
   });
 
   it("marks Jira, Sentry, and Productive.io as coming soon when their organization features are off", () => {
@@ -357,7 +355,7 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
-    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
@@ -371,7 +369,7 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
   });
 
   it("maps every intake template id to an API source the picker can create", () => {

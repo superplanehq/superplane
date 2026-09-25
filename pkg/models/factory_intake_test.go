@@ -77,6 +77,7 @@ func Test__FactoryIntake(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions,
 			models.FactoryIntakeSourcePagerDutyIncidents,
 			models.FactoryIntakeSourceProductiveTasks,
+			models.FactoryIntakeSourceDatadog,
 		} {
 			assert.True(t, models.ValidFactoryIntakeSource(source))
 

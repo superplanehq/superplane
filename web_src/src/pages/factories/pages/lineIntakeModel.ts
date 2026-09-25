@@ -5,6 +5,7 @@ import type {
   FactoryIntakeHealth,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -48,7 +49,8 @@ export type LineIntakeSourceId =
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
-  | "productive-tasks";
+  | "productive-tasks"
+  | "datadog";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -175,6 +177,25 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "Create a task in Backlog",
     },
   },
+  {
+    id: "datadog",
+    name: "Datadog errors",
+    description: "Creates tasks from Datadog Error Tracking alerts.",
+    iconSrc: datadogIcon,
+    iconAlt: "Datadog",
+    listen: {
+      kind: "webhook",
+      label: "On Error Tracking alert",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Datadog Error Tracking alert becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
 ];
 
 export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
@@ -224,6 +245,7 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
   SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
+  SOURCE_DATADOG: "datadog",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
@@ -232,6 +254,7 @@ const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesF
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
   "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
+  datadog: "SOURCE_DATADOG",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {

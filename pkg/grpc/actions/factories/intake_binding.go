@@ -14,6 +14,7 @@ const intakeGitHubAppName = "github"
 const intakeJiraAppName = "jira"
 const intakeProductiveAppName = "productive"
 const intakeSentryAppName = "sentry"
+const intakeDatadogAppName = "datadog"
 
 // intakeBinding points the generated trigger at a concrete integration and
 // resource. A trigger without one registers no webhook, so the intake would
@@ -68,6 +69,9 @@ func resolveIntakeBinding(
 	}
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return resolveDatadogIntakeBinding(tx, factory)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues {
 		return nil, nil
@@ -173,6 +177,43 @@ func resolveProductiveIntakeBinding(
 		Configuration: map[string]any{"project": projectID},
 		Installation:  integration,
 	}, nil
+}
+
+func resolveDatadogIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+) (*intakeBinding, error) {
+	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	var ready []models.Integration
+	for _, integration := range integrations {
+		if integration.AppName != intakeDatadogAppName {
+			continue
+		}
+		if integration.State != models.IntegrationStateReady {
+			continue
+		}
+		ready = append(ready, integration)
+	}
+
+	switch len(ready) {
+	case 0:
+		return nil, invalidArgument("connect one Datadog integration before adding this intake")
+	case 1:
+		integration := ready[0]
+		return &intakeBinding{
+			Integration: &yaml.IntegrationRef{
+				ID:   integration.ID.String(),
+				Name: integration.InstallationName,
+			},
+			Installation: &integration,
+		}, nil
+	default:
+		return nil, invalidArgument("connect only one Datadog integration for this intake")
+	}
 }
 
 func resolveSentryIntakeBinding(
