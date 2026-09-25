@@ -282,6 +282,24 @@ describe("FirstRunSetup reliability", () => {
     expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });
 
+  it("keeps the ticket source when the repository does not change", async () => {
+    const user = userEvent.setup();
+    const setup = {
+      ...setupState(),
+      selectedRepo: "acme/api",
+      issuesRepo: "acme/api",
+      issuesChoice: "vcs" as const,
+      selectRepo: vi.fn(),
+    };
+    renderSetup(pageModel({ openSection: "repo", setup }), "/org-1/workspaces/PAY/setup?step=repo");
+
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(setup.selectRepo).not.toHaveBeenCalled();
+    expect(setup.issuesChoice).toBe("vcs");
+  });
+
   it("shows only the current user's GitHub account picker", () => {
     const picker = (userId: string) =>
       githubConnection("int-1", {
