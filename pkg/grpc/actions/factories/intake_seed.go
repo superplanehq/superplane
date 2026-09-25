@@ -647,7 +647,7 @@ func newIntakeProductiveClient(
 	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
 	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
+		return nil, fmt.Errorf("failed to build Productive client: %w", err)
 	}
 
 	return client, nil

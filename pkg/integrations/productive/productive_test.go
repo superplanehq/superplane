@@ -157,8 +157,8 @@ func Test__Productive__Configuration(t *testing.T) {
 
 	require.Len(t, fields, 3)
 	assert.Equal(t, "apiToken", fields[0].Name)
-	assert.Equal(t, "Personal access token from Productive.io Settings > API Integrations, with read and write permissions.", fields[0].Description)
-	assert.Equal(t, "The numeric organization id in your Productive.io URL", fields[1].Description)
+	assert.Equal(t, "Personal access token from Productive Settings > API Integrations, with read and write permissions.", fields[0].Description)
+	assert.Equal(t, "The numeric organization id in your Productive URL", fields[1].Description)
 }
 
 // authorizedIntegration returns an integration context with valid Productive.io

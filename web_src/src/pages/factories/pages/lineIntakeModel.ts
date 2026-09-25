@@ -178,17 +178,17 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   },
   {
     id: "productive-tasks",
-    name: "Productive.io tasks",
-    description: "Create tasks from Productive.io tasks.",
+    name: "Productive tasks",
+    description: "Create tasks from Productive tasks.",
     iconSrc: productiveIcon,
     iconAlt: "Productive",
     listen: {
       kind: "webhook",
-      label: "On Productive.io task",
+      label: "On Productive task",
     },
     evaluate: {
       label: "Create a task",
-      rule: "A matching Productive.io task becomes a task in Backlog. SuperPlane scores it there.",
+      rule: "A matching Productive task becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",

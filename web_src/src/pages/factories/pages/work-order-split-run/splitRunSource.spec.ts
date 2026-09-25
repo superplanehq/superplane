@@ -131,9 +131,9 @@ describe("splitRunSourceForOrder", () => {
       splitRunSourceForOrder({
         ...DRAFT_WORK_ORDER,
         origin: undefined,
-        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive.io tasks" } },
+        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive tasks" } },
       }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks", iconAlt: "Productive.io" }));
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks", iconAlt: "Productive" }));
   });
 
   it("names the Productive.io intake from a task link", () => {
@@ -142,7 +142,7 @@ describe("splitRunSourceForOrder", () => {
         ...DRAFT_WORK_ORDER,
         origin: { url: "https://app.productive.io/1-acme/tasks/task/19976991" },
       }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks" }));
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks" }));
   });
 
   it("names the Jira intake from a browse link", () => {

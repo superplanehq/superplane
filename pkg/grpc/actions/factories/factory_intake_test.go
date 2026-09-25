@@ -82,7 +82,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
 
 		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
-		assert.Equal(t, "Productive.io tasks", intake.GetName())
+		assert.Equal(t, "Productive tasks", intake.GetName())
 		assert.False(t, intake.GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, intake.GetHealth())
 		assert.True(t, intake.GetSettings().GetExcludeKeyTasks())

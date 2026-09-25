@@ -56,7 +56,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
-  "productive-tasks": { name: "Productive.io tasks", iconSrc: productiveIcon, iconAlt: "Productive.io" },
+  "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 

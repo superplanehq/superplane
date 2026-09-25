@@ -72,7 +72,7 @@ describe("ProductiveIntakeFilterFields", () => {
 
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Ignore key tasks" })).toBeChecked();
-    expect(screen.getByText("SuperPlane skips Productive.io key tasks (milestones).")).toBeInTheDocument();
+    expect(screen.getByText("SuperPlane skips Productive key tasks (milestones).")).toBeInTheDocument();
   });
 
   it("puts excludeKeyTasks on the save payload", async () => {
