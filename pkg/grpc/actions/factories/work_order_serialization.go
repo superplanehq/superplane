@@ -86,16 +86,25 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
+	candidates, err := models.ClaudeAliasCandidateIDs(db, factory.OrganizationID, &factory.ID)
+	if err != nil {
+		log.WithError(err).Warnf("work order %s: model alias resolution unavailable", order.ID)
+		candidates = nil
+	}
+	dispatches := resolveDispatchModelAliases(dispatchesByOrderID[order.ID], candidates)
+	usageModels := resolveUsageModelAliases(byModel[order.ID], candidates)
+	executionModels := resolveExecutionModelAliases(modelsByExecution, candidates)
+
 	serialized, err := serializeWorkOrder(
 		factory,
 		order,
-		dispatchesByOrderID[order.ID],
+		dispatches,
 		creatorAutomations[order.ID],
 		workOrderUsageView{
 			Totals:            usageByOrder[order.ID],
-			ByModel:           byModel[order.ID],
+			ByModel:           usageModels,
 			ByMachineType:     byMachineType[order.ID],
-			ModelsByExecution: modelsByExecution,
+			ModelsByExecution: executionModels,
 		},
 	)
 	if err != nil {
@@ -287,6 +296,44 @@ func attachWorkOrderFiles(ctx context.Context, db *gorm.DB, order *pb.WorkOrder,
 	}
 	order.Files = files
 	return nil
+}
+
+func resolveDispatchModelAliases(
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	candidates []string,
+) []models.FactoryWorkOrderLineDispatchRecord {
+	for i := range dispatches {
+		dispatches[i].Model = models.ConcreteClaudeModelID(dispatches[i].Model, candidates)
+	}
+	return dispatches
+}
+
+func resolveUsageModelAliases(rows []models.UsageByModel, candidates []string) []models.UsageByModel {
+	for i := range rows {
+		rows[i].Model = models.ConcreteClaudeModelID(rows[i].Model, candidates)
+	}
+	return rows
+}
+
+func resolveExecutionModelAliases(byExecution map[uuid.UUID][]string, candidates []string) map[uuid.UUID][]string {
+	if len(byExecution) == 0 {
+		return byExecution
+	}
+	resolved := make(map[uuid.UUID][]string, len(byExecution))
+	for id, names := range byExecution {
+		seen := map[string]struct{}{}
+		out := make([]string, 0, len(names))
+		for _, name := range names {
+			concrete := models.ConcreteClaudeModelID(name, candidates)
+			if _, dup := seen[concrete]; dup {
+				continue
+			}
+			seen[concrete] = struct{}{}
+			out = append(out, concrete)
+		}
+		resolved[id] = out
+	}
+	return resolved
 }
 
 func loadWorkOrderUsageBreakdowns(

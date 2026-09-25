@@ -104,7 +104,11 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 		return nil, err
 	}
 
-	return b.applyLineDispatchOverrides(resolved)
+	resolved, err = b.applyLineDispatchOverrides(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return b.replaceClaudeModelAlias(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -2302,6 +2306,28 @@ func (b *NodeConfigurationBuilder) applyLineDispatchModel(
 	}
 
 	resolved["model"] = override
+	return resolved, nil
+}
+
+func (b *NodeConfigurationBuilder) replaceClaudeModelAlias(resolved map[string]any) (map[string]any, error) {
+	model, _ := resolved["model"].(string)
+	if !models.IsClaudeFamilyAlias(model) {
+		return resolved, nil
+	}
+	var candidates []string
+	if b.tx != nil && b.workflowID != uuid.Nil {
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if err == nil {
+			candidates, err = models.ClaudeAliasCandidateIDs(b.tx, canvas.OrganizationID, canvas.FactoryID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	resolved["model"] = models.ConcreteClaudeModelID(model, candidates)
 	return resolved, nil
 }
 

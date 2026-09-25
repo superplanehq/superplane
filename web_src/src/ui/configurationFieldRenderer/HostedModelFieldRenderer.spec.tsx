@@ -157,8 +157,26 @@ describe("HostedModelFieldRenderer", () => {
     expect(screen.getByTestId("field-model-hosted-thinking")).toHaveTextContent("Thinking");
     expect(screen.queryByRole("menuitem", { name: "openai/gpt-5" })).not.toBeInTheDocument();
 
-    await selectFlyoutOption(user, "field-model-hosted-model-list", "anthropic/claude-sonnet-4-6");
+    await selectFlyoutOption(user, "field-model-hosted-model-list", "sonnet 4-6");
     expect(onChange).toHaveBeenCalledWith("claude-sonnet-4-6");
+  });
+
+  it("shows the allowlisted Claude model for an alias without saving it", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "anthropic", "claude-opus-5-5")]);
+
+    renderField(
+      <HostedModelFieldRenderer field={createField()} value="opus" onChange={onChange} organizationId="org-1" />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    expect(onChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "opus 5-5" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "opus" })).not.toBeInTheDocument();
   });
 
   it("explains when organization BYOK models cannot load", () => {
@@ -326,7 +344,7 @@ describe("HostedModelFieldRenderer", () => {
       />,
     );
 
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
     expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
