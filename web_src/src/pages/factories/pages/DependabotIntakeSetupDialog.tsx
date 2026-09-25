@@ -17,6 +17,7 @@ interface DependabotIntakeSetupDialogProps {
   organizationId: string;
   factoryId: string;
   repository: string;
+  setupReady: boolean;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -32,6 +33,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
 
   const create = async () => {
+    if (!props.setupReady) return;
     setError(undefined);
     try {
       await createIntake.mutateAsync({
@@ -86,6 +88,12 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
           testId="dependabot-skip-initial-import"
         />
 
+        {!props.setupReady ? (
+          <p className="workspace-body-text text-destructive" role="alert">
+            {DEPENDABOT_INTAKE_SETUP_COPY.setupRequired}
+          </p>
+        ) : null}
+
         {error ? (
           <p className="workspace-body-text text-destructive" role="alert">
             {error}
@@ -95,7 +103,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
         <Button
           type="button"
           className="w-full"
-          disabled={createIntake.isPending}
+          disabled={!props.setupReady || createIntake.isPending}
           onClick={() => void create()}
           data-testid="dependabot-setup-finish"
         >

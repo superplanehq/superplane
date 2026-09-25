@@ -75,11 +75,17 @@ func resolveIntakeBinding(
 
 	config := factory.OnboardingConfigValue()
 	if config.VCSIntegrationID == "" || config.BacklogRepository == "" {
+		if source == models.FactoryIntakeSourceDependabotAlerts {
+			return nil, invalidArgument("GitHub connection and backlog repository are required")
+		}
 		return nil, nil
 	}
 
 	integration := findIntakeGitHubIntegration(tx, factory, config.VCSIntegrationID)
 	if integration == nil {
+		if source == models.FactoryIntakeSourceDependabotAlerts {
+			return nil, invalidArgument("workspace GitHub integration is not ready")
+		}
 		return nil, nil
 	}
 

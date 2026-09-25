@@ -26,6 +26,7 @@ describe("DependabotIntakeSetupDialog", () => {
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/payments"
+        setupReady
         onClose={vi.fn()}
         onCreated={onCreated}
       />,
@@ -55,6 +56,7 @@ describe("DependabotIntakeSetupDialog", () => {
         organizationId="org-1"
         factoryId="factory-1"
         repository="acme/payments"
+        setupReady
         onClose={vi.fn()}
         onCreated={onCreated}
       />,
@@ -64,5 +66,24 @@ describe("DependabotIntakeSetupDialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("permission denied");
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it("blocks creation until workspace GitHub setup is complete", () => {
+    render(
+      <DependabotIntakeSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        repository=""
+        setupReady={false}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Connect GitHub and select a backlog repository in workspace setup before you create this intake.",
+    );
+    expect(screen.getByRole("button", { name: "Create intake" })).toBeDisabled();
+    expect(mocks.createIntake).not.toHaveBeenCalled();
   });
 });

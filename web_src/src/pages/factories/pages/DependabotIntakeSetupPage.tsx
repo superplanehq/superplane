@@ -26,6 +26,7 @@ export function DependabotIntakeSetupPage() {
         organizationId={model.dialog.organizationId}
         factoryId={model.dialog.factoryId}
         repository={model.dialog.repository}
+        setupReady={model.dialog.setupReady}
         onClose={() => navigate(model.returnHref)}
         onCreated={() => navigate(model.returnHref)}
       />
@@ -41,7 +42,7 @@ function resolveDependabotIntakeSetupModel(
   titleParts: string[];
   redirectTo: string;
   returnHref: string;
-  dialog?: { organizationId: string; factoryId: string; repository: string };
+  dialog?: { organizationId: string; factoryId: string; repository: string; setupReady: boolean };
 } {
   const { organizationId, factoryId, factoryKey, factory } = layout;
   const workspaceName = factory?.name ?? "Workspace";
@@ -63,6 +64,9 @@ function resolveDependabotIntakeSetupModel(
       organizationId,
       factoryId,
       repository: factory?.onboarding?.backlogRepository?.trim() ?? "",
+      setupReady: Boolean(
+        factory?.onboarding?.vcsIntegrationId?.trim() && factory?.onboarding?.backlogRepository?.trim(),
+      ),
     },
   };
 }
