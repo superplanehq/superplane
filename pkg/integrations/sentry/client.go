@@ -45,7 +45,35 @@ func wrapReleaseScopeError(err error) error {
 	return err
 }
 
+// IsRetryableAPIError reports whether the consumer should nack the message
+// so Tackle redelivers it. Rate limits, request timeouts, server errors,
+// and transport failures retry. Client errors such as 401, 403, and 404
+// do not.
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var sentryAPIError *apiError
+	if !errors.As(err, &sentryAPIError) {
+		return true
+	}
+
+	return sentryAPIError.StatusCode == http.StatusTooManyRequests ||
+		sentryAPIError.StatusCode == http.StatusRequestTimeout ||
+		sentryAPIError.StatusCode >= http.StatusInternalServerError
+}
+
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to decode sentry metadata: %w", err)
+	}
+
+	if metadata.HostedApp {
+		return newHostedClient(httpContext, integration, metadata)
+	}
+
 	baseURL, err := integration.GetConfig("baseUrl")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sentry base URL: %w", err)
@@ -60,11 +88,6 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 		return nil, fmt.Errorf("Sentry user token is missing")
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode sentry metadata: %w", err)
-	}
-
 	if metadata.Organization == nil || metadata.Organization.Slug == "" {
 		return nil, fmt.Errorf("Sentry organization is not connected")
 	}
@@ -75,6 +98,78 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 		userToken:   strings.TrimSpace(string(userToken)),
 		orgSlug:     metadata.Organization.Slug,
 	}, nil
+}
+
+func newHostedClient(httpContext core.HTTPContext, integration core.IntegrationContext, metadata Metadata) (*Client, error) {
+	app, ok := HostedAppFromEnv()
+	if !ok {
+		return nil, fmt.Errorf("hosted Sentry app is not configured")
+	}
+	if metadata.Organization == nil || metadata.Organization.Slug == "" {
+		return nil, fmt.Errorf("Sentry organization is not connected")
+	}
+
+	token, err := hostedAccessToken(httpContext, integration, app, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		httpContext: httpContext,
+		baseURL:     DefaultBaseURL,
+		userToken:   token,
+		orgSlug:     metadata.Organization.Slug,
+	}, nil
+}
+
+func hostedAccessToken(
+	httpContext core.HTTPContext,
+	integration core.IntegrationContext,
+	app HostedApp,
+	metadata Metadata,
+) (string, error) {
+	token := secretValue(integration, SecretAccessToken)
+	if token == "" {
+		return "", fmt.Errorf("Sentry installation token is missing")
+	}
+	if !hostedTokenExpired(metadata.TokenExpiresAt) {
+		return token, nil
+	}
+
+	refreshToken := secretValue(integration, SecretRefreshToken)
+	if refreshToken == "" {
+		return token, nil
+	}
+
+	tokens, err := refreshSentryAppToken(httpContext, app, metadata.InstallationUUID, refreshToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to refresh Sentry installation token: %w", err)
+	}
+	if err := integration.SetSecret(SecretAccessToken, []byte(tokens.Token)); err != nil {
+		return "", err
+	}
+	if tokens.RefreshToken != "" {
+		if err := integration.SetSecret(SecretRefreshToken, []byte(tokens.RefreshToken)); err != nil {
+			return "", err
+		}
+	}
+	metadata.TokenExpiresAt = tokens.ExpiresAt
+	integration.SetMetadata(metadata)
+	if err := persistIntegration(integration); err != nil {
+		return "", fmt.Errorf("failed to persist Sentry installation token: %w", err)
+	}
+	return tokens.Token, nil
+}
+
+func secretValue(integration core.IntegrationContext, name string) string {
+	if secrets, err := integration.GetSecrets(); err == nil {
+		for _, secret := range secrets {
+			if secret.Name == name && len(secret.Value) > 0 {
+				return strings.TrimSpace(string(secret.Value))
+			}
+		}
+	}
+	return ""
 }
 
 func NewAPIClient(httpContext core.HTTPContext, baseURL, userToken string) *Client {
@@ -126,6 +221,7 @@ type Issue struct {
 	Title         string         `json:"title" mapstructure:"title"`
 	Count         string         `json:"count" mapstructure:"count"`
 	Status        string         `json:"status" mapstructure:"status"`
+	Substatus     string         `json:"substatus" mapstructure:"substatus"`
 	Priority      string         `json:"priority" mapstructure:"priority"`
 	HasSeen       bool           `json:"hasSeen" mapstructure:"hasSeen"`
 	IsPublic      bool           `json:"isPublic" mapstructure:"isPublic"`
@@ -135,6 +231,10 @@ type Issue struct {
 	UserCount     int            `json:"userCount" mapstructure:"userCount"`
 	Permalink     string         `json:"permalink" mapstructure:"permalink"`
 	WebURL        string         `json:"web_url" mapstructure:"web_url"`
+	FirstSeen     string         `json:"firstSeen" mapstructure:"firstSeen"`
+	LastSeen      string         `json:"lastSeen" mapstructure:"lastSeen"`
+	Culprit       string         `json:"culprit" mapstructure:"culprit"`
+	Level         string         `json:"level" mapstructure:"level"`
 	Metadata      map[string]any `json:"metadata" mapstructure:"metadata"`
 	Tags          []IssueTag     `json:"tags" mapstructure:"tags"`
 	Stats         map[string]any `json:"stats" mapstructure:"stats"`
@@ -159,6 +259,94 @@ type IssueEvent struct {
 	Culprit     string         `json:"culprit" mapstructure:"culprit"`
 	Tags        []IssueTag     `json:"tags" mapstructure:"tags"`
 	User        map[string]any `json:"user" mapstructure:"user"`
+}
+
+const (
+	IssueEventLatest      = "latest"
+	IssueEventRecommended = "recommended"
+)
+
+// IssueEventDetail is the full event body from GET .../events/{latest|recommended|id}/.
+// ListIssueEvents returns summaries without entries or stack frames.
+type IssueEventDetail struct {
+	ID          string            `json:"id" mapstructure:"id"`
+	EventID     string            `json:"eventID" mapstructure:"eventID"`
+	Title       string            `json:"title" mapstructure:"title"`
+	Message     string            `json:"message" mapstructure:"message"`
+	DateCreated string            `json:"dateCreated" mapstructure:"dateCreated"`
+	Platform    string            `json:"platform" mapstructure:"platform"`
+	Location    string            `json:"location" mapstructure:"location"`
+	Culprit     string            `json:"culprit" mapstructure:"culprit"`
+	Type        string            `json:"type" mapstructure:"type"`
+	WebURL      string            `json:"web_url" mapstructure:"web_url"`
+	Release     IssueEventRelease `json:"release" mapstructure:"release"`
+	Tags        []IssueTag        `json:"tags" mapstructure:"tags"`
+	User        map[string]any    `json:"user" mapstructure:"user"`
+	Contexts    map[string]any    `json:"contexts" mapstructure:"contexts"`
+	Context     map[string]any    `json:"context" mapstructure:"context"`
+	Extra       map[string]any    `json:"extra" mapstructure:"extra"`
+	SDK         map[string]any    `json:"sdk" mapstructure:"sdk"`
+	Entries     []IssueEventEntry `json:"entries" mapstructure:"entries"`
+}
+
+type IssueEventEntry struct {
+	Type string         `json:"type" mapstructure:"type"`
+	Data map[string]any `json:"data" mapstructure:"data"`
+}
+
+// IssueEventRelease is a Sentry event release. GET .../events/{id}/ returns
+// either a version string or a release object. A type mismatch must not fail
+// the whole event decode.
+type IssueEventRelease struct {
+	Version string
+}
+
+func (r IssueEventRelease) String() string {
+	return r.Version
+}
+
+func (r *IssueEventRelease) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
+		r.Version = ""
+		return nil
+	}
+
+	if data[0] == '"' {
+		var version string
+		if err := json.Unmarshal(data, &version); err != nil {
+			return err
+		}
+		r.Version = version
+		return nil
+	}
+
+	if data[0] != '{' {
+		r.Version = ""
+		return nil
+	}
+
+	var obj struct {
+		Version      string `json:"version"`
+		ShortVersion string `json:"shortVersion"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+
+	r.Version = firstNonEmpty(obj.ShortVersion, obj.Version)
+	return nil
+}
+
+func (e *IssueEventDetail) HasStack() bool {
+	return len(stackFrames(e)) > 0
+}
+
+func (e *IssueEventDetail) EntryCount() int {
+	if e == nil {
+		return 0
+	}
+	return len(e.Entries)
 }
 
 type IssueAssignee struct {
@@ -621,6 +809,55 @@ func (c *Client) ListIssues() ([]Issue, error) {
 	return issues, nil
 }
 
+func (c *Client) ListNewestUnresolvedIssues(project string, limit int) ([]Issue, error) {
+	return c.SearchUnresolvedIssues(project, "", limit)
+}
+
+// SearchUnresolvedIssues lists unresolved issues newest first. A non-empty
+// query is appended to the Sentry search, which matches the issue title,
+// message, and culprit.
+func (c *Client) SearchUnresolvedIssues(project, query string, limit int) ([]Issue, error) {
+	if limit <= 0 {
+		limit = newestUnresolvedIssueLimit
+	}
+
+	search := "is:unresolved"
+	if query = strings.TrimSpace(query); query != "" {
+		search += " " + query
+	}
+	encodedQuery := url.QueryEscape(search)
+
+	path := fmt.Sprintf(
+		"/api/0/organizations/%s/issues/?query=%s&limit=%d",
+		url.PathEscape(c.orgSlug),
+		encodedQuery,
+		limit,
+	)
+	if project = strings.TrimSpace(project); project != "" {
+		path = fmt.Sprintf(
+			"/api/0/projects/%s/%s/issues/?query=%s&limit=%d",
+			url.PathEscape(c.orgSlug),
+			url.PathEscape(project),
+			encodedQuery,
+			limit,
+		)
+	}
+
+	responseBody, err := c.doJSON(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	issues := []Issue{}
+	if err := json.Unmarshal(responseBody, &issues); err != nil {
+		return nil, err
+	}
+	if len(issues) > limit {
+		issues = issues[:limit]
+	}
+	return issues, nil
+}
+
 func (c *Client) ListReleases() ([]Release, error) {
 	responseBody, err := c.doJSON(
 		http.MethodGet,
@@ -686,6 +923,61 @@ func (c *Client) ListIssueEvents(issueID string) ([]IssueEvent, error) {
 	}
 
 	return events, nil
+}
+
+func (c *Client) GetIssueEvent(issueID, eventID string) (*IssueEventDetail, error) {
+	issueID = strings.TrimSpace(issueID)
+	if issueID == "" {
+		return nil, fmt.Errorf("issue id is required")
+	}
+
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		eventID = IssueEventLatest
+	}
+
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf(
+			"/api/0/organizations/%s/issues/%s/events/%s/",
+			c.orgSlug,
+			url.PathEscape(issueID),
+			url.PathEscape(eventID),
+		),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	event := IssueEventDetail{}
+	if err := json.Unmarshal(responseBody, &event); err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+// GetPreferredIssueEvent returns the latest event, then recommended when latest
+// has no stack and recommended has a stack or more entries.
+func (c *Client) GetPreferredIssueEvent(issueID string) (*IssueEventDetail, error) {
+	latest, err := c.GetIssueEvent(issueID, IssueEventLatest)
+	if err != nil {
+		return nil, err
+	}
+	if latest.HasStack() {
+		return latest, nil
+	}
+
+	recommended, err := c.GetIssueEvent(issueID, IssueEventRecommended)
+	if err != nil {
+		return latest, nil
+	}
+	if recommended.HasStack() || recommended.EntryCount() > latest.EntryCount() {
+		return recommended, nil
+	}
+
+	return latest, nil
 }
 
 func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {

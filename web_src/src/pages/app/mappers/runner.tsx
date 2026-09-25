@@ -4,10 +4,10 @@ import { getColorClass } from "@/lib/colors";
 import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "./mapperLookup";
 
 import type {
   ComponentBaseContext,
@@ -20,7 +20,7 @@ import type {
   SubtitleContext,
 } from "./types";
 
-import { stringOrDash } from "./utils";
+import { stringOrDash } from "./eventDisplay";
 
 const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
@@ -189,8 +189,16 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
-      customField: <RunnerLiveLogDialog title={title} canvasMode={canvasMode} execution={lastExecution} />,
-      customFieldPosition: "after",
+      headerAction: (
+        <RunnerLiveLogDialog
+          title={title}
+          canvasMode={canvasMode}
+          execution={lastExecution}
+          component={context.node.componentName || componentDef.name}
+          iconSlug={iconSlug}
+          session={{ organizationId: context.organizationId, canvasId: context.canvasId }}
+        />
+      ),
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {

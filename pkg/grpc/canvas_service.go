@@ -9,13 +9,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -25,26 +23,20 @@ type CanvasService struct {
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
-	gitProvider    git.Provider
 	webhookBaseURL string
-	usageService   usage.Service
 }
 
 func NewCanvasService(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
-	gitProvider git.Provider,
 	webhookBaseURL string,
-	usageService usage.Service,
 ) *CanvasService {
 	return &CanvasService{
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
-		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
-		usageService:   usageService,
 	}
 }
 
@@ -81,13 +73,13 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		s.registry,
 		s.encryptor,
 		s.authService,
-		s.gitProvider,
 		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
 		req.GetName(),
 		req.GetDescription(),
 		factoryID,
-		s.usageService,
+		nil,
+		nil,
 	)
 }
 
@@ -408,24 +400,6 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 	return canvases.ResolveExecutionErrors(ctx, db, canvas, executionIDs)
 }
 
-func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanvasRepositoryRequest) (*pb.GetCanvasRepositoryResponse, error) {
-	db := database.DB(ctx)
-	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
-	if err != nil {
-		return nil, err
-	}
-	return canvases.GetCanvasRepository(ctx, s.gitProvider, canvas)
-}
-
-func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
-	db := database.DB(ctx)
-	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
-	if err != nil {
-		return nil, err
-	}
-	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, canvas)
-}
-
 func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasStagingRequest) (*pb.PutCanvasStagingResponse, error) {
 	db := database.DB(ctx)
 	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
@@ -478,8 +452,6 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 	return canvases.CommitCanvasStaging(
 		ctx,
 		db,
-		s.gitProvider,
-		s.usageService,
 		s.encryptor,
 		s.registry,
 		canvas,

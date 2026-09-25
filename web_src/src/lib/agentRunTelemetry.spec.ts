@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   applyAgentTelemetryRecord,
   applyPromptUsageRecord,
   emptyAgentRunTelemetry,
   emptyPromptUsageState,
+  isSerializedAgentActivityLiveLogText,
   parseAgentTurnLiveLogText,
   preferLiveTelemetry,
   promptUsageSeries,
@@ -255,6 +256,18 @@ describe("parseAgentTurnLiveLogText", () => {
     const raw =
       '{"type":"turn","turn":1,"usage":{"input_tokens":2,"output_tokens":4},"message":"I will inspect the remotes."}';
     expect(parseAgentTurnLiveLogText(raw)?.message).toBe("I will inspect the remotes.");
+  });
+});
+
+describe("isSerializedAgentActivityLiveLogText", () => {
+  it("recognizes a version 2 activity payload", () => {
+    expect(
+      isSerializedAgentActivityLiveLogText(
+        '{"type":"content_start","id":"msg-1","channel":"assistant","schema_version":2,"event_id":"e1:2","activity_id":"e1"}',
+      ),
+    ).toBe(true);
+    expect(isSerializedAgentActivityLiveLogText("I will verify the seams.")).toBe(false);
+    expect(isSerializedAgentActivityLiveLogText('{"type":"line","text":"hello"}')).toBe(false);
   });
 });
 

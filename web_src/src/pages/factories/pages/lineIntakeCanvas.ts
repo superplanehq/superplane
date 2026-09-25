@@ -20,11 +20,20 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.issue.body }}",
     title: "GitHub issue intake",
   },
+  "jira-issues": {
+    triggerComponent: "jira.onIssue",
+    triggerName: "On Issue",
+    createTitle: "{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}",
+    // Jira sends the raw description as an Atlassian Document Format object.
+    // The trigger reports a plain text copy next to it.
+    createDescription: "{{ root().data.description }}",
+    title: "Jira issue intake",
+  },
   "sentry-exceptions": {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
     createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: "{{ root().data.data.issue.permalink }}",
+    createDescription: "{{ root().data.description }}",
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { SuperplaneUsersUser } from "@/api-client";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
@@ -17,8 +17,11 @@ const members: SuperplaneUsersUser[] = [
   buildUser("bob", "Bob Brown", "bob@example.com"),
 ];
 
+const skills = [{ id: "1", command: "oypirate", title: "Oy Pirate!", description: "Talk like a pirate." }];
+
 function renderComposer(
   onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void> = vi.fn(async () => undefined),
+  composerSkills = skills,
 ) {
   render(
     <WorkOrderCommentComposer
@@ -26,6 +29,7 @@ function renderComposer(
       canComment
       isSubmitting={false}
       members={members}
+      skills={composerSkills}
       onSubmit={onSubmit}
     />,
   );
@@ -132,5 +136,17 @@ describe("WorkOrderCommentComposer", () => {
     await user.click(submitButton);
 
     expect(onSubmit).toHaveBeenCalledWith("cc @Alice Anderson", ["alice"]);
+  });
+
+  it("inserts a skill command from the slash menu", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    const textarea = screen.getByLabelText("Add a comment");
+    await user.type(textarea, "/oy");
+    expect(screen.getByTestId("skill-slash-menu")).toBeInTheDocument();
+    await user.click(screen.getByTestId("skill-slash-option-oypirate"));
+
+    expect(textarea).toHaveValue("/oypirate ");
   });
 });

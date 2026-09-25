@@ -10,10 +10,12 @@ import { resolveWorkOrderFileSrc } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 
 import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
+import { WorkOrderRequestImage } from "./lib/workOrderRequestImage";
 import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
 import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
+import { WorkOrderDescriptionSkillSlash } from "./WorkOrderDescriptionSkillSlash";
 
 interface WorkOrderDescriptionEditorProps {
   value: string;
@@ -23,9 +25,14 @@ interface WorkOrderDescriptionEditorProps {
   onFocus?: () => void;
   onBlur?: () => void;
   className?: string;
+  placeholder?: string;
   fileUrls?: Record<string, string>;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   isUploading?: boolean;
+  canRemoveImages?: boolean;
+  autoFocus?: boolean;
+  organizationId?: string;
+  factoryId?: string;
 }
 
 function areUrlMapsEqual(a?: Record<string, string>, b?: Record<string, string>): boolean {
@@ -56,11 +63,17 @@ export function WorkOrderDescriptionEditor({
   onFocus,
   onBlur,
   className,
+  placeholder = "Add description…",
   fileUrls,
   onUploadFiles,
   isUploading = false,
+  canRemoveImages = false,
+  autoFocus = false,
+  organizationId,
+  factoryId,
 }: WorkOrderDescriptionEditorProps) {
   const editorRef = useRef<Editor | null>(null);
+  const skillKeyDownRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const onChangeRef = useRef(onChange);
   const onFocusRef = useRef(onFocus);
   const onBlurRef = useRef(onBlur);
@@ -79,6 +92,7 @@ export function WorkOrderDescriptionEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
+    autofocus: autoFocus ? "end" : false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
@@ -86,9 +100,9 @@ export function WorkOrderDescriptionEditor({
         underline: false,
       }),
       WorkspaceUnderline,
-      WorkOrderImage,
+      canRemoveImages ? WorkOrderRequestImage : WorkOrderImage,
       Markdown,
-      Placeholder.configure({ placeholder: "Add description…" }),
+      Placeholder.configure({ placeholder }),
     ],
     content: value,
     contentType: "markdown",
@@ -102,6 +116,7 @@ export function WorkOrderDescriptionEditor({
         ),
         "data-testid": "work-order-description-input",
       },
+      handleKeyDown: (_view, event) => skillKeyDownRef.current(event),
       handlePaste: (_view, event) => {
         if (tryUploadClipboardFiles(editorRef.current, event, onUploadFilesRef.current, disabled)) {
           return true;
@@ -169,6 +184,13 @@ export function WorkOrderDescriptionEditor({
   }, [disabled, editor]);
 
   useEffect(() => {
+    if (!autoFocus || disabled || !editor) {
+      return;
+    }
+    editor.commands.focus("end");
+  }, [autoFocus, disabled, editor]);
+
+  useEffect(() => {
     if (!editor) {
       return;
     }
@@ -225,6 +247,7 @@ export function WorkOrderDescriptionEditor({
           updateDelay={0}
           appendTo={() =>
             editor.view.dom.closest('[data-testid="create-work-order-dialog"]') ??
+            editor.view.dom.closest('[data-testid="create-work-order-request-dialog"]') ??
             editor.view.dom.closest('[data-testid="work-order-split-run"]') ??
             editor.view.dom.parentElement ??
             document.body
@@ -238,7 +261,17 @@ export function WorkOrderDescriptionEditor({
           />
         </BubbleMenu>
       ) : null}
-      <EditorContent editor={editor} />
+      <div className="relative">
+        {editor && factoryId ? (
+          <WorkOrderDescriptionSkillSlash
+            editor={editor}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            keyDownRef={skillKeyDownRef}
+          />
+        ) : null}
+        <EditorContent editor={editor} />
+      </div>
     </>
   );
 }

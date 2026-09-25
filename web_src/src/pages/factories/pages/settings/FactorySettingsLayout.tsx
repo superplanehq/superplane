@@ -7,7 +7,12 @@ import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_MODELS,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
@@ -40,23 +45,45 @@ import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScro
 /** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
 const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
 
+/** Nav item id for workspace MCP servers, gated behind `FEATURE_WORKSPACE_MCP`. */
+const WORKSPACE_MCP_NAV_ITEM_ID = "workspace-mcp";
+
+/** Nav item id for workspace skills, gated behind `FEATURE_WORKSPACE_SKILLS`. */
+const WORKSPACE_SKILLS_NAV_ITEM_ID = "workspace-skills";
+
+/** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
+const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
+
 /**
- * Drops the Models nav item when the workspace-models experimental feature is
- * off, and skips any group left with no items. The source groups stay static
- * so other consumers (e.g. route lookups) keep seeing the full, approved list.
+ * Drops nav items whose experimental features are off, and skips any group
+ * left with no items. The source groups stay static so other consumers
+ * (e.g. route lookups) keep seeing the full, approved list.
  */
 function visibleFactorySettingsNavGroups(
   groups: FactorySettingsNavGroup[],
-  modelsEnabled: boolean,
+  hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
-  if (modelsEnabled) {
+  const hiddenNavItemIds = new Set<string>();
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MODELS)) {
+    hiddenNavItemIds.add(WORKSPACE_MODELS_NAV_ITEM_ID);
+  }
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP)) {
+    hiddenNavItemIds.add(WORKSPACE_MCP_NAV_ITEM_ID);
+  }
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_SKILLS)) {
+    hiddenNavItemIds.add(WORKSPACE_SKILLS_NAV_ITEM_ID);
+  }
+  if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
+    hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
+  }
+  if (hiddenNavItemIds.size === 0) {
     return groups;
   }
 
   return groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => item.id !== WORKSPACE_MODELS_NAV_ITEM_ID),
+      items: group.items.filter((item) => !hiddenNavItemIds.has(item.id)),
     }))
     .filter((group) => group.items.length > 0);
 }
@@ -130,7 +157,7 @@ function FactorySettingsLayoutContent({
   const [navQuery, setNavQuery] = useState("");
   const navGroups = visibleFactorySettingsNavGroups(
     filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading),
-    hasExperimentalFeature(FEATURE_WORKSPACE_MODELS),
+    hasExperimentalFeature,
   );
   const searchIndex = useMemo(
     () =>

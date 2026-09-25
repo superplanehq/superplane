@@ -37,6 +37,7 @@ const (
 var (
 	ErrHostedSubscriptionRequired = errors.New("a Business subscription is required for SuperPlane-hosted runs")
 	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
+	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
 )
 
 // OrganizationBillingPlan is the org plan and Polar subscription period.
@@ -46,11 +47,23 @@ type OrganizationBillingPlan struct {
 	PlanSource              string
 	PolarSubscriptionID     *string
 	PolarSubscriptionStatus string
+	CancelAtPeriodEnd       bool
+	PolarModifiedAt         *time.Time
 	CurrentPeriodStart      *time.Time
 	CurrentPeriodEnd        *time.Time
 	TrialStartedAt          *time.Time
 	TrialEndsAt             *time.Time
 	UpdatedAt               time.Time
+}
+
+// PolarSubscriptionApply is the Polar subscription snapshot to persist.
+type PolarSubscriptionApply struct {
+	ID                string
+	Status            string
+	PeriodStart       *time.Time
+	PeriodEnd         *time.Time
+	CancelAtPeriodEnd bool
+	ModifiedAt        *time.Time
 }
 
 func (OrganizationBillingPlan) TableName() string {
@@ -71,7 +84,10 @@ func (p *OrganizationBillingPlan) IsActiveBusiness() bool {
 	if p.PlanSource == BillingPlanSourceAdmin {
 		return true
 	}
-	return PolarSubscriptionIsPaid(p.PolarSubscriptionStatus)
+	if PolarSubscriptionIsPaid(p.PolarSubscriptionStatus) {
+		return true
+	}
+	return p.CancelAtPeriodEnd && periodStillOpen(p.CurrentPeriodEnd, time.Now())
 }
 
 func (p *OrganizationBillingPlan) IsOpenTrial(now time.Time) bool {
@@ -123,6 +139,10 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 	return &plan, nil
 }
 
+func lockOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
+	return FindOrganizationBillingPlan(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
+}
+
 // ResolveOrganizationBillingPlan loads the org plan and writes plan=none when
 // there is no row or the trial window has ended.
 func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
@@ -137,8 +157,12 @@ func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*Organization
 	if plan == nil {
 		return persistNoneBillingPlan(tx, orgID)
 	}
-	if plan.Plan == BillingPlanTrial && !plan.IsOpenTrial(time.Now()) {
+	now := time.Now()
+	if plan.Plan == BillingPlanTrial && !plan.IsOpenTrial(now) {
 		return lapseExpiredTrial(tx, plan)
+	}
+	if plan.shouldLapseEndedPolarBusiness(now) {
+		return lapseEndedPolarBusiness(tx, plan)
 	}
 	return plan, nil
 }
@@ -172,6 +196,13 @@ func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationB
 	return loadedOrganizationBillingPlan(tx, orgID)
 }
 
+func OrganizationBillingIsPolarManaged(plan *OrganizationBillingPlan) bool {
+	if !HostedPlanGatesEnabled() {
+		return false
+	}
+	return polarPaidAccessContinues(plan, time.Now())
+}
+
 func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*OrganizationBillingPlan, error) {
 	if orgID == uuid.Nil {
 		return nil, fmt.Errorf("organization is required")
@@ -184,9 +215,12 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 
 	var saved *OrganizationBillingPlan
 	err := tx.Transaction(func(inner *gorm.DB) error {
-		existing, err := FindOrganizationBillingPlan(inner, orgID)
+		existing, err := lockOrganizationBillingPlan(inner, orgID)
 		if err != nil {
 			return err
+		}
+		if OrganizationBillingIsPolarManaged(existing) {
+			return ErrPolarManagedBillingPlan
 		}
 
 		now := time.Now()
@@ -204,6 +238,8 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 		if existing != nil {
 			next.PolarSubscriptionID = existing.PolarSubscriptionID
 			next.PolarSubscriptionStatus = existing.PolarSubscriptionStatus
+			next.CancelAtPeriodEnd = existing.CancelAtPeriodEnd
+			next.PolarModifiedAt = existing.PolarModifiedAt
 			next.CurrentPeriodStart = existing.CurrentPeriodStart
 			next.CurrentPeriodEnd = existing.CurrentPeriodEnd
 			if planName != BillingPlanTrial {
@@ -220,6 +256,8 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 				"plan_source",
 				"polar_subscription_id",
 				"polar_subscription_status",
+				"cancel_at_period_end",
+				"polar_modified_at",
 				"current_period_start",
 				"current_period_end",
 				"trial_started_at",
@@ -249,62 +287,83 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 	return saved, nil
 }
 
-func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, subscriptionID, status string, periodStart, periodEnd *time.Time) (*OrganizationBillingPlan, bool, error) {
-	existing, err := EnsureOrganizationBillingPlan(tx, orgID)
+func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) (*OrganizationBillingPlan, bool, error) {
+	var saved *OrganizationBillingPlan
+	var grantIncluded bool
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		existing, err := EnsureOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		existing, err = lockOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if existing == nil {
+			return fmt.Errorf("organization billing plan is missing")
+		}
+		if polarSnapshotIsStale(existing, sub.ModifiedAt) {
+			saved = existing
+			return nil
+		}
+
+		now := time.Now()
+		next := *existing
+		next.PlanSource = BillingPlanSourcePolar
+		next.UpdatedAt = now
+		next.PolarModifiedAt = polarSnapshotModifiedAt(existing.PolarModifiedAt, sub.ModifiedAt)
+		if strings.TrimSpace(sub.ID) != "" {
+			id := strings.TrimSpace(sub.ID)
+			next.PolarSubscriptionID = &id
+		}
+		next.PolarSubscriptionStatus = strings.ToLower(strings.TrimSpace(sub.Status))
+		next.CancelAtPeriodEnd = sub.CancelAtPeriodEnd
+		if sub.PeriodStart != nil {
+			start := sub.PeriodStart.UTC()
+			next.CurrentPeriodStart = &start
+		}
+		if sub.PeriodEnd != nil {
+			end := sub.PeriodEnd.UTC()
+			next.CurrentPeriodEnd = &end
+		}
+
+		if polarPaidAccessContinues(&next, now) {
+			next.Plan = BillingPlanBusiness
+		} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) || polarScheduledCancelEnded(&next, now) {
+			next.Plan = planAfterPaidSubscriptionEnds(&next, now)
+		}
+
+		err = inner.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "organization_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"plan",
+				"plan_source",
+				"polar_subscription_id",
+				"polar_subscription_status",
+				"cancel_at_period_end",
+				"polar_modified_at",
+				"current_period_start",
+				"current_period_end",
+				"trial_started_at",
+				"trial_ends_at",
+				"updated_at",
+			}),
+		}).Create(&next).Error
+		if err != nil {
+			return err
+		}
+
+		saved, err = loadedOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		grantIncluded = shouldGrantIncludedUsage(existing, saved)
+		return nil
+	})
 	if err != nil {
 		return nil, false, err
 	}
-	if existing.PlanSource == BillingPlanSourceAdmin {
-		return existing, false, nil
-	}
-
-	now := time.Now()
-	next := *existing
-	next.PlanSource = BillingPlanSourcePolar
-	next.UpdatedAt = now
-	if strings.TrimSpace(subscriptionID) != "" {
-		id := strings.TrimSpace(subscriptionID)
-		next.PolarSubscriptionID = &id
-	}
-	next.PolarSubscriptionStatus = strings.ToLower(strings.TrimSpace(status))
-	if periodStart != nil {
-		start := periodStart.UTC()
-		next.CurrentPeriodStart = &start
-	}
-	if periodEnd != nil {
-		end := periodEnd.UTC()
-		next.CurrentPeriodEnd = &end
-	}
-
-	if PolarSubscriptionIsPaid(next.PolarSubscriptionStatus) {
-		next.Plan = BillingPlanBusiness
-	} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) {
-		next.Plan = planAfterPaidSubscriptionEnds(&next, now)
-	}
-
-	err = tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "organization_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"plan",
-			"plan_source",
-			"polar_subscription_id",
-			"polar_subscription_status",
-			"current_period_start",
-			"current_period_end",
-			"trial_started_at",
-			"trial_ends_at",
-			"updated_at",
-		}),
-	}).Create(&next).Error
-	if err != nil {
-		return nil, false, err
-	}
-
-	saved, err := loadedOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return nil, false, err
-	}
-	return saved, shouldGrantIncludedUsage(existing, saved), nil
+	return saved, grantIncluded, nil
 }
 
 func loadedOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
@@ -369,6 +428,80 @@ func planAfterPaidSubscriptionEnds(plan *OrganizationBillingPlan, now time.Time)
 		return BillingPlanTrial
 	}
 	return BillingPlanNone
+}
+
+func polarPaidAccessContinues(plan *OrganizationBillingPlan, now time.Time) bool {
+	if plan == nil || polarScheduledCancelEnded(plan, now) {
+		return false
+	}
+	if PolarSubscriptionIsPaid(plan.PolarSubscriptionStatus) {
+		return true
+	}
+	return plan.CancelAtPeriodEnd && periodStillOpen(plan.CurrentPeriodEnd, now)
+}
+
+func polarScheduledCancelEnded(plan *OrganizationBillingPlan, now time.Time) bool {
+	return plan != nil && plan.CancelAtPeriodEnd && !periodStillOpen(plan.CurrentPeriodEnd, now)
+}
+
+func polarSnapshotIsStale(existing *OrganizationBillingPlan, incoming *time.Time) bool {
+	if existing == nil || existing.PolarModifiedAt == nil || incoming == nil {
+		return false
+	}
+	return incoming.Before(*existing.PolarModifiedAt)
+}
+
+func polarSnapshotModifiedAt(existing, incoming *time.Time) *time.Time {
+	if incoming != nil {
+		at := incoming.UTC()
+		return &at
+	}
+	return existing
+}
+
+func (p *OrganizationBillingPlan) shouldLapseEndedPolarBusiness(now time.Time) bool {
+	if p == nil || p.Plan != BillingPlanBusiness || p.PlanSource == BillingPlanSourceAdmin {
+		return false
+	}
+	return polarScheduledCancelEnded(p, now)
+}
+
+func periodStillOpen(periodEnd *time.Time, now time.Time) bool {
+	return periodEnd != nil && periodEnd.After(now)
+}
+
+func lapseEndedPolarBusiness(tx *gorm.DB, plan *OrganizationBillingPlan) (*OrganizationBillingPlan, error) {
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		now := time.Now()
+		nextPlan := planAfterPaidSubscriptionEnds(plan, now)
+		result := inner.Model(&OrganizationBillingPlan{}).
+			Where("organization_id = ? AND plan = ? AND plan_source <> ?", plan.OrganizationID, BillingPlanBusiness, BillingPlanSourceAdmin).
+			Where("cancel_at_period_end = ?", true).
+			Where("current_period_end IS NOT NULL AND current_period_end <= ?", now).
+			Updates(map[string]any{
+				"plan":       nextPlan,
+				"updated_at": now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+
+		loaded, err := loadedOrganizationBillingPlan(inner, plan.OrganizationID)
+		if err != nil {
+			return err
+		}
+		saved = loaded
+		return SyncIncludedLLMCreditGrant(inner, IncludedUsageSync{
+			OrganizationID:   plan.OrganizationID,
+			SubscriptionID:   includedUsageSubscriptionID(saved),
+			IsActiveBusiness: saved.IsActiveBusiness(),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return saved, nil
 }
 
 func persistNoneBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {

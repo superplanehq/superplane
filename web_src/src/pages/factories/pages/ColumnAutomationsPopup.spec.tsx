@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
@@ -36,12 +36,17 @@ const AGENT: ColumnAutomation = {
 };
 
 const REPAIR: ColumnAutomation = {
-  ...INTAKE,
-  id: "intake-sentry",
-  name: "Sentry exceptions",
-  trigger: "On Sentry exception",
-  catalogId: "sentry-exceptions",
+  id: "prfb-checks",
+  kind: "pr-checks",
+  name: "Fix pull request checks",
+  trigger: "On failing pull request check",
+  action: "Fix the checks",
+  iconSrc: "",
+  iconAlt: "GitHub",
   health: "needs-repair",
+  runningCount: 0,
+  catalogId: "pr-checks",
+  canvasId: "app-pr-checks",
 };
 
 const DISABLED: ColumnAutomation = {
@@ -50,7 +55,7 @@ const DISABLED: ColumnAutomation = {
   kind: "analysis",
   name: "Task analysis",
   trigger: "On task in Backlog",
-  action: "Score the task",
+  action: "Plan the task",
   catalogId: "analysis",
   health: "disabled",
 };
@@ -76,8 +81,8 @@ describe("ColumnAutomationsPopup", () => {
 
   it("shows needs-repair and disabled badges", () => {
     renderPopup({ automation: REPAIR });
-    expect(screen.getByTestId("column-automation-row-intake-sentry")).toHaveTextContent("Needs repair");
-    expect(screen.getByTestId("column-automation-icon-intake-sentry-needs-repair")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-row-prfb-checks")).toHaveTextContent("Needs repair");
+    expect(screen.getByTestId("column-automation-icon-prfb-checks-needs-repair")).toBeInTheDocument();
 
     renderPopup({ automation: DISABLED });
     expect(screen.getByTestId("column-automation-row-analysis-1")).toHaveTextContent("Disabled");

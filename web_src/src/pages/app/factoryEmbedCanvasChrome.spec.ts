@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type { RefObject } from "react";
 import { resolveFactoryEmbedCanvasChrome } from "./factoryEmbedCanvasChrome";
 
@@ -22,12 +22,10 @@ function buildInput(overrides: Partial<Parameters<typeof resolveFactoryEmbedCanv
       runInspectionChromeActive: true,
       handleSelectMemoryMode: vi.fn(),
       handleSelectConsoleMode: vi.fn(),
-      handleSelectFilesMode: vi.fn(),
       handleEnterEditModeFromHeader: vi.fn(),
       handleExitEditSession: vi.fn(),
       handleSelectLiveCanvas,
       handleBackToRunList,
-      filesHeaderActionsSlotId: "files-actions",
       runsHasFitToViewRef: refOf(false),
       hasFitToViewRef: refOf(false),
       runsViewportRef: refOf<{ x: number; y: number; zoom: number } | undefined>(undefined),

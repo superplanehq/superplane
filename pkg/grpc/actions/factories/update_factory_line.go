@@ -15,21 +15,17 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory line")
-	}
-
 	lineID, err := parseLineID(req.GetLineId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
+	factoryID := factory.ID
 
 	line, err := factory.FindLine(db, lineID)
 	if err != nil {

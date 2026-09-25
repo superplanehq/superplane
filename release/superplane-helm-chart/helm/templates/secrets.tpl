@@ -47,6 +47,32 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.posthog.name" }}
+{{- if eq .Values.posthog.secretName "" }}
+{{- printf "%s-posthog" .Release.Name }}
+{{- else }}
+{{- .Values.posthog.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "secrets.polar.name" }}
+{{- if eq .Values.polar.secretName "" }}
+{{- printf "%s-polar" .Release.Name }}
+{{- else }}
+{{- .Values.polar.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "superplane.serviceAccountName" -}}
+{{- if .Values.serviceAccount.name }}
+{{- .Values.serviceAccount.name }}
+{{- else if .Values.serviceAccount.create }}
+{{- .Release.Name }}
+{{- else }}
+{{- "default" }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.encryption.name" }}
 {{- if eq .Values.encryption.secretName "" }}
 {{- printf "%s-encryption" .Release.Name }}

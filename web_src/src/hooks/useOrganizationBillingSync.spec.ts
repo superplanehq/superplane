@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { BILLING_SUBSCRIPTION_SYNC_INTERVAL_MS, useOrganizationBillingSync } from "./useOrganizationBillingSync";
 

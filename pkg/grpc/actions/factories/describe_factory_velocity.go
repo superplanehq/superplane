@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	velocityPeriodDaysDefault = 14
+	velocityPeriodDaysDefault = 30
 	velocityPeriodDaysMax     = 30
 
 	velocityPeoplePageSizeDefault = 5
@@ -39,17 +39,14 @@ func DescribeFactoryVelocity(
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
-	}
-
 	period := clampPeriodDays(int(req.GetPeriodDays()))
 
 	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
+	factoryID := factory.ID
 
 	now := time.Now().In(time.Local)
 	buckets := buildDayBuckets(now, period)
@@ -308,8 +305,8 @@ func serializeVelocityIntakeSources(
 	return out
 }
 
-// buildVelocityPeople joins repository authorship with the work orders each
-// member opened, sorts the result, and returns one page of it. It reports no
+// buildVelocityPeople joins repository authorship with the work orders credited
+// to each member, sorts the result, and returns one page of it. It reports no
 // rows when the organization has no members with activity, which is what a
 // brand new workspace looks like.
 //

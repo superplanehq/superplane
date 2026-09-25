@@ -12,16 +12,26 @@ import (
 )
 
 type PlanningSessionMessage struct {
-	ID        uuid.UUID
-	SessionID uuid.UUID
-	Role      string
-	Text      string
-	Delivered bool
-	CreatedAt time.Time
+	ID         uuid.UUID
+	SessionID  uuid.UUID
+	Role       string
+	Text       string
+	Delivered  bool
+	UserID     *uuid.UUID
+	ActivityID *uuid.UUID
+	CreatedAt  time.Time
 }
 
 func (PlanningSessionMessage) TableName() string {
 	return "factory_planning_session_messages"
+}
+
+func sessionWaitText(tx *gorm.DB, session *FactoryPlanningSession, text string, refined bool) string {
+	return planningWaitTextForKind(text, refined, session.Draft(), session.IsAnalysisSession())
+}
+
+func (s *FactoryPlanningSession) usesAnalysisFollowUp(_ *gorm.DB) bool {
+	return s.IsAnalysisSession()
 }
 
 func ListPlanningSessionMessages(tx *gorm.DB, sessionID uuid.UUID) ([]PlanningSessionMessage, error) {
@@ -46,7 +56,7 @@ func (s *FactoryPlanningSession) ProposeSurvey(tx *gorm.DB, survey PlanningSessi
 	})
 }
 
-func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error {
+func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string, userID uuid.UUID) error {
 	return tx.Transaction(func(inner *gorm.DB) error {
 		if err := s.lockAndReload(inner); err != nil {
 			return err
@@ -65,6 +75,9 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 			Text:      body,
 			CreatedAt: time.Now(),
 		}
+		if userID != uuid.Nil {
+			message.UserID = &userID
+		}
 		s.clearSurvey()
 		refined, err := s.applyRefineNote(inner, body)
 		if err != nil {
@@ -72,12 +85,53 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 		}
 		if s.WaitState == PlanningWaitPending {
 			message.Delivered = true
-			s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: planningWaitText(body, refined, s.Draft())})
+			s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: sessionWaitText(inner, s, body, refined)})
 		}
 		if err := inner.Create(&message).Error; err != nil {
 			return err
 		}
 		if err := s.saveSessionMutation(inner); err != nil {
+			return err
+		}
+		return s.reloadMessages(inner)
+	})
+}
+
+func (s *FactoryPlanningSession) RecordAgentMessage(tx *gorm.DB, text string) error {
+	return s.RecordAgentMessageForActivity(tx, text, uuid.Nil)
+}
+
+func (s *FactoryPlanningSession) RecordAgentMessageForActivity(tx *gorm.DB, text string, activityID uuid.UUID) error {
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		body := strings.TrimSpace(text)
+		if body == "" {
+			return fmt.Errorf("%w: message is required", ErrFactoryPlanningSessionInvalid)
+		}
+		message := PlanningSessionMessage{
+			ID:        uuid.New(),
+			SessionID: s.ID,
+			Role:      PlanningSessionMessageRoleAgent,
+			Text:      body,
+			Delivered: true,
+			CreatedAt: time.Now(),
+		}
+		if activityID != uuid.Nil {
+			var activity PlanningSessionActivity
+			err := inner.Select("id", "session_id").Where("id = ?", activityID).First(&activity).Error
+			if err == nil && activity.SessionID != s.ID {
+				return fmt.Errorf("%w: activity belongs to a different session", ErrFactoryPlanningSessionInvalid)
+			}
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if err == nil {
+				message.ActivityID = &activityID
+			}
+		}
+		if err := inner.Create(&message).Error; err != nil {
 			return err
 		}
 		return s.reloadMessages(inner)
@@ -91,6 +145,15 @@ func (s *FactoryPlanningSession) reloadMessages(tx *gorm.DB) error {
 	}
 	s.Messages = messages
 	return nil
+}
+
+func (s *FactoryPlanningSession) MarkUserMessagesDelivered(tx *gorm.DB) error {
+	if err := tx.Model(&PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ? AND delivered = ?", s.ID, PlanningSessionMessageRoleUser, false).
+		Update("delivered", true).Error; err != nil {
+		return err
+	}
+	return s.reloadMessages(tx)
 }
 
 func (s *FactoryPlanningSession) nextUndeliveredUserMessage(tx *gorm.DB) (PlanningSessionMessage, bool, error) {
@@ -112,7 +175,7 @@ func (s *FactoryPlanningSession) deliverUserMessage(tx *gorm.DB, message Plannin
 	if err := tx.Model(&message).Select("Delivered").Updates(PlanningSessionMessage{Delivered: true}).Error; err != nil {
 		return err
 	}
-	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: planningWaitText(message.Text, refined, s.Draft())})
+	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: sessionWaitText(tx, s, message.Text, refined)})
 	return nil
 }
 

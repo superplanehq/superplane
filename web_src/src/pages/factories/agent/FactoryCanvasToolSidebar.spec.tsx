@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { FactoryCanvasToolSidebar } from "./FactoryCanvasToolSidebar";
 
@@ -69,6 +69,10 @@ vi.mock("@/hooks/useAgentChats", () => ({
 
 vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
   useAgentSessionWebsocket: () => undefined,
+}));
+
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: () => [],
 }));
 
 vi.mock("./FactoryRichMessage", () => ({

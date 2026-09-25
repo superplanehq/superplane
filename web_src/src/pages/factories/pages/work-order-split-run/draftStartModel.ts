@@ -1,10 +1,5 @@
 export const DRAFT_START_MODEL_AUTO = "auto";
 
-export const DRAFT_START_MODEL_HELP = [
-  "Auto uses the default model on each automation.",
-  "Pick a model to overwrite that default for this start.",
-] as const;
-
 export function draftStartModelPayload(selected: string): string | undefined {
   const trimmed = selected.trim();
   if (trimmed === "" || trimmed === DRAFT_START_MODEL_AUTO) {
@@ -19,6 +14,9 @@ export function displayRunnerModel(id: string): string {
   if (trimmed === "") {
     return "";
   }
+  if (trimmed.includes(" · ")) {
+    return joinRunnerModels(trimmed.split(" · ").map(displayRunnerModel));
+  }
   const slash = trimmed.lastIndexOf("/");
   if (slash >= 0 && slash < trimmed.length - 1) {
     return trimmed.slice(slash + 1);
@@ -32,6 +30,7 @@ export function joinRunnerModels(ids: Array<string | undefined>): string {
 }
 
 type RunnerCanvasNode = {
+  id?: string;
   component?: string;
   configuration?: { model?: unknown } | Record<string, unknown>;
 };
@@ -44,12 +43,29 @@ const RUNNER_PROVIDER: Record<string, string> = {
 };
 
 export function runnerModelsFromCanvasNodes(nodes?: RunnerCanvasNode[]): string {
-  return joinRunnerModels(
-    (nodes ?? []).map((node) => {
-      const model = node.configuration && "model" in node.configuration ? node.configuration.model : undefined;
-      return typeof model === "string" ? model : undefined;
-    }),
-  );
+  return joinRunnerModels((nodes ?? []).map(runnerModelFromCanvasNode));
+}
+
+function runnerModelFromCanvasNode(node: RunnerCanvasNode): string | undefined {
+  const model = node.configuration && "model" in node.configuration ? node.configuration.model : undefined;
+  return typeof model === "string" ? model : undefined;
+}
+
+export function canvasNodesForRunnerModel(
+  nodes?: RunnerCanvasNode[],
+  statuses?: Record<string, string>,
+): RunnerCanvasNode[] | undefined {
+  if (!nodes || !statuses) {
+    return nodes;
+  }
+  const ran = nodes.filter((node) => {
+    const status = node.id ? statuses[node.id] : undefined;
+    return Boolean(status && status !== "did_not_run");
+  });
+  if (ran.some((node) => runnerModelFromCanvasNode(node)?.trim())) {
+    return ran;
+  }
+  return nodes;
 }
 
 function runnerAcceptsStartModel(component: string | undefined, model: string): boolean {

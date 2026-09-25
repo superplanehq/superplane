@@ -27,12 +27,13 @@ func ListFactoryLineRunnerModels(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line runner models")
 	}
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	db := database.DB(ctx)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line runner models")
 	}
 
-	ids, err := listLineRunnerModels(database.DB(ctx), orgID, factoryID, req.GetLineName())
+	ids, err := listLineRunnerModels(db, orgID, factory.ID, req.GetLineName())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line runner models")
 	}

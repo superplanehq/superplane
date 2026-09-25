@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   Blocks,
+  BookOpen,
   CircleDollarSign,
   CircleUser,
   Cpu,
@@ -23,6 +24,8 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
+  | "mcp"
+  | "skills"
   | "models"
   | "spending"
   | "usage"
@@ -77,18 +80,17 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "light",
           "dark",
           "system",
-          "github for velocity",
+          "associated accounts",
+          "linked accounts",
           "velocity",
           "pull requests",
           "preferences",
           "profile",
           "security",
           "password",
-          "sso",
           "token",
           "access",
           "github",
-          "google",
           "sign in methods",
           "personal tokens",
           "cli",
@@ -158,6 +160,24 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "pull request automations",
           "save repository",
         ],
+      },
+      {
+        id: "workspace-mcp",
+        label: "MCP servers",
+        Icon: Plug,
+        scope: "workspace",
+        section: "mcp",
+        permission: { resource: "factories", action: "update" },
+        keywords: ["mcp server", "mcp", "oauth", "header", "agent", "sign-in", "tools"],
+      },
+      {
+        id: "workspace-skills",
+        label: "Skills",
+        Icon: BookOpen,
+        scope: "workspace",
+        section: "skills",
+        permission: { resource: "factories", action: "update" },
+        keywords: ["skill", "skill.md", "agent", "github package"],
       },
       {
         id: "workspace-models",

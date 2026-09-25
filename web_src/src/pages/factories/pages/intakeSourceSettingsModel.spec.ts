@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
+  intakeSupportsDelete,
+  jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
 } from "./intakeSourceSettingsModel";
@@ -74,6 +77,31 @@ describe("intakeSourceSettingsModel", () => {
     });
   });
 
+  it("round-trips the Jira completion column through the API shape", () => {
+    const settings = intakeSettingsFromApi("Jira issues", {
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "QA",
+    });
+
+    expect(settings.jiraMoveOnComplete).toBe(false);
+    expect(settings.jiraCompletionColumn).toBe("QA");
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      jiraMoveOnComplete: false,
+      jiraCompletionColumn: "",
+    });
+  });
+
+  it("defaults the Jira completion move on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Jira issues", {});
+
+    expect(settings.jiraMoveOnComplete).toBe(true);
+    expect(settings.jiraCompletionColumn).toBe("");
+    expect(jiraCompletionSettingsToApi(settings)).toEqual({
+      jiraMoveOnComplete: true,
+      jiraCompletionColumn: "",
+    });
+  });
+
   it("keeps the new and re-opened toggles apart", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {
       newIssues: true,
@@ -90,5 +118,66 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
     expect(settings.superplaneLabelAdded).toBe(true);
+  });
+
+  it("round-trips Sentry new-issue and level fields and turns off hidden triggers", () => {
+    const settings = intakeSettingsFromApi("Sentry exceptions", {
+      sentryNewIssues: false,
+      sentryRegressedIssues: true,
+      sentryAssignedIssues: true,
+      sentryLevels: ["error", "unknown", "fatal"],
+    });
+
+    expect(settings.sentryNewIssues).toBe(false);
+    expect(settings.sentryRegressedIssues).toBe(true);
+    expect(settings.sentryAssignedIssues).toBe(true);
+    expect(settings.sentryLevels).toEqual(["fatal", "error"]);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      sentryNewIssues: false,
+      sentryRegressedIssues: false,
+      sentryAssignedIssues: false,
+      sentryLevels: ["fatal", "error"],
+    });
+  });
+
+  it("defaults omitted Sentry event toggles from the Sentry intake defaults", () => {
+    const settings = intakeSettingsFromApi("Sentry exceptions", {});
+
+    expect(settings.sentryNewIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues);
+    expect(settings.sentryRegressedIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues);
+    expect(settings.sentryAssignedIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues);
+    expect(settings.sentryLevels).toEqual([]);
+  });
+
+  it("defaults excludeKeyTasks on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Productive.io tasks", {});
+
+    expect(settings.excludeKeyTasks).toBe(true);
+    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(true);
+  });
+
+  it("round-trips excludeKeyTasks through the API shape", () => {
+    const settings = intakeSettingsFromApi("Productive.io tasks", { excludeKeyTasks: false });
+
+    expect(settings.excludeKeyTasks).toBe(false);
+    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
+  });
+
+  it("round-trips selected Productive.io task lists and drops blanks", () => {
+    const settings = intakeSettingsFromApi("Productive.io tasks", {
+      taskListIds: [" list-a ", "list-a", "", "list-b"],
+    });
+
+    expect(settings.taskListIds).toEqual(["list-a", "list-b"]);
+    expect(intakeSettingsToApi(settings).taskListIds).toEqual(["list-a", "list-b"]);
+    expect(intakeSettingsFromApi("Productive.io tasks", {}).taskListIds).toEqual([]);
+  });
+
+  it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
+    expect(intakeSupportsDelete("github-issues")).toBe(true);
+    expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
+    expect(intakeSupportsDelete("jira-issues")).toBe(true);
+    expect(intakeSupportsDelete("productive-tasks")).toBe(true);
+    expect(intakeSupportsDelete("pagerduty-incidents")).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { resolvePageObservability } from "@/lib/pageObservability";
 
 describe("resolvePageObservability", () => {
@@ -7,7 +7,6 @@ describe("resolvePageObservability", () => {
     expect(resolvePageObservability("/login")).toEqual({ pageKey: "login", attributes: {} });
     expect(resolvePageObservability("/onboarding")).toEqual({ pageKey: "organizationOnboarding", attributes: {} });
     expect(resolvePageObservability("/setup")).toEqual({ pageKey: "ownerSetup", attributes: {} });
-    expect(resolvePageObservability("/install")).toEqual({ pageKey: "install", attributes: {} });
     expect(resolvePageObservability("/github/approved")).toEqual({
       pageKey: "githubInstallApproved",
       attributes: {},

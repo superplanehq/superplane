@@ -1,23 +1,34 @@
 import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
-import { selectWorkOrderCardPullRequest, visibleWorkOrderCardAttentionReasons } from "../lib/workOrderCardPullRequest";
+import {
+  selectWorkOrderCardPullRequest,
+  visibleWorkOrderCardAttentionReasons,
+  workOrderCardPullRequestIsMergeable,
+} from "../lib/workOrderCardPullRequest";
+import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
-import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
-import { WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
-import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
+import { CardScoreBadges } from "./ReadinessMark";
+import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
+import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
+import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 
 const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
 const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
+const EMPTY_CHECKS_PASSED_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
 const EMPTY_PULL_REQUESTS: FactoriesFactoryPullRequest[] = [];
 
@@ -41,6 +52,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   waitingOnChecksOrderIds?: ReadonlySet<string>;
   /** Tasks whose latest check wait finished with passing checks. */
   checksPassedOrderIds?: ReadonlySet<string>;
+  /** Completed check-wait title, keyed by task id. */
+  checksPassedLabels?: ReadonlyMap<string, string>;
   /** Tasks whose check handler stopped at the attempt limit. */
   fixesPausedOrderIds?: ReadonlySet<string>;
   /** Pull requests attached to tasks on this board. */
@@ -56,57 +69,71 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  /** Clarity score from the task, 0 to 5. Shown in the footer. */
+  clarityScore?: number;
+  /** Confidence score from the task, 0 to 5. Shown in the footer. */
   confidenceScore?: number;
+  /** Hide Clarity when Planning has that score off. */
+  showClarity?: boolean;
+  /** Hide Confidence when Planning has that score off. */
+  showConfidenceScore?: boolean;
   /**
-   * True while the Backlog automation analyzes this task. The card
-   * shows a spinner in the meter slot until the score arrives.
+   * True while the agent still works on this draft. The card shows
+   * thinking states in the meter slot, even after a score exists.
    */
   isAnalyzing?: boolean;
   /** Extra surface classes. Use for sidebar hover and selected fills. */
   className?: string;
   /** True when this card is the active item in a list. */
   selected?: boolean;
+  /** True when the draft analysis session waits for a multiple-choice answer. */
+  hasAgentQuestion?: boolean;
 }
 
 /**
  * The canonical task card.
  *
  * Every board uses this complete component. Status is an icon next
- * to the title. Optional pills sit on a middle row: an attached pull
- * request, then attention such as Waiting on status checks. The
+ * to the title, with the intake source icon on the right. Optional
+ * pills sit on a middle row: an attached pull request, then
+ * attention such as Waiting on status checks. The
  * footer shows when the task was created on the left, and the owner
- * given name plus avatar on the right (except on drafts). Drafts show
- * a Start button. Reviewed drafts also show a score to the left of
- * Start. The owner is display-only on the card.
+ * given name plus avatar on the right (except on drafts). Reviewed
+ * drafts show Clarity and Confidence scores. The owner is display-only
+ * on the card.
  */
 export function WorkOrderCard({
   entry,
   organizationId,
   factoryKey,
   factoryLines,
-  preferredLineName,
-  canDispatch,
-  dispatchingOrderIds,
   addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
   checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
+  checksPassedLabels = EMPTY_CHECKS_PASSED_LABELS,
   fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   pullRequests = EMPTY_PULL_REQUESTS,
-  onDispatch,
   href,
   onOpen,
+  clarityScore,
   confidenceScore,
+  showClarity,
+  showConfidenceScore,
   isAnalyzing = false,
   className,
   selected = false,
+  hasAgentQuestion = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const showStart = entry.displayStatus === "draft";
+  const isDraft = entry.displayStatus === "draft";
+  const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
+  const source = workOrderCardSource(entry.order);
+  const pullRequestMerge = useExperimentalFeature(organizationId);
+  const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
       addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
@@ -115,6 +142,7 @@ export function WorkOrderCard({
       fixesPaused: fixesPausedOrderIds.has(entry.id),
     }),
     cardPullRequest,
+    showPullRequestMerge,
   );
 
   return (
@@ -130,33 +158,58 @@ export function WorkOrderCard({
       <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 
       <div className="relative z-10 pointer-events-none">
-        <div className="flex min-w-0 items-center gap-2">
-          <WorkOrderStatusIcon status={entry.displayStatus} title={meta.label} aria-label={meta.label} />
-          <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
-            {entry.title}
-          </h3>
-        </div>
+        <WorkOrderCardTitleRow
+          entryId={entry.id}
+          displayStatus={entry.displayStatus}
+          statusLabel={meta.label}
+          title={entry.title}
+          source={source}
+        />
 
         <WorkOrderCardStatusRow
+          entryId={entry.id}
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
+          checksPassedLabel={checksPassedLabels.get(entry.id)}
           cardPullRequest={cardPullRequest}
+          hasAgentQuestion={showAgentQuestion}
+          showPullRequestMerge={showPullRequestMerge}
         />
         <WorkOrderCardMetaRow
           entry={entry}
           organizationId={organizationId}
-          factoryLines={factoryLines}
-          preferredLineName={preferredLineName}
-          canDispatch={canDispatch}
-          isDispatching={dispatchingOrderIds.has(entry.id)}
-          onDispatch={onDispatch}
           createdAt={createdAt}
-          showStart={showStart}
+          isDraft={isDraft}
+          clarityScore={clarityScore}
           confidenceScore={confidenceScore}
-          isAnalyzing={isAnalyzing}
+          showClarity={showClarity}
+          showConfidenceScore={showConfidenceScore}
+          isAnalyzing={agentWorking}
         />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardTitleRow({
+  entryId,
+  displayStatus,
+  statusLabel,
+  title,
+  source,
+}: {
+  entryId: string;
+  displayStatus: WorkOrderListEntry["displayStatus"];
+  statusLabel: string;
+  title: string;
+  source: ReturnType<typeof workOrderCardSource>;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <WorkOrderStatusIcon status={displayStatus} title={statusLabel} aria-label={statusLabel} />
+      <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">{title}</h3>
+      {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
+    </div>
   );
 }
 
@@ -178,65 +231,100 @@ function WorkOrderCardOpenControl({
 }
 
 function WorkOrderCardStatusRow({
+  entryId,
   reasons,
   feedbackLabel,
+  checksPassedLabel,
   cardPullRequest,
+  hasAgentQuestion,
+  showPullRequestMerge,
 }: {
+  entryId: string;
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
+  checksPassedLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
+  hasAgentQuestion: boolean;
+  showPullRequestMerge?: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest) {
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
     return null;
   }
 
   return (
     <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+      {hasAgentQuestion ? <WorkOrderAgentQuestionChip entryId={entryId} /> : null}
       {cardPullRequest ? (
-        <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
+        <>
+          <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
+          {showPullRequestMerge && workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest) ? (
+            <WorkOrderMergeableChip />
+          ) : null}
+        </>
       ) : null}
-      {reasons.map((reason) =>
-        reason === "checksPassed" ? (
-          <WorkOrderChecksPassedMark key={reason} />
-        ) : (
-          <WorkOrderAttentionChip
-            key={reason}
-            reason={reason}
-            label={reason === "feedback" ? feedbackLabel : undefined}
-          />
-        ),
-      )}
+      {reasons.map((reason) => (
+        <WorkOrderAttentionChip
+          key={reason}
+          reason={reason}
+          label={attentionChipLabel(reason, feedbackLabel, checksPassedLabel)}
+        />
+      ))}
     </div>
+  );
+}
+
+function attentionChipLabel(
+  reason: WorkOrderAttentionReason,
+  feedbackLabel?: string,
+  checksPassedLabel?: string,
+): string | undefined {
+  if (reason === "feedback") {
+    return feedbackLabel;
+  }
+  if (reason === "checksPassed") {
+    return checksPassedLabel;
+  }
+  return undefined;
+}
+
+function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
+  return (
+    <span
+      className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400"
+      data-testid={`work-order-card-agent-question-${entryId}`}
+      title="Agent question"
+    >
+      <Bot className="size-3 shrink-0" aria-hidden />
+      <span className="truncate">Agent question</span>
+    </span>
   );
 }
 
 function WorkOrderCardMetaRow({
   entry,
   organizationId,
-  factoryLines,
-  preferredLineName,
-  canDispatch,
-  isDispatching,
-  onDispatch,
   createdAt,
-  showStart,
+  isDraft,
+  clarityScore,
   confidenceScore,
+  showClarity = true,
+  showConfidenceScore = true,
   isAnalyzing,
 }: {
   entry: WorkOrderListEntry;
   organizationId: string;
-  factoryLines: FactoriesFactoryLine[];
-  preferredLineName?: string;
-  canDispatch: boolean;
-  isDispatching: boolean;
-  onDispatch: WorkOrderCardContext["onDispatch"];
   createdAt: Date | null;
-  showStart: boolean;
+  isDraft: boolean;
+  clarityScore?: number;
   confidenceScore?: number;
+  showClarity?: boolean;
+  showConfidenceScore?: boolean;
   isAnalyzing: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
-  const showActions = confidenceScore != null || isAnalyzing || showStart;
+  const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
+  const showActions = hasScore || isAnalyzing;
+  const ownerMark = isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -246,39 +334,72 @@ function WorkOrderCardMetaRow({
       >
         {createdLabel}
       </span>
-      <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
-        {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
-        {showActions ? (
-          <>
-            <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
-            {showStart ? (
-              <StartDraftButton
-                entry={entry}
-                lines={factoryLines}
-                preferredLineName={preferredLineName}
-                canDispatch={canDispatch}
-                isDispatching={isDispatching}
-                onDispatch={onDispatch}
-              />
-            ) : null}
-          </>
-        ) : null}
-      </div>
+      {ownerMark || showActions ? (
+        <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
+          {ownerMark}
+          {showActions ? (
+            <CardScores
+              entryId={entry.id}
+              clarity={clarityScore}
+              confidence={confidenceScore}
+              showClarity={showClarity}
+              showConfidence={showConfidenceScore}
+              isAnalyzing={isAnalyzing}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
+function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
+  const showAgentQuestion = hasAgentQuestion && isDraft;
+  const agentWorking = isAnalyzing && !showAgentQuestion;
+  return { showAgentQuestion, agentWorking };
+}
+
 /**
- * Score meter, or a spinner while the Backlog automation still analyzes the
- * task. Both take the same slot, so the card does not move when the
- * score arrives.
+ * Thinking states while the agent still works, even after a score exists.
+ * When the agent waits for the user the card shows one verdict word with a
+ * tone dot. The two scores stay in the tooltip. Intake-only drafts have
+ * Confidence alone; the verdict uses the scores that exist.
  */
-function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
-  if (score != null) {
-    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
-  }
+function CardScores({
+  entryId,
+  clarity,
+  confidence,
+  showClarity = true,
+  showConfidence = true,
+  isAnalyzing,
+}: {
+  entryId: string;
+  clarity?: number;
+  confidence?: number;
+  showClarity?: boolean;
+  showConfidence?: boolean;
+  isAnalyzing: boolean;
+}) {
   if (isAnalyzing) {
-    return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+    return (
+      <ConfidenceAnalyzingIndicator
+        className="shrink-0"
+        testId={`work-order-card-analyzing-${entryId}`}
+        showThinkingStates
+        showTooltip={false}
+      />
+    );
   }
-  return null;
+  if (clarity == null && confidence == null) {
+    return null;
+  }
+  return (
+    <CardScoreBadges
+      clarity={clarity}
+      confidence={confidence}
+      showClarity={showClarity}
+      showConfidence={showConfidence}
+      testId={`work-order-card-score-${entryId}`}
+    />
+  );
 }

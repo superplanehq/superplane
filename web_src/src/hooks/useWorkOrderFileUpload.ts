@@ -6,6 +6,7 @@ import {
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
   MAX_WORK_ORDER_FILE_BYTES,
+  resolveWorkOrderFileMimeType,
   setWorkOrderFilePreviewUrl,
   workOrderFileRef,
 } from "@/lib/workOrderFiles";
@@ -62,6 +63,7 @@ async function uploadOneWorkOrderFile(
   args: { organizationId: string; factoryId: string; orderId?: string },
   file: File,
 ): Promise<UploadedWorkOrderFile | null> {
+  const contentType = resolveWorkOrderFileMimeType(file);
   if (!isAllowedWorkOrderFile(file)) {
     showErrorToast("This file type is not allowed.");
     return null;
@@ -77,28 +79,30 @@ async function uploadOneWorkOrderFile(
           withOrganizationHeader({
             organizationId: args.organizationId,
             path: { factoryId: args.factoryId, orderId: args.orderId },
-            body: { filename: file.name, contentType: file.type },
+            body: { filename: file.name, contentType },
           }),
         )
       : await filesCreateFactoryFile(
           withOrganizationHeader({
             organizationId: args.organizationId,
             path: { factoryId: args.factoryId },
-            body: { filename: file.name, contentType: file.type },
+            body: { filename: file.name, contentType },
           }),
         );
-    const id = created.data?.file?.id;
-    if (!id) {
+    const createdFile = created.data?.file;
+    const id = createdFile?.id;
+    const uploadUrl = createdFile?.uploadUrl;
+    if (!id || !uploadUrl) {
       showErrorToast("The file could not be stored.");
       return null;
     }
 
-    const response = await fetch(`/api/v1/files/${id}/content`, {
+    const response = await fetch(uploadUrl, {
       method: "PUT",
       credentials: "include",
       headers: {
         "x-organization-id": args.organizationId,
-        "Content-Type": file.type || "application/octet-stream",
+        "Content-Type": contentType || "application/octet-stream",
       },
       body: file,
     });
@@ -112,10 +116,10 @@ async function uploadOneWorkOrderFile(
     return {
       id,
       filename: file.name,
-      contentType: file.type,
+      contentType,
       ref: workOrderFileRef(id),
       previewUrl,
-      isImage: isInlineWorkOrderImage(file.type),
+      isImage: isInlineWorkOrderImage(contentType),
     };
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "The file could not be stored."));

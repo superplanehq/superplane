@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
-import { canvasKeys, useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
+import { canvasKeys, useCreateCanvas } from "@/hooks/useCanvasData";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 
 import {
@@ -18,7 +18,6 @@ import {
 } from "./installFactoryCanvas";
 import { getFactoryDefinition, type FactoryAgentRewrite, type FactoryDefinition } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
-import type { CanvasFolderData } from "./types";
 
 export interface InstallFactoryInput {
   /** Bundled template id. Defaults to the Software Factory template. */
@@ -53,7 +52,6 @@ export interface InstallFactoryInput {
 export type InstallFactoryResult = FactoryCanvasHandle;
 
 interface UseInstallFactoryOptions {
-  folder?: CanvasFolderData;
   organizationId?: string;
 }
 
@@ -97,16 +95,14 @@ async function finishFactoryInstall(args: {
   args.navigate(appPath(args.organizationId, args.canvasId, shouldTriggerRun ? "?view=console" : ""));
 }
 
-export function useInstallFactory({ folder, organizationId: organizationIdOverride }: UseInstallFactoryOptions = {}) {
+export function useInstallFactory({ organizationId: organizationIdOverride }: UseInstallFactoryOptions = {}) {
   const { organizationId: routeOrganizationId } = useParams<{ organizationId: string }>();
   const organizationId = organizationIdOverride ?? routeOrganizationId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAct } = usePermissions();
   const createCanvasMutation = useCreateCanvas(organizationId || "");
-  const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId || "");
   const { mutateAsync: createCanvas } = createCanvasMutation;
-  const { mutateAsync: updateCanvasFolderMembership } = updateCanvasFolderMembershipMutation;
   const [isInstalling, setIsInstalling] = useState(false);
   const isInstallingRef = useRef(false);
   // Reuse a canvas created on a failed attempt so retry does not spawn duplicates.
@@ -123,7 +119,7 @@ export function useInstallFactory({ folder, organizationId: organizationIdOverri
         showErrorToast("You don't have permission to create canvases.");
         return;
       }
-      if ((folder || reusingCanvas) && !canUpdateCanvases) {
+      if (reusingCanvas && !canUpdateCanvases) {
         showErrorToast("You don't have permission to update canvases.");
         return;
       }
@@ -140,11 +136,9 @@ export function useInstallFactory({ folder, organizationId: organizationIdOverri
           organizationId,
           queryClient,
           definition,
-          folder,
           workspaceFactoryId: input.workspaceFactoryId,
           existingCanvasId: input.existingCanvasId,
           createCanvas,
-          updateCanvasFolderMembership,
         });
         pendingCanvasRef.current = await prepareFactoryCanvas({ canvasId, canvasName }, input.onCanvasReady);
 
@@ -175,23 +169,14 @@ export function useInstallFactory({ folder, organizationId: organizationIdOverri
         pendingCanvasRef.current = null;
         return { canvasId, canvasName };
       } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to install factory"));
+        showErrorToast(getApiErrorMessage(error, "Failed to install factory"));
         throw error;
       } finally {
         isInstallingRef.current = false;
         setIsInstalling(false);
       }
     },
-    [
-      canCreateCanvases,
-      canUpdateCanvases,
-      createCanvas,
-      folder,
-      navigate,
-      organizationId,
-      queryClient,
-      updateCanvasFolderMembership,
-    ],
+    [canCreateCanvases, canUpdateCanvases, createCanvas, navigate, organizationId, queryClient],
   );
 
   return {

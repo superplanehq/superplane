@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   buildAppTabSearchParams,
@@ -13,13 +13,11 @@ import {
 const CANVAS_FLAGS: UrlViewFlags = {
   isRunInspectionMode: false,
   isMemoryMode: false,
-  isFilesMode: false,
   isConsoleMode: false,
 };
 
 const CONSOLE_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isConsoleMode: true };
 const MEMORY_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isMemoryMode: true };
-const FILES_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isFilesMode: true };
 const RUN_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isRunInspectionMode: true };
 
 function consoleLoaded(panelCount: number): ConsoleQueryLike {
@@ -42,7 +40,6 @@ describe("urlViewFlagsToTab", () => {
     expect(urlViewFlagsToTab(CANVAS_FLAGS)).toBe("canvas");
     expect(urlViewFlagsToTab(CONSOLE_FLAGS)).toBe("console");
     expect(urlViewFlagsToTab(MEMORY_FLAGS)).toBe("memory");
-    expect(urlViewFlagsToTab(FILES_FLAGS)).toBe("files");
   });
 });
 
@@ -52,7 +49,7 @@ describe("urlPinsNavigation", () => {
   });
 
   it.each(["console", "dashboard", "memory", "files"])(
-    "pins on tab-selecting view=%s (dashboard is the legacy Console alias)",
+    "pins on tab-selecting view=%s (dashboard is the legacy Console alias; files is the retired Files tab)",
     (view) => {
       expect(urlPinsNavigation(new URLSearchParams(`view=${view}`))).toBe(true);
     },

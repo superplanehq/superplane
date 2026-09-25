@@ -219,6 +219,7 @@ function createTurnTelemetry(options) {
   const opts = options || {};
   const taskDir = opts.taskDir !== undefined ? opts.taskDir : process.env.SUPERPLANE_TASK_DIR || "";
   const write = typeof opts.write === "function" ? opts.write : defaultWrite;
+  const sanitize = typeof opts.sanitize === "function" ? opts.sanitize : (value) => value;
   const state = loadState(taskDir);
 
   function persist() {
@@ -318,6 +319,21 @@ function createTurnTelemetry(options) {
       persist();
       return snapshot.turn;
     },
+    replaceTurnUsage(turn, usage) {
+      const turnNumber = asNumber(turn);
+      const snapshot = state.turns.find((item) => item.turn === turnNumber);
+      if (!snapshot) {
+        return 0;
+      }
+      const incoming = normalizeUsage(usage);
+      if (usageEquals(snapshot.usage, incoming)) {
+        return snapshot.turn;
+      }
+      snapshot.usage = incoming;
+      persist();
+      emitTurn(snapshot);
+      return snapshot.turn;
+    },
     stampToolStart(record) {
       if (state.currentTurn < 1) {
         this.beginTurn({});
@@ -353,7 +369,7 @@ function createTurnTelemetry(options) {
       return Object.assign({}, rec, { turn });
     },
     snapshot() {
-      return buildTelemetry(state);
+      return sanitize(buildTelemetry(state));
     },
     applyBilledUsage(usage) {
       const snapshot = currentSnapshot(state);
@@ -381,7 +397,7 @@ function createTurnTelemetry(options) {
       if (result.usage) {
         this.applyBilledUsage(result.usage);
       }
-      const telemetry = buildTelemetry(state);
+      const telemetry = sanitize(buildTelemetry(state));
       if (result.usage) {
         telemetry.usage = normalizeUsage(result.usage);
       }

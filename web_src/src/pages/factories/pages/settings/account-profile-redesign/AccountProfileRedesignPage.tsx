@@ -10,7 +10,6 @@ import { showSuccessToast } from "@/lib/toast";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../FactorySettingsCard";
 import { SettingsIdentityField } from "../settingsIdentityField";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
-import { AccountProfileVelocityGithubCard } from "./AccountProfileVelocityGithubCard";
 
 const MAX_NAME_LENGTH = 80;
 
@@ -21,9 +20,7 @@ export function AccountProfileRedesignPage({
   onNameChange,
   onEmailChange,
   onSave,
-  velocityGithubUsername = null,
-  onLinkVelocityGithub,
-  onRemoveVelocityGithub,
+  associatedAccounts,
   security,
   dangerZone,
 }: {
@@ -33,9 +30,7 @@ export function AccountProfileRedesignPage({
   onNameChange: (name: string) => void;
   onEmailChange?: (email: string) => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  velocityGithubUsername?: string | null;
-  onLinkVelocityGithub?: () => void;
-  onRemoveVelocityGithub?: () => void;
+  associatedAccounts?: ReactNode;
   security?: ReactNode;
   dangerZone?: ReactNode;
 }) {
@@ -92,13 +87,7 @@ export function AccountProfileRedesignPage({
         </div>
       </FactorySettingsCard>
 
-      {onLinkVelocityGithub && onRemoveVelocityGithub ? (
-        <AccountProfileVelocityGithubCard
-          username={velocityGithubUsername}
-          onLink={onLinkVelocityGithub}
-          onRemove={onRemoveVelocityGithub}
-        />
-      ) : null}
+      {associatedAccounts}
 
       {security}
 
@@ -155,7 +144,7 @@ function ProfileEmailField({
             notifications.
           </>
         ) : (
-          "SuperPlane uses this email to sign you in. Change this in Security & access below."
+          "SuperPlane uses this email to sign you in and send notifications."
         )}
       </p>
     </div>

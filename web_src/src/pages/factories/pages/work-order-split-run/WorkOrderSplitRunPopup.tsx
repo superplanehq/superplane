@@ -1,261 +1,100 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { useFactory } from "@/hooks/useFactoryData";
+import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useWorkOrder } from "@/hooks/useFactoryData";
-import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
-
-import { CopyLinkButton } from "../../CopyLinkButton";
-import { workOrderDetailPath } from "../../lib/factoryPagePaths";
-import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
-import { JumpToLatestPill } from "./JumpToLatestPill";
-import { PhaseLogCard } from "./PhaseLogCard";
+import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
+import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
+import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
-import { DRAFT_START_MODEL_AUTO, draftStartModelPayload, phaseWithRunnerModel } from "./draftStartModel";
+import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
+import { PopupHeaderActions } from "./PopupHeaderActions";
+import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
-import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import {
-  autoExpandedPhaseId,
-  splitRunStatusLabel,
-  type SplitRunFixture,
-  type SplitRunPhase,
-  type SplitRunPhaseId,
-} from "./splitRunMocks";
-import { defaultSplitRunPopupTab, type SplitRunPopupTab, splitRunPhaseRunHref } from "./splitRunPopupModel";
+import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
-import { useSplitRunFooterActions, type SplitRunFooterActions } from "./useSplitRunFooterActions";
+import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
-import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
-import { runningSplitRunPhaseId } from "./followLogScroll";
-import { useFollowLogScroll } from "./useFollowLogScroll";
-import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
-import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
-import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
-import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
+import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
+import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
+import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
+import { workOrderPopupMode } from "./workOrderPopupMode";
+import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
 
-/**
- * Absolute work-order permalink, so the popup copies the right link even
- * when it is shown without a route change (e.g. straight from a board card).
- * Falls back to the current address when identifiers are missing.
- */
-function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, orderNumber?: string, lineId?: string) {
-  if (!organizationId || !factoryKey || !orderNumber) {
-    return window.location.href;
-  }
-  return window.location.origin + workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId);
-}
-
-function footerMutationHandlers(
-  canUpdate: boolean,
-  footerActions: SplitRunFooterActions,
-  fixture: SplitRunFixture,
-  onDismiss?: () => void,
-) {
-  if (!canUpdate) {
-    return {};
-  }
-  return {
-    onArchive: async () => {
-      const archived = await footerActions.handleArchive();
-      if (archived) {
-        onDismiss?.();
-      }
-    },
-    onReject: () => void footerActions.handleReject(),
-    onBackToDraft: () => footerActions.handleBackToDraft(),
-    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
-      void footerActions.handleStop(choice, {
-        ...fixture.footer,
-        lineName: fixture.lineName,
-        stepIndex: fixture.currentStepIndex,
-      }),
-  };
-}
-
-type WorkOrderSplitRunBodyProps = {
-  organizationId?: string;
-  factoryId?: string;
-  factoryKey?: string;
-  orderId?: string;
-  orderNumber?: string;
-  lineId?: string;
-  fixture: SplitRunFixture;
-  canUpdate?: boolean;
-  footerActions: SplitRunFooterActions;
-};
-
-type SplitRunFollow = ReturnType<typeof useFollowLogScroll<HTMLOListElement>>;
-
-/** Phase log for a work-order popup. The popup wraps this. */
-export function WorkOrderSplitRunBody({
-  organizationId,
-  factoryId,
-  factoryKey,
-  orderId,
-  orderNumber,
-  lineId,
-  fixture,
-  canUpdate = true,
-  footerActions,
-  follow,
-  onStreamTick,
-}: WorkOrderSplitRunBodyProps & {
-  follow: SplitRunFollow;
-  onStreamTick: (tick: string) => void;
-}) {
-  const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
-  const [nodeId, setNodeId] = useState<string | null>(null);
-  const streamLengthsRef = useRef<Record<string, number>>({});
-  const currentPhaseId = fixture.currentPhaseId;
-  const expandedPhaseId = autoExpandedPhaseId(fixture);
-  useEffect(() => {
-    setOpenPhaseId(expandedPhaseId);
-  }, [currentPhaseId, expandedPhaseId]);
-  const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
-  const demoArtifacts = !organizationId;
-  const onStreamLength = useCallback(
-    (phaseId: string, length: number) => {
-      if (streamLengthsRef.current[phaseId] === length) {
-        return;
-      }
-      streamLengthsRef.current = { ...streamLengthsRef.current, [phaseId]: length };
-      onStreamTick(fixture.phases.map((entry) => streamLengthsRef.current[entry.id] ?? 0).join(":"));
-    },
-    [fixture.phases, onStreamTick],
-  );
-  const liveOrder = Boolean(organizationId && factoryId && orderId);
-  const automationStop = (entry: SplitRunPhase) => {
-    const appId = entry.appId;
-    const runId = entry.runId;
-    if (!canUpdate || !liveOrder || entry.status !== "running" || !appId || !runId) {
-      return undefined;
-    }
-    return () => void footerActions.handleStopAutomation({ appId, runId });
-  };
-  const automationRerun = (entry: SplitRunPhase) => {
-    if (!canUpdate || !liveOrder || entry.status !== "failed" || entry.stepIndex == null) {
-      return undefined;
-    }
-    return () =>
-      void footerActions.handleStop("rerun-step", {
-        kind: "failed",
-        lineName: fixture.lineName,
-        stepIndex: entry.stepIndex,
-      });
-  };
-
-  return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
-      <ol
-        ref={follow.scrollRef}
-        onScroll={follow.onScroll}
-        className="min-h-0 min-w-0 flex-1 list-none space-y-2 overflow-x-hidden overflow-y-auto px-3 pb-3"
-        data-testid="split-run-log-scroll"
-      >
-        {fixture.phases.map((entry) => (
-          <li key={entry.id} className="min-w-0 first:mt-3">
-            <SplitRunPhaseLogItem
-              entry={entry}
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              orderNumber={orderNumber}
-              lineId={lineId}
-              expanded={entry.id === openPhaseId}
-              selectedNodeId={nodeId}
-              onSelectNode={setNodeId}
-              demoArtifacts={demoArtifacts}
-              artifactIndex={artifactIndex}
-              onStop={automationStop(entry)}
-              onRerun={automationRerun(entry)}
-              actionBusy={footerActions.busy}
-              onStreamLength={onStreamLength}
-              onToggle={() => {
-                setNodeId(null);
-                setOpenPhaseId((current) => (current === entry.id ? null : entry.id));
-              }}
-            />
-          </li>
-        ))}
-      </ol>
-      {follow.following ? null : (
-        <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
-      )}
-    </div>
-  );
-}
-
-function SplitRunPhaseLogItem({
-  entry,
-  organizationId,
-  factoryKey,
-  orderNumber,
-  lineId,
-  expanded,
-  selectedNodeId,
-  onSelectNode,
-  demoArtifacts,
-  artifactIndex,
-  onStop,
-  onRerun,
-  actionBusy,
-  onStreamLength,
-  onToggle,
-}: {
-  entry: SplitRunPhase;
-  organizationId?: string;
-  factoryKey?: string;
-  orderNumber?: string;
-  lineId?: string;
-  expanded: boolean;
-  selectedNodeId?: string | null;
-  onSelectNode: (nodeId: string) => void;
-  demoArtifacts: boolean;
-  artifactIndex: StreamArtifactIndex;
-  onStop?: () => void;
-  onRerun?: () => void;
-  actionBusy: boolean;
-  onStreamLength: (phaseId: string, length: number) => void;
-  onToggle: () => void;
-}) {
-  const [usageOpen, setUsageOpen] = useState(false);
-  const live = useSplitRunLiveCanvas(organizationId, expanded || usageOpen ? entry : undefined);
-  const visual = useMemo(() => resolveSplitRunVisual(entry, live, { demoArtifacts }), [demoArtifacts, entry, live]);
-  const stream = useMemo(
-    () => attachArtifactsToStream(visual.stream, artifactIndex, entry.runId),
-    [artifactIndex, entry.runId, visual.stream],
-  );
-  useEffect(() => {
-    onStreamLength(entry.id, stream?.length ?? 0);
-  }, [entry.id, onStreamLength, stream?.length]);
-
-  return (
-    <PhaseLogCard
-      phase={phaseWithRunnerModel(entry, live.canvas?.nodes)}
-      expanded={expanded}
-      stream={stream ?? entry.stream}
-      streamLoading={live.isLoading}
-      selectedNodeId={selectedNodeId}
-      onSelectNode={onSelectNode}
-      organizationId={organizationId}
-      canvasId={entry.appId}
-      onStop={onStop}
-      onRerun={onRerun}
-      runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
-      actionBusy={actionBusy}
-      onToggle={onToggle}
-      onUsageOpenChange={setUsageOpen}
-    />
-  );
-}
+export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
 /**
  * Work-order popup from a line-board card. Description and a phase log.
  * The automation canvas lives on the full run page, not here.
  */
-export function WorkOrderSplitRunPopup({
+export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
+  const { organizationId, factoryId, orderId, fixture, fixed = false, onClose, canUpdate = true } = props;
+  const factoryQuery = useFactory(organizationId ?? "", factoryId ?? "");
+  const refinementEnabled = factoryPlanningEnabled(factoryQuery.data);
+  const refinementFeature = { isLoading: factoryQuery.isPending };
+  const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
+  const canLookupSession = Boolean(organizationId && factoryId && orderId);
+  const hasLookupIdentity = Boolean(factoryId && orderId);
+  const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
+  const fileUpload = useWorkOrderFileUpload({
+    organizationId: organizationId ?? "",
+    factoryId: factoryId ?? "",
+    orderId,
+  });
+  const analysis = useAnalysisPlanningSession({
+    organizationId,
+    factoryId,
+    workOrderId: orderId,
+    enabled: canLookupSession,
+    canUpdate,
+    isUploading: fileUpload.isUploading,
+    uploadFiles: fileUpload.uploadFiles,
+    analysisDelivered: analysisFirstResultDelivered({
+      checks: fixture.checks,
+      artifacts: popupData.artifacts,
+    }),
+  });
+  const mode = workOrderPopupMode({
+    hasPlanningSession: Boolean(analysis.session),
+    hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
+    refinementEnabled,
+    refinementLoading: refinementFeature.isLoading,
+    sessionLoading: analysis.isLoading,
+    artifactsLoading: popupData.artifactsLoading,
+    artifactsFailed: Boolean(popupData.artifactsError),
+    analysisActive: isAnalyzing,
+    hasLookupIdentity,
+    isDraft: fixture.footer.kind === "draft",
+  });
+
+  if (mode === "loading") {
+    return <LoadingWorkOrderPopup title={fixture.title} fixed={fixed} onClose={onClose} />;
+  }
+  return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
+}
+
+function LoadingWorkOrderPopup({ title, fixed, onClose }: { title: string; fixed: boolean; onClose?: () => void }) {
+  return (
+    <PopupShell testId="work-order-split-run-loading" fixed={fixed} onDismiss={onClose}>
+      <PopupHeader title={title} onClose={onClose} />
+      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        Loading task…
+      </div>
+    </PopupShell>
+  );
+}
+
+function AnalysisWorkOrderPopup({
   organizationId,
   factoryId,
   factoryKey,
@@ -269,250 +108,368 @@ export function WorkOrderSplitRunPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
-  canRefine = true,
-  onRefine,
-}: Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
-  onClose?: () => void;
-  fixed?: boolean;
-  onDispatch?: (model?: string) => Promise<void>;
-  isDispatching?: boolean;
-  canDispatch?: boolean;
-  canUpdate?: boolean;
-  canRefine?: boolean;
-  onRefine?: () => void;
+  analysis,
+  popupData,
+}: WorkOrderSplitRunPopupProps & {
+  analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  popupData: ReturnType<typeof useSplitRunPopupData>;
 }) {
-  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
-  const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
-  const edits = useSplitRunWorkOrderEdits({
+  const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
+  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
+  const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
+  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
+  const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
+  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel, draftThinking);
+  const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
+  const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
+  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
+  const draftChrome = analysisDraftChrome({
+    factory,
     organizationId,
     factoryId,
+    factoryKey,
+    lineId,
+    fixture: viewFixture,
+    analysis,
+    draftModel,
+    draftThinking,
+    onDraftStartChange: ({ model, thinkingLevel }) => {
+      setDraftModel(model);
+      setDraftThinking(thinkingLevel);
+    },
+    disabled: isDispatching || !canDispatch,
+  });
+  const reviewArgs = analysisReviewArgs({
+    viewFixture,
+    organizationId,
+    factoryId,
+    factoryKey,
     orderId,
+    orderNumber,
+    pullRequests: popupData.pullRequests,
     canUpdate,
-    title: fixture.title,
-    description: popupData.sourceDescription,
-    owner: fixture.owner,
-    assigneeIds: fixture.assigneeIds ?? [],
-    footerKind: fixture.footer.kind,
+    draftStart,
+    mutations,
+    isDispatching,
+    footerBusy: footerActions.busy,
+    canDispatch,
+    compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
+    modelSelect: draftChrome.footerModelSelect,
+    factory,
   });
-  const initialTab = defaultSplitRunPopupTab(fixture);
-  const [tab, setTab] = useState(initialTab);
-  const [fullPage, setFullPage] = useState(false);
-  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
-  const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
+  const review = analysisPopupReview(reviewArgs);
+  const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
+  const stripAnalysis = draftChrome.stripAnalysis;
+  const descriptionReview = showsDescriptionReview(sourceOnly, showSidebarNote, tab) ? review : undefined;
 
   return (
-    <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
-      <PopupHeader
-        title={edits.title}
-        onClose={onClose}
-        canEditTitle={edits.canEdit}
-        titleBusy={edits.titleBusy}
-        onTitleSave={(next) => void edits.saveTitle(next)}
-        expanded={fullPage}
-        onToggleExpanded={() => setFullPage((current) => !current)}
-        actions={
-          <CopyLinkButton
-            url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-            iconClassName="h-4 w-4"
-            testId="popup-work-order-copy-link-button"
-          />
-        }
-      >
-        <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
-      </PopupHeader>
-      <SplitRunPopupTabs
-        fixture={fixture}
-        edits={edits}
-        artifacts={popupData.artifacts}
-        artifactsLoading={popupData.artifactsLoading}
-        pullRequests={popupData.pullRequests}
-        pullRequestsLoading={popupData.pullRequestsLoading}
-        pullRequestsError={popupData.pullRequestsError}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        lineId={lineId}
-        tab={tab}
-        onTabChange={setTab}
-        canUpdate={canUpdate}
-        footerActions={footerActions}
-      />
-      <SplitRunReview
-        footer={fixture.footer}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        canAct={canUpdate}
-        canRefine={canRefine}
-        onStart={draftStart}
-        onArchive={mutations.onArchive}
-        onReject={mutations.onReject}
-        onRefine={onRefine}
-        onBackToDraft={backToDraft}
-        onStop={mutations.onStop}
-        startBusy={isDispatching}
-        actionBusy={footerActions.busy}
-        startDisabled={!canDispatch}
-        modelSelect={
-          fixture.footer.kind === "draft" && canPickDraftStartModel ? (
-            <DraftStartModelSelect
-              organizationId={organizationId}
-              factoryId={factoryId}
-              lineName={fixture.lineName}
-              value={draftModel}
-              onChange={setDraftModel}
-              disabled={isDispatching}
-            />
-          ) : undefined
-        }
-      />
-    </PopupShell>
-  );
-}
-
-function draftStartAction(
-  kind: SplitRunFixture["footer"]["kind"],
-  onDispatch: ((model?: string) => Promise<void>) | undefined,
-  openAutomations: () => void,
-  selectedModel: string,
-) {
-  if (kind !== "draft") {
-    return undefined;
-  }
-  return async () => {
-    await onDispatch?.(draftStartModelPayload(selectedModel));
-    openAutomations();
-  };
-}
-
-function returnToBacklogAction(
-  onBackToDraft: (() => void | Promise<boolean | void>) | undefined,
-  openDescription: () => void,
-) {
-  if (!onBackToDraft) {
-    return undefined;
-  }
-  return async () => {
-    const returned = await onBackToDraft();
-    if (returned === false) {
-      return;
-    }
-    openDescription();
-  };
-}
-
-function SplitRunPopupTabs({
-  fixture,
-  edits,
-  artifacts,
-  artifactsLoading,
-  pullRequests,
-  pullRequestsLoading,
-  pullRequestsError,
-  organizationId,
-  factoryId,
-  factoryKey,
-  orderId,
-  orderNumber,
-  lineId,
-  tab,
-  onTabChange,
-  canUpdate,
-  footerActions,
-}: {
-  fixture: SplitRunFixture;
-  edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
-  artifacts: ReturnType<typeof useSplitRunPopupData>["artifacts"];
-  artifactsLoading: boolean;
-  pullRequests: ReturnType<typeof useSplitRunPopupData>["pullRequests"];
-  pullRequestsLoading: boolean;
-  pullRequestsError: Error | null;
-  organizationId?: string;
-  factoryId?: string;
-  factoryKey?: string;
-  orderId?: string;
-  orderNumber?: string;
-  lineId?: string;
-  tab: SplitRunPopupTab;
-  onTabChange: (tab: SplitRunPopupTab) => void;
-  canUpdate: boolean;
-  footerActions: SplitRunFooterActions;
-}) {
-  const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
-  const [streamTick, setStreamTick] = useState("");
-  const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
-    resumeOnBottom: true,
-  });
-
-  return (
-    <Tabs
-      value={tab}
-      onValueChange={(value) => {
-        if (value === "description" || value === "log") {
-          onTabChange(value);
-        }
-      }}
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
+    <PopupShell
+      testId="work-order-split-run"
+      fixed={fixed}
+      fullPage={fullPage}
+      className={analysisPopupClassName(fullPage, sourceOnly)}
+      onDismiss={onClose}
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-2">
-        <TabsList aria-label="Task views">
-          <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="log">
-            <WorkOrderStatusIcon
-              status={displayStatusForLineStatus(fixture.lineStatus)}
-              title={splitRunStatusLabel(fixture.lineStatus)}
-              className="size-3"
-              data-testid="split-run-log-tab-dot"
-              aria-hidden
-            />
-            Automations
-          </TabsTrigger>
-        </TabsList>
-      </div>
-      <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
-        <WorkOrderSplitRunOverview
-          description={edits.description}
-          artifacts={artifacts}
-          checks={fixture.checks}
-          artifactsLoading={artifactsLoading}
-          pullRequests={pullRequests}
-          pullRequestsLoading={pullRequestsLoading}
-          pullRequestsError={pullRequestsError}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          orderId={orderId}
-          orderNumber={orderNumber}
-          files={liveWorkOrder.data?.files}
-          expandFirstCheck={fixture.footer.kind === "draft"}
-          canEditDescription={edits.canEditDescription}
-          descriptionBusy={edits.descriptionBusy}
-          onDescriptionSave={edits.saveDescription}
-          source={fixture.source}
-        />
-      </TabsContent>
-      <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <WorkOrderSplitRunBody
+      <LiveHeaderSpendProvider>
+        <SplitRunPopupTabs
+          fixture={viewFixture}
+          edits={edits}
+          popupData={popupData}
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
           orderId={orderId}
           orderNumber={orderNumber}
           lineId={lineId}
-          fixture={fixture}
+          tab={tab}
+          onTabChange={setTab}
           canUpdate={canUpdate}
           footerActions={footerActions}
-          follow={follow}
-          onStreamTick={setStreamTick}
+          resultFooter={descriptionReview}
+          sidebarNote={showSidebarNote ? review : undefined}
+          analysis={stripAnalysis}
+          sourceOnly={sourceOnly}
+          sessionLookupError={analysis.queryError?.message}
+          header={analysisPopupHeader({
+            edits,
+            fixture,
+            organizationId,
+            factoryKey,
+            orderNumber,
+            lineId,
+            onClose,
+            fullPage,
+            toggleFullPage,
+            mutations,
+            footerBusy: footerActions.busy,
+            reviewActions,
+          })}
         />
-      </TabsContent>
-    </Tabs>
+        {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
+      </LiveHeaderSpendProvider>
+    </PopupShell>
   );
+}
+
+/** Title, owner, and assignee edits for the popup header, fed from the fixture and loaded description. */
+function useAnalysisPopupEdits(args: {
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  canUpdate: boolean;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  popupData: ReturnType<typeof useSplitRunPopupData>;
+}) {
+  const { fixture, popupData, ...ids } = args;
+  return useSplitRunWorkOrderEdits({
+    ...ids,
+    title: fixture.title,
+    description: popupData.sourceDescription,
+    owner: fixture.owner,
+    assigneeIds: fixture.assigneeIds ?? [],
+    footerKind: fixture.footer.kind,
+  });
+}
+
+function analysisPopupHeader(args: {
+  edits: ReturnType<typeof useAnalysisPopupEdits>;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
+  onClose: WorkOrderSplitRunPopupProps["onClose"];
+  fullPage: boolean;
+  toggleFullPage: () => void;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  footerBusy: boolean;
+  reviewActions: ReactNode;
+}) {
+  return (views: ReactNode) => (
+    <PopupHeader
+      title={args.edits.title}
+      onClose={args.onClose}
+      canEditTitle={args.edits.canEdit}
+      titleBusy={args.edits.titleBusy}
+      onTitleSave={(next) => void args.edits.saveTitle(next)}
+      expanded={args.fullPage}
+      onToggleExpanded={args.toggleFullPage}
+      actions={
+        <PopupHeaderActions
+          copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
+          onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
+          archiveBusy={args.footerBusy}
+          taskActions={args.reviewActions}
+        />
+      }
+      accessory={views}
+    >
+      <LiveOwnerTimeCostRow
+        fixture={{ ...args.fixture, owner: args.edits.owner }}
+        assigneeIds={args.edits.assigneeIds}
+        usageByModel={args.fixture.usageByModel}
+        usageByMachineType={args.fixture.usageByMachineType}
+      />
+    </PopupHeader>
+  );
+}
+
+function analysisReviewArgs(args: {
+  viewFixture: WorkOrderSplitRunPopupProps["fixture"];
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderId?: string;
+  orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canUpdate: boolean;
+  draftStart: ReturnType<typeof draftStartAction>;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  isDispatching: boolean;
+  footerBusy: boolean;
+  canDispatch: boolean;
+  compact: boolean;
+  modelSelect?: ReactNode;
+  factory?: FactoriesFactory;
+}) {
+  return {
+    fixture: args.viewFixture,
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    factoryKey: args.factoryKey,
+    orderId: args.orderId,
+    orderNumber: args.orderNumber,
+    pullRequests: args.pullRequests,
+    canUpdate: args.canUpdate,
+    draftStart: args.draftStart,
+    mutations: args.mutations,
+    isDispatching: args.isDispatching,
+    footerBusy: args.footerBusy,
+    canDispatch: args.canDispatch,
+    compact: args.compact,
+    modelSelect: args.modelSelect,
+    confirmUnclearStart: factoryPlanningEnabled(args.factory),
+  };
+}
+
+function analysisPopupReview(args: {
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderId?: string;
+  orderNumber?: string;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canUpdate: boolean;
+  draftStart: ReturnType<typeof draftStartAction>;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  isDispatching: boolean;
+  footerBusy: boolean;
+  canDispatch: boolean;
+  compact: boolean;
+  actionsOnly?: boolean;
+  modelSelect?: ReactNode;
+  confirmUnclearStart?: boolean;
+}) {
+  return (
+    <SplitRunReview
+      footer={args.fixture.footer}
+      organizationId={args.organizationId}
+      factoryId={args.factoryId}
+      factoryKey={args.factoryKey}
+      orderId={args.orderId}
+      orderNumber={args.orderNumber}
+      pullRequests={args.pullRequests}
+      canAct={args.canUpdate}
+      onStart={args.draftStart}
+      onArchive={args.mutations.onArchive}
+      onReject={args.mutations.onReject}
+      onStop={args.mutations.onStop}
+      startBusy={args.isDispatching}
+      actionBusy={args.footerBusy}
+      startDisabled={!args.canDispatch}
+      compact={args.compact}
+      actionsOnly={args.actionsOnly}
+      confirmUnclearStart={args.confirmUnclearStart}
+      modelSelect={args.modelSelect}
+    />
+  );
+}
+
+function analysisDraftChrome(args: {
+  factory?: FactoriesFactory;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  lineId?: string;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  draftModel: string;
+  draftThinking: string;
+  onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
+  disabled: boolean;
+}) {
+  if (!factoryPlanningEnabled(args.factory)) {
+    return { footerModelSelect: undefined, stripAnalysis: undefined };
+  }
+  const modelSelects = draftModelSelects({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    fixture: args.fixture,
+    model: args.draftModel,
+    thinkingLevel: args.draftThinking,
+    onChange: args.onDraftStartChange,
+    disabled: args.disabled,
+  });
+  return {
+    footerModelSelect: modelSelects.footer,
+    stripAnalysis: draftStripAnalysis(
+      args.fixture.footer.kind,
+      args.analysis,
+      modelSelects.strip,
+      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+      {
+        showClarity: factoryShowsClarity(args.factory),
+        showConfidence: factoryShowsConfidence(args.factory),
+      },
+    ),
+  };
+}
+
+/** A draft with Planning on uses the compact review; a source-only draft keeps the classic one. */
+function analysisReviewCompact(
+  showSidebarNote: boolean,
+  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
+  sourceOnly: boolean,
+) {
+  return showSidebarNote || (footerKind === "draft" && !sourceOnly);
+}
+
+function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
+  return !sourceOnly && !showSidebarNote && tab === "description";
+}
+
+function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
+  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
+    return review;
+  }
+  return null;
+}
+
+/** The split-run dialog width applies only to the Planning layout in a fixed popup. */
+function analysisPopupClassName(fullPage: boolean, sourceOnly: boolean) {
+  return fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
+}
+
+/**
+ * The refine strip only shows for a draft. It gets the ghost model select
+ * and a permalink builder for tasks the agent splits off this one.
+ */
+function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
+  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  return {
+    sourceOnly,
+    viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
+  };
+}
+
+function draftStripAnalysis(
+  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
+  analysis: ReturnType<typeof useAnalysisPlanningSession>,
+  modelSelect: ReactNode | undefined,
+  taskHref: CreatedTaskHref,
+  scores: { showClarity: boolean; showConfidence: boolean },
+) {
+  if (footerKind !== "draft") {
+    return undefined;
+  }
+  return { ...analysis, modelSelect, taskHref, ...scores };
+}
+
+/**
+ * One model select per surface: `labeled` for the footer capsule under the
+ * plan, `ghost` for the refine strip settings row. Only a draft with Start
+ * gets one.
+ */
+function draftModelSelects(args: {
+  organizationId?: string;
+  factoryId?: string;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  model: string;
+  thinkingLevel: string;
+  onChange: (next: { model: string; thinkingLevel: string }) => void;
+  disabled: boolean;
+}): { footer?: ReactNode; strip?: ReactNode } {
+  const { fixture, ...select } = args;
+  if (fixture.footer.kind !== "draft" || !fixture.footer.actions.some((action) => action.kind === "start")) {
+    return {};
+  }
+  return {
+    footer: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="labeled" />,
+    strip: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="ghost" />,
+  };
 }

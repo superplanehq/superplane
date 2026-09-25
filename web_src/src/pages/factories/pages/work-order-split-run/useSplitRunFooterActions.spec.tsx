@@ -1,10 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type * as ApiClient from "@/api-client";
 import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedSrc } from "@/test/unmockedModule";
 
 const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
@@ -13,16 +14,16 @@ const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock 
   cancelRunMock: vi.fn(),
 }));
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
   };
 });
 
-vi.mock("@/hooks/useFactoryData", async (importOriginal) => {
-  const actual = await importOriginal<typeof FactoryData>();
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
   return {
     ...actual,
     useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
@@ -156,12 +157,14 @@ describe("useSplitRunFooterActions", () => {
 
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders"],
+      exact: true,
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders", "wo-1"],
+      exact: true,
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+      queryKey: ["factories", "org-1", "factory-1", "work-orders-page"],
     });
   });
 
@@ -180,17 +183,6 @@ describe("useSplitRunFooterActions", () => {
       }),
     );
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
-  });
-
-  it("sends a stopped task back to the Backlog", async () => {
-    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
-
-    const moved = await result.current.handleBackToDraft();
-
-    expect(moved).toBe(true);
-    expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_DRAFT" });
-    expect(closeMutateAsync).not.toHaveBeenCalled();
-    expect(showSuccessToast).toHaveBeenCalledWith("Task returned to the Backlog.");
   });
 
   it("archives a draft as rejected", async () => {
@@ -220,7 +212,6 @@ describe("useSplitRunFooterActions", () => {
     await result.current.handleStop("canceled", { kind: "running" });
     await result.current.handleReject();
     await result.current.handleArchive();
-    await result.current.handleBackToDraft();
 
     expect(closeMutateAsync).not.toHaveBeenCalled();
     expect(updateMutateAsync).not.toHaveBeenCalled();

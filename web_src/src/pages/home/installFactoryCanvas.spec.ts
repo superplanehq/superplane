@@ -1,8 +1,8 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { getFactoryDefinition } from "./factories";
 import { ensureFactoryCanvas, type CreateFactoryCanvasFn } from "./installFactoryCanvas";
@@ -16,7 +16,7 @@ function createCanvasSpy(): CreateFactoryCanvasFn & ReturnType<typeof vi.fn> {
   }));
 }
 
-function seedQueryClient(args: { workspaceApps?: FactoryApp[]; organizationApps?: { name: string }[] }) {
+function seedQueryClient(args: { workspaceApps?: FactoryAutomation[]; organizationApps?: { name: string }[] }) {
   const queryClient = new QueryClient();
   queryClient.setQueryData(factoryAppsKey(ORGANIZATION_ID, WORKSPACE_ID), args.workspaceApps ?? []);
   queryClient.setQueryData(canvasKeys.list(ORGANIZATION_ID), args.organizationApps ?? []);
@@ -35,7 +35,6 @@ async function install(args: {
     definition: getFactoryDefinition("line-implementation"),
     workspaceFactoryId: args.workspaceFactoryId,
     createCanvas: args.createCanvas,
-    updateCanvasFolderMembership: vi.fn(),
   });
 }
 

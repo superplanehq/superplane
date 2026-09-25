@@ -15,11 +15,13 @@ export function BacklogIntakeSources({
 }) {
   const listeners: LaneListener[] = intakes.map((intake) => ({
     id: intake.intakeId,
-    title: lineIntakeListenTitle(intake.source),
+    title: lineIntakeListenTitle(intake.source, intake.paused),
     iconSrc: intake.source.iconSrc,
     iconAlt: intake.source.iconAlt,
-    healthy: intake.healthy,
-    needsRepairLabel: LINE_INTAKE_COPY.needsRepair,
+    healthy: true,
+    paused: intake.paused,
+    pausedLabel: LINE_INTAKE_COPY.paused,
+    pausedHelper: LINE_INTAKE_COPY.pausedHelper,
     settingsLabel: `Open ${intake.source.name} settings`,
     testId: `line-intake-source-${intake.intakeId}`,
     onOpenSettings: () => onOpenSettings(intake),

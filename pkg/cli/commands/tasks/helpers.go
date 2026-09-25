@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/commands/workspaces"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -20,26 +19,26 @@ func stringValue(value *string) string {
 	return *value
 }
 
-func resolveTaskID(ctx core.CommandContext, workspaceID, raw string) (string, error) {
+func resolveTaskID(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", fmt.Errorf("--task is required")
 	}
+	return trimmed, nil
+}
 
-	if _, err := uuid.Parse(trimmed); err == nil {
-		return trimmed, nil
+type taskIdentity interface {
+	GetId() string
+	GetNumber() string
+	GetKey() string
+}
+
+func taskDisplayID(task taskIdentity) string {
+	if number := strings.TrimSpace(task.GetNumber()); number != "" {
+		return number
 	}
-
-	response, _, err := ctx.API.FactoryAPI.FactoriesListWorkOrders(ctx.Context, workspaceID).Execute()
-	if err != nil {
-		return "", err
+	if key := strings.TrimSpace(task.GetKey()); key != "" {
+		return key
 	}
-
-	for _, task := range response.GetOrders() {
-		if task.GetKey() == trimmed {
-			return task.GetId(), nil
-		}
-	}
-
-	return "", fmt.Errorf("task %q not found", trimmed)
+	return task.GetId()
 }

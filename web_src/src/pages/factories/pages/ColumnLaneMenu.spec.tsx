@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 
@@ -214,5 +214,48 @@ describe("ColumnLaneMenu", () => {
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
+  });
+
+  it("offers Refresh backlog when supplied", async () => {
+    const onRefreshBacklog = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          onRefreshBacklog={onRefreshBacklog}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    const refresh = screen.getByTestId("lines-backlog-menu-refresh-backlog");
+    expect(refresh).toHaveTextContent("Refresh backlog");
+    await user.click(refresh);
+    expect(onRefreshBacklog).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Refresh backlog when it is not supplied", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 });

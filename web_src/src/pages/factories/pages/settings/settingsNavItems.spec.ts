@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   FACTORY_SETTINGS_NAV_GROUPS,
@@ -18,6 +18,10 @@ describe("factorySettingsRouteFromPathname", () => {
     );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
       "organization-models",
+    );
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/mcp")?.id).toBe("workspace-mcp");
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/skills")?.id).toBe(
+      "workspace-skills",
     );
   });
 
@@ -41,6 +45,8 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
+      "MCP servers",
+      "Skills",
       "Models",
       "Usage",
       "General",
@@ -79,6 +85,8 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
+      "workspace-mcp",
+      "workspace-skills",
       "workspace-models",
       "workspace-usage",
     ]);

@@ -152,23 +152,27 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	if err := runner.EnsureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
-
 	broker, err := runner.NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 
-	// command_list tasks only accept commands (+ optional files).
-	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups)
+	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	if err != nil {
+		return err
+	}
+	dispatched = runner.AppendVisualEvidenceProtocol(dispatched, runner.HasArtifactUploadToken(environment))
+	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched)
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
 	}
+	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
+	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
+	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

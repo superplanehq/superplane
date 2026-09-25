@@ -8,7 +8,7 @@
  * self-contained.
  */
 
-export type AttentionReason = "approval" | "failed" | "stalled";
+export type AttentionReason = "approval" | "failed";
 
 export interface WorkOrderOwner {
   name: string;

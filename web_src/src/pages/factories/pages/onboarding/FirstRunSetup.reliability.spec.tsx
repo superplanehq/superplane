@@ -1,7 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 
@@ -76,6 +76,15 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     finish: vi.fn(),
     provisionedDestination: null,
     githubOwner: undefined,
+    jiraIntegrationId: "",
+    jiraProjectId: "",
+    setJiraProjectId: vi.fn(),
+    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
+    setJiraCompletion: vi.fn(),
+    jiraProjects: [],
+    jiraProjectsLoading: false,
+    jiraProjectsError: false,
+    retryJiraProjects: vi.fn(),
     ...overrides,
   };
 }

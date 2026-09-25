@@ -40,7 +40,9 @@ type RunSuperPlaneSpec struct {
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
 	Model                   string                        `mapstructure:"model"`
+	ThinkingLevel           string                        `mapstructure:"thinkingLevel"`
 	HostedProvider          string                        `mapstructure:"hostedProvider"`
+	IncludeVisualEvidence   bool                          `mapstructure:"includeVisualEvidence"`
 }
 
 func decodeRunSuperPlaneSpec(raw any) (RunSuperPlaneSpec, error) {
@@ -69,6 +71,9 @@ func decodeRunSuperPlaneSpecWithSidecar(raw any, stripSidecar bool) (RunSuperPla
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
+	if thinking, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel); err == nil {
+		spec.ThinkingLevel = thinking
+	}
 	return spec, nil
 }
 
@@ -96,7 +101,8 @@ func validateRunSuperPlaneSpec(spec RunSuperPlaneSpec) error {
 	if _, _, err := specSelectedSuperPlaneModel(spec); err != nil {
 		return err
 	}
-	return nil
+	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
+	return err
 }
 
 func specSelectedSuperPlaneModel(spec RunSuperPlaneSpec) (core.DefaultHostedLLMModel, bool, error) {

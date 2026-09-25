@@ -1,0 +1,278 @@
+import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { getApiErrorMessage } from "@/lib/errors";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+
+import { emptyCreateWithAgentView } from "../createWithAgentDemo";
+import {
+  answerPlanningSessionSurvey,
+  findPlanningSessionByWorkOrder,
+  sendPlanningSessionMessage,
+} from "../planningSessionClient";
+import {
+  createWithAgentViewFromSession,
+  mergePlanningSessionHistory,
+  type PlanningSessionPayload,
+} from "../planningSessionView";
+import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
+
+export function workOrderPlanningSessionQueryKey(organizationId: string, factoryId: string, workOrderId: string) {
+  return factoryQueryKeys.planningSession(organizationId, factoryId, workOrderId);
+}
+
+export const ANALYSIS_PLANNING_COPY = {
+  composerPlaceholder: "Tell the agent more about this task",
+  send: "Send",
+  sendShortcut: "Enter",
+  dictate: "Dictate",
+  stopDictation: "Stop dictation",
+  microphoneDenied: "Microphone access was denied. Allow access and try again.",
+  stopped: "This analysis has stopped.",
+  failedSend: "The message did not send. Try again.",
+  failedLoad: "The analysis session did not load. Try again.",
+};
+
+type AnalysisPlanningSessionArgs = {
+  organizationId?: string;
+  factoryId?: string;
+  workOrderId?: string;
+  enabled: boolean;
+  canUpdate: boolean;
+  analysisDelivered?: boolean;
+  isUploading?: boolean;
+  uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
+};
+
+const LIVE_SESSION_REFETCH_INTERVAL_MS = 15_000;
+
+function planningSessionIsLive(session: PlanningSessionPayload | null | undefined): boolean {
+  return Boolean(session?.id && session.state !== "ended");
+}
+
+function usePlanningSessionLookup(
+  args: Required<Pick<AnalysisPlanningSessionArgs, "enabled">> & {
+    organizationId: string;
+    factoryId: string;
+    workOrderId: string;
+    isLive: boolean;
+  },
+) {
+  const { organizationId, factoryId, workOrderId, enabled, isLive } = args;
+  return useQuery<PlanningSessionPayload | null>({
+    queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
+    queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
+    enabled: enabled && Boolean(organizationId && factoryId && workOrderId),
+    structuralSharing: (previous, next) =>
+      mergePlanningSessionHistory(
+        previous as PlanningSessionPayload | null | undefined,
+        next as PlanningSessionPayload | null,
+      ),
+    refetchOnWindowFocus: false,
+    refetchInterval: isLive ? LIVE_SESSION_REFETCH_INTERVAL_MS : undefined,
+  });
+}
+
+async function refreshAnalysisWorkOrder(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  workOrderId: string,
+) {
+  if (!organizationId || !factoryId || !workOrderId) {
+    return;
+  }
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, workOrderId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
+    }),
+  ]);
+}
+
+function useRefreshAnalysisWorkOrder(args: {
+  queryClient: QueryClient;
+  organizationId: string;
+  factoryId: string;
+  workOrderId: string;
+  session: PlanningSessionPayload | null;
+}) {
+  const { queryClient, organizationId, factoryId, workOrderId, session } = args;
+  const refreshKey = analysisWorkOrderRefreshKey(session);
+  useEffect(() => {
+    if (!refreshKey) {
+      return;
+    }
+    void refreshAnalysisWorkOrder(queryClient, organizationId, factoryId, workOrderId);
+  }, [factoryId, organizationId, queryClient, refreshKey, workOrderId]);
+}
+
+export function analysisWorkOrderRefreshKey(session: PlanningSessionPayload | null | undefined): string {
+  if (!session?.id) {
+    return "";
+  }
+  return JSON.stringify({
+    id: session.id,
+    state: session.state,
+    waitState: session.waitState,
+    messages: session.messages?.map(({ id, role, text, createdAt }) => ({ id, role, text, createdAt })),
+    draft: session.draft,
+    created: session.created,
+  });
+}
+
+function analysisView(session: PlanningSessionPayload | null, composer: string, analysisDelivered: boolean) {
+  if (!session) {
+    return emptyCreateWithAgentView();
+  }
+  return createWithAgentViewFromSession(session, {
+    composer,
+    right: emptyCreateWithAgentView().right,
+    endConfirmOpen: false,
+    analysisDelivered,
+  });
+}
+
+function analysisSendState(
+  session: PlanningSessionPayload | null,
+  machineStatus: string,
+  canUpdate: boolean,
+  sendPending: boolean,
+  isUploading = false,
+) {
+  const stopped = machineStatus === "failed" || machineStatus === "passed";
+  const isLive = Boolean(session?.id && session.state !== "ended" && !stopped);
+  const canRestart = Boolean(session?.id && (session.state === "ended" || stopped));
+  return { isLive, canSend: canUpdate && !sendPending && !isUploading && (isLive || canRestart) };
+}
+
+export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
+  const {
+    organizationId = "",
+    factoryId = "",
+    workOrderId = "",
+    enabled,
+    canUpdate,
+    analysisDelivered = false,
+    isUploading = false,
+    uploadFiles,
+  } = args;
+  const queryClient = useQueryClient();
+  const [composer, setComposer] = useState("");
+  const [composerError, setComposerError] = useState("");
+  const queryKey = workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId);
+  const query = usePlanningSessionLookup({
+    organizationId,
+    factoryId,
+    workOrderId,
+    enabled,
+    isLive: planningSessionIsLive(queryClient.getQueryData<PlanningSessionPayload | null>(queryKey)),
+  });
+  const session = query.data ?? null;
+  useRefreshAnalysisWorkOrder({
+    queryClient,
+    organizationId,
+    factoryId,
+    workOrderId,
+    session,
+  });
+
+  const onMutationSuccess = (next: PlanningSessionPayload) => {
+    queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
+      mergePlanningSessionHistory(previous, next),
+    );
+    setComposer("");
+    setComposerError("");
+  };
+  const onMutationError = (error: Error) => {
+    setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
+  };
+
+  const sendMessage = useMutation({
+    mutationFn: (text: string) => sendPlanningSessionMessage(organizationId, factoryId, session?.id ?? "", text),
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+  const answerSurvey = useMutation({
+    mutationFn: (text: string) => answerPlanningSessionSurvey(organizationId, factoryId, session?.id ?? "", text),
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+
+  const view = usePlanningSessionLiveRun(
+    organizationId,
+    analysisView(session, composer, analysisDelivered),
+    analysisDelivered,
+  );
+  const { isLive, canSend } = analysisSendState(
+    session,
+    view.machineStatus,
+    canUpdate,
+    sendMessage.isPending || answerSurvey.isPending,
+    isUploading,
+  );
+  const submit = (text: string, send: (body: string) => void) => {
+    const trimmed = text.trim();
+    if (!trimmed || !canSend) {
+      return false;
+    }
+    setComposerError("");
+    send(trimmed);
+    return true;
+  };
+  const onSend = async (text?: string) => {
+    const trimmed = (text ?? composer).trim();
+    if (!trimmed || !canSend) {
+      return false;
+    }
+    setComposerError("");
+    try {
+      await sendMessage.mutateAsync(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const onUploadFiles = async (files: FileList | File[]) => {
+    if (!uploadFiles) {
+      return [];
+    }
+    const uploaded = await uploadFiles(files);
+    if (uploaded.length > 0) {
+      await queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
+      });
+    }
+    return uploaded;
+  };
+
+  return {
+    organizationId,
+    factoryId,
+    session,
+    sessionId: session?.id ?? "",
+    queryError: query.error,
+    isLoading: query.isLoading,
+    view,
+    composer,
+    composerError,
+    canSend,
+    isUploading,
+    isLive,
+    showChat: Boolean(session?.id),
+    onComposerChange: setComposer,
+    onSend,
+    onUploadFiles: uploadFiles ? onUploadFiles : undefined,
+    onSubmitSurvey: (text: string) => {
+      submit(text, answerSurvey.mutate);
+    },
+  };
+}

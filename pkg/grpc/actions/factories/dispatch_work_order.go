@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -24,15 +25,18 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
+	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	factoryID := resolvedFactory.ID
 
-	orderID, err := parseOrderID(req.GetOrderId())
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
+	orderID := resolvedOrder.ID
 
 	lineName := strings.TrimSpace(req.GetLineName())
 	if lineName == "" {
@@ -54,7 +58,6 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var logger *log.Entry
 	var fromState string
 
-	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		f, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -64,6 +67,9 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 
 		order, err = factory.FindWorkOrder(tx, orderID)
 		if err != nil {
+			return err
+		}
+		if err := order.LockForUpdate(tx); err != nil {
 			return err
 		}
 
@@ -90,6 +96,10 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			if !slices.Contains(allowed, model) {
 				return invalidArgument("model is not available on this line")
 			}
+		}
+		thinkingLevel, err := runner.NormalizeDispatchThinkingLevel(req.GetThinkingLevel())
+		if err != nil {
+			return invalidArgument(err.Error())
 		}
 
 		startIndex := int(req.GetStartStepIndex())
@@ -122,7 +132,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model)
+		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model, thinkingLevel)
 		if err != nil {
 			return err
 		}

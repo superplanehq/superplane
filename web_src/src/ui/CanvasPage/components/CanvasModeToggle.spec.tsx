@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { CanvasModeToggle } from "./CanvasModeToggle";
 
 const routerWrapper = ({ children }: { children: React.ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
@@ -34,25 +34,19 @@ describe("CanvasModeToggle", () => {
     expect(onSelectLive).toHaveBeenCalledTimes(2);
   });
 
-  it("orders tabs as Canvas, Console, Memory, and Files", () => {
+  it("orders tabs as Canvas, Console, and Memory", () => {
     render(
       <CanvasModeToggle
         mode="version-live"
         onSelectLive={vi.fn()}
         onSelectConsole={vi.fn()}
         onSelectMemory={vi.fn()}
-        onSelectFiles={vi.fn()}
       />,
       { wrapper: routerWrapper },
     );
 
     const tabs = screen.getAllByRole("link");
-    expect(tabs.map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual([
-      "Canvas",
-      "Console",
-      "Memory",
-      "Files",
-    ]);
+    expect(tabs.map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual(["Canvas", "Console", "Memory"]);
   });
 
   it("does not render a Versions tab", () => {
@@ -143,22 +137,17 @@ describe("CanvasModeToggle", () => {
     expect(screen.getByTestId("canvas-view-mode-live-committed-dot")).toHaveClass("bg-blue-500");
   });
 
-  it("invokes onSelectFiles when clicking the Files tab", async () => {
-    const user = userEvent.setup();
-    const onSelectFiles = vi.fn();
-
+  it("does not render a Files tab", () => {
     render(
       <CanvasModeToggle
         mode="version-live"
         onSelectLive={vi.fn()}
         onSelectConsole={vi.fn()}
-        onSelectFiles={onSelectFiles}
+        onSelectMemory={vi.fn()}
       />,
       { wrapper: routerWrapper },
     );
 
-    await user.click(screen.getByRole("link", { name: "Files" }));
-
-    expect(onSelectFiles).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("link", { name: "Files" })).not.toBeInTheDocument();
   });
 });

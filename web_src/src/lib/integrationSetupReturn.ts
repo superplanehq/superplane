@@ -15,14 +15,27 @@ export const GITHUB_SETUP_ORG_PARAM = "githubOrg";
 /** GitHub connection that received the installation request callback. */
 export const GITHUB_SETUP_INTEGRATION_PARAM = "githubIntegrationId";
 
+/** Stored on the integration so the provider callback can redirect in one hop. */
+export const INTEGRATION_SETUP_RETURN_PATH_KEY = "setupReturnPath";
+
+export function configurationWithSetupReturnPath(
+  configuration: Record<string, unknown>,
+  setupReturnTo?: string,
+): Record<string, unknown> {
+  if (!setupReturnTo) return configuration;
+  return { ...configuration, [INTEGRATION_SETUP_RETURN_PATH_KEY]: setupReturnTo };
+}
+
 interface StoredReturn {
   path: string;
   createdAt: number;
+  preferredIntegrationId?: string;
 }
 
-// Keyed by organization only, not by integration id: the legacy GitHub connect
-// creates a new integration during the round trip to the provider, so the id the
-// caller knows before leaving does not match the id the provider redirects to.
+// Legacy GitHub setup uses organization-wide local storage because it can
+// change integration ids during its provider round trip. Other provider flows
+// use tab-scoped session storage so concurrent setup tabs cannot overwrite one
+// another.
 function storageKey(organizationId: string): string {
   return `${STORAGE_PREFIX}:${organizationId}`;
 }
@@ -33,19 +46,32 @@ function isSafePath(path: string, organizationId: string): boolean {
   return (isOrganizationPath || pathname === "/onboarding") && !path.startsWith("//");
 }
 
-export function rememberIntegrationSetupReturn(organizationId: string, path: string | undefined): void {
+export function rememberIntegrationSetupReturn(
+  organizationId: string,
+  path: string | undefined,
+  preferredIntegrationId?: string,
+): void {
   if (!organizationId || !path || !isSafePath(path, organizationId)) return;
 
-  const value: StoredReturn = { path, createdAt: Date.now() };
-  window.localStorage.setItem(storageKey(organizationId), JSON.stringify(value));
+  const value: StoredReturn = {
+    path,
+    createdAt: Date.now(),
+    ...(preferredIntegrationId?.trim() ? { preferredIntegrationId: preferredIntegrationId.trim() } : {}),
+  };
+  const key = storageKey(organizationId);
+  if (value.preferredIntegrationId) {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+    return;
+  }
+
+  window.sessionStorage.removeItem(key);
+  window.localStorage.setItem(key, JSON.stringify(value));
   writeSetupReturnCookie(path);
 }
 
-export function peekIntegrationSetupReturn(organizationId: string): string | null {
-  if (!organizationId) return null;
-
+function readStoredReturn(organizationId: string, storage: Storage): StoredReturn | null {
   const key = storageKey(organizationId);
-  const raw = window.localStorage.getItem(key);
+  const raw = storage.getItem(key);
   if (!raw) return null;
 
   try {
@@ -56,18 +82,50 @@ export function peekIntegrationSetupReturn(organizationId: string): string | nul
       !isSafePath(value.path, organizationId) ||
       Date.now() - value.createdAt > MAX_AGE_MS
     ) {
-      window.localStorage.removeItem(key);
+      storage.removeItem(key);
       return null;
     }
-    return value.path;
+    const preferredIntegrationId =
+      typeof value.preferredIntegrationId === "string" && value.preferredIntegrationId.trim()
+        ? value.preferredIntegrationId.trim()
+        : undefined;
+    return {
+      path: value.path,
+      createdAt: value.createdAt,
+      ...(preferredIntegrationId ? { preferredIntegrationId } : {}),
+    };
   } catch {
-    window.localStorage.removeItem(key);
+    storage.removeItem(key);
     return null;
   }
 }
 
+function readIntegrationSetupReturn(organizationId: string): StoredReturn | null {
+  if (!organizationId) return null;
+
+  const key = storageKey(organizationId);
+  if (window.sessionStorage.getItem(key)) {
+    return readStoredReturn(organizationId, window.sessionStorage);
+  }
+  return readStoredReturn(organizationId, window.localStorage);
+}
+
+export function peekIntegrationSetupReturn(organizationId: string): string | null {
+  return readIntegrationSetupReturn(organizationId)?.path ?? null;
+}
+
+export function peekIntegrationSetupReturnPreferredIntegration(organizationId: string): string | null {
+  return readIntegrationSetupReturn(organizationId)?.preferredIntegrationId ?? null;
+}
+
 export function consumeIntegrationSetupReturn(organizationId: string): void {
-  window.localStorage.removeItem(storageKey(organizationId));
+  const key = storageKey(organizationId);
+  if (window.sessionStorage.getItem(key)) {
+    window.sessionStorage.removeItem(key);
+    return;
+  }
+
+  window.localStorage.removeItem(key);
   clearSetupReturnCookie();
 }
 

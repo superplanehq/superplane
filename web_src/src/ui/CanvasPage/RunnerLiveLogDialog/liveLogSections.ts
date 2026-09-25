@@ -1,6 +1,6 @@
-import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 
-import type { CommandSection, CommandSectionEvent, CommandTool, LogState } from "./types";
+import type { CommandSection, CommandSectionEvent, CommandTool, LogState, PendingLiveLogRecord } from "./types";
 
 export type CommandStart = {
   index: number;
@@ -18,6 +18,7 @@ export function emptyCommandSection(start: CommandStart): CommandSection {
     preview: start.preview?.trim() || undefined,
     lines: [],
     events: [],
+    activities: [],
     status: "running",
     duration_ms: null,
     started_at: start.startedAtMs ?? Date.now(),
@@ -29,10 +30,13 @@ export function startCommandSection(state: LogState, start: CommandStart): LogSt
   if (state.sections.some((section) => section.index === start.index)) {
     return state;
   }
-  return {
-    ...state,
-    sections: [...state.sections, emptyCommandSection(start)],
-  };
+  return attachPendingRecords(
+    {
+      ...state,
+      sections: [...state.sections, emptyCommandSection(start)],
+    },
+    start.index,
+  );
 }
 
 export function completeCommandSection(
@@ -68,21 +72,18 @@ export function appendLineToLatestSection(
   replayLineSkip?: Map<number, number>,
   commandIndex?: number,
 ): LogState {
-  if (isRawAgentTurnLiveLogText(text)) {
+  if (isHiddenAgentLiveLogText(text)) {
     return state;
   }
-  const sectionPos = commandSectionPosition(state, commandIndex);
-  if (sectionPos < 0) {
-    return {
-      ...state,
-      orphanLines: [...state.orphanLines, text],
-    };
+  const destination = liveLogRecordDestination(state, commandIndex);
+  if (destination.kind === "buffer") {
+    return bufferPendingRecord(state, { type: "line", text, commandIndex });
+  }
+  if (destination.kind === "drop") {
+    return state;
   }
 
-  const section = state.sections[sectionPos];
-  if (section.status !== "running") {
-    return state;
-  }
+  const section = state.sections[destination.pos];
   const skipLeft = replayLineSkip?.get(section.index) ?? 0;
   if (skipLeft > 0) {
     replayLineSkip?.set(section.index, skipLeft - 1);
@@ -90,7 +91,7 @@ export function appendLineToLatestSection(
   }
 
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = appendLineToSection(section, text);
+  nextSections[destination.pos] = appendLineToSection(section, text);
   return {
     ...state,
     sections: nextSections,
@@ -104,19 +105,19 @@ export function startToolOnLatestSection(
   sourceId?: string,
   commandIndex?: number,
 ): LogState {
-  const sectionPos = commandSectionPosition(state, commandIndex);
-  if (sectionPos < 0) {
+  const destination = liveLogRecordDestination(state, commandIndex);
+  if (destination.kind === "buffer") {
+    return bufferPendingRecord(state, { type: "tool_start", kind, text, sourceId, commandIndex });
+  }
+  if (destination.kind === "drop") {
     return state;
   }
-  const section = state.sections[sectionPos];
-  if (section.status !== "running") {
-    return state;
-  }
+  const section = state.sections[destination.pos];
   if (sourceId && state.sections.some((candidate) => findToolInSection(candidate, sourceId))) {
     return state;
   }
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = startToolOnSection(section, kind, text, sourceId);
+  nextSections[destination.pos] = startToolOnSection(section, kind, text, sourceId);
   return { ...state, sections: nextSections };
 }
 
@@ -127,11 +128,14 @@ export function endToolOnLatestSection(
   sourceId?: string,
   commandIndex?: number,
 ): LogState {
-  const sectionPos = commandSectionPosition(state, commandIndex);
-  if (sectionPos < 0) {
+  const destination = liveLogRecordDestination(state, commandIndex);
+  if (destination.kind === "buffer") {
+    return bufferPendingRecord(state, { type: "tool_end", status, durationMs, sourceId, commandIndex });
+  }
+  if (destination.kind === "drop") {
     return state;
   }
-  const section = state.sections[sectionPos];
+  const section = state.sections[destination.pos];
   if (sourceId) {
     const existing = findToolInSection(section, sourceId);
     if (existing && existing.status !== "running") {
@@ -139,7 +143,7 @@ export function endToolOnLatestSection(
     }
   }
   const nextSections = [...state.sections];
-  nextSections[sectionPos] = endOpenTool(section, status, durationMs, sourceId);
+  nextSections[destination.pos] = endOpenTool(section, status, durationMs, sourceId);
   return { ...state, sections: nextSections };
 }
 
@@ -158,33 +162,167 @@ function commandSectionPosition(state: LogState, commandIndex?: number): number 
   return state.sections.findIndex((section) => section.index === commandIndex);
 }
 
+function liveLogRecordDestination(
+  state: LogState,
+  commandIndex?: number,
+): { kind: "buffer" } | { kind: "drop" } | { kind: "section"; pos: number } {
+  const sectionPos = commandSectionPosition(state, commandIndex);
+  if (sectionPos < 0) {
+    return { kind: "buffer" };
+  }
+  if (state.sections[sectionPos].status === "running") {
+    return { kind: "section", pos: sectionPos };
+  }
+  if (commandIndex === undefined) {
+    return { kind: "buffer" };
+  }
+  return { kind: "drop" };
+}
+
+function pendingRecordsOf(state: LogState): PendingLiveLogRecord[] {
+  return state.pendingRecords ?? [];
+}
+
+function orphanLinesFromPending(pendingRecords: PendingLiveLogRecord[]): string[] {
+  return pendingRecords.filter((record) => record.type === "line").map((record) => record.text);
+}
+
+function bufferPendingRecord(state: LogState, record: PendingLiveLogRecord): LogState {
+  const pendingRecords = [...pendingRecordsOf(state), record];
+  return {
+    ...state,
+    pendingRecords,
+    orphanLines: orphanLinesFromPending(pendingRecords),
+  };
+}
+
+function recordBelongsToCommand(record: PendingLiveLogRecord, commandIndex: number): boolean {
+  return record.commandIndex === undefined || record.commandIndex === commandIndex;
+}
+
+function attachPendingRecords(state: LogState, commandIndex: number): LogState {
+  const pendingRecords = pendingRecordsOf(state);
+  if (pendingRecords.length === 0) {
+    return state;
+  }
+  const taken: PendingLiveLogRecord[] = [];
+  const remaining: PendingLiveLogRecord[] = [];
+  for (const record of pendingRecords) {
+    if (recordBelongsToCommand(record, commandIndex)) {
+      taken.push(record);
+    } else {
+      remaining.push(record);
+    }
+  }
+  if (taken.length === 0) {
+    return state;
+  }
+  let next: LogState = {
+    ...state,
+    pendingRecords: remaining,
+    orphanLines: orphanLinesFromPending(remaining),
+  };
+  for (const record of taken) {
+    next = applyBufferedRecord(next, record, commandIndex);
+  }
+  return next;
+}
+
+function applyBufferedRecord(state: LogState, record: PendingLiveLogRecord, commandIndex: number): LogState {
+  const index = record.commandIndex ?? commandIndex;
+  if (record.type === "line") {
+    return appendLineToLatestSection(state, record.text, undefined, index);
+  }
+  if (record.type === "tool_start") {
+    return startToolOnLatestSection(state, record.kind, record.text, record.sourceId, index);
+  }
+  return endToolOnLatestSection(state, record.status, record.durationMs, record.sourceId, index);
+}
+
 function appendLineToSection(section: CommandSection, text: string): CommandSection {
   const withLine = { ...section, lines: [...section.lines, text] };
-  if (!isPromptSection(section) || !text.trim()) {
+  if (!isPromptSection(section)) {
     return withLine;
   }
 
   const running = runningToolsInSection(section);
-  if (running.length !== 1) {
+  if (running.length === 1) {
+    if (!text.trim()) {
+      return withLine;
+    }
+    const open = running[0];
     return {
       ...withLine,
-      events: [...section.events, { kind: "note", text }],
+      events: section.events.map((event) => {
+        if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
+          return event;
+        }
+        return {
+          ...event,
+          tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
+        };
+      }),
     };
   }
 
-  const open = running[0];
+  const last = section.events.at(-1);
+  if (last?.kind === "note" && noteHasUnclosedFence(last.text)) {
+    return {
+      ...withLine,
+      events: [...section.events.slice(0, -1), { kind: "note", text: `${last.text}\n${text}` }],
+    };
+  }
+
+  if (!text.trim()) {
+    return withLine;
+  }
+
   return {
     ...withLine,
-    events: section.events.map((event) => {
-      if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
-        return event;
-      }
-      return {
-        ...event,
-        tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
-      };
-    }),
+    events: [...section.events, { kind: "note", text }],
   };
+}
+
+type MarkdownFence = {
+  marker: "`" | "~";
+  length: number;
+  info: string;
+};
+
+function noteHasUnclosedFence(text: string): boolean {
+  let open: MarkdownFence | undefined;
+  for (const line of text.split("\n")) {
+    const fence = parseMarkdownFenceLine(line);
+    if (!fence) {
+      continue;
+    }
+    if (!open) {
+      open = fence;
+      continue;
+    }
+    if (isClosingMarkdownFence(open, fence)) {
+      open = undefined;
+    }
+  }
+  return open !== undefined;
+}
+
+function parseMarkdownFenceLine(line: string): MarkdownFence | undefined {
+  const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!match) {
+    return undefined;
+  }
+  const run = match[2];
+  const marker = run[0] === "~" ? "~" : "`";
+  const rest = match[3];
+  if (marker === "`" && rest.includes("`")) {
+    return undefined;
+  }
+  return { marker, length: run.length, info: rest.trim() };
+}
+
+function isClosingMarkdownFence(open: MarkdownFence, fence: MarkdownFence): boolean {
+  return fence.marker === open.marker && fence.length >= open.length && fence.info === "";
 }
 
 function startToolOnSection(section: CommandSection, kind: string, text: string, sourceId?: string): CommandSection {

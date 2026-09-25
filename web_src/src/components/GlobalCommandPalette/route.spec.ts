@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getRouteContext } from "./route";
 
 describe("getRouteContext", () => {
@@ -35,7 +35,6 @@ describe("getRouteContext", () => {
       "/",
       "/admin",
       "/invite/token-1",
-      "/install",
       "/login",
       "/onboarding",
       "/setup",

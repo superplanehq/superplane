@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -137,11 +137,15 @@ describe("Line board job popup", () => {
         name: "Open Show a clearer empty state on the billing page",
       }),
     ).toBeInTheDocument();
+    const cardVerdict = (id: string) => screen.getByTestId(`work-order-card-score-${id}`).getAttribute("aria-label");
     await waitFor(() => {
-      expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toHaveAttribute("aria-valuenow", "5");
+      expect(cardVerdict("wo-review-pay-842")).toContain("Confidence score 5 of 5");
     });
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-844")).toHaveAttribute("aria-valuenow", "4");
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("aria-valuenow", "3");
+    expect(cardVerdict("wo-review-pay-842")).toContain("Clarity score 5 of 5");
+    expect(cardVerdict("wo-review-pay-844")).toContain("Confidence score 4 of 5");
+    expect(cardVerdict("wo-review-pay-845")).toContain("Confidence score 3 of 5");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("data-tone", "caution");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("Confidence3");
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
     expect(
@@ -239,9 +243,8 @@ describe("Line board job popup", () => {
     );
 
     const dialog = await screen.findByTestId("work-order-split-run");
-    const source = within(dialog).getByTestId("split-run-source");
-    expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
-    expect(within(source).getByText("Created manually")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-description")).toHaveTextContent(
       "Let a user add emoji reactions on a task itself (not only on comments).",
     );
@@ -279,7 +282,10 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     const waitingNote = within(dialog).getByTestId("split-run-attention-note");
-    expect(within(waitingNote).getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(within(waitingNote).queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    const popupHeader = within(dialog).getByTestId("popup-work-order-title").closest("header");
+    expect(popupHeader).not.toBeNull();
+    expect(within(popupHeader as HTMLElement).getByRole("button", { name: "More actions" })).toBeInTheDocument();
     expect(within(waitingNote).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
@@ -309,13 +315,17 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-title")).toHaveTextContent(
+      "Add retry handling to webhook delivery",
+    );
+    expect(within(dialog).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
-    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
-    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-intent-document")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -327,10 +337,6 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(await within(dialog).findByRole("link", { name: /#510/ })).toHaveAttribute(
-      "href",
-      "https://github.com/example/ledger/pull/510",
-    );
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
@@ -350,7 +356,11 @@ describe("Line board job popup", () => {
     );
 
     const card = await screen.findByTestId("work-order-card-wo-review-pay-842", {}, { timeout: 8000 });
-    await user.click(within(card).getByRole("button", { name: "Start" }));
+    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+
+    const dialog = await screen.findByTestId("work-order-split-run");
+    await user.click(within(dialog).getByRole("button", { name: "Start" }));
 
     await waitFor(() => {
       expect(

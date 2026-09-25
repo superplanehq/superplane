@@ -1,13 +1,13 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { CanvasToolSidebar } from ".";
 import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT } from "./events";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() => {
+const { sendMutation, resetMutation, chatState, chatRefetch, websocketState } = vi.hoisted(() => {
   const state = {
     hasChat: true,
     isError: false,
@@ -29,6 +29,9 @@ const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() =>
     },
     chatState: state,
     chatRefetch: vi.fn(async () => ({ data: { id: "chat-1", status: state.refetchStatus } })),
+    websocketState: {
+      callbacks: undefined as { onConnectionOpen?: () => void } | undefined,
+    },
   };
 });
 
@@ -80,7 +83,13 @@ vi.mock("@/hooks/useAgentChats", () => ({
 }));
 
 vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
-  useAgentSessionWebsocket: () => undefined,
+  useAgentSessionWebsocket: (_organizationId: string, _sessionId: string, callbacks: unknown) => {
+    websocketState.callbacks = callbacks as { onConnectionOpen?: () => void };
+  },
+}));
+
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: () => [],
 }));
 
 vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
@@ -126,6 +135,7 @@ describe("CanvasToolSidebar", () => {
     chatState.refetchStatus = "idle";
     chatState.error = null;
     chatRefetch.mockClear();
+    websocketState.callbacks = undefined;
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
@@ -133,10 +143,6 @@ describe("CanvasToolSidebar", () => {
     resetMutation.mutateAsync.mockReset();
     resetMutation.mutateAsync.mockResolvedValue(null);
     sessionStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it("renders the agent panel when the sidebar is open", async () => {
@@ -300,7 +306,6 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("clears stale streaming state when a durable chat refetch returns idle", async () => {
-    vi.useFakeTimers();
     chatState.status = "streaming";
     chatState.refetchStatus = "streaming";
 
@@ -308,10 +313,14 @@ describe("CanvasToolSidebar", () => {
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
     expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     chatState.refetchStatus = "idle";
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
+      websocketState.callbacks?.onConnectionOpen?.();
+      await Promise.resolve();
     });
 
     expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
@@ -320,16 +329,19 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("keeps streaming state while durable chat refetches are still streaming", async () => {
-    vi.useFakeTimers();
     chatState.status = "streaming";
     chatState.refetchStatus = "streaming";
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
+      websocketState.callbacks?.onConnectionOpen?.();
+      await Promise.resolve();
     });
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();

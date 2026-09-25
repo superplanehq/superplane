@@ -11,6 +11,7 @@ const CONSOLE_VIEW = "console";
 const LEGACY_CONSOLE_VIEW = "dashboard";
 const LEGACY_RUNS_VIEW = "runs";
 const LEGACY_VERSIONS_VIEW = "versions";
+const LEGACY_FILES_VIEW = "files";
 
 function isConsoleView(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
@@ -32,6 +33,13 @@ function migrateLegacyViewParams(view: string, params: URLSearchParams): URLSear
   if (view === LEGACY_VERSIONS_VIEW) {
     const next = new URLSearchParams(params);
     next.delete("view");
+    return next;
+  }
+
+  if (view === LEGACY_FILES_VIEW) {
+    const next = new URLSearchParams(params);
+    next.delete("view");
+    next.delete("file");
     return next;
   }
 
@@ -63,7 +71,6 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   const consoleViewActive = isConsoleView(viewParam);
 
   const isMemoryMode = viewParam === "memory";
-  const isFilesMode = viewParam === "files";
   const isConsoleMode = consoleViewActive;
   const isRunInspectionMode = Boolean(runParam) && isWorkflowCanvasViewParam(viewParam);
   const selectedRunId = isRunInspectionMode ? runParam : null;
@@ -104,8 +111,6 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
     setIsConsoleMode: noopSetBoolean,
     isMemoryMode,
     setIsMemoryMode: noopSetBoolean,
-    isFilesMode,
-    setIsFilesMode: noopSetBoolean,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,

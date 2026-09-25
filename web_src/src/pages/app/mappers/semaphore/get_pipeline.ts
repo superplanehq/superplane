@@ -9,7 +9,7 @@ import type {
 import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -17,6 +17,25 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 interface GetPipelineConfiguration {
   pipelineId?: string;
 }
+
+type GetPipelinePayload = {
+  ppl_id?: string;
+  name?: string;
+  wf_id?: string;
+  state?: string;
+  result?: string;
+  result_reason?: string;
+  branch_name?: string;
+  commit_sha?: string;
+  commit_message?: string;
+  yaml_file_name?: string;
+  working_directory?: string;
+  project_id?: string;
+  created_at?: string;
+  done_at?: string;
+  running_at?: string;
+  error_description?: string;
+};
 
 export const getPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -45,10 +64,10 @@ export const getPipelineMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const outputs = context.execution.outputs as { default?: { data?: any }[] } | undefined;
-    const payload = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, unknown> = {};
+    const outputs = context.execution.outputs as { default?: { data?: unknown }[] } | undefined;
+    const payload = outputs?.default?.[0]?.data as GetPipelinePayload | undefined;
 
     if (!payload || typeof payload !== "object") {
       return details;

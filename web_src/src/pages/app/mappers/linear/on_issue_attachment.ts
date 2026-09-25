@@ -5,7 +5,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 import { addTeamMetadata, getIssueLabel } from "./utils";
 import type { LinearAttachmentWebhookEvent, LinearNodeMetadata, OnIssueAttachmentConfiguration } from "./types";
 

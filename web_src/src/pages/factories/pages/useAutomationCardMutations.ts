@@ -1,8 +1,8 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
-import { factoryAppsKey } from "@/hooks/useFactoryData";
+import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -27,7 +27,7 @@ function collectExistingCanvasNames(
   sessionNames: Iterable<string>,
 ): string[] {
   const names = new Set<string>([...sessionNames]);
-  const apps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, factoryId));
+  const apps = queryClient.getQueryData<FactoryAutomation[]>(factoryAppsKey(organizationId, factoryId));
   for (const app of apps ?? []) {
     if (app.name?.trim()) {
       names.add(app.name.trim());
@@ -37,11 +37,12 @@ function collectExistingCanvasNames(
 }
 
 async function runDuplicateAutomation(args: {
-  app: FactoryApp;
+  app: FactoryAutomation;
   factoryId: string;
   factoryKey: string;
   organizationId: string;
   createCanvas: ReturnType<typeof useCreateCanvas>["mutateAsync"];
+  createAttachedAutomation: ReturnType<typeof useCreateFactoryAutomation>["mutateAsync"];
   queryClient: ReturnType<typeof useQueryClient>;
   pendingDuplicateCanvases: Map<string, PendingDuplicateCanvas>;
   sessionDuplicateNames: Set<string>;
@@ -57,6 +58,7 @@ async function runDuplicateAutomation(args: {
     factoryId: args.factoryId,
     app,
     createCanvas: args.createCanvas,
+    createAttachedAutomation: args.createAttachedAutomation,
     existingCanvasNames: collectExistingCanvasNames(
       args.queryClient,
       args.organizationId,
@@ -93,6 +95,7 @@ export function useAutomationCardMutations(args: {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const createCanvas = useCreateCanvas(organizationId);
+  const createAttachedAutomation = useCreateFactoryAutomation(organizationId, factoryId);
   const deleteCanvas = useDeleteCanvas(organizationId);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const pendingDuplicateCanvases = useRef(new Map<string, PendingDuplicateCanvas>());
@@ -103,7 +106,7 @@ export function useAutomationCardMutations(args: {
   }, [factoryId, organizationId, queryClient]);
 
   const handleEditAutomation = useCallback(
-    (app: FactoryApp) => {
+    (app: FactoryAutomation) => {
       if (!app.id) {
         return;
       }
@@ -113,7 +116,7 @@ export function useAutomationCardMutations(args: {
   );
 
   const handleDuplicateAutomation = useCallback(
-    async (app: FactoryApp) => {
+    async (app: FactoryAutomation) => {
       if (isDuplicating || !app.id) {
         return;
       }
@@ -125,6 +128,7 @@ export function useAutomationCardMutations(args: {
           factoryKey,
           organizationId,
           createCanvas: createCanvas.mutateAsync,
+          createAttachedAutomation: createAttachedAutomation.mutateAsync,
           queryClient,
           pendingDuplicateCanvases: pendingDuplicateCanvases.current,
           sessionDuplicateNames: sessionDuplicateNames.current,
@@ -132,12 +136,13 @@ export function useAutomationCardMutations(args: {
           navigate,
         });
       } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to duplicate automation"));
+        showErrorToast(getApiErrorMessage(error, "Failed to duplicate automation"));
       } finally {
         setIsDuplicating(false);
       }
     },
     [
+      createAttachedAutomation.mutateAsync,
       createCanvas.mutateAsync,
       factoryId,
       factoryKey,
@@ -150,7 +155,7 @@ export function useAutomationCardMutations(args: {
   );
 
   const handleDeleteAutomation = useCallback(
-    async (app: FactoryApp) => {
+    async (app: FactoryAutomation) => {
       if (!app.id) {
         return;
       }
@@ -170,7 +175,7 @@ export function useAutomationCardMutations(args: {
   );
 
   const actionsForApp = useCallback(
-    (app: FactoryApp): AutomationCardActions => ({
+    (app: FactoryAutomation): AutomationCardActions => ({
       onEdit: () => handleEditAutomation(app),
       onDuplicate: () => handleDuplicateAutomation(app),
       onDelete: () => handleDeleteAutomation(app),

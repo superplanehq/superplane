@@ -244,6 +244,32 @@ process.stdout.write(JSON.stringify({ records, telemetry: telemetry.snapshot() }
 	assert.Equal(t, float64(29497), payload.Telemetry.Turns[0].Usage["cache_read_input_tokens"])
 }
 
+func TestTurnTelemetryReplacesUsageForAnEarlierTurn(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeTurnTelemetryScript(t, taskDir)
+
+	payload := runTurnTelemetryHarness(t, taskDir, `
+const { createTurnTelemetry } = require(process.env.TURN_TELEMETRY_SCRIPT);
+const records = [];
+const telemetry = createTurnTelemetry({
+  taskDir: process.env.SUPERPLANE_TASK_DIR,
+  write: (record) => records.push(record),
+});
+telemetry.beginTurn({});
+telemetry.beginTurn({});
+telemetry.replaceTurnUsage(1, { input_tokens: 10, output_tokens: 2 });
+process.stdout.write(JSON.stringify({ records, telemetry: telemetry.snapshot() }));
+`)
+
+	require.Len(t, payload.Telemetry.Turns, 2)
+	assert.Equal(t, float64(10), payload.Telemetry.Turns[0].Usage["input_tokens"])
+	assert.Equal(t, float64(2), payload.Telemetry.Turns[0].Usage["output_tokens"])
+	lastRecord := payload.Records[len(payload.Records)-1]
+	assert.Equal(t, float64(1), lastRecord["turn"])
+}
+
 func TestTurnTelemetryAppliesBilledOutputGapToLastTurn(t *testing.T) {
 	t.Parallel()
 

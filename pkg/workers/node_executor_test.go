@@ -20,7 +20,6 @@ func newTestNodeExecutor(t *testing.T, r *support.ResourceRegistry) *NodeExecuto
 	return NewNodeExecutor(
 		r.Encryptor,
 		r.Registry,
-		r.GitProvider,
 		support.NewOIDCProvider(),
 		"http://localhost",
 		"http://localhost",

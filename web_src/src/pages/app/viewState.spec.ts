@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   allowsRunsSidebar,
   applyRunInspectionNavigationSearchParams,
@@ -16,24 +16,22 @@ describe("clampWorkflowViewFlagsForFactoryApp", () => {
       clampWorkflowViewFlagsForFactoryApp({
         isRunInspectionMode: true,
         isMemoryMode: true,
-        isFilesMode: true,
         isConsoleMode: true,
       }),
     ).toEqual({
       isRunInspectionMode: true,
       isMemoryMode: false,
-      isFilesMode: false,
       isConsoleMode: false,
     });
   });
 });
 
 describe("isNonCanvasAppViewParam", () => {
-  it("detects console, memory, and files views", () => {
+  it("detects console and memory views", () => {
     expect(isNonCanvasAppViewParam("console")).toBe(true);
     expect(isNonCanvasAppViewParam("dashboard")).toBe(true);
     expect(isNonCanvasAppViewParam("memory")).toBe(true);
-    expect(isNonCanvasAppViewParam("files")).toBe(true);
+    expect(isNonCanvasAppViewParam("files")).toBe(false);
     expect(isNonCanvasAppViewParam("")).toBe(false);
     expect(isNonCanvasAppViewParam("runs")).toBe(false);
   });
@@ -50,9 +48,8 @@ describe("allowsRunsSidebar", () => {
     expect(allowsRunsSidebar("console")).toBe(true);
   });
 
-  it("hides the runs sidebar on the Memory and Files surfaces", () => {
+  it("hides the runs sidebar on the Memory surface", () => {
     expect(allowsRunsSidebar("memory")).toBe(false);
-    expect(allowsRunsSidebar("files")).toBe(false);
   });
 });
 
@@ -127,7 +124,6 @@ describe("getWorkflowViewPresentation", () => {
       isConsoleMode: false,
       isRunInspectionMode: true,
       isMemoryMode: false,
-      isFilesMode: false,
       hasEditableVersion: false,
       isViewingCurrentLiveVersion: true,
     });
@@ -138,7 +134,6 @@ describe("getWorkflowViewPresentation", () => {
       isConsoleMode: false,
       isRunInspectionMode: false,
       isMemoryMode: false,
-      isFilesMode: false,
       hasEditableVersion: true,
       isViewingCurrentLiveVersion: true,
     });

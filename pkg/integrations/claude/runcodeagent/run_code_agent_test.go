@@ -146,7 +146,7 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug", BaseBranch: "main"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+	got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
 	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
 	assert.Contains(t, got, "git checkout -b claude/agent-abc")
 	assert.Contains(t, got, "fix the bug")
@@ -160,7 +160,7 @@ func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
 	attr := commitAttribution{AuthorName: "Octo Cat", AuthorEmail: "1+octocat@users.noreply.github.com"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, attr, nil)
+	got := buildPrompt(spec, nil, "claude/agent-abc", attr, nil)
 	assert.Contains(t, got, `git config user.name "Octo Cat"`)
 	assert.Contains(t, got, `git config user.email "1+octocat@users.noreply.github.com"`)
 	assert.Contains(t, got, "Co-Authored-By")
@@ -168,7 +168,7 @@ func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__pr(t *testing.T) {
 	pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
-	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", false, commitAttribution{}, nil)
+	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", commitAttribution{}, nil)
 	assert.Contains(t, got, "git switch feature-x")
 	assert.Contains(t, got, "do NOT open a new pull request")
 	assert.Contains(t, got, "address review")
@@ -183,7 +183,7 @@ func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
 			Task:          "fix the bug",
 			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
 		}
-		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
 		assert.Contains(t, got, `Include "This resolves #12" in the pull request description`)
 	})
 
@@ -194,13 +194,13 @@ func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
 			Task:          "fix the bug",
 			ResolvesIssue: &IssueRef{Repository: "other-owner/other-repo", Number: 12},
 		}
-		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
 		assert.Contains(t, got, `Include "This resolves other-owner/other-repo#12" in the pull request description`)
 	})
 
 	t.Run("no origin: no backlink instruction", func(t *testing.T) {
 		spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
-		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
 		assert.NotContains(t, got, "This resolves")
 	})
 
@@ -213,7 +213,7 @@ func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
 			AutoCreatePr:  &no,
 			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
 		}
-		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
 		assert.NotContains(t, got, "This resolves")
 	})
 
@@ -224,7 +224,7 @@ func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
 			Task:          "address review",
 			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
 		}
-		got := buildPrompt(spec, pr, "feature-x", false, commitAttribution{}, nil)
+		got := buildPrompt(spec, pr, "feature-x", commitAttribution{}, nil)
 		assert.NotContains(t, got, "This resolves")
 	})
 }
@@ -236,7 +236,7 @@ func Test__RunCodeAgent__buildPrompt__structuredOutput(t *testing.T) {
 		"required":   []any{"summary"},
 	}
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, schema)
+	got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, schema)
 
 	assert.Contains(t, got, "fenced json code block")
 	assert.Contains(t, got, `"summary"`)

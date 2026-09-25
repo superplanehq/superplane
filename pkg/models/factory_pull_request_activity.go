@@ -13,6 +13,7 @@ import (
 
 type FactoryPullRequestActivityParams struct {
 	RunID             uuid.UUID
+	Title             string
 	Description       string
 	RevisionSHA       string
 	Access            string
@@ -131,16 +132,21 @@ func (a *FactoryPullRequestRun) RequestExclusiveAccess(tx *gorm.DB) (*FactoryPul
 	return pullRequest.RequestExclusiveAccess(tx, a)
 }
 
-func (a *FactoryPullRequestRun) UpdateDescription(tx *gorm.DB, description string) error {
+func (a *FactoryPullRequestRun) UpdateContent(tx *gorm.DB, title, description *string) error {
 	now := time.Now()
-	a.Description = strings.TrimSpace(description)
+	updates := map[string]any{"updated_at": now}
+	if title != nil {
+		a.Title = strings.TrimSpace(*title)
+		updates["title"] = a.Title
+	}
+	if description != nil {
+		a.Description = strings.TrimSpace(*description)
+		updates["description"] = a.Description
+	}
 	a.UpdatedAt = now
 	return tx.Model(a).
 		Where("pull_request_id = ? AND run_id = ?", a.PullRequestID, a.RunID).
-		Updates(map[string]any{
-			"description": a.Description,
-			"updated_at":  now,
-		}).Error
+		Updates(updates).Error
 }
 
 func (a *FactoryPullRequestRun) Finalize(tx *gorm.DB, run *CanvasRun) error {
@@ -214,6 +220,7 @@ func (p *FactoryPullRequest) insertActivity(
 		FeedbackHandlerID: params.FeedbackHandlerID,
 		Access:            access,
 		State:             state,
+		Title:             strings.TrimSpace(params.Title),
 		Description:       strings.TrimSpace(params.Description),
 		CreatedAt:         now,
 		UpdatedAt:         now,

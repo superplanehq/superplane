@@ -31,11 +31,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   entry("account", "profile", "Account", undefined, ["identity", "name", "avatar", "preferences"]),
   entry("account", "profile", "Identity", "account-redesign-identity", ["name", "primary email", "email", "avatar"]),
   entry("account", "profile", "Appearance", "account-redesign-appearance", ["theme", "light", "dark", "system"]),
-  entry("account", "profile", "GitHub for Velocity", "account-redesign-velocity-github", [
-    "github",
-    "velocity",
-    "pull requests",
-  ]),
   entry("account", "profile", "Security", "account-redesign-security", [
     "sign in",
     "password",
@@ -43,13 +38,17 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "sso",
     "login",
   ]),
+  entry("account", "profile", "Associated accounts", "account-redesign-associated-accounts", [
+    "linked accounts",
+    "github",
+    "velocity",
+    "pull requests",
+    "pr credit",
+  ]),
   entry("account", "profile", "Sign in methods", "account-redesign-signin", [
     "security",
     "password",
     "change password",
-    "github",
-    "google",
-    "sso",
   ]),
   entry("account", "profile", "Personal tokens", "account-redesign-tokens", [
     "create token",
@@ -90,6 +89,20 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "github",
     "issue intake",
   ]),
+
+  // Workspace · MCP servers
+  entry("workspace", "mcp", "MCP servers", undefined, [
+    "mcp server",
+    "mcp",
+    "oauth",
+    "header",
+    "agent",
+    "sign-in",
+    "tools",
+  ]),
+
+  // Workspace · Skills
+  entry("workspace", "skills", "Skills", undefined, ["skill", "skill.md", "agent", "github package"]),
 
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [

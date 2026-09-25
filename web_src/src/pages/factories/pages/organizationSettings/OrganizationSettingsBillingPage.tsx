@@ -1,5 +1,4 @@
-import { ChevronRight } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useParams } from "react-router";
 
 import type {
@@ -24,14 +23,14 @@ import {
   type BillingCreditBucketView,
 } from "../../lib/billingCreditBuckets";
 import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
-import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
+import { formatUsdCents } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
 import { BillingPlansSection } from "./BillingPlansSection";
+import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
-const BUY_MORE_PACK_CENTS = [5_000, 10_000, 50_000] as const;
 const HOSTED_CREDIT_EXPLANATION =
   "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
 const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
@@ -61,6 +60,9 @@ export function OrganizationSettingsBillingPage() {
         isLoading={model.isLoading}
         packs={packs}
         plan={model.plan}
+        planSource={model.planSource}
+        cancelAtPeriodEnd={model.cancelAtPeriodEnd}
+        subscriptionPending={model.cancelPending || model.keepPending}
         portalPending={model.billing.portalPending}
         purchased={model.purchased}
         remaining={model.remaining}
@@ -73,11 +75,48 @@ export function OrganizationSettingsBillingPage() {
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onAddCredit={model.billing.startCheckout}
         onSubscribe={model.billing.startBusinessCheckout}
+        onCancelSubscription={model.onCancelSubscription}
+        onKeepSubscription={model.onKeepSubscription}
         onManageInvoices={model.billing.openInvoices}
       />
     </FactorySettingsPageFrame>
   );
 }
+
+type BillingPageBodyProps = {
+  billingContactMessage?: string;
+  billingEnabled: boolean;
+  businessCheckoutPending: boolean;
+  canManageBilling: boolean;
+  checkoutPending: boolean;
+  creditPurchaseAllowed: boolean;
+  creditRefreshStatus: HostedCreditRefreshStatus;
+  error: unknown;
+  grants: OrganizationsOrganizationCreditGrant[];
+  hasBillingCustomer: boolean;
+  invoices: OrganizationsHostedCreditInvoice[];
+  isLoading: boolean;
+  packs: OrganizationsHostedCreditProduct[];
+  plan?: string;
+  planSource?: string;
+  cancelAtPeriodEnd: boolean;
+  subscriptionPending: boolean;
+  portalPending: boolean;
+  purchased: number;
+  remaining: number;
+  includedRemaining: number;
+  purchasedRemaining: number;
+  welcomeRemaining: number;
+  adminRemaining: number;
+  currentPeriodEnd?: string;
+  trialEndsAt?: string;
+  welcomeCreditExpiresAt?: string;
+  onAddCredit: (productId: string) => void | Promise<void>;
+  onSubscribe: () => void | Promise<void>;
+  onCancelSubscription: () => void | Promise<void>;
+  onKeepSubscription: () => void | Promise<void>;
+  onManageInvoices: () => void | Promise<void>;
+};
 
 function BillingPageBody({
   billingContactMessage,
@@ -94,6 +133,9 @@ function BillingPageBody({
   isLoading,
   packs,
   plan,
+  planSource,
+  cancelAtPeriodEnd,
+  subscriptionPending,
   portalPending,
   purchased,
   remaining,
@@ -106,36 +148,10 @@ function BillingPageBody({
   welcomeCreditExpiresAt,
   onAddCredit,
   onSubscribe,
+  onCancelSubscription,
+  onKeepSubscription,
   onManageInvoices,
-}: {
-  billingContactMessage?: string;
-  billingEnabled: boolean;
-  businessCheckoutPending: boolean;
-  canManageBilling: boolean;
-  checkoutPending: boolean;
-  creditPurchaseAllowed: boolean;
-  creditRefreshStatus: HostedCreditRefreshStatus;
-  error: unknown;
-  grants: OrganizationsOrganizationCreditGrant[];
-  hasBillingCustomer: boolean;
-  invoices: OrganizationsHostedCreditInvoice[];
-  isLoading: boolean;
-  packs: OrganizationsHostedCreditProduct[];
-  plan?: string;
-  portalPending: boolean;
-  purchased: number;
-  remaining: number;
-  includedRemaining: number;
-  purchasedRemaining: number;
-  welcomeRemaining: number;
-  adminRemaining: number;
-  currentPeriodEnd?: string;
-  trialEndsAt?: string;
-  welcomeCreditExpiresAt?: string;
-  onAddCredit: (productId: string) => void | Promise<void>;
-  onSubscribe: () => void | Promise<void>;
-  onManageInvoices: () => void | Promise<void>;
-}) {
+}: BillingPageBodyProps) {
   if (isLoading) {
     return (
       <FactorySettingsCard>
@@ -159,8 +175,13 @@ function BillingPageBody({
       <BillingPlansSection
         canManageBilling={canManageBilling}
         creditPurchaseAllowed={creditPurchaseAllowed}
-        pending={businessCheckoutPending}
+        planSource={planSource}
+        cancelAtPeriodEnd={cancelAtPeriodEnd}
+        currentPeriodEnd={currentPeriodEnd}
+        pending={businessCheckoutPending || subscriptionPending}
         onSubscribe={onSubscribe}
+        onCancel={onCancelSubscription}
+        onKeep={onKeepSubscription}
       />
       <HostedCreditRemainingCard
         billingContactMessage={billingContactMessage}
@@ -262,7 +283,7 @@ function HostedCreditRemainingCard({
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
   const showBuyMore = canManageBilling && creditPurchaseAllowed;
   const remainingShares = billingCreditRemainingShares(buckets);
-  const spendOrderCopy = billingSpendOrderCopy(buckets.some((bucket) => bucket.key === "grant"));
+  const spendOrderCopy = billingSpendOrderCopy(buckets);
 
   return (
     <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
@@ -396,76 +417,6 @@ function bucketAccentClassName(key: BillingCreditBucketKey) {
     case "grant":
       return "bg-emerald-500";
   }
-}
-
-function HostedCreditTopUpBanner({
-  checkoutPending,
-  packs,
-  onAddCredit,
-}: {
-  checkoutPending: boolean;
-  packs: OrganizationsHostedCreditProduct[];
-  onAddCredit: (productId: string) => void | Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const hasPurchasablePack = BUY_MORE_PACK_CENTS.some((cents) => findPackForCents(packs, cents));
-  const disabled = checkoutPending || !hasPurchasablePack;
-
-  return (
-    <div className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-violet-100 py-1 pr-1.5 pl-2.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900">
-      <button
-        type="button"
-        disabled={disabled}
-        aria-expanded={open}
-        aria-label="Top up"
-        data-testid="billing-top-up"
-        onClick={() => setOpen((current) => !current)}
-        className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-violet-800 disabled:pointer-events-none disabled:opacity-50 dark:text-violet-200"
-      >
-        {checkoutPending ? "Opening checkout..." : "Top up"}
-        <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
-      </button>
-      {open ? (
-        <div className="flex items-center gap-1" data-testid="billing-top-up-options">
-          {BUY_MORE_PACK_CENTS.map((cents) => {
-            const product = findPackForCents(packs, cents);
-            const productId = product?.id ?? "";
-            return (
-              <button
-                key={cents}
-                type="button"
-                disabled={!productId || checkoutPending}
-                onClick={() => productId && void onAddCredit(productId)}
-                className="inline-flex h-5 items-center rounded-full bg-violet-600 px-2.5 text-[11px] leading-none font-medium text-white hover:bg-violet-700 disabled:pointer-events-none disabled:opacity-40"
-              >
-                {formatUsdPackLabel(cents)}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            disabled
-            title="Custom amounts are not available yet."
-            className="inline-flex h-5 cursor-not-allowed items-center rounded-full bg-violet-600/40 px-2.5 text-[11px] leading-none font-medium text-white"
-          >
-            Custom
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function findPackForCents(packs: OrganizationsHostedCreditProduct[], cents: number) {
-  return packs.find((product) => Boolean(product.id) && parseWorkOrderMetric(product.amountCents) === cents);
-}
-
-function formatUsdPackLabel(cents: number): string {
-  const dollars = cents / 100;
-  if (Number.isInteger(dollars)) {
-    return `$${dollars}`;
-  }
-  return formatUsdCents(cents);
 }
 
 function creditRefreshClassName(status: HostedCreditRefreshStatus) {

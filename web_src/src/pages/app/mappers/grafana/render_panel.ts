@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { getStateMap } from "..";
+import { getStateMap } from "../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type {
   ComponentBaseContext,
@@ -10,7 +10,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { buildGrafanaEventSections } from "./base";
 import { buildDashboardSelectionMetadata, buildPanelMetadata, buildTimeRangeMetadata } from "./dashboard_shared";
 import type { DashboardNodeMetadata, RenderPanelConfiguration, RenderPanelOutput } from "./types";
@@ -51,7 +51,7 @@ export const renderPanelMapper: ComponentBaseMapper = {
       }
     }
 
-    const output: RenderPanelOutput | undefined = payload.data;
+    const output = payload.data as RenderPanelOutput | undefined;
     if (!output) {
       details.Response = "No data returned";
       return details;

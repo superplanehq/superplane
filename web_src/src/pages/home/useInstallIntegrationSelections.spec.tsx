@@ -1,8 +1,9 @@
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import type { OrganizationsIntegration } from "@/api-client";
 
+import type { IntegrationInstanceSummary } from "./homeIntegrationStatus";
 import { useInstallIntegrationSelections } from "./useInstallIntegrationSelections";
 
 const savedSelections = { github: { id: "saved-github", name: "saved-github", ready: false } };
@@ -45,6 +46,54 @@ describe("useInstallIntegrationSelections", () => {
 
     expect(onSelectionsChange).toHaveBeenCalledWith({
       github: { id: "saved-github", name: "acme-github", ready: true },
+    });
+  });
+
+  it("selects the integration that completed setup after the connection list loads", () => {
+    const onSelectionsChange = vi.fn();
+    const returnedOpenRouter: OrganizationsIntegration = {
+      metadata: { id: "returned-openrouter", name: "openrouter-4", integrationName: "openrouter" },
+      status: { state: "ready" },
+    };
+    const { rerender } = renderHook(
+      ({ loading, integrationData }: { loading: boolean; integrationData: IntegrationInstanceSummary[] }) =>
+        useInstallIntegrationSelections({
+          integrationData,
+          selections: {},
+          onSelectionsChange,
+          manualSelectionNames: ["openrouter"],
+          loading,
+          initialPreferredIntegrationId: "returned-openrouter",
+        }),
+      {
+        initialProps: {
+          loading: true,
+          integrationData: [
+            {
+              name: "openrouter",
+              allInstances: [] as OrganizationsIntegration[],
+              readyInstances: [] as OrganizationsIntegration[],
+            },
+          ],
+        },
+      },
+    );
+
+    expect(onSelectionsChange).not.toHaveBeenCalled();
+
+    rerender({
+      loading: false,
+      integrationData: [
+        {
+          name: "openrouter",
+          allInstances: [returnedOpenRouter],
+          readyInstances: [returnedOpenRouter],
+        },
+      ],
+    });
+
+    expect(onSelectionsChange).toHaveBeenCalledWith({
+      openrouter: { id: "returned-openrouter", name: "openrouter-4", ready: true },
     });
   });
 });

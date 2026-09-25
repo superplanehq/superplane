@@ -32,53 +32,26 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnAlertFiredEventData;
-
-    return {
-      Name: eventData?.name ?? "-",
-      "Alert Type": eventData?.alert_type ?? "-",
-      Status: eventData?.status ?? "-",
-      Summary: eventData?.summary ?? "-",
-      Severity: eventData?.severity ?? "-",
-      "Result Value": eventData?.result_value?.toString() ?? "-",
-      "Triggered At": eventData?.triggered_at ?? "-",
-      "Trigger URL": eventData?.trigger_url ?? "-",
-    };
+    return alertFiredValues(context.event?.data as OnAlertFiredEventData);
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const configuration = node.configuration as unknown as OnAlertFiredConfiguration;
-    const metadataItems = [];
-
-    if (configuration?.datasetSlug) {
-      metadataItems.push({
-        icon: "database",
-        label: configuration.datasetSlug,
-      });
-    }
-
-    if (configuration?.trigger) {
-      metadataItems.push({
-        icon: "bell",
-        label: configuration.trigger,
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: honeycombIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: alertFiredMetadataItems(configuration),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnAlertFiredEventData;
-
+      const { title, subtitle } = onAlertFiredTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
-        title: buildEventTitle(eventData),
-        subtitle: lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "",
+        title,
+        subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,
@@ -88,6 +61,47 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function alertFiredValues(eventData?: OnAlertFiredEventData): Record<string, string> {
+  return {
+    Name: missingToDash(eventData?.name),
+    "Alert Type": missingToDash(eventData?.alert_type),
+    Status: missingToDash(eventData?.status),
+    Summary: missingToDash(eventData?.summary),
+    Severity: missingToDash(eventData?.severity),
+    "Result Value": missingToDash(eventData?.result_value),
+    "Triggered At": missingToDash(eventData?.triggered_at),
+    "Trigger URL": missingToDash(eventData?.trigger_url),
+  };
+}
+
+function missingToDash(value: string | number | undefined | null): string {
+  if (value == null) {
+    return "-";
+  }
+
+  return String(value);
+}
+
+function alertFiredMetadataItems(configuration?: OnAlertFiredConfiguration) {
+  const metadataItems = [];
+
+  if (configuration?.datasetSlug) {
+    metadataItems.push({
+      icon: "database",
+      label: configuration.datasetSlug,
+    });
+  }
+
+  if (configuration?.trigger) {
+    metadataItems.push({
+      icon: "bell",
+      label: configuration.trigger,
+    });
+  }
+
+  return metadataItems;
+}
 
 function buildEventTitle(eventData?: OnAlertFiredEventData): string {
   const name = eventData?.name?.trim() || "Alert Fired";

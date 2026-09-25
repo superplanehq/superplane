@@ -10,7 +10,7 @@ import type {
 import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
@@ -26,7 +26,7 @@ interface RunFunctionMetadata {
 
 interface RunFunctionOutput {
   requestId: string;
-  payload?: any;
+  payload?: unknown;
   payloadRaw?: string;
   functionError?: string;
   report?: {
@@ -121,14 +121,14 @@ function runFunctionSpecs(node: NodeInfo): ComponentBaseSpec[] {
 
 function runFunctionEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({
     event: {
-      nodeId: rootTriggerNode?.id!,
-      id: execution.rootEvent?.id!,
-      createdAt: execution.rootEvent?.createdAt!,
+      nodeId: rootTriggerNode?.id ?? "",
+      id: execution.rootEvent?.id ?? "",
+      createdAt: execution.rootEvent?.createdAt ?? "",
       data: execution.rootEvent?.data || {},
-      type: execution.rootEvent?.type!,
+      type: execution.rootEvent?.type ?? "",
     },
   });
 
@@ -138,7 +138,7 @@ function runFunctionEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }

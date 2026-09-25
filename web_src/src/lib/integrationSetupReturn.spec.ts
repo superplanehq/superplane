@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
   INTEGRATION_SETUP_RETURN_COOKIE,
@@ -6,22 +6,26 @@ import {
   consumeIntegrationSetupReturnIfArrived,
   hasGitHubSetupRequest,
   hasIntegrationSetupStay,
+  peekIntegrationSetupReturnPreferredIntegration,
   peekIntegrationSetupReturn,
   rememberIntegrationSetupReturn,
   withGitHubSetupRequest,
+  configurationWithSetupReturnPath,
 } from "./integrationSetupReturn";
 
 function setupReturnCookie(): string | undefined {
   const prefix = `${INTEGRATION_SETUP_RETURN_COOKIE}=`;
-  return document.cookie
+  const value = document.cookie
     .split("; ")
     .find((part) => part.startsWith(prefix))
     ?.slice(prefix.length);
+  return value === undefined || value === "" ? undefined : value;
 }
 
 describe("integration setup return", () => {
   afterEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     document.cookie = `${INTEGRATION_SETUP_RETURN_COOKIE}=; Path=/; Max-Age=0`;
     vi.useRealTimers();
   });
@@ -34,6 +38,29 @@ describe("integration setup return", () => {
     consumeIntegrationSetupReturn("org-1");
     expect(peekIntegrationSetupReturn("org-1")).toBeNull();
     expect(setupReturnCookie()).toBeUndefined();
+  });
+
+  it("stores the integration that started the provider round trip", () => {
+    rememberIntegrationSetupReturn("org-1", "/org-1/workspaces/APP/setup?step=agent", "openrouter-1");
+
+    expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBe("openrouter-1");
+
+    consumeIntegrationSetupReturn("org-1");
+    expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBeNull();
+  });
+
+  it("keeps a provider return isolated from another tab", () => {
+    const providerPath = "/org-1/workspaces/APP/setup?step=agent";
+    rememberIntegrationSetupReturn("org-1", providerPath, "openrouter-1");
+
+    // A legacy setup in another tab writes organization-wide local storage.
+    window.localStorage.setItem(
+      "integration-setup-return:org-1",
+      JSON.stringify({ path: "/org-1/workspaces/OTHER/setup", createdAt: Date.now() }),
+    );
+
+    expect(peekIntegrationSetupReturn("org-1")).toBe(providerPath);
+    expect(peekIntegrationSetupReturnPreferredIntegration("org-1")).toBe("openrouter-1");
   });
 
   it("mirrors the return path in a cookie for the GitHub callback", () => {
@@ -99,6 +126,16 @@ describe("integration setup return", () => {
     rememberIntegrationSetupReturn("org-1", "/onboarding?attempt=attempt-1&step=vcs&pick=newest");
 
     expect(peekIntegrationSetupReturn("org-1")).toBe("/onboarding?attempt=attempt-1&step=vcs&pick=newest");
+  });
+
+  it("adds setupReturnPath when a return path is present", () => {
+    expect(
+      configurationWithSetupReturnPath({ clientId: "id" }, "/org-1/workspaces/sp/lines/line-1/setup/jira"),
+    ).toEqual({
+      clientId: "id",
+      setupReturnPath: "/org-1/workspaces/sp/lines/line-1/setup/jira",
+    });
+    expect(configurationWithSetupReturnPath({ clientId: "id" })).toEqual({ clientId: "id" });
   });
 
   it("expires a return path after fifteen minutes", () => {

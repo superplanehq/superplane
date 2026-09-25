@@ -130,6 +130,38 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
 }
 
+/** Legacy query that opened Add Jira intake on the line board. */
+export const JIRA_INTAKE_SETUP_SEARCH_PARAM = "jiraIntake";
+/** Connection created in this OAuth round trip. The Jira callback appends it. */
+export const JIRA_INTAKE_INTEGRATION_SEARCH_PARAM = "jiraIntegrationId";
+
+/** Dedicated setup page for Jira issue intake. */
+export function factoryJiraIntakeSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  options?: { integrationId?: string },
+) {
+  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/jira`;
+  const integrationId = options?.integrationId?.trim();
+  if (!integrationId) {
+    return path;
+  }
+  const params = new URLSearchParams();
+  params.set(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  return `${path}?${params.toString()}`;
+}
+
+export function isJiraIntakeSetupSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(JIRA_INTAKE_SETUP_SEARCH_PARAM) === "1";
+}
+
+export function jiraIntakeIntegrationIdFromSearch(search: string): string {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM)?.trim() ?? "";
+}
+
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
 /** Opens PR feedback settings on a tab: general, agent, or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
@@ -166,6 +198,34 @@ export function prFeedbackSettingsTabFromSearch(search: string): string | null {
 export function prFeedbackHandlerIdFromSearch(search: string): string | null {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
+}
+
+export const PLANNING_SEARCH_PARAM = "planning";
+/** Opens Planning settings on a tab: general, agent, or automation. */
+export const PLANNING_SETTINGS_SEARCH_PARAM = "planningSettings";
+
+export function factoryPlanningPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  settingsTab?: string,
+) {
+  const params = new URLSearchParams();
+  params.set(PLANNING_SEARCH_PARAM, "1");
+  if (settingsTab) {
+    params.set(PLANNING_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function isPlanningSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PLANNING_SEARCH_PARAM) === "1";
+}
+
+export function planningSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PLANNING_SETTINGS_SEARCH_PARAM);
 }
 
 /** Opens the per-column Automations drawer. Value is a column key. */
@@ -303,12 +363,27 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
   return sourceId === "checks" ? "checks" : "comments";
 }
 
+/** Dedicated setup page for the post-onboarding Backlog Refinement wizard. */
+export function factoryPlanningSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
+}
+
+/** Dedicated setup page for Sentry exception intake. */
+export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
+/** Dedicated setup page for Productive.io task intake. */
+export function factoryProductiveIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/productive`;
+}
+
 export function automationsPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/automations`;
 }
 
 export function automationDetailPath(organizationId: string, factoryKey: string, appId: string) {
-  return `${automationsPath(organizationId, factoryKey)}/${appId}`;
+  return factoryAppPath(organizationId, factoryKey, appId, { from: "automations" });
 }
 
 export type FactoryAppNavFrom = "automations" | "lines" | "task" | "overview";
@@ -412,7 +487,7 @@ export function factoryAppPath(
   appId: string,
   options?: FactoryAppNavOptions,
 ) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}${buildFactoryAppSearchParams(options)}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations/${appId}${buildFactoryAppSearchParams(options)}`;
 }
 
 export function factoryAppRunPath(
@@ -448,7 +523,7 @@ export function factoryAppSplitRunPath(
     search.set("canvas", options.canvas);
   }
   const qs = search.toString();
-  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}/split-run${qs ? `?${qs}` : ""}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations/${appId}/split-run${qs ? `?${qs}` : ""}`;
 }
 
 export function factorySettingsPath(organizationId: string, factoryKey: string) {

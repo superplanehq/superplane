@@ -13,6 +13,8 @@ type SupportFeedbackRequestedMessage struct {
 	OrganizationName string                     `json:"organization_name"`
 	PagePath         string                     `json:"page_path,omitempty"`
 	Attachment       *SupportFeedbackAttachment `json:"attachment,omitempty"`
+	EmailDelivered   bool                       `json:"email_delivered,omitempty"`
+	DiscordDelivered bool                       `json:"discord_delivered,omitempty"`
 }
 
 type SupportFeedbackAttachment struct {

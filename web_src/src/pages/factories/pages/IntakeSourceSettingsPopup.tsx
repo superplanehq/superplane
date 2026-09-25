@@ -1,17 +1,22 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
+import { cn } from "@/lib/utils";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
+import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
 import {
   INTAKE_SETTINGS_COPY,
   intakeSettingsTabs,
-  normalizeIntakeSourceSettings,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
+import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
+import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
+import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import {
   SettingsAutomationCanvasEdit,
@@ -19,12 +24,15 @@ import {
   SettingsAutomationWorkspace,
 } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
+import { lineIntakeSourceById, type LineIntakeSourceId } from "./lineIntakeModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
-import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
   sourceId?: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   automationGraph?: IntakeAutomationGraph;
@@ -34,6 +42,9 @@ interface IntakeSourceSettingsPopupProps {
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   savePending?: boolean;
   saveError?: string;
+  deletePending?: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
   editAutomationHref?: string;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
@@ -46,6 +57,9 @@ interface IntakeSourceSettingsPopupProps {
 export function IntakeSourceSettingsPopup({
   settings,
   sourceId = "github-issues",
+  organizationId,
+  integrationId,
+  resourceId,
   labelOptions,
   labelOptionsLoading,
   automationGraph,
@@ -55,6 +69,9 @@ export function IntakeSourceSettingsPopup({
   onSave,
   savePending = false,
   saveError,
+  deletePending = false,
+  deleteError,
+  onDelete,
   editAutomationHref,
   canvasId,
   runHrefFor,
@@ -81,7 +98,11 @@ export function IntakeSourceSettingsPopup({
 
   return (
     <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={`Intake ${settings.name}`} onClose={onClose}>
+      <PopupHeader
+        title={`Intake ${settings.name}`}
+        onClose={onClose}
+        leading={<IntakeSourceTitleLogo sourceId={sourceId} />}
+      >
         <SettingsAutomationHeaderRow
           tabs={
             <Tabs value={tab} onValueChange={(value) => setTab(value as IntakeSettingsTab)}>
@@ -108,6 +129,9 @@ export function IntakeSourceSettingsPopup({
       <IntakeSettingsTabPanel
         tab={tab}
         sourceId={sourceId}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        resourceId={resourceId}
         labelOptions={labelOptions}
         labelOptionsLoading={labelOptionsLoading}
         draft={draft}
@@ -121,6 +145,9 @@ export function IntakeSourceSettingsPopup({
         editAutomationHref={editAutomationHref}
         savePending={savePending}
         saveError={saveError}
+        deletePending={deletePending}
+        deleteError={deleteError}
+        onDelete={onDelete}
         onDraftChange={setDraft}
         onSave={onSave}
         onClose={onClose}
@@ -129,9 +156,32 @@ export function IntakeSourceSettingsPopup({
   );
 }
 
+function IntakeSourceTitleLogo({ sourceId }: { sourceId: LineIntakeSourceId }) {
+  const source = lineIntakeSourceById(sourceId);
+  if (!source?.iconSrc) {
+    return null;
+  }
+
+  return (
+    <img
+      src={source.iconSrc}
+      alt=""
+      data-testid="intake-source-settings-title-icon"
+      className={cn(
+        "size-5 shrink-0 object-contain",
+        source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+        logoDarkInvertClass(source.iconSrc),
+      )}
+    />
+  );
+}
+
 function IntakeSettingsTabPanel({
   tab,
   sourceId,
+  organizationId,
+  integrationId,
+  resourceId,
   labelOptions,
   labelOptionsLoading,
   draft,
@@ -145,12 +195,18 @@ function IntakeSettingsTabPanel({
   editAutomationHref,
   savePending,
   saveError,
+  deletePending,
+  deleteError,
+  onDelete,
   onDraftChange,
   onSave,
   onClose,
 }: {
   tab: IntakeSettingsTab;
   sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
@@ -164,6 +220,9 @@ function IntakeSettingsTabPanel({
   editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
+  deletePending: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
@@ -188,6 +247,8 @@ function IntakeSettingsTabPanel({
         initialDraft={agent.draft}
         onSave={agent.onSave}
         organizationId={agent.organizationId}
+        factoryId={agent.factoryId}
+        factoryKey={agent.factoryKey}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -197,11 +258,17 @@ function IntakeSettingsTabPanel({
   return (
     <IntakeGeneralTab
       sourceId={sourceId}
+      organizationId={organizationId}
+      integrationId={integrationId}
+      resourceId={resourceId}
       labelOptions={labelOptions}
       labelOptionsLoading={labelOptionsLoading}
       draft={draft}
       savePending={savePending}
       saveError={saveError}
+      deletePending={deletePending}
+      deleteError={deleteError}
+      onDelete={onDelete}
       onDraftChange={onDraftChange}
       onSave={onSave}
       onClose={onClose}
@@ -211,21 +278,33 @@ function IntakeSettingsTabPanel({
 
 function IntakeGeneralTab({
   sourceId,
+  organizationId,
+  integrationId,
+  resourceId,
   labelOptions,
   labelOptionsLoading,
   draft,
   savePending,
   saveError,
+  deletePending,
+  deleteError,
+  onDelete,
   onDraftChange,
   onSave,
   onClose,
 }: {
   sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
+  deletePending: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
@@ -241,32 +320,36 @@ function IntakeGeneralTab({
             labelOptions={labelOptions}
             labelOptionsLoading={labelOptionsLoading}
           />
+          <JiraIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            projectId={resourceId}
+          />
+          <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <ProductiveIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            projectId={resourceId}
+          />
         </div>
       </div>
-      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-        {saveError ? (
-          <p className="workspace-body-text text-destructive" role="alert">
-            {saveError}
-          </p>
-        ) : (
-          <span />
-        )}
-        <Button
-          type="button"
-          disabled={savePending}
-          onClick={async () => {
-            try {
-              await onSave(normalizeIntakeSourceSettings(draft));
-              onClose();
-            } catch {
-              // The parent supplies the actionable error message.
-            }
-          }}
-          data-testid="intake-source-settings-save"
-        >
-          {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
-        </Button>
-      </footer>
+      <IntakeSourceSettingsFooter
+        sourceId={sourceId}
+        draft={draft}
+        savePending={savePending}
+        saveError={saveError}
+        deletePending={deletePending}
+        deleteError={deleteError}
+        onDelete={onDelete}
+        onSave={onSave}
+        onClose={onClose}
+      />
     </>
   );
 }

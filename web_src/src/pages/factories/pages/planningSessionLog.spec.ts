@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
@@ -45,6 +45,11 @@ describe("isPlanningSessionNoise", () => {
   it("treats survey JSON as a tool payload", () => {
     expect(isPlanningSessionToolPayload('{"questions":[{"prompt":"Priority?","options":["High"]}]}')).toBe(true);
     expect(isPlanningSessionToolPayload('{"status":"shown"}')).toBe(true);
+  });
+
+  it("treats spec and confidence JSON as tool payloads", () => {
+    expect(isPlanningSessionToolPayload('{"body":"# Add breed\\n## Executive summary"}')).toBe(true);
+    expect(isPlanningSessionToolPayload('{"score":4,"summary":"The files already exist."}')).toBe(true);
   });
 
   it("treats say and draft JSON as tool payloads", () => {

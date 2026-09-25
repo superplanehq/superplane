@@ -46,19 +46,41 @@ export function workOrderCardPullRequestVisibleLabel(pullRequest: FactoriesFacto
   return `${verb} ${number}${extra}`;
 }
 
+export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
+  return Boolean(pullRequest?.mergeable) && pullRequestState(pullRequest?.state) === "open";
+}
+
 /**
- * An open Review pill already asks for review. Keep other attention,
- * including Needs attention and notes next to a closed or merged
- * request.
+ * An open Review pill already asks for review. A merged request is
+ * already done, so hide the review wait until the task closes. Keep
+ * other attention next to a closed request. A Mergeable pill already
+ * says checks passed.
  */
 export function visibleWorkOrderCardAttentionReasons(
   reasons: WorkOrderAttentionReason[],
   cardPullRequest: WorkOrderCardPullRequest | null,
+  showPullRequestMerge?: boolean,
 ): WorkOrderAttentionReason[] {
-  if (!cardPullRequest || pullRequestState(cardPullRequest.pullRequest.state) !== "open") {
+  if (!cardPullRequest) {
     return reasons;
   }
-  return reasons.filter((reason) => reason !== "approval");
+  const state = pullRequestState(cardPullRequest.pullRequest.state);
+  if (state !== "open" && state !== "merged") {
+    return reasons;
+  }
+  return reasons.filter((reason) => {
+    if (reason === "approval") {
+      return false;
+    }
+    if (
+      reason === "checksPassed" &&
+      showPullRequestMerge &&
+      workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest)
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function workOrderCardPullRequestAriaLabel(pullRequest: FactoriesFactoryPullRequest, extraCount = 0): string {

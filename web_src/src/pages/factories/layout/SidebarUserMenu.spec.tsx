@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FACTORIES_ORGANIZATION_ID } from "../__fixtures__/factoryPageResponses";
@@ -32,7 +32,15 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderMenu(planLabel?: string) {
+function renderMenu({
+  planLabel,
+  factoryKey = "RFSDR",
+  withFactoryKey = true,
+}: {
+  planLabel?: string;
+  factoryKey?: string;
+  withFactoryKey?: boolean;
+} = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -44,7 +52,7 @@ function renderMenu(planLabel?: string) {
               element={
                 <SidebarUserMenu
                   organizationId={FACTORIES_ORGANIZATION_ID}
-                  factoryKey="RFSDR"
+                  factoryKey={withFactoryKey ? factoryKey : undefined}
                   userName="Ada Lovelace"
                   organizationName="SuperPlane"
                   planLabel={planLabel}
@@ -113,7 +121,7 @@ describe("SidebarUserMenu", () => {
 
   it("shows the plan below the organization name in the open menu", async () => {
     const user = userEvent.setup();
-    renderMenu("Business");
+    renderMenu({ planLabel: "Business" });
 
     const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
     expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
@@ -127,7 +135,7 @@ describe("SidebarUserMenu", () => {
 
   it("shows Trial in the open menu but never under the avatar for a trial organization", async () => {
     const user = userEvent.setup();
-    renderMenu("Trial");
+    renderMenu({ planLabel: "Trial" });
 
     const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
     expect(trigger).toHaveAccessibleName("Ada Lovelace, SuperPlane");
@@ -148,6 +156,69 @@ describe("SidebarUserMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: "Installation Admin" }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/admin");
+  });
+
+  it("renders Profile, Installation Admin, and organization settings as links", async () => {
+    accountMocks.installationAdmin = true;
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+
+    const profile = screen.getByTestId("factories-sidebar-profile");
+    expect(profile.tagName).toBe("A");
+    expect(profile).toHaveAttribute("href", `/${FACTORIES_ORGANIZATION_ID}/workspaces/rfsdr/settings/account/general`);
+
+    const installationAdmin = screen.getByTestId("factories-sidebar-installation-admin");
+    expect(installationAdmin.tagName).toBe("A");
+    expect(installationAdmin).toHaveAttribute("href", "/admin");
+
+    const organizationSettings = screen.getByTestId("factories-sidebar-organization-settings-link");
+    expect(organizationSettings.tagName).toBe("A");
+    expect(organizationSettings).toHaveAttribute(
+      "href",
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/rfsdr/settings/organization/general`,
+    );
+  });
+
+  it("renders profile and organization settings without a factory key", async () => {
+    const user = userEvent.setup();
+    renderMenu({ withFactoryKey: false });
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+
+    expect(screen.getByTestId("factories-sidebar-profile")).toHaveAttribute(
+      "href",
+      `/${FACTORIES_ORGANIZATION_ID}/settings/profile`,
+    );
+    expect(screen.getByTestId("factories-sidebar-organization-settings-link")).toHaveAttribute(
+      "href",
+      `/${FACTORIES_ORGANIZATION_ID}/settings/general`,
+    );
+  });
+
+  it("opens Profile in the same tab on a plain click", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Profile" }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/rfsdr/settings/account/general`,
+    );
+  });
+
+  it("opens organization settings in the same tab on a plain click", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByLabelText("Organization settings"));
+
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/rfsdr/settings/organization/general`,
+    );
   });
 
   it("lists organizations and Create new organization last", async () => {

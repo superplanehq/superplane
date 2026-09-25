@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryPRFeedbackDataModule from "@/hooks/useFactoryPRFeedbackData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { PR_DISCUSSION_HANDLER } from "../__fixtures__/columnAutomationsFixture";
@@ -26,26 +27,26 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
-  ...(await importOriginal<typeof CanvasDataModule>()),
+vi.mock("@/hooks/useCanvasData", () => ({
+  ...unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData"),
   useCanvas,
   useTriggers,
   useInfiniteCanvasRuns,
 }));
 
-vi.mock("@/hooks/useComponentData", async (importOriginal) => ({
-  ...(await importOriginal<typeof ComponentDataModule>()),
+vi.mock("@/hooks/useComponentData", () => ({
+  ...unmockedSrc<typeof ComponentDataModule>("hooks/useComponentData"),
   useComponents,
 }));
 
-vi.mock("@/hooks/useIntegrations", async (importOriginal) => ({
-  ...(await importOriginal<typeof IntegrationsModule>()),
+vi.mock("@/hooks/useIntegrations", () => ({
+  ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
   useConnectedIntegrations: () => ({ data: [], isLoading: false, error: null }),
   useAvailableIntegrations: () => ({ data: [], isLoading: false }),
 }));
 
-vi.mock("@/hooks/useFactoryPRFeedbackData", async (importOriginal) => ({
-  ...(await importOriginal<typeof FactoryPRFeedbackDataModule>()),
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  ...unmockedSrc<typeof FactoryPRFeedbackDataModule>("hooks/useFactoryPRFeedbackData"),
   useFactoryPRFeedbackHandlers: () => ({
     data: [PR_DISCUSSION_HANDLER],
     isPending: false,
@@ -143,13 +144,13 @@ describe("PRFeedbackSettingsHost", () => {
     const edit = within(automation).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute(
       "href",
-      "/org-1/workspaces/rf/apps/app-pr-discussion?configure=1&agent=1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/automations/app-pr-discussion?configure=1&agent=1&from=lines&lineId=line-plan",
     );
     expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-pr-discussion", {}, true);
     const sidebar = within(automation).getByTestId("factory-automation-runs-sidebar");
     expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/rf/apps/app-pr-discussion?run=run-pr-1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/automations/app-pr-discussion?run=run-pr-1&from=lines&lineId=line-plan",
     );
   });
 });

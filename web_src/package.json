@@ -17,10 +17,9 @@
     "lint:baseline:update": "node scripts/check-eslint-budget.mjs --update-baseline",
     "generate:api": "openapi-ts --silent",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "bun test --watch --isolate",
+    "test:run": "bun test --isolate --dots",
+    "test:coverage": "bun test --coverage --isolate --dots",
     "storybook": "storybook dev --no-open -p 6006",
     "build-storybook": "storybook build",
     "format": "prettier --write --log-level warn '**/*.{ts,tsx}'",
@@ -34,8 +33,7 @@
     "@headlessui/react": "^2.2.4",
     "@marcbachmann/cel-js": "^8.0.0",
     "@monaco-editor/react": "^4.7.0",
-    "@pierre/diffs": "^1.2.2",
-    "@pierre/trees": "^1.0.0-beta.4",
+    "@pierre/diffs": "^1.4.3",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -85,11 +83,11 @@
     "elkjs": "^0.10.0",
     "embla-carousel-react": "^8.6.0",
     "html-to-image": "^1.11.11",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.3.2",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.545.0",
     "mermaid": "^11.17.2",
-    "posthog-js": "^1.425.0",
+    "posthog-js": "^1.433.6",
     "react": "^19.2.7",
     "react-day-picker": "^9.11.0",
     "react-diff-view": "^3.3.2",
@@ -115,6 +113,7 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^5.3.0",
     "@eslint/js": "^10.0.1",
+    "@happy-dom/global-registrator": "^20.14.5",
     "@hey-api/openapi-ts": "^0.99.0",
     "@storybook/addon-a11y": "^10.5.7",
     "@storybook/addon-docs": "^10.5.7",
@@ -127,8 +126,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
-    "@vitest/coverage-v8": "^4.1.10",
-    "@vitest/ui": "^4.1.10",
     "eslint": "^10.10.0",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
@@ -138,7 +135,7 @@
     "eslint-plugin-storybook": "^10.5.7",
     "globals": "^16.0.0",
     "jsdom": "^30.0.1",
-    "knip": "^5.88.1",
+    "knip": "^6.35.0",
     "msw": "^2.14.6",
     "msw-storybook-addon": "^2.0.7",
     "prettier": "^3.6.2",
@@ -147,7 +144,7 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.69.0",
     "vite": "^8.2.1",
-    "vitest": "^4.1.10",
+    "vitest": "^5.0.0",
     "web-worker": "^1.5.0"
   },
   "prettier": {
@@ -155,6 +152,13 @@
     "trailingComma": "all"
   },
   "overrides": {
+    "js-yaml": "$js-yaml",
+    "@humanfs/node": "0.16.8",
+    "brace-expansion@1": "1.1.21",
+    "brace-expansion@5": "5.0.12",
+    "posthog-js": {
+      "fflate": "0.4.9"
+    },
     "monaco-editor": {
       "dompurify": "^3.4.14"
     },

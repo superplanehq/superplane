@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { fetchFactoryPageFixture } from "./handlers";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
+import { refineChatBoardFixture } from "./refineChatBoardFixture";
 import {
   CLOSED_WORK_ORDER,
   defaultFactoriesFixture,
+  DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -12,6 +14,7 @@ import {
   REFUND_LINE_PLAN_ID,
   RUNNING_WORK_ORDER,
 } from "./factoryPageResponses";
+import { HEADER_MCP_RESOURCE } from "./agentResourceFixtures";
 import { BUSINESS_ORGANIZATION_BILLING } from "./usageReportFixtures";
 
 describe("matchFactoryPageFixture", () => {
@@ -31,10 +34,35 @@ describe("matchFactoryPageFixture", () => {
   });
 
   it("serves tasks and includes both open and closed entries", async () => {
-    const orders = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/orders`);
+    const orders = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100`);
     const body = (await orders.json()) as { orders: Array<{ id?: string; state?: string }> };
     const ids = body.orders.map((entry) => entry.id);
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
+  });
+
+  it("filters work orders by user", async () => {
+    const unassigned = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100&unassigned=true`,
+    );
+    const unassignedBody = (await unassigned.json()) as { orders: Array<{ assignees?: Array<{ id?: string }> }> };
+    expect(unassignedBody.orders.length).toBeGreaterThan(0);
+    expect(unassignedBody.orders.every((order) => (order.assignees ?? []).length === 0)).toBe(true);
+
+    const byUser = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100&userId=nobody-here`,
+    );
+    const byUserBody = (await byUser.json()) as { orders: Array<{ id?: string }> };
+    expect(byUserBody.orders).toEqual([]);
+  });
+
+  it("pages work orders by state and limit", async () => {
+    const page = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_DRAFT&limit=1`,
+    );
+    const body = (await page.json()) as { orders: Array<{ id?: string; state?: string }>; hasNextPage?: boolean };
+    expect(body.orders).toHaveLength(1);
+    expect(body.orders[0]?.state).toBe("STATE_DRAFT");
+    expect(body.hasNextPage).toBe(true);
   });
 
   it("serves factory usage, usage history, and organization workspace usage reports", async () => {
@@ -82,10 +110,37 @@ describe("matchFactoryPageFixture", () => {
     });
   });
 
-  it("returns factory apps for the populated factory", async () => {
-    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
+  it("deletes a factory automation by id", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      { method: "POST", body: JSON.stringify({ name: "Create env", columnKey: "verify" }) },
+      fixture,
+    );
+    const createdBody = (await created.json()) as { automation?: { id?: string } };
+    const automationId = createdBody.automation?.id;
+    expect(automationId).toBeTruthy();
+
+    const deleted = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations/${automationId}`,
+      { method: "DELETE" },
+      fixture,
+    );
+    expect(deleted.status).toBe(200);
+
+    const list = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`,
+      undefined,
+      fixture,
+    );
+    const body = (await list.json()) as { automations?: Array<{ id?: string }> };
+    expect(body.automations?.some((entry) => entry.id === automationId)).toBe(false);
+  });
+
+  it("returns factory automations for the populated factory", async () => {
+    const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/automations`);
     await expect(apps.json()).resolves.toMatchObject({
-      apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
+      automations: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
   });
 
@@ -228,16 +283,46 @@ describe("matchFactoryPageFixture", () => {
     expect(fixture.organizationBilling).toMatchObject({ plan: "business" });
   });
 
-  it("lists two pull requests per line-board column across draft, open, merged, and closed", async () => {
+  it("cancels and resumes Polar Business on the billing routes", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      organizationBilling: { ...BUSINESS_ORGANIZATION_BILLING },
+    };
+
+    const canceled = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/cancel`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(canceled.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: true,
+    });
+
+    const resumed = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/billing/resume`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    await expect(resumed.json()).resolves.toMatchObject({
+      plan: "business",
+      cancelAtPeriodEnd: false,
+    });
+  });
+
+  it("returns pull requests on listed work orders", async () => {
     const response = await fetchFactoryPageFixture(
-      `/api/v1/factories/${PRIMARY_FACTORY_ID}/prs`,
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100`,
       undefined,
       structuredClone(lineMetricsFactoriesFixture),
     );
     const body = (await response.json()) as {
-      pullRequests: Array<{ workOrderId?: string; number?: string; state?: string }>;
+      orders: Array<{
+        id?: string;
+        pullRequests?: Array<{ number?: string; state?: string }>;
+      }>;
     };
-    const byOrder = Object.fromEntries(body.pullRequests.map((pullRequest) => [pullRequest.workOrderId, pullRequest]));
+    const byOrder = Object.fromEntries(body.orders.map((order) => [order.id, order.pullRequests?.[0]]));
 
     expect(byOrder["wo-review-pay-842"]).toMatchObject({ number: "842", state: "STATE_DRAFT" });
     expect(byOrder["wo-review-pay-844"]).toMatchObject({ number: "844", state: "STATE_DRAFT" });
@@ -247,5 +332,125 @@ describe("matchFactoryPageFixture", () => {
     expect(byOrder["wo-open-refunds-schema"]).toMatchObject({ number: "102", state: "STATE_DRAFT" });
     expect(byOrder["wo-pr-closure-receipts"]).toMatchObject({ number: "510", state: "STATE_MERGED" });
     expect(byOrder["wo-board-done-rejected"]).toMatchObject({ number: "112", state: "STATE_CLOSED" });
+  });
+
+  it("returns a 7-day velocity series when periodDays is 7", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/velocity?periodDays=7`);
+    const body = (await response.json()) as { points?: unknown[] };
+
+    expect(body.points).toHaveLength(7);
+  });
+
+  it("returns no planning session when the fixture does not seed one", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/work-orders/${DRAFT_WORK_ORDER.id}/planning-session`,
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("serves a seeded planning session and stores a survey answer", async () => {
+    const fixture = refineChatBoardFixture();
+    const sessionPath = `/api/v1/factories/${PRIMARY_FACTORY_ID}/work-orders/${DRAFT_WORK_ORDER.id}/planning-session`;
+    const loaded = await fetchFactoryPageFixture(sessionPath, undefined, fixture);
+    const body = (await loaded.json()) as { session?: { id?: string; survey?: unknown } };
+
+    expect(loaded.status).toBe(200);
+    expect(body.session?.id).toBe("ps-draft-refunds");
+    expect(body.session?.survey).toBeTruthy();
+
+    const answered = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/planning-sessions/ps-draft-refunds/survey-answer`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text: "What should the first change include? Reactions on the task header only" }),
+      },
+      fixture,
+    );
+    const next = (await answered.json()) as {
+      session?: { survey?: unknown; messages?: Array<{ text?: string }> };
+    };
+
+    expect(next.session?.survey).toBeNull();
+    expect(next.session?.messages?.at(-1)?.text).toContain("Reactions on the task header only");
+  });
+});
+
+describe("factory agent resources fixture", () => {
+  it("lists MCP connections and creates a header connection", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+    };
+
+    const listed = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources?kind=KIND_MCP_SERVER`,
+      undefined,
+      fixture,
+    );
+    await expect(listed.json()).resolves.toMatchObject({
+      resources: [expect.objectContaining({ name: "docs", auth: "AUTH_HEADERS" })],
+    });
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "KIND_MCP_SERVER",
+          name: "mobbin",
+          url: "https://api.mobbin.com/mcp",
+          auth: "AUTH_OAUTH",
+        }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      resource: expect.objectContaining({
+        name: "mobbin",
+        auth: "AUTH_OAUTH",
+        oauthStatus: "OAUTH_STATUS_NOT_CONNECTED",
+      }),
+    });
+  });
+
+  it("creates an inline skill", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "KIND_SKILL",
+          name: "review-copy",
+          markdown: "# Review copy",
+        }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      resource: expect.objectContaining({
+        kind: "KIND_SKILL",
+        name: "review-copy",
+        markdown: "# Review copy",
+      }),
+    });
+  });
+
+  it("lists tools for an MCP server", async () => {
+    const fixture = {
+      ...structuredClone(defaultFactoriesFixture),
+      agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+    };
+
+    const listed = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/agent-resources/${HEADER_MCP_RESOURCE.id}/tools`,
+      undefined,
+      fixture,
+    );
+    await expect(listed.json()).resolves.toMatchObject({
+      tools: expect.arrayContaining([expect.objectContaining({ name: "search" })]),
+    });
   });
 });

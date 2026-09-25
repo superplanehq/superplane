@@ -10,12 +10,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -33,14 +36,25 @@ type FactoryContext struct {
 	// recorded). Wired by the node executor via WithWorkOrderUpdated.
 	onWorkOrderUpdated func(factoryID, orderID, reason string)
 
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID)
+
 	// Optional notification fan-out callback: invoked with a fully built
 	// notification payload for mutations that should email work order
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onFileBindCleanup       func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
+	// remoteImageFetch, when set, copies remote images without a GitHub client.
+	remoteImageFetch storedfiles.FetchFunc
+	// readProductiveTaskFiles, when set, supplies Productive.io files without
+	// calling the Productive.io API.
+	readProductiveTaskFiles productiveFileRead
+	// readJiraIssueFiles, when set, supplies Jira files without calling the
+	// Jira API.
+	readJiraIssueFiles jiraFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -67,11 +81,52 @@ func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, 
 	return c
 }
 
+func (c *FactoryContext) WithGitHubPullRequestRecorded(
+	callback func(organizationID, factoryID, pullRequestID uuid.UUID),
+) *FactoryContext {
+	c.onGitHubPullRequestRecorded = callback
+	return c
+}
+
 func (c *FactoryContext) WithWorkOrderNotification(
 	callback func(messages.FactoryWorkOrderNotificationMessage),
 ) *FactoryContext {
 	c.onWorkOrderNotification = callback
 	return c
+}
+
+// FileBindCleanup is blob deletion work that must run after the surrounding
+// database transaction commits. Apply it with ApplyFileBindCleanups.
+type FileBindCleanup struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Result         storedfiles.BindResult
+	BindErr        error
+}
+
+func (c *FactoryContext) WithFileBindCleanup(callback func(FileBindCleanup)) *FactoryContext {
+	c.onFileBindCleanup = callback
+	return c
+}
+
+func ApplyFileBindCleanups(jobs []FileBindCleanup, txErr error) {
+	for _, job := range jobs {
+		err := txErr
+		if err == nil {
+			err = job.BindErr
+		}
+		if delErr := storedfiles.ApplyBindResult(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			job.OrganizationID,
+			job.FactoryID,
+			job.Result,
+			err,
+		); delErr != nil {
+			log.WithError(delErr).Warn("Failed to delete file objects after bind")
+		}
+	}
 }
 
 func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryContext {
@@ -80,35 +135,116 @@ func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, regis
 	return c
 }
 
-func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
+func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *FactoryContext {
+	c.remoteImageFetch = fetch
+	return c
+}
+
+func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
-		return nil, errors.New("cannot create work order while executing another work order")
+		return nil, false, errors.New("cannot create work order while executing another work order")
 	}
 	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	if c.canvas.FactoryID == nil {
-		return nil, errors.New("app is not owned by a factory")
+		return nil, false, errors.New("app is not owned by a factory")
 	}
 
 	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+
+	skip, err := c.skipDuplicateSentryWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
+	skip, err = c.skipDuplicateJiraWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
 	}
 
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	if err := c.prepareWorkOrderFiles(order); err != nil {
+		return nil, false, err
+	}
 	EmitWorkOrderCreated(c.tx, f, order)
-	c.ingestGitHubImages(order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
-	return workOrderToCore(order), nil
+	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) skipDuplicateSentryWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	issueID, ok := sentry.IssueIDFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := sentry.LockIssueWorkOrder(c.tx, factoryModel, issueID); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := sentry.IssueHasWorkOrder(c.tx, factoryModel, issueID)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Sentry issue %s: work order already exists", issueID)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := jira.IssueRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := jira.LockIssueWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := jira.IssueHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
+	}
+	return hasOrder, nil
 }
 
 func (c *FactoryContext) createFactoryWorkOrder(
@@ -144,24 +280,29 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	return models.OriginFromIntakeRootEvent(event)
 }
 
+func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
+	c.ingestGitHubImages(order)
+	c.ingestProductiveFiles(order)
+	c.ingestJiraFiles(order)
+	return c.bindDescriptionFiles(order)
+}
+
 func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
-	if order == nil || c.registry == nil || c.encryptor == nil {
+	if order == nil {
 		return
 	}
 	if len(blob.HTTPImageURLs(order.Description)) == 0 {
 		return
 	}
-	client := c.githubClientForCanvas()
-	if client == nil {
+	fetch := c.remoteImageFetcher()
+	if fetch == nil {
 		return
 	}
 	next, err := storedfiles.IngestRemoteImages(
 		context.Background(),
 		c.tx,
 		blob.Current(),
-		func(ctx context.Context, req *http.Request) (*http.Response, error) {
-			return client.HTTPDo(req.WithContext(ctx))
-		},
+		fetch,
 		blob.IsGitHubImageURL,
 		order.OrganizationID,
 		order.FactoryID,
@@ -182,6 +323,49 @@ func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
 			next.ObjectKeys,
 		)
 	}
+}
+
+func (c *FactoryContext) remoteImageFetcher() storedfiles.FetchFunc {
+	if c.remoteImageFetch != nil {
+		return c.remoteImageFetch
+	}
+	if c.registry == nil || c.encryptor == nil {
+		return nil
+	}
+	client := c.githubClientForCanvas()
+	if client == nil {
+		return nil
+	}
+	return func(ctx context.Context, req *http.Request) (*http.Response, error) {
+		return client.HTTPDo(req.WithContext(ctx))
+	}
+}
+
+func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	result, err := storedfiles.BindDescriptionFiles(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+	)
+	job := FileBindCleanup{
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		Result:         result,
+		BindErr:        err,
+	}
+	if c.onFileBindCleanup != nil {
+		c.onFileBindCleanup(job)
+		return err
+	}
+	ApplyFileBindCleanups([]FileBindCleanup{job}, err)
+	return err
 }
 
 func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
@@ -285,14 +469,6 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderCommentAdded,
-		ActorName:      c.automationName(),
-		CommentBody:    body,
-	})
 	return nil
 }
 
@@ -302,7 +478,7 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
 		Key:        params.Key,
@@ -313,15 +489,11 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderArtifactAdded,
-		ActorName:      c.automationName(),
-		ArtifactType:   artifact.Type,
-	})
+	if created {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+	} else {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
+	}
 	return artifactToCore(artifact)
 }
 
@@ -465,6 +637,16 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 		return
 	}
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
+}
+
+func (c *FactoryContext) notifyGitHubPullRequestRecorded(pullRequest *models.FactoryPullRequest) {
+	if c.onGitHubPullRequestRecorded == nil || pullRequest == nil {
+		return
+	}
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+		return
+	}
+	c.onGitHubPullRequestRecorded(pullRequest.OrganizationID, pullRequest.FactoryID, pullRequest.ID)
 }
 
 func (c *FactoryContext) notifyWorkOrderNotification(message messages.FactoryWorkOrderNotificationMessage) {
@@ -658,6 +840,7 @@ func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderPullRequestAdded)
+	c.notifyGitHubPullRequestRecorded(pullRequest)
 	return pullRequestToCore(pullRequest), nil
 }
 
@@ -770,6 +953,7 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 
 	created, err := pullRequest.CreateActivity(c.tx, models.FactoryPullRequestActivityParams{
 		RunID:             c.execution.RunID,
+		Title:             params.Title,
 		Description:       params.Description,
 		RevisionSHA:       params.Revision,
 		Access:            access,
@@ -801,8 +985,8 @@ func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequest
 		return nil, err
 	}
 
-	if params.Description != nil {
-		if err := activity.UpdateDescription(c.tx, *params.Description); err != nil {
+	if params.Title != nil || params.Description != nil {
+		if err := activity.UpdateContent(c.tx, params.Title, params.Description); err != nil {
 			return nil, err
 		}
 	}
@@ -868,6 +1052,7 @@ func (c *FactoryContext) activityResult(
 
 func pullRequestActivityToCore(activity *models.FactoryPullRequestRun, revision *models.FactoryPullRequestRevision) *core.PullRequestActivity {
 	item := &core.PullRequestActivity{
+		Title:        activity.Title,
 		Description:  activity.Description,
 		Access:       activity.Access,
 		State:        activity.State,

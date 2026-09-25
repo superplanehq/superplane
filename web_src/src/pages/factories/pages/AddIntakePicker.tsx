@@ -1,9 +1,11 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
+import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { ADD_INTAKE_TEMPLATES, type AddIntakeTemplate } from "./lineIntakeModel";
+import { ADD_INTAKE_COPY, ADD_INTAKE_TEMPLATES, type AddIntakeTemplate } from "./lineIntakeModel";
 
 interface AddIntakePickerProps {
   open: boolean;
@@ -11,6 +13,8 @@ interface AddIntakePickerProps {
   onSelect: (template: AddIntakeTemplate) => void;
   /** Templates offered by the picker. Defaults to the full template catalog. */
   templates?: AddIntakeTemplate[];
+  /** Source ids that already have an intake. Those cards stay disabled. */
+  takenSourceIds?: readonly string[];
 }
 
 function filterTemplates(templates: AddIntakeTemplate[], query: string): AddIntakeTemplate[] {
@@ -24,14 +28,12 @@ function filterTemplates(templates: AddIntakeTemplate[], query: string): AddInta
   });
 }
 
-/**
- * Lightweight picker: search, then choose one intake template box.
- */
 export function AddIntakePicker({
   open,
   onClose,
   onSelect,
   templates: availableTemplates = ADD_INTAKE_TEMPLATES,
+  takenSourceIds = [],
 }: AddIntakePickerProps) {
   const [query, setQuery] = useState("");
   const templates = useMemo(() => filterTemplates(availableTemplates, query), [availableTemplates, query]);
@@ -53,9 +55,11 @@ export function AddIntakePicker({
     >
       <DialogContent className="gap-0 p-0 sm:max-w-lg" showCloseButton data-testid="add-intake-picker">
         <DialogHeader className="border-b border-border px-4 py-3 text-left">
-          <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em]">Add intake</DialogTitle>
+          <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em]">
+            {ADD_INTAKE_COPY.pickerTitle}
+          </DialogTitle>
           <DialogDescription className="workspace-body-text text-muted-foreground">
-            Choose a template for a new intake automation.
+            {ADD_INTAKE_COPY.pickerDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -87,22 +91,37 @@ export function AddIntakePicker({
               <p className="workspace-body-text text-muted-foreground">No intakes match this search.</p>
             </li>
           ) : (
-            templates.map((template) => (
-              <li key={template.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(template)}
-                  data-testid={`add-intake-template-${template.id}`}
-                  className="flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors hover:border-foreground/20 hover:bg-accent/40"
-                >
-                  <TemplateGlyph template={template} />
-                  <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
-                    {template.name}
-                  </span>
-                  <span className="workspace-body-text text-muted-foreground">{template.description}</span>
-                </button>
-              </li>
-            ))
+            templates.map((template) => {
+              const taken = takenSourceIds.includes(template.id);
+              const unavailable = Boolean(template.soon) || taken;
+              return (
+                <li key={template.id}>
+                  <button
+                    type="button"
+                    disabled={unavailable}
+                    onClick={() => {
+                      if (unavailable) {
+                        return;
+                      }
+                      onSelect(template);
+                    }}
+                    data-testid={`add-intake-template-${template.id}`}
+                    className={cn(
+                      "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
+                      unavailable ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
+                    )}
+                  >
+                    <TemplateGlyph template={template} />
+                    <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
+                      {template.name}
+                    </span>
+                    <span className="workspace-body-text text-muted-foreground">
+                      {intakeTemplateStatus(template, taken)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })
           )}
         </ul>
       </DialogContent>
@@ -110,9 +129,21 @@ export function AddIntakePicker({
   );
 }
 
+function intakeTemplateStatus(template: AddIntakeTemplate, taken: boolean): string {
+  if (taken) {
+    return ADD_INTAKE_COPY.sourceTaken;
+  }
+  if (template.soon) {
+    return ADD_INTAKE_COPY.comingSoon;
+  }
+  return template.description;
+}
+
 function TemplateGlyph({ template }: { template: AddIntakeTemplate }) {
   if (template.iconSrc) {
-    return <img src={template.iconSrc} alt="" className="size-5 shrink-0" />;
+    return (
+      <img src={template.iconSrc} alt="" className={cn("size-5 shrink-0", logoDarkInvertClass(template.iconSrc))} />
+    );
   }
   return (
     <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-muted-foreground">

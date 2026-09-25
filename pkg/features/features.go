@@ -24,9 +24,13 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactorySentryIntake gates the manual "Add intake" entry for Sentry
-// in the Backlog column menu until the flow is generally available.
+// FeatureFactorySentryIntake gates Sentry intake setup from the Backlog
+// column until the flow is generally available.
 const FeatureFactorySentryIntake = "factory_sentry_intake"
+
+// FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
+// in the Backlog column menu until the flow is generally available.
+const FeatureFactoryJiraIntake = "factory_jira_intake"
 
 // FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
 // Productive.io in the Backlog column menu until the flow is generally
@@ -37,13 +41,24 @@ const FeatureFactoryProductiveIntake = "factory_productive_intake"
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
 
-// FeatureFactoryDraftStartModel gates the model selector next to Start on
-// a draft task until the flow is generally available.
-const FeatureFactoryDraftStartModel = "factory_draft_start_model"
+// FeatureOrganizationBYOK gates the organization LLM Models settings page
+// until the BYOK UX is ready for general use.
+const FeatureOrganizationBYOK = "organization_byok"
 
-// FeatureFactoryCreateWithAgent gates agent-assisted task creation and
-// refinement until the flow is generally available.
-const FeatureFactoryCreateWithAgent = "factory_create_with_agent"
+// FeatureFactoryCustomAutomations gates blank custom automations on Verify,
+// Done, and phase columns until the flow is generally available.
+const FeatureFactoryCustomAutomations = "factory_custom_automations"
+
+// FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
+const FeatureWorkspaceMCP = "workspace_mcp"
+
+// FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
+const FeatureWorkspaceSkills = "workspace_skills"
+
+// FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
+// the Merge button on pull request review until the feature is generally
+// available.
+const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
 func released() *bool {
 	v := true
@@ -54,11 +69,15 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
+	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column"},
+	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
-	{ID: FeatureFactoryDraftStartModel, Label: "Draft Start Model", Description: "Show a model selector next to Start on a draft task"},
-	{ID: FeatureFactoryCreateWithAgent, Label: "Create with an Agent", Description: "Create and refine factory tasks with an agent"},
+	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
+	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
+	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 }
 
 func All() []Feature {

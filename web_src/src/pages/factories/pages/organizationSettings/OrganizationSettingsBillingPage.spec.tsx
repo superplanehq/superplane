@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
@@ -13,22 +13,37 @@ import {
   EXPIRED_TRIAL_ORGANIZATION_BILLING,
   EXPIRED_WELCOME_USAGE_REPORT,
   LAPSED_ORGANIZATION_BILLING,
+  RESTORED_TRIAL_ORGANIZATION_BILLING,
   LAPSED_TOPUP_USAGE_REPORT,
   PURCHASED_CREDIT_USAGE_REPORT,
-  RESTORED_TRIAL_ORGANIZATION_BILLING,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+  ACTIVE_TRIAL_ENDS_AT,
+  ACTIVE_BILLING_PERIOD_ENDS_AT,
 } from "../../__fixtures__/usageReportFixtures";
-import {
-  BILLING_SPEND_ORDER_COPY,
-  BILLING_SPEND_ORDER_WITH_GRANT_COPY,
-  BILLING_TRIAL_TTL_COPY,
-} from "../../lib/billingCreditBuckets";
+import { BILLING_SPEND_ORDER_COPY, BILLING_TRIAL_TTL_COPY } from "../../lib/billingCreditBuckets";
 
-const WELCOME_EXPIRY_LABEL = new Date("2026-09-22T12:00:00.000Z").toLocaleDateString();
+const WELCOME_EXPIRY_LABEL = new Date(ACTIVE_TRIAL_ENDS_AT).toLocaleDateString();
+let canUpdateOrg = true;
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) => {
+      if (resource === "org" && action === "update") {
+        return canUpdateOrg;
+      }
+      return true;
+    },
+    isLoading: false,
+  }),
+}));
 
 describe("OrganizationSettingsBillingPage", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  beforeEach(() => {
+    canUpdateOrg = true;
   });
 
   it("shows remaining welcome credit and trial copy when Polar has no customer", async () => {
@@ -49,6 +64,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(plans).queryByTestId("billing-plan-usage")).not.toBeInTheDocument();
     expect(within(plans).getByTestId("billing-plan-business")).toHaveTextContent("$199");
     expect(within(plans).getByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
@@ -131,12 +147,16 @@ describe("OrganizationSettingsBillingPage", () => {
     );
 
     const balance = await screen.findByTestId("billing-credit-balance");
-    expect(within(balance).getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
+    expect(within(balance).queryByTestId("billing-credit-trial")).not.toBeInTheDocument();
+    expect(balance).toHaveTextContent("Hosted runs spend included usage first, then top-up credit.");
     expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
     expect(balance).toHaveTextContent(`The trial ends on ${WELCOME_EXPIRY_LABEL}.`);
     expect(balance).toHaveTextContent("Subscribe to Business to keep hosted runs.");
+    expect(within(balance).getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
+    expect(within(balance).getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("Trial");
   }, 10000);
 
   it("explains unused welcome credit after it expires", async () => {
@@ -165,7 +185,9 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(balance).toHaveTextContent(
       "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.",
     );
-    expect(within(balance).getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
+    expect(within(balance).queryByTestId("billing-credit-trial")).not.toBeInTheDocument();
+    expect(balance).toHaveTextContent("Hosted runs spend included usage first, then top-up credit.");
+    expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("Trial");
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
   }, 10000);
 
@@ -300,13 +322,15 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent("Included usage");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent(
-      `Resets ${new Date("2026-10-09T12:00:00.000Z").toLocaleDateString()}`,
+      `Resets ${new Date(ACTIVE_BILLING_PERIOD_ENDS_AT).toLocaleDateString()}`,
     );
     expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$41.24 remaining");
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");
     expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$141.24");
     expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel Business" })).toBeEnabled();
+    expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
@@ -386,8 +410,11 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(await screen.findByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent("Included with Business.");
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$50.00 remaining");
-    expect(screen.getByTestId("billing-credit-balance")).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
+    expect(screen.getByTestId("billing-credit-balance")).toHaveTextContent(
+      "Hosted runs spend included usage first, then top-up credit.",
+    );
     expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("billing-current-plan")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
@@ -442,14 +469,16 @@ describe("OrganizationSettingsBillingPage", () => {
 
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$1152.78");
-    expect(within(balance).getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$0.00 remaining");
+    expect(within(balance).queryByTestId("billing-credit-trial")).not.toBeInTheDocument();
     expect(within(balance).getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(within(balance).getByTestId("billing-credit-topup")).toHaveTextContent("Spend third");
+    expect(within(balance).getByTestId("billing-credit-topup")).toHaveTextContent("Spend next");
     expect(within(balance).getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$1042.78 remaining");
     expect(within(balance).getByTestId("billing-credit-grant")).toHaveTextContent("SuperPlane grant");
     expect(within(balance).getByTestId("billing-credit-grant")).toHaveTextContent("Spend last");
     expect(within(balance).getByTestId("billing-credit-grant-remaining")).toHaveTextContent("$110.00 remaining");
-    expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_WITH_GRANT_COPY);
+    expect(balance).toHaveTextContent(
+      "Hosted runs spend included usage first, then top-up credit, then SuperPlane grant.",
+    );
   }, 10000);
 
   it("does not show SuperPlane grant when remaining grant is zero", async () => {

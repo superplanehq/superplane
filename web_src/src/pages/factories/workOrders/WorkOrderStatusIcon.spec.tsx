@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 
@@ -20,7 +20,7 @@ describe("WorkOrderStatusIcon", () => {
     rerender(<WorkOrderStatusIcon status="failed" title="Failed" />);
     expect(container.querySelector("[data-status-mark='failed']")).not.toBeNull();
 
-    rerender(<WorkOrderStatusIcon status="waiting" title="Needs attention" />);
+    rerender(<WorkOrderStatusIcon status="waiting" title="Waiting" />);
     expect(container.querySelector("[data-status-mark='waiting']")).not.toBeNull();
 
     rerender(<WorkOrderStatusIcon status="draft" title="Draft" />);
@@ -41,7 +41,7 @@ describe("WorkOrderStatusIcon", () => {
     rerender(<WorkOrderStatusIcon status="failed" title="Failed" />);
     expect(container.querySelector("[data-status-mark='failed']")?.className).toContain("--status-failed-dot");
 
-    rerender(<WorkOrderStatusIcon status="waiting" title="Needs attention" />);
+    rerender(<WorkOrderStatusIcon status="waiting" title="Waiting" />);
     expect(container.querySelector("[data-status-mark='waiting']")?.className).toContain("--status-waiting-dot");
   });
 });

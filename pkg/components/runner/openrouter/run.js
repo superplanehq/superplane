@@ -4,7 +4,7 @@
 /**
  * Run OpenCode against OpenRouter and format JSONL into live logs.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [thinking]
  */
 
 const fs = require("fs");
@@ -15,27 +15,189 @@ const { spawn, spawnSync } = require("child_process");
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
+const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 30_000;
+const MODEL_CATALOG_REFRESH_MAX_BUFFER = 32 * 1024 * 1024;
 const SESSION_FILE = "opencode_session";
+
+function loadActivityStreamModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ];
+  for (const file of candidates) {
+    if (file && fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return { createActivityStream: () => createDisabledActivityStream() };
+}
+
+function createDisabledActivityStream() {
+  const noop = () => undefined;
+  return {
+    enabled: false,
+    activityId: "",
+    start: noop,
+    startContent: noop,
+    appendContent: noop,
+    endContent: noop,
+    startTool: (input) => String((input && input.id) || ""),
+    appendToolOutput: noop,
+    endTool: noop,
+    notice: noop,
+    end: noop,
+    flush: () => Promise.resolve(),
+  };
+}
 const MAX_ATTEMPTS = 4;
 const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
 
-const PLANNING_SYSTEM_PROMPT =
-  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
-  "Call propose_draft with a title and a description. The description must include the user's request and constraints. " +
-  "After you show a draft, tell the user it is on the right and ask them to review it. " +
-  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
-  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
-  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
-  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
-  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
-  "edit or write any files.";
+function loadAnalysisProtocolModule() {
+  const candidates = [
+    path.join(__dirname, "analysis_protocol.js"),
+    path.join(__dirname, "..", "analysis_protocol.js"),
+  ];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol(env = process.env) {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function"
+    ? mod.analysisProtocol(env)
+    : "";
+}
+
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  return prompt;
+}
+
+function applyAnalysisContinuation(
+  taskDir,
+  promptCount,
+  prompt,
+  env = process.env,
+) {
+  if (!planningAnalysisEnabled(env)) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
 function planningEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return (
+    planningAnalysisEnabled(env) &&
+    envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")
+  );
+}
+
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const servers = Array.isArray(parsed.servers) ? parsed.servers : [];
+    const out = {};
+    for (const server of servers) {
+      const name = String((server && server.name) || "").trim();
+      const url = String((server && server.url) || "").trim();
+      if (!name || name === "superplane" || !url) {
+        continue;
+      }
+      const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+      const disabledTools = Array.isArray(server.disabledTools)
+        ? server.disabledTools.map((tool) => String(tool || "").trim()).filter(Boolean)
+        : [];
+      out[name] = {
+        type: "remote",
+        url,
+        enabled: true,
+        headers,
+        disabledTools,
+      };
+    }
+    return out;
+  } catch (_err) {
+    return {};
+  }
+}
+
+function applyWorkspaceMCPDenylist(config, servers) {
+  const permission = { ...(config.permission || {}) };
+  const mcp = { ...(config.mcp || {}) };
+  let changed = Object.keys(servers).length > 0;
+  for (const [name, server] of Object.entries(servers)) {
+    const disabledTools = Array.isArray(server.disabledTools) ? server.disabledTools : [];
+    mcp[name] = {
+      type: server.type,
+      url: server.url,
+      enabled: server.enabled,
+      headers: server.headers,
+    };
+    for (const tool of disabledTools) {
+      permission[`${name}_${tool}`] = "deny";
+      changed = true;
+    }
+  }
+  if (!changed) {
+    return config;
+  }
+  config.mcp = mcp;
+  config.permission = permission;
+  return config;
+}
+
+function planningAnalysisEnabled(env = process.env) {
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function artifactEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+}
+
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
 function catalogModelId(model) {
@@ -66,7 +228,9 @@ function classifyOpenRouterError(text) {
     return "hard";
   }
   if (
-    /new-account-rpm|rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(lower) ||
+    /new-account-rpm|rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(
+      lower,
+    ) ||
     /too many requests/.test(lower)
   ) {
     return "rate_limit";
@@ -191,12 +355,23 @@ function writeSessionID(taskDir, sessionID) {
   fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
 }
 
-function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
-  const args = ["--pure", "run", "--format", "json", "--auto"];
+function thinkingArgs(thinking) {
+  const level = String(thinking || "")
+    .trim()
+    .toLowerCase();
+  if (level === "low" || level === "medium" || level === "high") {
+    return ["--variant", level];
+  }
+  return [];
+}
+
+function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking }) {
+  const args = ["--pure", "run", "--format", "json", "--thinking", "--auto"];
   const prefixed = openRouterModelId(model);
   if (prefixed) {
     args.push("-m", prefixed);
   }
+  args.push(...thinkingArgs(thinking));
   if (cwd) {
     args.push("--dir", cwd);
   }
@@ -207,7 +382,12 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
   return args;
 }
 
-function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, models = [] } = {}) {
+function buildOpenCodeConfig({
+  taskDir,
+  env = process.env,
+  planning = false,
+  models = [],
+} = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
     permission: planning
@@ -244,14 +424,31 @@ function buildOpenCodeConfig({ taskDir, env = process.env, planning = false, mod
       config.provider.openrouter.models = modelEntries;
     }
   }
-  if (planning && taskDir) {
+  if ((planning || artifactEnabled(env)) && taskDir) {
     config.mcp = {
       superplane: {
         type: "local",
-        command: ["node", path.join(taskDir, "planning_session_mcp.js")],
+        command: [
+          "node",
+          path.join(
+            taskDir,
+            planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
+          ),
+        ],
         enabled: true,
       },
     };
+  }
+  applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
+  const protocol = planningSystemPrompt(env);
+  if (protocol && taskDir) {
+    const protocolPath = path.join(taskDir, "analysis_protocol.md");
+    try {
+      fs.writeFileSync(protocolPath, `${protocol}\n`);
+    } catch (_err) {
+      // Tests pass a fake task dir. The runner writes this file when the dir exists.
+    }
+    config.instructions = [protocolPath];
   }
   return config;
 }
@@ -263,7 +460,10 @@ function writeOpenCodeConfig(taskDir, env, models) {
     planning: planningEnabled(env),
     models,
   });
-  fs.writeFileSync(path.join(taskDir, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(taskDir, "opencode.json"),
+    `${JSON.stringify(config, null, 2)}\n`,
+  );
 }
 
 function openCodeProcessEnv(taskDir, baseEnv = process.env) {
@@ -282,6 +482,114 @@ function openCodeProcessEnv(taskDir, baseEnv = process.env) {
   };
 }
 
+function openCodeModelCatalogPath(taskDir) {
+  return path.join(taskDir, "xdg", "cache", "opencode", "models.json");
+}
+
+function modelCatalogIncludes(catalogPath, model) {
+  try {
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+    return Boolean(catalog?.openrouter?.models?.[catalogModelId(model)]);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function bundledModelMetadataIncludes(stdout, model) {
+  const expected = openRouterModelId(model);
+  const lines = String(stdout || "").split(/\r?\n/);
+  const modelLine = lines.findIndex((line) => line.trim() === expected);
+  if (modelLine < 0) {
+    return false;
+  }
+
+  for (let end = modelLine + 2; end <= lines.length; end += 1) {
+    try {
+      const metadata = JSON.parse(lines.slice(modelLine + 1, end).join("\n"));
+      return Boolean(
+        metadata?.id === catalogModelId(model) &&
+          metadata?.capabilities &&
+          typeof metadata?.capabilities === "object"
+      );
+    } catch (_error) {
+      // Continue until the complete pretty-printed metadata object is present.
+    }
+  }
+  return false;
+}
+
+function ensureOpenCodeModelCatalog(
+  taskDir,
+  model,
+  childEnv,
+  run = spawnSync,
+) {
+  if (!model) {
+    return "skipped";
+  }
+  const catalogPath = openCodeModelCatalogPath(taskDir);
+  if (modelCatalogIncludes(catalogPath, model)) {
+    return "cache";
+  }
+
+  const refreshEnv = { ...childEnv };
+  delete refreshEnv.OPENCODE_DISABLE_MODELS_FETCH;
+  delete refreshEnv.OPENCODE_CONFIG;
+  // Keep the generated task config from making a custom model look bundled.
+  const commandOptions = {
+    cwd: path.parse(path.resolve(taskDir)).root,
+    encoding: "utf8",
+    timeout: MODEL_CATALOG_REFRESH_TIMEOUT_MS,
+    maxBuffer: MODEL_CATALOG_REFRESH_MAX_BUFFER,
+  };
+  const refreshResult = run(
+    "opencode",
+    ["models", "openrouter", "--refresh", "--pure"],
+    {
+      ...commandOptions,
+      env: refreshEnv,
+    },
+  );
+  if (modelCatalogIncludes(catalogPath, model)) {
+    return "refreshed";
+  }
+
+  const bundledEnv = { ...childEnv };
+  delete bundledEnv.OPENCODE_CONFIG;
+  // With fetching disabled and no cache, OpenCode reads its embedded Models.dev
+  // snapshot. The prompt process uses the same snapshot, so require the full
+  // model metadata instead of accepting a model name alone.
+  const bundledResult = run(
+    "opencode",
+    ["models", "openrouter", "--pure", "--verbose"],
+    {
+      ...commandOptions,
+      env: bundledEnv,
+    },
+  );
+  if (bundledModelMetadataIncludes(bundledResult.stdout, model)) {
+    return "bundled";
+  }
+
+  if (catalogRefreshFailed(refreshResult)) {
+    return "unavailable";
+  }
+
+  throw new Error(
+    `OpenCode could not refresh metadata for ${catalogModelId(model)}: the refreshed catalog does not list the model`,
+  );
+}
+
+function catalogRefreshFailed(result) {
+  if (!result) {
+    return true;
+  }
+  if (result.error) {
+    return true;
+  }
+  return result.status !== 0;
+}
+
 function ensureXdgDirs(taskDir) {
   for (const name of ["data", "config", "cache"]) {
     fs.mkdirSync(path.join(taskDir, "xdg", name), { recursive: true });
@@ -291,18 +599,19 @@ function ensureXdgDirs(taskDir) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model] [thinking]\n");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", { thinking: args[2] || "" })
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
 
 async function runPrompt(promptFile, model, helpers = {}) {
+  const thinking = helpers.thinking || "";
   const env = helpers.env || process.env;
   const sp = env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -313,33 +622,76 @@ async function runPrompt(promptFile, model, helpers = {}) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
-  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const promptCount =
+    Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const rewindPlanning =
+    planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND");
+  let prompt = applyAnalysisContinuation(
+    sp,
+    rewindPlanning ? 0 : promptCount,
+    fs.readFileSync(promptFile, "utf8"),
+    env,
+  );
+  if (planningAnalysisEnabled(env)) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
   const startedAt = Date.now();
   const now = helpers.now || Date.now;
   const sleep = helpers.sleep || defaultSleep;
   const cwd = helpers.cwd || process.cwd();
+  const recordAgentMessage =
+    helpers.recordAgentMessage ||
+    ((text) =>
+      require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+        text,
+      ));
   const planning = planningEnabled(env);
+  if (artifactEnabled(env)) {
+    const outputDir = path.join(sp, "evidence");
+    fs.mkdirSync(outputDir, { recursive: true });
+    env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
+    env.PLAYWRIGHT_MCP_BROWSER = env.PLAYWRIGHT_MCP_BROWSER || "chromium";
+  }
+  const activity = loadActivityStreamModule().createActivityStream({
+    provider: "openrouter",
+    env,
+    turn: promptCount + 1,
+  });
+  activity.start();
   if (planning) {
     printLiveLogLine("Planning session tools enabled");
-    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
   }
 
   ensureXdgDirs(sp);
 
   const currentModel = catalogModelId(model);
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
   const childEnv = openCodeProcessEnv(sp, env);
+  const ensureModelCatalog =
+    helpers.ensureOpenCodeModelCatalog || ensureOpenCodeModelCatalog;
+  const catalogSource = ensureModelCatalog(sp, currentModel, childEnv);
+  if (catalogSource === "bundled") {
+    printLiveLogLine(
+      `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
+    );
+  }
+  if (catalogSource === "unavailable") {
+    printLiveLogLine(
+      `Model catalog refresh unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
+    );
+  }
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
   let lastUsage = emptyUsage();
   let lastCost = 0;
-  let sessionID = readSessionID(sp);
+  let sessionID = rewindPlanning ? "" : readSessionID(sp);
   const continuing = promptCount > 0 && Boolean(sessionID);
   if (continuing) {
-    printLiveLogLine(`Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`);
+    printLiveLogLine(
+      `Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`,
+    );
   } else {
     const startModel = openRouterModelId(currentModel) || model;
     if (startModel) {
@@ -350,12 +702,18 @@ async function runPrompt(promptFile, model, helpers = {}) {
   }
 
   const telemetry = loadTurnTelemetry();
-  const formatter = createOpenCodeFormatter(telemetry, (id) => {
-    sessionID = id || sessionID;
-    writeSessionID(sp, sessionID);
-  });
+  const formatter = createOpenCodeFormatter(
+    telemetry,
+    (id) => {
+      sessionID = id || sessionID;
+      writeSessionID(sp, sessionID);
+    },
+    activity,
+  );
   const loadSessionUsage = helpers.readSessionUsage || readSessionUsage;
   const sessionUsageBefore = loadSessionUsage(sp);
+  const sessionStepsBefore = readSessionStepUsages(sp);
+  const firstPromptTurn = telemetry.currentTurn() + 1;
 
   let failed = false;
   let exitCode = 0;
@@ -370,8 +728,15 @@ async function runPrompt(promptFile, model, helpers = {}) {
       sessionID: sessionID || undefined,
       prompt,
       cwd,
+      thinking,
     });
-    const spawnResult = await spawnOpenCodeTurn(args, childEnv, cwd, formatter, helpers);
+    const spawnResult = await spawnOpenCodeTurn(
+      args,
+      childEnv,
+      cwd,
+      formatter,
+      helpers,
+    );
     if (spawnResult.sessionID) {
       sessionID = spawnResult.sessionID;
       writeSessionID(sp, sessionID);
@@ -408,7 +773,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
-      printRetryOutcome(lastErrorText, stoppedAfterAttemptsLine(classKind, currentModel));
+      printRetryOutcome(
+        lastErrorText,
+        stoppedAfterAttemptsLine(classKind, currentModel),
+      );
       break;
     }
     const waitMs = retryWaitMs(lastErrorText, attempt);
@@ -419,43 +787,67 @@ async function runPrompt(promptFile, model, helpers = {}) {
       printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
-    printRetryOutcome(lastErrorText, retryWaitLine(classKind, currentModel, waitMs, attempt + 1));
+    printRetryOutcome(
+      lastErrorText,
+      retryWaitLine(classKind, currentModel, waitMs, attempt + 1),
+    );
+    activity.notice("retry", `OpenRouter request retry ${attempt + 1}`);
     await sleep(waitMs);
     attempt += 1;
   }
 
   formatter.flush(failed);
+  activity.end(failed ? "failed" : "passed");
+  await activity.flush();
+  const sessionSteps = newSessionStepUsages(
+    readSessionStepUsages(sp),
+    sessionStepsBefore,
+  );
   const recorded = preferRecordedUsage(
     usageWithCost(lastUsage, lastCost),
     subtractUsage(loadSessionUsage(sp), sessionUsageBefore),
   );
   const usage = recorded;
   lastCost = Number(recorded.total_cost_usd) || lastCost;
-  applyRecordedUsageToTelemetry(telemetry, usage);
+  if (sessionSteps.length > 0) {
+    applyRecordedStepsToTelemetry(telemetry, sessionSteps, firstPromptTurn);
+  } else {
+    applyRecordedUsageToTelemetry(telemetry, usage);
+  }
   const payload = {
     type: "result",
     result: resultTextFrom(lastResult, formatter),
-    model: openRouterModelId(currentModel) || model,
+    model: catalogModelId(currentModel) || catalogModelId(model),
     usage,
   };
   if (lastCost) {
     payload.total_cost_usd = lastCost;
   }
   telemetry.attachToResult(payload, { name: promptSeriesName(promptFile) });
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
+  const activityModule = loadActivityStreamModule();
+  const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planning) {
+    await recordAgentMessage(safePayload.result);
+  }
   formatTurnResult({
     is_error: failed,
-    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    num_turns:
+      safePayload.telemetry && safePayload.telemetry.num_turns
+        ? safePayload.telemetry.num_turns
+        : 1,
     duration_ms: Date.now() - startedAt,
-    total_cost_usd: payload.total_cost_usd,
+    total_cost_usd: safePayload.total_cost_usd,
   });
   return failed ? exitCode || 1 : 0;
 }
 
 function waitDeadlineMs(env, now) {
-  const seconds = Number((env && env.SUPERPLANE_EXECUTION_TIMEOUT_SECONDS) || 0);
+  const seconds = Number(
+    (env && env.SUPERPLANE_EXECUTION_TIMEOUT_SECONDS) || 0,
+  );
   if (!Number.isFinite(seconds) || seconds <= 0) {
     return now() + DEFAULT_WAIT_CAP_MS;
   }
@@ -469,7 +861,9 @@ function defaultSleep(ms) {
 }
 
 function commandExists(name) {
-  const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
+  const result = spawnSync("sh", ["-c", `command -v ${name}`], {
+    encoding: "utf8",
+  });
   return result.status === 0;
 }
 
@@ -488,7 +882,10 @@ function defaultSpawnOpenCode(args, options) {
 }
 
 function spawnHasCompleteAssistantTurn(spawnResult, formatter) {
-  const text = formatter && typeof formatter.lastText === "function" ? formatter.lastText() : "";
+  const text =
+    formatter && typeof formatter.lastText === "function"
+      ? formatter.lastText()
+      : "";
   if (!String(text || "").trim()) {
     return false;
   }
@@ -530,16 +927,36 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
       resolve();
       return;
     }
+    let pending = "";
+    let finished = false;
+    const flush = () => {
+      if (pending) {
+        writeStderr(pending);
+        pending = "";
+      }
+    };
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      flush();
+      resolve();
+    };
     child.stderr.on("data", (chunk) => {
-      stderrText += String(chunk);
-      process.stderr.write(chunk);
+      const text = String(chunk);
+      stderrText += text;
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() || "";
+      for (const line of lines) writeStderr(`${line}\n`);
     });
-    child.stderr.on("end", resolve);
-    child.stderr.on("error", resolve);
+    child.stderr.on("end", finish);
+    child.stderr.on("error", finish);
   });
 
   const stdout = child.stdout;
-  const rl = stdout ? readline.createInterface({ input: stdout, crlfDelay: Infinity }) : null;
+  const rl = stdout
+    ? readline.createInterface({ input: stdout, crlfDelay: Infinity })
+    : null;
   if (rl) {
     rl.on("line", (raw) => formatter.handleLine(raw));
   }
@@ -619,15 +1036,25 @@ function tokenTotal(usage) {
 
 function mergeUsage(left, right) {
   const merged = {
-    input_tokens: Number((left && left.input_tokens) || 0) + Number((right && right.input_tokens) || 0),
-    output_tokens: Number((left && left.output_tokens) || 0) + Number((right && right.output_tokens) || 0),
+    input_tokens:
+      Number((left && left.input_tokens) || 0) +
+      Number((right && right.input_tokens) || 0),
+    output_tokens:
+      Number((left && left.output_tokens) || 0) +
+      Number((right && right.output_tokens) || 0),
     cache_read_input_tokens:
-      Number((left && left.cache_read_input_tokens) || 0) + Number((right && right.cache_read_input_tokens) || 0),
+      Number((left && left.cache_read_input_tokens) || 0) +
+      Number((right && right.cache_read_input_tokens) || 0),
     cache_creation_input_tokens:
-      Number((left && left.cache_creation_input_tokens) || 0) + Number((right && right.cache_creation_input_tokens) || 0),
-    reasoning_tokens: Number((left && left.reasoning_tokens) || 0) + Number((right && right.reasoning_tokens) || 0),
+      Number((left && left.cache_creation_input_tokens) || 0) +
+      Number((right && right.cache_creation_input_tokens) || 0),
+    reasoning_tokens:
+      Number((left && left.reasoning_tokens) || 0) +
+      Number((right && right.reasoning_tokens) || 0),
   };
-  const cost = Number((left && left.total_cost_usd) || 0) + Number((right && right.total_cost_usd) || 0);
+  const cost =
+    Number((left && left.total_cost_usd) || 0) +
+    Number((right && right.total_cost_usd) || 0);
   if (cost) {
     merged.total_cost_usd = cost;
   }
@@ -645,14 +1072,20 @@ function usageWithCost(usage, cost) {
 
 function subtractUsage(after, before) {
   const delta = {
-    input_tokens: Math.max(0, Number((after && after.input_tokens) || 0) - Number((before && before.input_tokens) || 0)),
+    input_tokens: Math.max(
+      0,
+      Number((after && after.input_tokens) || 0) -
+        Number((before && before.input_tokens) || 0),
+    ),
     output_tokens: Math.max(
       0,
-      Number((after && after.output_tokens) || 0) - Number((before && before.output_tokens) || 0),
+      Number((after && after.output_tokens) || 0) -
+        Number((before && before.output_tokens) || 0),
     ),
     cache_read_input_tokens: Math.max(
       0,
-      Number((after && after.cache_read_input_tokens) || 0) - Number((before && before.cache_read_input_tokens) || 0),
+      Number((after && after.cache_read_input_tokens) || 0) -
+        Number((before && before.cache_read_input_tokens) || 0),
     ),
     cache_creation_input_tokens: Math.max(
       0,
@@ -661,12 +1094,14 @@ function subtractUsage(after, before) {
     ),
     reasoning_tokens: Math.max(
       0,
-      Number((after && after.reasoning_tokens) || 0) - Number((before && before.reasoning_tokens) || 0),
+      Number((after && after.reasoning_tokens) || 0) -
+        Number((before && before.reasoning_tokens) || 0),
     ),
   };
   const cost = Math.max(
     0,
-    Number((after && after.total_cost_usd) || 0) - Number((before && before.total_cost_usd) || 0),
+    Number((after && after.total_cost_usd) || 0) -
+      Number((before && before.total_cost_usd) || 0),
   );
   if (cost) {
     delta.total_cost_usd = cost;
@@ -676,8 +1111,14 @@ function subtractUsage(after, before) {
 
 function preferRecordedUsage(left, right) {
   const usage = {
-    input_tokens: Math.max(Number((left && left.input_tokens) || 0), Number((right && right.input_tokens) || 0)),
-    output_tokens: Math.max(Number((left && left.output_tokens) || 0), Number((right && right.output_tokens) || 0)),
+    input_tokens: Math.max(
+      Number((left && left.input_tokens) || 0),
+      Number((right && right.input_tokens) || 0),
+    ),
+    output_tokens: Math.max(
+      Number((left && left.output_tokens) || 0),
+      Number((right && right.output_tokens) || 0),
+    ),
     cache_read_input_tokens: Math.max(
       Number((left && left.cache_read_input_tokens) || 0),
       Number((right && right.cache_read_input_tokens) || 0),
@@ -691,7 +1132,10 @@ function preferRecordedUsage(left, right) {
       Number((right && right.reasoning_tokens) || 0),
     ),
   };
-  const cost = Math.max(Number((left && left.total_cost_usd) || 0), Number((right && right.total_cost_usd) || 0));
+  const cost = Math.max(
+    Number((left && left.total_cost_usd) || 0),
+    Number((right && right.total_cost_usd) || 0),
+  );
   if (cost) {
     usage.total_cost_usd = cost;
   }
@@ -699,7 +1143,10 @@ function preferRecordedUsage(left, right) {
 }
 
 function telemetryUsageTotal(telemetry) {
-  const snapshot = telemetry && typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const snapshot =
+    telemetry && typeof telemetry.snapshot === "function"
+      ? telemetry.snapshot()
+      : null;
   const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
   let total = emptyUsage();
   for (const turn of turns) {
@@ -717,10 +1164,44 @@ function applyRecordedUsageToTelemetry(telemetry, recorded) {
   if (tokenTotal(gap) <= 0 && !(Number(gap.total_cost_usd) > 0)) {
     return;
   }
-  const snapshot = typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const snapshot =
+    typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
   const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
   const current = turns.length ? turns[turns.length - 1].usage : emptyUsage();
-  telemetry.updateCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
+  telemetry.mergeCurrentUsage(turns.length ? mergeUsage(current, gap) : gap);
+}
+
+function newSessionStepUsages(after, before) {
+  const priorKeys = new Set((before || []).map((step) => step.key));
+  return (after || []).filter((step) => !priorKeys.has(step.key));
+}
+
+function promptTurnNumbers(telemetry, firstTurn) {
+  const snapshot =
+    typeof telemetry.snapshot === "function" ? telemetry.snapshot() : null;
+  const turns = snapshot && Array.isArray(snapshot.turns) ? snapshot.turns : [];
+  return turns
+    .map((item) => Number(item && item.turn))
+    .filter((turn) => Number.isFinite(turn) && turn >= firstTurn);
+}
+
+function applyRecordedStepsToTelemetry(telemetry, steps, firstTurn) {
+  if (!telemetry || !Array.isArray(steps)) {
+    return;
+  }
+  const billed = steps.filter((step) => step && tokenTotal(step.usage) > 0);
+  if (!billed.length) {
+    return;
+  }
+  const liveTurns = promptTurnNumbers(telemetry, firstTurn);
+  const offset = Math.max(0, liveTurns.length - billed.length);
+  for (const [index, step] of billed.entries()) {
+    const turn = liveTurns[offset + index];
+    if (turn && telemetry.replaceTurnUsage(turn, step.usage)) {
+      continue;
+    }
+    telemetry.beginTurn(step.usage, { forceNew: true });
+  }
 }
 
 function openCodeDataHome(taskDir) {
@@ -779,21 +1260,35 @@ function collectJsonFiles(dir, files = []) {
   return files;
 }
 
-function readSessionUsageFromJsonParts(openCodeHome) {
-  const roots = [path.join(openCodeHome, "storage", "part"), path.join(openCodeHome, "storage", "session", "part")];
-  let usage = emptyUsage();
+function sessionStepUsage(key, raw) {
+  const usage = usageFromStoredPart(parseStoredPart(raw));
+  if (tokenTotal(usage) <= 0 && !(Number(usage.total_cost_usd) > 0)) {
+    return null;
+  }
+  return { key, usage };
+}
+
+function readSessionStepUsagesFromJsonParts(openCodeHome) {
+  const roots = [
+    path.join(openCodeHome, "storage", "part"),
+    path.join(openCodeHome, "storage", "session", "part"),
+  ];
+  const steps = [];
   for (const root of roots) {
-    for (const file of collectJsonFiles(root)) {
+    for (const file of collectJsonFiles(root).sort()) {
       let parsed;
       try {
         parsed = JSON.parse(fs.readFileSync(file, "utf8"));
       } catch {
         continue;
       }
-      usage = mergeUsage(usage, usageFromStoredPart(parseStoredPart(parsed)));
+      const step = sessionStepUsage(file, parsed);
+      if (step) {
+        steps.push(step);
+      }
     }
   }
-  return usage;
+  return steps;
 }
 
 function openCodeDatabasePaths(openCodeHome) {
@@ -806,14 +1301,29 @@ function openCodeDatabasePaths(openCodeHome) {
   } catch {
     return [];
   }
-  return entries.filter((name) => /^opencode.*\.db$/.test(name)).map((name) => path.join(openCodeHome, name));
+  return entries
+    .filter((name) => /^opencode.*\.db$/.test(name))
+    .map((name) => path.join(openCodeHome, name));
 }
 
-function sumStepFinishRows(rows) {
-  let usage = emptyUsage();
+function stepUsagesFromRows(dbPath, rows) {
+  const steps = [];
   for (const row of rows || []) {
-    const data = row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
-    usage = mergeUsage(usage, usageFromStoredPart(parseStoredPart(data)));
+    const data =
+      row && Object.prototype.hasOwnProperty.call(row, "data") ? row.data : row;
+    const id = row && row.id != null ? String(row.id) : String(steps.length);
+    const step = sessionStepUsage(`${dbPath}:${id}`, data);
+    if (step) {
+      steps.push(step);
+    }
+  }
+  return steps;
+}
+
+function sumStepUsages(steps) {
+  let usage = emptyUsage();
+  for (const step of steps || []) {
+    usage = mergeUsage(usage, step && step.usage);
   }
   return usage;
 }
@@ -834,7 +1344,7 @@ function withSilencedExperimentalWarnings(fn) {
   }
 }
 
-function readSessionUsageFromSqliteNative(dbPath) {
+function readSessionStepUsagesFromSqliteNative(dbPath) {
   return withSilencedExperimentalWarnings(() => {
     let DatabaseSync;
     try {
@@ -845,23 +1355,29 @@ function readSessionUsageFromSqliteNative(dbPath) {
     const db = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const rows = db
-        .prepare(`SELECT data FROM part WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')`)
+        .prepare(
+          `SELECT id, data FROM part
+           WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+           ORDER BY time_created, id`,
+        )
         .all();
-      return sumStepFinishRows(rows);
+      return stepUsagesFromRows(dbPath, rows);
     } finally {
       db.close();
     }
   });
 }
 
-function readSessionUsageFromSqliteCli(dbPath) {
+function readSessionStepUsagesFromSqliteCli(dbPath) {
   const result = spawnSync(
     "sqlite3",
     [
       "-readonly",
       "-json",
       dbPath,
-      `SELECT data FROM part WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')`,
+      `SELECT id, data FROM part
+       WHERE json_extract(data, '$.type') IN ('step-finish', 'step_finish')
+       ORDER BY time_created, id`,
     ],
     { encoding: "utf8" },
   );
@@ -872,17 +1388,17 @@ function readSessionUsageFromSqliteCli(dbPath) {
   try {
     rows = JSON.parse(result.stdout);
   } catch {
-    return emptyUsage();
+    return [];
   }
-  return sumStepFinishRows(rows);
+  return stepUsagesFromRows(dbPath, rows);
 }
 
-function readSessionUsageFromSqlite(dbPath) {
+function readSessionStepUsagesFromSqlite(dbPath) {
   if (!dbPath || !fs.existsSync(dbPath)) {
-    return emptyUsage();
+    return [];
   }
   try {
-    const native = readSessionUsageFromSqliteNative(dbPath);
+    const native = readSessionStepUsagesFromSqliteNative(dbPath);
     if (native) {
       return native;
     }
@@ -890,22 +1406,35 @@ function readSessionUsageFromSqlite(dbPath) {
     // Missing tables or a locked WAL file are expected. Try the sqlite3 CLI.
   }
   try {
-    return readSessionUsageFromSqliteCli(dbPath);
+    return readSessionStepUsagesFromSqliteCli(dbPath);
   } catch {
-    return emptyUsage();
+    return [];
   }
 }
 
-function readSessionUsage(taskDir) {
+function preferSessionSteps(left, right) {
+  return tokenTotal(sumStepUsages(right)) > tokenTotal(sumStepUsages(left))
+    ? right
+    : left;
+}
+
+function readSessionStepUsages(taskDir) {
   if (!taskDir) {
-    return emptyUsage();
+    return [];
   }
   const openCodeHome = openCodeDataHome(taskDir);
-  let usage = emptyUsage();
+  let steps = [];
   for (const dbPath of openCodeDatabasePaths(openCodeHome)) {
-    usage = preferRecordedUsage(usage, readSessionUsageFromSqlite(dbPath));
+    steps = preferSessionSteps(steps, readSessionStepUsagesFromSqlite(dbPath));
   }
-  return preferRecordedUsage(usage, readSessionUsageFromJsonParts(openCodeHome));
+  return preferSessionSteps(
+    steps,
+    readSessionStepUsagesFromJsonParts(openCodeHome),
+  );
+}
+
+function readSessionUsage(taskDir) {
+  return sumStepUsages(readSessionStepUsages(taskDir));
 }
 
 function usageFromStepFinish(part) {
@@ -928,7 +1457,11 @@ function collectErrorText(value, parts, depth) {
   if (value == null || depth > 5) {
     return;
   }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
     const text = String(value).trim();
     if (text) {
       parts.push(text);
@@ -938,7 +1471,15 @@ function collectErrorText(value, parts, depth) {
   if (typeof value !== "object") {
     return;
   }
-  for (const key of ["message", "name", "code", "status", "statusCode", "type", "responseBody"]) {
+  for (const key of [
+    "message",
+    "name",
+    "code",
+    "status",
+    "statusCode",
+    "type",
+    "responseBody",
+  ]) {
     if (value[key] != null && value[key] !== value) {
       collectErrorText(value[key], parts, depth + 1);
     }
@@ -995,10 +1536,16 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function promptSeriesName(promptFile) {
@@ -1007,11 +1554,21 @@ function promptSeriesName(promptFile) {
   if (words.length === 0) {
     return "";
   }
-  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function writeStdout(chunk) {
-  fs.writeSync(1, chunk);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(chunk) : String(chunk);
+  fs.writeSync(1, safe);
+}
+
+function writeStderr(chunk) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(chunk) : String(chunk);
+  fs.writeSync(2, safe);
 }
 
 function writeLiveLogRecord(rec) {
@@ -1023,7 +1580,7 @@ function printLiveLogLine(text) {
   if (!line) {
     return;
   }
-  writeLiveLogRecord({ type: "line", text: line });
+  println(line);
 }
 
 function printRetryOutcome(errorText, extraLine) {
@@ -1039,9 +1596,14 @@ function println(text = "") {
   writeStdout(`${text}\n`);
 }
 
-function createOpenCodeFormatter(telemetry, onSession) {
+function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
+  const activity =
+    activityOverride ||
+    loadActivityStreamModule().createActivityStream({ provider: "openrouter" });
   const tools = createToolTracker(tracker);
+  const contentText = new Map();
+  const toolOutputText = new Map();
   let sessionID = "";
   let resultFailed = false;
   let errorText = "";
@@ -1053,7 +1615,11 @@ function createOpenCodeFormatter(telemetry, onSession) {
   let announcedStart = false;
 
   function rememberSession(event) {
-    const id = String((event && event.sessionID) || (event && event.part && event.part.sessionID) || "").trim();
+    const id = String(
+      (event && event.sessionID) ||
+        (event && event.part && event.part.sessionID) ||
+        "",
+    ).trim();
     if (!id) {
       return;
     }
@@ -1100,7 +1666,8 @@ function createOpenCodeFormatter(telemetry, onSession) {
       rememberSession(event);
       lastEvent = event;
       const type = String(event.type || "");
-      const part = event.part && typeof event.part === "object" ? event.part : {};
+      const part =
+        event.part && typeof event.part === "object" ? event.part : {};
       switch (type) {
         case "step_start":
           if (!announcedStart) {
@@ -1116,16 +1683,40 @@ function createOpenCodeFormatter(telemetry, onSession) {
             if (!roundOpen) {
               beginRound(undefined, { message: lastText });
             }
-            println(lastText);
+            const contentID = emitOpenCodeContent(
+              activity,
+              contentText,
+              "assistant",
+              part,
+              lastText,
+            );
+            activity.endContent(contentID, {
+              endedAt: openCodePartTime(part, "end"),
+            });
+            if (!activity.enabled) {
+              println(lastText);
+            }
           }
           break;
         }
         case "reasoning": {
           const thinking = typeof part.text === "string" ? part.text : "";
           if (thinking.trim()) {
-            println("Thinking");
-            println(truncateText(thinking.trim()));
-            println();
+            const contentID = emitOpenCodeContent(
+              activity,
+              contentText,
+              "reasoning",
+              part,
+              thinking,
+            );
+            activity.endContent(contentID, {
+              endedAt: openCodePartTime(part, "end"),
+            });
+            if (!activity.enabled) {
+              println("Thinking");
+              println(truncateText(thinking.trim()));
+              println();
+            }
           }
           break;
         }
@@ -1133,9 +1724,10 @@ function createOpenCodeFormatter(telemetry, onSession) {
           if (!roundOpen) {
             beginRound(undefined, { hasTools: true });
           }
-          formatToolUse(part, tools);
+          formatToolUse(part, tools, activity, toolOutputText);
           break;
-        case "step_finish": {
+        case "step_finish":
+        case "step-finish": {
           const stepUsage = usageFromStepFinish(part);
           usage = mergeUsage(usage, stepUsage);
           if (part.cost != null && Number.isFinite(Number(part.cost))) {
@@ -1144,7 +1736,7 @@ function createOpenCodeFormatter(telemetry, onSession) {
           if (!roundOpen) {
             beginRound(stepUsage, { message: lastText });
           } else {
-            tracker.updateCurrentUsage(usage);
+            tracker.mergeCurrentUsage(stepUsage);
           }
           roundOpen = false;
           break;
@@ -1163,6 +1755,9 @@ function createOpenCodeFormatter(telemetry, onSession) {
     },
     flush(failed) {
       tools.flush(Boolean(failed));
+      for (const [id] of contentText) {
+        activity.endContent(id);
+      }
     },
     snapshot() {
       return {
@@ -1182,6 +1777,28 @@ function createOpenCodeFormatter(telemetry, onSession) {
       return resultFailed;
     },
   };
+}
+
+function emitOpenCodeContent(activity, seenText, kind, part, nextText) {
+  const id = String(part.id || part.partID || `${kind}-${seenText.size + 1}`);
+  if (!activity.enabled) {
+    return id;
+  }
+  const previous = seenText.get(id) || "";
+  const delta = nextText.startsWith(previous)
+    ? nextText.slice(previous.length)
+    : nextText;
+  activity.startContent(kind, id, {
+    startedAt: openCodePartTime(part, "start"),
+  });
+  activity.appendContent(kind, id, delta);
+  seenText.set(id, nextText);
+  return id;
+}
+
+function openCodePartTime(part, key) {
+  const value = Number(part && part.time && part.time[key]);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function createToolTracker(telemetry) {
@@ -1206,8 +1823,16 @@ function createToolTracker(telemetry) {
   return {
     start(kind, text, id) {
       const key = resolveKey(id, true);
+      if (openTools.has(key)) {
+        return key;
+      }
       const startedAt = Date.now();
-      openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
+      openTools.set(key, {
+        kind,
+        text: text || kind,
+        startedAt,
+        emitted: false,
+      });
       return key;
     },
     emitStart(id) {
@@ -1264,28 +1889,95 @@ function createToolTracker(telemetry) {
   };
 }
 
-function formatToolUse(part, tools) {
+function formatToolUse(
+  part,
+  tools,
+  activity = createDisabledActivityStream(),
+  seenOutput = new Map(),
+) {
   const name = String(part.tool || part.name || "tool");
   const kind = name.toLowerCase();
   const state = part.state && typeof part.state === "object" ? part.state : {};
   const id = part.callID || part.id || "";
-  const started = tools.start(kind, toolInputDetail(name, state.input) || kind, id);
+  const started = tools.start(
+    kind,
+    toolInputDetail(name, state.input) || kind,
+    id,
+  );
   tools.emitStart(started);
+  activity.startTool({
+    id: started,
+    kind: normalizeOpenCodeToolKind(kind),
+    name,
+    input: toolInputDetail(name, state.input),
+  });
   const output = typeof state.output === "string" ? state.output : "";
   if (output.trim()) {
-    println(truncateText(output.replace(/\s+$/, "")));
+    const previous = seenOutput.get(started) || "";
+    const outputDelta = output.startsWith(previous)
+      ? output.slice(previous.length)
+      : output;
+    seenOutput.set(started, output);
+    if (activity.enabled) {
+      activity.appendToolOutput(started, outputDelta, "stdout");
+    } else {
+      println(truncateText(output.replace(/\s+$/, "")));
+    }
   } else if (state.error) {
-    const errText = typeof state.error === "string" ? state.error : JSON.stringify(state.error);
+    const errText =
+      typeof state.error === "string"
+        ? state.error
+        : JSON.stringify(state.error);
     if (errText.trim()) {
-      println(truncateText(errText));
+      const previous = seenOutput.get(started) || "";
+      const outputDelta = errText.startsWith(previous)
+        ? errText.slice(previous.length)
+        : errText;
+      seenOutput.set(started, errText);
+      if (activity.enabled) {
+        activity.appendToolOutput(started, outputDelta, "stderr");
+      } else {
+        println(truncateText(errText));
+      }
     }
   }
-  const failed = state.status === "error" || Boolean(state.error);
+  const stateStatus = String(state.status || "").toLowerCase();
+  if (["pending", "running"].includes(stateStatus)) {
+    return;
+  }
+  const failed = stateStatus === "error" || Boolean(state.error);
+  activity.endTool(started, {
+    status: openCodeToolStatus(stateStatus, failed),
+  });
   tools.end(failed, started);
+  seenOutput.delete(started);
+}
+
+function normalizeOpenCodeToolKind(kind) {
+  const normalized = String(kind || "tool").toLowerCase();
+  if (normalized.startsWith("superplane_")) return "mcp";
+  if (normalized === "grep" || normalized === "glob") return "search";
+  if (normalized === "notebookedit") return "edit";
+  if (normalized === "websearch" || normalized === "web_search")
+    return "web_search";
+  if (normalized === "webfetch" || normalized === "web_fetch")
+    return "web_fetch";
+  return normalized;
+}
+
+function openCodeToolStatus(status, failed) {
+  if (status === "cancelled" || status === "canceled") return "cancelled";
+  if (status === "timed_out" || status === "timeout") return "timed_out";
+  if (status === "interrupted") return "interrupted";
+  return failed ? "failed" : "passed";
 }
 
 function toolInputDetail(name, rawInput) {
-  if (rawInput == null || typeof rawInput !== "object" || Array.isArray(rawInput)) {
+  if (
+    rawInput == null ||
+    typeof rawInput !== "object" ||
+    Array.isArray(rawInput)
+  ) {
     if (rawInput == null) {
       return "";
     }
@@ -1295,15 +1987,24 @@ function toolInputDetail(name, rawInput) {
   if (lowered === "bash") {
     const command = rawInput.command;
     if (typeof command === "string" && command.trim()) {
-      return command.trim().split(/\r?\n/).join(" ");
+      return command;
     }
   }
   if (["read", "write", "edit", "notebookedit"].includes(lowered)) {
-    for (const key of ["file_path", "path", "notebook_path"]) {
+    for (const key of [
+      "filePath",
+      "file_path",
+      "path",
+      "notebookPath",
+      "notebook_path",
+    ]) {
       const value = rawInput[key];
       if (typeof value === "string" && value.trim()) {
         let detail = value.trim();
-        if ((lowered === "write" || lowered === "edit") && typeof rawInput.content === "string") {
+        if (
+          (lowered === "write" || lowered === "edit") &&
+          typeof rawInput.content === "string"
+        ) {
           detail += ` (${rawInput.content.length} chars)`;
         }
         return detail;
@@ -1333,7 +2034,9 @@ function toolInputDetail(name, rawInput) {
 }
 
 function truncateText(text) {
-  let lines = String(text || "").split(/\r?\n/);
+  const activity = loadActivityStreamModule();
+  text = activity.sanitizeLogText ? activity.sanitizeLogText(text) : String(text || "");
+  let lines = text.split(/\r?\n/);
   if (lines.length > TOOL_RESULT_MAX_LINES) {
     const kept = lines.slice(0, TOOL_RESULT_MAX_LINES);
     const omitted = lines.length - TOOL_RESULT_MAX_LINES;
@@ -1355,7 +2058,11 @@ function formatTurnResult(event) {
   }
   if (event && event.total_cost_usd != null) {
     const cost = Number(event.total_cost_usd);
-    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+    parts.push(
+      Number.isFinite(cost)
+        ? `$${cost.toFixed(4)}`
+        : `$${event.total_cost_usd}`,
+    );
   }
   if (event && event.duration_ms != null) {
     const ms = Number(event.duration_ms);
@@ -1363,7 +2070,7 @@ function formatTurnResult(event) {
       parts.push(`${(ms / 1000).toFixed(1)}s`);
     }
   }
-  process.stdout.write(`${parts.join(" · ")}\n`);
+  writeStdout(`${parts.join(" · ")}\n`);
 }
 
 function formatOpenCodeJsonLines(rawLines) {
@@ -1385,6 +2092,7 @@ module.exports = {
   formatOpenCodeJsonLines,
   formatTurnResult,
   opencodeRunArgs,
+  thinkingArgs,
   planningEnabled,
   classifyOpenRouterError,
   openRouterModelId,
@@ -1392,5 +2100,8 @@ module.exports = {
   retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,
+  openCodeModelCatalogPath,
+  ensureOpenCodeModelCatalog,
   readSessionUsage,
+  workspaceMCPServers,
 };

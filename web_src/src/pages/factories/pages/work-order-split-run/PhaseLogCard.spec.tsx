@@ -1,12 +1,21 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
+import { PhaseLogCard } from "./PhaseLogCard";
+import { groupClaudeSteps } from "./phaseLogStream";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
 const useLiveLogStreamMock = vi.fn();
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
 
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
@@ -26,15 +35,6 @@ function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: numb
     delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
   };
 }
-
-describe("toolCallSummary", () => {
-  it("names read files and ran commands", () => {
-    expect(toolCallSummary([{ type: "read" }, { type: "read" }, { type: "bash" }])).toBe("Read 2 files, ran 1 command");
-    expect(toolCallSummary([{ componentType: "read" }, { componentType: "bash" }])).toBe("Read 1 file, ran 1 command");
-    expect(toolCallSummary([{ type: "read" }])).toBe("Read 1 file");
-    expect(toolCallSummary([{ type: "bash" }, { type: "bash" }])).toBe("Ran 2 commands");
-  });
-});
 
 describe("groupClaudeSteps", () => {
   it("keeps tools and agent notes in log order", () => {
@@ -398,7 +398,7 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.queryByText("prompt")).not.toBeInTheDocument();
     expect(screen.queryByText(/"message":"Hi! I am ready/)).not.toBeInTheDocument();
     expect(screen.getByText("The repository is ready. What do you want to do?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Read 1 file, ran 1 command" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read 1 file, used 1 tool" })).toBeInTheDocument();
   });
 
   it("hides the automation and node headers in the compact session log", () => {
@@ -500,5 +500,35 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByText("size").tagName).toBe("STRONG");
     expect(screen.getByText("medium").tagName).toBe("CODE");
     expect(screen.queryByText("**size**")).not.toBeInTheDocument();
+  });
+
+  it("renders a fenced Go note as one code block", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "```go\npackage main\n\nfunc main() {}\n```",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByTestId("code-block-editor")).toHaveLength(1);
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent("package main");
   });
 });

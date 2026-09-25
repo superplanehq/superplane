@@ -5,20 +5,17 @@ import {
   canvasesListCanvases,
   canvasesPutCanvasStaging,
   factoriesMaterializeFactoryAppTemplate,
-  factoriesListFactoryApps,
+  factoriesListFactoryAutomations,
   type CanvasesCanvasSummary,
-  type FactoryApp,
+  type FactoryAutomation,
 } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
 import {
   buildFactoryRunParameters,
   factoryAppTemplateAgentFromRewrite,
@@ -28,7 +25,6 @@ import {
   type FactoryDefinition,
 } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
-import type { CanvasFolderData } from "./types";
 import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "./uniqueCanvasName";
 
 const MAX_NAME_RETRY_ATTEMPTS = 20;
@@ -46,10 +42,6 @@ export type CreateFactoryCanvasFn = (input: {
 }) => Promise<{
   data?: { canvas?: { metadata?: { id?: string; name?: string } } };
 }>;
-
-export type UpdateCanvasFolderMembershipFn = (
-  membership: ReturnType<typeof appendCanvasToFolderMembership>,
-) => Promise<unknown>;
 
 export async function stageAndCommitFactorySpecs(
   organizationId: string,
@@ -158,15 +150,17 @@ function presentNames(items: { name?: string }[]): string[] {
  */
 async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient, workspaceFactoryId?: string) {
   if (workspaceFactoryId) {
-    const cachedApps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, workspaceFactoryId));
+    const cachedApps = queryClient.getQueryData<FactoryAutomation[]>(
+      factoryAppsKey(organizationId, workspaceFactoryId),
+    );
     if (cachedApps) {
       return presentNames(cachedApps);
     }
 
-    const appsResponse = await factoriesListFactoryApps(
+    const appsResponse = await factoriesListFactoryAutomations(
       withOrganizationHeader({ organizationId, path: { factoryId: workspaceFactoryId } }),
     );
-    return presentNames(appsResponse.data?.apps ?? []);
+    return presentNames(appsResponse.data?.automations ?? []);
   }
 
   const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
@@ -239,11 +233,9 @@ export async function ensureFactoryCanvas(args: {
   organizationId: string;
   queryClient: QueryClient;
   definition: FactoryDefinition;
-  folder?: CanvasFolderData;
   workspaceFactoryId?: string;
   existingCanvasId?: string;
   createCanvas: CreateFactoryCanvasFn;
-  updateCanvasFolderMembership: UpdateCanvasFolderMembershipFn;
 }): Promise<FactoryCanvasHandle> {
   if (args.existingCanvasId) {
     if (args.pending?.canvasId === args.existingCanvasId) {
@@ -264,14 +256,6 @@ export async function ensureFactoryCanvas(args: {
     existingNames,
     createCanvas: args.createCanvas,
   });
-
-  if (args.folder) {
-    try {
-      await args.updateCanvasFolderMembership(appendCanvasToFolderMembership(args.folder, created.canvasId));
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-    }
-  }
 
   return created;
 }

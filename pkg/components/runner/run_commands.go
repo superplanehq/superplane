@@ -299,9 +299,6 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
-	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
 
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {

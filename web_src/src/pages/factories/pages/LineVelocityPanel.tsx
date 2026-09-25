@@ -51,7 +51,15 @@ function DailyVelocityChart({ stats }: { stats: VelocityPeriodStats }) {
     >
       <BarChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={0} className="text-[11px]" />
+        <XAxis
+          dataKey="day"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          interval={0}
+          padding="gap"
+          className="text-[11px]"
+        />
         <YAxis
           allowDecimals={false}
           tickLine={false}

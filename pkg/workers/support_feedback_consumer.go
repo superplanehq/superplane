@@ -2,6 +2,7 @@ package workers
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/renderedtext/go-tackle"
@@ -19,6 +20,7 @@ type SupportFeedbackConsumer struct {
 	RabbitMQURL  string
 	EmailService services.EmailService
 	Discord      *services.DiscordWebhookClient
+	publish      func(messages.SupportFeedbackRequestedMessage) error
 }
 
 func NewSupportFeedbackConsumer(
@@ -38,6 +40,9 @@ func NewSupportFeedbackConsumer(
 		Consumer:     consumer,
 		EmailService: emailService,
 		Discord:      discord,
+		publish: func(message messages.SupportFeedbackRequestedMessage) error {
+			return message.Publish()
+		},
 	}
 }
 
@@ -94,34 +99,74 @@ func (c *SupportFeedbackConsumer) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	emailEnabled := c.EmailService != nil
-	discordEnabled := c.Discord.Enabled()
-	if !emailEnabled && !discordEnabled {
+	sendEmail := c.EmailService != nil && !data.EmailDelivered
+	sendDiscord := c.Discord.Enabled() && !data.DiscordDelivered
+	if !sendEmail && !sendDiscord && !data.EmailDelivered && !data.DiscordDelivered {
 		log.Warn("Skipping support feedback: email and Discord are not configured")
 		outcome = executorOutcomeSkipped
 		reason = emailWorkerReasonInvalidMessage
 		return nil
 	}
 
-	if emailEnabled {
-		if err := c.EmailService.SendSupportFeedbackEmail(services.SupportFeedbackToEmail(), feedback); err != nil {
-			log.Errorf("Failed to send support feedback email: %v", err)
-			outcome = executorOutcomeFailed
-			reason = emailWorkerReasonSendError
-			return err
+	var emailErr error
+	var discordErr error
+	if sendEmail {
+		emailErr = c.EmailService.SendSupportFeedbackEmail(services.SupportFeedbackToEmail(), feedback)
+		if emailErr != nil {
+			log.Errorf("Failed to send support feedback email: %v", emailErr)
+		}
+	}
+	if sendDiscord {
+		discordErr = c.Discord.SendSupportFeedback(feedback)
+		if discordErr != nil {
+			log.Errorf("Failed to send support feedback to Discord: %v", discordErr)
 		}
 	}
 
-	if discordEnabled {
-		if err := c.Discord.SendSupportFeedback(feedback); err != nil {
-			log.Errorf("Failed to send support feedback to Discord: %v", err)
-			outcome = executorOutcomeFailed
-			reason = emailWorkerReasonSendError
-			return err
-		}
+	if err := c.finishSupportFeedbackDelivery(data, sendEmail, emailErr, sendDiscord, discordErr); err != nil {
+		outcome = executorOutcomeFailed
+		reason = emailWorkerReasonSendError
+		return err
 	}
 
-	log.Infof("Delivered support feedback from %s", feedback.UserEmail)
+	return nil
+}
+
+// finishSupportFeedbackDelivery retries only the channel that failed.
+// A full queue retry would send the successful channel again.
+func (c *SupportFeedbackConsumer) finishSupportFeedbackDelivery(
+	data messages.SupportFeedbackRequestedMessage,
+	sendEmail bool,
+	emailErr error,
+	sendDiscord bool,
+	discordErr error,
+) error {
+	emailFailed := sendEmail && emailErr != nil
+	discordFailed := sendDiscord && discordErr != nil
+	if !emailFailed && !discordFailed {
+		log.Infof("Delivered support feedback from %s", data.UserEmail)
+		return nil
+	}
+
+	emailSucceeded := sendEmail && emailErr == nil
+	discordSucceeded := sendDiscord && discordErr == nil
+	if !emailSucceeded && !discordSucceeded {
+		return errors.Join(emailErr, discordErr)
+	}
+
+	next := data
+	if emailSucceeded {
+		next.EmailDelivered = true
+	}
+	if discordSucceeded {
+		next.DiscordDelivered = true
+	}
+	if err := c.publish(next); err != nil {
+		log.Errorf("Failed to republish partial support feedback: %v", err)
+		return errors.Join(emailErr, discordErr, err)
+	}
+
+	log.Warnf("Republished support feedback after a partial delivery failure")
 	return nil
 }
 

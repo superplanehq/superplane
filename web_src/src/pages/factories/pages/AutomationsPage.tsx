@@ -10,18 +10,19 @@ import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
 import { useAutomationsPageModel } from "./useAutomationsPageModel";
-import { useFactoryPullRequests } from "@/hooks/useFactoryData";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { usePRFeedbackWorkOrderAttention } from "./useWorkOrderPRFeedbackRunHref";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(model.organizationId, model.factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(model.workOrders);
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
 
@@ -54,6 +55,7 @@ export function AutomationsPage() {
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    checksPassedLabels,
     fixesPausedOrderIds,
     pullRequests,
     ...cardActions,
@@ -80,7 +82,7 @@ export function AutomationsPage() {
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Automations"
-        subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
+        subtitle="Automations are one-step lines. Each one listens for a trigger and runs its steps when it fires."
         actions={
           <PermissionTooltip
             allowed={model.canCreateApp || model.permissionsLoading}

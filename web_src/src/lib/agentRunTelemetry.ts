@@ -1,3 +1,5 @@
+import { parseAgentActivityRecordText } from "@/lib/agentActivity";
+
 export type AgentTurnUsage = {
   input_tokens: number;
   output_tokens: number;
@@ -368,6 +370,14 @@ export function parseAgentTurnLiveLogText(
 
 export function isRawAgentTurnLiveLogText(text: string): boolean {
   return parseAgentTurnLiveLogText(text) != null;
+}
+
+export function isSerializedAgentActivityLiveLogText(text: string): boolean {
+  return parseAgentActivityRecordText(text) !== undefined;
+}
+
+export function isHiddenAgentLiveLogText(text: string): boolean {
+  return isRawAgentTurnLiveLogText(text) || isSerializedAgentActivityLiveLogText(text);
 }
 
 export type AgentPromptUsageSeries = {

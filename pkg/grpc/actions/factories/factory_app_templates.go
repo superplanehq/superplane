@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	factoryTemplateMetadataKey = "factoryTemplate"
+	factoryTemplateMetadataKey = models.FactoryAppTemplateMetadataKey
 	factoryTemplateVersion     = 1
 	factoryCanvasIDPlaceholder = "__FACTORY_CANVAS_ID__"
+	implementationAgentNodeID  = "implementation-agent-no-issue"
 )
 
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
@@ -41,9 +42,10 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 		canvasFile:       "templates/line-implementation.canvas.yaml",
 		consoleFile:      "templates/line-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"github.createPullRequest": "github",
-			"github.findPullRequest":   "github",
-			"github.updatePullRequest": "github",
+			"github.createIssueComment": "github",
+			"github.createPullRequest":  "github",
+			"github.findPullRequest":    "github",
+			"github.updatePullRequest":  "github",
 		},
 	},
 	"pr-closure": {
@@ -66,20 +68,15 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 			"github.onIssue": "github",
 		},
 	},
-	"create-with-agent": {
-		id:               "create-with-agent",
-		entrypointNodeID: "onrun-create-with-agent",
-		canvasFile:       "templates/create-with-agent.canvas.yaml",
-		consoleFile:      "templates/create-with-agent.console.yaml",
-	},
 }
 
 type factoryTemplateInput struct {
-	appID         string
-	appName       string
-	installParams map[string]string
-	integrations  map[string]factoryTemplateIntegration
-	agent         *factoryTemplateAgent
+	appID                 string
+	appName               string
+	installParams         map[string]string
+	integrations          map[string]factoryTemplateIntegration
+	agent                 *factoryTemplateAgent
+	includeVisualEvidence *bool
 }
 
 type factoryTemplateIntegration struct {
@@ -186,6 +183,7 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		}
 		rewriteFactoryIntegrationNames(node.Configuration, input.integrations)
 		rewriteFactoryAgent(node, input.agent)
+		applyFactoryVisualEvidence(node, input.includeVisualEvidence)
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
 			if node.Metadata == nil {
@@ -216,6 +214,16 @@ func rewriteFactoryIntegrationNames(value any, integrations map[string]factoryTe
 			rewriteFactoryIntegrationNames(child, integrations)
 		}
 	}
+}
+
+func applyFactoryVisualEvidence(node *yaml.Node, includeVisualEvidence *bool) {
+	if includeVisualEvidence == nil || node.Configuration == nil {
+		return
+	}
+	if _, ok := node.Configuration["includeVisualEvidence"]; !ok {
+		return
+	}
+	node.Configuration["includeVisualEvidence"] = *includeVisualEvidence
 }
 
 func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
@@ -257,10 +265,7 @@ func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {
 		if node.Metadata == nil {
 			node.Metadata = map[string]any{}
 		}
-		node.Metadata[factoryTemplateMetadataKey] = map[string]any{
-			"id":      template.id,
-			"version": factoryTemplateVersion,
-		}
+		maps.Copy(node.Metadata, models.FactoryAppTemplateMetadata(template.id, factoryTemplateVersion))
 		return
 	}
 }
@@ -337,12 +342,14 @@ func deriveFactoryTemplateInput(
 	version *models.CanvasVersion,
 	template factoryAppTemplate,
 ) factoryTemplateInput {
+	includeVisualEvidence := canvasAgentIncludesVisualEvidence(version.Nodes)
 	input := factoryTemplateInput{
-		appID:         canvas.ID.String(),
-		appName:       canvas.Name,
-		installParams: deriveFactoryInstallParams(version.Nodes),
-		integrations:  map[string]factoryTemplateIntegration{},
-		agent:         resetFactoryTemplateAgent(tx, factory, version.Nodes),
+		appID:                 canvas.ID.String(),
+		appName:               canvas.Name,
+		installParams:         deriveFactoryInstallParams(version.Nodes),
+		integrations:          map[string]factoryTemplateIntegration{},
+		agent:                 resetFactoryTemplateAgent(tx, factory, version.Nodes),
+		includeVisualEvidence: &includeVisualEvidence,
 	}
 	for _, node := range version.Nodes {
 		integrationType := template.componentIntegrations[node.ComponentName()]
@@ -545,19 +552,14 @@ func materializeIntakeDefaults(
 	if err != nil {
 		return nil, err
 	}
-	settings := intakeSettingsFromGraph(graph, spec)
+	settings := intakeSettingsFromGraph(intake.Source, graph, spec)
 	for i := range defaults.Spec.Nodes {
 		node := &defaults.Spec.Nodes[i]
 		if node.ID == intakeFilterNodeID {
 			node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
 		}
 		if node.ID == intakeTriggerNodeID {
-			node.Metadata = map[string]any{
-				factoryTemplateMetadataKey: map[string]any{
-					"id":      "intake:" + intake.Source,
-					"version": factoryTemplateVersion,
-				},
-			}
+			node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
 		}
 	}
 	defaults.Metadata.ID = canvas.ID.String()
@@ -588,29 +590,39 @@ func materializeBacklogDefaults(
 		if node.ID != backlogTriggerNodeID {
 			continue
 		}
-		node.Metadata = map[string]any{
-			factoryTemplateMetadataKey: map[string]any{
-				"id":      "backlog",
-				"version": factoryTemplateVersion,
-			},
-		}
+		node.Metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion)
 	}
 	encoded, err := goyaml.Marshal(defaults)
 	if err != nil {
 		return nil, fmt.Errorf("encode Backlog defaults: %w", err)
 	}
 	return &materializedFactoryTemplate{
-		templateID: "backlog",
+		templateID: models.FactoryAppTemplateBacklogID,
 		canvasYAML: string(encoded),
 	}, nil
 }
 
+func canvasAgentIncludesVisualEvidence(nodes []models.Node) bool {
+	node := findIntakeNode(nodes, implementationAgentNodeID)
+	if node == nil {
+		return false
+	}
+	value, ok := node.Configuration["includeVisualEvidence"].(bool)
+	return ok && value
+}
+
+func isFactoryAgentHarness(component string) bool {
+	switch component {
+	case models.SuperPlaneRunnerComponent, "runnerClaudeCode", "runnerCodex", "runnerOpenRouter":
+		return true
+	default:
+		return false
+	}
+}
+
 func intakeAgentFromCanvasNodes(nodes []models.Node) *intakeAgent {
 	for _, node := range nodes {
-		if node.ComponentName() != models.SuperPlaneRunnerComponent &&
-			node.ComponentName() != "runnerClaudeCode" &&
-			node.ComponentName() != "runnerCodex" &&
-			node.ComponentName() != "runnerOpenRouter" {
+		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
@@ -638,6 +650,7 @@ func materializePRFeedbackDefaults(
 		Repository:             settings.Repository,
 		Mention:                settings.Mention,
 		IgnoreBots:             settings.IgnoreBots,
+		IncludeVisualEvidence:  prFeedbackVisualEvidenceEnabled(graph, spec),
 		AllowedBots:            settings.AllowedBots,
 		CheckNames:             settings.CheckNames,
 		MaximumAttempts:        prFeedbackResetMaximumAttempts(handler),
@@ -667,6 +680,16 @@ func materializePRFeedbackDefaults(
 	}, nil
 }
 
+func prFeedbackVisualEvidenceEnabled(graph prFeedbackGraph, spec models.LiveCanvasSpec) bool {
+	for nodeID := range graph.discussionRunnerNodeIDs(spec) {
+		node := findIntakeNode(spec.Nodes, nodeID)
+		if prFeedbackNodeBool(node, "includeVisualEvidence", false) {
+			return true
+		}
+	}
+	return prFeedbackNodeBool(findIntakeNode(spec.Nodes, graph.RunnerNodeID), "includeVisualEvidence", false)
+}
+
 func prFeedbackResetMaximumAttempts(handler *models.FactoryPRFeedbackHandler) int {
 	if handler != nil && handler.MaximumAttempts != nil && *handler.MaximumAttempts > 0 {
 		return *handler.MaximumAttempts
@@ -687,10 +710,7 @@ func stampFactoryTemplateMetadata(canvas *yaml.Canvas, nodeID, templateID string
 		if node.Metadata == nil {
 			node.Metadata = map[string]any{}
 		}
-		node.Metadata[factoryTemplateMetadataKey] = map[string]any{
-			"id":      templateID,
-			"version": factoryTemplateVersion,
-		}
+		maps.Copy(node.Metadata, models.FactoryAppTemplateMetadata(templateID, factoryTemplateVersion))
 		return
 	}
 }

@@ -63,6 +63,53 @@ func Test__SupportFeedbackConsumer(t *testing.T) {
 		})))
 		require.ErrorContains(t, err, "smtp unavailable")
 	})
+
+	t.Run("republishes after Discord fails so the email is not sent again", func(t *testing.T) {
+		emailService := services.NewNoopEmailService()
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "discord down", http.StatusBadGateway)
+		}))
+		t.Cleanup(server.Close)
+
+		var republished *messages.SupportFeedbackRequestedMessage
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(server.URL))
+		consumer.publish = func(message messages.SupportFeedbackRequestedMessage) error {
+			republished = &message
+			return nil
+		}
+
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:  services.FeedbackCategoryBug,
+			Details:   "The canvas did not load.",
+			UserEmail: "ada@example.com",
+		})))
+		require.NoError(t, err)
+		require.Len(t, emailService.SentSupportFeedbackEmails(), 1)
+		require.NotNil(t, republished)
+		assert.True(t, republished.EmailDelivered)
+		assert.False(t, republished.DiscordDelivered)
+	})
+
+	t.Run("skips email when that channel was already delivered", func(t *testing.T) {
+		emailService := services.NewNoopEmailService()
+		discordCalls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			discordCalls++
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		t.Cleanup(server.Close)
+
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(server.URL))
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:       services.FeedbackCategoryBug,
+			Details:        "The canvas did not load.",
+			UserEmail:      "ada@example.com",
+			EmailDelivered: true,
+		})))
+		require.NoError(t, err)
+		assert.Empty(t, emailService.SentSupportFeedbackEmails())
+		assert.Equal(t, 1, discordCalls)
+	})
 }
 
 func supportFeedbackPayload(t *testing.T, message messages.SupportFeedbackRequestedMessage) []byte {

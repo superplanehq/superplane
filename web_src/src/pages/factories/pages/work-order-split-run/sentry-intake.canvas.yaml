@@ -39,7 +39,7 @@ spec:
       component: createWorkOrder
       configuration:
         title: '{{ root().data.issue.title }}'
-        description: '{{ root().data.issue.permalink }}'
+        description: '{{ root().data.description }}'
       position:
         x: 576
         'y': 978

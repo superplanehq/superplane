@@ -29,13 +29,19 @@ type FactoryWorkOrderNotificationMessage struct {
 	ToState          string   `json:"to_state,omitempty"`
 	Result           string   `json:"result,omitempty"`
 	ArtifactType     string   `json:"artifact_type,omitempty"`
-	// StatusNote* carry a `setWorkOrderStatusNote` write into the email,
+	// StatusNote* carry a task status note update into the email,
 	// so the consumer never has to re-read the (latest-only, mutable)
 	// note off the order row and risk describing a later update.
 	StatusNoteHeadline string `json:"status_note_headline,omitempty"`
 	StatusNoteBody     string `json:"status_note_body,omitempty"`
 	StatusNoteCtaLabel string `json:"status_note_cta_label,omitempty"`
 	StatusNoteCtaURL   string `json:"status_note_cta_url,omitempty"`
+	// QuestionPrompt is the first survey prompt, or the wait text when
+	// there is no survey, for an agent-question notification.
+	QuestionPrompt string `json:"question_prompt,omitempty"`
+	// SessionStarterUserID is the user who started the planning session,
+	// when that person is not already the task creator.
+	SessionStarterUserID string `json:"session_starter_user_id,omitempty"`
 }
 
 func (m FactoryWorkOrderNotificationMessage) Publish() error {

@@ -7,7 +7,6 @@ import { type MetadataItem } from "../metadataList";
 export type LastRunState = "success" | "failed" | "running";
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running" | string;
 
-// Map LastRunState to EventState
 const mapLastRunStateToEventState = (state: LastRunState): EventState => {
   switch (state) {
     case "success":
@@ -74,6 +73,79 @@ export interface CompositeProps extends ComponentActionsProps {
   nodeName?: string;
 }
 
+function buildEventSections(
+  visibleEvents: LastRunItem[],
+  hiddenEventsCount: number,
+  onViewMoreEvents?: () => void,
+): EventSection[] {
+  const sections: EventSection[] = visibleEvents.map((event) => ({
+    eventId: event.id?.slice(0, 4) || "",
+    eventState: mapLastRunStateToEventState(event.state),
+    eventTitle: event.title,
+    eventSubtitle: event.subtitle,
+    receivedAt: event.receivedAt,
+    showAutomaticTime: true,
+  }));
+
+  if (hiddenEventsCount > 0) {
+    sections.push({
+      eventId: "",
+      eventState: "neutral",
+      eventTitle: `+${hiddenEventsCount} more`,
+      handleComponent: (
+        <div
+          onClick={onViewMoreEvents}
+          className="cursor-pointer hover:bg-gray-200 transition-colors px-2 py-1 rounded"
+        >
+          Click to view more events
+        </div>
+      ),
+    });
+  }
+
+  return sections;
+}
+
+function parameterGroupsToSpecs(parameters: ParameterGroup[]) {
+  if (parameters.length === 0) return undefined;
+
+  return parameters.map((group) => ({
+    title: Object.keys(group.items).join(", "),
+    iconSlug: group.icon,
+    values: Object.entries(group.items).map(([key, value]) => ({
+      badges: [
+        {
+          label: `${key}: ${value}`,
+          bgColor: "bg-gray-100",
+          textColor: "text-gray-700",
+        },
+      ],
+    })),
+  }));
+}
+
+function missingComponentField(isMissing: boolean) {
+  if (!isMissing) return undefined;
+
+  return (
+    <div className="px-3 py-2 bg-orange-50 border-t border-amber-200 flex items-center gap-2">
+      <div className="flex-shrink-0">
+        <svg className="h-4 w-4 text-amber-700" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </div>
+      <div className="text-sm text-amber-700">
+        <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be removed
+        or replaced.
+      </div>
+    </div>
+  );
+}
+
 export const Composite: React.FC<CompositeProps> = ({
   iconSrc,
   iconSlug,
@@ -106,7 +178,6 @@ export const Composite: React.FC<CompositeProps> = ({
   onDelete,
   isCompactView,
 }) => {
-  // Use lastRunItems if provided, otherwise fall back to single lastRunItem
   const eventsToDisplay = React.useMemo(() => {
     if (lastRunItems && lastRunItems.length > 0) {
       return lastRunItems;
@@ -124,79 +195,13 @@ export const Composite: React.FC<CompositeProps> = ({
     return Math.max(0, eventsToDisplay.length - maxVisibleEvents);
   }, [eventsToDisplay.length, maxVisibleEvents]);
 
-  // Convert events to EventSection format for ComponentBase
-  const eventSections: EventSection[] = React.useMemo(() => {
-    const sections: EventSection[] = [];
+  const eventSections: EventSection[] = React.useMemo(
+    () => buildEventSections(visibleEvents, hiddenEventsCount, onViewMoreEvents),
+    [visibleEvents, hiddenEventsCount, onViewMoreEvents],
+  );
 
-    // Add visible events
-    visibleEvents.forEach((event) => {
-      sections.push({
-        eventId: event.id?.slice(0, 4) || "",
-        eventState: mapLastRunStateToEventState(event.state),
-        eventTitle: event.title,
-        eventSubtitle: event.subtitle,
-        receivedAt: event.receivedAt,
-        showAutomaticTime: true,
-      });
-    });
-
-    // Add "View More" section if there are hidden events
-    if (hiddenEventsCount > 0) {
-      sections.push({
-        eventId: "",
-        eventState: "neutral",
-        eventTitle: `+${hiddenEventsCount} more`,
-        handleComponent: (
-          <div
-            onClick={onViewMoreEvents}
-            className="cursor-pointer hover:bg-gray-200 transition-colors px-2 py-1 rounded"
-          >
-            Click to view more events
-          </div>
-        ),
-      });
-    }
-
-    return sections;
-  }, [visibleEvents, hiddenEventsCount, onViewMoreEvents]);
-
-  // Convert parameters to specs format
-  const specs = React.useMemo(() => {
-    if (parameters.length === 0) return undefined;
-
-    return parameters.map((group) => ({
-      title: Object.keys(group.items).join(", "),
-      iconSlug: group.icon,
-      values: Object.entries(group.items).map(([key, value]) => ({
-        badges: [
-          {
-            label: `${key}: ${value}`,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-700",
-          },
-        ],
-      })),
-    }));
-  }, [parameters]);
-
-  // Handle missing state with custom component
-  const customField = isMissing ? (
-    <div className="px-3 py-2 bg-orange-50 border-t border-amber-200 flex items-center gap-2">
-      <div className="flex-shrink-0">
-        <svg className="h-4 w-4 text-amber-700" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </div>
-      <div className="text-sm text-amber-700">
-        <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be removed
-        or replaced.
-      </div>
-    </div>
-  ) : undefined;
+  const specs = React.useMemo(() => parameterGroupsToSpecs(parameters), [parameters]);
+  const customField = missingComponentField(isMissing);
 
   return (
     <ComponentBase

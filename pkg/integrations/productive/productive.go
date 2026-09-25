@@ -19,9 +19,7 @@ To configure Productive.io to work with SuperPlane:
 `
 
 func init() {
-	// No webhook handler: Productive.io grants webhooks by plan and refuses to
-	// register one otherwise, so the onTask trigger polls instead.
-	registry.RegisterIntegration("productive", &Productive{})
+	registry.RegisterIntegrationWithWebhookHandler("productive", &Productive{}, &ProductiveWebhookHandler{})
 }
 
 type Productive struct{}
@@ -127,13 +125,16 @@ func (p *Productive) HandleHook(ctx core.IntegrationHookContext) error {
 }
 
 func (p *Productive) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op - Productive.io does not call SuperPlane; the onTask trigger polls.
+	// no-op - Productive.io calls the per-node webhook URL directly, not the
+	// integration's own HTTP endpoint.
 }
 
 func (p *Productive) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case ResourceTypeProject:
 		return listProjectResources(ctx)
+	case ResourceTypeTaskList:
+		return listTaskListResources(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -156,6 +157,34 @@ func listProjectResources(ctx core.ListResourcesContext) ([]core.IntegrationReso
 			Type: ResourceTypeProject,
 			Name: project.Name,
 			ID:   project.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listTaskListResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	projectID := ""
+	if ctx.Parameters != nil {
+		projectID = ctx.Parameters["project"]
+	}
+
+	lists, err := client.ListTaskLists(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list task lists: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(lists))
+	for _, list := range lists {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeTaskList,
+			Name: list.Name,
+			ID:   list.ID,
 		})
 	}
 

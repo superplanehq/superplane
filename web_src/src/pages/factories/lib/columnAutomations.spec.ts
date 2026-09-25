@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
@@ -12,10 +12,17 @@ import {
   columnAutomationsNeedRepair,
   columnTitleForKey,
   isColumnKey,
+  onlyCustomCatalogRemains,
   phaseIndexFromColumnKey,
   takenCatalogIds,
 } from "./columnAutomations";
-import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
+import {
+  factoryColumnAutomationViewPath,
+  factoryIntakePath,
+  factoryPlanningPath,
+  factoryPlanningSetupPath,
+  factoryPRFeedbackPath,
+} from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import type { LinePhaseColumn } from "./linePhaseRuns";
 
@@ -143,19 +150,33 @@ describe("buildColumnAutomations", () => {
       kind: "analysis",
       name: "Task analysis",
       trigger: "On task in Backlog",
-      action: "Score the task",
+      action: "Plan the task",
       catalogId: "analysis",
+      health: "healthy",
     });
   });
 
-  it("marks an unhealthy intake as needs-repair", () => {
+  it("marks Task analysis disabled when Planning is off", () => {
+    const automations = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [{ id: "app-refund-backlog", name: "Ingest" }],
+      planningEnabled: false,
+    });
+
+    expect(automations[0]).toMatchObject({
+      kind: "analysis",
+      health: "disabled",
+    });
+  });
+
+  it("does not mark an unhealthy intake as needs-repair", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
       intakes: [UNHEALTHY_SENTRY],
     });
 
-    expect(automations[0]?.health).toBe("needs-repair");
-    expect(columnAutomationsNeedRepair(automations)).toBe(true);
+    expect(automations[0]?.health).toBe("healthy");
+    expect(columnAutomationsNeedRepair(automations)).toBe(false);
   });
 
   it("builds a phase agent sentence from the column name", () => {
@@ -220,6 +241,46 @@ describe("buildColumnAutomations", () => {
       }),
     ]);
   });
+
+  it("appends custom canvases attached to Verify or Done", () => {
+    const verify = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [{ id: "app-create-env", name: "Create env", columnKey: "verify" }],
+    });
+    const done = buildColumnAutomations("done", {
+      columnTitle: "Done",
+      apps: [
+        { id: "app-pr-closure", name: "PR Closure" },
+        { id: "app-destroy-env", name: "Destroy env", columnKey: "done" },
+      ],
+    });
+
+    expect(verify).toEqual([
+      expect.objectContaining({
+        kind: "custom",
+        name: "Create env",
+        trigger: "On a trigger you choose",
+        canvasId: "app-create-env",
+      }),
+    ]);
+    expect(done.map((automation) => automation.kind)).toEqual(["pr-closure", "custom"]);
+    expect(done[1]).toMatchObject({ name: "Destroy env", canvasId: "app-destroy-env" });
+  });
+
+  it("keeps a custom Done canvas named PR Closure off the built-in type", () => {
+    const automations = buildColumnAutomations("done", {
+      columnTitle: "Done",
+      apps: [{ id: "app-custom-close", name: "PR Closure", columnKey: "done" }],
+    });
+
+    expect(automations).toEqual([
+      expect.objectContaining({
+        kind: "custom",
+        name: "PR Closure",
+        canvasId: "app-custom-close",
+      }),
+    ]);
+  });
 });
 
 describe("catalogForColumn", () => {
@@ -239,6 +300,22 @@ describe("catalogForColumn", () => {
     expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
   });
 
+  it("offers a custom canvas in the verify catalog when the feature is on", () => {
+    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
+      "discussion",
+      "checks",
+      "custom",
+    ]);
+  });
+
+  it("offers pull request closure in the done catalog", () => {
+    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure"]);
+  });
+
+  it("offers a custom canvas in the done catalog when the feature is on", () => {
+    expect(catalogForColumn("done", { allowCustom: true }).map((entry) => entry.id)).toEqual(["pr-closure", "custom"]);
+  });
+
   it("keeps phase catalog entries available after one agent exists", () => {
     const catalog = catalogForColumn("phase-0");
     const automations = buildColumnAutomations("phase-0", {
@@ -247,7 +324,35 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
-    expect(catalog.map((entry) => entry.id)).toEqual(["agent-step", "custom"]);
+    expect(catalog.map((entry) => entry.id)).toEqual(["agent-step"]);
+  });
+
+  it("offers a custom canvas in the phase catalog when the feature is on", () => {
+    expect(catalogForColumn("phase-0", { allowCustom: true }).map((entry) => entry.id)).toEqual([
+      "agent-step",
+      "custom",
+    ]);
+  });
+});
+
+describe("onlyCustomCatalogRemains", () => {
+  it("is true when every unique Verify type is taken", () => {
+    const catalog = catalogForColumn("verify", { allowCustom: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(true);
+  });
+
+  it("is false when custom automations are off", () => {
+    expect(onlyCustomCatalogRemains(catalogForColumn("verify"), ["discussion", "checks"])).toBe(false);
+  });
+
+  it("is false when another unique Verify type is still available", () => {
+    const catalog = catalogForColumn("verify", { allowCustom: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion"])).toBe(false);
+    expect(onlyCustomCatalogRemains(catalog, [])).toBe(false);
+  });
+
+  it("is true when Done already has pull request closure", () => {
+    expect(onlyCustomCatalogRemains(catalogForColumn("done", { allowCustom: true }), ["pr-closure"])).toBe(true);
   });
 });
 
@@ -275,27 +380,36 @@ describe("columnAutomationOpenPath", () => {
     ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-implementer"));
   });
 
-  it("does not open the full-screen editor for a canvas automation", () => {
-    const href = columnAutomationOpenPath(
-      {
-        id: "analysis-app-refund-backlog",
-        kind: "analysis",
-        name: "Task analysis",
-        trigger: "On task in Backlog",
-        action: "Score the task",
-        iconSrc: "",
-        iconAlt: "",
-        health: "healthy",
-        runningCount: 0,
-        catalogId: "analysis",
-        canvasId: "app-refund-backlog",
-      },
-      nav,
-    );
+  const analysisAutomation = {
+    id: "analysis-app-refund-backlog",
+    kind: "analysis",
+    name: "Task analysis",
+    trigger: "On task in Backlog",
+    action: "Plan the task",
+    iconSrc: "",
+    iconAlt: "",
+    health: "healthy",
+    runningCount: 0,
+    catalogId: "analysis",
+    canvasId: "app-refund-backlog",
+  } as const;
 
-    expect(href).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-backlog"));
+  it("opens Planning settings for Task analysis", () => {
+    const href = columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: true });
+
+    expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
+  });
+
+  it("opens the Planning setup wizard for Task analysis until setup is confirmed", () => {
+    expect(columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: false })).toBe(
+      factoryPlanningSetupPath("org-1", "RF", "line-plan"),
+    );
+  });
+
+  it("opens Planning settings for Task analysis when the setup state is unknown", () => {
+    expect(columnAutomationOpenPath(analysisAutomation, nav)).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
   });
 
   it("opens the intake settings popup on the first tab", () => {

@@ -16,6 +16,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
@@ -103,7 +104,7 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 		return nil, err
 	}
 
-	return b.applyLineDispatchModel(resolved)
+	return b.applyLineDispatchOverrides(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -1053,9 +1054,10 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order()
 // and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments, and
-// assignees are loaded only when the expression AST references those fields
-// on order() or task(). Origin is attached whenever the work order has one.
+// factory work-order execution. The url, key, artifacts, comments,
+// assignees, and spec are loaded only when the expression AST references
+// those fields on order() or task(). Origin is attached whenever the work
+// order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1085,7 +1087,6 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, err
 	}
-
 	payload := map[string]any{
 		"id":             order.ID.String(),
 		"title":          order.Title,
@@ -1096,6 +1097,8 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"repository":     repository,
 		"repository_url": githubRepositoryURL(repository),
 		"default_branch": defaultBranch,
+		// Keep this compatibility value until stored canvases no longer reference it.
+		"visual_evidence_enabled": false,
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
@@ -1207,11 +1210,49 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["assignees"] = assigneePayloads
 	}
 
+	usesSpec, err := expressionvalidation.ExpressionUsesOrderSpec(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesSpec {
+		spec, err := b.resolveOrderSpec(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["spec"] = spec
+	}
+
 	return payload, nil
 }
 
+func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
+	if !workOrderRefinementEnabled(b.tx, order) {
+		return "", nil
+	}
+	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
+	}
+	return planningSpecArtifactBody(artifact), nil
+}
+
+func planningSpecArtifactBody(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact == nil || artifact.Type != models.FactoryWorkOrderArtifactTypeMarkdown {
+		return ""
+	}
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return ""
+	}
+	body, _ := data["body"].(string)
+	return strings.TrimSpace(body)
+}
+
 func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
-	markdown, files, err := storedfiles.DescriptionForDispatch(
+	_, files, err := storedfiles.DescriptionForDispatch(
 		context.Background(),
 		tx,
 		blob.Current(),
@@ -1229,7 +1270,6 @@ func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[s
 	for _, file := range files {
 		filePayloads = append(filePayloads, file.Map())
 	}
-	payload["description"] = markdown
 	payload["files"] = filePayloads
 	return nil
 }
@@ -2235,11 +2275,22 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 	return executions, nil
 }
 
-func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]any) (map[string]any, error) {
+func (b *NodeConfigurationBuilder) applyLineDispatchOverrides(resolved map[string]any) (map[string]any, error) {
 	dispatch, err := b.lineDispatch()
 	if err != nil || dispatch == nil {
 		return resolved, err
 	}
+	resolved, err = b.applyLineDispatchModel(resolved, dispatch)
+	if err != nil {
+		return resolved, err
+	}
+	return applyLineDispatchThinking(resolved, dispatch.ThinkingLevel), nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchModel(
+	resolved map[string]any,
+	dispatch *models.FactoryWorkOrderLineDispatch,
+) (map[string]any, error) {
 	override := strings.TrimSpace(dispatch.Model)
 	if override == "" {
 		return resolved, nil
@@ -2252,6 +2303,16 @@ func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]an
 
 	resolved["model"] = override
 	return resolved, nil
+}
+
+func applyLineDispatchThinking(resolved map[string]any, dispatchThinking string) map[string]any {
+	agent, _ := resolved["thinkingLevel"].(string)
+	thinking, ok := runner.OverlayThinkingLevel(agent, dispatchThinking)
+	if !ok {
+		return resolved
+	}
+	resolved["thinkingLevel"] = thinking
+	return resolved
 }
 
 func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineDispatch, error) {

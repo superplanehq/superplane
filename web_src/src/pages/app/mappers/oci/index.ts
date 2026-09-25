@@ -14,7 +14,7 @@ import { deleteFunctionMapper } from "./delete_function";
 import { invokeFunctionMapper } from "./invoke_function";
 import { onInstanceStateChangeTriggerRenderer } from "./on_instance_state_change";
 import { updateInstanceMapper } from "./update_instance";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { updateImageMapper } from "./update_image";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {

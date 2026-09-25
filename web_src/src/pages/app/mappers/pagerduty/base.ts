@@ -12,7 +12,8 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
     return null;
   }
 
-  return outputs.default[0].data.incident as Incident;
+  const payload = outputs.default[0].data as { incident?: Incident } | undefined;
+  return payload?.incident ?? null;
 }
 
 export function getDetailsForIncident(incident: Incident | undefined, agent?: ResourceRef): Record<string, string> {
@@ -55,12 +56,18 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
     details["Resolved At"] = new Date(incident.resolved_at).toLocaleString();
   }
 
-  if (agent) {
-    details["Agent"] = agent.summary || "-";
-    details["Agent URL"] = agent.html_url || "-";
-  }
+  assignAgentDetails(details, agent);
 
   return details;
+}
+
+function assignAgentDetails(details: Record<string, string>, agent?: ResourceRef) {
+  if (!agent) {
+    return;
+  }
+
+  details["Agent"] = agent.summary || "-";
+  details["Agent URL"] = agent.html_url || "-";
 }
 
 /**
@@ -68,8 +75,8 @@ export function getDetailsForIncident(incident: Incident | undefined, agent?: Re
  * Includes incident details if available, and adds error in the proper format if execution failed.
  * This ensures errors are displayed as key/value pairs, not raw text.
  */
-export function buildIncidentExecutionDetails(execution: ExecutionInfo): Record<string, any> {
-  const details: Record<string, any> = {};
+export function buildIncidentExecutionDetails(execution: ExecutionInfo): Record<string, string> {
+  const details: Record<string, string> = {};
 
   // Add execution timestamp
   if (execution.createdAt) {

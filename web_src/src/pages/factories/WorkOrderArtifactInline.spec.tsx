@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
 
@@ -133,5 +133,43 @@ describe("WorkOrderArtifactInline (link artifacts)", () => {
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("Preview")).toBeInTheDocument();
+  });
+});
+
+describe("WorkOrderArtifactInline (file artifacts)", () => {
+  it("renders an uploaded screenshot as a safe link", () => {
+    render(
+      <WorkOrderArtifactInline
+        artifact={{
+          id: "file-1",
+          type: "TYPE_FILE",
+          data: {
+            filename: "checkout.png",
+            contentType: "image/png",
+            title: "Checkout screen",
+            url: "https://app.example/api/v1/public/artifacts/capability/checkout.png",
+          },
+        }}
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: /Checkout screen/ });
+    expect(link).toHaveAttribute("href", "https://app.example/api/v1/public/artifacts/capability/checkout.png");
+    expect(link.querySelector("svg")).toBeTruthy();
+  });
+
+  it("renders an unsafe uploaded file URL as plain text", () => {
+    render(
+      <WorkOrderArtifactInline
+        artifact={{
+          id: "file-2",
+          type: "TYPE_FILE",
+          data: { filename: "demo.webm", contentType: "video/webm", url: "javascript:alert(1)" },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("demo.webm")).toBeInTheDocument();
   });
 });

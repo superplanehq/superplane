@@ -118,17 +118,6 @@ service Organizations {
     };
   }
 
-  rpc DescribeUsage(DescribeUsageRequest) returns (DescribeUsageResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/usage"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe organization usage";
-      description: "Returns usage tracking and limits for an organization";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeOrganizationWorkspaceUsage(DescribeOrganizationWorkspaceUsageRequest) returns (DescribeOrganizationWorkspaceUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/workspace-usage"
@@ -273,6 +262,30 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Sync organization billing";
       description: "Reads the Polar Business subscription for the organization and updates the local plan";
+      tags: "Organization";
+    };
+  }
+
+  rpc CancelOrganizationSubscription(CancelOrganizationSubscriptionRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel organization subscription";
+      description: "Cancels the Polar Business subscription at the end of the current period";
+      tags: "Organization";
+    };
+  }
+
+  rpc ResumeOrganizationSubscription(ResumeOrganizationSubscriptionRequest) returns (DescribeOrganizationBillingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/resume"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume organization subscription";
+      description: "Clears a scheduled Polar Business cancellation so the subscription renews";
       tags: "Organization";
     };
   }
@@ -493,44 +506,6 @@ message ResetInviteLinkRequest {
 
 message ResetInviteLinkResponse {
   InviteLink invite_link = 1;
-}
-
-message OrganizationLimits {
-  int32 max_canvases = 1;
-  int32 max_nodes_per_canvas = 2;
-  int32 max_users = 3;
-  int32 retention_window_days = 4;
-  int64 max_events_per_month = 5;
-  int32 max_integrations = 6;
-  int64 max_agent_tokens_per_month = 7;
-  int64 max_runner_minutes_per_month = 8;
-}
-
-message OrganizationUsage {
-  int32 canvases = 1;
-  double event_bucket_level = 2;
-  double event_bucket_capacity = 3;
-  google.protobuf.Timestamp event_bucket_last_updated_at = 4;
-  google.protobuf.Timestamp next_event_bucket_decrease_at = 5;
-  double agent_token_bucket_level = 6;
-  double agent_token_bucket_capacity = 7;
-  google.protobuf.Timestamp agent_token_bucket_last_updated_at = 8;
-  google.protobuf.Timestamp next_agent_token_bucket_decrease_at = 9;
-  double runner_minutes_bucket_level = 10;
-  double runner_minutes_bucket_capacity = 11;
-  google.protobuf.Timestamp runner_minutes_bucket_last_updated_at = 12;
-  google.protobuf.Timestamp next_runner_minutes_bucket_decrease_at = 13;
-}
-
-message DescribeUsageRequest {
-  string id = 1;
-}
-
-message DescribeUsageResponse {
-  bool enabled = 1;
-  string status_message = 2;
-  OrganizationLimits limits = 3;
-  OrganizationUsage usage = 4;
 }
 
 message DescribeOrganizationWorkspaceUsageRequest {
@@ -779,6 +754,7 @@ message DescribeOrganizationBillingResponse {
   bool has_billing_customer = 13;
   int64 welcome_remaining_cents = 14;
   int64 admin_remaining_cents = 15;
+  bool cancel_at_period_end = 16;
 }
 
 message CreateBusinessCheckoutRequest {
@@ -790,6 +766,14 @@ message CreateBusinessCheckoutResponse {
 }
 
 message SyncOrganizationBillingRequest {
+  string id = 1;
+}
+
+message CancelOrganizationSubscriptionRequest {
+  string id = 1;
+}
+
+message ResumeOrganizationSubscriptionRequest {
   string id = 1;
 }
 
@@ -1069,11 +1053,6 @@ message BrowserAction {
 }
 
 // Event messages for organization lifecycle events
-message OrganizationCreated {
-  string organization_id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-}
-
 message OrganizationUpdated {
   string organization_id = 1;
   google.protobuf.Timestamp timestamp = 2;

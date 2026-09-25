@@ -1,8 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useAccount } from "@/contexts/useAccount";
-import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
-import { isUsagePageForced } from "@/lib/env";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { organizationMatchesRoute, organizationRouteId, readyAccountOrganizations } from "@/lib/accountOrganizations";
 import { cn } from "@/lib/utils";
 import {
@@ -10,7 +9,6 @@ import {
   Bug,
   CircleUser,
   Factory,
-  Gauge,
   Key,
   KeyRound,
   Lock,
@@ -51,11 +49,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
-  const canReadOrg = permissionsLoading || canAct("org", "read");
-  const { data: usageStatus, error: usageError } = useOrganizationUsage(
-    organizationId || "",
-    !!organizationId && canReadOrg,
-  );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isOrganizationSwitchOpen, setIsOrganizationSwitchOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -98,7 +91,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   }, [isMenuOpen]);
 
   const organizationName = organization?.metadata?.name || "Organization";
-  const usageEnabled = usageStatus?.enabled === true || !!usageError || isUsagePageForced();
   const logoHref = !organizationId ? "/" : factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
 
   const openFeedback = (category?: FeedbackCategory) => {
@@ -186,16 +178,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
       Icon: Plug,
       permission: { resource: "integrations", action: "read" },
     },
-    ...(usageEnabled
-      ? [
-          {
-            label: "Usage",
-            href: organizationId ? `/${organizationId}/settings/billing` : "#",
-            Icon: Gauge,
-            permission: { resource: "org", action: "read" },
-          },
-        ]
-      : []),
     {
       label: "Secrets",
       href: organizationId ? `/${organizationId}/settings/secrets` : "#",

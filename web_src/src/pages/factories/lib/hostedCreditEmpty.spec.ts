@@ -1,22 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
-  HOSTED_CREDIT_RUNS_STOP_HINT,
-  hostedCreditBannerCopy,
   hostedCreditBannerKind,
-  hostedCreditBannerTone,
   hostedCreditBillingBalanceCopy,
-  hostedCreditEmptyBannerCopy,
+  hostedCreditHeaderKickerActionLabel,
   hostedCreditHeaderKickerLabel,
-  hostedCreditRunsStopHint,
   isHostedCreditHeaderKickerKind,
   isHostedCreditTrialOrg,
   organizationPlanLabel,
-  isLowHostedCreditRemaining,
   shouldShowHostedCreditEmptyBanner,
-  welcomeCreditExpiryLabel,
   welcomeCreditHeaderLabel,
-  trialExpirySentence,
 } from "./hostedCreditEmpty";
 
 const now = new Date("2026-09-08T12:00:00.000Z");
@@ -228,11 +221,12 @@ describe("hostedCreditBannerKind", () => {
 });
 
 describe("isHostedCreditHeaderKickerKind", () => {
-  it("uses the title chip for trial, trial ended, and no-plan states", () => {
+  it("uses the title chip for every credit state", () => {
     expect(isHostedCreditHeaderKickerKind("trial")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("trial-expired")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("lapsed")).toBe(true);
-    expect(isHostedCreditHeaderKickerKind("empty")).toBe(false);
+    expect(isHostedCreditHeaderKickerKind("low")).toBe(true);
+    expect(isHostedCreditHeaderKickerKind("empty")).toBe(true);
   });
 });
 
@@ -241,6 +235,21 @@ describe("hostedCreditHeaderKickerLabel", () => {
     expect(hostedCreditHeaderKickerLabel("trial")).toBe("Trial");
     expect(hostedCreditHeaderKickerLabel("trial-expired")).toBe("Trial ended");
     expect(hostedCreditHeaderKickerLabel("lapsed")).toBe("No plan");
+    expect(hostedCreditHeaderKickerLabel("low")).toBe("Credit low");
+    expect(hostedCreditHeaderKickerLabel("empty")).toBe("No credit");
+  });
+});
+
+describe("hostedCreditHeaderKickerActionLabel", () => {
+  it("opens billing for low and empty credit", () => {
+    expect(hostedCreditHeaderKickerActionLabel("low")).toBe("Add credits");
+    expect(hostedCreditHeaderKickerActionLabel("empty")).toBe("Add credits");
+  });
+
+  it("keeps Subscribe for trial and no-plan states", () => {
+    expect(hostedCreditHeaderKickerActionLabel("trial")).toBe("Subscribe");
+    expect(hostedCreditHeaderKickerActionLabel("trial-expired")).toBe("Subscribe");
+    expect(hostedCreditHeaderKickerActionLabel("lapsed")).toBe("Subscribe");
   });
 });
 
@@ -337,22 +346,6 @@ describe("shouldShowHostedCreditEmptyBanner", () => {
   });
 });
 
-describe("trialExpirySentence", () => {
-  it("names today, one day, and many days", () => {
-    expect(trialExpirySentence(new Date("2026-09-08T18:00:00.000Z"), now)).toBe("The trial ends today.");
-    expect(trialExpirySentence(new Date("2026-09-09T12:00:00.000Z"), now)).toBe("The trial ends in 1 day.");
-    expect(trialExpirySentence(new Date(inFourteenDays), now)).toBe("The trial ends in 14 days.");
-  });
-});
-
-describe("welcomeCreditExpiryLabel", () => {
-  it("names today, one day, and many days as short labels", () => {
-    expect(welcomeCreditExpiryLabel(new Date("2026-09-08T18:00:00.000Z"), now)).toBe("Expires today");
-    expect(welcomeCreditExpiryLabel(new Date("2026-09-09T12:00:00.000Z"), now)).toBe("1 day remaining");
-    expect(welcomeCreditExpiryLabel(new Date(inFourteenDays), now)).toBe("14 days remaining");
-  });
-});
-
 describe("welcomeCreditHeaderLabel", () => {
   it("names today, one day, and many days above the page title", () => {
     expect(welcomeCreditHeaderLabel(new Date("2026-09-08T18:00:00.000Z"), now)).toBe("Ends today");
@@ -362,164 +355,5 @@ describe("welcomeCreditHeaderLabel", () => {
 
   it("names an ended trial", () => {
     expect(welcomeCreditHeaderLabel(new Date(yesterday), now)).toBe("Ended");
-  });
-});
-
-describe("hostedCreditBannerTone", () => {
-  it("keeps a healthy trial informational", () => {
-    expect(hostedCreditBannerTone("trial", new Date(inFourteenDays), now)).toBe("info");
-  });
-
-  it("warns when the trial expires today", () => {
-    expect(hostedCreditBannerTone("trial", new Date("2026-09-08T18:00:00.000Z"), now)).toBe("warning");
-  });
-
-  it("warns when hosted runs cannot start", () => {
-    expect(hostedCreditBannerTone("trial-expired")).toBe("warning");
-    expect(hostedCreditBannerTone("lapsed")).toBe("warning");
-    expect(hostedCreditBannerTone("empty")).toBe("warning");
-    expect(hostedCreditBannerTone("low")).toBe("warning");
-  });
-
-  it("warns when trial credit is at or below $20", () => {
-    expect(hostedCreditBannerTone("trial", new Date(inFourteenDays), now, 1500)).toBe("warning");
-  });
-});
-
-describe("isLowHostedCreditRemaining", () => {
-  it("is true at or below $20 while credit remains", () => {
-    expect(isLowHostedCreditRemaining(2000)).toBe(true);
-    expect(isLowHostedCreditRemaining(432)).toBe(true);
-    expect(isLowHostedCreditRemaining(2001)).toBe(false);
-    expect(isLowHostedCreditRemaining(0)).toBe(false);
-    expect(isLowHostedCreditRemaining(undefined)).toBe(false);
-  });
-});
-
-describe("hostedCreditRunsStopHint", () => {
-  it("names the stop outcome only while remaining credit is low", () => {
-    expect(hostedCreditRunsStopHint(432)).toBe(HOSTED_CREDIT_RUNS_STOP_HINT);
-    expect(hostedCreditRunsStopHint(4124)).toBeUndefined();
-    expect(hostedCreditRunsStopHint(0)).toBeUndefined();
-  });
-});
-
-describe("hostedCreditBannerCopy", () => {
-  it("names remaining trial credit and the expiry window", () => {
-    expect(
-      hostedCreditBannerCopy({
-        kind: "trial",
-        billingEnabled: true,
-        remainingCreditCents: 4124,
-        welcomeCreditExpiresAt: new Date(inFourteenDays),
-        now,
-      }),
-    ).toEqual({
-      title: "Trial",
-      description:
-        "You have a 14-day Business trial with $41.24 for machines and managed models. The trial ends in 14 days. Subscribe to keep hosted runs.",
-      remainingLabel: "$41.24 remaining",
-      expiryLabel: "14 days remaining",
-      actionLabel: "Subscribe",
-      tone: "info",
-      showAction: true,
-      showPricingLink: true,
-    });
-  });
-
-  it("tells the user that tasks stop when trial credit is low", () => {
-    expect(
-      hostedCreditBannerCopy({
-        kind: "trial",
-        billingEnabled: true,
-        remainingCreditCents: 432,
-        welcomeCreditExpiresAt: new Date(inFourteenDays),
-        now,
-      }),
-    ).toEqual({
-      title: "Trial",
-      description:
-        "You have a 14-day Business trial with $4.32 for machines and managed models. The trial ends in 14 days. Subscribe to keep hosted runs.",
-      remainingLabel: "$4.32 remaining",
-      expiryLabel: "14 days remaining",
-      consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
-      actionLabel: "Subscribe",
-      tone: "warning",
-      showAction: true,
-      showPricingLink: true,
-    });
-  });
-
-  it("tells the user the trial ended", () => {
-    expect(hostedCreditBannerCopy({ kind: "trial-expired", billingEnabled: true })).toEqual({
-      title: "Trial ended",
-      description: "Hosted runs cannot start. Subscribe to Business to continue.",
-      actionLabel: "Subscribe",
-      tone: "warning",
-      showAction: true,
-      showPricingLink: true,
-    });
-  });
-
-  it("warns before purchased credit runs out", () => {
-    expect(
-      hostedCreditBannerCopy({
-        kind: "low",
-        billingEnabled: true,
-        remainingCreditCents: 1500,
-      }),
-    ).toEqual({
-      title: "Hosted credit is low",
-      description: "Less than $20.00 remains. Add hosted credit to keep SuperPlane-hosted runs.",
-      remainingLabel: "$15.00 remaining",
-      consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
-      actionLabel: "Add credits",
-      tone: "warning",
-      showAction: true,
-    });
-  });
-
-  it("asks an installation admin to add credit when billing is off and credit is low", () => {
-    expect(hostedCreditBannerCopy({ kind: "low", billingEnabled: false, remainingCreditCents: 1500 })).toEqual({
-      title: "Hosted credit is low",
-      description: "Less than $20.00 remains. Ask an installation admin to add hosted credit.",
-      remainingLabel: "$15.00 remaining",
-      consequenceHint: HOSTED_CREDIT_RUNS_STOP_HINT,
-      actionLabel: "Add credits",
-      tone: "warning",
-      showAction: false,
-    });
-  });
-});
-
-describe("hostedCreditEmptyBannerCopy", () => {
-  it("tells the user to view billing when billing is on", () => {
-    expect(hostedCreditEmptyBannerCopy(true)).toEqual({
-      title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Add hosted credit to continue.",
-      actionLabel: "Add credits",
-      tone: "warning",
-      showAction: true,
-    });
-  });
-
-  it("asks the user to wait for an installation admin when billing is off", () => {
-    expect(hostedCreditEmptyBannerCopy(false)).toEqual({
-      title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
-      actionLabel: "Add credits",
-      tone: "warning",
-      showAction: false,
-    });
-  });
-
-  it("points every role to Billing", () => {
-    expect(hostedCreditEmptyBannerCopy(true, false)).toEqual({
-      title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Add hosted credit to continue.",
-      actionLabel: "Add credits",
-      tone: "warning",
-      showAction: true,
-    });
   });
 });

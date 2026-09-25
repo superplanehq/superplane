@@ -4,7 +4,7 @@
 /**
  * Run Codex CLI and emit typed live-log records.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [thinking]
  */
 
 const fs = require("fs");
@@ -12,52 +12,275 @@ const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
 
-const PLANNING_SYSTEM_PROMPT =
-  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
-  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
-  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
-  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
-  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
-  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
-  "edit or write any files.";
+const SESSION_FILE = "codex_session";
+
+function loadActivityStreamModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ];
+  for (const file of candidates) {
+    if (file && fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return { createActivityStream: () => createDisabledActivityStream() };
+}
+
+function createDisabledActivityStream() {
+  const noop = () => undefined;
+  return {
+    enabled: false,
+    activityId: "",
+    start: noop,
+    startContent: noop,
+    appendContent: noop,
+    endContent: noop,
+    startTool: (input) => String((input && input.id) || ""),
+    appendToolOutput: noop,
+    endTool: noop,
+    notice: noop,
+    end: noop,
+    flush: () => Promise.resolve(),
+  };
+}
+
+function loadAnalysisProtocolModule() {
+  const candidates = [
+    path.join(__dirname, "analysis_protocol.js"),
+    path.join(__dirname, "..", "analysis_protocol.js"),
+  ];
+  for (const file of candidates) {
+    try {
+      return require(file);
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  return {};
+}
+
+function loadAnalysisProtocol(env = process.env) {
+  const mod = loadAnalysisProtocolModule();
+  return typeof mod.analysisProtocol === "function"
+    ? mod.analysisProtocol(env)
+    : "";
+}
+
+function withoutEmbeddedAnalysisProtocol(prompt) {
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withoutEmbeddedAnalysisProtocol === "function") {
+    return mod.withoutEmbeddedAnalysisProtocol(prompt);
+  }
+  return prompt;
+}
+
+function applyAnalysisContinuation(taskDir, promptCount, prompt) {
+  if (!planningAnalysisEnabled()) {
+    return prompt;
+  }
+  const mod = loadAnalysisProtocolModule();
+  if (typeof mod.withAnalysisContinuation !== "function") {
+    return prompt;
+  }
+  return mod.withAnalysisContinuation(taskDir, promptCount, prompt);
+}
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
 }
 
 function planningEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+  return (
+    planningAnalysisEnabled(env) &&
+    envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")
+  );
 }
 
-// Codex `exec` has no --ask-for-approval flag; approval_policy is set via a
-// `-c` config override instead. `--sandbox read-only` still allows Bash/Read
-// style exploration (shell commands, file reads) but rejects file writes, so
-// planning sessions stay read-only without disabling tool use entirely.
-function codexExecArgs(env = process.env, model, mcpScriptPath) {
-  const args = ["exec", "--json", "--skip-git-repo-check"];
+function planningAnalysisEnabled(env = process.env) {
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "work_order_analysis";
+}
+
+function artifactEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+}
+
+function planningSystemPrompt(env = process.env) {
+  return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
+}
+
+// Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
+// --sandbox flag. Config overrides keep both new and resumed analysis turns
+// read-only without disabling shell commands and file reads.
+function thinkingArgs(thinking) {
+  const level = String(thinking || "")
+    .trim()
+    .toLowerCase();
+  if (level === "low" || level === "medium" || level === "high") {
+    return ["-c", `model_reasoning_effort=${tomlString(level)}`];
+  }
+  return [];
+}
+
+function codexExecArgs(
+  env = process.env,
+  model,
+  mcpScriptPath,
+  sessionID = "",
+  thinking = "",
+) {
+  const args = ["exec"];
+  if (sessionID) {
+    args.push("resume", sessionID);
+  }
+  args.push("--json", "--skip-git-repo-check");
   if (planningEnabled(env)) {
-    args.push("--sandbox", "read-only", "-c", "approval_policy=\"never\"");
-    args.push(...mcpConfigOverrides(mcpScriptPath));
+    args.push(
+      "-c",
+      'sandbox_mode="read-only"',
+      "-c",
+      'approval_policy="never"',
+    );
+    args.push(...mcpConfigOverrides(mcpScriptPath, env));
+    args.push(
+      "-c",
+      `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
+    );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
+    if (artifactEnabled(env)) {
+      args.push(...mcpConfigOverrides(mcpScriptPath, env));
+    } else {
+      args.push(...workspaceMCPConfigOverrides(env));
+    }
   }
   if (model) {
     args.push("-m", model);
   }
+  args.push(...thinkingArgs(thinking));
   return args;
 }
 
-function mcpConfigOverrides(mcpScriptPath) {
+function readSessionID(taskDir) {
+  const file = path.join(taskDir, SESSION_FILE);
+  if (!fs.existsSync(file)) {
+    return "";
+  }
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+function writeSessionID(taskDir, sessionID) {
+  const id = String(sessionID || "").trim();
+  if (id) {
+    fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
+  }
+}
+
+function codexSessionForPrompt(promptCount, sessionID, env = process.env) {
+  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
+    return "";
+  }
+  if (Number(promptCount) < 1) {
+    return "";
+  }
+  const id = String(sessionID || "").trim();
+  if (!id) {
+    throw new Error("Codex session ID is missing for a follow-up prompt");
+  }
+  return id;
+}
+
+function codexSessionIDFromEvent(event) {
+  return String(
+    (event && (event.thread_id || (event.thread && event.thread.id))) || "",
+  ).trim();
+}
+
+function mcpConfigOverrides(mcpScriptPath, env = process.env) {
   return [
     "-c",
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    ...workspaceMCPConfigOverrides(env),
   ];
 }
 
+function workspaceMCPConfigPath(env = process.env) {
+  const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
+  const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
+  const expanded = taskDir
+    ? configured
+        .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+        .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir)
+    : configured;
+  const candidates = [expanded, configured];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "workspace_mcp.json"));
+  }
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function workspaceMCPServers(env = process.env) {
+  const configPath = workspaceMCPConfigPath(env);
+  if (!configPath) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    return Array.isArray(parsed.servers) ? parsed.servers : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function workspaceMCPConfigOverrides(env = process.env) {
+  const args = [];
+  for (const server of workspaceMCPServers(env)) {
+    const name = String((server && server.name) || "").trim();
+    const url = String((server && server.url) || "").trim();
+    if (!name || name === "superplane" || !url) {
+      continue;
+    }
+    const serverKey = tomlKey(name);
+    args.push("-c", `mcp_servers.${serverKey}.url=${tomlString(url)}`);
+    const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
+    for (const [headerName, headerValue] of Object.entries(headers)) {
+      if (!headerName) {
+        continue;
+      }
+      args.push("-c", `mcp_servers.${serverKey}.http_headers.${tomlKey(headerName)}=${tomlString(String(headerValue))}`);
+    }
+    const disabledTools = Array.isArray(server.disabledTools)
+      ? server.disabledTools.map((name) => String(name || "").trim()).filter(Boolean)
+      : [];
+    if (disabledTools.length > 0) {
+      args.push("-c", `mcp_servers.${serverKey}.disabled_tools=${tomlStringArray(disabledTools)}`);
+    }
+  }
+  return args;
+}
+
+function tomlKey(value) {
+  const key = String(value);
+  if (/^[A-Za-z0-9_]+$/.test(key)) {
+    return key;
+  }
+  return tomlString(key);
+}
+
 function tomlString(value) {
-  return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return `"${String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")}"`;
 }
 
 function tomlStringArray(values) {
@@ -67,18 +290,18 @@ function tomlStringArray(values) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    writeStderr("usage: node run.js <prompt-file> [model] [thinking]\n");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", args[2] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      console.error(err && err.message ? err.message : err);
+      writeStderr(`${err && err.message ? err.message : err}\n`);
       process.exit(1);
     });
 }
 
-async function runPrompt(promptFile, model) {
+async function runPrompt(promptFile, model, thinking) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
     throw new Error("SUPERPLANE_TASK_DIR is required");
@@ -88,30 +311,65 @@ async function runPrompt(promptFile, model) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
-  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const promptCount =
+    Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+  const sessionID = codexSessionForPrompt(promptCount, readSessionID(sp));
+  let prompt = applyAnalysisContinuation(
+    sp,
+    sessionID ? promptCount : 0,
+    fs.readFileSync(promptFile, "utf8"),
+  );
+  if (planningAnalysisEnabled()) {
+    prompt = withoutEmbeddedAnalysisProtocol(prompt);
+  }
 
   const startedAt = Date.now();
-  const planning = planningEnabled();
-  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"));
-  if (planning) {
-    process.stdout.write("Planning session tools enabled\n");
-    process.stdout.write("sandbox: read-only\n");
-    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
+  if (artifactEnabled()) {
+    const outputDir = path.join(sp, "evidence");
+    fs.mkdirSync(outputDir, { recursive: true });
+    process.env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
+    process.env.PLAYWRIGHT_MCP_BROWSER =
+      process.env.PLAYWRIGHT_MCP_BROWSER || "chromium";
   }
-  if (promptCount > 0) {
-    process.stdout.write("Continuing Codex session in the current directory\n");
+  const planning = planningEnabled();
+  const activity = loadActivityStreamModule().createActivityStream({
+    provider: "codex",
+    turn: promptCount + 1,
+  });
+  activity.start();
+  const mcpScript = path.join(
+    sp,
+    planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
+  );
+  const codexArgs = codexExecArgs(
+    process.env,
+    model,
+    mcpScript,
+    sessionID,
+    thinking,
+  );
+  if (planning) {
+    writeStdout("Planning session tools enabled\n");
+    writeStdout("sandbox: read-only\n");
+  }
+  if (sessionID) {
+    writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);
 
-  const child = spawn("codex", codexArgs, { stdio: ["ignore", "pipe", "pipe"] });
-  child.stderr.pipe(process.stderr);
+  const child = spawn("codex", codexArgs, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const stderrDone = pipeRedactedStderr(child.stderr);
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
-  const formatter = createCodexFormatter(telemetry);
-  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  const formatter = createCodexFormatter(telemetry, activity);
+  const rl = readline.createInterface({
+    input: child.stdout,
+    crlfDelay: Infinity,
+  });
   rl.on("line", (raw) => {
     const line = raw.trim();
     if (!line) {
@@ -120,11 +378,22 @@ async function runPrompt(promptFile, model) {
     try {
       const event = JSON.parse(line);
       if (event && typeof event === "object") {
+        const nextSessionID = codexSessionIDFromEvent(event);
+        if (nextSessionID) {
+          writeSessionID(sp, nextSessionID);
+        }
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
         }
-        if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "result") {
-          if (!lastResult.usage && !(lastResult.item && lastResult.item.usage)) {
+        if (
+          event.type === "item.completed" ||
+          event.type === "turn.completed" ||
+          event.type === "result"
+        ) {
+          if (
+            !lastResult.usage &&
+            !(lastResult.item && lastResult.item.usage)
+          ) {
             lastResult = event;
           }
         }
@@ -132,7 +401,7 @@ async function runPrompt(promptFile, model) {
         return;
       }
     } catch (_err) {
-      process.stdout.write(`${line}\n`);
+      writeStdout(`${line}\n`);
     }
   });
 
@@ -142,26 +411,39 @@ async function runPrompt(promptFile, model) {
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
   ]).then(([code]) => code);
 
   formatter.flush(exitCode !== 0);
+  activity.end(exitCode === 0 ? "passed" : "failed");
+  await activity.flush();
   const usage = extractUsage(lastResult);
   if (tokenTotal(usage) > 0) {
     telemetry.updateCurrentUsage(usage);
   }
   const payload = {
     type: "result",
-    result: lastResult.result || lastResult.text || "",
+    result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: lastResult.model || model,
     usage,
   };
   telemetry.attachToResult(payload);
-  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
-  accumulateLLMUsage(payload);
+  const activityModule = loadActivityStreamModule();
+  const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (planning) {
+    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+      safePayload.result,
+    );
+  }
   formatTurnResult({
     is_error: exitCode !== 0,
-    num_turns: payload.telemetry && payload.telemetry.num_turns ? payload.telemetry.num_turns : 1,
+    num_turns:
+      safePayload.telemetry && safePayload.telemetry.num_turns
+        ? safePayload.telemetry.num_turns
+        : 1,
     duration_ms: Date.now() - startedAt,
   });
   return exitCode;
@@ -188,18 +470,28 @@ function loadTurnTelemetry() {
   candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
   for (const file of candidates) {
     if (fs.existsSync(file)) {
-      return require(file).createTurnTelemetry();
+      return require(file).createTurnTelemetry({
+        write: writeLiveLogRecord,
+        sanitize: loadActivityStreamModule().sanitizeLogValue,
+      });
     }
   }
-  return require("../turn_telemetry").createTurnTelemetry();
+  return require("../turn_telemetry").createTurnTelemetry({
+    write: writeLiveLogRecord,
+    sanitize: loadActivityStreamModule().sanitizeLogValue,
+  });
 }
 
 function extractUsage(event) {
   const source = event.usage || (event.item && event.item.usage) || event;
   return {
     input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
-    output_tokens: Number(source.output_tokens || source.completion_tokens || 0),
-    cache_read_input_tokens: Number(source.cached_input_tokens || source.cache_read_input_tokens || 0),
+    output_tokens: Number(
+      source.output_tokens || source.completion_tokens || 0,
+    ),
+    cache_read_input_tokens: Number(
+      source.cached_input_tokens || source.cache_read_input_tokens || 0,
+    ),
     reasoning_tokens: Number(source.reasoning_tokens || 0),
   };
 }
@@ -217,15 +509,44 @@ function accumulateLLMUsage(payload) {
 }
 
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`${JSON.stringify(rec)}\n`);
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogValue ? activity.sanitizeLogValue(rec) : rec;
+  process.stdout.write(`${JSON.stringify(safe)}\n`);
 }
 
-function createCodexFormatter(telemetry) {
+function writeStdout(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stdout.write(safe);
+}
+
+function writeStderr(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  process.stderr.write(safe);
+}
+
+function pipeRedactedStderr(stream) {
+  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  lines.on("line", (line) => {
+    writeStderr(`${line}\n`);
+  });
+  return new Promise((resolve) => lines.on("close", resolve));
+}
+
+function createCodexFormatter(telemetry, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
+  const activity =
+    activityOverride ||
+    loadActivityStreamModule().createActivityStream({ provider: "codex" });
   const open = new Map();
   const anonQueue = [];
+  const contentText = new Map();
+  const anonymousContent = new Map();
   let anonSeq = 0;
+  let contentSeq = 0;
   let roundOpen = false;
+  let lastText = "";
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -245,6 +566,34 @@ function createCodexFormatter(telemetry) {
     return anonQueue.shift() || "";
   }
 
+  function contentID(item, type, creating) {
+    const id = item && item.id != null ? String(item.id).trim() : "";
+    if (id) {
+      return id;
+    }
+    const queue = anonymousContent.get(type) || [];
+    if (creating) {
+      const generated = `${type}-${contentSeq}`;
+      contentSeq += 1;
+      queue.push(generated);
+      anonymousContent.set(type, queue);
+      return generated;
+    }
+    return queue.shift() || `${type}-${contentSeq++}`;
+  }
+
+  function appendContentDelta(contentKind, id, text) {
+    if (typeof text !== "string" || !text) {
+      return;
+    }
+    const previous = contentText.get(id) || "";
+    const delta = text.startsWith(previous)
+      ? text.slice(previous.length)
+      : text;
+    activity.appendContent(contentKind, id, delta);
+    contentText.set(id, text);
+  }
+
   function rememberTool(item) {
     const id = itemID(item, true);
     if (open.has(id)) {
@@ -255,6 +604,12 @@ function createCodexFormatter(telemetry) {
       text: toolTextForItem(item),
       startedAt: Date.now(),
       emitted: false,
+    });
+    activity.startTool({
+      id,
+      kind: normalizeCodexToolKind(item),
+      name: String(item.name || item.type || "tool"),
+      input: toolTextForItem(item),
     });
     return id;
   }
@@ -284,9 +639,20 @@ function createCodexFormatter(telemetry) {
     emitStart(id);
     const output = item.aggregated_output || item.output || "";
     if (typeof output === "string" && output.trim()) {
-      process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
+      if (activity.enabled) {
+        activity.appendToolOutput(
+          id,
+          output.replace(/\s+$/, ""),
+          toolFailed(item) ? "stderr" : "stdout",
+        );
+      } else {
+        writeStdout(`${output.replace(/\s+$/, "")}\n`);
+      }
     }
-    const tracked = open.get(id) || { kind: normalizeCodexToolKind(item), startedAt: Date.now() };
+    const tracked = open.get(id) || {
+      kind: normalizeCodexToolKind(item),
+      startedAt: Date.now(),
+    };
     open.delete(id);
     const anonIndex = anonQueue.indexOf(id);
     if (anonIndex >= 0) {
@@ -301,6 +667,11 @@ function createCodexFormatter(telemetry) {
         duration_ms: Math.max(0, Date.now() - tracked.startedAt),
       }),
     );
+    activity.endTool(id, {
+      status: codexToolStatus(item),
+      exitCode: item.exit_code,
+      signal: item.signal,
+    });
   }
 
   return {
@@ -311,16 +682,34 @@ function createCodexFormatter(telemetry) {
       }
       const type = itemType(item);
       if (isMessageItem(type)) {
+        const contentKind = type === "reasoning" ? "reasoning" : "assistant";
+        const id = contentID(item, type, event.type === "item.started");
+        if (event.type === "item.started") {
+          activity.startContent(contentKind, id);
+          const initialText = item.text || item.result || "";
+          appendContentDelta(contentKind, id, initialText);
+          return;
+        }
         if (event.type === "item.completed") {
           const text = item.text || item.result || "";
           if (!roundOpen) {
             tracker.beginTurn(item.usage || event.usage, {
-              message: typeof text === "string" && type !== "reasoning" ? text : undefined,
+              message:
+                typeof text === "string" && type !== "reasoning"
+                  ? text
+                  : undefined,
             });
           }
           roundOpen = false;
+          activity.startContent(contentKind, id);
+          appendContentDelta(contentKind, id, text);
+          activity.endContent(id);
+          contentText.delete(id);
           if (typeof text === "string" && text.trim() && type !== "reasoning") {
-            process.stdout.write(`${text.replace(/\s+$/, "")}\n`);
+            lastText = text.replace(/\s+$/, "");
+            if (!activity.enabled) {
+              writeStdout(`${lastText}\n`);
+            }
           }
         }
         return;
@@ -333,7 +722,8 @@ function createCodexFormatter(telemetry) {
           tracker.beginTurn(item.usage || event.usage);
           roundOpen = true;
         }
-        rememberTool(item);
+        const id = rememberTool(item);
+        emitStart(id);
         return;
       }
       if (event.type === "item.completed") {
@@ -360,14 +750,22 @@ function createCodexFormatter(telemetry) {
             duration_ms: Math.max(0, Date.now() - tracked.startedAt),
           }),
         );
+        activity.endTool(id, { status: failed ? "failed" : "interrupted" });
         open.delete(id);
       }
+    },
+    lastText() {
+      return lastText;
     },
   };
 }
 
 function isMessageItem(type) {
-  return type === "agent_message" || type === "assistant_message" || type === "reasoning";
+  return (
+    type === "agent_message" ||
+    type === "assistant_message" ||
+    type === "reasoning"
+  );
 }
 
 function isToolItem(type) {
@@ -406,7 +804,9 @@ function normalizeCodexToolKind(item) {
 
 function fileChangeKind(item) {
   const changes = Array.isArray(item.changes) ? item.changes : [];
-  const kinds = changes.map((change) => String((change && change.kind) || "").toLowerCase());
+  const kinds = changes.map((change) =>
+    String((change && change.kind) || "").toLowerCase(),
+  );
   if (kinds.includes("add") && !kinds.includes("update")) {
     return "write";
   }
@@ -423,10 +823,16 @@ function toolTextForItem(item) {
   }
   if (type === "file_change") {
     const changes = Array.isArray(item.changes) ? item.changes : [];
-    const pathValue = changes.map((change) => change && change.path).find(Boolean);
-    return String(pathValue || item.path || "file");
+    const paths = changes
+      .map((change) => change && change.path)
+      .filter(Boolean);
+    return paths.length > 0
+      ? paths.map(String).join("\n")
+      : String(item.path || "file");
   }
-  return String(item.command || item.path || item.query || item.name || type || "tool");
+  return String(
+    item.command || item.path || item.query || item.name || type || "tool",
+  );
 }
 
 function stripBashLc(command) {
@@ -441,6 +847,14 @@ function toolFailed(item) {
   return Number.isFinite(exit) && exit !== 0;
 }
 
+function codexToolStatus(item) {
+  const status = String((item && item.status) || "").toLowerCase();
+  if (status === "cancelled" || status === "canceled") return "cancelled";
+  if (status === "timed_out" || status === "timeout") return "timed_out";
+  if (status === "interrupted") return "interrupted";
+  return toolFailed(item) ? "failed" : "passed";
+}
+
 function formatTurnResult(event) {
   const isError = Boolean(event && event.is_error);
   const status = isError ? "failed" : "done";
@@ -450,7 +864,11 @@ function formatTurnResult(event) {
   }
   if (event && event.total_cost_usd != null) {
     const cost = Number(event.total_cost_usd);
-    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+    parts.push(
+      Number.isFinite(cost)
+        ? `$${cost.toFixed(4)}`
+        : `$${event.total_cost_usd}`,
+    );
   }
   if (event && event.duration_ms != null) {
     const ms = Number(event.duration_ms);
@@ -458,7 +876,7 @@ function formatTurnResult(event) {
       parts.push(`${(ms / 1000).toFixed(1)}s`);
     }
   }
-  process.stdout.write(`${parts.join(" · ")}\n`);
+  writeStdout(`${parts.join(" · ")}\n`);
 }
 
 function formatCodexJsonLines(rawLines) {
@@ -471,7 +889,7 @@ function formatCodexJsonLines(rawLines) {
     try {
       formatter.handleEvent(JSON.parse(trimmed));
     } catch (_err) {
-      process.stdout.write(`${trimmed}\n`);
+      writeStdout(`${trimmed}\n`);
     }
   }
   formatter.flush();
@@ -487,5 +905,11 @@ module.exports = {
   createCodexFormatter,
   normalizeCodexToolKind,
   codexExecArgs,
+  thinkingArgs,
+  codexSessionForPrompt,
+  codexSessionIDFromEvent,
   planningEnabled,
+  planningSystemPrompt,
+  planningAnalysisEnabled,
+  workspaceMCPConfigOverrides,
 };

@@ -28,7 +28,7 @@ func (c *taskDescribeCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	taskID, err := resolveTaskID(ctx, workspaceID, rawTaskID)
+	taskID, err := resolveTaskID(rawTaskID)
 	if err != nil {
 		return err
 	}
@@ -111,6 +111,8 @@ func renderTaskDescribeText(
 ) error {
 	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 	writeAlignedField(writer, "ID", task.GetId())
+	writeAlignedField(writer, "Number", task.GetNumber())
+	writeAlignedField(writer, "Key", task.GetKey())
 	writeAlignedField(writer, "Title", task.GetTitle())
 	writeAlignedField(writer, "State", formatTaskState(task.GetState()))
 	writeAlignedField(writer, "Result", formatTaskResult(task.GetResult()))

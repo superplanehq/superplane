@@ -1,7 +1,8 @@
-import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import { ACTIVE_TRIAL_ENDS_AT, BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
+import { factoryPlanningSessionRoutes } from "./factoryPlanningSessionHandlers";
 import { factoryPRFeedbackRoutes } from "./factoryPRFeedbackHandlers";
 import {
   defaultFactoriesFixture,
@@ -20,6 +21,7 @@ import {
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
   FactoriesFactory,
+  FactoriesFactoryAgentResource,
   FactoriesFactoryLine,
   FactoriesFactoryOnboarding,
   FactoriesFactoryPullRequest,
@@ -34,6 +36,12 @@ import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { storybookHostedLlmModels, storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import {
+  formatUsageCsvDollarsFromMicros,
+  usageSpendMicros,
+  usageTokenSpendMicros,
+  usageVmSpendMicros,
+} from "../lib/workOrderUsage";
 import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
@@ -195,10 +203,9 @@ function usageHistoryCsvBody(rows: FactoriesWorkOrderRunUsageRow[]): string {
 function usageHistoryCsvRow(row: FactoriesWorkOrderRunUsageRow): string[] {
   const totalTokens = Number(row.totalTokens ?? 0);
   const durationSeconds = Number(row.durationSeconds ?? 0);
-  const hostedCostCents = Number(row.hostedCostCents ?? 0);
-  const byokCostCents = Number(row.byokCostCents ?? 0);
-  const tokenPriceCents = hostedCostCents + byokCostCents;
-  const vmPriceCents = Math.max(0, Number(row.costCents ?? 0) - tokenPriceCents);
+  const hostedCostMicros = usageSpendMicros(row.hostedCostMicros, row.hostedCostCents);
+  const byokCostMicros = usageSpendMicros(row.byokCostMicros, row.byokCostCents);
+  const totalCostMicros = usageSpendMicros(row.costMicros, row.costCents);
 
   return [
     row.lastOccurredAt ? new Date(row.lastOccurredAt).toISOString() : "",
@@ -206,10 +213,10 @@ function usageHistoryCsvRow(row: FactoriesWorkOrderRunUsageRow): string[] {
     row.workOrderKey ?? "",
     usageHistoryCsvModels(row.models, row.byokModels),
     totalTokens > 0 ? String(totalTokens) : "",
-    tokenPriceCents > 0 ? (tokenPriceCents / 100).toFixed(2) : "",
+    formatUsageCsvDollarsFromMicros(usageTokenSpendMicros(hostedCostMicros, byokCostMicros)),
     (row.machineTypes ?? []).join(" · "),
     durationSeconds > 0 ? String(durationSeconds) : "",
-    vmPriceCents > 0 ? (vmPriceCents / 100).toFixed(2) : "",
+    formatUsageCsvDollarsFromMicros(usageVmSpendMicros(totalCostMicros, hostedCostMicros, byokCostMicros)),
   ];
 }
 
@@ -269,6 +276,43 @@ function usageHistoryRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/automations/([^/:]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") {
+          return { json: {} };
+        }
+        const factoryId = match[1];
+        const automationId = match[2];
+        fixture.appsByFactoryId[factoryId] = (fixture.appsByFactoryId[factoryId] ?? []).filter(
+          (app) => app.id !== automationId,
+        );
+        return { json: {} };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/automations"),
+      resolve: (match, method, body) => {
+        const factoryId = match[1];
+        if (method === "POST") {
+          const request = (body ?? {}) as { name?: string; columnKey?: string };
+          const id = `app-custom-${(fixture.appsByFactoryId[factoryId] ?? []).length + 1}`;
+          const automation = {
+            id,
+            name: request.name?.trim() || "Custom automation",
+            columnKey: request.columnKey,
+          };
+          fixture.appsByFactoryId[factoryId] = [...(fixture.appsByFactoryId[factoryId] ?? []), automation];
+          return { json: { automation } };
+        }
+        return { json: { automations: fixture.appsByFactoryId[factoryId] ?? [] } };
+      },
+    },
+  ];
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -308,12 +352,11 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         return factory ? { json: { factory: factoryWithLineMetrics(factory) } } : { json: {} };
       },
     },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/apps"),
-      resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
-    },
+    ...factoryAutomationRoutes(fixture),
     ...factoryIntakeRoutes(fixture),
+    ...factoryPlanningSessionRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
+    ...factoryAgentResourceRoutes(fixture),
     ...usageHistoryRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
@@ -323,8 +366,8 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       pattern: re("/api/v1/factories/([^/]+)/velocity"),
       resolve: (match, _method, _body, url) => {
         const byPeriod = fixture.velocityByFactoryId?.[match[1]];
-        const periodDays = Number(url.searchParams.get("periodDays") ?? 14);
-        const report = byPeriod?.[periodDays] ?? byPeriod?.[14] ?? EMPTY_FACTORY_VELOCITY;
+        const periodDays = Number(url.searchParams.get("periodDays") ?? 30);
+        const report = byPeriod?.[periodDays] ?? byPeriod?.[30] ?? EMPTY_FACTORY_VELOCITY[30];
         const paged = paginateVelocityPeople(report, url);
 
         // The page follows peopleSyncedAt to know a sync finished, so a report
@@ -340,6 +383,10 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         velocitySynced(match[1]);
         return { json: { started: true } };
       },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/backlog/refresh"),
+      resolve: () => ({ json: { archivedCount: 0, failedItemCount: 0, failedSourceCount: 0 } }),
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/line-runner-models"),
@@ -392,6 +439,218 @@ function mergedOnboarding(
   return next;
 }
 
+function ensureAgentResources(fixture: FactoriesFixture, factoryId: string): FactoriesFactoryAgentResource[] {
+  if (!fixture.agentResourcesByFactoryId) {
+    fixture.agentResourcesByFactoryId = {};
+  }
+  const existing = fixture.agentResourcesByFactoryId[factoryId];
+  if (existing) {
+    return existing;
+  }
+  const created: FactoriesFactoryAgentResource[] = [];
+  fixture.agentResourcesByFactoryId[factoryId] = created;
+  return created;
+}
+
+function requestedAgentResourceKind(url: URL): FactoriesFactoryAgentResource["kind"] {
+  return url.searchParams.get("kind") === "KIND_SKILL" ? "KIND_SKILL" : "KIND_MCP_SERVER";
+}
+
+const DEFAULT_MCP_TOOLS = [
+  { name: "search", description: "Search the catalog.", readOnly: true },
+  { name: "create_issue", description: "Create an issue.", readOnly: false },
+];
+
+function toolsForAgentResource(
+  fixture: FactoriesFixture,
+  resourceId: string,
+): Array<{ name: string; description?: string; readOnly?: boolean }> {
+  return fixture.agentResourceToolsById?.[resourceId] ?? DEFAULT_MCP_TOOLS;
+}
+
+function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
+  const request = (body ?? {}) as FactoriesFactoryAgentResource & {
+    disabledTools?: string[];
+    replaceDisabledTools?: boolean;
+  };
+  if (typeof request.name === "string" && request.name.trim()) {
+    resource.name = request.name.trim();
+  }
+  if (typeof request.enabled === "boolean") {
+    resource.enabled = request.enabled;
+  }
+  if (typeof request.url === "string") {
+    resource.url = request.url;
+  }
+  if (request.auth) {
+    resource.auth = request.auth;
+  }
+  if (Array.isArray(request.headers)) {
+    resource.headers = request.headers;
+  }
+  if (typeof request.markdown === "string") {
+    resource.markdown = request.markdown;
+  }
+  if (request.replaceDisabledTools) {
+    resource.disabledTools = Array.isArray(request.disabledTools) ? request.disabledTools : [];
+  }
+  resource.updatedAt = new Date().toISOString();
+  return resource;
+}
+
+function factoryAgentResourceToolsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/tools"),
+    resolve: (match, method) => {
+      if (method !== "GET") return { json: {} };
+      const resources = ensureAgentResources(fixture, match[1]);
+      const resource = resources.find((entry) => entry.id === match[2]);
+      if (!resource || resource.kind === "KIND_SKILL") {
+        return { json: { tools: [] } };
+      }
+      return { json: { tools: toolsForAgentResource(fixture, match[2]) } };
+    },
+  };
+}
+
+function factoryAgentResourceOAuthStartRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:start"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      const resource = ensureAgentResources(fixture, match[1]).find((entry) => entry.id === match[2]);
+      if (!resource) return { json: {} };
+      return { json: { authorizationUrl: "https://auth.example.com/authorize?client_id=storybook", resource } };
+    },
+  };
+}
+
+function factoryAgentResourceOAuthDisconnectRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/oauth:disconnect"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      const resource = ensureAgentResources(fixture, match[1]).find((entry) => entry.id === match[2]);
+      if (!resource) return { json: {} };
+      resource.oauthStatus = "OAUTH_STATUS_NOT_CONNECTED";
+      resource.oauthError = undefined;
+      resource.oauthConnectedAt = undefined;
+      resource.oauthConnectedByUserId = undefined;
+      return { json: { resource } };
+    },
+  };
+}
+
+function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)"),
+    resolve: (match, method, body) => {
+      const resources = ensureAgentResources(fixture, match[1]);
+      const index = resources.findIndex((entry) => entry.id === match[2]);
+      const resource = index >= 0 ? resources[index] : undefined;
+      if (method === "DELETE") {
+        if (index >= 0) {
+          resources.splice(index, 1);
+        }
+        return { json: {} };
+      }
+      if (method === "PATCH") {
+        if (!resource) return { json: {} };
+        return { json: { resource: patchAgentResource(resource, body) } };
+      }
+      return resource ? { json: { resource } } : { json: {} };
+    },
+  };
+}
+
+function createPostedAgentResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource) {
+  const now = new Date().toISOString();
+  if (request.kind === "KIND_SKILL") {
+    return {
+      id,
+      factoryId,
+      kind: "KIND_SKILL" as const,
+      name: typeof request.name === "string" ? request.name.trim() : "skill",
+      enabled: request.enabled !== false,
+      markdown: typeof request.markdown === "string" ? request.markdown : "",
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+  return {
+    id,
+    factoryId,
+    kind: "KIND_MCP_SERVER" as const,
+    name: typeof request.name === "string" ? request.name.trim() : "connection",
+    enabled: request.enabled !== false,
+    url: typeof request.url === "string" ? request.url : "",
+    auth: request.auth === "AUTH_OAUTH" ? ("AUTH_OAUTH" as const) : ("AUTH_HEADERS" as const),
+    headers: request.headers ?? [],
+    oauthStatus: request.auth === "AUTH_OAUTH" ? ("OAUTH_STATUS_NOT_CONNECTED" as const) : undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function factoryAgentResourceListRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources"),
+    resolve: (match, method, body, url) => {
+      const resources = ensureAgentResources(fixture, match[1]);
+      if (method === "POST") {
+        const resource = createPostedAgentResource(
+          match[1],
+          `resource-${resources.length + 1}`,
+          (body ?? {}) as FactoriesFactoryAgentResource,
+        );
+        resources.push(resource);
+        return { json: { resource } };
+      }
+      const kind = requestedAgentResourceKind(url);
+      return { json: { resources: resources.filter((entry) => (entry.kind ?? "KIND_MCP_SERVER") === kind) } };
+    },
+  };
+}
+
+function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    factoryAgentResourceToolsRoute(fixture),
+    factoryAgentResourceOAuthStartRoute(fixture),
+    factoryAgentResourceOAuthDisconnectRoute(fixture),
+    factoryAgentResourceItemRoute(fixture),
+    factoryAgentResourceListRoute(fixture),
+  ];
+}
+
+const STORYBOOK_ORG_SECRETS = [
+  {
+    metadata: { id: "secret-vendor-mcp", name: "vendor-mcp" },
+    spec: { local: { data: { token: "••••••••" } } },
+  },
+];
+
+function organizationSecretsRoutes(): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/secrets"),
+      resolve: (_match, method) => {
+        if (method !== "GET") return { json: {} };
+        return { json: { secrets: STORYBOOK_ORG_SECRETS } };
+      },
+    },
+    {
+      pattern: re("/api/v1/secrets/([^/]+)"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        const secret =
+          STORYBOOK_ORG_SECRETS.find((entry) => entry.metadata.id === match[1] || entry.metadata.name === match[1]) ??
+          STORYBOOK_ORG_SECRETS[0];
+        return { json: { secret } };
+      },
+    },
+  ];
+}
+
 function factoryRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/factories/([^/]+)/repository"),
@@ -422,33 +681,6 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
       return { json: { factory: factoryWithLineMetrics(factory) } };
     },
   };
-}
-
-function factoryPullRequestRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
-  return [
-    {
-      pattern: re("/api/v1/factories/([^/]+)/prs"),
-      resolve: (match, method, _body, url) => {
-        if (method !== "GET") return { json: {} };
-        const factoryId = match[1];
-        const orderNumber = (url.searchParams.get("order") ?? "").trim();
-        const workOrderIds = [
-          ...url.searchParams.getAll("workOrderIds"),
-          ...url.searchParams.getAll("work_order_ids"),
-        ].filter(Boolean);
-        const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
-        let pullRequests = orders.flatMap((order) => (order.id ? orderPullRequests(fixture, order.id) : []));
-        if (orderNumber) {
-          const order = orders.find((entry) => entry.number === orderNumber || entry.id === orderNumber);
-          pullRequests = order?.id ? orderPullRequests(fixture, order.id) : [];
-        } else if (workOrderIds.length > 0) {
-          const allowed = new Set(workOrderIds);
-          pullRequests = pullRequests.filter((pr) => pr.workOrderId && allowed.has(pr.workOrderId));
-        }
-        return { json: { pullRequests } };
-      },
-    },
-  ];
 }
 
 function orderPullRequests(fixture: FactoriesFixture, orderId: string): FactoriesFactoryPullRequest[] {
@@ -505,6 +737,50 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
     assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids).slice(0, 1)),
     lineDispatches: [],
+  };
+}
+
+function orderWithChecks(fixture: FactoriesFixture, order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const withPullRequests = orderWithPullRequests(fixture, order);
+  if (!order.id) {
+    return withPullRequests;
+  }
+  const checks = fixture.checksByOrderId?.[order.id] ?? DEFAULT_CHECKS_BY_ORDER_ID[order.id];
+  if (!checks) {
+    return withPullRequests;
+  }
+  return { ...withPullRequests, checks };
+}
+
+function orderWithPullRequests(fixture: FactoriesFixture, order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (!order.id) {
+    return order;
+  }
+  const pullRequests = orderPullRequests(fixture, order.id);
+  if (pullRequests.length === 0) {
+    return order;
+  }
+  return { ...order, pullRequests };
+}
+
+function orderWithListChecks(fixture: FactoriesFixture, order: FactoriesWorkOrder) {
+  const withChecks = orderWithChecks(fixture, order);
+  const {
+    checks,
+    usageByModel: _usageByModel,
+    usageByMachineType: _usageByMachineType,
+    files: _files,
+    sourceRunId: _sourceRunId,
+    ...listed
+  } = withChecks;
+  return {
+    ...listed,
+    checkScores: checks?.map((check) => ({
+      key: check.key,
+      name: check.name,
+      score: check.score,
+      maxScore: check.maxScore,
+    })),
   };
 }
 
@@ -594,13 +870,71 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   return { json: { order } };
 }
 
+function listWorkOrdersFixture(
+  fixture: FactoriesFixture,
+  orders: FactoriesWorkOrder[],
+  url: URL,
+): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
+  const states = url.searchParams.getAll("states");
+  const userId = url.searchParams.get("userId");
+  const unassigned = url.searchParams.get("unassigned") === "true";
+  const limit = Number(url.searchParams.get("limit") ?? "0");
+  const beforeId = url.searchParams.get("beforeId");
+  let filtered =
+    states.length > 0 ? orders.filter((order) => order.state && states.includes(order.state)) : [...orders];
+  if (userId || unassigned) {
+    filtered = filtered.filter((order) => {
+      const owners = (order.assignees ?? []).flatMap((assignee) => (assignee.id ? [assignee.id] : []));
+      const isUnassigned = owners.length === 0;
+      if (userId && unassigned) {
+        return isUnassigned || order.createdBy?.user?.id === userId || owners.includes(userId);
+      }
+      if (unassigned) {
+        return isUnassigned;
+      }
+      return order.createdBy?.user?.id === userId || owners.includes(userId ?? "");
+    });
+  }
+
+  if (limit <= 0) {
+    return { orders: [], hasNextPage: false };
+  }
+
+  filtered.sort((left, right) => {
+    const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
+    const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
+    if (leftTime !== rightTime) {
+      return rightTime - leftTime;
+    }
+    return (right.id ?? "").localeCompare(left.id ?? "");
+  });
+  if (beforeId) {
+    const cursor = filtered.find((order) => order.id === beforeId);
+    if (!cursor) {
+      return { orders: [], hasNextPage: false };
+    }
+    const cursorTime = Date.parse(cursor.updatedAt ?? cursor.createdAt ?? "") || 0;
+    filtered = filtered.filter((order) => {
+      const time = Date.parse(order.updatedAt ?? order.createdAt ?? "") || 0;
+      if (time !== cursorTime) {
+        return time < cursorTime;
+      }
+      return (order.id ?? "") < beforeId;
+    });
+  }
+  return {
+    orders: filtered.slice(0, limit).map((order) => orderWithListChecks(fixture, order)),
+    hasNextPage: filtered.length > limit,
+  };
+}
+
 function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
       pattern: re("/api/v1/factories/([^/]+)/orders"),
-      resolve: (match, method, body) => {
+      resolve: (match, method, body, url) => {
         const orders = ensureFactoryWorkOrders(fixture, match[1]);
-        if (method !== "POST") return { json: { orders } };
+        if (method !== "POST") return { json: listWorkOrdersFixture(fixture, orders, url) };
         const created = createWorkOrderFromRequest((body ?? {}) as RequestBody, orders.length);
         orders.unshift(created);
         return { json: { order: created } };
@@ -621,7 +955,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           }
           order.updatedAt = new Date().toISOString();
         }
-        return { json: { order } };
+        return { json: { order: orderWithChecks(fixture, order) } };
       },
     },
     {
@@ -690,14 +1024,6 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         if (method !== "GET") return { json: {} };
         const artifacts = fixture.artifactsByOrderId?.[match[2]] ?? DEFAULT_ARTIFACTS_BY_ORDER_ID[match[2]] ?? [];
         return { json: { artifacts } };
-      },
-    },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/checks"),
-      resolve: (match, method) => {
-        if (method !== "GET") return { json: {} };
-        const checks = fixture.checksByOrderId?.[match[2]] ?? DEFAULT_CHECKS_BY_ORDER_ID[match[2]] ?? [];
-        return { json: { checks } };
       },
     },
     {
@@ -838,13 +1164,45 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
         json: fixture.organizationBilling ?? {
           plan: "trial",
           planSource: "system",
-          trialEndsAt: "2026-09-22T12:00:00.000Z",
+          trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
           billingEnabled: true,
           subscriptionCheckoutEnabled: true,
           creditPurchaseAllowed: false,
           hasBillingCustomer: false,
         },
       };
+    },
+  };
+}
+
+function organizationBillingCancelRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/cancel"),
+    resolve: () => {
+      fixture.organizationBilling = {
+        ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
+        plan: "business",
+        planSource: "polar",
+        creditPurchaseAllowed: true,
+        cancelAtPeriodEnd: true,
+      };
+      return { json: fixture.organizationBilling };
+    },
+  };
+}
+
+function organizationBillingResumeRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/resume"),
+    resolve: () => {
+      fixture.organizationBilling = {
+        ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
+        plan: "business",
+        planSource: "polar",
+        creditPurchaseAllowed: true,
+        cancelAtPeriodEnd: false,
+      };
+      return { json: fixture.organizationBilling };
     },
   };
 }
@@ -856,7 +1214,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
       json: fixture.organizationBilling ?? {
         plan: "trial",
         planSource: "system",
-        trialEndsAt: "2026-09-22T12:00:00.000Z",
+        trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
         billingEnabled: true,
         subscriptionCheckoutEnabled: true,
         creditPurchaseAllowed: false,
@@ -936,8 +1294,8 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
     factoryRepositoryRoute(fixture),
+    ...organizationSecretsRoutes(),
     ...factoryLinesRoutes(fixture),
-    ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationWorkspaceUsageRoute(fixture),
     organizationSpendingReportRoute(fixture),
@@ -948,6 +1306,8 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
     organizationBillingSyncRoute(fixture),
+    organizationBillingCancelRoute(fixture),
+    organizationBillingResumeRoute(fixture),
     organizationBillingRoute(fixture),
     businessCheckoutRoute(),
     billingPortalSessionRoute(),

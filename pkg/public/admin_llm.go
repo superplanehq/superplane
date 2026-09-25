@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -93,6 +94,7 @@ type organizationBillingPlanResponse struct {
 	Plan                    string  `json:"plan"`
 	PlanSource              string  `json:"plan_source"`
 	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
+	PolarManaged            bool    `json:"polar_managed"`
 	TrialEndsAt             *string `json:"trial_ends_at"`
 	CurrentPeriodEnd        *string `json:"current_period_end"`
 }
@@ -398,6 +400,9 @@ func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
+	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
+		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
+	}
 	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
 	if err != nil {
 		log.Errorf("admin: failed to load organization billing plan: %v", err)
@@ -417,6 +422,10 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
+		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
 	}
 
 	_, err := models.SetAdminOrganizationPlan(database.Conn(), orgID, strings.TrimSpace(req.Plan))
@@ -443,6 +452,7 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 		Plan:                    plan.Plan,
 		PlanSource:              plan.PlanSource,
 		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
+		PolarManaged:            models.OrganizationBillingIsPolarManaged(plan),
 		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
 		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
 	}, nil

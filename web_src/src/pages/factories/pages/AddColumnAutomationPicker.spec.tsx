@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { catalogForColumn } from "../lib/columnAutomations";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
@@ -8,7 +8,12 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 describe("AddColumnAutomationPicker", () => {
   it("offers the catalog for the column", () => {
     render(
-      <AddColumnAutomationPicker open onClose={vi.fn()} onSelect={vi.fn()} catalog={catalogForColumn("verify")} />,
+      <AddColumnAutomationPicker
+        open
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        catalog={catalogForColumn("verify", { allowCustom: true })}
+      />,
     );
 
     expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();

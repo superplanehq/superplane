@@ -1,9 +1,9 @@
-import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import { useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -11,6 +11,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
+import { firstWorkOrderPullRequests } from "../../lib/workOrderPullRequest";
 import { useWorkOrderPRFeedbackLog } from "../useWorkOrderPRFeedbackRunHref";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
@@ -47,14 +48,12 @@ function useSplitRunWorkOrderExtras(
   organizationId: string,
   factoryId: string,
   order: ReturnType<typeof useSplitRunPageSelection>["order"],
+  liveOrder: FactoriesWorkOrder | undefined,
 ) {
   const orderId = order?.id ?? "";
-  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, orderId);
-  const { data: pullRequests = [] } = useFactoryPullRequests(
-    organizationId,
-    factoryId,
-    orderId ? { workOrderIds: [orderId] } : undefined,
-  );
+  const orderChecks = firstWorkOrderChecks(liveOrder, order);
+  const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
+  const pullRequests = firstWorkOrderPullRequests(liveOrder, order);
   const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
   const { runsByWorkOrder, analyzingOrderIds } = useFactoryBacklogAnalysis(organizationId, factoryId);
@@ -63,19 +62,22 @@ function useSplitRunWorkOrderExtras(
   // is known to be analyzing before its run appears in `analysisRuns`, so the
   // popup copy and actions match the board card.
   const isAnalyzing = Boolean(orderId && analyzingOrderIds.has(orderId));
-  return { orderChecks, prFeedbackRuns, analysisRuns, isAnalyzing };
+  return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing };
 }
 
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
-  const { appId = "" } = useParams<{ appId: string }>();
+  const params = useParams<{ appId?: string; automationId?: string }>();
+  const appId = params.automationId ?? params.appId ?? "";
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
-  const { orderChecks, prFeedbackRuns, analysisRuns, isAnalyzing } = useSplitRunWorkOrderExtras(
+  const liveWorkOrder = useWorkOrder(organizationId, factoryId, order?.id ?? "");
+  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing } = useSplitRunWorkOrderExtras(
     organizationId,
     factoryId,
     order,
+    liveWorkOrder.data,
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(
@@ -83,10 +85,11 @@ export function useFactoryAppSplitRunPage() {
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
         prFeedbackRuns,
         analysisRuns,
+        artifacts,
         isAnalyzing,
         resolveUser,
       }),
-    [order, orderChecks, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
@@ -156,5 +159,17 @@ export function useFactoryAppSplitRunPage() {
     stream,
     streamLoading: live.isLoading,
     subtitle: resolveFactoryAppCanvasSubtitle({ factoryName: factory?.name }),
+    files: liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined,
   };
+}
+
+function firstWorkOrderChecks(
+  ...orders: Array<{ checks?: FactoriesWorkOrderCheck[] } | null | undefined>
+): FactoriesWorkOrderCheck[] {
+  for (const order of orders) {
+    if (order?.checks) {
+      return order.checks;
+    }
+  }
+  return [];
 }
