@@ -451,7 +451,14 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindActionHook(node.Ref.Data().Component.Name, spec.InvokeAction.ActionName)
+	componentName := ""
+	if component := node.Ref.Data().Component; component != nil {
+		componentName = component.Name
+	}
+	if frozen := execution.FrozenComponentName(); frozen != "" {
+		componentName = frozen
+	}
+	hookProvider, _, err := w.registry.FindActionHook(componentName, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}

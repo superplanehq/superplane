@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const planningAgentNodeID = "planner-agent-no-issue"
@@ -208,7 +209,9 @@ func rewriteCanvasAgents(
 
 func freezeActiveExecutionComponent(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error {
 	var runtime models.CanvasNode
-	err := tx.Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).First(&runtime).Error
+	err := tx.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).
+		Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).
+		First(&runtime).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
