@@ -95,7 +95,7 @@ func TestActivityForDelivery_IgnoresALaterUpdate(t *testing.T) {
 		},
 	}
 
-	changeset, ok := activityForDelivery(activities, delivered, moveDocument)
+	changeset, _, ok := activityForDelivery(activities, delivered, moveDocument)
 	require.True(t, ok)
 	move, ok := taskListMoveFromChangeset(changeset)
 	require.True(t, ok)
@@ -107,12 +107,12 @@ func TestActivityForDelivery_IgnoresALaterUpdate(t *testing.T) {
 			"task_list": map[string]any{"data": map[string]any{"id": "20"}},
 		},
 	}
-	changeset, ok = activityForDelivery(activities, delivered.Add(30*time.Second), titleDocument)
+	changeset, _, ok = activityForDelivery(activities, delivered.Add(30*time.Second), titleDocument)
 	require.True(t, ok)
 	_, ok = taskListMoveFromChangeset(changeset)
 	assert.False(t, ok)
 
-	_, ok = activityForDelivery(activities, delivered.Add(10*time.Minute), moveDocument)
+	_, _, ok = activityForDelivery(activities, delivered.Add(10*time.Minute), moveDocument)
 	assert.False(t, ok)
 }
 
@@ -187,4 +187,70 @@ func Test__Client__TaskUpdateChangesetAt_ReadsThePageThatHoldsThisDelivery(t *te
 	require.Len(t, httpContext.Requests, 2)
 	assert.Equal(t, "1", httpContext.Requests[0].URL.Query().Get("page[number]"))
 	assert.Equal(t, "2", httpContext.Requests[1].URL.Query().Get("page[number]"))
+}
+
+func Test__Client__TaskUpdateChangesetAt_StopsWhenThisDeliveryIsOnTheFirstPage(t *testing.T) {
+	delivered := testClock()
+	firstPage := make([]activityRecord, taskActivityPageSize)
+	for i := range firstPage {
+		firstPage[i] = activityRecord{
+			id:        strconv.Itoa(i + 1),
+			at:        delivered.Add(time.Duration(i+1) * time.Second),
+			changeset: map[string]any{"title": []any{"Old", "Other"}},
+		}
+	}
+	firstPage[0] = activityRecord{
+		id:        "move",
+		at:        delivered,
+		changeset: map[string]any{"task_list_id": []any{float64(10), float64(20)}},
+	}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{activitiesResponse(firstPage)}}
+	document := map[string]any{
+		"attributes": map[string]any{"title": "Fix payment retries"},
+		"relationships": map[string]any{
+			"task_list": map[string]any{"data": map[string]any{"id": "20"}},
+		},
+	}
+
+	changeset, found, err := testClient(t, httpContext).taskUpdateChangesetAt("91", delivered, document)
+	require.NoError(t, err)
+	require.True(t, found)
+	move, ok := taskListMoveFromChangeset(changeset)
+	require.True(t, ok)
+	assert.Equal(t, TaskListMove{From: "10", To: "20"}, move)
+	require.Len(t, httpContext.Requests, 1)
+}
+
+func Test__Client__TaskUpdateChangesetAt_KeepsReadingForACloserActivity(t *testing.T) {
+	delivered := testClock()
+	firstPage := make([]activityRecord, taskActivityPageSize)
+	for i := range firstPage {
+		firstPage[i] = activityRecord{
+			id:        strconv.Itoa(i + 1),
+			at:        delivered.Add(time.Duration(i+1) * time.Second),
+			changeset: map[string]any{"description": []any{"Old", "New"}},
+		}
+	}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		activitiesResponse(firstPage),
+		activitiesResponse([]activityRecord{{
+			id:        "move",
+			at:        delivered,
+			changeset: map[string]any{"task_list_id": []any{float64(10), float64(20)}},
+		}}),
+	}}
+	document := map[string]any{
+		"attributes": map[string]any{"title": "Fix payment retries"},
+		"relationships": map[string]any{
+			"task_list": map[string]any{"data": map[string]any{"id": "20"}},
+		},
+	}
+
+	changeset, found, err := testClient(t, httpContext).taskUpdateChangesetAt("91", delivered, document)
+	require.NoError(t, err)
+	require.True(t, found)
+	move, ok := taskListMoveFromChangeset(changeset)
+	require.True(t, ok)
+	assert.Equal(t, TaskListMove{From: "10", To: "20"}, move)
+	require.Len(t, httpContext.Requests, 2)
 }

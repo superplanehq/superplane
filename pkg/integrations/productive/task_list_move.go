@@ -52,9 +52,14 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 	}
 
 	activities := []taskActivity{}
+	var changeset any
+	var bestDelta time.Duration
+	found := false
 	for page := 1; page <= maxTaskActivityPages; page++ {
 		body, err := c.execRequest(http.MethodGet, c.taskActivityURL(taskID, deliveredAt, page), nil)
 		if err != nil {
+			// This page can still hold the closest change. Fail the lookup so
+			// Productive.io retries, instead of emitting an older match.
 			return nil, false, err
 		}
 
@@ -65,13 +70,18 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 
 		pageActivities := taskActivitiesFromDocuments(response.Data)
 		activities = append(activities, pageActivities...)
+		changeset, bestDelta, found = activityForDelivery(activities, deliveredAt, document)
 		if len(response.Data) < taskActivityPageSize || activityPageBeforeWindow(pageActivities, deliveredAt) {
+			break
+		}
+		// Later pages are older. Stop once none of them can sit closer to
+		// this delivery than the activity already found.
+		if found && !laterPageCanBeCloser(activities, deliveredAt, bestDelta) {
 			break
 		}
 	}
 
-	changeset, ok := activityForDelivery(activities, deliveredAt, document)
-	return changeset, ok, nil
+	return changeset, found, nil
 }
 
 func (c *Client) taskActivityURL(taskID string, deliveredAt time.Time, page int) string {
@@ -116,9 +126,9 @@ func activityPageBeforeWindow(activities []taskActivity, deliveredAt time.Time) 
 	return newest.Before(deliveredAt.Add(-taskActivityMatchWindow))
 }
 
-func activityForDelivery(activities []taskActivity, deliveredAt time.Time, document map[string]any) (any, bool) {
+func activityForDelivery(activities []taskActivity, deliveredAt time.Time, document map[string]any) (any, time.Duration, bool) {
 	if deliveredAt.IsZero() {
-		return nil, false
+		return nil, 0, false
 	}
 
 	var changeset any
@@ -145,7 +155,37 @@ func activityForDelivery(activities []taskActivity, deliveredAt time.Time, docum
 		bestDelta = delta
 		found = true
 	}
-	return changeset, found
+	return changeset, bestDelta, found
+}
+
+// laterPageCanBeCloser reports whether an older page can beat bestDelta.
+// The query sorts newest first, so later pages are older than the oldest
+// activity already read.
+func laterPageCanBeCloser(activities []taskActivity, deliveredAt time.Time, bestDelta time.Duration) bool {
+	if bestDelta == 0 {
+		return false
+	}
+
+	oldest, ok := oldestActivityTime(activities)
+	if !ok || oldest.After(deliveredAt) {
+		return true
+	}
+	return deliveredAt.Sub(oldest) < bestDelta
+}
+
+func oldestActivityTime(activities []taskActivity) (time.Time, bool) {
+	var oldest time.Time
+	found := false
+	for _, activity := range activities {
+		if activity.at.IsZero() {
+			continue
+		}
+		if !found || activity.at.Before(oldest) {
+			oldest = activity.at
+			found = true
+		}
+	}
+	return oldest, found
 }
 
 func changesetMatchesDocument(changeset any, document map[string]any) bool {
