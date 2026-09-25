@@ -245,16 +245,19 @@ describe("FirstRunSetup reliability", () => {
   it("keeps a newly bound repository available on the ticket step", async () => {
     const user = userEvent.setup();
     const setup = setupState();
+    let backlogRepository: string | null = null;
     setup.selectRepo = vi.fn((repository: string) => {
       setup.selectedRepo = repository;
       setup.issuesRepo = repository;
+      backlogRepository = repository;
     });
     const selectVcsConnection = vi.fn(async () => {
-      setup.selectedRepo = null;
-      setup.issuesRepo = null;
+      // React keeps the setup snapshot from this render while the connection
+      // switch clears the repository for the next render.
+      backlogRepository = null;
       return true;
     });
-    const saveIssues = vi.fn(async () => Boolean(setup.issuesRepo ?? setup.selectedRepo));
+    const saveIssues = vi.fn(async () => Boolean(backlogRepository));
     const picker = githubConnection("int-new", {
       startedByUserID: "user-1",
       state: "csrf",
@@ -277,7 +280,8 @@ describe("FirstRunSetup reliability", () => {
     await user.click(screen.getByTestId("first-run-continue-to-tickets"));
     await user.click(await screen.findByTestId("first-run-analyze-tickets"));
 
-    expect(setup.selectRepo).toHaveBeenCalledWith("acme/api");
+    expect(setup.selectRepo).toHaveBeenCalledTimes(3);
+    expect(setup.selectRepo).toHaveBeenLastCalledWith("acme/api");
     expect(saveIssues).toHaveBeenCalledWith("vcs");
     expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });

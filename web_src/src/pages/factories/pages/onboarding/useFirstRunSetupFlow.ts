@@ -268,7 +268,7 @@ function useFirstRunCommands(args: {
         // Selecting a newly bound connection clears the previous repository.
         // Restore the repository that this action just saved before the ticket
         // step reads it as its backlog repository.
-        if (model.setup.selectedRepo !== repository) model.setup.selectRepo(repository);
+        if (githubSelection.installation) model.setup.selectRepo(repository);
         model.setup.commitRepoStep();
         navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
       }
