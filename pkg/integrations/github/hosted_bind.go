@@ -22,6 +22,8 @@ var (
 	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
 )
 
+const installRequestAssociationWindow = 2 * time.Minute
+
 func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
 	return g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
 }
@@ -178,7 +180,8 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 			unresolved = append(unresolved, request)
 			continue
 		}
-		if installRequestHasVerifiedInstallation(request, metadata.PendingInstallations) {
+		installation, found := installationForAccount(metadata.PendingInstallations, request.AccountLogin)
+		if found && len(installation.Repositories) > 0 {
 			continue
 		}
 		if installRequestMayStillResolve(request, now) {
@@ -194,33 +197,6 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		metadata.InstallRequestDiscoveryUntil = ""
 	}
 	return nil
-}
-
-func pendingInstallationIDs(installations []common.PendingInstallation) []string {
-	ids := make([]string, 0, len(installations))
-	for _, installation := range installations {
-		if installation.ID != "" {
-			ids = append(ids, installation.ID)
-		}
-	}
-	return ids
-}
-
-func installRequestHasVerifiedInstallation(
-	request common.InstallRequest,
-	installations []common.PendingInstallation,
-) bool {
-	if strings.TrimSpace(request.AccountLogin) != "" {
-		installation, found := installationForAccount(installations, request.AccountLogin)
-		return found && len(installation.Repositories) > 0
-	}
-	if request.ExistingInstallationIDs == nil {
-		return false
-	}
-
-	return slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
-		return len(installation.Repositories) > 0 && !slices.Contains(request.ExistingInstallationIDs, installation.ID)
-	})
 }
 
 func installRequestMayStillResolve(request common.InstallRequest, now time.Time) bool {
@@ -253,9 +229,36 @@ func installRequestIsOpen(request common.InstallRequest, open []common.InstallRe
 }
 
 func trackedOpenInstallRequests(tracked, open []common.InstallRequest) []common.InstallRequest {
-	return slices.DeleteFunc(slices.Clone(open), func(candidate common.InstallRequest) bool {
+	matched := slices.DeleteFunc(slices.Clone(open), func(candidate common.InstallRequest) bool {
 		return !installRequestIsOpen(candidate, tracked)
 	})
+	for _, request := range tracked {
+		if request.AccountLogin != "" {
+			continue
+		}
+
+		candidates := slices.DeleteFunc(slices.Clone(open), func(candidate common.InstallRequest) bool {
+			return installRequestIsOpen(candidate, matched) || !installRequestsAreContemporaneous(request, candidate)
+		})
+		if len(candidates) == 1 {
+			matched = append(matched, candidates[0])
+		}
+	}
+	return matched
+}
+
+func installRequestsAreContemporaneous(first, second common.InstallRequest) bool {
+	firstCreatedAt, firstErr := time.Parse(time.RFC3339Nano, first.CreatedAt)
+	secondCreatedAt, secondErr := time.Parse(time.RFC3339Nano, second.CreatedAt)
+	if firstErr != nil || secondErr != nil {
+		return false
+	}
+
+	difference := firstCreatedAt.Sub(secondCreatedAt)
+	if difference < 0 {
+		difference = -difference
+	}
+	return difference <= installRequestAssociationWindow
 }
 
 // listAppInstallationRequestsFromGitHub returns open App install requests. A

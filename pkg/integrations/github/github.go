@@ -1184,10 +1184,9 @@ func persistInstallRequested(ctx core.HTTPRequestContext) {
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	requests := metadata.CurrentInstallRequests()
 	requests = append(requests, common.InstallRequest{
-		AccountLogin:            requestedInstallAccount(ctx),
-		RequesterLogin:          metadata.StartedByGitHubLogin,
-		CreatedAt:               time.Now().UTC().Format(time.RFC3339Nano),
-		ExistingInstallationIDs: pendingInstallationIDs(metadata.PendingInstallations),
+		AccountLogin:   requestedInstallAccount(ctx),
+		RequesterLogin: metadata.StartedByGitHubLogin,
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339Nano),
 	})
 	metadata.SetInstallRequests(requests)
 	ctx.Integration.SetMetadata(metadata)

@@ -665,11 +665,9 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
+	installations := []common.PendingInstallation{{ID: "11", AccountLogin: "existing", AccountType: "User"}}
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{
-			{ID: "11", AccountLogin: "existing", AccountType: "User"},
-			{ID: "22", AccountLogin: "approved", AccountType: "Organization"},
-		}, nil
+		return slices.Clone(installations), nil
 	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -677,8 +675,15 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
+	createdAt := time.Now().UTC()
+	openRequests := []common.InstallRequest{{
+		ID:             "1",
+		AccountLogin:   "approved",
+		RequesterLogin: "member",
+		CreatedAt:      createdAt.Format(time.RFC3339Nano),
+	}}
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
-		return []common.InstallRequest{{ID: "1", AccountLogin: "approved", RequesterLogin: "member"}}, nil
+		return slices.Clone(openRequests), nil
 	}
 	integration := &contexts.IntegrationContext{
 		State: "pending",
@@ -690,23 +695,33 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 				{ID: "11", AccountLogin: "existing", Repositories: []common.Repository{{ID: 101, Name: "existing/api"}}},
 			},
 			InstallRequests: []common.InstallRequest{{
-				RequesterLogin:          "development",
-				CreatedAt:               time.Now().UTC().Format(time.RFC3339Nano),
-				ExistingInstallationIDs: []string{"11"},
+				RequesterLogin: "development",
+				CreatedAt:      createdAt.Format(time.RFC3339Nano),
 			}},
 			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 		},
 	}
 
-	err := (&GitHub{}).Sync(core.SyncContext{
+	ctx := core.SyncContext{
 		Logger:         logrus.NewEntry(logrus.New()),
 		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		BaseURL:        "https://app.example",
 		Integration:    integration,
-	})
+	}
 
-	require.NoError(t, err)
+	require.NoError(t, (&GitHub{}).Sync(ctx))
 	metadata := integration.Metadata.(common.Metadata)
+	require.Len(t, metadata.InstallRequests, 1)
+	assert.Equal(t, "approved", metadata.InstallRequests[0].AccountLogin)
+
+	installations = append(installations, common.PendingInstallation{
+		ID: "22", AccountLogin: "approved", AccountType: "Organization",
+	})
+	openRequests = nil
+	metadata.InstallationsRefreshedAt = time.Now().UTC().Add(-hostedInstallationDiscoveryInterval).Format(time.RFC3339Nano)
+	integration.Metadata = metadata
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata = integration.Metadata.(common.Metadata)
 	assert.Empty(t, metadata.InstallRequests)
 	assert.False(t, metadata.InstallRequested)
 	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
@@ -714,22 +729,15 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 	}))
 }
 
-func TestInstallRequestHasVerifiedInstallationUsesRequestSnapshot(t *testing.T) {
-	request := common.InstallRequest{ExistingInstallationIDs: []string{"11"}}
-	existing := common.PendingInstallation{
-		ID:           "11",
-		AccountLogin: "existing",
-		Repositories: []common.Repository{{ID: 101, Name: "existing/api"}},
-	}
-	approved := common.PendingInstallation{
-		ID:           "22",
-		AccountLogin: "approved",
-		Repositories: []common.Repository{{ID: 202, Name: "approved/api"}},
+func TestTrackedOpenInstallRequestsDoesNotGuessBetweenConcurrentRequests(t *testing.T) {
+	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
+	tracked := []common.InstallRequest{{CreatedAt: createdAt}}
+	open := []common.InstallRequest{
+		{ID: "1", AccountLogin: "acme", CreatedAt: createdAt},
+		{ID: "2", AccountLogin: "octo", CreatedAt: createdAt},
 	}
 
-	assert.False(t, installRequestHasVerifiedInstallation(request, []common.PendingInstallation{existing}))
-	assert.True(t, installRequestHasVerifiedInstallation(request, []common.PendingInstallation{existing, approved}))
-	assert.False(t, installRequestHasVerifiedInstallation(common.InstallRequest{}, []common.PendingInstallation{approved}))
+	assert.Empty(t, trackedOpenInstallRequests(tracked, open))
 }
 
 func TestSyncHostedAppKeepsDevelopmentInstallRequestWithUnverifiedRepositories(t *testing.T) {

@@ -65,10 +65,6 @@ type InstallRequest struct {
 	AccountLogin   string `mapstructure:"accountLogin" json:"accountLogin,omitempty"`
 	RequesterLogin string `mapstructure:"requesterLogin" json:"requesterLogin,omitempty"`
 	CreatedAt      string `mapstructure:"createdAt" json:"createdAt,omitempty"`
-	// ExistingInstallationIDs records the verified installations visible when
-	// an anonymous GitHub request callback arrives. An empty, non-nil slice
-	// means that the snapshot was captured and no installations existed.
-	ExistingInstallationIDs []string `mapstructure:"existingInstallationIds" json:"existingInstallationIds"`
 }
 
 type GitHubAppMetadata struct {
