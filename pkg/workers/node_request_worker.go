@@ -328,7 +328,22 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindActionHook(nodeRef.Component.Name, spec.InvokeAction.ActionName)
+	componentName := nodeRef.Component.Name
+	configuration := node.Configuration.Data()
+	if request.ExecutionID != nil {
+		execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if execution != nil {
+			if frozen := execution.FrozenComponentName(); frozen != "" {
+				componentName = frozen
+				configuration = execution.Configuration.Data()
+			}
+		}
+	}
+
+	hookProvider, _, err := w.registry.FindActionHook(componentName, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
@@ -336,7 +351,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 	logger = logging.WithNode(logger, *node)
 	hookCtx := core.ActionHookContext{
 		Name:          spec.InvokeAction.ActionName,
-		Configuration: node.Configuration.Data(),
+		Configuration: configuration,
 		Parameters:    spec.InvokeAction.Parameters,
 		Logger:        logger,
 		HTTP:          w.registry.HTTPContextInTransaction(tx),

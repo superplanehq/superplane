@@ -187,14 +187,8 @@ func rewriteCanvasAgents(
 
 	now := time.Now()
 	for _, node := range rewritten {
-		busy, err := nodeHasActiveExecution(tx, canvas.ID, node.ID)
-		if err != nil {
+		if err := freezeActiveExecutionComponent(tx, canvas.ID, node.ID); err != nil {
 			return false, err
-		}
-		// An active execution copies configuration and reads the runner from
-		// the runtime node when it starts. Leave that node until it is idle.
-		if busy {
-			continue
 		}
 		err = tx.Model(&models.CanvasNode{}).
 			Where("workflow_id = ? AND node_id = ?", canvas.ID, node.ID).
@@ -212,15 +206,40 @@ func rewriteCanvasAgents(
 	return true, nil
 }
 
-func nodeHasActiveExecution(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (bool, error) {
-	var count int64
-	err := tx.Model(&models.CanvasNodeExecution{}).
-		Where("workflow_id = ? AND node_id = ? AND state IN ?", canvasID, nodeID, models.CanvasNodeExecutionActiveStates).
-		Count(&count).Error
+func freezeActiveExecutionComponent(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error {
+	var runtime models.CanvasNode
+	err := tx.Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).First(&runtime).Error
 	if err != nil {
-		return false, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
 	}
-	return count > 0, nil
+	component := runtime.Ref.Data().Component
+	if component == nil || strings.TrimSpace(component.Name) == "" {
+		return nil
+	}
+
+	var executions []models.CanvasNodeExecution
+	err = tx.Where("workflow_id = ? AND node_id = ? AND state IN ?", canvasID, nodeID, models.CanvasNodeExecutionActiveStates).
+		Find(&executions).Error
+	if err != nil {
+		return err
+	}
+	for i := range executions {
+		if executions[i].FrozenComponentName() != "" {
+			continue
+		}
+		metadata := executions[i].Metadata.Data()
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata[models.CanvasNodeExecutionFrozenComponentKey] = component.Name
+		if err := tx.Model(&executions[i]).Update("metadata", datatypes.NewJSONType(metadata)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureWorkspaceProviderIntegration(

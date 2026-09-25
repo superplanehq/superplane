@@ -257,10 +257,7 @@ function factorySettingsOrganizationModelsRoute(LLMModelsPage: ComponentType) {
   );
 }
 
-function factorySettingsHarnessRoutes(
-  OrganizationSpendingPage: ComponentType,
-  LLMModelsPage?: ComponentType,
-) {
+function factorySettingsHarnessRoutes(OrganizationSpendingPage: ComponentType, LLMModelsPage?: ComponentType) {
   return [
     ...factorySettingsSectionRoutes.filter((route) => {
       if (route.key === "factory-settings-organization-spending" || route.key === "factory-settings-legacy") {
