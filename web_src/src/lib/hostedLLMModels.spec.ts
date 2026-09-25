@@ -13,8 +13,45 @@ import {
   parseHostedLLMModelKey,
   pickHostedAnthropicModel,
   pickHostedModel,
+  newestClaudeModelInFamily,
   uniqueSortedModelIds,
 } from "./hostedLLMModels";
+
+describe("newestClaudeModelInFamily", () => {
+  const anthropicKeyModels = [
+    "claude-3-7-sonnet-20250219",
+    "claude-sonnet-4-20250514",
+    "claude-sonnet-4-5-20250929",
+    "claude-sonnet-4-6",
+    "claude-opus-4-20250514",
+    "claude-opus-4-1-20250805",
+    "claude-opus-5-5",
+    "claude-haiku-4-5-20251001",
+  ];
+
+  it("picks the newest Sonnet, not the one with a snapshot date", () => {
+    expect(newestClaudeModelInFamily(anthropicKeyModels, "sonnet")).toBe("claude-sonnet-4-6");
+  });
+
+  it("picks the newest Opus", () => {
+    expect(newestClaudeModelInFamily(anthropicKeyModels, "opus")).toBe("claude-opus-5-5");
+  });
+
+  it("compares versions as numbers", () => {
+    expect(newestClaudeModelInFamily(["claude-opus-9", "claude-opus-10"], "opus")).toBe("claude-opus-10");
+  });
+
+  it("uses the later snapshot for the same version", () => {
+    expect(newestClaudeModelInFamily(["claude-sonnet-4-5-20250929", "claude-sonnet-4-5-20251115"], "sonnet")).toBe(
+      "claude-sonnet-4-5-20251115",
+    );
+  });
+
+  it("returns undefined when the family is missing", () => {
+    expect(newestClaudeModelInFamily(["claude-opus-5-5"], "sonnet")).toBeUndefined();
+    expect(newestClaudeModelInFamily([], "opus")).toBeUndefined();
+  });
+});
 
 describe("specificModelId", () => {
   it("replaces a Claude alias with the newest model in that family", () => {
