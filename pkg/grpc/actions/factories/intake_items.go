@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -52,6 +53,7 @@ func registerIntakeItemSource(triggerComponent string, builder intakeItemSourceB
 
 func init() {
 	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
+	registerIntakeItemSource("github.onDependabotAlert", newDependabotIntakeItemSource)
 	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
@@ -440,6 +442,102 @@ func (s *gitHubIntakeItemSource) IsItemAvailable(ctx context.Context, id string)
 		return false, nil
 	}
 	return !strings.EqualFold(issue.GetState(), "closed"), nil
+}
+
+type dependabotIntakeItemSource struct {
+	github     *common.Client
+	repository string
+}
+
+func newDependabotIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	repository, _ := trigger.Configuration["repository"].(string)
+	repository = strings.TrimSpace(repository)
+	if repository == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeGitHubClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	return &dependabotIntakeItemSource{github: client, repository: repository}, nil
+}
+
+func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
+	query = strings.ToLower(strings.TrimSpace(query))
+	var alerts []*github.DependabotAlert
+	var err error
+	if query == "" {
+		alerts, _, err = s.github.ListOpenDependabotAlerts(ctx, s.repository, limit)
+	} else {
+		alerts, err = s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
+	}
+	if err != nil {
+		return nil, ghdependabot.UnavailableError(err)
+	}
+
+	items := make([]IntakeItem, 0, len(alerts))
+	for _, alert := range alerts {
+		item, ok := dependabotAlertItem(alert)
+		if !ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(item.Title+" "+item.Body), query) {
+			continue
+		}
+		items = append(items, item)
+		if len(items) >= limit {
+			break
+		}
+	}
+	return items, nil
+}
+
+func (s *dependabotIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
+	number, err := strconv.Atoi(strings.TrimSpace(id))
+	if err != nil || number <= 0 {
+		return nil, errIntakeItemNotFound
+	}
+
+	alert, _, err := s.github.GetDependabotAlert(ctx, s.repository, number)
+	if err != nil {
+		if common.IsNotFoundError(err) {
+			return nil, errIntakeItemNotFound
+		}
+		return nil, ghdependabot.UnavailableError(err)
+	}
+
+	item, ok := dependabotAlertItem(alert)
+	if !ok {
+		return nil, errIntakeItemNotFound
+	}
+	return &item, nil
+}
+
+func dependabotAlertItem(alert *github.DependabotAlert) (IntakeItem, bool) {
+	if alert == nil || alert.GetNumber() <= 0 || !strings.EqualFold(alert.GetState(), "open") {
+		return IntakeItem{}, false
+	}
+	copy := ghdependabot.TaskCopyFromAlert(alert)
+	page := strings.TrimSpace(alert.GetHTMLURL())
+	if page == "" {
+		return IntakeItem{}, false
+	}
+	number := strconv.Itoa(alert.GetNumber())
+	return IntakeItem{
+		ID:    number,
+		Key:   "#" + number,
+		Title: copy.Title,
+		Body:  copy.Description,
+		URL:   page,
+	}, true
 }
 
 func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {

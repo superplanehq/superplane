@@ -69,17 +69,23 @@ func resolveIntakeBinding(
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
 	}
-	if source != models.FactoryIntakeSourceGitHubIssues {
+	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
 	}
 
 	config := factory.OnboardingConfigValue()
 	if config.VCSIntegrationID == "" || config.BacklogRepository == "" {
+		if source == models.FactoryIntakeSourceDependabotAlerts {
+			return nil, invalidArgument("GitHub connection and backlog repository are required")
+		}
 		return nil, nil
 	}
 
 	integration := findIntakeGitHubIntegration(tx, factory, config.VCSIntegrationID)
 	if integration == nil {
+		if source == models.FactoryIntakeSourceDependabotAlerts {
+			return nil, invalidArgument("workspace GitHub integration is not ready")
+		}
 		return nil, nil
 	}
 

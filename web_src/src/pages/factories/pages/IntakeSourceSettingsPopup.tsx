@@ -13,6 +13,7 @@ import {
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
+import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
@@ -329,6 +330,7 @@ function IntakeGeneralTab({
             projectId={resourceId}
           />
           <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
           <ProductiveIntakeFilterFields
             sourceId={sourceId}
             settings={draft}
