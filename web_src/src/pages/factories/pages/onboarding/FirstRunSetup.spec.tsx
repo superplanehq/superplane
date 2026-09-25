@@ -15,6 +15,10 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 let factory: FactoriesFactory;
 let factories: FactoriesFactory[];
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
+}));
+
 vi.mock("../../layout/factoriesLayoutContext", () => ({
   useFactoriesLayout: () => ({
     organizationId: "org-1",

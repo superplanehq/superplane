@@ -17,6 +17,8 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
+  /** True when the organization has the Jira intake feature. Hides Jira when false. */
+  jiraAvailable?: boolean;
   continueLabel?: string;
   /** True while this screen waits to learn whether the agent screen is next. */
   continuePending?: boolean;
@@ -57,6 +59,7 @@ export function FirstRunTicketsScreen({
   ticketSource,
   chrome,
   sphere,
+  jiraAvailable = false,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   continuePending = false,
   saving = false,
@@ -97,16 +100,13 @@ export function FirstRunTicketsScreen({
               disabled={saving}
               onSelect={() => onSelectTicketSource("github-issues")}
             />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="jira" />}
-              title={copy.jira}
-              detail={copy.jiraHelper}
-              selected={ticketSource === "jira"}
-              connectLabel={copy.jira}
-              connected={jiraConnected}
-              disabled={saving}
-              onSelect={() => onSelectTicketSource("jira")}
-              onConnect={onConnectJira}
+            <FirstRunJiraTicketRow
+              jiraAvailable={jiraAvailable}
+              ticketSource={ticketSource}
+              saving={saving}
+              jiraConnected={jiraConnected}
+              onSelectTicketSource={onSelectTicketSource}
+              onConnectJira={onConnectJira}
             />
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="linear" />}
@@ -118,6 +118,7 @@ export function FirstRunTicketsScreen({
             />
           </div>
           <FirstRunJiraProjectFields
+            jiraAvailable={jiraAvailable}
             visible={ticketSource === "jira" && jiraConnected}
             copy={copy}
             saving={saving}
@@ -152,7 +153,42 @@ export function FirstRunTicketsScreen({
   );
 }
 
+function FirstRunJiraTicketRow({
+  jiraAvailable,
+  ticketSource,
+  saving,
+  jiraConnected,
+  onSelectTicketSource,
+  onConnectJira,
+}: {
+  jiraAvailable: boolean;
+  ticketSource: FirstRunTicketSource | null;
+  saving: boolean;
+  jiraConnected: boolean;
+  onSelectTicketSource: (source: FirstRunTicketSource) => void;
+  onConnectJira?: () => void;
+}) {
+  if (!jiraAvailable) {
+    return null;
+  }
+  const copy = FIRST_RUN_COPY.tickets;
+  return (
+    <ConnectOptionRow
+      icon={<IntegrationChoiceIcon name="jira" />}
+      title={copy.jira}
+      detail={copy.jiraHelper}
+      selected={ticketSource === "jira"}
+      connectLabel={copy.jira}
+      connected={jiraConnected}
+      disabled={saving}
+      onSelect={() => onSelectTicketSource("jira")}
+      onConnect={onConnectJira}
+    />
+  );
+}
+
 function FirstRunJiraProjectFields({
+  jiraAvailable,
   visible,
   copy,
   saving,
@@ -167,6 +203,7 @@ function FirstRunJiraProjectFields({
   onJiraCompletionChange,
   onRetryJiraProjects,
 }: {
+  jiraAvailable: boolean;
   visible: boolean;
   copy: (typeof FIRST_RUN_COPY)["tickets"];
   saving: boolean;
@@ -181,7 +218,7 @@ function FirstRunJiraProjectFields({
   onJiraCompletionChange?: (next: JiraCompletionColumnValue) => void;
   onRetryJiraProjects?: () => void;
 }) {
-  if (!visible) {
+  if (!jiraAvailable || !visible) {
     return null;
   }
 

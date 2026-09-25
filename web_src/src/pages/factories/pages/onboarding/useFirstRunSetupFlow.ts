@@ -1,7 +1,9 @@
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import { getApiErrorMessage } from "@/lib/errors";
+import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 import {
   GITHUB_SETUP_INTEGRATION_PARAM,
@@ -244,9 +246,10 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
+function selectedIssuesChoice(model: OnboardingPageModel, jiraAvailable: boolean): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
+  if (issuesChoice === "jira" && !jiraAvailable) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({
@@ -260,13 +263,15 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
   return issuesChoice;
 }
 
-function useFirstRunCommands(
-  model: OnboardingPageModel,
-  agentGate: OnboardingAgentGate,
-  connection: ReturnType<typeof useGitHubConnectionState>,
-  navigation: ReturnType<typeof useFirstRunNavigation>,
-  blocking: ReturnType<typeof useFirstRunBlockingAction>,
-) {
+function useFirstRunCommands(args: {
+  model: OnboardingPageModel;
+  agentGate: OnboardingAgentGate;
+  connection: ReturnType<typeof useGitHubConnectionState>;
+  navigation: ReturnType<typeof useFirstRunNavigation>;
+  blocking: ReturnType<typeof useFirstRunBlockingAction>;
+  jiraAvailable: boolean;
+}) {
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
       const repository = model.setup.selectedRepo;
@@ -276,7 +281,7 @@ function useFirstRunCommands(
     });
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model);
+      const issuesChoice = selectedIssuesChoice(model, jiraAvailable);
       if (!issuesChoice) return;
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
@@ -293,6 +298,7 @@ function useFirstRunCommands(
     });
   const connectJira = () =>
     blocking.runUntilNavigation("connecting-jira", async () => {
+      if (!jiraAvailable) return false;
       model.setup.setIssuesChoice("jira");
       if (!(await model.saveIssues("jira"))) return false;
       await waitForBrowserPaint();
@@ -317,6 +323,7 @@ function useFirstRunCommands(
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
+    if (source === "jira" && !jiraAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
@@ -414,6 +421,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(model, organizationId);
+  const jiraFeature = useExperimentalFeature(organizationId);
+  const jiraAvailable = !jiraFeature.isLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
@@ -421,7 +430,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection);
-  const commands = useFirstRunCommands(model, agentGate, connection, navigation, blocking);
+  const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
   const binding = useGitHubInstallationBinding(
     organizationId,
     model,
@@ -430,6 +439,15 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     blocking,
   );
   useRepositoryErrorToast(model.repositoriesError);
+  // A saved Jira choice is not valid when the organization does not have the
+  // Jira intake feature. Clear it once the lookup finishes so setup does not
+  // connect Jira or provision a Jira intake from that stale choice.
+  const issuesChoice = model.setup.issuesChoice;
+  const setIssuesChoice = model.setup.setIssuesChoice;
+  useEffect(() => {
+    if (jiraFeature.isLoading || jiraAvailable || issuesChoice !== "jira") return;
+    setIssuesChoice(null);
+  }, [jiraFeature.isLoading, jiraAvailable, issuesChoice, setIssuesChoice]);
   // Recheck while a request waits, and also while the picker is open: an
   // install request made on GitHub without a callback (for example when the
   // callback URL was unreachable) only surfaces through this sync.
@@ -451,6 +469,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
+    jiraAvailable,
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,
     requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,
