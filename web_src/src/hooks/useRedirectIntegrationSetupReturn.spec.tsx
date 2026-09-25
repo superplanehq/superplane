@@ -75,11 +75,20 @@ describe("useRedirectIntegrationSetupReturn", () => {
   });
 
   it("keeps the hosted-install picker on integration settings", async () => {
-    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, "/org-1/settings/integrations");
 
     renderAt("/org-1/settings/integrations/github-connection?setupStay=1");
 
     expect(await screen.findByText("integration details")).toBeInTheDocument();
     expect(screen.queryByText("workspace setup")).not.toBeInTheDocument();
+  });
+
+  it("never renders legacy integration details for an onboarding return", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/org-1/settings/integrations/github-connection?setupStay=1");
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 });

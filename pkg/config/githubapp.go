@@ -11,8 +11,6 @@ const (
 	EnvGitHubAppSlug          = "SUPERPLANE_GITHUB_APP_SLUG"
 	EnvGitHubAppPrivateKey    = "SUPERPLANE_GITHUB_APP_PRIVATE_KEY"
 	EnvGitHubAppWebhookSecret = "SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET"
-	EnvGitHubAppClientID      = "SUPERPLANE_GITHUB_APP_CLIENT_ID"
-	EnvGitHubAppClientSecret  = "SUPERPLANE_GITHUB_APP_CLIENT_SECRET"
 )
 
 // GitHubHostedAppConfig is SuperPlane Cloud's public GitHub App. The process
@@ -22,8 +20,6 @@ type GitHubHostedAppConfig struct {
 	Slug          string
 	PrivateKey    string
 	WebhookSecret string
-	ClientID      string
-	ClientSecret  string
 }
 
 // LoadGitHubHostedAppConfig reads the public GitHub App from the process
@@ -48,21 +44,12 @@ func LoadGitHubHostedAppConfig() GitHubHostedAppConfig {
 		Slug:          slug,
 		PrivateKey:    privateKey,
 		WebhookSecret: webhookSecret,
-		ClientID:      strings.TrimSpace(os.Getenv(EnvGitHubAppClientID)),
-		ClientSecret:  strings.TrimSpace(os.Getenv(EnvGitHubAppClientSecret)),
 	}
 }
 
 // Enabled reports whether Cloud holds a complete public GitHub App.
 func (c GitHubHostedAppConfig) Enabled() bool {
 	return c.ID > 0 && c.Slug != "" && c.PrivateKey != "" && c.WebhookSecret != ""
-}
-
-// UserOAuthEnabled reports whether Cloud can list the current user's installs
-// of the public GitHub App. This needs the App client id and client secret
-// in addition to Enabled().
-func (c GitHubHostedAppConfig) UserOAuthEnabled() bool {
-	return c.Enabled() && c.ClientID != "" && c.ClientSecret != ""
 }
 
 func normalizePEM(value string) string {

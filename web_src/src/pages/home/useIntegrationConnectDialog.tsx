@@ -1,11 +1,17 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   IntegrationsIntegrationDefinition,
   OrganizationsCreateIntegrationResponse,
   OrganizationsIntegration,
 } from "@/api-client";
-import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import {
+  integrationKeys,
+  useAvailableIntegrations,
+  useConnectedIntegrations,
+  useCreateIntegration,
+} from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integrationSetupReturn";
@@ -49,6 +55,44 @@ export function selectReadyIntegrationInstance(
   );
   const selection = instance ? selectionFromInstance(instance) : null;
   return selection?.ready ? { ...selections, [integrationName]: selection } : null;
+}
+
+/** Prefer the query cache after an async mutation refreshes a connection. */
+export function selectLatestReadyIntegrationInstance(
+  refreshed: OrganizationsIntegration[] | undefined,
+  rendered: OrganizationsIntegration[],
+  selections: IntegrationSelections,
+  integrationName: string,
+  integrationId?: string,
+): IntegrationSelections | null {
+  return selectReadyIntegrationInstance(refreshed ?? rendered, selections, integrationName, integrationId);
+}
+
+function useLatestReadyIntegrationSelection(args: {
+  organizationId: string;
+  connected: OrganizationsIntegration[];
+  selections: IntegrationSelections;
+  onSelectionsChange: (selections: IntegrationSelections) => void;
+}) {
+  const queryClient = useQueryClient();
+  const selections = useRef(args.selections);
+  selections.current = args.selections;
+
+  return (integrationName: string, integrationId: string): boolean => {
+    const refreshed = queryClient.getQueryData<OrganizationsIntegration[]>(
+      integrationKeys.connected(args.organizationId),
+    );
+    const next = selectLatestReadyIntegrationInstance(
+      refreshed,
+      args.connected,
+      selections.current,
+      integrationName,
+      integrationId,
+    );
+    if (!next) return false;
+    args.onSelectionsChange(next);
+    return true;
+  };
 }
 
 /**
@@ -169,7 +213,9 @@ export function useIntegrationConnectDialog({
     const existingSelection = selectReadyIntegrationInstance(connected, selections, integrationName);
     if (existingSelection) {
       onSelectionsChange(existingSelection);
-      return true;
+      // Selecting an in-memory connection does not navigate away. Callers
+      // must be able to finish their current action and render the selection.
+      return false;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
       return hostedConnect.jira();
@@ -217,10 +263,12 @@ export function useIntegrationConnectDialog({
     openCreateIntegrationModal(integrationName);
   };
 
-  const selectInstance = (integrationName: string, integrationId: string) => {
-    const next = selectReadyIntegrationInstance(connected, selections, integrationName, integrationId);
-    if (next) onSelectionsChange(next);
-  };
+  const selectInstance = useLatestReadyIntegrationSelection({
+    organizationId,
+    connected,
+    selections,
+    onSelectionsChange,
+  });
 
   const dialogs = (
     <>
