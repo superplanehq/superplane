@@ -39,6 +39,30 @@ async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, pare
   fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
 }
 
+function renderModelSelect({
+  appearance = "labeled",
+  model = "claude-opus-4-6",
+  thinkingLevel = "medium",
+  onChange = vi.fn(),
+}: {
+  appearance?: "icon" | "labeled" | "ghost";
+  model?: string;
+  thinkingLevel?: string;
+  onChange?: ReturnType<typeof vi.fn>;
+} = {}) {
+  return render(
+    <DraftStartModelSelect
+      organizationId="org-1"
+      factoryId="factory-1"
+      lineName="ship"
+      model={model}
+      thinkingLevel={thinkingLevel}
+      onChange={onChange as (next: { model: string; thinkingLevel: string }) => void}
+      appearance={appearance}
+    />,
+  );
+}
+
 function renderDraftFooter(
   onStart: () => void,
   selectedModel = DRAFT_START_MODEL_AUTO,
@@ -136,5 +160,68 @@ describe("SplitRunReview draft model select", () => {
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
+  });
+
+  it("shows Medium after the model name on a closed labeled trigger", () => {
+    renderModelSelect({ appearance: "labeled", thinkingLevel: "medium" });
+
+    const trigger = screen.getByRole("button", { name: "Model: claude-opus-4-6, Medium" });
+    const name = within(trigger).getByText("claude-opus-4-6");
+    const level = within(trigger).getByText("Medium");
+    expect(name.compareDocumentPosition(level) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(level).toHaveClass("shrink-0", "text-muted-foreground");
+    expect(name).toHaveClass("truncate");
+  });
+
+  it("shows Medium after the model name on a closed ghost trigger", () => {
+    renderModelSelect({ appearance: "ghost", thinkingLevel: "medium" });
+
+    const trigger = screen.getByRole("button", { name: "Model: claude-opus-4-6, Medium" });
+    const name = within(trigger).getByText("claude-opus-4-6");
+    const level = within(trigger).getByText("Medium");
+    expect(name.compareDocumentPosition(level) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(level).toHaveClass("shrink-0", "text-muted-foreground");
+  });
+
+  it("hides Auto and Default on a closed trigger", () => {
+    const { rerender } = renderModelSelect({
+      appearance: "labeled",
+      thinkingLevel: "auto",
+      model: DRAFT_START_MODEL_AUTO,
+    });
+
+    expect(screen.getByRole("button", { name: "Model: Auto" }).textContent?.replace(/\s+/g, " ").trim()).toBe("Auto");
+
+    rerender(
+      <DraftStartModelSelect model="claude-opus-4-6" thinkingLevel="default" onChange={vi.fn()} appearance="ghost" />,
+    );
+    const defaultTrigger = screen.getByRole("button", { name: "Model: claude-opus-4-6" });
+    expect(defaultTrigger).not.toHaveTextContent("Default");
+    expect(defaultTrigger).not.toHaveTextContent("Medium");
+
+    rerender(
+      <DraftStartModelSelect model="claude-opus-4-6" thinkingLevel="" onChange={vi.fn()} appearance="labeled" />,
+    );
+    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6" })).not.toHaveTextContent("Default");
+  });
+
+  it("keeps the icon trigger free of the model name and thinking level", () => {
+    renderModelSelect({ appearance: "icon", thinkingLevel: "medium" });
+
+    const trigger = screen.getByRole("button", { name: "Model: claude-opus-4-6" });
+    expect(trigger).not.toHaveTextContent("claude-opus-4-6");
+    expect(trigger).not.toHaveTextContent("Medium");
+  });
+
+  it("still reports the current thinking level on the open Thinking row", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderModelSelect({ appearance: "labeled", thinkingLevel: "medium", onChange });
+
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6, Medium" }));
+    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Thinking");
+    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
+    await selectFlyoutOption(user, "split-run-draft-thinking", "Low");
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: "low" });
   });
 });
