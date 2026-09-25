@@ -20,7 +20,7 @@ const TRIGGER_VARIANT: Record<Appearance, "default" | "outline" | "ghost"> = {
 const TRIGGER_CLASS: Record<Appearance, string> = {
   icon: "rounded-md rounded-l-none",
   labeled: "!rounded-none h-7 gap-1.5 border-0 bg-background text-xs shadow-none",
-  ghost: "gap-1.5 text-muted-foreground hover:text-foreground",
+  ghost: "max-w-full min-w-[min(100%,8rem)] shrink gap-1.5 text-muted-foreground hover:text-foreground",
 };
 
 const START_THINKING_LEVELS = [

@@ -181,6 +181,8 @@ describe("SplitRunReview draft model select", () => {
     const level = within(trigger).getByText("Medium");
     expect(name.compareDocumentPosition(level) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(level).toHaveClass("shrink-0", "text-muted-foreground");
+    expect(trigger).toHaveClass("shrink", "max-w-full");
+    expect(trigger.className).toContain("min(100%,8rem)");
   });
 
   it("hides Auto and Default on a closed trigger", () => {
