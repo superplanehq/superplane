@@ -410,10 +410,17 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	ref := node.Ref.Data()
-	action, err := w.registry.GetAction(ref.Component.Name)
+	componentName := ""
+	if ref.Component != nil {
+		componentName = ref.Component.Name
+	}
+	if frozen := execution.FrozenComponentName(); frozen != "" {
+		componentName = frozen
+	}
+	action, err := w.registry.GetAction(componentName)
 	if err != nil {
-		logger.Errorf("action %s not found: %v", ref.Component.Name, err)
-		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
+		logger.Errorf("action %s not found: %v", componentName, err)
+		return fmt.Errorf("action %s not found: %w", componentName, err)
 	}
 
 	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)

@@ -86,7 +86,7 @@ apt-get install -qy nodejs
 
 # Coding agent CLIs (host-mode tasks; binaries land on PATH for ubuntu).
 # Pin versions — bump deliberately when rebuilding AMIs.
-CLAUDE_CODE_VERSION=2.1.212
+CLAUDE_CODE_VERSION=2.1.282
 OPENCODE_VERSION=1.18.31
 CODEX_VERSION=0.144.5
 PLAYWRIGHT_VERSION=1.63.0

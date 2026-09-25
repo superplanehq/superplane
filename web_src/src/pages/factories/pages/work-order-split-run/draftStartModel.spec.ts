@@ -22,12 +22,19 @@ describe("draftStartModelPayload", () => {
 });
 
 describe("displayRunnerModel", () => {
-  it("keeps a short alias", () => {
-    expect(displayRunnerModel("opus")).toBe("opus");
+  it("keeps a short alias when no versioned models are known", () => {
+    expect(displayRunnerModel("opus")).toBe("opus 5-5");
   });
 
-  it("keeps the last path segment of an OpenRouter id", () => {
-    expect(displayRunnerModel("anthropic/claude-opus-4-6")).toBe("claude-opus-4-6");
+  it("shows the newest model in the alias family", () => {
+    expect(displayRunnerModel("sonnet", ["claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-5-5"])).toBe(
+      "sonnet 4-6",
+    );
+  });
+
+  it("uses the short Claude label for a provider path", () => {
+    expect(displayRunnerModel("anthropic/claude-opus-4-6")).toBe("opus 4-6");
+    expect(displayRunnerModel("anthropic/claude-opus-5-5")).toBe("opus 5-5");
   });
 
   it("keeps the last path segment of a hosted SuperPlane id", () => {
@@ -35,9 +42,7 @@ describe("displayRunnerModel", () => {
   });
 
   it("shortens each id in a joined list", () => {
-    expect(displayRunnerModel("anthropic/claude-opus-4-6 · anthropic/claude-sonnet-4-6")).toBe(
-      "claude-opus-4-6 · claude-sonnet-4-6",
-    );
+    expect(displayRunnerModel("anthropic/claude-opus-4-6 · anthropic/claude-sonnet-4-6")).toBe("opus 4-6 · sonnet 4-6");
   });
 });
 

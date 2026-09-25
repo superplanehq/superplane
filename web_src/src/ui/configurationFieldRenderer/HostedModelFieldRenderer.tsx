@@ -5,9 +5,10 @@ import { Text } from "@/components/Text/text";
 import { preferredFactoryScope, useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
-import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
+import { HOSTED_MODEL_ALL_PROVIDERS, shortClaudeModelLabel } from "@/lib/hostedLLMModels";
 import {
   byokRunnerModelOptions,
+  defaultByokRunnerModel,
   hostedSelectableLLMModelKey,
   normalizeSuperPlaneModelValue,
   SELECTABLE_LLM_SOURCE_BYOK,
@@ -107,11 +108,19 @@ function ProviderBYOKModelField({
     return status;
   }
 
+  const provider = field.typeOptions?.hostedModel?.provider ?? "";
+  const providerModels = selectableLLMModelsForProvider(selection.models, provider);
   const current = typeof value === "string" ? value : "";
-  const options = byokRunnerModelOptions(
-    selectableLLMModelsForProvider(selection.models, field.typeOptions?.hostedModel?.provider ?? ""),
+  const resolved = defaultByokRunnerModel(
     current,
+    provider,
+    providerModels.map((model) => model.model.id),
   );
+  const shown = resolved ?? current;
+  const options = byokRunnerModelOptions(providerModels, shown).map((option) => ({
+    value: option.value,
+    label: shortClaudeModelLabel(option.value) ?? option.label,
+  }));
   if (options.length === 0) {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
@@ -124,7 +133,7 @@ function ProviderBYOKModelField({
   return (
     <ModelThinkingSelect
       fieldName={field.name}
-      model={current}
+      model={shown}
       committedModel={current}
       thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
       placeholder={field.placeholder || "Select a model"}

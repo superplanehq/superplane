@@ -513,7 +513,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(trigger).toHaveClass("underline");
     await user.hover(trigger);
     const card = await screen.findByTestId("popup-spend-breakdown");
-    expect(card).toHaveTextContent("claude-sonnet-4-6");
+    expect(card).toHaveTextContent("sonnet 4-6");
     expect(card).toHaveTextContent("2.7k tokens · $0.45");
     expect(card).toHaveTextContent("Machine time");
     expect(card).toHaveTextContent("1 min 30 s · $0.28");
@@ -583,9 +583,7 @@ describe("WorkOrderSplitRunPopup", () => {
   it("shows tokens and cost on a line-step phase", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
 
-    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent(
-      "$0.28 · 900 · claude-sonnet-4-6 ·",
-    );
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 · sonnet 4-6 ·");
   });
 
   it("does not put an Open task link next to close", () => {

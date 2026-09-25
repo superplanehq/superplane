@@ -309,7 +309,7 @@ func Test__Build__DoesNotOverlaySiblingCanvasModel(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "opus", resolved["model"])
+	assert.Equal(t, "claude-opus-5-5", resolved["model"])
 }
 
 func Test__Build__OverlaysLineDispatchModelOnSuperPlaneWithoutCanvasModel(t *testing.T) {

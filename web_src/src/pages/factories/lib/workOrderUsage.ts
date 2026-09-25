@@ -1,4 +1,5 @@
 import { formatCompactTokenLabel, formatCompactTokenValue } from "@/lib/formatTokenCount";
+import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
 import { machineTypeLabel } from "@/lib/machineType";
 
 export function parseWorkOrderMetric(value: string | number | undefined): number {
@@ -95,11 +96,7 @@ export type WorkOrderSpendBreakdownRow = {
 
 function usageModelDisplayName(provider?: string, model?: string): string {
   const raw = (model ?? "").trim() || (provider ?? "").trim();
-  const slash = raw.lastIndexOf("/");
-  if (slash >= 0 && slash < raw.length - 1) {
-    return raw.slice(slash + 1);
-  }
-  return raw;
+  return displayModelName(concreteClaudeModelId(raw));
 }
 
 /** Model and machine-time rows that have spend. Empty when there is nothing to show. */
