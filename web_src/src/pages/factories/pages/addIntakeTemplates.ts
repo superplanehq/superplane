@@ -56,8 +56,8 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   },
   {
     id: "productive-tasks",
-    name: "Productive.io tasks",
-    description: "Creates tasks from Productive.io tasks.",
+    name: "Productive tasks",
+    description: "Creates tasks from Productive tasks.",
     iconSrc: productiveIcon,
     featureId: FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   },

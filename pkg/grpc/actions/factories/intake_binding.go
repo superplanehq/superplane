@@ -146,23 +146,23 @@ func resolveProductiveIntakeBinding(
 		return nil, nil
 	}
 	if integrationID == "" || projectID == "" {
-		return nil, invalidArgument("Productive.io integration and project are required")
+		return nil, invalidArgument("Productive integration and project are required")
 	}
 
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, invalidArgument("Productive.io integration is invalid")
+		return nil, invalidArgument("Productive integration is invalid")
 	}
 
 	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
 	if err != nil {
-		return nil, invalidArgument("Productive.io integration was not found")
+		return nil, invalidArgument("Productive integration was not found")
 	}
 	if integration.AppName != intakeProductiveAppName {
-		return nil, invalidArgument("selected integration is not Productive.io")
+		return nil, invalidArgument("selected integration is not Productive")
 	}
 	if integration.State != models.IntegrationStateReady {
-		return nil, invalidArgument("Productive.io integration is not ready")
+		return nil, invalidArgument("Productive integration is not ready")
 	}
 
 	return &intakeBinding{

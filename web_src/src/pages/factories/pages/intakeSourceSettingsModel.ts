@@ -81,7 +81,7 @@ export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
 
 export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
   ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-  name: "Productive.io tasks",
+  name: "Productive tasks",
   excludeKeyTasks: true,
 };
 

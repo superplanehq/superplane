@@ -230,7 +230,7 @@ describe("IntakeSourceSettingsPopup", () => {
     ["jira-issues", "Jira issues", jiraIcon],
     ["sentry-exceptions", "Sentry exceptions", sentryIcon],
     ["pagerduty-incidents", "PagerDuty incidents", pagerdutyIcon],
-    ["productive-tasks", "Productive.io tasks", productiveIcon],
+    ["productive-tasks", "Productive tasks", productiveIcon],
   ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
     renderPopup({ sourceId });
 

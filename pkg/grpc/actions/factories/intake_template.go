@@ -113,8 +113,8 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
 	models.FactoryIntakeSourceProductiveTasks: {
-		name:                 "Productive.io tasks",
-		description:          "Create a work order when a Productive.io task is created.",
+		name:                 "Productive tasks",
+		description:          "Create a work order when a Productive task is created.",
 		triggerComponent:     "productive.onTask",
 		triggerName:          "On Task",
 		triggerConfiguration: map[string]any{"actions": []any{"created"}},
