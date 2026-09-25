@@ -471,7 +471,7 @@ func newDependabotIntakeItemSource(
 }
 
 func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	alerts, _, err := s.github.ListOpenDependabotAlerts(ctx, s.repository, maxIntakeItems)
+	alerts, err := s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
 	if err != nil {
 		return nil, ghdependabot.UnavailableError(err)
 	}
@@ -516,7 +516,7 @@ func (s *dependabotIntakeItemSource) Get(ctx context.Context, id string) (*Intak
 }
 
 func dependabotAlertItem(alert *github.DependabotAlert) (IntakeItem, bool) {
-	if alert == nil || alert.GetNumber() <= 0 {
+	if alert == nil || alert.GetNumber() <= 0 || !strings.EqualFold(alert.GetState(), "open") {
 		return IntakeItem{}, false
 	}
 	copy := ghdependabot.TaskCopyFromAlert(alert)

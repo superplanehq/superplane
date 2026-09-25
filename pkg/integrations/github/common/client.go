@@ -493,6 +493,34 @@ func (c *Client) ListOpenDependabotAlerts(ctx context.Context, repository string
 	})
 }
 
+func (c *Client) ListAllOpenDependabotAlerts(ctx context.Context, repository string) ([]*github.DependabotAlert, error) {
+	owner, name := c.ownerAndName(repository)
+	state := "open"
+	sort := "created"
+	direction := "desc"
+	options := &github.ListAlertsOptions{
+		State:     &state,
+		Sort:      &sort,
+		Direction: &direction,
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	alerts := []*github.DependabotAlert{}
+	for {
+		page, response, err := c.underlying.Dependabot.ListRepoAlerts(ctx, owner, name, options)
+		if err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, page...)
+		if response.NextPage == 0 {
+			return alerts, nil
+		}
+		options.ListOptions.Page = response.NextPage
+	}
+}
+
 func (c *Client) GetDependabotAlert(ctx context.Context, repository string, number int) (*github.DependabotAlert, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Dependabot.GetRepoAlert(ctx, owner, name, number)
