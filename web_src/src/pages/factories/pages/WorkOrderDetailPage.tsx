@@ -6,8 +6,9 @@ import {
   useWorkOrderArtifacts,
   useWorkOrderEvents,
 } from "@/hooks/useFactoryData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
 import { Navigate, useLocation, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -16,6 +17,7 @@ import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
 import { canonicalWorkOrderNumber, resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDetailDerived } from "../lib/workOrderProgress";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../lib/workOrderChecks";
+import { pullRequestMentionNote } from "../lib/pullRequestMentionNote";
 import { useWorkOrderDetailActions } from "../useWorkOrderDetailActions";
 import { WorkOrderDetailLoadedView } from "../WorkOrderDetailLoadedView";
 import { presentWorkOrderStatusNotes } from "../lib/workOrderStatusNote";
@@ -67,6 +69,7 @@ export function WorkOrderDetailPanel({
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
   const { data: order, isLoading: orderLoading, error: orderError } = useWorkOrder(organizationId, factoryId, orderId);
+  const { data: prFeedbackHandlers } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
@@ -110,6 +113,7 @@ export function WorkOrderDetailPanel({
       checks={checks}
       isChecksLoading={false}
       checksError={null}
+      prFeedbackHandlers={prFeedbackHandlers}
       canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
@@ -175,6 +179,8 @@ interface LoadedWorkOrderDetailProps {
   checks: WorkOrderCheckPresentation[];
   isChecksLoading: boolean;
   checksError: Error | null;
+  /** Used to tell a reviewer when a mention in the pull request restarts the agent. */
+  prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
   canManageWorkOrders: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
@@ -194,13 +200,22 @@ function LoadedWorkOrderDetail({
   checks,
   isChecksLoading,
   checksError,
+  prFeedbackHandlers,
   canManageWorkOrders,
   permissionsLoading,
   actions,
 }: LoadedWorkOrderDetailProps) {
+  const statusNotes = presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined);
+  // Shown only while waiting, alongside any automation-authored note, and
+  // only once the repository already has a healthy handler listening for it.
+  const mentionNote =
+    derived.displayStatus === "waiting"
+      ? pullRequestMentionNote(order.pullRequests, order.id, prFeedbackHandlers)
+      : undefined;
+
   return (
     <WorkOrderDetailLoadedView
-      statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined)}
+      statusNotes={mentionNote ? [...statusNotes, mentionNote] : statusNotes}
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}

@@ -20,6 +20,7 @@ import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
+import { PULL_REQUEST_MENTION_NOTE_KEY } from "./lib/pullRequestMentionNote";
 import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
 
@@ -314,7 +315,13 @@ function WorkOrderStatusNotesSection({
   | "onClose"
   | "onStatusChange"
 > & { notes: WorkOrderStatusNotePresentation[] }) {
-  const lastIndex = notes.length - 1;
+  // The mention note is purely informational (it never resolves the wait),
+  // so "Update manually" stays on the last automation note even when the
+  // mention note renders after it.
+  const lastActionableIndex = notes.reduce(
+    (found, note, index) => (note.key === PULL_REQUEST_MENTION_NOTE_KEY ? found : index),
+    -1,
+  );
   const statusActions = buildWorkOrderStatusActions({
     displayStatus,
     isOpen,
@@ -337,7 +344,7 @@ function WorkOrderStatusNotesSection({
           canClose={canClose}
           canManage={canManage}
           isBusy={isCompleting || isRejecting || isClosing || isUpdatingStatus}
-          statusActions={index === lastIndex ? statusActions : []}
+          statusActions={index === lastActionableIndex ? statusActions : []}
           onClose={onClose}
           onStatusChange={onStatusChange}
         />
