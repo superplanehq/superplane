@@ -171,6 +171,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 	// replace callback placeholders for the same account during deduplication.
 	candidates := append(slices.Clone(openRequests), trackedRequests...)
 	unresolved := make([]common.InstallRequest, 0, len(openRequests))
+	now := time.Now().UTC()
 	for _, request := range candidates {
 		if installRequestIsOpen(request, openRequests) {
 			unresolved = append(unresolved, request)
@@ -180,10 +181,20 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		if found && len(installation.Repositories) > 0 {
 			continue
 		}
-		unresolved = append(unresolved, request)
+		if installRequestMayStillResolve(request, now) {
+			unresolved = append(unresolved, request)
+		}
 	}
 	metadata.SetInstallRequests(unresolved)
 	return nil
+}
+
+func installRequestMayStillResolve(request common.InstallRequest, now time.Time) bool {
+	createdAt, err := time.Parse(time.RFC3339Nano, request.CreatedAt)
+	if err != nil {
+		return false
+	}
+	return now.Before(createdAt.Add(installRequestResolutionGracePeriod))
 }
 
 func installationForAccount(installations []common.PendingInstallation, account string) (common.PendingInstallation, bool) {

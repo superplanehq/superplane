@@ -56,6 +56,7 @@ To complete the GitHub app setup:
 	Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
 	`
 	hostedInstallationDiscoveryInterval = time.Minute
+	installRequestResolutionGracePeriod = 2 * time.Minute
 )
 
 func init() {
@@ -323,7 +324,7 @@ func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation
 }
 
 func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time) bool {
-	if metadata.InstallationID != "" {
+	if metadata.InstallationID != "" && !metadata.HasInstallRequests() {
 		return false
 	}
 
