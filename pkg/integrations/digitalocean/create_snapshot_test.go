@@ -244,6 +244,11 @@ func Test__CreateSnapshot__HandleHook(t *testing.T) {
 		assert.True(t, executionState.Passed)
 		assert.Equal(t, "default", executionState.Channel)
 		assert.Equal(t, "digitalocean.snapshot.created", executionState.Type)
+
+		// The API defaults to 20 items per page; the snapshot lookup must ask
+		// for more, or droplets with many snapshots miss the one just created.
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.RawQuery, "per_page=200")
 	})
 
 	t.Run("action still in-progress -> schedules another poll", func(t *testing.T) {
