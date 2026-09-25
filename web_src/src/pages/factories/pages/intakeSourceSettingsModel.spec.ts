@@ -175,6 +175,7 @@ describe("intakeSourceSettingsModel", () => {
 
   it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
     expect(intakeSupportsDelete("github-issues")).toBe(true);
+    expect(intakeSupportsDelete("dependabot-alerts")).toBe(true);
     expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
     expect(intakeSupportsDelete("jira-issues")).toBe(true);
     expect(intakeSupportsDelete("productive-tasks")).toBe(true);

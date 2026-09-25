@@ -227,6 +227,7 @@ func reconcileFactoryRepository(
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			changed = replaceTriggerRepository(nodes, "github.onIssue", previousBacklogRepository, repository) || changed
+			changed = replaceTriggerRepository(nodes, "github.onDependabotAlert", previousBacklogRepository, repository) || changed
 		}
 		if _, ok := handlerCanvasIDs[canvas.ID]; ok {
 			changed = replaceGitHubTriggerRepository(nodes, previousAppRepository, repository) || changed
