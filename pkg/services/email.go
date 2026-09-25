@@ -15,6 +15,7 @@ import (
 type EmailService interface {
 	SendMagicCodeEmail(toEmail, code, magicLink string) error
 	SendWorkOrderNotificationEmail(toEmail, subject string, data WorkOrderNotificationTemplateData) error
+	SendSupportFeedbackEmail(toEmail string, feedback SupportFeedback) error
 }
 
 type MagicCodeTemplateData struct {
@@ -133,6 +134,51 @@ func (s *ResendEmailService) SendWorkOrderNotificationEmail(
 	}
 
 	log.Infof("Work order notification email sent successfully to %s (ID: %s)", toEmail, response.Id)
+	return nil
+}
+
+func (s *ResendEmailService) SendSupportFeedbackEmail(toEmail string, feedback SupportFeedback) error {
+	data := feedback.TemplateData()
+
+	plainTextContent, err := s.renderTemplate("support_feedback.txt", data)
+	if err != nil {
+		log.Errorf("Error rendering support feedback plain text template: %v", err)
+		return fmt.Errorf("failed to render support feedback plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("support_feedback.html", data)
+	if err != nil {
+		log.Errorf("Error rendering support feedback HTML template: %v", err)
+		return fmt.Errorf("failed to render support feedback HTML template: %w", err)
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
+		To:      []string{toEmail},
+		Subject: feedback.EmailSubject(),
+		Text:    plainTextContent,
+		Html:    htmlContent,
+	}
+	if replyTo := strings.TrimSpace(feedback.UserEmail); replyTo != "" {
+		params.ReplyTo = replyTo
+	}
+	if feedback.Attachment != nil {
+		params.Attachments = []*resend.Attachment{
+			{
+				Content:     feedback.Attachment.Content,
+				Filename:    feedback.Attachment.Filename,
+				ContentType: feedback.Attachment.ContentType,
+			},
+		}
+	}
+
+	response, err := s.client.Emails.Send(params)
+	if err != nil {
+		log.Errorf("Error sending support feedback email to %s: %v", toEmail, err)
+		return err
+	}
+
+	log.Infof("Support feedback email sent successfully to %s (ID: %s)", toEmail, response.Id)
 	return nil
 }
 
