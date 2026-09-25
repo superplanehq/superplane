@@ -105,6 +105,31 @@ func Test__ProductiveWebhookHandler__Setup(t *testing.T) {
 		assert.ErrorIs(t, err, ErrWebhooksLimitExceeded)
 		assert.Contains(t, err.Error(), "does not offer webhooks on this plan")
 	})
+
+	t.Run("plain 403 returns the write permission message", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusForbidden,
+					Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"403","title":"Forbidden"}]}`)),
+				},
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: authorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/hook",
+				Configuration: WebhookConfiguration{ProjectID: "1"},
+			},
+		})
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrMissingWritePermission)
+		assert.Contains(t, err.Error(), "read and write access")
+		assert.NotContains(t, err.Error(), "error creating webhook")
+	})
 }
 
 func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {

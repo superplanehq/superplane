@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -7,8 +8,13 @@ import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import { PRODUCTIVE_INTAKE_SETUP_COPY } from "./productiveIntakeSetupCopy";
 
+const PERMISSION_ERROR =
+  "This API token cannot create webhooks. In Productive, go to Settings > API Integrations and create a token with read and write access.";
+
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
+  createIntegration: vi.fn(),
+  deleteIntegration: vi.fn(),
   connected: [] as Array<{
     metadata: { id: string; name: string; integrationName: string };
     status: { state: string };
@@ -16,18 +22,31 @@ const mocks = vi.hoisted(() => ({
   projectsError: false,
 }));
 
+vi.mock("@/api-client/sdk.gen", () => ({
+  organizationsDeleteIntegration: mocks.deleteIntegration,
+}));
+
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useCreateFactoryIntake: () => ({ mutateAsync: mocks.createIntake, isPending: false }),
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
+  integrationKeys: {
+    connected: (organizationId: string) => ["integrations", "connected", organizationId],
+    integration: (organizationId: string, integrationId: string) => [
+      "integrations",
+      "connected",
+      organizationId,
+      integrationId,
+    ],
+  },
   useConnectedIntegrations: () => ({
     data: mocks.connected,
     isLoading: false,
     refetch: vi.fn(),
   }),
   useAvailableIntegrations: () => ({ data: [{ name: "productive", label: "Productive" }] }),
-  useCreateIntegration: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
+  useCreateIntegration: () => ({ mutateAsync: mocks.createIntegration, reset: vi.fn() }),
   useIntegrationResources: () => ({
     data: mocks.projectsError
       ? []
@@ -42,9 +61,39 @@ vi.mock("@/hooks/useIntegrations", () => ({
 }));
 
 vi.mock("@/ui/IntegrationCreateDialog", () => ({
-  IntegrationCreateDialog: ({ open, onCreated }: { open: boolean; onCreated: (id: string) => void }) =>
+  IntegrationCreateDialog: ({
+    open,
+    onCreateIntegration,
+    onCreated,
+  }: {
+    open: boolean;
+    onCreateIntegration: (payload: { integrationName: string; name: string }) => Promise<
+      | {
+          integration?: { metadata?: { id?: string } };
+        }
+      | undefined
+    >;
+    onCreated: (id: string) => void;
+  }) =>
     open ? (
-      <button type="button" data-testid="finish-connect" onClick={() => onCreated("integration-new")}>
+      <button
+        type="button"
+        data-testid="finish-connect"
+        onClick={() => {
+          void onCreateIntegration({ integrationName: "productive", name: "Productive" }).then(
+            (result) => {
+              onCreated(result?.integration?.metadata?.id ?? "integration-new");
+            },
+            (cause: unknown) => {
+              const alert = document.createElement("p");
+              alert.setAttribute("role", "alert");
+              alert.setAttribute("data-testid", "connect-error");
+              alert.textContent = cause instanceof Error ? cause.message : "";
+              document.body.appendChild(alert);
+            },
+          );
+        }}
+      >
         Finish connect
       </button>
     ) : null,
@@ -52,22 +101,36 @@ vi.mock("@/ui/IntegrationCreateDialog", () => ({
 
 function renderDialog(onCreated = vi.fn()) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/productive"]}>
-      <ProductiveIntakeSetupDialog
-        organizationId="org-1"
-        factoryId="factory-1"
-        integrationsBasePath="/org-1/workspaces/sp/settings/organization/integrations"
-        onClose={vi.fn()}
-        onCreated={onCreated}
-      />
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/productive"]}>
+        <ProductiveIntakeSetupDialog
+          organizationId="org-1"
+          factoryId="factory-1"
+          integrationsBasePath="/org-1/workspaces/sp/settings/organization/integrations"
+          onClose={vi.fn()}
+          onCreated={onCreated}
+        />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe("ProductiveIntakeSetupDialog", () => {
   beforeEach(() => {
+    document.querySelector("[data-testid='connect-error']")?.remove();
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1" });
+    mocks.createIntegration.mockReset();
+    mocks.createIntegration.mockResolvedValue({
+      data: {
+        integration: {
+          metadata: { id: "integration-new", name: "Productive", integrationName: "productive" },
+          status: { state: "ready" },
+        },
+      },
+    });
+    mocks.deleteIntegration.mockReset();
+    mocks.deleteIntegration.mockResolvedValue({});
     mocks.projectsError = false;
     mocks.connected.splice(0, mocks.connected.length, {
       metadata: { id: "integration-1", name: "Productive", integrationName: "productive" },
@@ -203,6 +266,34 @@ describe("ProductiveIntakeSetupDialog", () => {
     const connect = screen.getByTestId("productive-setup-connect");
     expect(connect).toHaveTextContent(PRODUCTIVE_INTAKE_SETUP_COPY.wizardConnectAnother);
     expect(screen.getByTestId("productive-connection-integration-1")).toBeInTheDocument();
+  });
+
+  it("stays on the connection step when the token cannot create webhooks", async () => {
+    mocks.connected.splice(0, mocks.connected.length);
+    mocks.createIntegration.mockResolvedValue({
+      data: {
+        integration: {
+          metadata: { id: "integration-bad", name: "Productive", integrationName: "productive" },
+          status: { state: "error", stateDescription: PERMISSION_ERROR },
+        },
+      },
+    });
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByTestId("productive-setup-connect"));
+    await user.click(screen.getByTestId("finish-connect"));
+
+    expect(await screen.findByTestId("connect-error")).toHaveTextContent(PERMISSION_ERROR);
+    expect(mocks.deleteIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { id: "org-1", integrationId: "integration-bad" },
+      }),
+    );
+    expect(screen.getByRole("heading", { name: PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnect })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProject }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the create fallback when SuperPlane returns an internal error", async () => {

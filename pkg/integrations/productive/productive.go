@@ -1,6 +1,7 @@
 package productive
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 const installationInstructions = `
 To configure Productive to work with SuperPlane:
 
-1. **Get an API token**: In Productive, go to **Settings > API Integrations**. Create a personal access token with read and write permissions.
+1. **Get an API token**: In Productive, go to **Settings > API Integrations**. Create a token with read and write access. SuperPlane needs that access to create webhooks.
 2. **Get the organization id**: The organization id is the numeric id in your Productive URL, e.g. ` + "`app.productive.io/<organization-id>-name`" + `.
 3. **Enter credentials**: Provide the API token and organization id in the integration configuration.
 `
@@ -52,7 +53,7 @@ func (p *Productive) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Personal access token from Productive Settings > API Integrations, with read and write permissions.",
+			Description: "Personal access token from Productive Settings > API Integrations. SuperPlane needs read and write access to create webhooks.",
 		},
 		{
 			Name:        "organizationId",
@@ -108,8 +109,22 @@ func (p *Productive) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("invalid credentials: %v", err)
 	}
 
+	if err := client.ValidateWebhookPermission(); err != nil {
+		if errors.Is(err, ErrMissingWritePermission) {
+			return ErrMissingWritePermission
+		}
+		if errors.Is(err, ErrWebhooksLimitExceeded) {
+			return webhooksUnavailableError(err)
+		}
+		return fmt.Errorf("error checking webhook permission: %v", err)
+	}
+
 	ctx.Integration.Ready()
 	return nil
+}
+
+func webhooksUnavailableError(err error) error {
+	return fmt.Errorf("Productive does not offer webhooks on this plan, so the On Task trigger cannot be set up: %w", err)
 }
 
 func (p *Productive) Cleanup(ctx core.IntegrationCleanupContext) error {
