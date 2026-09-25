@@ -1,4 +1,4 @@
-import { pickHostedModel, pickModelMatching } from "@/lib/hostedLLMModels";
+import { pickHostedModel, pickNewestModelMatching } from "@/lib/hostedLLMModels";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 
 import type { IntegrationId } from "./onboardingFixtures";
@@ -40,8 +40,8 @@ const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
     component: "runnerClaudeCode",
     hostedProvider: "anthropic",
     harness: "AGENT_HARNESS_CLAUDE_CODE",
-    defaultModel: "sonnet",
-    defaultPlanningModel: "opus",
+    defaultModel: "claude-opus-5-5",
+    defaultPlanningModel: "claude-opus-5-5",
     planningModelHint: "opus",
   },
   openai: {
@@ -57,17 +57,17 @@ const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
     hostedProvider: "openrouter",
     harness: "AGENT_HARNESS_CLAUDE_CODE",
     defaultModel: "anthropic/claude-sonnet-4-6",
-    defaultPlanningModel: "anthropic/claude-opus-4-6",
+    defaultPlanningModel: "anthropic/claude-opus-5-5",
     planningModelHint: "opus",
   },
 };
 
 // A hosted run only accepts a model id from the allowlist, so the planning
 // model has to come from the same list as the standard model. An empty list
-// means no allowlist applies, and the agent CLI resolves the alias itself.
+// uses a versioned model id.
 function planningModelFor(spec: AgentProviderSpec, modelIds: string[], model: string): string {
   if (modelIds.length === 0) return spec.defaultPlanningModel;
-  return pickModelMatching(modelIds, spec.planningModelHint) ?? model;
+  return pickNewestModelMatching(modelIds, spec.planningModelHint) ?? model;
 }
 
 export function isAgentProviderConnected(connected: Set<IntegrationId>): boolean {

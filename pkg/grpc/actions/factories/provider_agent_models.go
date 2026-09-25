@@ -7,8 +7,7 @@ import (
 
 // providerAgentModelSpec matches the onboarding agent plan. The run model
 // prefers a known id from the key's model list. The planning model prefers
-// an id that contains the hint. An empty list keeps the alias the agent CLI
-// resolves itself.
+// an id that contains the hint. An empty list uses a versioned model id.
 type providerAgentModelSpec struct {
 	defaultModel         string
 	defaultPlanningModel string
@@ -18,8 +17,8 @@ type providerAgentModelSpec struct {
 
 var providerAgentModelSpecs = map[string]providerAgentModelSpec{
 	modelSourceAnthropic: {
-		defaultModel:         "sonnet",
-		defaultPlanningModel: "opus",
+		defaultModel:         "claude-opus-5-5",
+		defaultPlanningModel: "claude-opus-5-5",
 		planningHint:         "opus",
 		preferred:            []string{"opus-5-5", "opus-5.5", "sonnet"},
 	},
@@ -31,7 +30,7 @@ var providerAgentModelSpecs = map[string]providerAgentModelSpec{
 	},
 	modelSourceOpenRouter: {
 		defaultModel:         "anthropic/claude-sonnet-4-6",
-		defaultPlanningModel: "anthropic/claude-opus-4-6",
+		defaultPlanningModel: "anthropic/claude-opus-5-5",
 		planningHint:         "opus",
 		preferred:            []string{"grok-4.7", "sonnet"},
 	},
@@ -55,7 +54,7 @@ func planningModelFor(spec providerAgentModelSpec, modelIDs []string, model stri
 	if len(modelIDs) == 0 {
 		return spec.defaultPlanningModel
 	}
-	if match := pickModelContaining(modelIDs, spec.planningHint); match != "" {
+	if match := pickNewestModelContaining(modelIDs, spec.planningHint); match != "" {
 		return match
 	}
 	return model
@@ -74,16 +73,29 @@ func pickPreferredModel(preferred []string, modelIDs []string) string {
 }
 
 func pickModelContaining(modelIDs []string, hint string) string {
+	return pickModelContainingAt(modelIDs, hint, false)
+}
+
+func pickNewestModelContaining(modelIDs []string, hint string) string {
+	return pickModelContainingAt(modelIDs, hint, true)
+}
+
+func pickModelContainingAt(modelIDs []string, hint string, newest bool) string {
 	needle := strings.ToLower(strings.TrimSpace(hint))
 	if needle == "" {
 		return ""
 	}
+	var match string
 	for _, id := range modelIDs {
-		if strings.Contains(strings.ToLower(id), needle) {
+		if !strings.Contains(strings.ToLower(id), needle) {
+			continue
+		}
+		match = id
+		if !newest {
 			return id
 		}
 	}
-	return ""
+	return match
 }
 
 func uniqueSortedModelIDs(ids []string) []string {

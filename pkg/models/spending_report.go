@@ -360,7 +360,7 @@ func listSpendingModelCatalog(tx *gorm.DB, filter UsageReportFilter) ([]Spending
 	if err != nil {
 		return nil, err
 	}
-	versionedIDs, err := spendingVersionedModelIDs(tx, rows)
+	versionedIDs, err := spendingVersionedModelIDs(tx, filter.OrganizationID, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ type spendingModelCatalogRow struct {
 	Model    string
 }
 
-func spendingVersionedModelIDs(tx *gorm.DB, rows []spendingModelCatalogRow) ([]string, error) {
+func spendingVersionedModelIDs(tx *gorm.DB, orgID uuid.UUID, rows []spendingModelCatalogRow) ([]string, error) {
 	providers, err := ListHostedLLMProviders(tx)
 	if err != nil {
 		return nil, err
@@ -386,6 +386,11 @@ func spendingVersionedModelIDs(tx *gorm.DB, rows []spendingModelCatalogRow) ([]s
 	for _, provider := range providers {
 		ids = append(ids, CompactModelIDs(provider.AllowedModels)...)
 	}
+	candidates, err := ClaudeAliasCandidateIDs(tx, orgID, nil)
+	if err != nil {
+		return nil, err
+	}
+	ids = append(ids, candidates...)
 	for _, row := range rows {
 		if spendingModelHasVersion(row.Model) {
 			ids = append(ids, row.Model)
@@ -402,6 +407,9 @@ func SpendingModelDisplayName(storedModel string, versionedIDs []string) string 
 		return stored
 	}
 	stored = pricebook.CatalogModelID(stored)
+	if IsClaudeFamilyAlias(stored) {
+		return canonicalSpendingModelName(ConcreteClaudeModelID(stored, versionedIDs))
+	}
 	alias := stored
 	if _, rest, found := strings.Cut(stored, "/"); found && rest != "" && !strings.Contains(rest, "/") {
 		alias = rest

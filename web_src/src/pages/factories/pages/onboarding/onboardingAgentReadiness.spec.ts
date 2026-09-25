@@ -74,8 +74,7 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  // With no allowlist to read, the agent CLI resolves the alias itself.
-  it("gives planning the Opus alias when no allowlist applies", () => {
+  it("uses versioned model ids when no allowlist applies", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("claude"),
@@ -83,8 +82,8 @@ describe("resolveOnboardingAgent", () => {
       }),
     ).toMatchObject({
       credentialsSource: "integration",
-      model: "sonnet",
-      planningModel: "opus",
+      model: "claude-opus-5-5",
+      planningModel: "claude-opus-5-5",
     });
   });
 
@@ -135,7 +134,7 @@ describe("resolveOnboardingAgent", () => {
     ).toMatchObject({
       providerId: "claude",
       credentialsSource: "integration",
-      model: "sonnet",
+      model: "claude-opus-5-5",
     });
   });
 

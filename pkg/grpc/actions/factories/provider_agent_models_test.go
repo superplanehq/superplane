@@ -18,6 +18,14 @@ func Test__AgentModelsForSource__UsesTheKeyModelList(t *testing.T) {
 	assert.Equal(t, "claude-opus-4-6", planning)
 
 	model, planning = agentModelsForSource(modelSourceAnthropic, []string{
+		"claude-opus-4-6",
+		"claude-opus-5-5",
+		"claude-sonnet-4-6",
+	})
+	assert.Equal(t, "claude-opus-5-5", model)
+	assert.Equal(t, "claude-opus-5-5", planning)
+
+	model, planning = agentModelsForSource(modelSourceAnthropic, []string{
 		"claude-opus-5-5",
 		"claude-sonnet-4-6",
 	})
@@ -50,16 +58,16 @@ func Test__AgentModelsForSource__UsesTheKeyModelList(t *testing.T) {
 	assert.Equal(t, "x-ai/grok-4.7", planning)
 }
 
-func Test__AgentModelsForSource__KeepsAliasesWhenTheKeyReturnsNoModels(t *testing.T) {
+func Test__AgentModelsForSource__UsesVersionedIdsWhenTheKeyReturnsNoModels(t *testing.T) {
 	t.Parallel()
 
 	model, planning := agentModelsForSource(modelSourceAnthropic, nil)
-	assert.Equal(t, "sonnet", model)
-	assert.Equal(t, "opus", planning)
+	assert.Equal(t, "claude-opus-5-5", model)
+	assert.Equal(t, "claude-opus-5-5", planning)
 
 	model, planning = agentModelsForSource(modelSourceOpenRouter, []string{" "})
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", model)
-	assert.Equal(t, "anthropic/claude-opus-4-6", planning)
+	assert.Equal(t, "anthropic/claude-opus-5-5", planning)
 }
 
 func Test__CompareModelIDs__OrdersNumericRuns(t *testing.T) {

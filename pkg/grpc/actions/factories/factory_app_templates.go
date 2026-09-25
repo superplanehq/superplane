@@ -252,7 +252,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 	if node.ID == "planning-agent" && agent.planningModel != "" {
 		model = agent.planningModel
 	}
-	node.Configuration["model"] = model
+	node.Configuration["model"] = models.ConcreteClaudeModelID(model, nil)
 }
 
 func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {
