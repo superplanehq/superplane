@@ -33,12 +33,12 @@ func testClient(t *testing.T, http *contexts.HTTPContext) *Client {
 func Test__NewClient(t *testing.T) {
 	t.Run("missing apiToken -> error", func(t *testing.T) {
 		_, err := NewClient(&contexts.HTTPContext{}, testIntegration(map[string]any{"apiToken": ""}))
-		require.ErrorContains(t, err, "missing Productive.io API token")
+		require.ErrorContains(t, err, "missing Productive API token")
 	})
 
 	t.Run("missing organizationId -> error", func(t *testing.T) {
 		_, err := NewClient(&contexts.HTTPContext{}, testIntegration(map[string]any{"organizationId": ""}))
-		require.ErrorContains(t, err, "missing Productive.io organization id")
+		require.ErrorContains(t, err, "missing Productive organization id")
 	})
 
 	t.Run("uses the default base URL when region is not set", func(t *testing.T) {

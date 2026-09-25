@@ -67,7 +67,7 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	if strings.TrimSpace(string(apiToken)) == "" {
-		return nil, fmt.Errorf("missing Productive.io API token")
+		return nil, fmt.Errorf("missing Productive API token")
 	}
 
 	organizationID, err := ctx.GetConfig("organizationId")
@@ -76,7 +76,7 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	if strings.TrimSpace(string(organizationID)) == "" {
-		return nil, fmt.Errorf("missing Productive.io organization id")
+		return nil, fmt.Errorf("missing Productive organization id")
 	}
 
 	baseURL := BaseURL

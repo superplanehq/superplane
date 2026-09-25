@@ -28,21 +28,21 @@ func (t *OnTask) Label() string {
 }
 
 func (t *OnTask) Description() string {
-	return "Listen to task events from Productive.io"
+	return "Listen to task events from Productive"
 }
 
 func (t *OnTask) Documentation() string {
-	return `The On Task trigger starts a workflow execution when task events occur in a Productive.io project.
+	return `The On Task trigger starts a workflow execution when task events occur in a Productive project.
 
 ## Use Cases
 
 - **Backlog intake**: Create a work order when a new task is added to a project
-- **Sync workflows**: Mirror Productive.io tasks into another tracker
+- **Sync workflows**: Mirror Productive tasks into another tracker
 - **Notifications**: Alert a channel when a task is created or updated
 
 ## Configuration
 
-- **Project** (required): Productive.io project to monitor
+- **Project** (required): Productive project to monitor
 - **Actions** (required): Which task actions to listen for (created, updated). Default: created.
 
 ## Outputs
@@ -53,15 +53,15 @@ func (t *OnTask) Documentation() string {
 
 ## Webhook Setup
 
-This trigger registers Productive.io webhooks automatically when configured, and removes them when the
-trigger is deleted. Productive.io webhooks are organization-wide and need the Ultimate plan. SuperPlane
+This trigger registers Productive webhooks automatically when configured, and removes them when the
+trigger is deleted. Productive webhooks are organization-wide and need the Ultimate plan. SuperPlane
 registers one remote webhook for task created and one for task updated, both pointing at
 ` + "`{WEBHOOKS_BASE_URL}/api/v1/webhooks/{id}`" + `. Deliveries for other projects are ignored.
 
-Productive.io puts the task resource under ` + "`object.data`" + `. Each remote webhook has its own
+Productive puts the task resource under ` + "`object.data`" + `. Each remote webhook has its own
 signature, and SuperPlane uses that signature to tell a created task from an updated task.
 
-Productive.io rejects registration with a 403 "webhooks_limit_exceeded" response on plans that do not
+Productive rejects registration with a 403 "webhooks_limit_exceeded" response on plans that do not
 include webhooks, in which case setup fails until the organization upgrades.`
 }
 
@@ -80,7 +80,7 @@ func (t *OnTask) Configuration() []configuration.Field {
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Productive.io project to monitor",
+			Description: "The Productive project to monitor",
 			Placeholder: "Select a project",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{

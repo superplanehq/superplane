@@ -48,7 +48,7 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerName: "On Task",
     createTitle: "{{ root().data.data.attributes.title }}",
     createDescription: "{{ root().data.data.attributes.description }}",
-    title: "Productive.io task intake",
+    title: "Productive task intake",
   },
 };
 

@@ -99,7 +99,7 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 			h.deleteRemoteWebhooks(client, ids)
 
 			if errors.Is(err, ErrWebhooksLimitExceeded) {
-				return nil, fmt.Errorf("Productive.io does not offer webhooks on this plan, so the On Task trigger cannot be set up: %w", err)
+				return nil, fmt.Errorf("Productive does not offer webhooks on this plan, so the On Task trigger cannot be set up: %w", err)
 			}
 
 			return nil, fmt.Errorf("error creating webhook: %v", err)
