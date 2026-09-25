@@ -1,9 +1,8 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
-import { useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/Text/text";
-import { useCanvas } from "@/hooks/useCanvasData";
+import { preferredFactoryScope, useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
@@ -34,18 +33,6 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
   return <StringFieldRenderer {...props} />;
 };
 
-function useCanvasFactoryScope(organizationId: string | undefined) {
-  const { appId } = useParams<{ appId?: string }>();
-  const canvasQuery = useCanvas(organizationId ?? "", appId ?? "", {
-    enabled: Boolean(organizationId && appId),
-    staleTime: Infinity,
-  });
-  return {
-    factoryId: canvasQuery.data?.metadata?.factoryId,
-    waitingForCanvas: Boolean(appId) && canvasQuery.isPending,
-  };
-}
-
 function SuperPlaneModelField({
   field,
   value,
@@ -53,9 +40,10 @@ function SuperPlaneModelField({
   onValuesChange,
   allValues,
   organizationId,
+  factoryId,
   readOnly = false,
 }: FieldRendererProps) {
-  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED]);
+  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED], factoryId);
   const usage = useOrganizationWorkspaceUsage(organizationId ?? "");
   const status = modelFieldStatus(organizationId, selection.isLoading || usage.isLoading, selection.isError);
   if (status) {
@@ -110,9 +98,10 @@ function ProviderBYOKModelField({
   onValuesChange,
   allValues,
   organizationId,
+  factoryId,
   readOnly = false,
 }: FieldRendererProps) {
-  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_BYOK]);
+  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_BYOK], factoryId);
   const status = modelFieldStatus(organizationId, selection.isLoading, selection.isError);
   if (status) {
     return status;
@@ -234,8 +223,13 @@ function modelFieldStatus(organizationId: string | undefined, isLoading: boolean
   return null;
 }
 
-function useSelectablePickerModels(organizationId: string | undefined, sources: SelectableLLMSourceID[]) {
-  const { factoryId, waitingForCanvas } = useCanvasFactoryScope(organizationId);
+function useSelectablePickerModels(
+  organizationId: string | undefined,
+  sources: SelectableLLMSourceID[],
+  explicitFactoryId?: string,
+) {
+  const canvasScope = useCanvasFactoryScope(organizationId);
+  const { factoryId, waitingForCanvas } = preferredFactoryScope(explicitFactoryId, canvasScope);
   const query = useSelectableLLMModels(organizationId, {
     factoryId,
     sources,

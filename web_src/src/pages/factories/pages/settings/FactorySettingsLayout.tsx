@@ -7,12 +7,7 @@ import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_MODELS,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
@@ -42,9 +37,6 @@ import {
 import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScroll";
 
-/** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
-const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
-
 /** Nav item id for workspace MCP servers, gated behind `FEATURE_WORKSPACE_MCP`. */
 const WORKSPACE_MCP_NAV_ITEM_ID = "workspace-mcp";
 
@@ -64,9 +56,6 @@ function visibleFactorySettingsNavGroups(
   hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MODELS)) {
-    hiddenNavItemIds.add(WORKSPACE_MODELS_NAV_ITEM_ID);
-  }
   if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP)) {
     hiddenNavItemIds.add(WORKSPACE_MCP_NAV_ITEM_ID);
   }

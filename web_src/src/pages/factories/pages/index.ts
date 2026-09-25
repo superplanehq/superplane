@@ -33,7 +33,6 @@ export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePag
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
 export { FactorySettingsRepositoryPage } from "./settings/FactorySettingsRepositoryPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
-export { FactorySettingsModelsPage } from "./settings/FactorySettingsModelsPage";
 export { FactorySettingsMCPPage } from "./settings/FactorySettingsMCPPage";
 export { FactorySettingsSkillsPage } from "./settings/FactorySettingsSkillsPage";
 export { FactorySettingsSkillEditorPage } from "./settings/FactorySettingsSkillEditorPage";

@@ -1,7 +1,7 @@
 export type VcsHostId = "github" | "gitlab";
 /** Matches SuperPlane integration registry names (Claude = `claude`, not anthropic). */
-export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "openrouter" | "linear" | "jira";
-export type AgentHarnessId = "claude-code" | "cursor" | "codex";
+export type IntegrationId = "github" | "gitlab" | "claude" | "openai" | "openrouter" | "linear" | "jira";
+export type AgentHarnessId = "claude-code" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
 export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name";
 
@@ -33,12 +33,6 @@ export const AGENT_OPTIONS: IntegrationOption[] = [
     id: "openrouter",
     label: "OpenRouter",
     detail: "Connect an OpenRouter API key for many model providers.",
-  },
-  {
-    id: "cursor",
-    label: "Cursor",
-    detail: "Cloud agent that changes the app repository and opens pull requests.",
-    soon: true,
   },
 ];
 
@@ -147,8 +141,6 @@ export function integrationLabel(id: IntegrationId) {
       return "GitLab";
     case "claude":
       return "Claude";
-    case "cursor":
-      return "Cursor";
     case "openai":
       return "OpenAI";
     case "openrouter":

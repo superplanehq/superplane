@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   ACME_ONBOARDING_FACTORY_ID,
@@ -350,59 +350,17 @@ describe("FactorySettingsLayout sidebar", () => {
     }, 10000);
   });
 
-  describe("workspace-models experimental feature", () => {
-    it("hides the Models nav item when the feature is off", async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-          factoriesFixture={defaultFactoriesFixture}
-        />,
-      );
+  it("does not show a workspace Models nav item", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
 
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
-    }, 10000);
-
-    it("shows the Models nav item when the feature is on", async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-          factoriesFixture={defaultFactoriesFixture}
-          experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
-        />,
-      );
-
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-models")).toHaveTextContent("Models");
-    }, 10000);
-
-    it("redirects away from the Models route when the feature is off", async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
-          factoriesFixture={defaultFactoriesFixture}
-        />,
-      );
-
-      await waitFor(() => {
-        expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
-      });
-      expect(screen.queryByTestId("workspace-page-header-title")).not.toBeInTheDocument();
-    }, 10000);
-
-    it("renders the Models page when the feature is on", async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
-          factoriesFixture={defaultFactoriesFixture}
-          experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
-        />,
-      );
-
-      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Models");
-    }, 10000);
-  });
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
+  }, 10000);
 
   describe("organization-byok experimental feature", () => {
     it("hides the LLM Models nav item when the feature is off", async () => {
