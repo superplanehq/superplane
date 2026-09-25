@@ -140,10 +140,16 @@ SUPERPLANE_GITHUB_APP_ID=123123
 SUPERPLANE_GITHUB_APP_SLUG=superplane-myslug
 SUPERPLANE_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n<pem>\n-----END RSA PRIVATE KEY-----"
 SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET=123123
+SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES=yes
 ```
 
 Put the PEM on one line. Replace each newline in the file with `\n`.
 Restart the server after you save `.env`.
+
+The last setting is for a trusted local workstation only. It lets local users
+select all repositories installed for the development App without a personal
+GitHub permission check. Never set it on a shared or production instance.
+Production ignores this setting.
 
 If the catalog still reports no hosted GitHub App, confirm every required
 value is set and that the App ID is a positive integer. Then restart
@@ -156,9 +162,9 @@ value is set and that the App ID is a positive integer. Then restart
 3. Connect GitHub. The browser opens the public app install page or shows the
    repositories from an existing installation.
 
-In development, SuperPlane lists the repositories that are available to the
-configured GitHub App. Production continues to verify the signed-in member's
-write access before it shows a repository.
+With the local override, SuperPlane lists the repositories that are available
+to the configured GitHub App. Without the override, SuperPlane verifies the
+signed-in member's write access before it shows a repository.
 
 If setup stays blocked, the installation still has no complete
 `SUPERPLANE_GITHUB_APP_*` set. Check `.env` and restart the server.

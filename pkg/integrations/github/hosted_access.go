@@ -18,12 +18,14 @@ import (
 )
 
 type hostedGitHubIdentity struct {
-	ID          int64
-	Login       string
-	Development bool
+	ID                          int64
+	Login                       string
+	AllowUnverifiedRepositories bool
 }
 
 type repositoryPermissionLookup func(context.Context, string, string, string) (*gh.RepositoryPermissionLevel, error)
+
+const allowUnverifiedDevelopmentRepositoriesEnv = "SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES"
 
 func findStartedByGitHubIdentity(organizationID, userID string) (*hostedGitHubIdentity, error) {
 	if organizationID == "" || userID == "" {
@@ -52,12 +54,13 @@ func findStartedByGitHubIdentity(organizationID, userID string) (*hostedGitHubId
 }
 
 func useDevelopmentGitHubDiscovery() bool {
-	return os.Getenv("APP_ENV") == "development"
+	return os.Getenv("APP_ENV") == "development" &&
+		os.Getenv(allowUnverifiedDevelopmentRepositoriesEnv) == "yes"
 }
 
 func hostedGitHubDiscoveryIdentity(organizationID, userID string) (*hostedGitHubIdentity, error) {
 	if useDevelopmentGitHubDiscovery() {
-		return &hostedGitHubIdentity{Login: "development", Development: true}, nil
+		return &hostedGitHubIdentity{Login: "development", AllowUnverifiedRepositories: true}, nil
 	}
 
 	return findStartedByGitHubIdentity(organizationID, userID)
@@ -101,7 +104,7 @@ func discoverAccessibleInstallations(
 			failedChecks = append(failedChecks, fmt.Errorf("create client for installation %s: %w", installation.ID, err))
 			continue
 		}
-		if identity.Development {
+		if identity.AllowUnverifiedRepositories {
 			repositories, err := listInstallationRepos(ctx, client)
 			if err != nil {
 				failedChecks = append(failedChecks, fmt.Errorf("list repositories for installation %s: %w", installation.ID, err))

@@ -85,8 +85,8 @@ func TestHostedBindRequiresRepository(t *testing.T) {
 	assert.Equal(t, "pending", integration.State)
 }
 
-func TestHostedBindUsesLocalInstallationAccessWithoutIdentity(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
+func TestHostedBindUsesOptInLocalInstallationAccessWithoutIdentity(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	t.Cleanup(resetBindClientHooks)
 
@@ -129,7 +129,7 @@ func TestHostedBindUsesLocalInstallationAccessWithoutIdentity(t *testing.T) {
 }
 
 func TestHostedBindIgnoresUnrelatedInstallationFailure(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
+	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	t.Cleanup(resetBindClientHooks)
 
@@ -177,7 +177,7 @@ func TestHostedBindIgnoresUnrelatedInstallationFailure(t *testing.T) {
 }
 
 func TestSyncHostedAppRetriesDiscoveryWithoutOpeningInstallPage(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
+	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
 	t.Cleanup(restore)
@@ -425,4 +425,10 @@ func stubEmptyHostedDiscovery(t *testing.T) {
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
 		return nil, nil
 	}
+}
+
+func enableUnverifiedDevelopmentRepositories(t *testing.T) {
+	t.Helper()
+	t.Setenv("APP_ENV", "development")
+	t.Setenv(allowUnverifiedDevelopmentRepositoriesEnv, "yes")
 }

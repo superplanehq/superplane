@@ -58,7 +58,7 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 	assert.Empty(t, writable)
 }
 
-func TestDiscoverAccessibleInstallationsUsesDevelopmentIdentity(t *testing.T) {
+func TestDiscoverAccessibleInstallationsUsesExplicitUnverifiedAccess(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Cleanup(resetBindClientHooks)
 
@@ -79,7 +79,7 @@ func TestDiscoverAccessibleInstallationsUsesDevelopmentIdentity(t *testing.T) {
 		context.Background(),
 		&contexts.IntegrationContext{},
 		common.HostedApp{ID: 99},
-		hostedGitHubIdentity{Login: "devuser", Development: true},
+		hostedGitHubIdentity{Login: "devuser", AllowUnverifiedRepositories: true},
 	)
 
 	require.NoError(t, err)
@@ -88,8 +88,12 @@ func TestDiscoverAccessibleInstallationsUsesDevelopmentIdentity(t *testing.T) {
 	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}, {ID: 102, Name: "acme/web"}}, installations[0].Repositories)
 }
 
-func TestDevelopmentGitHubDiscoveryIsLocalOnly(t *testing.T) {
+func TestDevelopmentGitHubDiscoveryRequiresExplicitLocalOptIn(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
+	t.Setenv(allowUnverifiedDevelopmentRepositoriesEnv, "")
+	assert.False(t, useDevelopmentGitHubDiscovery())
+
+	t.Setenv(allowUnverifiedDevelopmentRepositoriesEnv, "yes")
 	assert.True(t, useDevelopmentGitHubDiscovery())
 
 	t.Setenv("APP_ENV", "production")
