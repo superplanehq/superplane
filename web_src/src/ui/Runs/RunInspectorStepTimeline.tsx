@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { getJsonViewStyle } from "@/lib/jsonViewTheme";
+import { JsonPayload } from "@/ui/JsonPayload";
 import { Accordion } from "@/ui/accordion";
 import { useTheme } from "@/contexts/useTheme";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
@@ -7,13 +8,7 @@ import { shouldShowRunnerLogs } from "./runnerLogsVisibility";
 import { InputChainMoreChip } from "./RunInspectorInputChainModal";
 import { RunnerLogsTimelineCard } from "./RunInspectorRunnerLogs";
 import { RuntimeTimelineCard } from "./RunInspectorRuntimeConfig";
-import {
-  DetailBox,
-  EmptySectionText,
-  ErrorOutputCard,
-  JsonPayload,
-  TimelineAccordionCard,
-} from "./RunInspectorTimelineCard";
+import { DetailBox, EmptySectionText, ErrorOutputCard, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import { StepMarker, TimelineRail } from "./RunInspectorTimelineMarkers";
 import {
   ACCORDION_STORAGE_KEY,
