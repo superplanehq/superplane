@@ -309,6 +309,15 @@ func TestRequiresHostedInstallationDiscovery(t *testing.T) {
 		InstallRequests:          []common.InstallRequest{{ID: "1"}},
 		InstallationsRefreshedAt: now.Add(-hostedInstallationDiscoveryInterval).Format(time.RFC3339Nano),
 	}, now))
+	assert.True(t, requiresHostedInstallationDiscovery(common.Metadata{
+		InstallationID:               "11",
+		InstallRequestDiscoveryUntil: now.Add(time.Minute).Format(time.RFC3339Nano),
+		InstallationsRefreshedAt:     now.Add(-hostedInstallationDiscoveryInterval).Format(time.RFC3339Nano),
+	}, now))
+	assert.False(t, requiresHostedInstallationDiscovery(common.Metadata{
+		InstallationID:               "11",
+		InstallRequestDiscoveryUntil: now.Add(-time.Second).Format(time.RFC3339Nano),
+	}, now))
 	assert.True(t, requiresHostedInstallationDiscovery(common.Metadata{}, now))
 }
 
@@ -465,6 +474,77 @@ func TestSyncHostedAppClearsClosedInstallRequestAfterGracePeriod(t *testing.T) {
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Empty(t, metadata.InstallRequests)
 	assert.False(t, metadata.InstallRequested)
+	assert.True(t, installRequestFollowUpDiscoveryActive(metadata, time.Now().UTC()))
+}
+
+func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	installations := []common.PendingInstallation{{ID: "11", AccountLogin: "existing", AccountType: "Organization"}}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return slices.Clone(installations), nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "ready",
+		Metadata: common.Metadata{
+			State:                    "csrf",
+			HostedApp:                true,
+			InstallationID:           "11",
+			StartedByGitHubLogin:     "development",
+			InstallationsRefreshedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "existing", Repositories: []common.Repository{{ID: 101, Name: "existing/api"}}},
+			},
+			InstallRequests: []common.InstallRequest{{
+				ID:             "1",
+				AccountLogin:   "acme",
+				RequesterLogin: "member",
+				CreatedAt: time.Now().UTC().
+					Add(-installRequestResolutionGracePeriod - time.Second).
+					Format(time.RFC3339Nano),
+			}},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+	ctx := core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.InstallRequests)
+	assert.True(t, installRequestFollowUpDiscoveryActive(metadata, time.Now().UTC()))
+
+	installations = append(installations, common.PendingInstallation{
+		ID: "22", AccountLogin: "acme", AccountType: "Organization",
+	})
+	metadata.InstallationsRefreshedAt = time.Now().UTC().Add(-hostedInstallationDiscoveryInterval).Format(time.RFC3339Nano)
+	integration.Metadata = metadata
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata = integration.Metadata.(common.Metadata)
+	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+		return installation.AccountLogin == "acme" && len(installation.Repositories) > 0
+	}))
 }
 
 func TestSyncHostedAppDiscoversApprovedRequestOnBoundConnection(t *testing.T) {
@@ -612,14 +692,15 @@ func TestSyncHostedAppKeepsDevelopmentInstallRequestWithUnverifiedRepositories(t
 		},
 	}
 
-	err := (&GitHub{}).Sync(core.SyncContext{
+	ctx := core.SyncContext{
 		Logger:         logrus.NewEntry(logrus.New()),
 		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		BaseURL:        "https://app.example",
 		Integration:    integration,
-	})
+	}
 
-	require.NoError(t, err)
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	require.NoError(t, (&GitHub{}).Sync(ctx))
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Equal(t, []common.InstallRequest{request}, metadata.InstallRequests)
 	assert.True(t, metadata.InstallRequested)

@@ -133,7 +133,8 @@ func (g *GitHub) bindHostedInstallationWith(
 func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
 	trackedRequests := metadata.CurrentInstallRequests()
 	requester := strings.TrimSpace(metadata.StartedByGitHubLogin)
-	if requester != "" {
+	localUnverifiedDiscovery := useDevelopmentGitHubDiscovery() && requester == "development"
+	if requester != "" && !localUnverifiedDiscovery {
 		trackedRequests = slices.DeleteFunc(trackedRequests, func(request common.InstallRequest) bool {
 			return request.RequesterLogin != "" && !strings.EqualFold(request.RequesterLogin, requester)
 		})
@@ -149,7 +150,6 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 			return fmt.Errorf("failed to create app client: %w", err)
 		}
 		lookupRequester := requester
-		localUnverifiedDiscovery := useDevelopmentGitHubDiscovery() && requester == "development"
 		if localUnverifiedDiscovery {
 			// Local discovery has no linked GitHub identity. Query all App
 			// requests, then retain only requests already tracked by this
@@ -172,6 +172,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 	candidates := append(slices.Clone(openRequests), trackedRequests...)
 	unresolved := make([]common.InstallRequest, 0, len(openRequests))
 	now := time.Now().UTC()
+	followUpDiscovery := false
 	for _, request := range candidates {
 		if installRequestIsOpen(request, openRequests) {
 			unresolved = append(unresolved, request)
@@ -183,9 +184,16 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		}
 		if installRequestMayStillResolve(request, now) {
 			unresolved = append(unresolved, request)
+			continue
 		}
+		followUpDiscovery = true
 	}
 	metadata.SetInstallRequests(unresolved)
+	if followUpDiscovery {
+		metadata.InstallRequestDiscoveryUntil = now.Add(installRequestFollowUpDiscoveryPeriod).Format(time.RFC3339Nano)
+	} else if len(unresolved) == 0 {
+		metadata.InstallRequestDiscoveryUntil = ""
+	}
 	return nil
 }
 

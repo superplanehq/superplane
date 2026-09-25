@@ -55,8 +55,9 @@ To complete the GitHub app setup:
 	hostedInstallDescription = `
 	Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
 	`
-	hostedInstallationDiscoveryInterval = time.Minute
-	installRequestResolutionGracePeriod = 2 * time.Minute
+	hostedInstallationDiscoveryInterval   = time.Minute
+	installRequestResolutionGracePeriod   = 2 * time.Minute
+	installRequestFollowUpDiscoveryPeriod = 2 * hostedInstallationDiscoveryInterval
 )
 
 func init() {
@@ -324,7 +325,7 @@ func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation
 }
 
 func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time) bool {
-	if metadata.InstallationID != "" && !metadata.HasInstallRequests() {
+	if metadata.InstallationID != "" && !metadata.HasInstallRequests() && !installRequestFollowUpDiscoveryActive(metadata, now) {
 		return false
 	}
 
@@ -333,6 +334,11 @@ func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time
 		return true
 	}
 	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
+}
+
+func installRequestFollowUpDiscoveryActive(metadata common.Metadata, now time.Time) bool {
+	discoverUntil, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestDiscoveryUntil)
+	return err == nil && now.Before(discoverUntil)
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {

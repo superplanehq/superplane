@@ -44,6 +44,10 @@ type Metadata struct {
 	// The request callback does not name the requested organization, so Sync
 	// uses this login to find the member's App install request.
 	StartedByGitHubLogin string `mapstructure:"startedByGitHubLogin" json:"startedByGitHubLogin,omitempty"`
+	// InstallRequestDiscoveryUntil keeps installation discovery active briefly
+	// after a closed request leaves the waiting UI. This covers an approval
+	// that becomes visible after GitHub removes it from the open request list.
+	InstallRequestDiscoveryUntil string `mapstructure:"installRequestDiscoveryUntil" json:"installRequestDiscoveryUntil,omitempty"`
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
