@@ -10,6 +10,8 @@ import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import type { PlanningSessionPayload } from "../planningSessionView";
+
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
 const mergeability = {
   current: {
@@ -43,7 +45,9 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 }));
 
 const useLiveLogStreamMock = vi.fn();
-const findPlanningSessionMock = vi.fn(async () => null);
+const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(
+  async () => null,
+);
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
