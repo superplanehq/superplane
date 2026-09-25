@@ -53,14 +53,10 @@ To complete the GitHub app setup:
 `
 
 	hostedInstallDescription = `
-Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
-`
-
-	hostedOAuthDescription = `
-Authorize SuperPlane to list GitHub accounts where the SuperPlane GitHub App is already installed.
-
-If no account has the App, GitHub will ask you to install it.
-`
+	Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
+	`
+	hostedInstallationDiscoveryInterval = time.Minute
+	installRequestResolutionGracePeriod = 2 * time.Minute
 )
 
 func init() {
@@ -226,17 +222,22 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
+		discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &existing)
 		// A member can request an installation without the request callback
 		// reaching this server, so a known GitHub login is enough to ask
 		// GitHub for that member's open install requests.
 		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
-			// Adopt records the requested account it found on GitHub and
-			// moves an approved installation into the account picker;
-			// refreshHostedPendingAction below persists both.
-			if err := g.adoptRequestedInstallation(ctx, app, &existing); err != nil {
+			// Reconciliation records requests found on GitHub and clears a
+			// request only after repository discovery verifies access;
+			// refreshHostedPendingAction below persists both results.
+			if err := g.reconcileInstallRequests(ctx, app, &existing); err != nil {
 				// The connection stays pending; the next sync retries.
-				ctx.Logger.Errorf("failed to adopt requested GitHub App installation: %v", err)
+				ctx.Logger.Errorf("failed to reconcile GitHub App install requests: %v", err)
 			}
+		}
+		if discoveryErr != nil {
+			g.clearHostedPendingAction(ctx, existing)
+			return discoveryErr
 		}
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
@@ -252,7 +253,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 		startedBy = existing.StartedByUserID
 	}
 
-	g.refreshHostedPendingAction(ctx, app, common.Metadata{
+	metadata := common.Metadata{
 		State:           state,
 		HostedApp:       true,
 		StartedByUserID: startedBy,
@@ -261,34 +262,97 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 			ID:   app.ID,
 			Slug: app.Slug,
 		},
-	})
-
+	}
+	discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &metadata)
+	if discoveryErr != nil {
+		g.clearHostedPendingAction(ctx, metadata)
+		return discoveryErr
+	}
+	g.refreshHostedPendingAction(ctx, app, metadata)
 	return nil
 }
 
-func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
-	// The OAuth callback removes the browser action once installations load,
-	// so the connect screen keeps the authorize URL from metadata to ask
-	// again which GitHub account to use.
-	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
-	if oauthEnabled {
-		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+func (g *GitHub) refreshHostedAccessibleInstallations(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	metadata *common.Metadata,
+) error {
+	now := time.Now().UTC()
+	if !requiresHostedInstallationDiscovery(*metadata, now) {
+		return nil
 	}
+
+	requestContext := ctx.Context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
+	if err != nil {
+		return nil
+	}
+	metadata.StartedByGitHubLogin = identity.Login
+
+	installations, err := discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
+	if err != nil {
+		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
+		}
+		if len(metadata.PendingInstallations) == 0 {
+			metadata.InstallationsRefreshedAt = ""
+			return fmt.Errorf("failed to discover GitHub App installations: %w", err)
+		}
+		metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+		return nil
+	}
+	metadata.SetPendingInstallations(installations)
+	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+	return nil
+}
+
+func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation) []common.PendingInstallation {
+	merged := slices.Clone(refreshed)
+	for _, installation := range existing {
+		if slices.ContainsFunc(merged, func(candidate common.PendingInstallation) bool {
+			return candidate.ID == installation.ID
+		}) {
+			continue
+		}
+		merged = append(merged, installation)
+	}
+	return merged
+}
+
+func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time) bool {
+	if metadata.InstallationID != "" && !metadata.HasInstallRequests() {
+		return false
+	}
+
+	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallationsRefreshedAt)
+	if err != nil {
+		return true
+	}
+	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
+}
+
+func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
 	if metadata.InstallationID != "" {
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
 
 	if len(metadata.PendingInstallations) >= 1 {
+		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
-
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
-	if oauthEnabled {
-		actionURL = metadata.AuthorizeURL
-		description = hostedOAuthDescription
+	if metadata.StartedByGitHubLogin == "" {
+		if identityURL := hostedIdentityConnectURL(ctx.BaseURL, metadata.SetupReturnPath); identityURL != "" {
+			actionURL = identityURL
+			description = "Confirm your GitHub identity before choosing repositories"
+		}
 	}
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
@@ -299,14 +363,14 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 	ctx.Integration.SetMetadata(metadata)
 }
 
+func (g *GitHub) clearHostedPendingAction(ctx core.SyncContext, metadata common.Metadata) {
+	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.SetMetadata(metadata)
+}
+
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	if strings.HasSuffix(ctx.Request.URL.Path, "/redirect") {
 		g.afterAppCreation(ctx)
-		return
-	}
-
-	if strings.HasSuffix(ctx.Request.URL.Path, "/oauth/callback") {
-		g.afterHostedAppOAuth(ctx)
 		return
 	}
 
@@ -466,23 +530,13 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 
 		metadata.InstallationID = ""
 		metadata.Repositories = []common.Repository{}
+		metadata.RepositoryScoped = false
 		metadata.State = state
 		metadata.PendingInstallations = slices.DeleteFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
 			return installation.ID == installationID
 		})
-		metadata.AuthorizeURL = ""
-
 		actionURL := common.HostedAppInstallURL(metadata.GitHubApp.Slug, state)
 		actionDescription := appInstallationDescription
-		if app, ok := common.HostedAppFromEnv(); metadata.HostedApp && ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
-			metadata.AuthorizeURL = common.HostedAppAuthorizeURL(
-				app.ClientID,
-				common.HostedAppOAuthCallbackURL(ctx.BaseURL),
-				state,
-			)
-			actionURL = metadata.AuthorizeURL
-			actionDescription = hostedOAuthDescription
-		}
 
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
@@ -586,14 +640,14 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		return
 	}
 
-	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := newInstallationClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	repos, err := listInstallationRepositories(context.Background(), client)
+	repos, err := listInstallationRepos(context.Background(), client)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -613,7 +667,19 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		metadata.Owner = resolveInstallationOwner(context.Background(), appClient, metadata.InstallationID, repos)
 	}
 
-	metadata.Repositories = repos
+	if metadata.RepositoryScoped {
+		if len(metadata.SelectedRepositories) == 0 {
+			metadata.SelectedRepositories = slices.Clone(metadata.Repositories)
+		}
+		metadata.Repositories = retainInstalledRepositories(metadata.SelectedRepositories, repos)
+		if len(metadata.Repositories) == 0 {
+			ctx.Integration.Error("No authorized repositories remain in the GitHub App installation")
+		} else {
+			ctx.Integration.Ready()
+		}
+	} else {
+		metadata.Repositories = repos
+	}
 	ctx.Integration.SetMetadata(metadata)
 }
 
@@ -947,11 +1013,29 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
 
+	// GitHub documents installation_id on the setup callback as spoofable.
+	// Hosted connections use the state only for navigation, then rediscover
+	// installations with the App credential and verify repository access for
+	// the linked GitHub identity before binding.
+	if metadata.HostedApp {
+		if state == "" || state != metadata.State {
+			http.Error(ctx.Response, "invalid state", http.StatusBadRequest)
+			return
+		}
+		if isInstallationRequestSetupAction(setupAction) {
+			persistInstallRequested(ctx)
+			redirectToIntegrationSettingsRequested(ctx)
+			return
+		}
+		metadata.InstallationsRefreshedAt = ""
+		ctx.Integration.SetMetadata(metadata)
+		redirectToIntegrationSettings(ctx)
+		return
+	}
+
 	//
-	// App installation has already been set up. A hosted connection with a
-	// valid state accepts an install on another account (the onboarding
-	// picker offers it); every other callback redirects to the SuperPlane
-	// app installation page.
+	// App installation has already been set up. Every later callback redirects
+	// to the SuperPlane integration page. Hosted callbacks returned above.
 	//
 	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
@@ -987,22 +1071,6 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	if !isPendingInstallationSetupAction(setupAction) {
 		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
 		redirectToIntegrationSettings(ctx)
-		return
-	}
-
-	if metadata.HostedApp && !metadata.AllowsPendingInstallation(installationID) {
-		app, ok := common.HostedAppFromEnv()
-		if ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
-			http.Redirect(
-				ctx.Response,
-				ctx.Request,
-				common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State),
-				http.StatusSeeOther,
-			)
-			return
-		}
-		ctx.Logger.Errorf("installation %s is not in the pending allowlist", installationID)
-		http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
 		return
 	}
 
