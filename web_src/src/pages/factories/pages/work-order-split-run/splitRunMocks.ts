@@ -158,10 +158,20 @@ export interface SplitRunPhase {
   /** Pull request and revision that started this activity. */
   pullRequestActivity?: {
     pullRequest?: FactoriesFactoryPullRequest;
-    revision?: FactoriesFactoryPullRequestRevision;
+    revision?: SplitRunRevision;
     startedAt?: string;
     waitingForAccess?: boolean;
   };
+}
+
+/**
+ * Pushed commit. The API sends only `sha` and `createdAt`; `message` is the
+ * commit subject and is not yet persisted by the backend.
+ */
+export interface SplitRunRevision extends FactoriesFactoryPullRequestRevision {
+  message?: string;
+  /** Automation that pushed this commit. Not yet persisted by the backend. */
+  pushedBy?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };

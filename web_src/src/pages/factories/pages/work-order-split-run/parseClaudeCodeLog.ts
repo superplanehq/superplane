@@ -57,7 +57,8 @@ export function parseClaudeCodeLog(
     }));
 }
 
-function consumeStepLine(current: OpenStep, rawLine: string) {
+/** Tool calls, `~ duration` lines, and blank lines. Returns true when consumed. */
+function consumeStepMetaLine(current: OpenStep, rawLine: string): boolean {
   const tool = rawLine.match(TOOL_LINE);
   if (tool) {
     current.agentStream = true;
@@ -66,15 +67,18 @@ function consumeStepLine(current: OpenStep, rawLine: string) {
       name: cleanCommandDetail(tool[2] ?? "", COMMAND_DETAIL_MAX),
       status: "passed",
     });
-    return;
+    return true;
   }
-
   const duration = rawLine.match(DURATION_LINE)?.[1]?.trim();
   if (duration) {
     current.duration = duration;
-    return;
+    return true;
   }
-  if (!rawLine.trim()) {
+  return !rawLine.trim();
+}
+
+function consumeStepLine(current: OpenStep, rawLine: string) {
+  if (consumeStepMetaLine(current, rawLine)) {
     return;
   }
   if (rawLine === "✗ tool failed") {
@@ -160,12 +164,19 @@ function stripToolIndent(line: string): string {
   return line.replace(/^ {5}/, "").replace(/^ {4}/, "");
 }
 
+/** Runner checkout roots. Paths under these read as repo-relative. */
+const WORKSPACE_ROOT = /^\/home\/ubuntu\/(?:repo|superplane)\//;
+const HOME_ROOT = /^\/home\/ubuntu\//;
+/** Size the runner appends to a write: `path (2264 chars)`. */
+const WRITE_SIZE_SUFFIX = /\s*\(\d+ (?:chars|bytes)\)$/;
+
 function cleanCommandDetail(text: string, max?: number): string {
   const trimmed = text
     .trim()
     .replace(/\s+/g, " ")
-    .replace(/^\/home\/ubuntu\/superplane\//, "")
-    .replace(/^\/home\/ubuntu\//, "");
+    .replace(WRITE_SIZE_SUFFIX, "")
+    .replace(WORKSPACE_ROOT, "")
+    .replace(HOME_ROOT, "");
   if (max === undefined || trimmed.length <= max) {
     return trimmed;
   }

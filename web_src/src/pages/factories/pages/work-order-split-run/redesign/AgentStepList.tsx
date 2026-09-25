@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { SegmentedNav } from "@/ui/SegmentedNav";
@@ -7,7 +8,7 @@ import { useState } from "react";
 import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
 import { RawLogPre } from "./RawLogSheet";
 import { META_TEXT_CLASSNAME, MONO_LOG_CLASSNAME } from "./redesignFormat";
-import { StageStatusGlyph, ToolKindIcon } from "./redesignShared";
+import { NodeIcon, StageStatusGlyph, ToolKindIcon } from "./redesignShared";
 
 export type AgentStepView = "summary" | "detailed" | "raw";
 
@@ -21,15 +22,19 @@ const VIEW_OPTIONS = [
  * Agent transcript with three densities (agent-activity-2 pattern):
  * Summary is one row per step, Detailed opens tool groups, Raw is the
  * plain log. The view toggle can live inside or be controlled by a parent.
+ * Pass `steps` to list the whole run (canvas nodes and transcript) instead
+ * of the transcript alone.
  */
 export function AgentStepList({
   stage,
+  steps = stage.agentSteps,
   view: controlledView,
   onViewChange,
   showToggle = true,
   className,
 }: {
   stage: AutomationStage;
+  steps?: AgentStep[];
   view?: AgentStepView;
   onViewChange?: (view: AgentStepView) => void;
   showToggle?: boolean;
@@ -43,7 +48,7 @@ export function AgentStepList({
     onViewChange?.(value);
   };
 
-  if (stage.agentSteps.length === 0) {
+  if (steps.length === 0) {
     return null;
   }
 
@@ -65,7 +70,7 @@ export function AgentStepList({
         <RawLogPre log={stage.rawLog} className="max-h-[480px]" />
       ) : (
         <ol key={view} className="divide-y divide-border/70 rounded-md border border-border/80 bg-card">
-          {stage.agentSteps.map((step) => (
+          {steps.map((step) => (
             <AgentStepRow key={step.id} step={step} detailed={view === "detailed"} />
           ))}
         </ol>
@@ -75,28 +80,32 @@ export function AgentStepList({
   );
 }
 
+/** In the detailed view every expandable step starts open. */
 function AgentStepRow({ step, detailed }: { step: AgentStep; detailed: boolean }) {
-  const [open, setOpen] = useState(detailed && step.type === "prompt");
   const expandable = detailed && (step.events.length > 0 || Boolean(step.output));
+  const [open, setOpen] = useState(expandable);
+  // An open step already shows its output, so do not repeat its first line.
+  const reason = open && !step.summary ? "" : stepReason(step);
   const row = (
     <div className="flex min-w-0 items-start gap-2.5 px-3 py-2">
       {expandable ? (
         <ChevronRight
-          className={cn("mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+          className={cn("mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
           aria-hidden
         />
       ) : (
-        <ToolKindIcon type={step.type} className="mt-0.5" />
+        <StepIcon step={step} />
       )}
       <div className="min-w-0 flex-1">
-        <div className="flex w-full min-w-0 flex-wrap items-baseline gap-x-2">
-          <span className="text-[13px] font-medium text-foreground">{step.title}</span>
-          {step.type === "bash" ? <span className={META_TEXT_CLASSNAME}>setup</span> : null}
-          {step.duration ? <span className={cn(META_TEXT_CLASSNAME, "ml-auto tabular-nums")}>{step.duration}</span> : null}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-medium text-foreground">{step.title}</span>
+          {step.status !== "passed" ? <StepStatusBadge status={step.status} /> : null}
+          {step.duration ? (
+            <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{step.duration}</span>
+          ) : null}
         </div>
-        {step.summary ? <p className="text-[12.5px] text-muted-foreground">{step.summary}</p> : null}
+        {reason ? <p className="truncate text-[12.5px] text-muted-foreground">{reason}</p> : null}
       </div>
-      <StageStatusGlyph status={step.status} className="mt-1" />
     </div>
   );
 
@@ -123,6 +132,45 @@ function AgentStepRow({ step, detailed }: { step: AgentStep; detailed: boolean }
       </Collapsible>
     </li>
   );
+}
+
+function StepIcon({ step }: { step: AgentStep }) {
+  if (step.type === "node") {
+    return <NodeIcon iconSlug={step.iconSlug} className="mt-1" />;
+  }
+  return <ToolKindIcon type={step.type} className="mt-1" />;
+}
+
+function stepReason(step: AgentStep): string {
+  if (step.summary) {
+    return step.summary;
+  }
+  const output = step.output
+    ?.split("\n")
+    .find((line) => line.trim())
+    ?.trim();
+  if (!output || output === step.title) {
+    return "";
+  }
+  return output;
+}
+
+function StepStatusBadge({ status }: { status: AgentStep["status"] }) {
+  if (status === "failed" || status === "cancelled") {
+    return (
+      <Badge variant="outline" className="border-destructive/40 text-destructive">
+        {status === "cancelled" ? "Skipped" : "Failed"}
+      </Badge>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <Badge variant="outline" className="text-muted-foreground">
+        Pending
+      </Badge>
+    );
+  }
+  return <Badge variant="outline">Running</Badge>;
 }
 
 function AgentEventBlock({ event }: { event: AgentStepEvent }) {
