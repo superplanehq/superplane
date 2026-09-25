@@ -148,9 +148,22 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		if err != nil {
 			return fmt.Errorf("failed to create app client: %w", err)
 		}
-		openRequests, err = listAppInstallationRequests(requestContext, client, requester)
+		lookupRequester := requester
+		localUnverifiedDiscovery := useDevelopmentGitHubDiscovery() && requester == "development"
+		if localUnverifiedDiscovery {
+			// Local discovery has no linked GitHub identity. Query all App
+			// requests, then retain only requests already tracked by this
+			// connection. This keeps an open organization request from being
+			// mistaken for an approved installation without attaching another
+			// developer's request to this connection.
+			lookupRequester = ""
+		}
+		openRequests, err = listAppInstallationRequests(requestContext, client, lookupRequester)
 		if err != nil {
 			return fmt.Errorf("failed to list app installation requests: %w", err)
+		}
+		if localUnverifiedDiscovery {
+			openRequests = trackedOpenInstallRequests(trackedRequests, openRequests)
 		}
 	}
 
@@ -194,13 +207,16 @@ func installRequestIsOpen(request common.InstallRequest, open []common.InstallRe
 	})
 }
 
-// listAppInstallationRequestsFromGitHub returns every open App install request
-// made by the requester.
-func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) ([]common.InstallRequest, error) {
-	if strings.TrimSpace(requesterLogin) == "" {
-		return nil, nil
-	}
+func trackedOpenInstallRequests(tracked, open []common.InstallRequest) []common.InstallRequest {
+	return slices.DeleteFunc(slices.Clone(open), func(candidate common.InstallRequest) bool {
+		return !installRequestIsOpen(candidate, tracked)
+	})
+}
 
+// listAppInstallationRequestsFromGitHub returns open App install requests. A
+// non-empty requester limits the result to requests made by that GitHub user.
+func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) ([]common.InstallRequest, error) {
+	requesterLogin = strings.TrimSpace(requesterLogin)
 	result := []common.InstallRequest{}
 	opts := &github.ListOptions{PerPage: 100}
 	for {
@@ -210,7 +226,7 @@ func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.C
 		}
 
 		for _, request := range requests {
-			if strings.EqualFold(request.GetRequester().GetLogin(), requesterLogin) {
+			if requesterLogin == "" || strings.EqualFold(request.GetRequester().GetLogin(), requesterLogin) {
 				createdAt := ""
 				if request.CreatedAt != nil {
 					createdAt = request.CreatedAt.Time.UTC().Format(time.RFC3339Nano)

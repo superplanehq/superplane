@@ -456,6 +456,57 @@ func TestSyncHostedAppKeepsOpenInstallRequestAfterRepositoryAccessIsVerified(t *
 	assert.Equal(t, "acme", metadata.InstallRequestedAccount)
 }
 
+func TestSyncHostedAppKeepsDevelopmentInstallRequestWithUnverifiedRepositories(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	request := common.InstallRequest{ID: "1", AccountLogin: "acme", RequesterLogin: "member"}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(_ context.Context, _ *gh.Client, requester string) ([]common.InstallRequest, error) {
+		assert.Empty(t, requester)
+		return []common.InstallRequest{
+			request,
+			{ID: "2", AccountLogin: "other", RequesterLogin: "another-member"},
+		}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                    "csrf",
+			HostedApp:                true,
+			StartedByGitHubLogin:     "development",
+			InstallationsRefreshedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			PendingInstallations: []common.PendingInstallation{
+				{
+					ID:           "11",
+					AccountLogin: "acme",
+					Repositories: []common.Repository{{ID: 101, Name: "acme/api"}},
+				},
+			},
+			InstallRequests: []common.InstallRequest{{AccountLogin: "acme"}},
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	err := (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	})
+
+	require.NoError(t, err)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Equal(t, []common.InstallRequest{request}, metadata.InstallRequests)
+	assert.True(t, metadata.InstallRequested)
+	assert.Equal(t, "acme", metadata.InstallRequestedAccount)
+}
+
 func TestListAppInstallationRequestsFiltersRequester(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/app/installation-requests", r.URL.Path)
@@ -473,6 +524,24 @@ func TestListAppInstallationRequestsFiltersRequester(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	assert.Equal(t, "acme", requests[0].AccountLogin)
+}
+
+func TestListAppInstallationRequestsWithoutRequesterReturnsAll(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installation-requests", r.URL.Path)
+		_, _ = w.Write([]byte(`[
+			{"id":1,"account":{"login":"acme"},"requester":{"login":"member"}},
+			{"id":2,"account":{"login":"other"},"requester":{"login":"someone-else"}}
+		]`))
+	}))
+	defer server.Close()
+
+	client := gh.NewClient(server.Client())
+	client.BaseURL, _ = client.BaseURL.Parse(server.URL + "/")
+	requests, err := listAppInstallationRequestsFromGitHub(context.Background(), client, "")
+
+	require.NoError(t, err)
+	assert.Len(t, requests, 2)
 }
 
 func pendingHostedIntegration(state string) *contexts.IntegrationContext {
