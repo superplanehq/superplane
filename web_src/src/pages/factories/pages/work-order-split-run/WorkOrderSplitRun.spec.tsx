@@ -45,9 +45,7 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 }));
 
 const useLiveLogStreamMock = vi.fn();
-const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(
-  async () => null,
-);
+const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(async () => null);
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
