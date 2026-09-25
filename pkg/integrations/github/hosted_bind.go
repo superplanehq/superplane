@@ -26,6 +26,39 @@ func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata co
 	return g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
 }
 
+func (g *GitHub) bindHostedInstallationRepositories(
+	ctx core.HTTPRequestContext,
+	metadata common.Metadata,
+	installation common.PendingInstallation,
+	repositories []common.Repository,
+) error {
+	if len(repositories) == 0 {
+		return fmt.Errorf("at least one repository is required")
+	}
+
+	metadata.InstallationID = installation.ID
+	metadata.Owner = installation.AccountLogin
+	metadata.Repositories = slices.Clone(repositories)
+	metadata.SelectedRepositories = slices.Clone(repositories)
+	metadata.RepositoryScoped = true
+	remainingRequests := slices.DeleteFunc(metadata.CurrentInstallRequests(), func(request common.InstallRequest) bool {
+		return request.AccountLogin == "" || strings.EqualFold(request.AccountLogin, metadata.Owner)
+	})
+	metadata.SetInstallRequests(remainingRequests)
+
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.Ready()
+
+	ctx.Logger.Infof(
+		"Successfully connected GitHub App %s - installation=%s repositories=%d",
+		metadata.GitHubApp.Slug,
+		metadata.InstallationID,
+		len(metadata.Repositories),
+	)
+	return nil
+}
+
 func (g *GitHub) bindHostedInstallationWith(
 	integration core.IntegrationContext,
 	logger *logrus.Entry,
@@ -73,6 +106,7 @@ func (g *GitHub) bindHostedInstallationWith(
 	// account picker with them, so the member can move the connection to
 	// another GitHub account.
 	metadata.Repositories = repos
+	metadata.RepositoryScoped = false
 	remainingRequests := slices.DeleteFunc(metadata.CurrentInstallRequests(), func(request common.InstallRequest) bool {
 		return request.AccountLogin == "" || strings.EqualFold(request.AccountLogin, metadata.Owner)
 	})
@@ -87,58 +121,66 @@ func (g *GitHub) bindHostedInstallationWith(
 	return nil
 }
 
-// adoptRequestedInstallation resolves a pending install request once an owner
-// approved it on GitHub. The approve callback carries no CSRF state and the
-// installation webhook cannot find a connection without an installation id,
-// so Sync asks GitHub whether the requested account has the App installed.
-// An approved installation joins the account picker; the member still picks
-// the account, a silent bind must not happen.
+// reconcileInstallRequests resolves a pending request only after repository
+// discovery verifies that the member can use the requested installation. The
+// approve callback carries no CSRF state and the installation webhook cannot
+// find a connection without an installation ID, so Sync performs this check.
 //
 // The request callback from GitHub also does not name the requested account,
 // so when it is unknown Sync finds the member's open install request on
 // GitHub and records the account on the metadata for the next sync and the
 // waiting screen.
-func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
-	client, err := newAppJWTClient(ctx.Integration, app.ID)
-	if err != nil {
-		return fmt.Errorf("failed to create app client: %w", err)
-	}
-
+func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
 	trackedRequests := metadata.CurrentInstallRequests()
-	if requester := strings.TrimSpace(metadata.StartedByGitHubLogin); requester != "" {
+	requester := strings.TrimSpace(metadata.StartedByGitHubLogin)
+	if requester != "" {
 		trackedRequests = slices.DeleteFunc(trackedRequests, func(request common.InstallRequest) bool {
 			return request.RequesterLogin != "" && !strings.EqualFold(request.RequesterLogin, requester)
 		})
 	}
 	openRequests := trackedRequests
-	if strings.TrimSpace(metadata.StartedByGitHubLogin) != "" {
-		openRequests, err = listAppInstallationRequests(context.Background(), client, metadata.StartedByGitHubLogin)
+	if requester != "" {
+		requestContext := ctx.Context
+		if requestContext == nil {
+			requestContext = context.Background()
+		}
+		client, err := newAppJWTClient(ctx.Integration, app.ID)
+		if err != nil {
+			return fmt.Errorf("failed to create app client: %w", err)
+		}
+		lookupRequester := requester
+		localUnverifiedDiscovery := useDevelopmentGitHubDiscovery() && requester == "development"
+		if localUnverifiedDiscovery {
+			// Local discovery has no linked GitHub identity. Query all App
+			// requests, then retain only requests already tracked by this
+			// connection. This keeps an open organization request from being
+			// mistaken for an approved installation without attaching another
+			// developer's request to this connection.
+			lookupRequester = ""
+		}
+		openRequests, err = listAppInstallationRequests(requestContext, client, lookupRequester)
 		if err != nil {
 			return fmt.Errorf("failed to list app installation requests: %w", err)
 		}
-	}
-
-	installations, err := listAppInstallations(context.Background(), client)
-	if err != nil {
-		return fmt.Errorf("failed to list app installations: %w", err)
+		if localUnverifiedDiscovery {
+			openRequests = trackedOpenInstallRequests(trackedRequests, openRequests)
+		}
 	}
 
 	// Put GitHub's current records first so their request IDs and timestamps
 	// replace callback placeholders for the same account during deduplication.
 	candidates := append(slices.Clone(openRequests), trackedRequests...)
-	metadata.SetPendingInstallations(metadata.PendingInstallations)
 	unresolved := make([]common.InstallRequest, 0, len(openRequests))
 	for _, request := range candidates {
-		installation, installed := installationForAccount(installations, request.AccountLogin)
-		if installed {
-			if !metadata.AllowsPendingInstallation(installation.ID) {
-				metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
-			}
-			continue
-		}
 		if installRequestIsOpen(request, openRequests) {
 			unresolved = append(unresolved, request)
+			continue
 		}
+		installation, found := installationForAccount(metadata.PendingInstallations, request.AccountLogin)
+		if found && len(installation.Repositories) > 0 {
+			continue
+		}
+		unresolved = append(unresolved, request)
 	}
 	metadata.SetInstallRequests(unresolved)
 	return nil
@@ -165,13 +207,16 @@ func installRequestIsOpen(request common.InstallRequest, open []common.InstallRe
 	})
 }
 
-// listAppInstallationRequestsFromGitHub returns every open App install request
-// made by the requester.
-func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) ([]common.InstallRequest, error) {
-	if strings.TrimSpace(requesterLogin) == "" {
-		return nil, nil
-	}
+func trackedOpenInstallRequests(tracked, open []common.InstallRequest) []common.InstallRequest {
+	return slices.DeleteFunc(slices.Clone(open), func(candidate common.InstallRequest) bool {
+		return !installRequestIsOpen(candidate, tracked)
+	})
+}
 
+// listAppInstallationRequestsFromGitHub returns open App install requests. A
+// non-empty requester limits the result to requests made by that GitHub user.
+func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) ([]common.InstallRequest, error) {
+	requesterLogin = strings.TrimSpace(requesterLogin)
 	result := []common.InstallRequest{}
 	opts := &github.ListOptions{PerPage: 100}
 	for {
@@ -181,7 +226,7 @@ func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.C
 		}
 
 		for _, request := range requests {
-			if strings.EqualFold(request.GetRequester().GetLogin(), requesterLogin) {
+			if requesterLogin == "" || strings.EqualFold(request.GetRequester().GetLogin(), requesterLogin) {
 				createdAt := ""
 				if request.CreatedAt != nil {
 					createdAt = request.CreatedAt.Time.UTC().Format(time.RFC3339Nano)
