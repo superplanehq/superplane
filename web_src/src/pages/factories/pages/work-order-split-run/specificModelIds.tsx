@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- provider and hooks share one context module */
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
