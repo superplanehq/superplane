@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/sirupsen/logrus"
@@ -20,10 +21,11 @@ func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		State: "pending",
 		Metadata: common.Metadata{
-			State:           "csrf",
-			HostedApp:       true,
-			StartedByUserID: "11111111-1111-1111-1111-111111111111",
-			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			State:                    "csrf",
+			HostedApp:                true,
+			StartedByUserID:          "11111111-1111-1111-1111-111111111111",
+			InstallationsRefreshedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			GitHubApp:                common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 		},
 	}
 	ctx, rec := hostedRequestContext(
@@ -39,6 +41,7 @@ func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Empty(t, metadata.InstallationID)
 	assert.Empty(t, metadata.Repositories)
+	assert.Empty(t, metadata.InstallationsRefreshedAt)
 }
 
 func TestHostedSetupCallbackRejectsInvalidState(t *testing.T) {
@@ -141,15 +144,18 @@ func TestSyncHostedAppKeepsVerifiedPickerMetadata(t *testing.T) {
 }
 
 func TestRequiresHostedInstallationDiscovery(t *testing.T) {
+	now := time.Now().UTC()
 	cached := common.Metadata{
 		PendingInstallations: []common.PendingInstallation{
 			{ID: "11", AccountLogin: "acme", Repositories: []common.Repository{{ID: 101, Name: "acme/api"}}},
 		},
+		InstallationsRefreshedAt: now.Format(time.RFC3339Nano),
 	}
 
-	assert.False(t, requiresHostedInstallationDiscovery(cached))
-	assert.False(t, requiresHostedInstallationDiscovery(common.Metadata{InstallationID: "11"}))
-	assert.True(t, requiresHostedInstallationDiscovery(common.Metadata{}))
+	assert.False(t, requiresHostedInstallationDiscovery(cached, now))
+	assert.True(t, requiresHostedInstallationDiscovery(cached, now.Add(hostedInstallationDiscoveryInterval)))
+	assert.False(t, requiresHostedInstallationDiscovery(common.Metadata{InstallationID: "11"}, now))
+	assert.True(t, requiresHostedInstallationDiscovery(common.Metadata{}, now))
 }
 
 func TestSyncHostedAppReconcilesInstallationRequests(t *testing.T) {

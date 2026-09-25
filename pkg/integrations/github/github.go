@@ -53,8 +53,9 @@ To complete the GitHub app setup:
 `
 
 	hostedInstallDescription = `
-Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
-`
+	Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
+	`
+	hostedInstallationDiscoveryInterval = time.Minute
 )
 
 func init() {
@@ -264,7 +265,8 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) {
-	if !requiresHostedInstallationDiscovery(*metadata) {
+	now := time.Now().UTC()
+	if !requiresHostedInstallationDiscovery(*metadata, now) {
 		return
 	}
 
@@ -273,6 +275,7 @@ func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app 
 		return
 	}
 	metadata.StartedByGitHubLogin = identity.Login
+	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 
 	installations, err := discoverAccessibleInstallations(context.Background(), ctx.Integration, app, *identity)
 	if err != nil {
@@ -284,8 +287,16 @@ func (g *GitHub) refreshHostedAccessibleInstallations(ctx core.SyncContext, app 
 	metadata.SetPendingInstallations(installations)
 }
 
-func requiresHostedInstallationDiscovery(metadata common.Metadata) bool {
-	return metadata.InstallationID == "" && len(metadata.PendingInstallations) == 0
+func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time) bool {
+	if metadata.InstallationID != "" {
+		return false
+	}
+
+	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallationsRefreshedAt)
+	if err != nil {
+		return true
+	}
+	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
@@ -976,6 +987,8 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 			redirectToIntegrationSettingsRequested(ctx)
 			return
 		}
+		metadata.InstallationsRefreshedAt = ""
+		ctx.Integration.SetMetadata(metadata)
 		redirectToIntegrationSettings(ctx)
 		return
 	}

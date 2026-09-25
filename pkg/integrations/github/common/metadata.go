@@ -27,6 +27,9 @@ type Metadata struct {
 	// PendingInstallations is the server-verified list of installations and
 	// writable repositories available to the linked GitHub identity.
 	PendingInstallations []PendingInstallation `mapstructure:"pendingInstallations" json:"pendingInstallations,omitempty"`
+	// InstallationsRefreshedAt limits full App installation discovery while the
+	// picker polls, without making the verified list permanent.
+	InstallationsRefreshedAt string `mapstructure:"installationsRefreshedAt" json:"installationsRefreshedAt,omitempty"`
 	// InstallRequested is true when a non-admin asked a GitHub org admin to
 	// install the app. Setup then returned setup_action=request.
 	InstallRequested bool `mapstructure:"installRequested" json:"installRequested,omitempty"`
