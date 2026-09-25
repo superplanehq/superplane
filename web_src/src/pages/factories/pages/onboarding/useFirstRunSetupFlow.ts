@@ -264,8 +264,12 @@ function useFirstRunCommands(args: {
       if (!repository) return;
       const integrationId = await githubSelection.bindRepository(repository);
       if (githubSelection.installation && !integrationId) return;
-      model.setup.commitRepoStep();
       if (await model.saveRepository(repository, integrationId)) {
+        // Selecting a newly bound connection clears the previous repository.
+        // Restore the repository that this action just saved before the ticket
+        // step reads it as its backlog repository.
+        model.setup.selectRepo(repository);
+        model.setup.commitRepoStep();
         navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
       }
     });

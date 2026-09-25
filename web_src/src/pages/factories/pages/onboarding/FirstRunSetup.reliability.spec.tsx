@@ -242,6 +242,46 @@ describe("FirstRunSetup reliability", () => {
     expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });
 
+  it("keeps a newly bound repository available on the ticket step", async () => {
+    const user = userEvent.setup();
+    const setup = setupState();
+    setup.selectRepo = vi.fn((repository: string) => {
+      setup.selectedRepo = repository;
+      setup.issuesRepo = repository;
+    });
+    const selectVcsConnection = vi.fn(async () => {
+      setup.selectedRepo = null;
+      setup.issuesRepo = null;
+      return true;
+    });
+    const saveIssues = vi.fn(async () => Boolean(setup.issuesRepo ?? setup.selectedRepo));
+    const picker = githubConnection("int-new", {
+      startedByUserID: "user-1",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: 1, name: "acme/api" }] }],
+    });
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        setup,
+        saveIssues,
+        selectVcsConnection,
+        githubConnections: githubConnections([picker]),
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+    await user.click(await screen.findByRole("option", { name: "acme/api" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+    await user.click(await screen.findByTestId("first-run-analyze-tickets"));
+
+    expect(setup.selectRepo).toHaveBeenCalledWith("acme/api");
+    expect(saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
   it("shows only the current user's GitHub account picker", () => {
     const picker = (userId: string) =>
       githubConnection("int-1", {
