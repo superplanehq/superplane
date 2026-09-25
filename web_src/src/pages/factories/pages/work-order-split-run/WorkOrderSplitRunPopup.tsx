@@ -9,6 +9,8 @@ import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from 
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
+import { PlanningHeaderSpendCollector } from "./PlanningHeaderSpendCollector";
+import { planningHeaderSpendActive } from "./planningHeaderSpend";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
@@ -207,12 +209,27 @@ function AnalysisWorkOrderPopup({
             mutations,
             footerBusy: footerActions.busy,
             reviewActions,
+            planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
           })}
         />
         {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
+}
+
+function draftPlanningHeaderSpend(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  view: ReturnType<typeof useAnalysisPlanningSession>["view"],
+) {
+  if (!planningHeaderSpendActive(fixture.footer.kind, view)) {
+    return undefined;
+  }
+  return {
+    view,
+    savedTokens: fixture.savedTokens ?? 0,
+    savedCostCents: fixture.savedCostCents ?? 0,
+  };
 }
 
 /** Title, owner, and assignee edits for the popup header, fed from the fixture and loaded description. */
@@ -248,6 +265,11 @@ function analysisPopupHeader(args: {
   mutations: ReturnType<typeof footerMutationHandlers>;
   footerBusy: boolean;
   reviewActions: ReactNode;
+  planningSpend?: {
+    view: ReturnType<typeof useAnalysisPlanningSession>["view"];
+    savedTokens: number;
+    savedCostCents: number;
+  };
 }) {
   return (views: ReactNode) => (
     <PopupHeader
@@ -268,6 +290,13 @@ function analysisPopupHeader(args: {
       }
       accessory={views}
     >
+      {args.planningSpend ? (
+        <PlanningHeaderSpendCollector
+          organizationId={args.organizationId}
+          view={args.planningSpend.view}
+          saved={{ tokens: args.planningSpend.savedTokens, cents: args.planningSpend.savedCostCents }}
+        />
+      ) : null}
       <LiveOwnerTimeCostRow
         fixture={{ ...args.fixture, owner: args.edits.owner }}
         assigneeIds={args.edits.assigneeIds}
