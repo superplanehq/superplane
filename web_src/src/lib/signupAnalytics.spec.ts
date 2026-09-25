@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import {
   clearPendingSignupAnalyticsPreference,
+  hasConfirmedSignupAnalyticsPreference,
   confirmSignupAnalyticsPreference,
   consumePendingSignupAnalyticsPreference,
   savePendingSignupAnalyticsPreference,
@@ -16,6 +17,16 @@ describe("signup analytics preference", () => {
   afterEach(() => {
     localStorage.clear();
     vi.useRealTimers();
+  });
+
+  it("requires a confirmed, fresh signup for the same account", () => {
+    savePendingSignupAnalyticsPreference({ email: "new@example.com", productUpdatesOptIn: true });
+    expect(hasConfirmedSignupAnalyticsPreference("new@example.com")).toBe(false);
+    confirmSignupAnalyticsPreference({ email: "new@example.com", productUpdatesOptIn: true });
+    expect(hasConfirmedSignupAnalyticsPreference("NEW@example.com")).toBe(true);
+    expect(hasConfirmedSignupAnalyticsPreference("existing@example.com")).toBe(false);
+    vi.advanceTimersByTime(25 * 60 * 60 * 1000);
+    expect(hasConfirmedSignupAnalyticsPreference("new@example.com")).toBe(false);
   });
 
   it("consumes a confirmed signup preference outside welcome", () => {

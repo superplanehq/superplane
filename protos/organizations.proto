@@ -618,6 +618,10 @@ message HostedCreditInvoice {
   int64 amount_cents = 3;
   string status = 4;
   string product_name = 5;
+  string checkout_id = 6;
+  string currency = 7;
+  int64 net_amount_cents = 8;
+  int64 tax_amount_cents = 9;
 }
 
 message ListHostedLLMModelsRequest {

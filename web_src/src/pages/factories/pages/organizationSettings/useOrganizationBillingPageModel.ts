@@ -1,4 +1,6 @@
 import { useCallback } from "react";
+import { useAccount } from "@/contexts/useAccount";
+import { useGooglePurchaseTracking } from "@/hooks/useGooglePurchaseTracking";
 import { useSearchParams } from "react-router";
 
 import type {
@@ -112,7 +114,14 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const orgBilling = useOrganizationBilling(organizationId);
   const grantsQuery = useOrganizationCreditGrants(organizationId);
+  const { account } = useAccount();
   const metrics = creditMetricsFromSpend(spend.data);
+  useGooglePurchaseTracking({
+    checkoutID: searchParams.get("checkout_id") ?? "",
+    invoices: metrics.invoices,
+    refetch: spend.refetch,
+    enabled: (creditAdded || subscribed) && canManageBilling && !account?.impersonation?.active,
+  });
   const flags = billingFlags(orgBilling.data);
   const billing = useHostedCreditActions(
     organizationId,
