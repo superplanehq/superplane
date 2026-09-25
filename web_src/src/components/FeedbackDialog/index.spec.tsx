@@ -10,13 +10,9 @@ const { submitFeedback, showSuccessToast, showErrorToast } = vi.hoisted(() => ({
   showErrorToast: vi.fn(),
 }));
 
-vi.mock("@/lib/submitFeedback", async () => {
-  const actual = await vi.importActual("@/lib/submitFeedback");
-  return {
-    ...actual,
-    submitFeedback,
-  };
-});
+vi.mock("@/lib/submitFeedback", () => ({
+  submitFeedback,
+}));
 
 vi.mock("@/lib/toast", () => ({
   showSuccessToast,
