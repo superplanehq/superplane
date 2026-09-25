@@ -43,6 +43,7 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 }));
 
 const useLiveLogStreamMock = vi.fn();
+const findPlanningSessionMock = vi.fn(async () => null);
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -54,6 +55,12 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
+}));
+
+vi.mock("../planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSessionMock(...args),
+  sendPlanningSessionMessage: vi.fn(),
+  answerPlanningSessionSurvey: vi.fn(),
 }));
 
 import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
@@ -235,7 +242,10 @@ describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
+    useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
+    findPlanningSessionMock.mockReset();
+    findPlanningSessionMock.mockResolvedValue(null);
     mergeMutate.mockReset();
     mergeability.current = {
       canMerge: true,
@@ -551,6 +561,222 @@ describe("WorkOrderSplitRunPopup", () => {
     view.rerenderPopup();
     await waitFor(() => {
       expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.67 · 3.2k tokens");
+    });
+  });
+
+  it("shows planning tokens on a draft header while the agent runs and waits", async () => {
+    const earlier = liveUsageTelemetry(1500, 0.2);
+    const current = liveUsageTelemetry(700, 0.05);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: current,
+      usageSeries: [
+        { name: "First prompt", telemetry: earlier },
+        { name: "Second prompt", telemetry: current },
+      ],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.25 · 2.2k tokens");
+    });
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(useLiveLogStreamMock).toHaveBeenCalledWith("exec-plan", true, null, null, {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      canvasId: "canvas-plan",
+    });
+  });
+
+  it("keeps planning spend on a draft header while the agent waits", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
+    });
+    expect(useLiveLogStreamMock).toHaveBeenCalledWith("exec-plan", true, null, null, {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      canvasId: "canvas-plan",
+    });
+  });
+
+  it("leaves a sub-cent planning turn at $0.00 and still shows tokens", async () => {
+    const live = liveUsageTelemetry(40, 0.004);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.00 · 40 tokens");
+    });
+  });
+
+  it("does not stream planning spend after the machine has stopped", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "ended",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.00");
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("0 tokens");
+    expect(useLiveLogStreamMock.mock.calls.some((call) => call[0] === "exec-plan")).toBe(false);
+  });
+
+  it("does not add saved planning spend on top of the live log", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder({
+        ...DRAFT_WORK_ORDER,
+        totalTokens: "2100",
+        totalCostCents: "45",
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
+    });
+    expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("$0.90");
+    expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("4.2k tokens");
+  });
+
+  it("adds a follow-up planning run to saved draft usage", async () => {
+    const live = liveUsageTelemetry(1000, 0.1);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-follow-up",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder({
+        ...DRAFT_WORK_ORDER,
+        totalTokens: "2000",
+        totalCostCents: "20",
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.30 · 3k tokens");
+    });
+  });
+
+  it("does not round each planning prompt before it adds the cost", async () => {
+    const first = liveUsageTelemetry(10, 0.006);
+    const second = liveUsageTelemetry(12, 0.006);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: second,
+      usageSeries: [
+        { name: "First prompt", telemetry: first },
+        { name: "Second prompt", telemetry: second },
+      ],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.01 · 22 tokens");
     });
   });
 
