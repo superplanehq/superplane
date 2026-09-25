@@ -68,9 +68,7 @@ describe("PhaseLogCard title line", () => {
       />,
     );
 
-    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent(
-      "$0.45 · 1.2k · claude-opus-4-6 · 1m",
-    );
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · opus 4-6 · 1m");
   });
 
   it("uses one mono face and size on the name and artifact", () => {

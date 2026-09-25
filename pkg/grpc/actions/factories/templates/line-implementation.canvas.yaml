@@ -79,7 +79,7 @@ spec:
         executionTimeoutSeconds: 3600
         includeVisualEvidence: false
         machineType: e1-large-amd64
-        model: sonnet
+        model: claude-opus-5-5
         steps:
           - name: Clone Repo
             type: bash

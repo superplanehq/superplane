@@ -24,6 +24,7 @@ import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import { PR_FEEDBACK_SETTINGS_COPY } from "../prFeedbackSettingsCopy";
 import { PhaseGlyph } from "../linePhaseGlyph";
 import { displayRunnerModel } from "./draftStartModel";
+import { useSpecificModelIds } from "./specificModelIds";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
@@ -934,7 +935,8 @@ function PhaseMetrics({
   const agents = usePhaseAgentUsageAgents();
   const { tokens, cents } = displayedPhaseSpend(phase, agents);
   useReportLiveHeaderSpend(phase.id, tokens, cents);
-  const model = displayRunnerModel(phase.model ?? "");
+  const modelIds = useSpecificModelIds();
+  const model = displayRunnerModel(phase.model ?? "", modelIds);
   const spendParts: string[] = [];
   if (cents > 0) {
     spendParts.push(formatUsdCents(cents));
