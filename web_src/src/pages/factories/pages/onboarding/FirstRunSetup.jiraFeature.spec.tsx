@@ -158,7 +158,7 @@ describe("FirstRunSetup Jira intake feature", () => {
     feature.organizationReady = true;
   });
 
-  it("does not show Jira or provision a Jira intake when the feature is off", async () => {
+  it("shows Jira as coming soon and does not provision a Jira intake when the feature is off", async () => {
     feature.jiraIntake = false;
     const user = userEvent.setup();
     const model = pageModel({
@@ -175,7 +175,9 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon").length).toBeGreaterThanOrEqual(1);
     await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));

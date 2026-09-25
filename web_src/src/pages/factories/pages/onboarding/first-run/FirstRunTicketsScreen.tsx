@@ -17,7 +17,7 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Hides Jira when false. */
+  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false. */
   jiraAvailable?: boolean;
   continueLabel?: string;
   /** True while this screen waits to learn whether the agent screen is next. */
@@ -168,18 +168,16 @@ function FirstRunJiraTicketRow({
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onConnectJira?: () => void;
 }) {
-  if (!jiraAvailable) {
-    return null;
-  }
   const copy = FIRST_RUN_COPY.tickets;
   return (
     <ConnectOptionRow
       icon={<IntegrationChoiceIcon name="jira" />}
       title={copy.jira}
       detail={copy.jiraHelper}
-      selected={ticketSource === "jira"}
-      connectLabel={copy.jira}
+      selected={jiraAvailable && ticketSource === "jira"}
+      connectLabel={jiraAvailable ? copy.jira : undefined}
       connected={jiraConnected}
+      soon={!jiraAvailable}
       disabled={saving}
       onSelect={() => onSelectTicketSource("jira")}
       onConnect={onConnectJira}
