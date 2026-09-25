@@ -117,7 +117,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		description:          "Create a work order when a Productive task is created.",
 		triggerComponent:     "productive.onTask",
 		triggerName:          "On Task",
-		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		triggerConfiguration: map[string]any{"actions": intakeProductiveTriggerActions(defaultProductiveIntakeSettings())},
 		createTitle:          "{{ root().data.data.attributes.title }}",
 		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
@@ -194,7 +194,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Name:          spec.triggerName,
 			Type:          yaml.NodeTypeTrigger,
 			Component:     spec.triggerComponent,
-			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Configuration: intakeTriggerConfiguration(spec, request),
 			Metadata:      intakeTriggerMetadata(request.Source, request.Settings),
 			Integration:   request.Binding.integrationRef(),
 			Position:      yaml.Position{X: 160, Y: 80},
@@ -416,13 +416,17 @@ func ensureIntakeEdge(edges []models.Edge, expected models.Edge) []models.Edge {
 // intakeTriggerConfiguration lays the binding over the template so the trigger
 // listens on a concrete resource. The template map is shared between intakes,
 // so it is copied rather than written to.
-func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[string]any {
+func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) map[string]any {
+	binding := request.Binding
 	configuration := make(map[string]any, len(spec.triggerConfiguration)+len(binding.configuration()))
 	for name, value := range spec.triggerConfiguration {
 		configuration[name] = value
 	}
 	for name, value := range binding.configuration() {
 		configuration[name] = value
+	}
+	if request.Source == models.FactoryIntakeSourceProductiveTasks {
+		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
 
 	return configuration

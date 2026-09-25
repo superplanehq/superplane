@@ -19,6 +19,7 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -176,6 +177,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateProductiveWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	skip, err = c.skipDuplicateDependabotWorkOrder(f)
 	if err != nil {
 		return nil, false, err
@@ -252,6 +261,35 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 	}
 	if hasOrder {
 		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := productive.TaskRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := productive.LockTaskWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := productive.TaskHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Productive task %s in organization %s: work order already exists", ref.TaskID, ref.OrganizationID)
 	}
 	return hasOrder, nil
 }
