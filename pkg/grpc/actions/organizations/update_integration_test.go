@@ -126,6 +126,56 @@ func Test__UpdateIntegration(t *testing.T) {
 		assert.Contains(t, updateResponse.Integration.Status.StateDescription, "sync failed on update")
 	})
 
+	t.Run("successful retry restores a failed integration to pending", func(t *testing.T) {
+		syncCount := 0
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(core.SyncContext) error {
+				syncCount++
+				if syncCount == 1 {
+					return errors.New("temporary sync failure")
+				}
+				return nil
+			},
+		})
+
+		integrationName := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value1"})
+		require.NoError(t, err)
+		createResponse, err := CreateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			baseURL,
+			baseURL,
+			r.Organization.ID.String(),
+			"dummy",
+			integrationName,
+			appConfig,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, models.IntegrationStateError, createResponse.Integration.Status.State)
+
+		updateResponse, err := UpdateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			baseURL,
+			baseURL,
+			r.Organization.ID.String(),
+			createResponse.Integration.Metadata.Id,
+			map[string]any{"key": "value2"},
+			"",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, models.IntegrationStatePending, updateResponse.Integration.Status.State)
+		assert.Empty(t, updateResponse.Integration.Status.StateDescription)
+
+		integration, err := models.FindIntegrationByName(database.DB(ctx), r.Organization.ID, integrationName)
+		require.NoError(t, err)
+		assert.Equal(t, models.IntegrationStatePending, integration.State)
+		assert.Empty(t, integration.StateDescription)
+	})
+
 	t.Run("invalid integration ID -> error", func(t *testing.T) {
 		//
 		// Try to update with an invalid integration ID
