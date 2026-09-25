@@ -54,7 +54,7 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		repositoryIDs = append(repositoryIDs, repositoryID)
 	}
 
-	identity, err := hostedGitHubDiscoveryIdentity(ctx.OrganizationID, metadata.StartedByUserID)
+	identity, err := hostedGitHubDiscoveryIdentity(ctx.Request.Context(), ctx.OrganizationID, metadata.StartedByUserID)
 	if err != nil {
 		http.Error(ctx.Response, "GitHub identity is required", http.StatusForbidden)
 		return

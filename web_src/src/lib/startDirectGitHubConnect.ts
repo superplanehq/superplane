@@ -114,6 +114,25 @@ function pendingOwnGitHubWithAction(
       item.status?.state !== "ready" &&
       Boolean(item.status?.browserAction?.url),
   );
+  return selectOwnPendingGitHub(candidates, currentUserId, preferredIntegrationId);
+}
+
+function pendingOwnFailedGitHub(
+  connected: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): OrganizationsIntegration | undefined {
+  const candidates = connected.filter(
+    (item) => item.metadata?.integrationName === "github" && item.status?.state === "error",
+  );
+  return selectOwnPendingGitHub(candidates, currentUserId, preferredIntegrationId);
+}
+
+function selectOwnPendingGitHub(
+  candidates: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): OrganizationsIntegration | undefined {
   const preferred = candidates.find(
     (item) => item.metadata?.id === preferredIntegrationId && isOwnPendingGitHub(item, currentUserId),
   );
@@ -258,19 +277,28 @@ async function resumePendingGitHubConnect(
     return { handled: true, navigationStarted: openGitHubAccountPicker(args, picker.id) };
   }
 
-  const pending = pendingOwnGitHubWithAction(args.connected, args.currentUserId, args.preferredIntegrationId);
-  const pendingAction = pending?.status?.browserAction;
-  if (!pendingAction) {
+  const pending =
+    pendingOwnGitHubWithAction(args.connected, args.currentUserId, args.preferredIntegrationId) ??
+    pendingOwnFailedGitHub(args.connected, args.currentUserId, args.preferredIntegrationId);
+  if (!pending) {
     return { handled: false, navigationStarted: false };
   }
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
   const refreshed = await persistSetupReturnPath(args.update, pending.metadata?.id, args.returnTo);
-  const refreshedPicker = githubAccountPickerFromConnection(refreshed, args.currentUserId);
+  const connection = refreshed ?? pending;
+  const refreshedPicker = githubAccountPickerFromConnection(connection, args.currentUserId);
   if (refreshedPicker) {
     return { handled: true, navigationStarted: openGitHubAccountPicker(args, refreshedPicker.id) };
   }
-  return { handled: true, navigationStarted: followBrowserAction(pendingAction) };
+  const action = connection.status?.browserAction;
+  if (action?.url) {
+    return { handled: true, navigationStarted: followBrowserAction(action) };
+  }
+  if (connection.status?.state === "error") {
+    throw new Error(connection.status.stateDescription || "SuperPlane could not connect to GitHub. Try again.");
+  }
+  return { handled: true, navigationStarted: false };
 }
 
 export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {

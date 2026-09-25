@@ -27,12 +27,13 @@ type repositoryPermissionLookup func(context.Context, string, string, string) (*
 
 const allowUnverifiedDevelopmentRepositoriesEnv = "SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES"
 
-func findStartedByGitHubIdentity(organizationID, userID string) (*hostedGitHubIdentity, error) {
+func findStartedByGitHubIdentity(ctx context.Context, organizationID, userID string) (*hostedGitHubIdentity, error) {
 	if organizationID == "" || userID == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
 
-	user, err := models.FindActiveUserByIDInTransaction(database.Conn(), organizationID, userID)
+	db := database.DB(ctx)
+	user, err := models.FindActiveUserByIDInTransaction(db, organizationID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func findStartedByGitHubIdentity(organizationID, userID string) (*hostedGitHubId
 		return nil, gorm.ErrRecordNotFound
 	}
 
-	identity, err := models.FindAccountGitHubIdentity(database.Conn(), *user.AccountID)
+	identity, err := models.FindAccountGitHubIdentity(db, *user.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,12 +59,15 @@ func useDevelopmentGitHubDiscovery() bool {
 		os.Getenv(allowUnverifiedDevelopmentRepositoriesEnv) == "yes"
 }
 
-func hostedGitHubDiscoveryIdentity(organizationID, userID string) (*hostedGitHubIdentity, error) {
+func hostedGitHubDiscoveryIdentity(
+	ctx context.Context,
+	organizationID, userID string,
+) (*hostedGitHubIdentity, error) {
 	if useDevelopmentGitHubDiscovery() {
 		return &hostedGitHubIdentity{Login: "development", AllowUnverifiedRepositories: true}, nil
 	}
 
-	return findStartedByGitHubIdentity(organizationID, userID)
+	return findStartedByGitHubIdentity(ctx, organizationID, userID)
 }
 
 func hostedIdentityConnectURL(baseURL, returnPath string) string {

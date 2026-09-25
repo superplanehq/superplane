@@ -159,6 +159,7 @@ func (w *IntegrationRequestWorker) syncIntegration(request *models.IntegrationRe
 	integrationCtx := contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil)
 	logging.ForIntegration(*instance).WithField("source", "sync").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
+		Context:         context.Background(),
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            w.registry.HTTPContext(),
 		Integration:     integrationCtx,
@@ -173,6 +174,9 @@ func (w *IntegrationRequestWorker) syncIntegration(request *models.IntegrationRe
 		instance.State = models.IntegrationStateError
 		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
 	} else {
+		if instance.State == models.IntegrationStateError {
+			instance.State = models.IntegrationStatePending
+		}
 		instance.StateDescription = ""
 	}
 

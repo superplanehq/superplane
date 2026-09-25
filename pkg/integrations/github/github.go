@@ -281,13 +281,17 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 		return nil
 	}
 
-	identity, err := hostedGitHubDiscoveryIdentity(ctx.OrganizationID, metadata.StartedByUserID)
+	requestContext := ctx.Context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
 	if err != nil {
 		return nil
 	}
 	metadata.StartedByGitHubLogin = identity.Login
 
-	installations, err := discoverAccessibleInstallations(context.Background(), ctx.Integration, app, *identity)
+	installations, err := discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
 	if err != nil {
 		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
 		if ctx.Logger != nil {
