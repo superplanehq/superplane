@@ -180,6 +180,8 @@ export interface SplitRunFixture {
   startedLabel: string;
   costUsd: string;
   tokensLabel: string;
+  savedTokens?: number;
+  savedCostCents?: number;
   usageByModel?: WorkOrderUsageByModel[];
   usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
@@ -390,6 +392,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
+    savedTokens: parseWorkOrderMetric(order.totalTokens),
+    savedCostCents: parseWorkOrderMetric(order.totalCostCents),
     usageByModel: order.usageByModel,
     usageByMachineType: order.usageByMachineType,
     lineName:
