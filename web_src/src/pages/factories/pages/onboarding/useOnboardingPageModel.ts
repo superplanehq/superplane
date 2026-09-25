@@ -138,8 +138,8 @@ function useSectionSaves(args: {
       }),
     );
   };
-  const saveRepository = (repository: string) => {
-    const integrationId = args.selections.github?.id;
+  const saveRepository = (repository: string, integrationIdOverride?: string) => {
+    const integrationId = integrationIdOverride ?? args.selections.github?.id;
     if (!repository || !integrationId) return Promise.resolve(false);
     return runSave(args.setSaving, () => args.updateOnboarding(firstRunRepositoryPatch(integrationId, repository)));
   };
