@@ -1,9 +1,8 @@
 export const DEPENDABOT_INTAKE_SETUP_COPY = {
   pageTitle: "Which Dependabot alerts should create tasks?",
-  helper: (repository: string, skipInitialImport: boolean) =>
-    skipInitialImport
-      ? `SuperPlane listens for new Dependabot alerts from ${repository}.`
-      : `SuperPlane imports open Dependabot alerts from ${repository} and listens for new alerts.`,
+  helper: (repository: string) => `SuperPlane listens for new Dependabot alerts from ${repository}.`,
+  importExistingHelper: "SuperPlane imports open Dependabot alerts from this repository.",
+  importExistingHelperOff: "SuperPlane does not import existing alerts.",
   repositorySection: "Repository",
   repositoryFallback: "Workspace backlog repository",
   setupRequired: "Connect GitHub and select a backlog repository in workspace setup before you create this intake.",

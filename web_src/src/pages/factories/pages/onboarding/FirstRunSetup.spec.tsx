@@ -43,7 +43,6 @@ vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: () => ({
     data: [
       { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
       { id: "done", name: "Done" },
     ],
     isLoading: false,
