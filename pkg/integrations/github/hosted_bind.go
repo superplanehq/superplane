@@ -26,6 +26,38 @@ func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata co
 	return g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
 }
 
+func (g *GitHub) bindHostedInstallationRepositories(
+	ctx core.HTTPRequestContext,
+	metadata common.Metadata,
+	installation common.PendingInstallation,
+	repositories []common.Repository,
+) error {
+	if len(repositories) == 0 {
+		return fmt.Errorf("at least one repository is required")
+	}
+
+	metadata.InstallationID = installation.ID
+	metadata.Owner = installation.AccountLogin
+	metadata.Repositories = slices.Clone(repositories)
+	metadata.RepositoryScoped = true
+	remainingRequests := slices.DeleteFunc(metadata.CurrentInstallRequests(), func(request common.InstallRequest) bool {
+		return request.AccountLogin == "" || strings.EqualFold(request.AccountLogin, metadata.Owner)
+	})
+	metadata.SetInstallRequests(remainingRequests)
+
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.Ready()
+
+	ctx.Logger.Infof(
+		"Successfully connected GitHub App %s - installation=%s repositories=%d",
+		metadata.GitHubApp.Slug,
+		metadata.InstallationID,
+		len(metadata.Repositories),
+	)
+	return nil
+}
+
 func (g *GitHub) bindHostedInstallationWith(
 	integration core.IntegrationContext,
 	logger *logrus.Entry,
@@ -73,6 +105,7 @@ func (g *GitHub) bindHostedInstallationWith(
 	// account picker with them, so the member can move the connection to
 	// another GitHub account.
 	metadata.Repositories = repos
+	metadata.RepositoryScoped = false
 	remainingRequests := slices.DeleteFunc(metadata.CurrentInstallRequests(), func(request common.InstallRequest) bool {
 		return request.AccountLogin == "" || strings.EqualFold(request.AccountLogin, metadata.Owner)
 	})

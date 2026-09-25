@@ -42,8 +42,6 @@ export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 export type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent";
 type FirstRunBlockingAction =
   | "opening-github"
-  | "binding-github"
-  | "saving-github-connection"
   | "saving-repository"
   | "saving-ticket-source"
   | "connecting-jira"
@@ -128,7 +126,7 @@ function useFirstRunBlockingAction() {
     },
     [begin, finish],
   );
-  return { action, busy: action !== null, begin, finish, setAction, run, runUntilNavigation };
+  return { action, busy: action !== null, setAction, run, runUntilNavigation };
 }
 
 function useGitHubConnectionState(model: OnboardingPageModel, organizationId: string) {
@@ -267,17 +265,22 @@ function useFirstRunCommands(args: {
   model: OnboardingPageModel;
   agentGate: OnboardingAgentGate;
   connection: ReturnType<typeof useGitHubConnectionState>;
+  githubSelection: ReturnType<typeof useGitHubInstallationBinding>;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: ReturnType<typeof useFirstRunBlockingAction>;
   jiraAvailable: boolean;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
+  const { model, agentGate, connection, githubSelection, navigation, blocking, jiraAvailable } = args;
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
-      const repository = model.setup.selectedRepo;
+      const repository = githubSelection.selectedRepository ?? model.setup.selectedRepo;
       if (!repository) return;
+      const integrationId = await githubSelection.bindRepository(repository);
+      if (githubSelection.installation && !integrationId) return;
       model.setup.commitRepoStep();
-      if (await model.saveRepository(repository)) navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
+      if (await model.saveRepository(repository, integrationId)) {
+        navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
+      }
     });
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
@@ -291,11 +294,16 @@ function useFirstRunCommands(args: {
       blocking.setAction("finishing-setup");
       await model.finish(issuesChoice);
     });
-  const connectGitHub = () =>
-    blocking.runUntilNavigation("opening-github", async () => {
+  const connectGitHub = () => {
+    if (connection.accountPicker) {
+      navigation.goToScreen("connect", "picker");
+      return Promise.resolve();
+    }
+    return blocking.runUntilNavigation("opening-github", async () => {
       await waitForBrowserPaint();
       return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
     });
+  };
   const connectJira = () =>
     blocking.runUntilNavigation("connecting-jira", async () => {
       if (!jiraAvailable) return false;
@@ -338,68 +346,56 @@ function useFirstRunCommands(args: {
   };
 }
 
-function useSelectBoundGithubConnection(
-  boundIntegrationId: string | null,
-  model: OnboardingPageModel,
-  onSelected: () => void,
-  onFinished: () => void,
-) {
-  const selecting = useRef<string | null>(null);
-  useEffect(() => {
-    if (!boundIntegrationId || selecting.current === boundIntegrationId) return;
-    if (!model.githubConnections.readyInstances.some((item) => item.metadata?.id === boundIntegrationId)) return;
-    selecting.current = boundIntegrationId;
-    void model
-      .selectVcsConnection(boundIntegrationId)
-      .then((saved) => {
-        if (saved) onSelected();
-      })
-      .finally(() => {
-        selecting.current = null;
-        onFinished();
-      });
-  }, [boundIntegrationId, model, onFinished, onSelected]);
-}
-
 function useGitHubInstallationBinding(
   organizationId: string,
   model: OnboardingPageModel,
   accountPicker: PendingGitHubAccountPicker | undefined,
   goToScreen: (screen: FirstRunScreen) => void,
-  blocking: ReturnType<typeof useFirstRunBlockingAction>,
 ) {
   const bindInstallation = useBindGitHubInstallation(organizationId);
-  const [boundIntegrationId, setBoundIntegrationId] = useState<string | null>(null);
-  const [bindingInstallationId, setBindingInstallationId] = useState<string>();
-  const finish = () => {
-    setBoundIntegrationId(null);
-    setBindingInstallationId(undefined);
-    blocking.finish();
-  };
-  useSelectBoundGithubConnection(
-    boundIntegrationId,
-    model,
-    () => {
-      blocking.setAction("saving-github-connection");
-      goToScreen("choose");
-    },
-    finish,
-  );
+  const [installation, setInstallation] = useState<PendingGitHubInstallation>();
+  const [selectedRepository, setSelectedRepository] = useState<string>();
 
-  const useInstallation = async (installation: PendingGitHubInstallation) => {
-    if (!accountPicker?.state || !blocking.begin("binding-github")) return;
-    setBindingInstallationId(installation.id);
+  const useInstallation = (next: PendingGitHubInstallation) => {
+    setInstallation(next);
+    setSelectedRepository(undefined);
+    model.setup.selectRepo("");
+    goToScreen("choose");
+  };
+  const selectRepository = (repository: string) => {
+    setSelectedRepository(repository);
+    model.setup.selectRepo(repository);
+  };
+  const bindRepository = async (repositoryName: string): Promise<string | undefined> => {
+    if (!installation) return undefined;
+    if (!accountPicker?.state || !accountPicker.id) return undefined;
+    const repository = installation.repositories.find((candidate) => candidate.name === repositoryName);
+    if (!repository) return undefined;
     try {
-      await bindInstallation.mutateAsync({ state: accountPicker.state, installationId: installation.id });
-      if (accountPicker.id) return setBoundIntegrationId(accountPicker.id);
-      goToScreen("choose");
-      finish();
+      await bindInstallation.mutateAsync({
+        state: accountPicker.state,
+        installationId: installation.id,
+        repositoryId: repository.id,
+      });
+      if (!(await model.selectVcsConnection(accountPicker.id))) return undefined;
+      setInstallation(undefined);
+      setSelectedRepository(undefined);
+      return accountPicker.id;
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account"));
-      finish();
+      return undefined;
     }
   };
-  return { bindingInstallationId, useInstallation };
+  return {
+    installation,
+    repositories: installation?.repositories.map((repository) => repository.name),
+    owner: installation?.accountLogin,
+    selectedRepository,
+    bindingInstallationId: undefined,
+    useInstallation,
+    selectRepository,
+    bindRepository,
+  };
 }
 
 function useRepositoryErrorToast(error: unknown) {
@@ -456,14 +452,16 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection);
-  const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
-  const binding = useGitHubInstallationBinding(
-    organizationId,
+  const binding = useGitHubInstallationBinding(organizationId, model, connection.accountPicker, navigation.goToScreen);
+  const commands = useFirstRunCommands({
     model,
-    connection.accountPicker,
-    navigation.goToScreen,
+    agentGate,
+    connection,
+    githubSelection: binding,
+    navigation,
     blocking,
-  );
+    jiraAvailable,
+  });
   useRepositoryErrorToast(model.repositoriesError);
   // A saved Jira choice is not valid when the organization does not have the
   // Jira intake feature. Clear it only after the organization lookup confirms

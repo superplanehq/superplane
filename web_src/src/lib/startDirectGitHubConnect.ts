@@ -9,7 +9,6 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
-  hostedGitHubAuthorizeURL,
   hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -29,9 +28,7 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
-  /** GitHub OAuth authorize URL, to ask again which account to use. */
-  authorizeUrl: string;
-  /** GitHub login that authorized this connect. Empty when the field is absent. */
+  /** Linked GitHub login used to verify repository access. */
   githubLogin: string;
 };
 
@@ -53,23 +50,8 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     installations: pendingGitHubInstallations(item.status?.metadata),
     state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
-    authorizeUrl: authorizeURLWithState(hostedGitHubAuthorizeURL(item.status?.metadata), state),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
   };
-}
-
-function authorizeURLWithState(authorizeURL: string, state: string): string {
-  if (!authorizeURL || !state) return authorizeURL;
-
-  try {
-    const url = new URL(authorizeURL);
-    if (url.searchParams.get("state") === state) return authorizeURL;
-
-    url.searchParams.set("state", state);
-    return url.toString();
-  } catch {
-    return authorizeURL;
-  }
 }
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -202,19 +184,6 @@ export function githubAccountPickerFromConnection(
   return picker;
 }
 
-export function isOnboardingSetupReturnPath(path: string | undefined): boolean {
-  if (!path) {
-    return false;
-  }
-
-  const pathname = path.split("?")[0] ?? path;
-  if (pathname === "/onboarding") {
-    return true;
-  }
-
-  return pathname.includes("/workspaces/") && pathname.endsWith("/setup");
-}
-
 function setupReturnConfiguration(returnTo?: string): Record<string, unknown> | undefined {
   if (!returnTo) {
     return undefined;
@@ -271,17 +240,6 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
   const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId, args.preferredIntegrationId);
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-    if (isOnboardingSetupReturnPath(args.returnTo)) {
-      // Onboarding asks again which GitHub account to use on every Connect
-      // click, so the click goes to GitHub authorization instead of the
-      // stored picker. Without a stored authorize URL the flow falls
-      // through and starts a fresh connect, which also opens authorization.
-      if (picker.authorizeUrl) {
-        return followBrowserAction({ method: "GET", url: picker.authorizeUrl });
-      }
-      return false;
-    }
-
     const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);
     if (args.goTo) {
       args.goTo(path);
