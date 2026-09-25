@@ -144,7 +144,7 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
   });
 
-  it("keeps the connect screen locked after GitHub navigation starts", async () => {
+  it("keeps the connect screen locked while GitHub navigation starts", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
@@ -163,16 +163,43 @@ describe("FirstRunSetup reliability", () => {
       await navigation.promise;
     });
 
-    expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.openingGitHub);
-    expect(connect).toBeDisabled();
-    expect(screen.getByTestId("first-run-back")).toBeDisabled();
+    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(connect).toBeEnabled();
+    expect(screen.getByTestId("first-run-back")).toBeEnabled();
+  });
+
+  it("releases a browser-action lock before a later intake action", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      openSection: "vcs",
+      requestConnect: vi.fn().mockResolvedValue(true),
+    });
+    const view = renderSetup(model, "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByTestId("first-run-connect-github"));
+    await waitFor(() => expect(model.requestConnect).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+        <FirstRunSetup model={{ ...model, openSection: "issues" }} />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByTestId("first-run-analyze-tickets"));
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });
 
   it("unlocks the connect screen when GitHub navigation does not start", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
-    renderSetup(pageModel({ openSection: "vcs", requestConnect }), "/org-1/workspaces/PAY/setup?step=vcs");
+    const refreshGithubConnections = vi.fn().mockResolvedValue(undefined);
+    renderSetup(
+      pageModel({ openSection: "vcs", requestConnect, refreshGithubConnections }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+    await waitFor(() => expect(refreshGithubConnections).toHaveBeenCalledTimes(1));
 
     const connect = screen.getByTestId("first-run-connect-github");
     await user.click(connect);
@@ -182,6 +209,7 @@ describe("FirstRunSetup reliability", () => {
     });
 
     await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(refreshGithubConnections).toHaveBeenCalledTimes(2);
     expect(connect).toBeEnabled();
     expect(screen.getByTestId("first-run-back")).toBeEnabled();
   });
@@ -212,6 +240,64 @@ describe("FirstRunSetup reliability", () => {
     expect(saveIssues).toHaveBeenCalledTimes(1);
     issuesSaved.resolve(true);
     expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
+  it("keeps a newly bound repository available on the ticket step", async () => {
+    const user = userEvent.setup();
+    const setup = setupState();
+    setup.selectRepo = vi.fn((repository: string) => {
+      setup.selectedRepo = repository;
+      setup.issuesRepo = repository;
+    });
+    const selectVcsConnection = vi.fn(async () => {
+      setup.selectedRepo = null;
+      setup.issuesRepo = null;
+      return true;
+    });
+    const saveIssues = vi.fn(async () => Boolean(setup.issuesRepo ?? setup.selectedRepo));
+    const picker = githubConnection("int-new", {
+      startedByUserID: "user-1",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: 1, name: "acme/api" }] }],
+    });
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        setup,
+        saveIssues,
+        selectVcsConnection,
+        githubConnections: githubConnections([picker]),
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+    await user.click(await screen.findByRole("option", { name: "acme/api" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+    await user.click(await screen.findByTestId("first-run-analyze-tickets"));
+
+    expect(setup.selectRepo).toHaveBeenCalledWith("acme/api");
+    expect(saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
+  it("keeps the ticket source when the repository does not change", async () => {
+    const user = userEvent.setup();
+    const setup = {
+      ...setupState(),
+      selectedRepo: "acme/api",
+      issuesRepo: "acme/api",
+      issuesChoice: "vcs" as const,
+      selectRepo: vi.fn(),
+    };
+    renderSetup(pageModel({ openSection: "repo", setup }), "/org-1/workspaces/PAY/setup?step=repo");
+
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(setup.selectRepo).not.toHaveBeenCalled();
+    expect(setup.issuesChoice).toBe("vcs");
   });
 
   it("shows only the current user's GitHub account picker", () => {
