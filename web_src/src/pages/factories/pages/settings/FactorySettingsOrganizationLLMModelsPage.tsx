@@ -2,11 +2,17 @@ import { ArrowUpRight, Check, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 
+import superplaneLogo from "@/assets/superplane.svg";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { BYOK_PROVIDERS, useBYOKLLMModels, useUpdateBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
+import {
+  BYOK_PROVIDERS,
+  useBYOKLLMModels,
+  useSwitchFactoryModelSource,
+  useUpdateBYOKLLMModels,
+} from "@/hooks/useLLMModelAllowlists";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -19,6 +25,12 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import {
+  type LLMModelsSwitchDialog,
+  type LLMModelsSwitchProvider,
+  type LLMModelsSwitchTarget,
+  SwitchDialog,
+} from "./FactorySettingsLLMModelsSwitchPreview";
 import {
   byokProviderProductName,
   ORGANIZATION_LLM_MODELS_COPY as COPY,
@@ -34,6 +46,8 @@ const BYOK_INTEGRATION_NAMES: Record<string, string> = {
   openai: "openai",
   openrouter: "openrouter",
 };
+
+const SWITCH_PROVIDERS: LLMModelsSwitchProvider[] = ["anthropic", "openai", "openrouter"];
 
 export function FactorySettingsOrganizationLLMModelsPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
@@ -53,8 +67,31 @@ export function FactorySettingsOrganizationLLMModelsPage() {
 
   const hosted = useSelectableLLMModels(organizationId, { factoryId, sources: [SELECTABLE_LLM_SOURCE_HOSTED] });
   const source = workspaceModelSource(factory.onboarding?.agentHarness, connected.length > 0);
+  const currentProvider = resolveCurrentProvider(factory.onboarding, connected, byokQueries);
+  const [dialog, setDialog] = useState<LLMModelsSwitchDialog>(null);
+  const [switchedNotice, setSwitchedNotice] = useState<string | null>(null);
+  const switchSource = useSwitchFactoryModelSource(organizationId, factoryId);
 
   usePageTitle([COPY.pageTitle, "Settings", factory.name ?? "Workspace"]);
+
+  const choose = (target: LLMModelsSwitchTarget) => {
+    setDialog({ target, step: "warn" });
+  };
+
+  const saveSwitch = async (target: LLMModelsSwitchTarget, apiKey?: string) => {
+    try {
+      await switchSource.mutateAsync({ source: target, apiKey });
+      setDialog(null);
+      setSwitchedNotice(
+        target === "hosted"
+          ? "Automations in this workspace now use the SuperPlane agent."
+          : `Automations in this workspace now use the ${byokProviderProductName(target)} agent.`,
+      );
+      showSuccessToast("Model source saved.");
+    } catch (switchError) {
+      showErrorToast(getApiErrorMessage(switchError, "Unable to switch the model source."));
+    }
+  };
 
   return (
     <FactorySettingsPageFrame title={COPY.pageTitle} subtitle={COPY.pageSubtitle}>
@@ -69,24 +106,187 @@ export function FactorySettingsOrganizationLLMModelsPage() {
           }
         >
           {source === "hosted" ? (
-            <HostedModelList
-              models={hosted.data ?? []}
-              isLoading={hosted.isLoading}
-              isError={Boolean(hosted.isError)}
-            />
+            <div className="space-y-5">
+              {switchedNotice ? (
+                <p className="text-xs text-muted-foreground" data-testid="llm-models-switched-notice">
+                  {switchedNotice}
+                </p>
+              ) : null}
+              <HostedModelList
+                models={hosted.data ?? []}
+                isLoading={hosted.isLoading}
+                isError={Boolean(hosted.isError)}
+              />
+              <ProviderChoices providers={SWITCH_PROVIDERS} onChoose={choose} disabled={!canUpdate} />
+            </div>
           ) : (
-            <OwnKeyModelLists
-              organizationId={organizationId}
-              connected={connected}
-              byokQueries={byokQueries}
-              isLoading={byokLoading}
-              canUpdate={canUpdate}
-              integrationsHref={integrationsHref}
-            />
+            <div className="flex flex-col gap-5">
+              {switchedNotice ? (
+                <p className="text-xs text-muted-foreground" data-testid="llm-models-switched-notice">
+                  {switchedNotice}
+                </p>
+              ) : null}
+              {currentProvider ? (
+                <OwnKeyModelLists
+                  organizationId={organizationId}
+                  connected={[currentProvider]}
+                  byokQueries={byokQueries}
+                  isLoading={byokLoading}
+                  canUpdate={canUpdate}
+                  integrationsHref={integrationsHref}
+                />
+              ) : (
+                <NoProviderNotice integrationsHref={integrationsHref} />
+              )}
+              <ChangeModelSource current={currentProvider} onChoose={choose} disabled={!canUpdate} />
+            </div>
           )}
         </FactorySettingsCard>
       </div>
+      <SwitchDialog
+        source={source === "hosted" ? "hosted" : (currentProvider ?? "anthropic")}
+        dialog={dialog}
+        onCancel={() => setDialog(null)}
+        onContinueToKey={() => {
+          if (dialog && dialog.target !== "hosted") {
+            setDialog({ target: dialog.target, step: "key" });
+          }
+        }}
+        onBackToWarning={() => {
+          if (dialog) {
+            setDialog({ target: dialog.target, step: "warn" });
+          }
+        }}
+        onSaveKey={(apiKey) => {
+          if (dialog && dialog.target !== "hosted") {
+            void saveSwitch(dialog.target, apiKey);
+          }
+        }}
+        onSwitchToHosted={() => {
+          void saveSwitch("hosted");
+        }}
+      />
     </FactorySettingsPageFrame>
+  );
+}
+
+function resolveCurrentProvider(
+  onboarding: { agentHarness?: string; agentIntegrationId?: string } | undefined,
+  connected: string[],
+  queries: Record<string, BYOKQuery>,
+): LLMModelsSwitchProvider | null {
+  const integrationId = onboarding?.agentIntegrationId;
+  if (integrationId) {
+    const match = connected.find((provider) => queries[provider]?.data?.integrationId === integrationId);
+    if (isSwitchProvider(match)) {
+      return match;
+    }
+  }
+  if (onboarding?.agentHarness === "AGENT_HARNESS_CODEX" && connected.includes("openai")) {
+    return "openai";
+  }
+  if (onboarding?.agentHarness === "AGENT_HARNESS_CLAUDE_CODE") {
+    if (connected.includes("anthropic")) return "anthropic";
+    if (connected.includes("openrouter")) return "openrouter";
+  }
+  const first = connected.find(isSwitchProvider);
+  return first ?? null;
+}
+
+function isSwitchProvider(value: string | undefined): value is LLMModelsSwitchProvider {
+  return value === "anthropic" || value === "openai" || value === "openrouter";
+}
+
+function ProviderChoices({
+  providers,
+  onChoose,
+  disabled,
+}: {
+  providers: LLMModelsSwitchProvider[];
+  onChoose: (target: LLMModelsSwitchTarget) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="space-y-3 border-t border-border pt-4" data-testid="llm-models-provider-choices">
+      <div>
+        <h3 className="text-[13px] font-medium text-foreground">Use your own key</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Connect a provider key. The provider bills these runs.</p>
+      </div>
+      <ul className="space-y-2">
+        {providers.map((provider) => (
+          <li
+            key={provider}
+            className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+            data-testid={`llm-models-connect-${provider}`}
+          >
+            <span className="flex min-w-0 items-center gap-2 text-[13px]">
+              <IntegrationIcon
+                integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
+                className="size-4"
+                size={16}
+              />
+              {byokProviderProductName(provider)}
+            </span>
+            <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChoose(provider)}>
+              Connect
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ChangeModelSource({
+  current,
+  onChoose,
+  disabled,
+}: {
+  current: LLMModelsSwitchProvider | null;
+  onChoose: (target: LLMModelsSwitchTarget) => void;
+  disabled: boolean;
+}) {
+  const others = SWITCH_PROVIDERS.filter((provider) => provider !== current);
+  return (
+    <div className="space-y-3 border-t border-border pt-4" data-testid="llm-models-change-source">
+      <div>
+        <h3 className="text-[13px] font-medium text-foreground">Change model source</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Switching replaces the {current ? byokProviderProductName(current) : "current"} agent in every automation in
+          this workspace.
+        </p>
+      </div>
+      <ul className="space-y-2">
+        <li className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+          <span className="flex min-w-0 items-center gap-2 text-[13px]">
+            <img src={superplaneLogo} alt="" className="size-4 dark:brightness-0 dark:invert" />
+            SuperPlane
+          </span>
+          <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChoose("hosted")}>
+            Use SuperPlane
+          </Button>
+        </li>
+        {others.map((provider) => (
+          <li
+            key={provider}
+            className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+            data-testid={`llm-models-connect-${provider}`}
+          >
+            <span className="flex min-w-0 items-center gap-2 text-[13px]">
+              <IntegrationIcon
+                integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
+                className="size-4"
+                size={16}
+              />
+              {byokProviderProductName(provider)}
+            </span>
+            <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChoose(provider)}>
+              Connect
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

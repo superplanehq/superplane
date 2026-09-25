@@ -196,6 +196,35 @@ export function useUpdateFactoryLLMModels(organizationId: string, factoryId: str
   });
 }
 
+export function useSwitchFactoryModelSource(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { source: string; apiKey?: string }) => {
+      const response = await fetch(`/api/v1/factories/${factoryId}/model-source`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
+          "x-organization-id": organizationId,
+        },
+        body: JSON.stringify({
+          source: input.source,
+          apiKey: input.apiKey ?? "",
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Unable to switch the model source.");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "byok-models"] });
+      void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
+    },
+  });
+}
+
 export { BYOK_PROVIDERS };
 
 export function isFactoryBYOKModelsQuery(queryKey: readonly unknown[], organizationId: string, provider: string) {
