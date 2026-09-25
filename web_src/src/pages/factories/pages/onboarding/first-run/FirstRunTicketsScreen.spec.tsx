@@ -100,6 +100,50 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByText("Coming soon")).toBeInTheDocument();
   });
 
+  it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraChoiceBlock="lookup-failed"
+        jiraConnected
+        jiraProjectId="PAY"
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-jira-projects")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupFailed,
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
+    expect(onSelectTicketSource).toHaveBeenCalledWith("github-issues");
+  });
+
+  it("explains a saved Jira choice while the feature lookup is still loading", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraChoiceBlock="loading"
+        jiraConnected
+        jiraProjectId="PAY"
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupLoading,
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+  });
+
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {
     const user = userEvent.setup();
     const onSelectJiraProject = vi.fn();

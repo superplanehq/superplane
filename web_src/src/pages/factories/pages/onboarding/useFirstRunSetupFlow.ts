@@ -427,6 +427,21 @@ export function shouldClearSavedJiraChoice(args: {
   return args.organizationReady;
 }
 
+export type SavedJiraChoiceBlock = "loading" | "lookup-failed";
+
+/** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
+export function savedJiraChoiceBlock(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  jiraAvailable: boolean;
+  organizationReady: boolean;
+}): SavedJiraChoiceBlock | null {
+  if (args.jiraAvailable || args.issuesChoice !== "jira") return null;
+  if (args.featureLoading) return "loading";
+  if (!args.organizationReady) return "lookup-failed";
+  return null;
+}
+
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
   const blocking = useFirstRunBlockingAction();
@@ -455,12 +470,14 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
-  const clearSavedJiraChoice = shouldClearSavedJiraChoice({
+  const jiraChoiceArgs = {
     issuesChoice,
     featureLoading: jiraFeature.isLoading,
     jiraAvailable,
     organizationReady: jiraFeature.organizationReady,
-  });
+  };
+  const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
+  const jiraChoiceBlock = savedJiraChoiceBlock(jiraChoiceArgs);
   useEffect(() => {
     if (!clearSavedJiraChoice) return;
     setIssuesChoice(null);
@@ -487,6 +504,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
+    jiraChoiceBlock,
     installRequested: connection.installRequested,
     githubOrganizations: connection.githubOrganizations,
     requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,

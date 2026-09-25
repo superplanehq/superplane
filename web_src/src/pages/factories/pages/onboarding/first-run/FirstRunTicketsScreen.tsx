@@ -13,12 +13,19 @@ import type { FirstRunChrome, FirstRunTicketSource } from "./firstRunTypes";
 
 export type FirstRunJiraProject = { id?: string; name?: string };
 
+export type FirstRunJiraChoiceBlock = "loading" | "lookup-failed";
+
 type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   /** True when the organization has the Jira intake feature. Hides Jira when false. */
   jiraAvailable?: boolean;
+  /**
+   * A saved Jira choice cannot continue because the feature lookup has not
+   * confirmed Jira. The row stays hidden. The notice explains the block.
+   */
+  jiraChoiceBlock?: FirstRunJiraChoiceBlock | null;
   continueLabel?: string;
   /** True while this screen waits to learn whether the agent screen is next. */
   continuePending?: boolean;
@@ -60,6 +67,7 @@ export function FirstRunTicketsScreen({
   chrome,
   sphere,
   jiraAvailable = false,
+  jiraChoiceBlock = null,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   continuePending = false,
   saving = false,
@@ -80,8 +88,10 @@ export function FirstRunTicketsScreen({
   onRetryJiraProjects,
 }: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
-  const canAnalyze = canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
+  const jiraSelectionBlocked = Boolean(jiraChoiceBlock) || (ticketSource === "jira" && !jiraAvailable);
+  const canAnalyze = !jiraSelectionBlocked && canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
+  const jiraChoiceNotice = jiraChoiceNoticeCopy(jiraChoiceBlock);
 
   return (
     <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere}>
@@ -135,6 +145,18 @@ export function FirstRunTicketsScreen({
           />
         </FirstRunPanel>
 
+        {jiraChoiceNotice ? (
+          <p
+            className={
+              jiraChoiceBlock === "lookup-failed" ? "text-[13px] text-destructive" : "text-[13px] text-muted-foreground"
+            }
+            role={jiraChoiceBlock === "lookup-failed" ? "alert" : "status"}
+            data-testid="first-run-jira-choice-notice"
+          >
+            {jiraChoiceNotice}
+          </p>
+        ) : null}
+
         <div className="space-y-3">
           <LoadingButton
             type="button"
@@ -151,6 +173,12 @@ export function FirstRunTicketsScreen({
       </div>
     </FirstRunShell>
   );
+}
+
+function jiraChoiceNoticeCopy(block: FirstRunJiraChoiceBlock | null): string | null {
+  if (block === "lookup-failed") return FIRST_RUN_COPY.tickets.jiraLookupFailed;
+  if (block === "loading") return FIRST_RUN_COPY.tickets.jiraLookupLoading;
+  return null;
 }
 
 function FirstRunJiraTicketRow({

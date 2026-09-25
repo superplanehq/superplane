@@ -7,7 +7,7 @@ import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
-import { shouldClearSavedJiraChoice } from "./useFirstRunSetupFlow";
+import { shouldClearSavedJiraChoice, savedJiraChoiceBlock } from "./useFirstRunSetupFlow";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -178,6 +178,7 @@ describe("FirstRunSetup Jira intake feature", () => {
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
@@ -208,13 +209,20 @@ describe("FirstRunSetup Jira intake feature", () => {
 
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupFailed,
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
     expect(setupRef.current?.issuesChoice).toBe("jira");
+
+    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
+    expect(setupRef.current?.issuesChoice).toBe("vcs");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
-    expect(setupRef.current?.issuesChoice).toBe("jira");
-    expect(model.saveIssues).not.toHaveBeenCalled();
-    expect(model.finish).not.toHaveBeenCalled();
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(model.finish).toHaveBeenCalledWith("vcs");
   });
 });
 
@@ -239,5 +247,40 @@ describe("shouldClearSavedJiraChoice", () => {
         organizationReady: false,
       }),
     ).toBe(false);
+  });
+});
+
+describe("savedJiraChoiceBlock", () => {
+  it("blocks a saved Jira choice when the organization lookup fails", () => {
+    expect(
+      savedJiraChoiceBlock({
+        issuesChoice: "jira",
+        featureLoading: false,
+        jiraAvailable: false,
+        organizationReady: false,
+      }),
+    ).toBe("lookup-failed");
+  });
+
+  it("blocks a saved Jira choice while the feature lookup is loading", () => {
+    expect(
+      savedJiraChoiceBlock({
+        issuesChoice: "jira",
+        featureLoading: true,
+        jiraAvailable: false,
+        organizationReady: false,
+      }),
+    ).toBe("loading");
+  });
+
+  it("does not block Jira after the lookup confirms the feature is off", () => {
+    expect(
+      savedJiraChoiceBlock({
+        issuesChoice: "jira",
+        featureLoading: false,
+        jiraAvailable: false,
+        organizationReady: true,
+      }),
+    ).toBeNull();
   });
 });
