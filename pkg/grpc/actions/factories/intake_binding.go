@@ -69,7 +69,7 @@ func resolveIntakeBinding(
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
 	}
-	if source != models.FactoryIntakeSourceGitHubIssues {
+	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
 	}
 
