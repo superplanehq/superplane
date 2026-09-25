@@ -131,6 +131,22 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		}, canvas.Spec.Edges)
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("a Productive.io task list filter also listens for updates", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source: models.FactoryIntakeSourceProductiveTasks,
+			Settings: intakeSettings{
+				ExcludeKeyTasks: true,
+				TaskListIDs:     []string{"list-bugs"},
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("every action node works on a whole batch at once", func(t *testing.T) {
