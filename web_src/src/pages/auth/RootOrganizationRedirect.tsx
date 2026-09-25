@@ -61,14 +61,25 @@ function workspaceKeyFromPath(path: string, routeId: string): string | null {
   return segment;
 }
 
-function workspaceKeyFromSavedScreen(screen: SavedScreen): string | null {
+function workspaceIdForKey(workspaces: WorkspaceHomeCandidate[], key: string): string | null {
+  const match = workspaces.find(
+    (workspace) => workspace.id && workspace.key && workspace.key.toLowerCase() === key.toLowerCase(),
+  );
+  return match?.id ?? null;
+}
+
+function workspaceIdFromSavedScreen(screen: SavedScreen, workspaces: WorkspaceHomeCandidate[]): string | null {
   for (const candidate of savedScreenCandidates(screen)) {
     if (!candidate || !pathBelongsToOrganization(candidate, screen.routeId)) {
       continue;
     }
     const key = workspaceKeyFromPath(candidate, screen.routeId);
-    if (key) {
-      return key;
+    if (!key) {
+      continue;
+    }
+    const id = workspaceIdForKey(workspaces, key);
+    if (id) {
+      return id;
     }
   }
   return null;
@@ -76,18 +87,11 @@ function workspaceKeyFromSavedScreen(screen: SavedScreen): string | null {
 
 function preferredWorkspaceId(screen: SavedScreen, workspaces: WorkspaceHomeCandidate[]): string | null {
   const lastVisitedId = readLastVisitedFactory(screen.accountId, screen.routeId);
-  if (lastVisitedId) {
+  if (lastVisitedId && workspaces.some((workspace) => workspace.id === lastVisitedId)) {
     return lastVisitedId;
   }
 
-  const key = workspaceKeyFromSavedScreen(screen);
-  if (!key) {
-    return null;
-  }
-  const match = workspaces.find(
-    (workspace) => workspace.id && workspace.key && workspace.key.toLowerCase() === key.toLowerCase(),
-  );
-  return match?.id ?? null;
+  return workspaceIdFromSavedScreen(screen, workspaces);
 }
 
 function pathForChosenWorkspace(routeId: string, workspace: WorkspaceHomeCandidate): string | null {

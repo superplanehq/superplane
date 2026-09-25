@@ -312,6 +312,52 @@ describe("RootOrganizationRedirect", () => {
     });
   });
 
+  it("ignores a deleted last workspace and opens the workspace from the saved screen", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/ship/task/12";
+    workspacesState.data = [finishedPay, finishedShip];
+    rememberLastWorkspace("deleted-factory");
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("skips a deleted workspace path and uses a later saved workspace path", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/gone/tasks";
+    organizationsState.data = [
+      {
+        id: "org-uuid-1",
+        slug: "acme",
+        name: "Acme",
+        lastLocationPath: "/acme/workspaces/ship/velocity",
+      },
+    ];
+    workspacesState.data = [finishedPay, finishedShip];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/ship");
+    });
+  });
+
+  it("opens the first workspace when every saved workspace is gone", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/workspaces/gone/tasks";
+    workspacesState.data = [finishedPay, finishedShip];
+    rememberLastWorkspace("deleted-factory");
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expectPath("/acme/workspaces/pay");
+    });
+  });
+
   it("opens the workspace list when the organization has no workspace", async () => {
     experimentalState.has = () => true;
     lastLocationState.data = "/acme/workspaces/pay/task/4";
