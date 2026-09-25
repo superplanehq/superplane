@@ -719,6 +719,67 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("4.2k tokens");
   });
 
+  it("adds a follow-up planning run to saved draft usage", async () => {
+    const live = liveUsageTelemetry(1000, 0.1);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-follow-up",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder({
+        ...DRAFT_WORK_ORDER,
+        totalTokens: "2000",
+        totalCostCents: "20",
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.30 · 3k tokens");
+    });
+  });
+
+  it("does not round each planning prompt before it adds the cost", async () => {
+    const first = liveUsageTelemetry(10, 0.006);
+    const second = liveUsageTelemetry(12, 0.006);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: second,
+      usageSeries: [
+        { name: "First prompt", telemetry: first },
+        { name: "Second prompt", telemetry: second },
+      ],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.01 · 22 tokens");
+    });
+  });
+
   it("does not show a model on a draft that has not started", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 

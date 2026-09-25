@@ -209,13 +209,27 @@ function AnalysisWorkOrderPopup({
             mutations,
             footerBusy: footerActions.busy,
             reviewActions,
-            planningSpend: planningHeaderSpendActive(fixture.footer.kind, analysis.view) ? analysis.view : undefined,
+            planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
           })}
         />
         {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
+}
+
+function draftPlanningHeaderSpend(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  view: ReturnType<typeof useAnalysisPlanningSession>["view"],
+) {
+  if (!planningHeaderSpendActive(fixture.footer.kind, view)) {
+    return undefined;
+  }
+  return {
+    view,
+    savedTokens: fixture.savedTokens ?? 0,
+    savedCostCents: fixture.savedCostCents ?? 0,
+  };
 }
 
 /** Title, owner, and assignee edits for the popup header, fed from the fixture and loaded description. */
@@ -251,7 +265,11 @@ function analysisPopupHeader(args: {
   mutations: ReturnType<typeof footerMutationHandlers>;
   footerBusy: boolean;
   reviewActions: ReactNode;
-  planningSpend?: ReturnType<typeof useAnalysisPlanningSession>["view"];
+  planningSpend?: {
+    view: ReturnType<typeof useAnalysisPlanningSession>["view"];
+    savedTokens: number;
+    savedCostCents: number;
+  };
 }) {
   return (views: ReactNode) => (
     <PopupHeader
@@ -273,7 +291,11 @@ function analysisPopupHeader(args: {
       accessory={views}
     >
       {args.planningSpend ? (
-        <PlanningHeaderSpendCollector organizationId={args.organizationId} view={args.planningSpend} />
+        <PlanningHeaderSpendCollector
+          organizationId={args.organizationId}
+          view={args.planningSpend.view}
+          saved={{ tokens: args.planningSpend.savedTokens, cents: args.planningSpend.savedCostCents }}
+        />
       ) : null}
       <LiveOwnerTimeCostRow
         fixture={{ ...args.fixture, owner: args.edits.owner }}
