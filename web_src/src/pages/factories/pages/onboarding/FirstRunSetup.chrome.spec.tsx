@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { useState } from "react";
@@ -259,6 +259,15 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it("lists SuperPlane-hosted models before Your key in the model source choice", () => {
+    renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
+
+    const source = screen.getByTestId("first-run-model-source");
+    const buttons = within(source).getAllByRole("button");
+    expect(buttons[0]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.hostedModels));
+    expect(buttons[1]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.ownKey));
   });
 
   it("opens the backlog when the organization chooses SuperPlane-hosted models", async () => {
