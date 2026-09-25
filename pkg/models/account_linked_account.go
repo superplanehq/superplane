@@ -30,6 +30,11 @@ type AccountLinkedAccount struct {
 	UpdatedAt  time.Time
 }
 
+type AccountGitHubIdentity struct {
+	ProviderID string
+	Username   string
+}
+
 func NewAccountLinkedAccount(accountID uuid.UUID, provider, providerID, username, name, avatarURL string) *AccountLinkedAccount {
 	return &AccountLinkedAccount{
 		AccountID:  accountID,
@@ -67,6 +72,30 @@ func FindAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string)
 		return nil, err
 	}
 	return &linked, nil
+}
+
+// FindAccountGitHubIdentity returns the identity explicitly linked for
+// activity attribution. A GitHub sign-in identity is a safe fallback because
+// it proves ownership of the same durable GitHub account ID.
+func FindAccountGitHubIdentity(tx *gorm.DB, accountID uuid.UUID) (*AccountGitHubIdentity, error) {
+	linked, err := FindAccountLinkedAccount(tx, accountID, ProviderGitHub)
+	if err == nil {
+		return &AccountGitHubIdentity{ProviderID: linked.ProviderID, Username: linked.Username}, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	var provider AccountProvider
+	err = tx.
+		Where("account_id = ? AND provider = ?", accountID, ProviderGitHub).
+		First(&provider).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &AccountGitHubIdentity{ProviderID: provider.ProviderID, Username: provider.Username}, nil
 }
 
 func accountLinkedIdentityConflictsInSharedOrganization(tx *gorm.DB, ownerAccountID, claimantAccountID uuid.UUID) (bool, error) {

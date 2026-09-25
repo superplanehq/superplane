@@ -104,10 +104,13 @@ above if you still need to expose `localhost:8000`.
    `{WEBHOOKS_BASE_URL}` with the same tunnel URL.
 
    - Setup URL: `{BASE_URL}/api/v1/github/app/setup`
-   - User authorization callback URL: `{BASE_URL}/api/v1/github/app/oauth/callback`
    - Redirect on update: enabled
    - Webhook URL: `{WEBHOOKS_BASE_URL}/api/v1/github/app/webhook`
    - Webhook secret: a random string. Copy it for `.env`.
+
+   Disable **Request user authorization (OAuth) during installation**. SuperPlane
+   uses the linked GitHub identity and GitHub App installation tokens. It does
+   not request a GitHub App user access token.
 
 5. Grant repository permissions that match the private-app manifest:
 
@@ -126,7 +129,7 @@ above if you still need to expose `localhost:8000`.
    settings and change the visibility. Factory onboarding cannot install a
    private app on other accounts.
 8. Generate a private key and download the PEM file.
-9. Copy the App ID, slug, Client ID, and Client secret from the app page.
+9. Copy the App ID and slug from the app page.
 
 ### 3. Set the SuperPlane environment
 
@@ -137,12 +140,16 @@ SUPERPLANE_GITHUB_APP_ID=123123
 SUPERPLANE_GITHUB_APP_SLUG=superplane-myslug
 SUPERPLANE_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n<pem>\n-----END RSA PRIVATE KEY-----"
 SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET=123123
-SUPERPLANE_GITHUB_APP_CLIENT_ID=123123
-SUPERPLANE_GITHUB_APP_CLIENT_SECRET=123123
+SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES=yes
 ```
 
 Put the PEM on one line. Replace each newline in the file with `\n`.
 Restart the server after you save `.env`.
+
+The last setting is for a trusted local workstation only. It lets local users
+select all repositories installed for the development App without a personal
+GitHub permission check. Never set it on a shared or production instance.
+Production ignores this setting.
 
 If the catalog still reports no hosted GitHub App, confirm every required
 value is set and that the App ID is a positive integer. Then restart
@@ -152,7 +159,12 @@ value is set and that the App ID is a positive integer. Then restart
 
 1. Open `/onboarding` or create a workspace.
 2. SuperPlane must show the workspace wizard, not the GitHub App notice.
-3. Connect GitHub. The browser must open your public app install page.
+3. Connect GitHub. The browser opens the public app install page or shows the
+   repositories from an existing installation.
+
+With the local override, SuperPlane lists the repositories that are available
+to the configured GitHub App. Without the override, SuperPlane verifies the
+signed-in member's write access before it shows a repository.
 
 If setup stays blocked, the installation still has no complete
 `SUPERPLANE_GITHUB_APP_*` set. Check `.env` and restart the server.
