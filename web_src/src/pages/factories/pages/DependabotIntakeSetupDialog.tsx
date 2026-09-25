@@ -62,9 +62,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
       }}
     >
       <FirstRunHeading headline={DEPENDABOT_INTAKE_SETUP_COPY.pageTitle}>
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          {DEPENDABOT_INTAKE_SETUP_COPY.helper(repository, skipInitialImport)}
-        </p>
+        <p className="text-[15px] leading-6 text-muted-foreground">{DEPENDABOT_INTAKE_SETUP_COPY.helper(repository)}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
@@ -83,8 +81,13 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
         </div>
 
         <IntakeSkipInitialImportField
-          checked={skipInitialImport}
-          onCheckedChange={setSkipInitialImport}
+          checked={!skipInitialImport}
+          onCheckedChange={(importExisting) => setSkipInitialImport(!importExisting)}
+          helper={
+            skipInitialImport
+              ? DEPENDABOT_INTAKE_SETUP_COPY.importExistingHelperOff
+              : DEPENDABOT_INTAKE_SETUP_COPY.importExistingHelper
+          }
           testId="dependabot-skip-initial-import"
         />
 

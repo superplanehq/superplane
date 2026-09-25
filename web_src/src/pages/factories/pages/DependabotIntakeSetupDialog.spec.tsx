@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { DependabotIntakeSetupDialog } from "./DependabotIntakeSetupDialog";
+import { DEPENDABOT_INTAKE_SETUP_COPY } from "./dependabotIntakeSetupCopy";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
@@ -33,6 +34,8 @@ describe("DependabotIntakeSetupDialog", () => {
     );
 
     expect(screen.getByTestId("dependabot-setup-repository")).toHaveTextContent("acme/payments");
+    expect(screen.getByTestId("dependabot-skip-initial-import")).toBeChecked();
+    expect(screen.getByText(DEPENDABOT_INTAKE_SETUP_COPY.importExistingHelper)).toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: "Low" }));
     await user.click(screen.getByTestId("dependabot-skip-initial-import"));
     await user.click(screen.getByRole("button", { name: "Create intake" }));

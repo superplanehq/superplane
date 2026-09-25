@@ -29,9 +29,7 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
   const helper =
     setup.step === "connection"
       ? JIRA_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : setup.skipInitialImport
-        ? JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
-        : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const showConnectAction =
     setup.step === "connection" && !setup.connectedQuery.isLoading && setup.jiraIntegrations.length === 0;
 
@@ -317,8 +315,13 @@ function SetupFooter({ setup, onCreated }: { setup: JiraIntakeSetupModel; onCrea
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
-        checked={setup.skipInitialImport}
-        onCheckedChange={setup.setSkipInitialImport}
+        checked={!setup.skipInitialImport}
+        onCheckedChange={(importExisting) => setup.setSkipInitialImport(!importExisting)}
+        helper={
+          setup.skipInitialImport
+            ? JIRA_INTAKE_SETUP_COPY.importExistingHelperOff
+            : JIRA_INTAKE_SETUP_COPY.importExistingHelper
+        }
         testId="jira-skip-initial-import"
       />
       <Button
