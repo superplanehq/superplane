@@ -1,6 +1,9 @@
 package dependabot
 
 import (
+	"errors"
+	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
@@ -8,12 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTaskCopyFromAlert(t *testing.T) {
-	alert := &github.DependabotAlert{
-		HTMLURL: github.Ptr("https://github.com/acme/payments/security/dependabot/7"),
+func lodashAlert(number int, manifest string) *github.DependabotAlert {
+	return &github.DependabotAlert{
+		Number:  github.Ptr(number),
+		State:   github.Ptr("open"),
+		HTMLURL: github.Ptr("https://github.com/acme/payments/security/dependabot/" + strconv.Itoa(number)),
 		Dependency: &github.Dependency{
 			Package:      &github.VulnerabilityPackage{Name: github.Ptr("lodash"), Ecosystem: github.Ptr("npm")},
-			ManifestPath: github.Ptr("package.json"),
+			ManifestPath: github.Ptr(manifest),
 		},
 		SecurityAdvisory: &github.DependabotSecurityAdvisory{
 			Summary:  github.Ptr("Prototype pollution in lodash"),
@@ -24,38 +29,119 @@ func TestTaskCopyFromAlert(t *testing.T) {
 			FirstPatchedVersion:    &github.FirstPatchedVersion{Identifier: github.Ptr("4.17.21")},
 		},
 	}
-
-	copy := TaskCopyFromAlert(alert)
-	assert.Equal(t, "Bump lodash in package.json", copy.Title)
-	assert.Contains(t, copy.Description, "Prototype pollution in lodash")
-	assert.Contains(t, copy.Description, "Package: lodash (npm)")
-	assert.Contains(t, copy.Description, "Manifest: package.json")
-	assert.Contains(t, copy.Description, "Vulnerable versions: < 4.17.21")
-	assert.Contains(t, copy.Description, "Patched version: 4.17.21")
-	assert.Contains(t, copy.Description, "Severity: high")
-	assert.Contains(t, copy.Description, alert.GetHTMLURL())
 }
 
-func TestAlertRefFromURL(t *testing.T) {
-	ref, ok := AlertRefFromURL("https://github.com/acme/payments/security/dependabot/7")
+func TestTaskCopyFromAlerts(t *testing.T) {
+	ref, ok := PackageRefFromAlert("acme/payments", lodashAlert(7, "package.json"))
 	require.True(t, ok)
-	assert.Equal(t, AlertRef{Repository: "acme/payments", Number: 7}, ref)
 
-	_, ok = AlertRefFromURL("https://github.com/acme/payments/issues/7")
+	copy := TaskCopyFromAlerts(ref, []*github.DependabotAlert{
+		lodashAlert(7, "package.json"),
+		lodashAlert(8, "package-lock.json"),
+	})
+
+	assert.Equal(t, "Fix Dependabot alerts for lodash (npm)", copy.Title)
+	assert.Contains(t, copy.Description, "Fix every open Dependabot alert for lodash (npm).\n"+packageFixGuidance+"\n\n## Alerts")
+	assert.Contains(t, copy.Description, "find the direct dependency that requires it")
+	assert.Contains(t, copy.Description, "### #7 Prototype pollution in lodash\nSeverity: high\nManifest: package.json\nVulnerable versions: < 4.17.21\nPatched version: 4.17.21\nhttps://github.com/acme/payments/security/dependabot/7")
+	assert.Contains(t, copy.Description, "### #8 Prototype pollution in lodash\nSeverity: high\nManifest: package-lock.json")
+	assert.NotContains(t, copy.Description, "Relationship:")
+}
+
+func TestAlertSection_NamesTheRelationship(t *testing.T) {
+	section := AlertSection(map[string]any{
+		"number":   float64(7),
+		"html_url": "https://github.com/acme/payments/security/dependabot/7",
+		"dependency": map[string]any{
+			"manifest_path": "package.json",
+			"relationship":  "transitive",
+		},
+		"security_advisory": map[string]any{"summary": "Prototype pollution", "severity": "high"},
+	})
+
+	assert.Contains(t, section, "### #7 Prototype pollution")
+	assert.Contains(t, section, "Relationship: transitive\nhttps://github.com/acme/payments/security/dependabot/7")
+
+	unknown := AlertSection(map[string]any{"dependency": map[string]any{"relationship": "unknown"}})
+	assert.NotContains(t, unknown, "Relationship:")
+}
+
+func TestMergeAlertSection(t *testing.T) {
+	first := "Fix every open Dependabot alert for lodash (npm).\n\n## Alerts\n\n### #7 Prototype pollution\nhttps://github.com/acme/payments/security/dependabot/7"
+	second := "### #8 Prototype pollution\nhttps://github.com/acme/payments/security/dependabot/8"
+
+	t.Run("appends a new alert", func(t *testing.T) {
+		merged := MergeAlertSection(first, second)
+		assert.Equal(t, first+"\n\n"+second, merged)
+	})
+
+	t.Run("does not add the same alert twice", func(t *testing.T) {
+		merged := MergeAlertSection(first, second)
+		assert.Equal(t, merged, MergeAlertSection(merged, second))
+	})
+
+	t.Run("ignores an empty section", func(t *testing.T) {
+		assert.Equal(t, first, MergeAlertSection(first, "  \n"))
+	})
+}
+
+func TestPackageRefOriginURL_RoundTrips(t *testing.T) {
+	ref := PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "@babel/core"}
+
+	originURL := ref.OriginURL()
+	assert.Equal(t, "https://github.com/acme/payments/security/dependabot?q=is%3Aopen+package%3A%40babel%2Fcore+ecosystem%3Anpm", originURL)
+	assert.Equal(t, "Dependabot: @babel/core", ref.OriginLabel())
+
+	parsed, ok := PackageRefFromURL(originURL)
+	require.True(t, ok)
+	assert.Equal(t, ref, parsed)
+
+	_, ok = PackageRefFromURL("https://github.com/acme/payments/security/dependabot/7")
+	assert.False(t, ok)
+	_, ok = PackageRefFromURL("https://github.com/acme/payments/issues/7")
 	assert.False(t, ok)
 }
 
-func TestAlertRefFromEventData(t *testing.T) {
-	ref, ok := AlertRefFromEventData(map[string]any{
+func TestPackageRefFromEventData(t *testing.T) {
+	ref, ok := PackageRefFromEventData(map[string]any{
 		"type": AlertPayloadType,
 		"data": map[string]any{
 			"action": "created",
 			"alert": map[string]any{
-				"html_url": "https://github.com/acme/payments/security/dependabot/7",
+				"html_url": "https://github.com/Acme/Payments/security/dependabot/7",
+				"dependency": map[string]any{
+					"package": map[string]any{"name": "lodash", "ecosystem": "NPM"},
+				},
 			},
 		},
 	})
 	require.True(t, ok)
-	assert.Equal(t, 7, ref.Number)
-	assert.Equal(t, "acme/payments", ref.Repository)
+	assert.Equal(t, PackageRef{Repository: "Acme/Payments", Ecosystem: "npm", Name: "lodash"}, ref)
+	assert.True(t, ref.Matches(PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}))
+	assert.False(t, ref.Matches(PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "Lodash"}))
+
+	_, ok = PackageRefFromEventData(map[string]any{
+		"type": AlertPayloadType,
+		"data": map[string]any{"alert": map[string]any{"html_url": "https://github.com/acme/payments/security/dependabot/7"}},
+	})
+	assert.False(t, ok)
+}
+
+func TestUnavailableError_NamesTheCause(t *testing.T) {
+	disabled := &github.ErrorResponse{
+		Response: &http.Response{StatusCode: http.StatusForbidden},
+		Message:  "Dependabot alerts are disabled for this repository.",
+	}
+	err := UnavailableError(disabled)
+	assert.ErrorIs(t, err, ErrAlertsDisabled)
+
+	unreadable := &github.ErrorResponse{
+		Response: &http.Response{StatusCode: http.StatusForbidden},
+		Message:  "Resource not accessible by integration",
+	}
+	err = UnavailableError(unreadable)
+	assert.ErrorIs(t, err, ErrAlertsUnreadable)
+
+	other := errors.New("connection reset")
+	assert.Equal(t, other, UnavailableError(other))
 }

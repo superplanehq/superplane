@@ -5,6 +5,7 @@ import {
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
   factoriesRefreshBacklog,
+  factoriesSearchDependabotIntakeSetupItems,
   factoriesSearchFactoryIntakeItems,
   factoriesUpdateFactoryIntake,
 } from "@/api-client";
@@ -32,6 +33,8 @@ const factoryIntakeQueryKeys = {
     ["factories", organizationId, factoryId, "intakes", intakeId, "runs"] as const,
   items: (organizationId: string, factoryId: string, intakeId: string, query: string, limit: number) =>
     ["factories", organizationId, factoryId, "intakes", intakeId, "items", query, limit] as const,
+  dependabotSetupItems: (organizationId: string, factoryId: string, severities: string, limit: number) =>
+    ["factories", organizationId, factoryId, "dependabot-setup-items", severities, limit] as const,
 };
 
 export function factoryIntakesKey(organizationId: string, factoryId: string) {
@@ -234,6 +237,36 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
         queryKey: factoryIntakeQueryKeys.runs(organizationId, factoryId, variables.intakeId),
       });
     },
+  });
+}
+
+export function useSearchDependabotIntakeSetupItems({
+  organizationId,
+  factoryId,
+  dependabotSeverities,
+  enabled = true,
+  limit = 50,
+}: {
+  organizationId: string;
+  factoryId: string;
+  dependabotSeverities: string[];
+  enabled?: boolean;
+  limit?: number;
+}) {
+  const severitiesKey = dependabotSeverities.join(",");
+  return useQuery({
+    queryKey: factoryIntakeQueryKeys.dependabotSetupItems(organizationId, factoryId, severitiesKey, limit),
+    queryFn: async (): Promise<FactoriesFactoryIntakeItem[]> => {
+      const response = await factoriesSearchDependabotIntakeSetupItems(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          query: { dependabotSeverities, limit },
+        }),
+      );
+      return response.data?.items ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId) && enabled,
   });
 }
 

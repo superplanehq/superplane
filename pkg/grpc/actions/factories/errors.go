@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -160,6 +161,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
 		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
+	case errors.Is(err, ghdependabot.ErrAlertsDisabled):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsDisabledMessage)
+	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsUnreadableMessage)
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
