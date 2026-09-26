@@ -161,6 +161,39 @@ func TestProcessVideoAttachmentsScriptIndexesImagesWithoutMediaTools(t *testing.
 	assert.Equal(t, "ready", manifestFile(t, attachments, "01-shot.png")["status"])
 }
 
+func TestProcessVideoAttachmentsScriptSkipsProcessedMediaWithoutToolchain(t *testing.T) {
+	t.Parallel()
+
+	dir, attachments := newAttachmentDir(t)
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "01-ready.mp4"), []byte("ready"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "02-partial.mp4"), []byte("partial"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "03-failed.mp4"), []byte("failed"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "04-note.wav"), []byte("audio"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "files": [
+    {"filename":"ready.mp4","content_type":"video/mp4","dest":"01-ready.mp4","kind":"video","status":"ready"},
+    {"filename":"partial.mp4","content_type":"video/mp4","dest":"02-partial.mp4","kind":"video","status":"partial","reason":"transcription_failed"},
+    {"filename":"failed.mp4","content_type":"video/mp4","dest":"03-failed.mp4","kind":"video","status":"failed","reason":"undecodable"},
+    {"filename":"note.wav","content_type":"audio/wav","dest":"04-note.wav","kind":"audio","status":"ready"}
+  ]
+}`), 0o644))
+
+	cmd := exec.Command("bash", "process_video_attachments.sh")
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_TASK_DIR="+dir,
+		"PATH=/usr/bin:/bin",
+		"WHISPER_MODEL="+filepath.Join(dir, "missing.bin"),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "No video or audio files in task attachments.")
+	assert.Equal(t, "ready", manifestFile(t, attachments, "01-ready.mp4")["status"])
+	assert.Equal(t, "partial", manifestFile(t, attachments, "02-partial.mp4")["status"])
+	assert.Equal(t, "failed", manifestFile(t, attachments, "03-failed.mp4")["status"])
+	assert.Equal(t, "ready", manifestFile(t, attachments, "04-note.wav")["status"])
+}
+
 func TestProcessVideoAttachmentsScriptTranscribesAudioWithoutFrames(t *testing.T) {
 	requireLookPath(t, "ffmpeg", "ffprobe", "python3")
 	dir, attachments := newAttachmentDir(t)

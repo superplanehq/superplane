@@ -509,6 +509,14 @@ def process_audio(item, dest):
     print(f"{dest.name}: transcript ready")
 
 
+PROCESSED_MEDIA_STATUSES = {"ready", "partial", "failed"}
+
+
+def needs_media_processing(item) -> bool:
+    status = str(item.get("status") or "").strip().lower()
+    return status not in PROCESSED_MEDIA_STATUSES
+
+
 manifest = load_manifest()
 videos = []
 audios = []
@@ -516,6 +524,8 @@ for item in manifest.get("files") or []:
     dest_name = item.get("dest") or ""
     dest = attachments / dest_name
     if not dest_name or not dest.is_file():
+        continue
+    if not needs_media_processing(item):
         continue
     if looks_like_video(item, dest):
         videos.append((item, dest))
