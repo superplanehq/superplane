@@ -90,6 +90,7 @@ export function FactorySettingsMCPPage() {
       <MCPCatalogSetupDialog
         open={page.catalogSetupOpen}
         entry={page.catalogEntry}
+        resource={page.editResource}
         isSaving={page.isSaving}
         onClose={page.closeCatalogSetup}
         onSignIn={page.startCatalogOAuth}

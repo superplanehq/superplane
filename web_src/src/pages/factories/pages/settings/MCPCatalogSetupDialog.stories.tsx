@@ -6,6 +6,7 @@ import { MCP_CATALOG } from "./mcpCatalog";
 
 const github = MCP_CATALOG.find((entry) => entry.id === "github");
 const linear = MCP_CATALOG.find((entry) => entry.id === "linear");
+const sentry = MCP_CATALOG.find((entry) => entry.id === "sentry");
 
 const meta = {
   title: "Factories/Pages/Settings/MCP catalog setup",
@@ -51,4 +52,22 @@ export const GitHubToken: Story = {
 
 export const LinearSignIn: Story = {
   render: () => <OAuthSetup />,
+};
+
+function SentrySetup() {
+  const [open, setOpen] = useState(true);
+  return (
+    <MCPCatalogSetupDialog
+      open={open}
+      entry={sentry}
+      isSaving={false}
+      onClose={() => setOpen(false)}
+      onSignIn={async () => setOpen(false)}
+      onSaveToken={async () => undefined}
+    />
+  );
+}
+
+export const SentrySignIn: Story = {
+  render: () => <SentrySetup />,
 };

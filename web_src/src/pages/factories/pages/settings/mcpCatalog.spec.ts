@@ -1,7 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
 import { AGENT_RESOURCES_COPY, GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentResourceCopy";
-import { catalogConnectionDefaults, filterMCPCatalog, groupMCPCatalog, MCP_CATALOG } from "./mcpCatalog";
+import {
+  catalogConnectionDefaults,
+  catalogEntryForResource,
+  filterMCPCatalog,
+  groupMCPCatalog,
+  MCP_CATALOG,
+} from "./mcpCatalog";
 
 describe("MCP_CATALOG", () => {
   it("includes a HTTPS URL and a SuperPlane-ready auth method on every entry", () => {
@@ -44,6 +50,13 @@ describe("MCP_CATALOG", () => {
 
   it("omits defaults for a custom MCP server", () => {
     expect(catalogConnectionDefaults(undefined)).toBeUndefined();
+  });
+
+  it("matches a saved server to a catalog entry by URL", () => {
+    expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp" })?.id).toBe("sentry");
+    expect(catalogEntryForResource({ url: "https://mcp.linear.app/mcp" })?.id).toBe("linear");
+    expect(catalogEntryForResource({ url: "https://mcp.example.com/mcp" })).toBeUndefined();
+    expect(catalogEntryForResource(undefined)).toBeUndefined();
   });
 });
 

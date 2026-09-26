@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 import { AGENT_RESOURCES_COPY, type AgentResourceInstruction } from "./agentResourceCopy";
 import type { MCPCatalogEntry } from "./mcpCatalog";
@@ -20,6 +22,7 @@ import type { MCPCatalogEntry } from "./mcpCatalog";
 export function MCPCatalogSetupDialog({
   open,
   entry,
+  resource,
   isSaving,
   onClose,
   onSignIn,
@@ -27,6 +30,7 @@ export function MCPCatalogSetupDialog({
 }: {
   open: boolean;
   entry?: MCPCatalogEntry;
+  resource?: FactoriesFactoryAgentResource;
   isSaving: boolean;
   onClose: () => void;
   onSignIn: (entry: MCPCatalogEntry) => Promise<void>;
@@ -48,6 +52,7 @@ export function MCPCatalogSetupDialog({
   }
 
   const isHeaderAuth = entry.auth === "AUTH_HEADERS";
+  const title = resource ? entry.label : AGENT_RESOURCES_COPY.addServerTitle(entry.label);
 
   const handleSignIn = async () => {
     await onSignIn(entry);
@@ -67,7 +72,12 @@ export function MCPCatalogSetupDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !isSaving && onClose()}>
       <DialogContent data-testid="mcp-catalog-setup-dialog">
         <DialogHeader>
-          <DialogTitle>{AGENT_RESOURCES_COPY.addServerTitle(entry.label)}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <span data-testid="mcp-catalog-setup-icon">
+              <IntegrationIcon integrationName={entry.icon} iconSlug={entry.icon} className="size-5" />
+            </span>
+            {title}
+          </DialogTitle>
           <DialogDescription data-testid="mcp-catalog-setup-instruction">
             <CatalogInstruction instruction={entry.instruction} />
           </DialogDescription>
@@ -112,6 +122,7 @@ export function MCPCatalogSetupDialog({
               data-testid="mcp-catalog-setup-sign-in"
             >
               {AGENT_RESOURCES_COPY.signIn}
+              <ExternalLink className="size-3.5" aria-hidden />
             </LoadingButton>
           )}
         </DialogFooter>
@@ -134,7 +145,7 @@ function CatalogInstruction({ instruction }: { instruction: AgentResourceInstruc
         className="inline-flex items-center gap-0.5 text-foreground underline underline-offset-2"
       >
         {instruction.label}
-        <ExternalLink className="size-3" aria-hidden />
+        <ExternalLink className="size-3.5" aria-hidden />
       </a>
       {instruction.after}
     </>

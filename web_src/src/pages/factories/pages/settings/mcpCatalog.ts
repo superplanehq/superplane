@@ -43,6 +43,14 @@ export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogCo
   };
 }
 
+export function catalogEntryForResource(resource?: { url?: string }): MCPCatalogEntry | undefined {
+  const url = resource?.url?.trim();
+  if (!url) {
+    return undefined;
+  }
+  return MCP_CATALOG.find((entry) => entry.url === url);
+}
+
 export const CUSTOM_MCP_CATALOG_ID = "custom";
 
 export const MCP_CATALOG_CATEGORY_ORDER: MCPCatalogCategory[] = [
