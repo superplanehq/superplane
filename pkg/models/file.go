@@ -44,7 +44,11 @@ var allowedFileContentTypes = []string{
 	"image/jpeg",
 	"image/gif",
 	"image/webp",
+	"image/heic",
+	"image/heif",
 	"application/pdf",
+	"application/msword",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 	"text/plain",
 	"text/markdown",
 	"application/json",
@@ -623,6 +627,9 @@ func normalizeContentType(contentType string) string {
 	}
 	if value == "text/yaml" || value == "application/x-yaml" {
 		return "application/yaml"
+	}
+	if value == "text/x-csv" || value == "application/csv" || value == "text/comma-separated-values" {
+		return "text/csv"
 	}
 	return value
 }
