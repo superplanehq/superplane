@@ -271,3 +271,31 @@ func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"create_issue", "search"}, response.GetResource().GetDisabledTools())
 }
+
+func Test__finishFactoryAgentResourceOAuthConnectRejectsDuplicateURL(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	oauth := models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://api.mobbin.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthOAuth,
+	}
+	first, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin", true, oauth)
+	require.NoError(t, err)
+	second, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin-retry", true, oauth)
+	require.NoError(t, err)
+	require.NoError(t, first.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
+	require.NoError(t, second.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, []byte("refresh")))
+	require.NoError(t, second.UpsertSecret(db, models.FactoryAgentResourceSecretAccessToken, []byte("access")))
+
+	finishFactoryAgentResourceOAuthConnect(db, second)
+
+	assert.Equal(t, models.FactoryAgentResourceOAuthNeedsReconnect, second.OAuthState())
+	assert.Equal(t, "This MCP server is already connected.", second.OAuthError)
+	_, err = second.FindSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
+	_, err = second.FindSecret(db, models.FactoryAgentResourceSecretAccessToken)
+	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
+}

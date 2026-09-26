@@ -12,6 +12,7 @@ describe("canonicalMCPServerURL", () => {
     expect(canonicalMCPServerURL("https://mcp.sentry.dev/mcp/")).toBe(
       canonicalMCPServerURL("https://mcp.sentry.dev/mcp"),
     );
+    expect(canonicalMCPServerURL("https://mcp.example.com/")).toBe(canonicalMCPServerURL("https://mcp.example.com"));
   });
 
   it("returns empty for a blank value", () => {

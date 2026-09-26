@@ -232,10 +232,10 @@ func CanonicalMCPServerURL(raw string) string {
 	parsed.Fragment = ""
 	parsed.Scheme = strings.ToLower(parsed.Scheme)
 	parsed.Host = strings.ToLower(parsed.Host)
-	if len(parsed.Path) > 1 && strings.HasSuffix(parsed.Path, "/") {
-		parsed.Path = strings.TrimSuffix(parsed.Path, "/")
+	if strings.HasSuffix(parsed.Path, "/") {
+		parsed.Path = strings.TrimRight(parsed.Path, "/")
 	}
-	return parsed.String()
+	return strings.TrimRight(parsed.String(), "/")
 }
 
 func NormalizeDisabledTools(names []string) []string {

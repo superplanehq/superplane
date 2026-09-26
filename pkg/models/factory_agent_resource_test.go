@@ -279,6 +279,19 @@ func Test__FactoryAgentResource(t *testing.T) {
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
 	})
 
+	t.Run("rejects a root URL with or without a trailing slash", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		root := headerConfig
+		root.URL = "https://mcp.example.com"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "root", true, root)
+		require.NoError(t, err)
+		slash := root
+		slash.URL = "https://mcp.example.com/"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "root-slash", true, slash)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
+	})
+
 	t.Run("allows a second OAuth server that is not connected yet", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -389,5 +402,6 @@ func Test__CanonicalMCPServerURL(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp"), models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp/"))
 	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp"), models.CanonicalMCPServerURL("https://MCP.Sentry.DEV/mcp"))
+	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.example.com"), models.CanonicalMCPServerURL("https://mcp.example.com/"))
 	assert.Empty(t, models.CanonicalMCPServerURL("  "))
 }

@@ -12,10 +12,8 @@ export function canonicalMCPServerURL(raw: string): string {
     parsed.hash = "";
     parsed.protocol = parsed.protocol.toLowerCase();
     parsed.hostname = parsed.hostname.toLowerCase();
-    if (parsed.pathname.length > 1 && parsed.pathname.endsWith("/")) {
-      parsed.pathname = parsed.pathname.slice(0, -1);
-    }
-    return parsed.toString();
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+    return parsed.toString().replace(/\/+$/, "");
   } catch {
     return trimmed.replace(/\/+$/, "").toLowerCase();
   }
