@@ -160,7 +160,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		require.NoError(t, err)
 		agent := findYAMLNode(t, defaults, "implementation-agent-no-issue")
 		assert.Equal(t, "runnerClaudeCode", agent.Component)
-		assert.Equal(t, "opus", agent.Configuration["model"])
+		assert.Equal(t, "claude-opus-5-5", agent.Configuration["model"])
 		assert.Equal(t, map[string]any{
 			"source":      "integration",
 			"integration": map[string]any{"name": "claude"},
@@ -207,7 +207,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		require.NoError(t, err)
 		refinement := findYAMLNode(t, defaults, backlogRefinementNodeID)
 		assert.Equal(t, "runnerClaudeCode", refinement.Component)
-		assert.Equal(t, "opus", refinement.Configuration["model"])
+		assert.Equal(t, "claude-opus-5-5", refinement.Configuration["model"])
 	})
 
 	t.Run("a discussion PR feedback handler resets to its generated graph", func(t *testing.T) {

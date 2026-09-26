@@ -134,7 +134,7 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			Label:       "Model",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Default:     "claude-opus-4-6",
+			Default:     "claude-opus-5-5",
 			Placeholder: "Select a Claude model",
 			Description: "Model used for this request.",
 			TypeOptions: &configuration.TypeOptions{

@@ -50,10 +50,41 @@ func ListFactoryWorkOrderRunUsage(
 		return nil, grpcerrors.Internal(err, "failed to list factory work order run usage")
 	}
 
+	candidates, err := models.ClaudeAliasCandidateIDs(db, orgID, &factoryID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list factory work order run usage")
+	}
+	rows = resolveRunUsageModelAliases(rows, candidates)
+
 	return &pb.ListFactoryWorkOrderRunUsageResponse{
 		Rows:       serializeWorkOrderRunUsageRows(factory, rows),
 		TotalCount: uint32(total),
 	}, nil
+}
+
+func resolveRunUsageModelAliases(rows []models.WorkOrderRunUsage, candidates []string) []models.WorkOrderRunUsage {
+	for i := range rows {
+		rows[i].Models = resolveModelNames(rows[i].Models, candidates)
+		rows[i].BYOKModels = resolveModelNames(rows[i].BYOKModels, candidates)
+	}
+	return rows
+}
+
+func resolveModelNames(names []string, candidates []string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		concrete := models.ConcreteClaudeModelID(name, candidates)
+		if _, dup := seen[concrete]; dup {
+			continue
+		}
+		seen[concrete] = struct{}{}
+		out = append(out, concrete)
+	}
+	return out
 }
 
 func resolveWorkOrderRunUsageWindow(req *pb.ListFactoryWorkOrderRunUsageRequest) (time.Time, time.Time, error) {

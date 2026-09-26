@@ -1,3 +1,5 @@
+import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
+
 export const DRAFT_START_MODEL_AUTO = "auto";
 
 export function draftStartModelPayload(selected: string): string | undefined {
@@ -8,20 +10,16 @@ export function draftStartModelPayload(selected: string): string | undefined {
   return trimmed;
 }
 
-/** Short label for a stored runner model id. */
-export function displayRunnerModel(id: string): string {
+/** Short label for a stored runner model id. Aliases use a versioned id from modelIds. */
+export function displayRunnerModel(id: string, modelIds: readonly string[] = []): string {
   const trimmed = id.trim();
   if (trimmed === "") {
     return "";
   }
   if (trimmed.includes(" · ")) {
-    return joinRunnerModels(trimmed.split(" · ").map(displayRunnerModel));
+    return joinRunnerModels(trimmed.split(" · ").map((part) => displayRunnerModel(part, modelIds)));
   }
-  const slash = trimmed.lastIndexOf("/");
-  if (slash >= 0 && slash < trimmed.length - 1) {
-    return trimmed.slice(slash + 1);
-  }
-  return trimmed;
+  return displayModelName(concreteClaudeModelId(trimmed, modelIds));
 }
 
 export function joinRunnerModels(ids: Array<string | undefined>): string {

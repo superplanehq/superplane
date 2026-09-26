@@ -8,6 +8,7 @@ import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "./draftStartModel";
+import { SpecificModelIdsProvider } from "./specificModelIds";
 import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "./splitRunActivityGroups";
@@ -141,23 +142,25 @@ export function WorkOrderSplitRunBody({
   );
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
-      <ol
-        ref={follow.scrollRef}
-        onScroll={follow.onScroll}
-        className="min-h-0 min-w-0 flex-1 list-none space-y-6 overflow-x-hidden overflow-y-auto px-3 pb-3"
-        data-testid="split-run-log-scroll"
-      >
-        <SplitRunActivitySections
-          taskAutomationPhases={taskAutomationPhases}
-          pullRequestActivityGroups={pullRequestActivityGroups}
-          renderPhase={renderPhase}
-        />
-      </ol>
-      {follow.showJumpToLatest ? (
-        <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
-      ) : null}
-    </div>
+    <SpecificModelIdsProvider organizationId={organizationId}>
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
+        <ol
+          ref={follow.scrollRef}
+          onScroll={follow.onScroll}
+          className="min-h-0 min-w-0 flex-1 list-none space-y-6 overflow-x-hidden overflow-y-auto px-3 pb-3"
+          data-testid="split-run-log-scroll"
+        >
+          <SplitRunActivitySections
+            taskAutomationPhases={taskAutomationPhases}
+            pullRequestActivityGroups={pullRequestActivityGroups}
+            renderPhase={renderPhase}
+          />
+        </ol>
+        {follow.showJumpToLatest ? (
+          <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
+        ) : null}
+      </div>
+    </SpecificModelIdsProvider>
   );
 }
 

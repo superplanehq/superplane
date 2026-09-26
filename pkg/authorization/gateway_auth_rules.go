@@ -550,6 +550,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "POST", Pattern: "/api/v1/factories/{id}/model-source"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureOrganizationBYOK},
+		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{id}/repository"}: {
 			Resource:                     "factories",
 			Action:                       "update",
