@@ -32,6 +32,7 @@ interface WorkOrderDetailHeaderProps {
   isUpdatingStatus: boolean;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  onSendToBacklog?: () => void;
   className?: string;
 }
 
@@ -63,6 +64,7 @@ const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
   reject: "work-order-reject-button",
   "reject-draft": "work-order-reject-draft-button",
   reopen: "work-order-reopen-open-button",
+  "send-to-backlog": "work-order-send-to-backlog-button",
 };
 
 function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {

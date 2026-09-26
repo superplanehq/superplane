@@ -23,6 +23,7 @@ export type WorkOrderTimelineEventKind =
   | "statusChanged"
   | "commented"
   | "artifactAdded"
+  | "artifactsCleared"
   | "pullRequestAdded"
   | "pullRequestUpdated"
   | "checkReported"
