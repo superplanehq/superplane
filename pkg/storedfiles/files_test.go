@@ -537,6 +537,7 @@ func TestDescriptionForDispatchRewritesReadyFileRefs(t *testing.T) {
 	require.Len(t, files, 1)
 	assert.Equal(t, ready.ID, files[0].ID)
 	assert.Equal(t, "ready.png", files[0].Filename)
+	assert.NotEmpty(t, files[0].Checksum)
 	assert.Contains(t, files[0].URL, "/api/v1/public/files/"+ready.ID.String())
 	assert.Contains(t, rewritten, files[0].URL)
 	assert.NotContains(t, rewritten, blob.FileRef(ready.ID))

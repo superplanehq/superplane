@@ -773,6 +773,7 @@
   }
 
   .workspace-markdown img,
+  .workspace-markdown video,
   .workspace-markdown .work-order-file-image {
     display: block;
     max-width: 100%;
