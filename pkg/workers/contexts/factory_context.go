@@ -176,11 +176,11 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
-	skip, err = c.skipDuplicateDependabotWorkOrder(f)
+	merged, err := c.mergeDependabotWorkOrder(f)
 	if err != nil {
 		return nil, false, err
 	}
-	if skip {
+	if merged {
 		return nil, false, nil
 	}
 
@@ -256,7 +256,11 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 	return hasOrder, nil
 }
 
-func (c *FactoryContext) skipDuplicateDependabotWorkOrder(factoryModel *models.Factory) (bool, error) {
+// mergeDependabotWorkOrder adds a Dependabot alert to the factory's open task
+// for the same package instead of opening a second task. GitHub raises one
+// alert per advisory per manifest, and one dependency update fixes them all.
+// It reports true when the alert was merged and no task must be created.
+func (c *FactoryContext) mergeDependabotWorkOrder(factoryModel *models.Factory) (bool, error) {
 	if c.execution == nil {
 		return false, nil
 	}
@@ -266,23 +270,39 @@ func (c *FactoryContext) skipDuplicateDependabotWorkOrder(factoryModel *models.F
 		return false, nil
 	}
 
-	ref, ok := ghdependabot.AlertRefFromEventData(event.Data.Data())
+	ref, ok := ghdependabot.PackageRefFromEventData(event.Data.Data())
 	if !ok {
 		return false, nil
 	}
 
-	if err := ghdependabot.LockAlertWorkOrder(c.tx, factoryModel, ref); err != nil {
+	if err := ghdependabot.LockPackageWorkOrder(c.tx, factoryModel, ref); err != nil {
 		return false, err
 	}
 
-	hasOrder, err := ghdependabot.AlertHasWorkOrder(c.tx, factoryModel, ref)
+	order, err := ghdependabot.FindOpenPackageWorkOrder(c.tx, factoryModel, ref)
 	if err != nil {
 		return false, err
 	}
-	if hasOrder {
-		log.Infof("skipping Dependabot alert %s#%d: work order already exists", ref.Repository, ref.Number)
+	if order == nil {
+		return false, nil
 	}
-	return hasOrder, nil
+
+	section, ok := ghdependabot.AlertSectionFromEventData(event.Data.Data())
+	if !ok {
+		return true, nil
+	}
+	next := ghdependabot.MergeAlertSection(order.Description, section)
+	if next == order.Description {
+		log.Infof("skipping Dependabot alert for %s in %s: task %s already lists it", ref.Name, ref.Repository, order.ID)
+		return true, nil
+	}
+
+	if err := order.UpdateContent(c.tx, nil, &next); err != nil {
+		return false, err
+	}
+	c.notifyWorkOrderUpdated(factoryModel.ID, order.ID, factory.EventTypeOrderUpdated)
+	log.Infof("merged Dependabot alert for %s in %s into task %s", ref.Name, ref.Repository, order.ID)
+	return true, nil
 }
 
 func (c *FactoryContext) createFactoryWorkOrder(
@@ -313,6 +333,13 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	event, err := models.FindRootEventForRun(c.tx, sourceRunID)
 	if err != nil {
 		return nil
+	}
+
+	// A Dependabot task collects every alert of one package, so its origin
+	// is the package's alerts page and not the first alert.
+	if ref, ok := ghdependabot.PackageRefFromEventData(event.Data.Data()); ok {
+		origin := ref.Origin()
+		return &origin
 	}
 
 	return models.OriginFromIntakeRootEvent(event)

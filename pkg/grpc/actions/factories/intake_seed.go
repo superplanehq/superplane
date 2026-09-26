@@ -414,16 +414,20 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 }
 
 func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
-	settings := defaultProductiveIntakeSettings()
+	return liveIntakeSettings(tx, models.FactoryIntakeSourceProductiveTasks, canvasID, defaultProductiveIntakeSettings())
+}
+
+// liveIntakeSettings reads the settings out of the intake's live canvas. It
+// returns fallback when the canvas cannot be read.
+func liveIntakeSettings(tx *gorm.DB, source string, canvasID uuid.UUID, fallback intakeSettings) intakeSettings {
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{canvasID})
 	if err != nil {
-		return settings
+		return fallback
 	}
 	spec, ok := specs[canvasID]
 	if !ok {
-		return settings
+		return fallback
 	}
-	source := models.FactoryIntakeSourceProductiveTasks
 	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 }
 
