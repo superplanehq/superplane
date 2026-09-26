@@ -108,6 +108,7 @@ const STREAM_SECTION = "bg-muted px-2";
 const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
 const STICKY_NODE = cn("sticky top-8 z-20", STREAM_SECTION);
 const STICKY_STEP = cn("sticky top-[3.375rem] z-10", STREAM_SECTION);
+const EXPANDED_TITLE_FACE = "max-h-48 overflow-y-auto";
 
 const LAST_RUNNING_LINE_PULSE = "data-[last-running-line]:animate-pulse";
 
@@ -147,9 +148,9 @@ function StreamLineTitle({
 }
 
 /**
- * Full bash command or prompt text. It is clamped to two lines so a long
- * prompt does not fill the sticky step header. A subtle toggle shows the rest
- * and hides it again when the text does not fit in two lines.
+ * Full bash command or prompt text. The text is clamped to two lines, and a
+ * toggle appears when it does not fit. An expanded title scrolls in a capped
+ * box, because the sticky step header would otherwise cover the log.
  */
 function CollapsibleStreamTitle({ text }: { text: string }) {
   const textRef = useRef<HTMLSpanElement>(null);
@@ -178,7 +179,10 @@ function CollapsibleStreamTitle({ text }: { text: string }) {
     <span className="flex min-w-0 flex-1 flex-col items-start">
       <span
         ref={textRef}
-        className={cn("w-full whitespace-pre-wrap break-words text-muted-foreground", !expanded && "line-clamp-2")}
+        className={cn(
+          "w-full whitespace-pre-wrap break-words text-muted-foreground",
+          expanded ? EXPANDED_TITLE_FACE : "line-clamp-2",
+        )}
       >
         {text}
       </span>
