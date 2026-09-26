@@ -246,7 +246,7 @@ func TestBuildAgentBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	assert.Equal(t, "echo install-sem-ai", requireBrokerFile(t, files, "setup/01-set-up-semaphore.sh").Content)
 	assert.Equal(
 		t,
-		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
+		AttachmentAgentInstructions+"\n\nThe gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
 		requireBrokerFile(t, files, "prompts/01-implement.txt").Content,
 	)
 }
@@ -272,7 +272,7 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 	t.Parallel()
 
 	prompt := "See ![bug](https://app.example/api/v1/public/files/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1)"
-	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -286,12 +286,50 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 		},
 	})
 
-	require.Len(t, commands, 3)
+	require.Len(t, commands, 4)
 	assert.Equal(t, "Fetch task attachments", commands[1].Name)
-	assert.Contains(t, commands[1].Command, `mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
-	assert.Contains(t, commands[1].Command, `curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
-	assert.Contains(t, commands[1].Command, "sp_file=1")
-	assert.Equal(t, "Implement", commands[2].Name)
+	assert.Contains(t, commands[1].Command, "fetch_task_attachments.sh")
+	assert.Equal(t, "Process task attachments", commands[2].Name)
+	assert.Contains(t, requireBrokerFile(t, files, "fetch_task_attachments.sh").Content, "attachments/manifest.json")
+	assert.Contains(t, requireBrokerFile(t, files, "process_video_attachments.sh").Content, "extract bounded timestamped frames")
+	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "sp_file=1")
+	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, "inspect_attachment")
+	assert.Equal(t, "Implement", commands[3].Name)
+}
+
+func TestBuildAgentBrokerTaskProcessesVideoAttachments(t *testing.T) {
+	t.Parallel()
+
+	prompt := "See the clip"
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+		},
+		Attachments: []TaskAttachment{{
+			ID:          "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+			URL:         "https://app.example/api/v1/public/files/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1",
+			Filename:    "clip.mp4",
+			ContentType: "video/mp4",
+			SizeBytes:   1024,
+			Checksum:    "abc",
+		}},
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.Len(t, commands, 4)
+	assert.Equal(t, "Fetch task attachments", commands[1].Name)
+	assert.Equal(t, "Process task attachments", commands[2].Name)
+	assert.Contains(t, commands[2].Command, "process_video_attachments.sh")
+	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, `"kind": "video"`)
+	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, AttachmentAgentInstructions)
+	assert.Equal(t, "Implement", commands[3].Name)
 }
 
 func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
@@ -315,21 +353,31 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 		RunScript:       "echo run",
 		Steps:           []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
 		DispatchedSteps: dispatched,
-		Model:           "google/gemini-3.7-flash",
+		Attachments: []TaskAttachment{{
+			ID:          fileID,
+			URL:         signed,
+			Filename:    "bug.png",
+			ContentType: "image/png",
+		}},
+		Model: "google/gemini-3.7-flash",
 		PromptCommand: func(promptName, model string) string {
 			return "node run.js " + promptName + " " + model
 		},
 	})
 
-	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, signed)
-	assert.NotContains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, "sp-file://")
-	require.Len(t, commands, 3)
+	prompt := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
+	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.Contains(t, prompt, "inspect_attachment")
+	assert.NotContains(t, prompt, signed)
+	assert.NotContains(t, prompt, "sp-file://")
+	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, signed)
+	require.Len(t, commands, 4)
 	assert.Equal(t, "Fetch task attachments", commands[1].Name)
-	assert.Contains(t, commands[1].Command, "curl -fsSL")
-	assert.Contains(t, commands[1].Command, "sp_file=1")
-	assert.Equal(t, "Implement", commands[2].Name)
-	assert.Contains(t, commands[2].Preview, "sp-file://"+fileID)
-	assert.NotContains(t, commands[2].Preview, "sp_file=1")
+	assert.Contains(t, commands[1].Command, "fetch_task_attachments.sh")
+	assert.Equal(t, "Process task attachments", commands[2].Name)
+	assert.Equal(t, "Implement", commands[3].Name)
+	assert.Contains(t, commands[3].Preview, "sp-file://"+fileID)
+	assert.NotContains(t, commands[3].Preview, "sp_file=1")
 }
 
 func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {

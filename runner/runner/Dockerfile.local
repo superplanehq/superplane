@@ -39,6 +39,7 @@ RUN apt-get update \
     jq \
     openssl \
     python3 \
+    ffmpeg \
   && mkdir -p -m 755 /etc/apt/keyrings \
   && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
@@ -70,6 +71,22 @@ RUN apt-get update \
   && test -s /tmp/playwright-smoke.png \
   && rm /tmp/playwright-smoke.png \
   && rm -rf /var/lib/apt/lists/*
+
+COPY packer/scripts/install-media-tools.sh /tmp/install-media-tools.sh
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends cmake g++ make \
+  && chmod +x /tmp/install-media-tools.sh \
+  && /tmp/install-media-tools.sh \
+  && rm /tmp/install-media-tools.sh \
+  && apt-get purge -y cmake g++ make \
+  && apt-get autoremove -y --purge \
+  && command -v ffmpeg \
+  && command -v ffprobe \
+  && command -v whisper-cli \
+  && test -s /usr/local/share/whisper/ggml-tiny.bin \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV WHISPER_MODEL=/usr/local/share/whisper/ggml-tiny.bin
 
 COPY --from=build /out/runner /usr/local/bin/runner
 COPY --from=build /out/mint-runner-registration /usr/local/bin/mint-runner-registration
