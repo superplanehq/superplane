@@ -14,7 +14,9 @@ describe("bearerAuthorizationValue", () => {
 });
 
 describe("catalogHeaderSecretName", () => {
-  it("names the secret from the server name", () => {
-    expect(catalogHeaderSecretName("github")).toBe("github-mcp");
+  it("names the secret from the server name and a unique part", () => {
+    expect(catalogHeaderSecretName("github", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")).toBe(
+      "github-mcp-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    );
   });
 });

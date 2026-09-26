@@ -9,6 +9,6 @@ export function bearerAuthorizationValue(token: string): string {
   return `Bearer ${trimmed}`;
 }
 
-export function catalogHeaderSecretName(serverName: string): string {
-  return `${serverName}-mcp`;
+export function catalogHeaderSecretName(serverName: string, uniquePart: string): string {
+  return `${serverName}-mcp-${uniquePart}`;
 }

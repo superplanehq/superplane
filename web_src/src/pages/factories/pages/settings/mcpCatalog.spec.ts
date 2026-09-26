@@ -4,6 +4,7 @@ import { AGENT_RESOURCES_COPY, GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentR
 import {
   catalogConnectionDefaults,
   catalogEntryForResource,
+  catalogOAuthResourceForEntry,
   filterMCPCatalog,
   groupMCPCatalog,
   MCP_CATALOG,
@@ -52,11 +53,47 @@ describe("MCP_CATALOG", () => {
     expect(catalogConnectionDefaults(undefined)).toBeUndefined();
   });
 
-  it("matches a saved server to a catalog entry by URL", () => {
-    expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp" })?.id).toBe("sentry");
-    expect(catalogEntryForResource({ url: "https://mcp.linear.app/mcp" })?.id).toBe("linear");
-    expect(catalogEntryForResource({ url: "https://mcp.example.com/mcp" })).toBeUndefined();
+  it("matches a saved server to a catalog entry by URL and auth", () => {
+    expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_OAUTH" })?.id).toBe("sentry");
+    expect(catalogEntryForResource({ url: "https://mcp.linear.app/mcp", auth: "AUTH_OAUTH" })?.id).toBe("linear");
+    expect(catalogEntryForResource({ url: "https://api.githubcopilot.com/mcp/", auth: "AUTH_HEADERS" })?.id).toBe(
+      "github",
+    );
+    expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_HEADERS" })).toBeUndefined();
+    expect(catalogEntryForResource({ url: "https://mcp.example.com/mcp", auth: "AUTH_OAUTH" })).toBeUndefined();
     expect(catalogEntryForResource(undefined)).toBeUndefined();
+  });
+});
+
+describe("catalogOAuthResourceForEntry", () => {
+  const sentry = MCP_CATALOG.find((entry) => entry.id === "sentry");
+  const github = MCP_CATALOG.find((entry) => entry.id === "github");
+
+  it("finds an OAuth server that already uses the catalog URL", () => {
+    expect(sentry).toBeDefined();
+    expect(
+      catalogOAuthResourceForEntry(
+        [
+          { url: "https://mcp.example.com/mcp", auth: "AUTH_OAUTH" },
+          { url: "https://mcp.sentry.dev/mcp", auth: "AUTH_OAUTH" },
+        ],
+        sentry!,
+      ),
+    ).toEqual({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_OAUTH" });
+  });
+
+  it("ignores a header server on the same catalog URL", () => {
+    expect(sentry).toBeDefined();
+    expect(
+      catalogOAuthResourceForEntry([{ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_HEADERS" }], sentry!),
+    ).toBeUndefined();
+  });
+
+  it("does not resume header catalog entries", () => {
+    expect(github).toBeDefined();
+    expect(
+      catalogOAuthResourceForEntry([{ url: "https://api.githubcopilot.com/mcp/", auth: "AUTH_HEADERS" }], github!),
+    ).toBeUndefined();
   });
 });
 

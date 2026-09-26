@@ -18,6 +18,11 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+function logAction(label: string, ...args: unknown[]) {
+  // eslint-disable-next-line no-console
+  console.log(label, ...args);
+}
+
 function HeaderSetup() {
   const [open, setOpen] = useState(true);
   return (
@@ -25,9 +30,17 @@ function HeaderSetup() {
       open={open}
       entry={github}
       isSaving={false}
-      onClose={() => setOpen(false)}
-      onSignIn={async () => undefined}
-      onSaveToken={async () => setOpen(false)}
+      onClose={() => {
+        logAction("close GitHub setup");
+        setOpen(false);
+      }}
+      onSignIn={async (entry) => {
+        logAction("sign in", entry.id);
+      }}
+      onSaveToken={async (entry, token) => {
+        logAction("save token", entry.id, token);
+        setOpen(false);
+      }}
     />
   );
 }
@@ -39,9 +52,17 @@ function OAuthSetup() {
       open={open}
       entry={linear}
       isSaving={false}
-      onClose={() => setOpen(false)}
-      onSignIn={async () => setOpen(false)}
-      onSaveToken={async () => undefined}
+      onClose={() => {
+        logAction("close Linear setup");
+        setOpen(false);
+      }}
+      onSignIn={async (entry) => {
+        logAction("sign in", entry.id);
+        setOpen(false);
+      }}
+      onSaveToken={async (entry, token) => {
+        logAction("save token", entry.id, token);
+      }}
     />
   );
 }
@@ -61,9 +82,17 @@ function SentrySetup() {
       open={open}
       entry={sentry}
       isSaving={false}
-      onClose={() => setOpen(false)}
-      onSignIn={async () => setOpen(false)}
-      onSaveToken={async () => undefined}
+      onClose={() => {
+        logAction("close Sentry setup");
+        setOpen(false);
+      }}
+      onSignIn={async (entry) => {
+        logAction("sign in", entry.id);
+        setOpen(false);
+      }}
+      onSaveToken={async (entry, token) => {
+        logAction("save token", entry.id, token);
+      }}
     />
   );
 }

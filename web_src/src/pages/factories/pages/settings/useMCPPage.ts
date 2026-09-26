@@ -18,7 +18,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-import { catalogEntryForResource, type MCPCatalogEntry } from "./mcpCatalog";
+import { catalogEntryForResource, catalogOAuthResourceForEntry, type MCPCatalogEntry } from "./mcpCatalog";
 import { bearerAuthorizationValue, catalogHeaderSecretName, MCP_HEADER_SECRET_KEY } from "./mcpHeaderAuth";
 
 function useMCPAddDialog() {
@@ -101,6 +101,7 @@ export function useMCPPage() {
         setConnectionOpen(true);
         return;
       }
+      setEditResource(catalogOAuthResourceForEntry(connections.data ?? [], entry));
       setCatalogEntry(entry);
     },
     startOAuthRedirect: (resource: FactoriesFactoryAgentResource) => startOAuthRedirect(mutations, resource),
@@ -108,7 +109,11 @@ export function useMCPPage() {
       saveConnection(mutations, editResource, draft, closeConnection),
     saveCatalogToken: (entry: MCPCatalogEntry, token: string) =>
       saveCatalogToken(mutations, entry, token, closeCatalogSetup),
-    startCatalogOAuth: (entry: MCPCatalogEntry) => startCatalogOAuth(mutations, entry, editResource, closeCatalogSetup),
+    startCatalogOAuth: (entry: MCPCatalogEntry) =>
+      startCatalogOAuth(mutations, entry, editResource ?? catalogOAuthResourceForEntry(connections.data ?? [], entry), {
+        rememberResource: setEditResource,
+        onRedirecting: closeCatalogSetup,
+      }),
     disconnectResource: (resource: FactoriesFactoryAgentResource) => disconnectResource(mutations, resource),
     toggleEnabled: (resource: FactoriesFactoryAgentResource, enabled: boolean) =>
       toggleEnabled(mutations, resource, enabled),
@@ -166,33 +171,44 @@ async function startCatalogOAuth(
   mutations: MCPMutations,
   entry: MCPCatalogEntry,
   existing: FactoriesFactoryAgentResource | undefined,
-  onCreated: () => void,
+  callbacks: {
+    rememberResource: (resource: FactoriesFactoryAgentResource) => void;
+    onRedirecting: () => void;
+  },
 ) {
+  let resource = existing;
   try {
-    if (existing?.id) {
-      onCreated();
-      await startOAuthRedirect(mutations, existing);
+    if (!resource?.id) {
+      resource = await mutations.createResource.mutateAsync({
+        kind: "KIND_MCP_SERVER",
+        name: entry.name,
+        enabled: true,
+        url: entry.url,
+        auth: "AUTH_OAUTH",
+        headers: [],
+      });
+      callbacks.rememberResource(resource);
+    }
+    if (!resource?.id) {
       return;
     }
-    const resource = await mutations.createResource.mutateAsync({
-      kind: "KIND_MCP_SERVER",
-      name: entry.name,
-      enabled: true,
-      url: entry.url,
-      auth: "AUTH_OAUTH",
-      headers: [],
-    });
-    onCreated();
-    await startOAuthRedirect(mutations, resource);
+    const result = await mutations.startOAuth.mutateAsync(resource.id);
+    if (!result.authorizationUrl) {
+      return;
+    }
+    callbacks.onRedirecting();
+    window.location.assign(result.authorizationUrl);
   } catch (error) {
-    showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.createFailed));
+    showErrorToast(
+      getApiErrorMessage(error, resource?.id ? AGENT_RESOURCES_COPY.connectFailed : AGENT_RESOURCES_COPY.createFailed),
+    );
     throw error;
   }
 }
 
 async function saveCatalogToken(mutations: MCPMutations, entry: MCPCatalogEntry, token: string, onSaved: () => void) {
   try {
-    const secretName = catalogHeaderSecretName(entry.name);
+    const secretName = catalogHeaderSecretName(entry.name, crypto.randomUUID());
     const secretResult = await mutations.createSecret.mutateAsync({
       name: secretName,
       environmentVariables: [{ name: MCP_HEADER_SECRET_KEY, value: bearerAuthorizationValue(token) }],

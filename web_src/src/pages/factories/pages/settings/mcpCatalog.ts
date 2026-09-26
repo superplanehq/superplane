@@ -43,12 +43,25 @@ export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogCo
   };
 }
 
-export function catalogEntryForResource(resource?: { url?: string }): MCPCatalogEntry | undefined {
+export function catalogEntryForResource(resource?: {
+  url?: string;
+  auth?: FactoryAgentResourceAuth;
+}): MCPCatalogEntry | undefined {
   const url = resource?.url?.trim();
   if (!url) {
     return undefined;
   }
-  return MCP_CATALOG.find((entry) => entry.url === url);
+  return MCP_CATALOG.find((entry) => entry.url === url && entry.auth === resource.auth);
+}
+
+export function catalogOAuthResourceForEntry<T extends { url?: string; auth?: FactoryAgentResourceAuth }>(
+  resources: T[],
+  entry: MCPCatalogEntry,
+): T | undefined {
+  if (entry.auth !== "AUTH_OAUTH") {
+    return undefined;
+  }
+  return resources.find((resource) => resource.auth === "AUTH_OAUTH" && resource.url?.trim() === entry.url);
 }
 
 export const CUSTOM_MCP_CATALOG_ID = "custom";

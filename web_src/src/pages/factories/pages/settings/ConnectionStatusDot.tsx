@@ -15,11 +15,11 @@ export function ConnectionStatusDot({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span
-          role="img"
+        <button
+          type="button"
           aria-label={status}
           className={cn(
-            "inline-block size-2 shrink-0 rounded-full",
+            "inline-block size-2 shrink-0 rounded-full border-0 p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             connected ? "bg-emerald-500" : "bg-muted-foreground/40",
             className,
           )}
