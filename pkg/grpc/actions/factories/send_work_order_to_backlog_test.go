@@ -203,6 +203,84 @@ func Test__SendWorkOrderToBacklog(t *testing.T) {
 		assert.True(t, found)
 	})
 
+	t.Run("stamps a closed GitHub pull request when a later close fails", func(t *testing.T) {
+		factory := newFactory(t)
+		order := closedOrder(t, factory, "Two PRs")
+		_, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL:   "https://github.com/acme/app/pull/45",
+			State: models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+		_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL:   "https://github.com/acme/app/pull/46",
+			State: models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		api := &fakeFactoryGitHub{editErr: errors.New("second refused"), editFailAfter: 1}
+		useGitHub(t, api, nil)
+
+		_, err = SendWorkOrderToBacklog(ctx, IntakeDependencies{}, orgID, &pb.SendWorkOrderToBacklogRequest{
+			FactoryId:         factory.ID.String(),
+			OrderId:           order.ID.String(),
+			ClosePullRequests: true,
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, 2, api.editCalls)
+
+		reloaded, err := factory.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+
+		grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+		require.NoError(t, err)
+		require.Len(t, grouped[order.ID], 2)
+		states := []string{grouped[order.ID][0].State, grouped[order.ID][1].State}
+		assert.ElementsMatch(t, []string{
+			models.FactoryPullRequestStateClosed,
+			models.FactoryPullRequestStateOpen,
+		}, states)
+	})
+
+	t.Run("does not undo a concurrent reopen", func(t *testing.T) {
+		factory := newFactory(t)
+		order := closedOrder(t, factory, "Reopened during close")
+		_, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL:   "https://github.com/acme/app/pull/47",
+			State: models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		api := &fakeFactoryGitHub{onEdit: func() {
+			_, reopenErr := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+				ToState: models.FactoryWorkOrderStateOpen,
+				Actor:   &r.User,
+			})
+			require.NoError(t, reopenErr)
+		}}
+		useGitHub(t, api, nil)
+
+		_, err = SendWorkOrderToBacklog(ctx, IntakeDependencies{}, orgID, &pb.SendWorkOrderToBacklogRequest{
+			FactoryId:         factory.ID.String(),
+			OrderId:           order.ID.String(),
+			ClosePullRequests: true,
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+
+		reloaded, err := factory.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+
+		grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+		require.NoError(t, err)
+		require.Len(t, grouped[order.ID], 1)
+		assert.Equal(t, models.FactoryPullRequestStateClosed, grouped[order.ID][0].State)
+	})
+
 	t.Run("leaves pull requests and artifacts when flags are off", func(t *testing.T) {
 		factory := newFactory(t)
 		order := closedOrder(t, factory, "Keep data")

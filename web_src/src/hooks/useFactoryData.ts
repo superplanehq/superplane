@@ -211,6 +211,7 @@ function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions):
     userId: options?.userId,
     unassigned: options?.unassigned,
     results: options?.results,
+    lineId: options?.lineId,
   });
 }
 
@@ -235,6 +236,7 @@ export function useFactoryWorkOrdersPage(
             ...(pageQuery.userId ? { userId: pageQuery.userId } : {}),
             ...(pageQuery.unassigned ? { unassigned: true } : {}),
             ...(pageQuery.results.length > 0 ? { results: [...pageQuery.results] } : {}),
+            ...(pageQuery.lineId ? { lineId: pageQuery.lineId } : {}),
             ...(pageParam ? { beforeId: pageParam.beforeId } : {}),
           },
         }),

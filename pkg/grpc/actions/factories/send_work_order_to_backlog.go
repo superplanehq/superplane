@@ -76,13 +76,16 @@ func SendWorkOrderToBacklog(
 		if err != nil {
 			return err
 		}
+		if err := order.LockForUpdate(tx); err != nil {
+			return err
+		}
 		if req.GetClosePullRequests() {
-			now := time.Now()
-			for i := range closeable {
-				if err := stampFactoryPullRequestClosed(tx, &closeable[i], false, nil, &now); err != nil {
-					return err
-				}
+			if err := stampClosedPullRequests(tx, closeable); err != nil {
+				return err
 			}
+		}
+		if order.State != models.FactoryWorkOrderStateClosed {
+			return errWorkOrderNotClosedForBacklog
 		}
 		if req.GetClearArtifacts() {
 			if _, err := order.DeleteArtifacts(tx, &actor); err != nil {
@@ -147,6 +150,16 @@ func closeablePullRequests(pullRequests []models.FactoryPullRequest) []models.Fa
 	return closeable
 }
 
+func stampClosedPullRequests(tx *gorm.DB, pullRequests []models.FactoryPullRequest) error {
+	now := time.Now()
+	for i := range pullRequests {
+		if err := stampFactoryPullRequestClosed(tx, &pullRequests[i], false, nil, &now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func closePreviousPullRequests(
 	ctx context.Context,
 	db *gorm.DB,
@@ -169,12 +182,15 @@ func closePreviousPullRequests(
 	}
 
 	closed := github.Ptr("closed")
-	for _, pullRequest := range pullRequests {
-		_, _, err := client.EditPullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), &github.PullRequest{
+	for i := range pullRequests {
+		_, _, err := client.EditPullRequest(ctx, pullRequests[i].Repository, int(pullRequests[i].Number), &github.PullRequest{
 			State: closed,
 		})
 		if err != nil {
 			return errors.Join(errCannotClosePullRequest, err)
+		}
+		if err := stampClosedPullRequests(db, pullRequests[i:i+1]); err != nil {
+			return err
 		}
 	}
 	return nil

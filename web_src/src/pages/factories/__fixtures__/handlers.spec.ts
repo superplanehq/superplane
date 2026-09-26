@@ -86,6 +86,25 @@ describe("matchFactoryPageFixture", () => {
     expect(rejectedBody.orders.every((order) => order.result === "RESULT_REJECTED")).toBe(true);
   });
 
+  it("filters listed tasks by line", async () => {
+    const fixture = structuredClone(lineMetricsFactoriesFixture);
+    const page = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_CLOSED&results=RESULT_FAILED&lineId=${REFUND_LINE_PLAN_ID}&limit=20`,
+      undefined,
+      fixture,
+    );
+    const body = (await page.json()) as {
+      orders: Array<{ id?: string; lineDispatches?: Array<{ line?: { id?: string } }> }>;
+    };
+    expect(body.orders.length).toBeGreaterThan(0);
+    expect(
+      body.orders.every((order) => {
+        const dispatches = order.lineDispatches ?? [];
+        return dispatches.length === 0 || dispatches.some((dispatch) => dispatch.line?.id === REFUND_LINE_PLAN_ID);
+      }),
+    ).toBe(true);
+  });
+
   it("sends a closed task to the Backlog and can close pull requests and clear artifacts", async () => {
     const fixture = structuredClone(lineMetricsFactoriesFixture);
     const orderId = "wo-board-implement-failed";

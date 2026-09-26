@@ -924,6 +924,16 @@ function listWorkOrdersFixture(
   if (results.length > 0) {
     filtered = filtered.filter((order) => order.result && results.includes(order.result));
   }
+  const lineId = url.searchParams.get("lineId");
+  if (lineId) {
+    filtered = filtered.filter((order) => {
+      const dispatches = order.lineDispatches ?? [];
+      if (dispatches.length === 0) {
+        return true;
+      }
+      return dispatches.some((dispatch) => dispatch.line?.id === lineId);
+    });
+  }
   if (userId || unassigned) {
     filtered = filtered.filter((order) => {
       const owners = (order.assignees ?? []).flatMap((assignee) => (assignee.id ? [assignee.id] : []));

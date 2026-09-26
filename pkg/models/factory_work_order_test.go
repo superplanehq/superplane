@@ -849,31 +849,32 @@ func TestFactoryWorkOrder_DeleteArtifacts(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "clear-artifacts")
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Clear target", "", &userID, nil, nil)
+	db := database.DB(t.Context())
+	order, err := factoryModel.CreateWorkOrder(db, "Clear target", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+	_, err = order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
 		Type:      FactoryWorkOrderArtifactTypeMarkdown,
 		Data:      map[string]any{"title": "plan.md", "body": "# Plan"},
 		CreatedBy: &userID,
 	})
 	require.NoError(t, err)
-	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+	_, err = order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
 		Type:      FactoryWorkOrderArtifactTypeBranch,
 		Data:      map[string]any{"name": "feature/clear"},
 		CreatedBy: &userID,
 	})
 	require.NoError(t, err)
 
-	count, err := order.DeleteArtifacts(database.Conn(), &userID)
+	count, err := order.DeleteArtifacts(db, &userID)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
 
-	remaining, err := order.ListArtifacts(database.Conn())
+	remaining, err := order.ListArtifacts(db)
 	require.NoError(t, err)
 	assert.Empty(t, remaining)
 
-	events, err := order.ListEvents(database.Conn(), 20, nil)
+	events, err := order.ListEvents(db, 20, nil)
 	require.NoError(t, err)
 	cleared := findEventOfType(t, events, factory.EventTypeOrderArtifactsCleared)
 	var payload factory.WorkOrderArtifactsCleared

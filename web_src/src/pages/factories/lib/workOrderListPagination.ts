@@ -5,6 +5,8 @@ import type {
   FactoriesWorkOrderSummary,
 } from "@/api-client";
 
+import { belongsToLineBoard } from "./linePhaseRuns";
+
 export const BOARD_BACKLOG_PAGE_SIZE = 20;
 export const BOARD_OPEN_PAGE_SIZE = 50;
 export const BOARD_DONE_PAGE_SIZE = 20;
@@ -73,6 +75,7 @@ export type WorkOrdersPageQuery = {
   userId?: string;
   unassigned: boolean;
   results: readonly FactoriesWorkOrderResult[];
+  lineId?: string;
 };
 
 export function normalizeWorkOrdersPageQuery(query?: Partial<WorkOrdersPageQuery>): WorkOrdersPageQuery {
@@ -80,6 +83,7 @@ export function normalizeWorkOrdersPageQuery(query?: Partial<WorkOrdersPageQuery
     userId: query?.userId,
     unassigned: Boolean(query?.unassigned),
     results: [...(query?.results ?? [])].sort(),
+    lineId: query?.lineId,
   };
 }
 
@@ -96,12 +100,14 @@ export function factoryWorkOrdersPageKey(
     normalized.userId ?? "",
     normalized.unassigned ? "unassigned" : "",
     normalized.results.join(","),
+    normalized.lineId ?? "",
   ] as const;
 }
 
 export function workOrdersPageQueryFromKey(queryKey: readonly unknown[]): WorkOrdersPageQuery {
   const userId = queryKey[5];
   const resultsJoined = queryKey[7];
+  const lineId = queryKey[8];
   return normalizeWorkOrdersPageQuery({
     userId: typeof userId === "string" && userId.length > 0 ? userId : undefined,
     unassigned: queryKey[6] === "unassigned",
@@ -109,6 +115,7 @@ export function workOrdersPageQueryFromKey(queryKey: readonly unknown[]): WorkOr
       typeof resultsJoined === "string" && resultsJoined.length > 0
         ? (resultsJoined.split(",") as FactoriesWorkOrderResult[])
         : [],
+    lineId: typeof lineId === "string" && lineId.length > 0 ? lineId : undefined,
   });
 }
 
@@ -123,9 +130,12 @@ export function workOrderMatchesUser(
 }
 
 export function workOrderMatchesPageQuery(
-  order: Pick<FactoriesWorkOrderSummary, "assignees" | "createdBy">,
+  order: Pick<FactoriesWorkOrderSummary, "assignees" | "createdBy" | "lineDispatches">,
   query: WorkOrdersPageQuery,
 ): boolean {
+  if (query.lineId && !belongsToLineBoard(order, query.lineId)) {
+    return false;
+  }
   const isUnassigned = (order.assignees ?? []).every((assignee) => !assignee.id);
   if (query.userId && query.unassigned) {
     return isUnassigned || workOrderMatchesUser(order, query.userId);

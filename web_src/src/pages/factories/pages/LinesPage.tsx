@@ -919,6 +919,7 @@ function LineDetailHeader({
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
+          lineId={line.id}
           canManage={canUpdate}
           onOpenChange={(open) => {
             if (!open) {

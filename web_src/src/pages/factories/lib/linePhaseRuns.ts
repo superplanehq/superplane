@@ -262,7 +262,7 @@ function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
 // A finished task belongs on this board when it ran on this line, or
 // when it closed before any line picked it up — the same rule the shared
 // backlog follows.
-function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+export function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
   const dispatches = order.lineDispatches ?? [];
   if (dispatches.length === 0) {
     return true;

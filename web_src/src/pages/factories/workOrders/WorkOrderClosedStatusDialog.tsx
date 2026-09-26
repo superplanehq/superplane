@@ -22,6 +22,7 @@ export interface WorkOrderClosedStatusDialogProps {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  lineId?: string;
   canManage?: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -32,12 +33,14 @@ export function WorkOrderClosedStatusDialog({
   organizationId,
   factoryId,
   factoryKey,
+  lineId,
   canManage = true,
   onOpenChange,
 }: WorkOrderClosedStatusDialogProps) {
   const copy = CLOSED_STATUS_DIALOG_COPY[status];
   const page = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
     results: [closedWorkOrderResultForDialogStatus(status)],
+    lineId,
   });
 
   return (

@@ -70,11 +70,13 @@ describe("workOrderListPagination", () => {
       userId: "user-1",
       unassigned: true,
       results: [],
+      lineId: undefined,
     });
     expect(workOrdersPageQueryFromKey(factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_DRAFT"]))).toEqual({
       userId: undefined,
       unassigned: false,
       results: [],
+      lineId: undefined,
     });
   });
 
@@ -86,6 +88,20 @@ describe("workOrderListPagination", () => {
       userId: undefined,
       unassigned: false,
       results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+      lineId: undefined,
+    });
+  });
+
+  it("stores the line on the page key", () => {
+    const key = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_CLOSED"], {
+      lineId: "line-1",
+      results: ["RESULT_FAILED"],
+    });
+    expect(workOrdersPageQueryFromKey(key)).toEqual({
+      userId: undefined,
+      unassigned: false,
+      results: ["RESULT_FAILED"],
+      lineId: "line-1",
     });
   });
 

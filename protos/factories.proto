@@ -1586,6 +1586,8 @@ message ListWorkOrdersRequest {
   uint32 limit = 6;
   // Return orders older than this id in updated_at DESC, id DESC order.
   string before_id = 7;
+  // When set, return orders that ran on this line, plus orders with no line.
+  string line_id = 8;
 }
 
 message ListWorkOrdersResponse {

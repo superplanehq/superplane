@@ -38,6 +38,7 @@ describe("WorkOrderClosedStatusDialog", () => {
           organizationId="org-1"
           factoryId="factory-1"
           factoryKey="RF"
+          lineId="line-1"
           onOpenChange={vi.fn()}
         />
       </MemoryRouter>,
@@ -45,6 +46,7 @@ describe("WorkOrderClosedStatusDialog", () => {
 
     expect(useFactoryWorkOrdersPage).toHaveBeenCalledWith("org-1", "factory-1", ["STATE_CLOSED"], 20, {
       results: ["RESULT_FAILED"],
+      lineId: "line-1",
     });
     expect(screen.getByTestId("work-order-failed-dialog")).toHaveTextContent("These tasks closed as failed.");
     expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
@@ -76,6 +78,7 @@ describe("WorkOrderClosedStatusDialog", () => {
 
     expect(useFactoryWorkOrdersPage).toHaveBeenCalledWith("org-1", "factory-1", ["STATE_CLOSED"], 20, {
       results: ["RESULT_REJECTED"],
+      lineId: undefined,
     });
     expect(screen.getByTestId("work-order-rejected-dialog")).toHaveTextContent(
       "Archive, Reject, and Stop and Close mark a task as Rejected.",
