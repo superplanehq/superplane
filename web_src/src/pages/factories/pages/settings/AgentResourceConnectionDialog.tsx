@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type {
@@ -20,7 +21,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SecretKeyFieldRenderer } from "@/ui/configurationFieldRenderer/SecretKeyFieldRenderer";
 
-import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
+import { AGENT_RESOURCES_COPY, type AgentResourceInstructionStep } from "./agentResourceCopy";
 
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
 const RESERVED_NAME = "superplane";
@@ -43,8 +44,24 @@ export type AgentResourceConnectionDraft = {
   headers: FactoriesFactoryAgentResourceHeader[];
 };
 
+export type AgentResourceConnectionDefaults = Partial<AgentResourceConnectionDraft> & {
+  instructions?: readonly AgentResourceInstructionStep[];
+};
+
 function emptyHeader(): HeaderDraft {
   return { name: "", secretName: "", secretKey: "" };
+}
+
+function headersFromDefaults(defaults?: AgentResourceConnectionDefaults): HeaderDraft[] {
+  const headers = defaults?.headers ?? [];
+  if (headers.length === 0) {
+    return [emptyHeader()];
+  }
+  return headers.map((header) => ({
+    name: header.name ?? "",
+    secretName: header.secretName ?? "",
+    secretKey: header.secretKey ?? "",
+  }));
 }
 
 function headersFromResource(resource?: FactoriesFactoryAgentResource): HeaderDraft[] {
@@ -111,7 +128,7 @@ export function AgentResourceConnectionDialog({
   open: boolean;
   organizationId: string;
   resource?: FactoriesFactoryAgentResource;
-  defaults?: Partial<AgentResourceConnectionDraft>;
+  defaults?: AgentResourceConnectionDefaults;
   isSaving: boolean;
   onClose: () => void;
   onSave: (draft: AgentResourceConnectionDraft) => Promise<void>;
@@ -134,7 +151,7 @@ export function AgentResourceConnectionDialog({
     setAuth(
       resource ? (resource.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS") : (defaults?.auth ?? "AUTH_OAUTH"),
     );
-    setHeaders(headersFromResource(resource));
+    setHeaders(resource ? headersFromResource(resource) : headersFromDefaults(defaults));
     setNameError("");
     setUrlError("");
     setHeaderError("");
@@ -182,6 +199,7 @@ export function AgentResourceConnectionDialog({
           url={url}
           auth={auth}
           headers={headers}
+          instructions={defaults?.instructions}
           nameError={nameError}
           urlError={urlError}
           headerError={headerError}
@@ -214,12 +232,59 @@ export function AgentResourceConnectionDialog({
   );
 }
 
+function CatalogInstructions({ instructions }: { instructions?: readonly AgentResourceInstructionStep[] }) {
+  if (!instructions?.length) {
+    return null;
+  }
+  return (
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-2" data-testid="agent-resource-instructions">
+      <p className="text-[13px] font-medium text-foreground">{AGENT_RESOURCES_COPY.catalogInstructionsTitle}</p>
+      <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[12px] text-muted-foreground">
+        {instructions.map((step, index) => (
+          <li key={instructionStepKey(step, index)}>
+            <CatalogInstructionStep step={step} />
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function CatalogInstructionStep({ step }: { step: AgentResourceInstructionStep }) {
+  if (typeof step === "string") {
+    return step;
+  }
+  return (
+    <>
+      {step.before}
+      <a
+        href={step.href}
+        target="_blank"
+        rel="external noopener noreferrer"
+        className="inline-flex items-center gap-0.5 text-foreground underline underline-offset-2"
+      >
+        {step.label}
+        <ExternalLink className="size-3" aria-hidden />
+      </a>
+      {step.after}
+    </>
+  );
+}
+
+function instructionStepKey(step: AgentResourceInstructionStep, index: number): string {
+  if (typeof step === "string") {
+    return step;
+  }
+  return `${index}:${step.href}:${step.label}`;
+}
+
 function ConnectionDialogFields({
   organizationId,
   name,
   url,
   auth,
   headers,
+  instructions,
   nameError,
   urlError,
   headerError,
@@ -233,6 +298,7 @@ function ConnectionDialogFields({
   url: string;
   auth: FactoryAgentResourceAuth;
   headers: HeaderDraft[];
+  instructions?: readonly AgentResourceInstructionStep[];
   nameError: string;
   urlError: string;
   headerError: string;
@@ -243,6 +309,7 @@ function ConnectionDialogFields({
 }) {
   return (
     <div className="flex flex-col gap-4">
+      <CatalogInstructions instructions={instructions} />
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="agent-resource-name">{AGENT_RESOURCES_COPY.nameLabel}</Label>
         <Input
