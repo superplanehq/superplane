@@ -1,10 +1,20 @@
 import type { FactoriesFactory } from "@/api-client";
-import { GITHUB_SETUP_ORG_PARAM, GITHUB_SETUP_REQUEST_PARAM } from "@/lib/integrationSetupReturn";
+import {
+  GITHUB_SETUP_INTEGRATION_PARAM,
+  GITHUB_SETUP_ORG_PARAM,
+  GITHUB_SETUP_REQUEST_PARAM,
+} from "@/lib/integrationSetupReturn";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 
-const RESUME_SEARCH_PARAMS = ["step", "pick", GITHUB_SETUP_REQUEST_PARAM, GITHUB_SETUP_ORG_PARAM] as const;
+const RESUME_SEARCH_PARAMS = [
+  "step",
+  "pick",
+  GITHUB_SETUP_REQUEST_PARAM,
+  GITHUB_SETUP_ORG_PARAM,
+  GITHUB_SETUP_INTEGRATION_PARAM,
+] as const;
 
 /**
  * Maps the first-run `/onboarding?...` URL to the org-scoped setup path that

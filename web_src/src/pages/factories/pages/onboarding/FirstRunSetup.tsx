@@ -320,6 +320,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     return (
       <FirstRunConnectScreen
         loading={flow.pickerLoading}
+        pickerExpected={flow.pickerShowing}
+        syncError={flow.githubCallbackSyncError}
         installRequested={flow.installRequested}
         githubOrganizations={flow.githubOrganizations}
         {...pickerPropsFor(flow)}
@@ -330,6 +332,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
+        onRetrySync={flow.retryGithubCallbackSync}
       />
     );
   }
@@ -337,15 +340,15 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "choose") {
     return (
       <FirstRunChooseScreen
-        repositories={model.repositories}
-        selectedRepository={setup.selectedRepo}
-        loading={model.repositoriesLoading}
+        repositories={flow.repositories ?? model.repositories}
+        selectedRepository={flow.selectedRepository ?? setup.selectedRepo}
+        loading={flow.installation ? false : model.repositoriesLoading}
         saving={flow.blockingAction === "saving-repository"}
         chrome={chromeFor("choose")}
-        sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
-        organizationName={model.githubOwner}
-        onSelectRepository={setup.selectRepo}
-        onEditConnection={() => model.requestConfigure()}
+        sphere={sphereFor("choose", setup.selectedRepo, flow.owner ?? model.githubOwner)}
+        organizationName={flow.owner ?? model.githubOwner}
+        onSelectRepository={flow.installation ? flow.selectRepository : setup.selectRepo}
+        onEditConnection={() => (flow.installation ? flow.goToScreen("connect", "picker") : model.requestConfigure())}
         onContinue={() => void flow.continueFromRepository()}
       />
     );

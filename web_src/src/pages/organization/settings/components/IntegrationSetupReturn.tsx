@@ -6,10 +6,11 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import {
-  hasGitHubSetupRequest,
+  hasGitHubSetupReturn,
   hasIntegrationSetupStay,
+  isOnboardingSetupReturnPath,
   peekIntegrationSetupReturn,
-  withGitHubSetupRequest,
+  withGitHubSetupReturn,
 } from "@/lib/integrationSetupReturn";
 
 interface IntegrationSetupReturnProps {
@@ -35,23 +36,23 @@ export function IntegrationSetupReturn({ organizationId, children }: Integration
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const stayOnPage = hasIntegrationSetupStay(searchParams.toString());
   const { has, isLoading: featuresLoading } = useExperimentalFeature(organizationId);
   // Peek on each render because provider callbacks use the organization UID.
   // OrganizationScope later replaces that UID with the slug that keys storage.
   // The destination page deletes the marker after navigation.
   const storedReturn = peekIntegrationSetupReturn(organizationId);
+  const stayOnPage = hasIntegrationSetupStay(searchParams.toString()) && !isOnboardingSetupReturnPath(storedReturn);
   const search = searchParams.toString();
   const factoriesOnboardingFallback =
     !featuresLoading &&
     has(FEATURE_FACTORIES) &&
     !storedReturn &&
     isLegacySettingsIntegrationsPath(location.pathname) &&
-    hasGitHubSetupRequest(search);
+    hasGitHubSetupReturn(search);
   const returnTo = storedReturn
-    ? withGitHubSetupRequest(storedReturn, search)
+    ? withGitHubSetupReturn(storedReturn, search)
     : factoriesOnboardingFallback
-      ? withGitHubSetupRequest("/onboarding", search)
+      ? withGitHubSetupReturn("/onboarding", search)
       : null;
 
   useEffect(() => {

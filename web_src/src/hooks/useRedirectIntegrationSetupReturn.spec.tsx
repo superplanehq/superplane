@@ -74,12 +74,33 @@ describe("useRedirectIntegrationSetupReturn", () => {
     expect(screen.getByText(/githubSetup=request/)).toBeInTheDocument();
   });
 
-  it("keeps the hosted-install picker on integration settings", async () => {
+  it("forwards a completed GitHub install onto the stored return path", async () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt(
+      "/org-1/settings/integrations/github-connection?githubSetup=complete&githubIntegrationId=github-connection",
+    );
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.getByText(/githubSetup=complete/)).toBeInTheDocument();
+    expect(screen.getByText(/githubIntegrationId=github-connection/)).toBeInTheDocument();
+  });
+
+  it("keeps the hosted-install picker on integration settings", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, "/org-1/settings/integrations");
 
     renderAt("/org-1/settings/integrations/github-connection?setupStay=1");
 
     expect(await screen.findByText("integration details")).toBeInTheDocument();
     expect(screen.queryByText("workspace setup")).not.toBeInTheDocument();
+  });
+
+  it("never renders legacy integration details for an onboarding return", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/org-1/settings/integrations/github-connection?setupStay=1");
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 });

@@ -30,6 +30,20 @@ describe("finishOnboardingError", () => {
     ).toBeNull();
   });
 
+  it("does not report missing repositories when only the GitHub selection is not ready", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: "acme/web",
+        workspaceName: "Web",
+        githubReady: false,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+      }),
+    ).toBe("GitHub is not connected. Return to the GitHub step and connect it.");
+  });
+
   it("requires a Jira connection and project when the ticket source is Jira", () => {
     expect(
       finishOnboardingError({
