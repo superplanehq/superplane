@@ -139,7 +139,7 @@ func businessCheckoutSuccessURL(baseURL string, organizationID uuid.UUID) string
 	if origin == "" {
 		origin = strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
 	}
-	return origin + "/" + organizationID.String() + "/organization/billing?subscribed=1"
+	return origin + "/" + organizationID.String() + "/organization/billing?subscribed=1&checkout_id={CHECKOUT_ID}"
 }
 
 func CancelOrganizationSubscription(
