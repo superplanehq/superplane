@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { filterMCPCatalog, groupMCPCatalog, MCP_CATALOG } from "./mcpCatalog";
+import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
+import { catalogConnectionDefaults, filterMCPCatalog, groupMCPCatalog, MCP_CATALOG } from "./mcpCatalog";
 
 describe("MCP_CATALOG", () => {
-  it("includes a HTTPS URL and sign-in auth on every entry", () => {
+  it("includes a HTTPS URL and a SuperPlane-ready auth method on every entry", () => {
     expect(MCP_CATALOG.map((entry) => entry.id)).toEqual([
       "github",
       "jira",
@@ -14,8 +15,31 @@ describe("MCP_CATALOG", () => {
     ]);
     for (const entry of MCP_CATALOG) {
       expect(entry.url.startsWith("https://")).toBe(true);
-      expect(entry.auth).toBe("AUTH_OAUTH");
     }
+    const github = MCP_CATALOG.find((entry) => entry.id === "github");
+    expect(github?.auth).toBe("AUTH_HEADERS");
+    expect(github?.headerName).toBe("Authorization");
+    expect(MCP_CATALOG.filter((entry) => entry.id !== "github").every((entry) => entry.auth === "AUTH_OAUTH")).toBe(
+      true,
+    );
+    for (const entry of MCP_CATALOG) {
+      expect(entry.instructions?.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("prefills GitHub header auth and setup instructions", () => {
+    const github = MCP_CATALOG.find((entry) => entry.id === "github");
+    expect(catalogConnectionDefaults(github)).toEqual({
+      name: "github",
+      url: "https://api.githubcopilot.com/mcp/",
+      auth: "AUTH_HEADERS",
+      headers: [{ name: "Authorization" }],
+      instructions: AGENT_RESOURCES_COPY.githubInstructions,
+    });
+  });
+
+  it("omits instructions for a custom MCP server", () => {
+    expect(catalogConnectionDefaults(undefined)).toBeUndefined();
   });
 });
 

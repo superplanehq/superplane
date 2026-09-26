@@ -1,5 +1,7 @@
 import type { FactoryAgentResourceAuth } from "@/api-client";
 
+import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
+
 export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
 
 export type MCPCatalogEntry = {
@@ -10,6 +12,8 @@ export type MCPCatalogEntry = {
   category: MCPCatalogCategory;
   url: string;
   auth: FactoryAgentResourceAuth;
+  headerName?: string;
+  instructions?: readonly string[];
 };
 
 export type MCPCatalogGroup = {
@@ -17,6 +21,27 @@ export type MCPCatalogGroup = {
   label: string;
   entries: MCPCatalogEntry[];
 };
+
+export type MCPCatalogConnectionDefaults = {
+  name: string;
+  url: string;
+  auth: FactoryAgentResourceAuth;
+  headers?: { name: string }[];
+  instructions?: readonly string[];
+};
+
+export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogConnectionDefaults | undefined {
+  if (!entry) {
+    return undefined;
+  }
+  return {
+    name: entry.name,
+    url: entry.url,
+    auth: entry.auth,
+    ...(entry.headerName ? { headers: [{ name: entry.headerName }] } : {}),
+    ...(entry.instructions?.length ? { instructions: entry.instructions } : {}),
+  };
+}
 
 export const CUSTOM_MCP_CATALOG_ID = "custom";
 
@@ -65,7 +90,7 @@ export function groupMCPCatalog(entries: MCPCatalogEntry[]): MCPCatalogGroup[] {
   });
 }
 
-/** Remote MCP servers that SuperPlane can open with a documented HTTPS URL and sign-in. */
+/** Remote MCP servers that SuperPlane can open with a documented HTTPS URL and auth method. */
 export const MCP_CATALOG: MCPCatalogEntry[] = [
   {
     id: "github",
@@ -74,7 +99,9 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     icon: "github",
     category: "code",
     url: "https://api.githubcopilot.com/mcp/",
-    auth: "AUTH_OAUTH",
+    auth: "AUTH_HEADERS",
+    headerName: "Authorization",
+    instructions: AGENT_RESOURCES_COPY.githubInstructions,
   },
   {
     id: "jira",
@@ -84,6 +111,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "issues",
     url: "https://mcp.atlassian.com/v2/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.jiraInstructions,
   },
   {
     id: "linear",
@@ -93,6 +121,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "issues",
     url: "https://mcp.linear.app/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.linearInstructions,
   },
   {
     id: "circleci",
@@ -102,6 +131,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "cicd",
     url: "https://mcp.circleci.com/v1/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.circleciInstructions,
   },
   {
     id: "semaphore",
@@ -111,6 +141,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "cicd",
     url: "https://mcp.semaphoreci.com/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.semaphoreInstructions,
   },
   {
     id: "sentry",
@@ -120,5 +151,6 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "observability",
     url: "https://mcp.sentry.dev/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.sentryInstructions,
   },
 ];

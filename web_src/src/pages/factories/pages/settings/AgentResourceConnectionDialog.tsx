@@ -43,8 +43,24 @@ export type AgentResourceConnectionDraft = {
   headers: FactoriesFactoryAgentResourceHeader[];
 };
 
+export type AgentResourceConnectionDefaults = Partial<AgentResourceConnectionDraft> & {
+  instructions?: readonly string[];
+};
+
 function emptyHeader(): HeaderDraft {
   return { name: "", secretName: "", secretKey: "" };
+}
+
+function headersFromDefaults(defaults?: AgentResourceConnectionDefaults): HeaderDraft[] {
+  const headers = defaults?.headers ?? [];
+  if (headers.length === 0) {
+    return [emptyHeader()];
+  }
+  return headers.map((header) => ({
+    name: header.name ?? "",
+    secretName: header.secretName ?? "",
+    secretKey: header.secretKey ?? "",
+  }));
 }
 
 function headersFromResource(resource?: FactoriesFactoryAgentResource): HeaderDraft[] {
@@ -111,7 +127,7 @@ export function AgentResourceConnectionDialog({
   open: boolean;
   organizationId: string;
   resource?: FactoriesFactoryAgentResource;
-  defaults?: Partial<AgentResourceConnectionDraft>;
+  defaults?: AgentResourceConnectionDefaults;
   isSaving: boolean;
   onClose: () => void;
   onSave: (draft: AgentResourceConnectionDraft) => Promise<void>;
@@ -134,7 +150,7 @@ export function AgentResourceConnectionDialog({
     setAuth(
       resource ? (resource.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS") : (defaults?.auth ?? "AUTH_OAUTH"),
     );
-    setHeaders(headersFromResource(resource));
+    setHeaders(resource ? headersFromResource(resource) : headersFromDefaults(defaults));
     setNameError("");
     setUrlError("");
     setHeaderError("");
@@ -182,6 +198,7 @@ export function AgentResourceConnectionDialog({
           url={url}
           auth={auth}
           headers={headers}
+          instructions={defaults?.instructions}
           nameError={nameError}
           urlError={urlError}
           headerError={headerError}
@@ -214,12 +231,29 @@ export function AgentResourceConnectionDialog({
   );
 }
 
+function CatalogInstructions({ instructions }: { instructions?: readonly string[] }) {
+  if (!instructions?.length) {
+    return null;
+  }
+  return (
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-2" data-testid="agent-resource-instructions">
+      <p className="text-[13px] font-medium text-foreground">{AGENT_RESOURCES_COPY.catalogInstructionsTitle}</p>
+      <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[12px] text-muted-foreground">
+        {instructions.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function ConnectionDialogFields({
   organizationId,
   name,
   url,
   auth,
   headers,
+  instructions,
   nameError,
   urlError,
   headerError,
@@ -233,6 +267,7 @@ function ConnectionDialogFields({
   url: string;
   auth: FactoryAgentResourceAuth;
   headers: HeaderDraft[];
+  instructions?: readonly string[];
   nameError: string;
   urlError: string;
   headerError: string;
@@ -243,6 +278,7 @@ function ConnectionDialogFields({
 }) {
   return (
     <div className="flex flex-col gap-4">
+      <CatalogInstructions instructions={instructions} />
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="agent-resource-name">{AGENT_RESOURCES_COPY.nameLabel}</Label>
         <Input

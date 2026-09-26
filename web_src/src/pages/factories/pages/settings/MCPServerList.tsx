@@ -103,7 +103,7 @@ function MCPServerRow({
 
   return (
     <li data-testid={`agent-resource-row-${resource.id}`}>
-      <div className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-3 py-3">
         <ConnectionStatusDot resource={resource} />
         <div className="min-w-0 flex-1">
           <button
