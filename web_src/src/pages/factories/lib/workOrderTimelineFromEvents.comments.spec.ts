@@ -176,6 +176,25 @@ describe("buildWorkOrderTimelineViewFromEvents: comments, artifacts, and attribu
     });
   });
 
+  it("records who cleared artifacts and how many rows were removed", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.artifacts.cleared",
+        event: {
+          user: { id: "user-1" },
+          count: 2,
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "artifactsCleared",
+      actorUserId: "user-1",
+      title: "cleared 2 artifacts",
+    });
+  });
+
   it("attributes automation-driven artifacts with the factory line", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {

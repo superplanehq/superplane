@@ -10,6 +10,7 @@ export type AgentResourceInstruction =
     };
 
 export const GITHUB_PERSONAL_ACCESS_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+export const CIRCLECI_PERSONAL_API_TOKEN_URL = "https://app.circleci.com/settings/user/tokens";
 
 export const AGENT_RESOURCES_COPY = {
   mcpTitle: "MCP servers",
@@ -107,7 +108,12 @@ export const AGENT_RESOURCES_COPY = {
   },
   jiraInstruction: "Sign in with Atlassian to grant access to Jira.",
   linearInstruction: "Sign in with Linear.",
-  circleciInstruction: "Sign in with CircleCI.",
+  circleciInstruction: {
+    before: "Create a ",
+    href: CIRCLECI_PERSONAL_API_TOKEN_URL,
+    label: "CircleCI personal API token",
+    after: " and paste it here.",
+  },
   semaphoreInstruction: "Ask Semaphore support to enable MCP for your organization, then sign in.",
   sentryInstruction: "Sign in with Sentry.",
   headerIncomplete: "Each header needs a name and a secret.",

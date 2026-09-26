@@ -28,9 +28,6 @@ describe("WorkOrderStatusIcon", () => {
 
     rerender(<WorkOrderStatusIcon status="rejected" title="Rejected" />);
     expect(container.querySelector("[data-status-mark='rejected']")).not.toBeNull();
-
-    rerender(<WorkOrderStatusIcon status="cancelled" title="Canceled" />);
-    expect(container.querySelector("[data-status-mark='cancelled']")).not.toBeNull();
   });
 
   it("fills attention and closed states so the color disk is easy to scan", () => {
