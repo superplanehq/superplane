@@ -37,8 +37,8 @@ function HeaderSetup() {
       onSignIn={async (entry) => {
         logAction("sign in", entry.id);
       }}
-      onSaveToken={async (entry, token) => {
-        logAction("save token", entry.id, token);
+      onSaveToken={async (entry) => {
+        logAction("save token", entry.id);
         setOpen(false);
       }}
     />
@@ -60,8 +60,8 @@ function OAuthSetup() {
         logAction("sign in", entry.id);
         setOpen(false);
       }}
-      onSaveToken={async (entry, token) => {
-        logAction("save token", entry.id, token);
+      onSaveToken={async (entry) => {
+        logAction("save token", entry.id);
       }}
     />
   );
@@ -90,8 +90,8 @@ function SentrySetup() {
         logAction("sign in", entry.id);
         setOpen(false);
       }}
-      onSaveToken={async (entry, token) => {
-        logAction("save token", entry.id, token);
+      onSaveToken={async (entry) => {
+        logAction("save token", entry.id);
       }}
     />
   );
