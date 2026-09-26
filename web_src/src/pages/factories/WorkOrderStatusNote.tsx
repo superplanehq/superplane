@@ -22,6 +22,7 @@ interface WorkOrderStatusNoteProps {
   statusActions: WorkOrderStatusAction[];
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  onSendToBacklog?: () => void;
 }
 
 export function WorkOrderStatusNote({
@@ -34,6 +35,7 @@ export function WorkOrderStatusNote({
   statusActions,
   onClose,
   onStatusChange,
+  onSendToBacklog,
 }: WorkOrderStatusNoteProps) {
   return (
     <aside className="rounded-lg border bg-card px-4 py-4" aria-label="Next step">
@@ -73,6 +75,7 @@ export function WorkOrderStatusNote({
                   isBusy={isBusy}
                   onClose={onClose}
                   onStatusChange={onStatusChange}
+                  onSendToBacklog={onSendToBacklog}
                 />
               ) : null}
             </div>
@@ -123,7 +126,11 @@ function ManualUpdateMenu({
   isBusy,
   onClose,
   onStatusChange,
-}: Pick<WorkOrderStatusNoteProps, "canClose" | "canManage" | "isBusy" | "onClose" | "onStatusChange"> & {
+  onSendToBacklog,
+}: Pick<
+  WorkOrderStatusNoteProps,
+  "canClose" | "canManage" | "isBusy" | "onClose" | "onStatusChange" | "onSendToBacklog"
+> & {
   actions: WorkOrderStatusAction[];
 }) {
   return (
@@ -147,7 +154,7 @@ function ManualUpdateMenu({
           <DropdownMenuItem
             key={action.kind}
             disabled={action.disabled}
-            onSelect={() => applyWorkOrderStatusAction(action.kind, { onClose, onStatusChange })}
+            onSelect={() => applyWorkOrderStatusAction(action.kind, { onClose, onStatusChange, onSendToBacklog })}
           >
             {action.label}
           </DropdownMenuItem>

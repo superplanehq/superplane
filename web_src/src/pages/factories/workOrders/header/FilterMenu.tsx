@@ -19,6 +19,7 @@ import {
   type WorkOrderFilterOption,
 } from "../../lib/workOrderFilterOptions";
 import { countWorkOrderFilters, visibleWorkOrderFilters } from "../../lib/workOrderListModel";
+import { isWorkOrderDialogStatus } from "../../lib/workOrderProgress";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
@@ -29,6 +30,7 @@ interface FilterMenuProps {
   assigneeOptions: WorkOrderFilterOption[];
   /** When false, hide Mergeable so the menu matches the card pill. */
   showPullRequestMerge?: boolean;
+  onOpenStatusDialog?: (status: "failed" | "rejected") => void;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
@@ -38,6 +40,7 @@ export function FilterMenu({
   sourceOptions,
   assigneeOptions,
   showPullRequestMerge = false,
+  onOpenStatusDialog,
 }: FilterMenuProps) {
   const visibleFilters = visibleWorkOrderFilters(state.filters, showPullRequestMerge);
   const filterCount = countWorkOrderFilters(visibleFilters) - (lineOptions ? 0 : visibleFilters.lineIds.length);
@@ -69,6 +72,7 @@ export function FilterMenu({
           dimension="statuses"
           state={state}
           options={buildStatusFilterOptions()}
+          onOpenStatusDialog={onOpenStatusDialog}
         />
 
         <FilterSubMenu
@@ -117,9 +121,18 @@ interface FilterSubMenuProps {
   state: WorkOrderListState;
   options: WorkOrderFilterOption[];
   emptyLabel?: string;
+  onOpenStatusDialog?: (status: "failed" | "rejected") => void;
 }
 
-function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabel }: FilterSubMenuProps) {
+function FilterSubMenu({
+  label,
+  resetLabel,
+  dimension,
+  state,
+  options,
+  emptyLabel,
+  onOpenStatusDialog,
+}: FilterSubMenuProps) {
   const selected: readonly string[] = state.filters[dimension];
   return (
     <DropdownMenuSub>
@@ -150,12 +163,21 @@ function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabe
               data-testid={`work-orders-filter-${dimension}-${option.value}`}
               onSelect={(event) => {
                 event.preventDefault();
+                if (dimension === "statuses" && isWorkOrderDialogStatus(option.value)) {
+                  state.setFilterMenuOpen(false);
+                  onOpenStatusDialog?.(option.value);
+                  return;
+                }
                 state.toggleFilter(dimension, option.value);
               }}
             >
               {option.dot ? <span className={cn("size-1.5 rounded-full", option.dot)} aria-hidden /> : null}
               <span className="flex-1 truncate">{option.label}</span>
-              {selected.includes(option.value) ? <Check className="size-3.5" aria-hidden /> : null}
+              {dimension === "statuses" && isWorkOrderDialogStatus(option.value) ? null : selected.includes(
+                  option.value,
+                ) ? (
+                <Check className="size-3.5" aria-hidden />
+              ) : null}
             </DropdownMenuItem>
           ))}
         </DropdownMenuSubContent>

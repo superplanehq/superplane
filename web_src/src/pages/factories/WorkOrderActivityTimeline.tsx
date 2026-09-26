@@ -244,6 +244,7 @@ const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
   "closed",
   "commented",
   "artifactAdded",
+  "artifactsCleared",
   "pullRequestAdded",
   "pullRequestUpdated",
 ];
@@ -386,7 +387,7 @@ function TimelineItemBody({
 }
 
 const AUTOMATION_ATTRIBUTABLE_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
-const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
+const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed", "artifactsCleared"];
 
 function UserActionEventDescription({
   event,
@@ -481,6 +482,7 @@ function SourceRunAttribution({
 function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
   switch (kind) {
     case "artifactAdded":
+    case "artifactsCleared":
       return FileText;
     case "pullRequestAdded":
     case "pullRequestUpdated":

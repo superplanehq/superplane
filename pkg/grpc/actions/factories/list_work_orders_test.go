@@ -139,3 +139,35 @@ func Test__ListWorkOrders_UsesDefaultLimit(t *testing.T) {
 	assert.Len(t, resp.Orders, 2)
 	assert.False(t, resp.HasNextPage)
 }
+
+func Test__ListWorkOrders_FiltersByLine(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "Line Filter", "", "LF")
+	require.NoError(t, err)
+	lineA, err := factoryModel.CreateLine(db, "alpha", nil)
+	require.NoError(t, err)
+	lineB, err := factoryModel.CreateLine(db, "beta", nil)
+	require.NoError(t, err)
+
+	onA, err := factoryModel.CreateWorkOrder(db, "On alpha", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	onB, err := factoryModel.CreateWorkOrder(db, "On beta", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	unassigned, err := factoryModel.CreateWorkOrder(db, "No line", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, onA.ID, lineA.ID, lineA.Name, nil)
+	support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, onB.ID, lineB.ID, lineB.Name, nil)
+
+	resp, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		LineId:    lineA.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Orders, 2)
+	ids := []string{resp.Orders[0].GetId(), resp.Orders[1].GetId()}
+	assert.ElementsMatch(t, []string{onA.ID.String(), unassigned.ID.String()}, ids)
+}

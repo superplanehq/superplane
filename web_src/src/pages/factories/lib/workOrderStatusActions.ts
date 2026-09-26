@@ -1,8 +1,9 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 
+import { SEND_WORK_ORDER_TO_BACKLOG_COPY } from "./sendWorkOrderToBacklog";
 import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
-export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen";
+export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen" | "send-to-backlog";
 
 export interface WorkOrderStatusAction {
   kind: WorkOrderStatusActionKind;
@@ -40,6 +41,13 @@ export function buildWorkOrderStatusActions(input: WorkOrderStatusActionInput): 
   }
 
   if (input.isClosed) {
+    if (input.displayStatus === "failed" || input.displayStatus === "rejected") {
+      actions.push({
+        kind: "send-to-backlog",
+        label: SEND_WORK_ORDER_TO_BACKLOG_COPY.action,
+        disabled: manageDisabled,
+      });
+    }
     actions.push({ kind: "reopen", label: "Reopen", disabled: manageDisabled });
   }
 
@@ -51,6 +59,7 @@ export function applyWorkOrderStatusAction(
   handlers: {
     onClose: (result: FactoriesWorkOrderResult) => void;
     onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+    onSendToBacklog?: () => void;
   },
 ): void {
   switch (kind) {
@@ -63,5 +72,8 @@ export function applyWorkOrderStatusAction(
       return;
     case "reopen":
       void handlers.onStatusChange("STATE_OPEN");
+      return;
+    case "send-to-backlog":
+      handlers.onSendToBacklog?.();
   }
 }

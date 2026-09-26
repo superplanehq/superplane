@@ -110,6 +110,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errCannotCloseBitbucketPullRequest):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
+	case errors.Is(err, errCannotClosePullRequest):
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
+	case errors.Is(err, errWorkOrderNotClosedForBacklog):
+		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
 		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
@@ -201,6 +207,9 @@ var errListMCPTools = errors.New("could not list MCP tools")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
+var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
+var errCannotClosePullRequest = errors.New("could not close a previous pull request")
+var errWorkOrderNotClosedForBacklog = errors.New("only a closed task can move to the backlog")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

@@ -15,7 +15,12 @@ import {
 } from "./workOrderListCache";
 
 function pages(
-  orders: Array<{ id: string; title?: string; state?: FactoriesWorkOrder["state"] }>,
+  orders: Array<{
+    id: string;
+    title?: string;
+    state?: FactoriesWorkOrder["state"];
+    result?: FactoriesWorkOrder["result"];
+  }>,
 ): InfiniteData<WorkOrdersPage> {
   return {
     pageParams: [undefined],
@@ -104,7 +109,7 @@ describe("patchCachedWorkOrderPages", () => {
       "wo-1",
       { id: "wo-1", title: "Other", state: "STATE_DRAFT", checks: [], assignees: [{ id: "other" }] },
       ["STATE_DRAFT"],
-      { userId: "me", unassigned: false },
+      { userId: "me", unassigned: false, results: [] },
     );
     expect(next?.pages[0]?.orders.map((order) => order.id)).toEqual(["wo-2"]);
   });
@@ -115,6 +120,17 @@ describe("patchCachedWorkOrderPages", () => {
       "wo-1",
       { id: "wo-1", title: "New", state: "STATE_OPEN", checks: [] },
       ["STATE_DRAFT"],
+    );
+    expect(next?.pages[0]?.orders).toEqual([]);
+  });
+
+  it("removes a row that left this result filter", () => {
+    const next = patchCachedWorkOrderPages(
+      pages([{ id: "wo-1", title: "Old", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }]),
+      "wo-1",
+      { id: "wo-1", title: "New", state: "STATE_CLOSED", result: "RESULT_FAILED", checks: [] },
+      ["STATE_CLOSED"],
+      { unassigned: false, results: ["RESULT_COMPLETED"] },
     );
     expect(next?.pages[0]?.orders).toEqual([]);
   });
