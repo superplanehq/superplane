@@ -20,18 +20,10 @@ describe("WorkOrderClosedStatusDialog", () => {
     useFactoryWorkOrdersPage.mockReset();
   });
 
-  it("loads Failed and Rejected together and shows a status badge on each row", async () => {
+  it("loads Rejected and Canceled together and shows a status badge on each row", async () => {
     const user = userEvent.setup();
     useFactoryWorkOrdersPage.mockReturnValue({
       orders: [
-        {
-          id: "wo-failed",
-          number: "106",
-          title: "Fix refund dispatcher timeout loop",
-          key: "RF-106",
-          state: "STATE_CLOSED",
-          result: "RESULT_FAILED",
-        },
         {
           id: "wo-rejected",
           number: "107",
@@ -71,16 +63,13 @@ describe("WorkOrderClosedStatusDialog", () => {
     );
 
     expect(useFactoryWorkOrdersPage).toHaveBeenCalledWith("org-1", "factory-1", ["STATE_CLOSED"], 20, {
-      results: ["RESULT_FAILED", "RESULT_REJECTED"],
+      results: ["RESULT_REJECTED"],
       lineId: "line-1",
     });
-    expect(screen.getByTestId("work-order-closed-status-dialog")).toHaveTextContent(
-      "Failed, Rejected, and Canceled tasks.",
-    );
-    expect(screen.getByTestId("work-order-status-badge-failed")).toHaveTextContent("Failed");
+    expect(screen.getByTestId("work-order-closed-status-dialog")).toHaveTextContent("Rejected and Canceled tasks.");
     expect(screen.getByTestId("work-order-status-badge-rejected")).toHaveTextContent("Rejected");
     expect(screen.getByTestId("work-order-status-badge-cancelled")).toHaveTextContent("Canceled");
-    await user.click(screen.getByTestId("send-to-backlog-wo-failed"));
+    await user.click(screen.getByTestId("send-to-backlog-wo-rejected"));
     expect(screen.getByTestId("send-work-order-to-backlog-form")).toBeInTheDocument();
   });
 
@@ -236,7 +225,7 @@ describe("WorkOrderClosedStatusDialog", () => {
     );
 
     expect(useFactoryWorkOrdersPage).toHaveBeenCalledWith("org-1", "factory-1", ["STATE_CLOSED"], 20, {
-      results: ["RESULT_FAILED", "RESULT_REJECTED"],
+      results: ["RESULT_REJECTED"],
       lineId: undefined,
     });
     expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
