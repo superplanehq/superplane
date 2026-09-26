@@ -96,7 +96,7 @@ describe("useWorkOrderListState", () => {
     window.localStorage.setItem("sp:work-orders:scope:factory-2", "my");
     window.localStorage.setItem(
       "sp:work-orders:filters:factory-2",
-      JSON.stringify({ statuses: ["failed"], lineIds: [], sourceIds: ["jira-issues"], assigneeIds: [] }),
+      JSON.stringify({ statuses: ["completed"], lineIds: [], sourceIds: ["jira-issues"], assigneeIds: [] }),
     );
 
     const { result, rerender } = renderHook(({ factoryId }) => useWorkOrderListState(factoryId), {
@@ -113,7 +113,7 @@ describe("useWorkOrderListState", () => {
     rerender({ factoryId: "factory-2" });
 
     expect(result.current.scope).toBe("my");
-    expect(result.current.filters.statuses).toEqual(["failed"]);
+    expect(result.current.filters.statuses).toEqual(["completed"]);
     expect(result.current.filters.sourceIds).toEqual(["jira-issues"]);
     // Session-local UI state is reset by the factory-change callback, which the
     // effect reaches through a ref; asserting all three guards that wiring.
@@ -194,13 +194,22 @@ describe("useWorkOrderListState", () => {
     const { result } = renderHook(() => useWorkOrderListState("factory-1"));
     act(() => {
       result.current.toggleFilter("statuses", "running");
-      result.current.toggleFilter("statuses", "failed");
+      result.current.toggleFilter("statuses", "completed");
     });
-    expect(result.current.filters.statuses).toEqual(["running", "failed"]);
+    expect(result.current.filters.statuses).toEqual(["running", "completed"]);
     act(() => {
       result.current.toggleFilter("statuses", "running");
     });
-    expect(result.current.filters.statuses).toEqual(["failed"]);
+    expect(result.current.filters.statuses).toEqual(["completed"]);
+  });
+
+  it("does not persist Failed or Rejected as board filters", () => {
+    const { result } = renderHook(() => useWorkOrderListState("factory-1"));
+    act(() => {
+      result.current.toggleFilter("statuses", "failed");
+      result.current.toggleFilter("statuses", "rejected");
+    });
+    expect(result.current.filters.statuses).toEqual([]);
   });
 
   it("clearFilterDimension only clears the dimension it targets", () => {

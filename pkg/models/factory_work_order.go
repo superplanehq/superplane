@@ -50,12 +50,13 @@ var (
 	}
 
 	// Allowed transitions. `open → draft` is "back to draft"; `closed →
-	// open` is reopen; `draft → closed` is "abandon before dispatch"
-	// (rejected only). See TransitionOnDispatch for the draft → open promotion.
+	// open` is reopen; `closed → draft` is send to backlog; `draft → closed`
+	// is "abandon before dispatch" (rejected only). See TransitionOnDispatch
+	// for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
 		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
-		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen, FactoryWorkOrderStateDraft},
 	}
 )
 
@@ -692,6 +693,18 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
+}
+
+func (o *FactoryWorkOrder) RecordArtifactsCleared(tx *gorm.DB, count int, actor *uuid.UUID) error {
+	data := factory.WorkOrderArtifactsCleared{
+		Order: o.Ref(),
+		Count: count,
+	}
+	if actor != nil {
+		data.User = &factory.UserRef{ID: *actor}
+	}
+
+	return o.recordEvent(tx, factory.EventTypeOrderArtifactsCleared, data)
 }
 
 func (o *FactoryWorkOrder) RecordPullRequestAdded(

@@ -80,6 +80,13 @@ function pageIncludesState(states: readonly string[], state: FactoriesWorkOrderS
   return Boolean(state && states.includes(state));
 }
 
+function pageIncludesResults(results: readonly string[], result: FactoriesWorkOrder["result"]): boolean {
+  if (results.length === 0) {
+    return true;
+  }
+  return Boolean(result && results.includes(result));
+}
+
 export function workOrdersPageStatesFromKey(queryKey: readonly unknown[]): FactoriesWorkOrderState[] {
   const joined = queryKey[4];
   if (typeof joined !== "string" || joined.length === 0) {
@@ -93,13 +100,16 @@ export function patchCachedWorkOrderPages(
   orderId: string,
   described: FactoriesWorkOrder,
   states: readonly FactoriesWorkOrderState[],
-  query: WorkOrdersPageQuery = { unassigned: false },
+  query: WorkOrdersPageQuery = { unassigned: false, results: [] },
 ): InfiniteData<WorkOrdersPage> | undefined {
   if (!data) {
     return data;
   }
 
-  const belongs = pageIncludesState(states, described.state) && workOrderMatchesPageQuery(described, query);
+  const belongs =
+    pageIncludesState(states, described.state) &&
+    pageIncludesResults(query.results, described.result) &&
+    workOrderMatchesPageQuery(described, query);
   const exists = data.pages.some((page) => page.orders.some((order) => order.id === orderId));
 
   if (!belongs) {
