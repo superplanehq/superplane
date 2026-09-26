@@ -71,6 +71,53 @@ describe("useWorkOrderFileUpload", () => {
     expect(showErrorToast).toHaveBeenCalledWith("The file could not be stored.");
   });
 
+  it("explains an opaque not-found create as a permission failure", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "Not found" },
+      response: new Response("Not found", { status: 404 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
+  it("explains a forbidden create as a permission failure", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "permission denied" },
+      response: new Response("permission denied", { status: 403 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
+  it("explains when the workspace or task no longer exists", async () => {
+    filesCreateWorkOrderFile.mockResolvedValue({
+      error: { message: "resource not found" },
+      response: new Response("resource not found", { status: 404 }),
+    });
+    const { result } = renderHook(() =>
+      useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1", orderId: "order-1" }),
+    );
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      "This workspace or task no longer exists. Refresh the page and try again.",
+    );
+    expect(filesCreateFactoryFile).not.toHaveBeenCalled();
+  });
+
   it("rejects a file type that SuperPlane does not store", async () => {
     const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
 

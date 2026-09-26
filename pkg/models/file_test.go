@@ -22,13 +22,20 @@ func TestArtifactFilePolicyAllowsEvidenceAndUsesLargerLimit(t *testing.T) {
 	assert.Equal(t, int64(MaxFileBytes), File{Purpose: FilePurposeAttachment}.MaxBytes())
 }
 
-func TestAllowedFileContentTypesIncludeTextDataFiles(t *testing.T) {
+func TestAllowedFileContentTypes(t *testing.T) {
 	allowed := []string{
 		"application/json",
 		"text/csv",
+		"text/x-csv",
+		"application/csv",
+		"text/comma-separated-values",
 		"application/yaml",
 		"text/yaml",
 		"application/x-yaml",
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"image/heic",
+		"image/heif",
 		"APPLICATION/JSON",
 		"text/yaml; charset=utf-8",
 	}
@@ -36,9 +43,34 @@ func TestAllowedFileContentTypesIncludeTextDataFiles(t *testing.T) {
 		assert.True(t, IsAllowedFileContentType(contentType), contentType)
 	}
 
-	rejected := []string{"video/mp4", "application/zip", "text/html", "application/octet-stream"}
+	rejected := []string{"video/mp4", "application/zip", "text/html", "application/octet-stream", "image/svg+xml"}
 	for _, contentType := range rejected {
 		assert.False(t, IsAllowedFileContentType(contentType), contentType)
+	}
+}
+
+func TestWordAndHEICFilesAreNotInlineImages(t *testing.T) {
+	contentTypes := []string{
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"image/heic",
+		"image/heif",
+	}
+
+	for _, contentType := range contentTypes {
+		assert.False(t, IsInlineImageContentType(contentType), contentType)
+	}
+}
+
+func TestNormalizeContentTypeMapsCSVAliases(t *testing.T) {
+	aliases := []string{
+		"text/x-csv",
+		"application/csv",
+		"text/comma-separated-values",
+	}
+
+	for _, alias := range aliases {
+		assert.Equal(t, "text/csv", normalizeContentType(alias), alias)
 	}
 }
 
