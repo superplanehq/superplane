@@ -1,5 +1,16 @@
 /** User-facing copy for workspace MCP servers and skills. STE. */
 
+export type AgentResourceInstructionStep =
+  | string
+  | {
+      before: string;
+      href: string;
+      label: string;
+      after: string;
+    };
+
+export const GITHUB_PERSONAL_ACCESS_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+
 export const AGENT_RESOURCES_COPY = {
   mcpTitle: "MCP servers",
   skillsTitle: "Skills",
@@ -87,7 +98,12 @@ export const AGENT_RESOURCES_COPY = {
   catalogInstructionsTitle: "How to connect",
   githubInstructions: [
     "GitHub does not support SuperPlane sign-in.",
-    "Create a GitHub personal access token.",
+    {
+      before: "Create a ",
+      href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+      label: "GitHub personal access token",
+      after: ".",
+    },
     "Store Bearer and the token in an organization secret.",
     "Select that secret for the Authorization header.",
   ],

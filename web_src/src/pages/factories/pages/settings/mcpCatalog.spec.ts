@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
+import { AGENT_RESOURCES_COPY, GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentResourceCopy";
 import { catalogConnectionDefaults, filterMCPCatalog, groupMCPCatalog, MCP_CATALOG } from "./mcpCatalog";
 
 describe("MCP_CATALOG", () => {
@@ -35,6 +35,12 @@ describe("MCP_CATALOG", () => {
       auth: "AUTH_HEADERS",
       headers: [{ name: "Authorization" }],
       instructions: AGENT_RESOURCES_COPY.githubInstructions,
+    });
+    expect(AGENT_RESOURCES_COPY.githubInstructions[1]).toEqual({
+      before: "Create a ",
+      href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+      label: "GitHub personal access token",
+      after: ".",
     });
   });
 

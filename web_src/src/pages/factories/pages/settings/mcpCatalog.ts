@@ -1,6 +1,6 @@
 import type { FactoryAgentResourceAuth } from "@/api-client";
 
-import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
+import { AGENT_RESOURCES_COPY, type AgentResourceInstructionStep } from "./agentResourceCopy";
 
 export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
 
@@ -13,7 +13,7 @@ export type MCPCatalogEntry = {
   url: string;
   auth: FactoryAgentResourceAuth;
   headerName?: string;
-  instructions?: readonly string[];
+  instructions?: readonly AgentResourceInstructionStep[];
 };
 
 export type MCPCatalogGroup = {
@@ -27,7 +27,7 @@ export type MCPCatalogConnectionDefaults = {
   url: string;
   auth: FactoryAgentResourceAuth;
   headers?: { name: string }[];
-  instructions?: readonly string[];
+  instructions?: readonly AgentResourceInstructionStep[];
 };
 
 export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogConnectionDefaults | undefined {
