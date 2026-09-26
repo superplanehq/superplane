@@ -701,6 +701,16 @@ func filenameFromURL(rawURL, contentType string) string {
 			base += ".m4v"
 		case "video/x-matroska":
 			base += ".mkv"
+		case "audio/mpeg":
+			base += ".mp3"
+		case "audio/mp4":
+			base += ".m4a"
+		case "audio/wav":
+			base += ".wav"
+		case "audio/webm":
+			base += ".webm"
+		case "audio/ogg":
+			base += ".oga"
 		}
 	}
 	return base
@@ -737,6 +747,14 @@ func normalizeFetchedContentType(header, rawURL string) string {
 		return "video/x-m4v"
 	case ".mkv":
 		return "video/x-matroska"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".m4a":
+		return "audio/mp4"
+	case ".wav":
+		return "audio/wav"
+	case ".oga":
+		return "audio/ogg"
 	default:
 		return value
 	}

@@ -362,7 +362,7 @@ describe("WorkOrderIntentDocument composer", () => {
       Array.from({ length: 10 }, (_, index) => composerPng(`extra-${index}.png`)),
     );
     await waitFor(() => expect(screen.getAllByTestId(/create-work-order-request-attachment-/)).toHaveLength(8));
-    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images or videos.");
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images, videos, or audio files.");
 
     await user.upload(input(), composerTextFile("data.csv"));
     await waitFor(() => expect(screen.getByTestId("create-work-order-request-file-file-11")).toBeInTheDocument());

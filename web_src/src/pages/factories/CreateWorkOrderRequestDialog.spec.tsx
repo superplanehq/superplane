@@ -394,7 +394,7 @@ describe("CreateWorkOrderRequestDialog", () => {
 
     expect(onUploadFiles).toHaveBeenCalledTimes(1);
     expect(Array.from(onUploadFiles.mock.calls[0][0] as File[])).toHaveLength(1);
-    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images or videos.");
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images, videos, or audio files.");
   });
 
   it("hides the dictate button when speech recognition is missing", () => {

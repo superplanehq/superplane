@@ -1,5 +1,10 @@
 package runner
 
+import (
+	"fmt"
+	"strings"
+)
+
 const (
 	VideoMaxDurationSeconds     = 900
 	VideoMaxFrames              = 24
@@ -16,8 +21,8 @@ const (
 )
 
 // AttachmentAgentInstructions tell every agent CLI to read processed
-// artifacts instead of original video bytes.
-const AttachmentAgentInstructions = `If $SUPERPLANE_TASK_DIR/attachments/INDEX.md exists, read that file first. Use the listed frames and transcript for any video. Do not ingest original video bytes.`
+// artifacts instead of original video or audio bytes.
+const AttachmentAgentInstructions = `If $SUPERPLANE_TASK_DIR/attachments/INDEX.md exists, read that file first. Use the listed frames and transcript for any video. Use the listed transcript for any audio. For an image, call inspect_attachment on the listed path. Do not ingest original video or audio bytes.`
 
 type AttachmentPolicy struct {
 	MaxDurationSeconds    int   `json:"max_duration_seconds"`
@@ -46,4 +51,35 @@ func ApplyAttachmentInstructions(prompt string) string {
 		return AttachmentAgentInstructions
 	}
 	return AttachmentAgentInstructions + "\n\n" + prompt
+}
+
+func LocalAttachmentPath(dest string) string {
+	return "$SUPERPLANE_TASK_DIR/attachments/" + dest
+}
+
+func RewritePromptLocalAttachmentPaths(prompt string, attachments []TaskAttachment) string {
+	if prompt == "" || len(attachments) == 0 {
+		return prompt
+	}
+	next := prompt
+	var imagePaths []string
+	for _, file := range NewAttachmentManifest(attachments).Files {
+		if file.Kind != "image" || file.URL == "" || file.Dest == "" {
+			continue
+		}
+		local := LocalAttachmentPath(file.Dest)
+		next = strings.ReplaceAll(next, file.URL, local)
+		imagePaths = append(imagePaths, local)
+	}
+	if len(imagePaths) == 0 {
+		return next
+	}
+	return next + "\n\n" + FormatInspectAttachmentInstruction(imagePaths)
+}
+
+func FormatInspectAttachmentInstruction(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("Call inspect_attachment on %s and review the returned image.", strings.Join(paths, ", "))
 }

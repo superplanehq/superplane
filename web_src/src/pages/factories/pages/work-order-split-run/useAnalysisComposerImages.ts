@@ -33,7 +33,7 @@ export function useAnalysisComposerImages({
       countCreateWorkOrderRequestImages("", pendingRef.current),
     );
     if (selected.rejectedCount > 0) {
-      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images or videos.`);
+      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
     }
     if (selected.accepted.length === 0) {
       return;
@@ -48,7 +48,7 @@ export function useAnalysisComposerImages({
 
   return {
     pending,
-    pendingFiles: pending.filter((file) => !file.isImage && !file.isVideo),
+    pendingFiles: pending.filter((file) => !file.isImage && !file.isVideo && !file.isAudio),
     previewImages: mergeCreateWorkOrderRequestImages([], pending),
     transcriptFiles: uploadedFiles.map(uploadedWorkOrderFileAsTranscriptFile),
     canAttach: Boolean(onUploadFiles) && !disabled,

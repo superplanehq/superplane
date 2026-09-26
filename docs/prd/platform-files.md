@@ -208,11 +208,15 @@ curls each signed file URL into `$SUPERPLANE_TASK_DIR/attachments/`
 before the model starts. See
 [pkg/components/runner/agent_task.go](../../pkg/components/runner/agent_task.go).
 
-When the manifest includes a video, the runner then runs **Process video
-attachments**. That step probes the actual bytes, extracts timestamped
-frames, and transcribes audio with `whisper-cli` and the baked
-`ggml-tiny.bin` model. Missing `ffmpeg`, `ffprobe`, `whisper-cli`, or
-the model fails the setup step. Do not skip video context.
+When the manifest includes a video or audio file, the runner then runs
+**Process task attachments**. That step probes the actual bytes. For a
+video it extracts timestamped frames and transcribes audio with
+`whisper-cli` and the baked `ggml-tiny.bin` model. For audio it
+transcribes without frames. For an image it lists the local path and
+tells the agent to call `inspect_attachment`. Missing `ffmpeg`,
+`ffprobe`, `whisper-cli`, or the model fails the setup step when video
+or audio is present. Image-only tasks still write `INDEX.md`. Do not
+skip video or audio context.
 
 A file with no audio is a success. A transcription failure is a partial
 result. Malformed, over-duration, or unsupported media is marked failed
@@ -221,11 +225,12 @@ in the manifest. The agent still receives `INDEX.md`.
 The same contract applies to the first refinement turn, later
 refinement messages, and implementation. Follow-up messages include
 `files[]` metadata. The wait loop downloads only unseen files and
-reprocesses new videos.
+reprocesses new video and audio.
 
-The agent reads frames and the transcript. SuperPlane does not send the
-raw video into the model. The original file stays in `attachments/` and
-stays an `sp-file://` ref for the UI.
+The agent reads frames, the transcript, and inspects images.
+SuperPlane does not send raw video or audio into the model. The
+original file stays in `attachments/` and stays an `sp-file://` ref
+for the UI.
 
 Land and deploy the runner media toolchain before you enable video
 acceptance. Rebuild local and production runners. Verify

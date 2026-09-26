@@ -1,7 +1,7 @@
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from "@tiptap/react";
 import { Trash2 } from "lucide-react";
 
-import { parseWorkOrderFileId, resolveWorkOrderFileSrc, isWorkOrderVideoSource } from "@/lib/workOrderFiles";
+import { parseWorkOrderFileId, resolveWorkOrderFileSrc, isWorkOrderMediaSource } from "@/lib/workOrderFiles";
 import { WorkOrderVideo } from "@/pages/app/WorkOrderVideo";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "../createWorkOrderRequestCopy";
@@ -16,7 +16,7 @@ function WorkOrderRequestImageView({ node, deleteNode, editor }: NodeViewProps) 
   const id = parseWorkOrderFileId(rawSrc) ?? rawSrc ?? "image";
 
   const contentType = id ? editor.storage.image?.contentTypes?.[id] : undefined;
-  const media = isWorkOrderVideoSource({ contentType, src, alt }) ? (
+  const media = isWorkOrderMediaSource({ contentType, src, alt }) ? (
     <WorkOrderVideo src={src} className="work-order-file-image" alt={alt} contentType={contentType} />
   ) : (
     <img src={src} alt={alt} className="work-order-file-image" />

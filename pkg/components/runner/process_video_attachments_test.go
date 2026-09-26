@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,14 +24,11 @@ func TestProcessVideoAttachmentsScriptFailsWithoutToolchain(t *testing.T) {
 
 	cmd := exec.Command("bash", "process_video_attachments.sh")
 	cmd.Dir = "."
-	cmd.Env = append(os.Environ(),
-		"SUPERPLANE_TASK_DIR="+dir,
-		"PATH=/usr/bin:/bin",
-		"WHISPER_MODEL="+filepath.Join(dir, "missing.bin"),
-	)
+	cmd.Env = replaceEnv(os.Environ(), "WHISPER_MODEL", filepath.Join(dir, "missing.bin"))
+	cmd.Env = append(cmd.Env, "SUPERPLANE_TASK_DIR="+dir)
 	out, err := cmd.CombinedOutput()
 	require.Error(t, err)
-	assert.Contains(t, string(out), "required for video task files")
+	assert.Contains(t, string(out), "WHISPER_MODEL")
 }
 
 func TestProcessVideoAttachmentsScriptMarksMalformedVideo(t *testing.T) {
@@ -137,6 +135,71 @@ func TestProcessVideoAttachmentsScriptMarksWhisperFailurePartial(t *testing.T) {
 	assert.Equal(t, "partial", item["status"])
 	assert.Equal(t, "transcription_failed", item["reason"])
 	assert.NotEmpty(t, item["frames"])
+}
+
+func TestProcessVideoAttachmentsScriptIndexesImagesWithoutMediaTools(t *testing.T) {
+	t.Parallel()
+
+	dir, attachments := newAttachmentDir(t)
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "01-shot.png"), []byte("png"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "files": [{"filename":"shot.png","content_type":"image/png","dest":"01-shot.png","kind":"image"}]
+}`), 0o644))
+
+	cmd := exec.Command("bash", "process_video_attachments.sh")
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_TASK_DIR="+dir,
+		"PATH=/usr/bin:/bin",
+		"WHISPER_MODEL="+filepath.Join(dir, "missing.bin"),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	index := readIndex(t, attachments)
+	assert.Contains(t, index, "inspect_attachment")
+	assert.Contains(t, index, "$SUPERPLANE_TASK_DIR/attachments/01-shot.png")
+	assert.Equal(t, "ready", manifestFile(t, attachments, "01-shot.png")["status"])
+}
+
+func TestProcessVideoAttachmentsScriptTranscribesAudioWithoutFrames(t *testing.T) {
+	requireLookPath(t, "ffmpeg", "ffprobe", "python3")
+	dir, attachments := newAttachmentDir(t)
+	clip := filepath.Join(attachments, "01-note.wav")
+	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", clip)
+	require.NoError(t, cmd.Run())
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "policy": {"max_duration_seconds": 900, "max_frames": 24, "max_frame_width": 1280, "process_timeout_seconds": 120, "disk_budget_bytes": 2147483648},
+  "files": [{"filename":"note.wav","content_type":"audio/wav","dest":"01-note.wav","kind":"audio"}]
+}`), 0o644))
+
+	binDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "whisper-cli"), []byte("#!/bin/sh\nwhile [ $# -gt 0 ]; do\n  if [ \"$1\" = \"-of\" ]; then printf 'hello\\n' > \"$2.txt\"; shift 2; continue; fi\n  shift\ndone\n"), 0o755))
+	model := filepath.Join(binDir, "ggml-tiny.bin")
+	require.NoError(t, os.WriteFile(model, []byte("x"), 0o644))
+	env := replaceEnv(replaceEnv(os.Environ(), "PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH")), "WHISPER_MODEL", model)
+
+	out := runProcessVideo(t, dir, env)
+	assert.Contains(t, string(out), "transcript ready")
+	index := readIndex(t, attachments)
+	assert.Contains(t, index, "transcript")
+	assert.NotContains(t, index, "frames:")
+	assert.NotContains(t, index, "no_video_stream")
+	item := manifestFile(t, attachments, "01-note.wav")
+	assert.Equal(t, "ready", item["status"])
+	assert.Equal(t, "01-note.wav.transcript.txt", item["transcript"])
+	assert.Nil(t, item["frames"])
+}
+
+func replaceEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	next := make([]string, 0, len(env)+1)
+	for _, item := range env {
+		if !strings.HasPrefix(item, prefix) {
+			next = append(next, item)
+		}
+	}
+	return append(next, prefix+value)
 }
 
 func requireLookPath(t *testing.T, names ...string) {

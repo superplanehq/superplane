@@ -4,6 +4,7 @@ import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   isAllowedWorkOrderFile,
+  isInlineWorkOrderAudio,
   isInlineWorkOrderImage,
   isInlineWorkOrderVideo,
   MAX_WORK_ORDER_FILE_BYTES,
@@ -21,6 +22,7 @@ export type UploadedWorkOrderFile = {
   previewUrl: string;
   isImage: boolean;
   isVideo?: boolean;
+  isAudio?: boolean;
 };
 
 type WorkOrderFileUploadTarget = {
@@ -112,6 +114,7 @@ async function uploadOneWorkOrderFile(
       previewUrl,
       isImage: isInlineWorkOrderImage(contentType),
       isVideo: isInlineWorkOrderVideo(contentType),
+      isAudio: isInlineWorkOrderAudio(contentType),
     };
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "The file could not be stored."));

@@ -55,19 +55,20 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 	setupCommands, setupFiles := BuildIntegrationSetupCommands(input.Setups)
 	files = append(files, setupFiles...)
 
+	attachments := ResolveTaskAttachments(input)
 	commands = make([]BrokerCommand, 0, len(input.Steps)+len(setupCommands)+1)
 	commands = append(commands, BrokerCommand{
 		Name:    input.PrepareName,
 		Command: WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    LiveLogKindSetup,
 	})
-	attachmentFiles, attachmentCommands := AttachmentSetup(ResolveTaskAttachments(input))
+	attachmentFiles, attachmentCommands := AttachmentSetup(attachments)
 	files = append(files, attachmentFiles...)
 	commands = append(commands, attachmentCommands...)
 	commands = append(commands, setupCommands...)
 
 	for i, step := range input.Steps {
-		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand)
+		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand, attachments)
 		files = append(files, file)
 		commands = append(commands, command)
 	}
@@ -130,7 +131,7 @@ func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []Broker
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
+func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand, attachments []TaskAttachment) (BrokerTaskFile, BrokerCommand) {
 	stepSlug := AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
 	switch NormalizeAgentStepType(original.Type) {
@@ -152,7 +153,7 @@ func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingD
 		promptName := stepSlug + ".txt"
 		return BrokerTaskFile{
 				Path:    "prompts/" + promptName,
-				Content: ApplyAttachmentInstructions(ApplyIntegrationUsage(stringPtrValue(dispatched.Prompt), usage)),
+				Content: ApplyAttachmentInstructions(ApplyIntegrationUsage(RewritePromptLocalAttachmentPaths(stringPtrValue(dispatched.Prompt), attachments), usage)),
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(original.Name, promptName),
@@ -326,9 +327,7 @@ func AttachmentSetup(attachments []TaskAttachment) (files []BrokerTaskFile, comm
 	if fetch := AttachmentFetchCommand(attachments); fetch != nil {
 		commands = append(commands, *fetch)
 	}
-	if HasVideoAttachment(attachments) {
-		commands = append(commands, VideoAttachmentCommand())
-	}
+	commands = append(commands, VideoAttachmentCommand())
 	return files, commands
 }
 
@@ -370,10 +369,10 @@ func AppendAttachmentSetupFiles(files []BrokerTaskFile) []BrokerTaskFile {
 
 func VideoAttachmentCommand() BrokerCommand {
 	return BrokerCommand{
-		Name:    "Process video attachments",
+		Name:    "Process task attachments",
 		Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/process_video_attachments.sh"`),
 		Kind:    LiveLogKindSetup,
-		Preview: LiveLogText("Extract still frames and transcribe task videos"),
+		Preview: LiveLogText("Index images and process video and audio files"),
 	}
 }
 

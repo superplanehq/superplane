@@ -15,7 +15,23 @@ export const ALLOWED_WORK_ORDER_VIDEO_TYPES = [
   "video/x-matroska",
 ] as const;
 
+export const ALLOWED_WORK_ORDER_AUDIO_TYPES = [
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/webm",
+  "audio/ogg",
+] as const;
+
 export const BROWSER_PLAYABLE_WORK_ORDER_VIDEO_TYPES = ["video/mp4", "video/webm", "video/ogg"] as const;
+
+export const BROWSER_PLAYABLE_WORK_ORDER_AUDIO_TYPES = [
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/webm",
+  "audio/ogg",
+] as const;
 
 export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
@@ -30,9 +46,11 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   "text/csv",
   "application/yaml",
   ...ALLOWED_WORK_ORDER_VIDEO_TYPES,
+  ...ALLOWED_WORK_ORDER_AUDIO_TYPES,
 ] as const;
 
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"] as const;
+const AUDIO_EXTENSIONS = [".mp3", ".m4a", ".wav", ".oga"] as const;
 
 const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
   ".png": "image/png",
@@ -59,6 +77,10 @@ const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
   ".ogg": "video/ogg",
   ".m4v": "video/x-m4v",
   ".mkv": "video/x-matroska",
+  ".mp3": "audio/mpeg",
+  ".m4a": "audio/mp4",
+  ".wav": "audio/wav",
+  ".oga": "audio/ogg",
 };
 
 const WORK_ORDER_FILE_EXTENSIONS = Object.keys(WORK_ORDER_FILE_TYPES_BY_EXTENSION);
@@ -69,12 +91,14 @@ export const WORK_ORDER_FILE_ACCEPT = [...ALLOWED_WORK_ORDER_FILE_TYPES, ...WORK
 export const WORK_ORDER_VISUAL_FILE_ACCEPT = [
   ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
   ...ALLOWED_WORK_ORDER_VIDEO_TYPES,
+  ...ALLOWED_WORK_ORDER_AUDIO_TYPES,
   ".png",
   ".jpg",
   ".jpeg",
   ".gif",
   ".webp",
   ...VIDEO_EXTENSIONS,
+  ...AUDIO_EXTENSIONS,
 ].join(",");
 
 const previewUrls = new Map<string, string>();
@@ -122,6 +146,10 @@ export function isInlineWorkOrderVideo(contentType: string | undefined): boolean
   return (ALLOWED_WORK_ORDER_VIDEO_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
 }
 
+export function isInlineWorkOrderAudio(contentType: string | undefined): boolean {
+  return (ALLOWED_WORK_ORDER_AUDIO_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
+}
+
 export function isBrowserPlayableWorkOrderVideo(contentType?: string, src?: string, alt?: string): boolean {
   const type = normalizeWorkOrderFileType(contentType);
   if ((BROWSER_PLAYABLE_WORK_ORDER_VIDEO_TYPES as readonly string[]).includes(type)) {
@@ -134,8 +162,22 @@ export function isBrowserPlayableWorkOrderVideo(contentType?: string, src?: stri
   return [".mp4", ".webm", ".ogv", ".ogg"].some((extension) => name.split("?")[0]?.endsWith(extension));
 }
 
+export function isBrowserPlayableWorkOrderAudio(contentType?: string, src?: string, alt?: string): boolean {
+  const type = normalizeWorkOrderFileType(contentType);
+  if ((BROWSER_PLAYABLE_WORK_ORDER_AUDIO_TYPES as readonly string[]).includes(type)) {
+    return true;
+  }
+  if (type && type.startsWith("audio/")) {
+    return false;
+  }
+  const name = `${alt ?? ""} ${src ?? ""}`.toLowerCase();
+  return AUDIO_EXTENSIONS.some((extension) => name.split("?")[0]?.endsWith(extension));
+}
+
 export function isInlineWorkOrderMedia(contentType: string | undefined): boolean {
-  return isInlineWorkOrderImage(contentType) || isInlineWorkOrderVideo(contentType);
+  return (
+    isInlineWorkOrderImage(contentType) || isInlineWorkOrderVideo(contentType) || isInlineWorkOrderAudio(contentType)
+  );
 }
 
 export function looksLikeWorkOrderVideoName(name: string | undefined): boolean {
@@ -143,11 +185,36 @@ export function looksLikeWorkOrderVideoName(name: string | undefined): boolean {
   return VIDEO_EXTENSIONS.some((extension) => value.endsWith(extension));
 }
 
+export function looksLikeWorkOrderAudioName(name: string | undefined): boolean {
+  const value = (name ?? "").split("?")[0]?.toLowerCase() ?? "";
+  return AUDIO_EXTENSIONS.some((extension) => value.endsWith(extension));
+}
+
+export function isWorkOrderAudioSource(args: { contentType?: string; src?: string; alt?: string }): boolean {
+  if (isInlineWorkOrderAudio(args.contentType)) {
+    return true;
+  }
+  if (isInlineWorkOrderVideo(args.contentType)) {
+    return false;
+  }
+  return looksLikeWorkOrderAudioName(args.alt) || looksLikeWorkOrderAudioName(args.src);
+}
+
 export function isWorkOrderVideoSource(args: { contentType?: string; src?: string; alt?: string }): boolean {
+  if (isInlineWorkOrderAudio(args.contentType)) {
+    return false;
+  }
   if (isInlineWorkOrderVideo(args.contentType)) {
     return true;
   }
+  if (looksLikeWorkOrderAudioName(args.alt) || looksLikeWorkOrderAudioName(args.src)) {
+    return false;
+  }
   return looksLikeWorkOrderVideoName(args.alt) || looksLikeWorkOrderVideoName(args.src);
+}
+
+export function isWorkOrderMediaSource(args: { contentType?: string; src?: string; alt?: string }): boolean {
+  return isWorkOrderVideoSource(args) || isWorkOrderAudioSource(args);
 }
 
 export function workOrderUploadContentType(file: File): string {
@@ -187,6 +254,15 @@ export function normalizeWorkOrderFileType(contentType: string | undefined): str
   }
   if (value === "video/x-mp4") {
     return "video/mp4";
+  }
+  if (value === "audio/mp3") {
+    return "audio/mpeg";
+  }
+  if (value === "audio/x-wav" || value === "audio/wave") {
+    return "audio/wav";
+  }
+  if (value === "audio/x-m4a") {
+    return "audio/mp4";
   }
   if (value === "text/yaml" || value === "application/x-yaml") {
     return "application/yaml";

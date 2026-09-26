@@ -14,7 +14,7 @@ import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import {
   isReachableWorkOrderFileUrl,
-  isWorkOrderVideoSource,
+  isWorkOrderMediaSource,
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
   workOrderFileContentTypeForSrc,
@@ -374,7 +374,7 @@ function MarkdownImage({
     return <span>{alt?.trim() || "image"}</span>;
   }
   const contentType = workOrderFileContentTypeForSrc(src, files) ?? workOrderFileContentTypeForSrc(resolved, files);
-  if (isWorkOrderVideoSource({ contentType, src: resolved, alt })) {
+  if (isWorkOrderMediaSource({ contentType, src: resolved, alt })) {
     return <WorkOrderVideo src={resolved} alt={alt} className={className} contentType={contentType} />;
   }
   if (hideUntilLoaded) {

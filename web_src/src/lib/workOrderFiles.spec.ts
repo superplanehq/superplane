@@ -6,7 +6,10 @@ import {
   isAllowedWorkOrderFile,
   isInlineWorkOrderImage,
   isInlineWorkOrderVideo,
+  isInlineWorkOrderAudio,
   isBrowserPlayableWorkOrderVideo,
+  isWorkOrderAudioSource,
+  isWorkOrderVideoSource,
   isReachableWorkOrderFileUrl,
   parseWorkOrderFileId,
   resolveWorkOrderFileMimeType,
@@ -44,12 +47,22 @@ describe("workOrderFiles", () => {
   it("accepts allowed images and rejects other types", () => {
     expect(isAllowedWorkOrderFile(new File(["x"], "a.png", { type: "image/png" }))).toBe(true);
     expect(isAllowedWorkOrderFile(new File(["x"], "a.mp4", { type: "video/mp4" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "a.mp3", { type: "audio/mpeg" }))).toBe(true);
     expect(isAllowedWorkOrderFile(new File(["x"], "a.zip", { type: "application/zip" }))).toBe(false);
     expect(isInlineWorkOrderImage("image/jpeg")).toBe(true);
     expect(isInlineWorkOrderVideo("video/webm")).toBe(true);
     expect(isInlineWorkOrderVideo("image/png")).toBe(false);
     expect(isBrowserPlayableWorkOrderVideo("video/mp4")).toBe(true);
     expect(isBrowserPlayableWorkOrderVideo("video/quicktime", "clip.mov", "clip.mov")).toBe(false);
+    expect(isInlineWorkOrderAudio("audio/mpeg")).toBe(true);
+    expect(isInlineWorkOrderAudio("audio/ogg")).toBe(true);
+    expect(isWorkOrderAudioSource({ contentType: "audio/ogg", src: "clip.ogg", alt: "clip.ogg" })).toBe(true);
+    expect(isWorkOrderVideoSource({ contentType: "audio/ogg", src: "clip.ogg", alt: "clip.ogg" })).toBe(false);
+    expect(isWorkOrderVideoSource({ src: "clip.ogg", alt: "clip.ogg" })).toBe(true);
+    expect(isWorkOrderAudioSource({ src: "note.mp3", alt: "note.mp3" })).toBe(true);
+    expect(resolveWorkOrderFileMimeType({ name: "note.mp3", type: "" })).toBe("audio/mpeg");
+    expect(resolveWorkOrderFileMimeType({ name: "clip.ogg", type: "audio/ogg" })).toBe("audio/ogg");
+    expect(resolveWorkOrderFileMimeType({ name: "clip.ogg", type: "" })).toBe("video/ogg");
   });
 
   it("accepts the allowed text data files", () => {

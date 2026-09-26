@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Probe task videos, extract bounded timestamped frames, and transcribe audio.
-# Fail before the agent starts when the media toolchain is missing.
+# Probe task videos and audio, extract bounded timestamped frames, and transcribe.
+# Image-only tasks write INDEX.md and exit without the media toolchain.
+# Fail before the agent starts when video or audio is present and tools are missing.
 set -euo pipefail
 
 attachments="${SUPERPLANE_TASK_DIR:?}/attachments"
@@ -22,21 +23,6 @@ if [ ! -d "$attachments" ]; then
 fi
 if [ ! -f "$manifest" ]; then
   printf 'attachments/manifest.json is missing.\n' >&2
-  exit 1
-fi
-
-missing=0
-for cmd in ffmpeg ffprobe whisper-cli python3; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    printf '%s is required for video task files. Install the runner media toolchain and rebuild this image.\n' "$cmd" >&2
-    missing=1
-  fi
-done
-if [ ! -s "$WHISPER_MODEL" ]; then
-  printf 'WHISPER_MODEL (%s) is missing. Bake ggml-tiny.bin into the runner image. Do not download models during a task.\n' "$WHISPER_MODEL" >&2
-  missing=1
-fi
-if [ "$missing" -ne 0 ]; then
   exit 1
 fi
 
@@ -76,6 +62,16 @@ VIDEO_TYPES = {
     "video/x-matroska",
 }
 VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"}
+AUDIO_TYPES = {
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/wav",
+    "audio/webm",
+    "audio/ogg",
+}
+AUDIO_SUFFIXES = {".mp3", ".m4a", ".wav", ".oga"}
+IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 def load_manifest():
@@ -97,12 +93,55 @@ def dir_size(path: Path) -> int:
     return total
 
 
+def content_type_of(item) -> str:
+    return (item.get("content_type") or "").split(";")[0].strip().lower()
+
+
+def looks_like_audio(item, dest: Path) -> bool:
+    content_type = content_type_of(item)
+    if content_type in AUDIO_TYPES:
+        return True
+    if content_type.startswith("video/"):
+        return False
+    return dest.suffix.lower() in AUDIO_SUFFIXES
+
+
 def looks_like_video(item, dest: Path) -> bool:
-    content_type = (item.get("content_type") or "").split(";")[0].strip().lower()
+    if looks_like_audio(item, dest):
+        return False
+    content_type = content_type_of(item)
     if content_type in VIDEO_TYPES:
         return True
-    suffix = dest.suffix.lower()
-    return suffix in VIDEO_SUFFIXES
+    return dest.suffix.lower() in VIDEO_SUFFIXES
+
+
+def looks_like_image(item, dest: Path) -> bool:
+    content_type = content_type_of(item)
+    if content_type in IMAGE_TYPES:
+        return True
+    return dest.suffix.lower() in IMAGE_SUFFIXES
+
+
+def require_media_toolchain():
+    missing = 0
+    for cmd in ("ffmpeg", "ffprobe", "whisper-cli", "python3"):
+        if shutil.which(cmd) is None:
+            print(
+                f"{cmd} is required for video and audio task files. "
+                "Install the runner media toolchain and rebuild this image.",
+                file=sys.stderr,
+            )
+            missing = 1
+    model = Path(whisper_model)
+    if not model.is_file() or model.stat().st_size == 0:
+        print(
+            f"WHISPER_MODEL ({whisper_model}) is missing. Bake ggml-tiny.bin into the runner image. "
+            "Do not download models during a task.",
+            file=sys.stderr,
+        )
+        missing = 1
+    if missing:
+        sys.exit(1)
 
 
 def run(cmd, timeout=process_timeout):
@@ -255,7 +294,9 @@ def write_index(manifest):
         "",
         "Read this index first. Original files stay in this directory.",
         "For a video, use the listed frames and transcript.",
-        "Do not ingest original video bytes into the model.",
+        "For audio, use the listed transcript.",
+        "For an image, call inspect_attachment on the original path.",
+        "Do not ingest original video or audio bytes into the model.",
         "",
         "## Policy",
         "",
@@ -272,6 +313,7 @@ def write_index(manifest):
     ]
     for item in manifest.get("files") or []:
         dest = item.get("dest") or item.get("filename") or "file"
+        dest_path = attachments / dest
         lines.append(f"### {dest}")
         lines.append("")
         if item.get("id"):
@@ -289,44 +331,48 @@ def write_index(manifest):
                 lines.append(f"  - {frame['timestamp_seconds']:.3f}s: attachments/{frame['path']}")
         if item.get("transcript"):
             lines.append(f"- transcript: attachments/{item['transcript']}")
+        if looks_like_image(item, dest_path):
+            lines.append(
+                f"- inspect: call inspect_attachment on $SUPERPLANE_TASK_DIR/attachments/{dest}"
+            )
         lines.append("")
     index_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
-manifest = load_manifest()
-videos = []
-for item in manifest.get("files") or []:
-    dest_name = item.get("dest") or ""
-    dest = attachments / dest_name
-    if dest_name and dest.is_file() and looks_like_video(item, dest):
-        videos.append((item, dest))
+def mark_ready_non_media(manifest, videos, audios):
+    media_dests = {dest.name for _, dest in videos + audios}
+    for item in manifest.get("files") or []:
+        dest_name = item.get("dest") or ""
+        dest = attachments / dest_name
+        if dest_name in media_dests:
+            continue
+        if item.get("status") in {"failed", "partial", "ready"}:
+            continue
+        if dest.is_file():
+            item["status"] = "ready"
+            item["reason"] = ""
 
-if not videos:
-    write_index(manifest)
-    save_manifest(manifest)
-    print("No video files in task attachments.")
-    sys.exit(0)
 
-for item, dest in videos:
+def process_video(item, dest):
     if dir_size(attachments) > disk_budget:
         item["status"] = "failed"
         item["reason"] = "disk_budget_exceeded"
         print(f"{dest.name}: disk budget exceeded", file=sys.stderr)
-        continue
+        return
 
     payload, reason = probe(dest)
     if payload is None:
         item["status"] = "failed"
         item["reason"] = reason
         print(f"{dest.name}: {reason}")
-        continue
+        return
 
     format_name = ((payload.get("format") or {}).get("format_name") or "").lower()
     if any(name.strip() in {"png_pipe", "image2", "gif", "webp_pipe", "bmp_pipe"} for name in format_name.split(",")):
         item["status"] = "failed"
         item["reason"] = "undecodable"
         print(f"{dest.name}: undecodable")
-        continue
+        return
 
     video_streams = [s for s in streams(payload, "video") if usable_video_stream(s)]
     audio_streams = streams(payload, "audio")
@@ -334,13 +380,13 @@ for item, dest in videos:
         item["status"] = "failed"
         item["reason"] = "no_video_stream"
         print(f"{dest.name}: no video stream")
-        continue
+        return
 
     if any(not source_dimensions_allowed(stream) for stream in video_streams):
         item["status"] = "failed"
         item["reason"] = "dimensions_exceed_limit"
         print(f"{dest.name}: video dimensions exceed limit")
-        continue
+        return
 
     duration = duration_seconds(payload)
     item["duration_seconds"] = duration
@@ -349,12 +395,11 @@ for item, dest in videos:
         item["status"] = "failed"
         item["reason"] = "duration_exceeds_limit"
         print(f"{dest.name}: duration {duration:.1f}s exceeds {max_duration:.0f}s")
-        continue
+        return
 
     stamps = unique_timestamps(duration)
     try:
         for stamp in scene_timestamps(dest, duration or 1.0):
-            key = round(stamp * 4) / 4.0
             if all(abs(existing - stamp) > 0.2 for existing in stamps):
                 stamps.append(stamp)
             if len(stamps) >= max_frames:
@@ -385,13 +430,13 @@ for item, dest in videos:
         item["status"] = "failed"
         item["reason"] = "disk_budget_exceeded"
         print(f"{dest.name}: disk budget exceeded", file=sys.stderr)
-        continue
+        return
 
     if not frames:
         item["status"] = "failed"
         item["reason"] = "frame_extraction_failed"
         print(f"{dest.name}: frame extraction failed")
-        continue
+        return
 
     item["frames_dir"] = frames_dir_name
     item["frames"] = frames
@@ -400,7 +445,7 @@ for item, dest in videos:
         item["status"] = "ready"
         item["reason"] = "no_audio"
         print(f"{dest.name}: {len(frames)} frames, no audio")
-        continue
+        return
 
     transcript_name = dest.name + ".transcript.txt"
     transcript_path = attachments / transcript_name
@@ -411,12 +456,82 @@ for item, dest in videos:
         item["status"] = "partial"
         item["reason"] = transcribe_reason
         print(f"{dest.name}: {len(frames)} frames, transcription failed")
-        continue
+        return
 
     item["status"] = "ready"
     item["reason"] = ""
     print(f"{dest.name}: {len(frames)} frames, transcript ready")
 
+
+def process_audio(item, dest):
+    if dir_size(attachments) > disk_budget:
+        item["status"] = "failed"
+        item["reason"] = "disk_budget_exceeded"
+        print(f"{dest.name}: disk budget exceeded", file=sys.stderr)
+        return
+
+    payload, reason = probe(dest)
+    if payload is None:
+        item["status"] = "failed"
+        item["reason"] = reason
+        print(f"{dest.name}: {reason}")
+        return
+
+    audio_streams = streams(payload, "audio")
+    if not audio_streams:
+        item["status"] = "failed"
+        item["reason"] = "no_audio_stream"
+        print(f"{dest.name}: no audio stream")
+        return
+
+    duration = duration_seconds(payload)
+    item["duration_seconds"] = duration
+    item["has_audio"] = True
+    if duration > max_duration:
+        item["status"] = "failed"
+        item["reason"] = "duration_exceeds_limit"
+        print(f"{dest.name}: duration {duration:.1f}s exceeds {max_duration:.0f}s")
+        return
+
+    transcript_name = dest.name + ".transcript.txt"
+    transcript_path = attachments / transcript_name
+    transcribe_reason = transcribe(dest, transcript_path, duration)
+    if transcript_path.is_file():
+        item["transcript"] = transcript_name
+    if transcribe_reason:
+        item["status"] = "partial"
+        item["reason"] = transcribe_reason
+        print(f"{dest.name}: transcript failed")
+        return
+
+    item["status"] = "ready"
+    item["reason"] = ""
+    print(f"{dest.name}: transcript ready")
+
+
+manifest = load_manifest()
+videos = []
+audios = []
+for item in manifest.get("files") or []:
+    dest_name = item.get("dest") or ""
+    dest = attachments / dest_name
+    if not dest_name or not dest.is_file():
+        continue
+    if looks_like_video(item, dest):
+        videos.append((item, dest))
+    elif looks_like_audio(item, dest):
+        audios.append((item, dest))
+
+if videos or audios:
+    require_media_toolchain()
+    for item, dest in videos:
+        process_video(item, dest)
+    for item, dest in audios:
+        process_audio(item, dest)
+else:
+    print("No video or audio files in task attachments.")
+
+mark_ready_non_media(manifest, videos, audios)
 write_index(manifest)
 save_manifest(manifest)
 PY

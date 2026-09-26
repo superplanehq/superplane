@@ -134,7 +134,7 @@ printf '%s' "$count" > ${JSON.stringify(attempts)}
   assert.equal(fs.readFileSync(attempts, "utf8"), "2");
 });
 
-test("prepareIncomingAttachments does not process image-only follow-ups", () => {
+test("prepareIncomingAttachments processes image-only follow-ups", () => {
   const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-image-"));
   const ran = path.join(taskDir, "ran.txt");
   fs.writeFileSync(
@@ -153,7 +153,31 @@ test("prepareIncomingAttachments does not process image-only follow-ups", () => 
       url: "https://files.example/shot.png",
     },
   ]);
-  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\n");
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments processes audio follow-ups", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-audio-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-3",
+      filename: "note.mp3",
+      content_type: "audio/mpeg",
+      url: "https://files.example/note.mp3",
+    },
+  ]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].kind, "audio");
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
 });
 
 test("ignores an empty user message", () => {

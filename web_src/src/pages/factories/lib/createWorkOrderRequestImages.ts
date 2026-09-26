@@ -1,7 +1,9 @@
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import {
+  isInlineWorkOrderAudio,
   isInlineWorkOrderVideo,
+  isWorkOrderAudioSource,
   isWorkOrderVideoSource,
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
@@ -15,6 +17,20 @@ export interface CreateWorkOrderRequestImage {
   alt: string;
   src: string;
   isVideo?: boolean;
+  isAudio?: boolean;
+}
+
+export function isVisualUploadedWorkOrderFile(file: {
+  isImage?: boolean;
+  isVideo?: boolean;
+  isAudio?: boolean;
+}): boolean {
+  return Boolean(file.isImage || file.isVideo || file.isAudio);
+}
+
+export function isVisualWorkOrderUpload(file: File): boolean {
+  const type = workOrderUploadContentType(file);
+  return isSupportedImageFile(file) || isInlineWorkOrderVideo(type) || isInlineWorkOrderAudio(type);
 }
 
 export function createWorkOrderRequestImages(
@@ -39,6 +55,7 @@ export function createWorkOrderRequestImages(
       alt,
       src,
       isVideo: isWorkOrderVideoSource({ src, alt }),
+      isAudio: isWorkOrderAudioSource({ src, alt }),
     });
   }
   return images;
@@ -54,7 +71,7 @@ export function countCreateWorkOrderRequestImages(markdown: string, attached: Up
     seen.add(parseWorkOrderFileId(rawSrc) ?? rawSrc);
   }
   for (const file of attached) {
-    if (file.isImage || file.isVideo) {
+    if (file.isImage || file.isVideo || file.isAudio) {
       seen.add(file.id);
     }
   }
@@ -69,7 +86,7 @@ export function selectCreateWorkOrderRequestUploads(
   const visual: File[] = [];
   const others: File[] = [];
   for (const file of Array.from(files)) {
-    if (isSupportedImageFile(file) || isInlineWorkOrderVideo(workOrderUploadContentType(file))) {
+    if (isVisualWorkOrderUpload(file)) {
       visual.push(file);
     } else {
       others.push(file);
@@ -89,7 +106,7 @@ export function mergeCreateWorkOrderRequestImages(
   const images = [...fromDescription];
   const seen = new Set(fromDescription.map((image) => image.id));
   for (const file of attached) {
-    if ((!file.isImage && !file.isVideo) || seen.has(file.id)) {
+    if (!isVisualUploadedWorkOrderFile(file) || seen.has(file.id)) {
       continue;
     }
     const src = file.previewUrl || resolveWorkOrderFileSrc(file.ref);
@@ -103,6 +120,8 @@ export function mergeCreateWorkOrderRequestImages(
       src,
       isVideo:
         Boolean(file.isVideo) || isWorkOrderVideoSource({ contentType: file.contentType, src, alt: file.filename }),
+      isAudio:
+        Boolean(file.isAudio) || isWorkOrderAudioSource({ contentType: file.contentType, src, alt: file.filename }),
     });
   }
   return images;
@@ -110,7 +129,7 @@ export function mergeCreateWorkOrderRequestImages(
 
 export function appendUploadedWorkOrderImages(description: string, files: UploadedWorkOrderFile[]): string {
   const blocks = files.map((file) =>
-    file.isImage || file.isVideo
+    file.isImage || file.isVideo || file.isAudio
       ? `![${markdownFileLabel(file.filename)}](${file.ref})`
       : `[${markdownFileLabel(file.filename)}](${file.ref})`,
   );

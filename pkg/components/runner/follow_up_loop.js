@@ -585,10 +585,16 @@ function maybePrepareAttachments(files, helpers) {
 
 function attachmentKind(file) {
   const type = String((file && file.content_type) || "").split(";")[0].trim().toLowerCase();
+  if (type.startsWith("audio/")) {
+    return "audio";
+  }
   if (type.startsWith("video/")) {
     return "video";
   }
   const name = String((file && (file.filename || file.dest)) || "").toLowerCase();
+  if (/\.(mp3|m4a|wav|oga)$/.test(name)) {
+    return "audio";
+  }
   return /\.(mp4|webm|mov|ogv|ogg|m4v|mkv)$/.test(name) ? "video" : "file";
 }
 
@@ -646,7 +652,12 @@ function mergeManifestFiles(taskDir, incoming) {
   manifest.files = files;
   saveManifest(taskDir, manifest);
   const needsPreparation =
-    added || files.some((file) => file.status === "pending" || (file.kind === "video" && file.status === "downloaded"));
+    added ||
+    files.some(
+      (file) =>
+        file.status === "pending" ||
+        ((file.kind === "video" || file.kind === "audio") && file.status === "downloaded"),
+    );
   return { manifest, needsPreparation };
 }
 
@@ -672,9 +683,7 @@ function prepareIncomingAttachments(taskDir, incoming) {
     return;
   }
   runTaskScript(taskDir, "fetch_task_attachments.sh");
-  if ((manifest.files || []).some((file) => file.kind === "video")) {
-    runTaskScript(taskDir, "process_video_attachments.sh");
-  }
+  runTaskScript(taskDir, "process_video_attachments.sh");
 }
 
 function isUnreachableWait(result) {

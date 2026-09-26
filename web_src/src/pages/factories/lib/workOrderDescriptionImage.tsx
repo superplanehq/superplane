@@ -3,8 +3,10 @@ import Image from "@tiptap/extension-image";
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from "@tiptap/react";
 
 import {
+  isBrowserPlayableWorkOrderAudio,
   isBrowserPlayableWorkOrderVideo,
-  isWorkOrderVideoSource,
+  isWorkOrderAudioSource,
+  isWorkOrderMediaSource,
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
 } from "@/lib/workOrderFiles";
@@ -27,7 +29,7 @@ function WorkOrderMediaView({ node, editor }: NodeViewProps) {
   const alt = (node.attrs.alt as string | undefined) ?? "";
   const id = parseWorkOrderFileId(rawSrc);
   const contentType = id ? editor.storage.image?.contentTypes?.[id] : undefined;
-  const media = isWorkOrderVideoSource({ contentType, src, alt }) ? (
+  const media = isWorkOrderMediaSource({ contentType, src, alt }) ? (
     <WorkOrderVideo src={src} className="work-order-file-image" alt={alt} contentType={contentType} />
   ) : (
     <img src={src} alt={alt} className="work-order-file-image" />
@@ -65,7 +67,13 @@ export const WorkOrderImage = Image.extend({
       src,
       class: "work-order-file-image",
     });
-    if (isWorkOrderVideoSource({ contentType, src, alt: rest.alt as string | undefined })) {
+    if (isWorkOrderMediaSource({ contentType, src, alt: rest.alt as string | undefined })) {
+      if (isWorkOrderAudioSource({ contentType, src, alt: rest.alt as string | undefined })) {
+        if (isBrowserPlayableWorkOrderAudio(contentType, src, rest.alt as string | undefined)) {
+          return ["audio", mergeAttributes(attrs, { controls: "" })];
+        }
+        return ["span", { class: "work-order-video-fallback" }, rest.alt || "Audio"];
+      }
       if (isBrowserPlayableWorkOrderVideo(contentType, src, rest.alt as string | undefined)) {
         return ["video", mergeAttributes(attrs, { controls: "", playsinline: "" })];
       }

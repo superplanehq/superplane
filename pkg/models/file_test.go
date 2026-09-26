@@ -38,6 +38,14 @@ func TestAllowedFileContentTypes(t *testing.T) {
 		"image/heif",
 		"APPLICATION/JSON",
 		"text/yaml; charset=utf-8",
+		"audio/mpeg",
+		"audio/mp4",
+		"audio/wav",
+		"audio/webm",
+		"audio/ogg",
+		"audio/mp3",
+		"audio/x-wav",
+		"audio/x-m4a",
 	}
 	for _, contentType := range allowed {
 		assert.True(t, IsAllowedFileContentType(contentType), contentType)
@@ -120,6 +128,24 @@ func TestCreatePendingFileAcceptsVideoContentType(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "video/mp4", file.ContentType)
 	assert.True(t, IsInlineVideoContentType(file.ContentType))
+}
+
+func TestCreatePendingFileAcceptsAudioContentType(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "file-audio")
+
+	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "note.mp3",
+		ContentType:    "audio/mpeg",
+		CreatedByID:    userID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "audio/mpeg", file.ContentType)
+	assert.True(t, IsInlineAudioContentType(file.ContentType))
+	assert.False(t, IsInlineVideoContentType(file.ContentType))
 }
 
 func TestCreatePendingFileStoresWorkspaceScope(t *testing.T) {
