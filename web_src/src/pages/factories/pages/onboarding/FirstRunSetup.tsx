@@ -320,6 +320,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     return (
       <FirstRunConnectScreen
         loading={flow.pickerLoading}
+        pickerExpected={flow.pickerShowing}
+        syncError={flow.githubCallbackSyncError}
         installRequested={flow.installRequested}
         githubOrganizations={flow.githubOrganizations}
         {...pickerPropsFor(flow)}
@@ -330,6 +332,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
+        onRetrySync={flow.retryGithubCallbackSync}
       />
     );
   }

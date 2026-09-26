@@ -122,6 +122,19 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
+  it("forwards a completed GitHub setup onto the stored return path", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt(
+      "/org-1/settings/integrations/abc?githubSetup=complete&githubIntegrationId=int-1",
+      <div>integration details</div>,
+    );
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.getByText("githubSetup=complete&githubIntegrationId=int-1")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+  });
+
   it("forwards the GitHub organization waiting for approval", async () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
 

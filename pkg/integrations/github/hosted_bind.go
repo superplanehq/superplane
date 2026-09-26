@@ -132,7 +132,11 @@ func (g *GitHub) bindHostedInstallationWith(
 // so when it is unknown Sync finds the member's open install request on
 // GitHub and records the account on the metadata for the next sync and the
 // waiting screen.
-func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
+func (g *GitHub) reconcileInstallRequests(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	metadata *common.Metadata,
+) (bool, error) {
 	trackedRequests := metadata.CurrentInstallRequests()
 	requester := strings.TrimSpace(metadata.StartedByGitHubLogin)
 	localUnverifiedDiscovery := useDevelopmentGitHubDiscovery() && requester == "development"
@@ -149,7 +153,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		}
 		client, err := newAppJWTClient(ctx.Integration, app.ID)
 		if err != nil {
-			return fmt.Errorf("failed to create app client: %w", err)
+			return false, fmt.Errorf("failed to create app client: %w", err)
 		}
 		lookupRequester := requester
 		if localUnverifiedDiscovery {
@@ -161,7 +165,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		}
 		openRequests, err = listAppInstallationRequests(requestContext, client, lookupRequester)
 		if err != nil {
-			return fmt.Errorf("failed to list app installation requests: %w", err)
+			return false, fmt.Errorf("failed to list app installation requests: %w", err)
 		}
 		if localUnverifiedDiscovery {
 			if len(trackedRequests) == 0 {
@@ -178,6 +182,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 	unresolved := make([]common.InstallRequest, 0, len(openRequests))
 	now := time.Now().UTC()
 	followUpDiscovery := false
+	needsInstallationDiscovery := false
 	for _, request := range candidates {
 		if installRequestIsOpen(request, openRequests) {
 			unresolved = append(unresolved, request)
@@ -187,6 +192,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 		if found && len(installation.Repositories) > 0 {
 			continue
 		}
+		needsInstallationDiscovery = true
 		if installRequestMayStillResolve(request, now) {
 			unresolved = append(unresolved, request)
 			continue
@@ -199,7 +205,7 @@ func (g *GitHub) reconcileInstallRequests(ctx core.SyncContext, app common.Hoste
 	} else if len(unresolved) == 0 {
 		metadata.InstallRequestDiscoveryUntil = ""
 	}
-	return nil
+	return needsInstallationDiscovery, nil
 }
 
 func installRequestMayStillResolve(request common.InstallRequest, now time.Time) bool {

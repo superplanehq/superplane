@@ -6,7 +6,7 @@ import {
   hasIntegrationSetupStay,
   isOnboardingSetupReturnPath,
   peekIntegrationSetupReturn,
-  withGitHubSetupRequest,
+  withGitHubSetupReturn,
 } from "@/lib/integrationSetupReturn";
 
 function isLegacyIntegrationDetailsPath(organizationId: string, pathname: string): boolean {
@@ -46,6 +46,6 @@ export function useRedirectIntegrationSetupReturn(
     // completed. Consume this one-shot return before navigating so that late
     // callbacks cannot reopen the setup wizard.
     consumeIntegrationSetupReturn(storageOrganizationId);
-    navigate(withGitHubSetupRequest(storedReturn, location.search), { replace: true });
+    navigate(withGitHubSetupReturn(storedReturn, location.search), { replace: true });
   }, [location.pathname, location.search, navigate, routeOrganizationId, storageOrganizationId]);
 }

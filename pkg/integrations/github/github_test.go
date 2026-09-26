@@ -305,6 +305,23 @@ func Test__redirectToIntegrationSettingsURL(t *testing.T) {
 		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
 	})
 
+	t.Run("adds a successful GitHub setup marker", func(t *testing.T) {
+		integration.Metadata = common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
+		}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)
+
+		redirectToIntegrationSettingsCompleted(ctx)
+
+		assert.Equal(
+			t,
+			"https://app.example/onboarding?attempt=1&githubIntegrationId=11111111-1111-1111-1111-111111111111&githubSetup=complete&step=vcs",
+			rec.Header().Get("Location"),
+		)
+	})
+
 	t.Run("uses cookie when metadata is empty", func(t *testing.T) {
 		integration.Metadata = common.Metadata{State: "csrf", HostedApp: true}
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)

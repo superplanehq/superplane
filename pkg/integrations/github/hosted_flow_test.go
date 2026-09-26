@@ -20,7 +20,8 @@ import (
 func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	setHostedAppEnv(t)
 	integration := &contexts.IntegrationContext{
-		State: "pending",
+		State:         "pending",
+		IntegrationID: "11111111-1111-1111-1111-111111111111",
 		Metadata: common.Metadata{
 			State:                    "csrf",
 			HostedApp:                true,
@@ -43,6 +44,11 @@ func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	assert.Empty(t, metadata.InstallationID)
 	assert.Empty(t, metadata.Repositories)
 	assert.Empty(t, metadata.InstallationsRefreshedAt)
+	assert.Equal(
+		t,
+		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=complete&githubIntegrationId=11111111-1111-1111-1111-111111111111",
+		rec.Header().Get("Location"),
+	)
 }
 
 func TestHostedSetupCallbackRejectsInvalidState(t *testing.T) {
@@ -642,6 +648,67 @@ func TestSyncHostedAppDiscoversApprovedRequestOnBoundConnection(t *testing.T) {
 	}))
 }
 
+func TestSyncHostedAppDiscoversApprovedRequestWithFreshInstallationCache(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		return []common.PendingInstallation{
+			{ID: "11", AccountLogin: "existing", AccountType: "Organization"},
+			{ID: "22", AccountLogin: "approved", AccountType: "Organization"},
+		}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "ready",
+		Metadata: common.Metadata{
+			State:                    "csrf",
+			HostedApp:                true,
+			InstallationID:           "11",
+			StartedByGitHubLogin:     "development",
+			InstallationsRefreshedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "existing", Repositories: []common.Repository{{ID: 101, Name: "existing/api"}}},
+			},
+			InstallRequests: []common.InstallRequest{{
+				ID:             "1",
+				AccountLogin:   "approved",
+				RequesterLogin: "member",
+				CreatedAt:      time.Now().UTC().Format(time.RFC3339Nano),
+			}},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	err := (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	})
+
+	require.NoError(t, err)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.InstallRequests)
+	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+		return installation.AccountLogin == "approved" && len(installation.Repositories) > 0
+	}))
+}
+
 func TestSyncHostedAppKeepsOpenInstallRequestAfterRepositoryAccessIsVerified(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	setHostedAppEnv(t)
@@ -807,7 +874,7 @@ func TestReconcileInstallRequestsRecordsDevelopmentBaseline(t *testing.T) {
 	}
 	metadata := common.Metadata{StartedByGitHubLogin: "development"}
 
-	err := (&GitHub{}).reconcileInstallRequests(
+	_, err := (&GitHub{}).reconcileInstallRequests(
 		core.SyncContext{Context: context.Background(), Integration: &contexts.IntegrationContext{}},
 		common.HostedApp{ID: 99},
 		&metadata,

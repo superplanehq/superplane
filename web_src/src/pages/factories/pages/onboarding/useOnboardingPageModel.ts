@@ -527,6 +527,7 @@ export function useOnboardingPageModel(args: {
     // The connect screen refetches on open, so the picker never shows a
     // stale connection list.
     refreshGithubConnections: connect.refetchConnections,
+    syncGithubConnection: connect.syncGitHubConnection,
     githubConnectionsLoading: connect.connectionsLoading,
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,

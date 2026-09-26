@@ -6,11 +6,11 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import {
-  hasGitHubSetupRequest,
+  hasGitHubSetupReturn,
   hasIntegrationSetupStay,
   isOnboardingSetupReturnPath,
   peekIntegrationSetupReturn,
-  withGitHubSetupRequest,
+  withGitHubSetupReturn,
 } from "@/lib/integrationSetupReturn";
 
 interface IntegrationSetupReturnProps {
@@ -48,11 +48,11 @@ export function IntegrationSetupReturn({ organizationId, children }: Integration
     has(FEATURE_FACTORIES) &&
     !storedReturn &&
     isLegacySettingsIntegrationsPath(location.pathname) &&
-    hasGitHubSetupRequest(search);
+    hasGitHubSetupReturn(search);
   const returnTo = storedReturn
-    ? withGitHubSetupRequest(storedReturn, search)
+    ? withGitHubSetupReturn(storedReturn, search)
     : factoriesOnboardingFallback
-      ? withGitHubSetupRequest("/onboarding", search)
+      ? withGitHubSetupReturn("/onboarding", search)
       : null;
 
   useEffect(() => {

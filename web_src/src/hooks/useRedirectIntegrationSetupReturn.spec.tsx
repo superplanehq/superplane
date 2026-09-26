@@ -74,6 +74,18 @@ describe("useRedirectIntegrationSetupReturn", () => {
     expect(screen.getByText(/githubSetup=request/)).toBeInTheDocument();
   });
 
+  it("forwards a completed GitHub install onto the stored return path", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt(
+      "/org-1/settings/integrations/github-connection?githubSetup=complete&githubIntegrationId=github-connection",
+    );
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.getByText(/githubSetup=complete/)).toBeInTheDocument();
+    expect(screen.getByText(/githubIntegrationId=github-connection/)).toBeInTheDocument();
+  });
+
   it("keeps the hosted-install picker on integration settings", async () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, "/org-1/settings/integrations");
 

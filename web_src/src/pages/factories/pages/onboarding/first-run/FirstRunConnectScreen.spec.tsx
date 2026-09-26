@@ -84,7 +84,7 @@ describe("FirstRunConnectScreen", () => {
   it("names the GitHub login that authorized the connect when the picker shows", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [{ id: "101", name: "octo/api" }] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         githubLogin="forestileao"
@@ -101,7 +101,7 @@ describe("FirstRunConnectScreen", () => {
   it("hides the signed-in line when the picker has no GitHub login", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [{ id: "101", name: "octo/api" }] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -115,7 +115,7 @@ describe("FirstRunConnectScreen", () => {
   it("asks which GitHub account to use when one install is pending", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [{ id: "101", name: "octo/api" }] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -137,8 +137,8 @@ describe("FirstRunConnectScreen", () => {
     render(
       <FirstRunConnectScreen
         pendingInstallations={[
-          { id: "11", accountLogin: "acme", repositories: [] },
-          { id: "22", accountLogin: "octo", repositories: [] },
+          { id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] },
+          { id: "22", accountLogin: "octo", repositories: [{ id: "202", name: "octo/api" }] },
         ]}
         githubState="csrf"
         githubAppSlug="superplane"
@@ -155,7 +155,11 @@ describe("FirstRunConnectScreen", () => {
     );
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
-    expect(onUseInstallation).toHaveBeenCalledWith({ id: "11", accountLogin: "acme", repositories: [] });
+    expect(onUseInstallation).toHaveBeenCalledWith({
+      id: "11",
+      accountLogin: "acme",
+      repositories: [{ id: "101", name: "acme/api" }],
+    });
   });
 
   it("hides the waiting chip when the picker offers the requested organization", () => {
@@ -196,7 +200,7 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganization="acme"
-        pendingInstallations={[{ id: "22", accountLogin: "octo", repositories: [] }]}
+        pendingInstallations={[{ id: "22", accountLogin: "octo", repositories: [{ id: "202", name: "octo/api" }] }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -212,8 +216,8 @@ describe("FirstRunConnectScreen", () => {
     render(
       <FirstRunConnectScreen
         pendingInstallations={[
-          { id: "11", accountLogin: "acme", repositories: [] },
-          { id: "22", accountLogin: "octo", repositories: [] },
+          { id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] },
+          { id: "22", accountLogin: "octo", repositories: [{ id: "202", name: "octo/api" }] },
         ]}
         githubState="csrf"
         githubAppSlug="superplane"
@@ -275,7 +279,9 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         installRequested
         githubOrganizations={["kittens-inc-1"]}
-        pendingInstallations={[{ id: "11", accountLogin: "puppies-inc", repositories: [] }]}
+        pendingInstallations={[
+          { id: "11", accountLogin: "puppies-inc", repositories: [{ id: "101", name: "puppies-inc/api" }] },
+        ]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -333,7 +339,9 @@ describe("FirstRunConnectScreen", () => {
   it("marks connect done and asks the organization question on the stepper picker", () => {
     render(
       <FirstRunConnectScreen
-        pendingInstallations={[{ id: "11", accountLogin: "puppies-inc", repositories: [] }]}
+        pendingInstallations={[
+          { id: "11", accountLogin: "puppies-inc", repositories: [{ id: "101", name: "puppies-inc/api" }] },
+        ]}
         githubState="csrf"
         githubAppSlug="superplane"
         githubLogin="ada"
@@ -348,5 +356,40 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-use-puppies-inc")).toBeInTheDocument();
     // The heading asks the question, so the picker must not repeat it.
     expect(screen.getAllByText(FIRST_RUN_COPY.connect.selectAccount)).toHaveLength(1);
+  });
+
+  it("does not offer an installation without a verified repository", () => {
+    render(
+      <FirstRunConnectScreen
+        pendingInstallations={[{ id: "11", accountLogin: "octo", repositories: [] }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("first-run-github-use-octo")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toBeInTheDocument();
+  });
+
+  it("keeps callback recovery in the organization step", async () => {
+    const user = userEvent.setup();
+    const onRetrySync = vi.fn();
+    render(
+      <FirstRunConnectScreen
+        pickerExpected
+        syncError={FIRST_RUN_COPY.connect.refreshError}
+        onRetrySync={onRetrySync}
+        onConnectGitHub={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(FIRST_RUN_COPY.connect.refreshError);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.tryAgain }));
+    expect(onRetrySync).toHaveBeenCalledTimes(1);
   });
 });

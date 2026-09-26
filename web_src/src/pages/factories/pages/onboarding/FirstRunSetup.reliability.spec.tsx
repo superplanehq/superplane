@@ -65,6 +65,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
+    syncGithubConnection: vi.fn().mockResolvedValue(undefined),
     githubConnectionsLoading: false,
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,
@@ -310,7 +311,7 @@ describe("FirstRunSetup reliability", () => {
         startedByUserID: userId,
         state: "csrf",
         githubApp: { slug: "superplane" },
-        pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+        pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
       });
     const mine = renderSetup(
       pageModel({ openSection: "vcs", githubConnections: githubConnections([picker("user-1")]) }),
@@ -334,7 +335,7 @@ describe("FirstRunSetup reliability", () => {
       startedByUserID: "user-1",
       state: "csrf",
       githubApp: { slug: "superplane" },
-      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
     });
     renderSetup(
       pageModel({ openSection: "vcs", githubConnections: githubConnections([picker]) }),
@@ -345,14 +346,17 @@ describe("FirstRunSetup reliability", () => {
     expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true);
   });
 
-  it("opens the waiting screen from a GitHub request return", () => {
+  it("opens the waiting screen from a GitHub request return", async () => {
     const request = githubConnection("int-1", { startedByUserID: "user-1", installRequested: true });
     renderSetup(
-      pageModel({ openSection: "vcs", githubConnections: githubConnections([request]) }),
+      pageModel({
+        openSection: "vcs",
+        githubConnections: githubConnections([request]),
+        syncGithubConnection: vi.fn().mockResolvedValue(request),
+      }),
       "/org-1/workspaces/PAY/setup?githubSetup=request&githubIntegrationId=int-1",
     );
-    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
+    expect(await screen.findByTestId("first-run-github-install-requested")).toHaveTextContent(
       FIRST_RUN_COPY.connect.installRequested,
     );
   });
@@ -389,7 +393,7 @@ describe("FirstRunSetup reliability", () => {
           readyInstances: [existing],
         },
       }),
-      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubIntegrationId=request-integration",
+      "/org-1/workspaces/PAY/setup?step=vcs",
     );
 
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("requested-org");
@@ -430,11 +434,11 @@ describe("FirstRunSetup reliability", () => {
       state: "csrf",
       githubApp: { slug: "superplane" },
       installRequests: [],
-      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
     });
     const view = renderSetup(
       pageModel({ openSection: "vcs", githubConnections: githubConnections([waiting]) }),
-      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubIntegrationId=int-1",
+      "/org-1/workspaces/PAY/setup?step=vcs",
     );
     expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
 

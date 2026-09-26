@@ -13,6 +13,7 @@ import {
   useCreateIntegration,
 } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
+import { useSyncGitHubConnection } from "@/hooks/useSyncGitHubConnection";
 import { getApiErrorMessage } from "@/lib/errors";
 import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integrationSetupReturn";
 import {
@@ -319,6 +320,8 @@ export function useIntegrationConnectDialog({
     connectionsLoading,
     /** Refetches the connected list, for screens that must not show a stale cache. */
     refetchConnections: refetch,
+    /** Synchronizes one hosted GitHub connection and updates the connected-list cache. */
+    syncGitHubConnection: hostedConnect.syncGitHubConnection,
     requestConnect,
     requestPrivateGitHubConnect,
     hostedGitHubAppInstall: githubConnect.hosted,
@@ -472,6 +475,7 @@ function useHostedProviderConnect({
   }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
 }) {
   return {
+    syncGitHubConnection: useSyncGitHubConnection(organizationId),
     github: useHostedGitHubConnect({
       organizationId,
       returnTo,

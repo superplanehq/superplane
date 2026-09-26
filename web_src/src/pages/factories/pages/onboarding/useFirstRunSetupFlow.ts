@@ -6,6 +6,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 import {
+  GITHUB_SETUP_COMPLETE_VALUE,
   GITHUB_SETUP_INTEGRATION_PARAM,
   GITHUB_SETUP_ORG_PARAM,
   GITHUB_SETUP_REQUEST_PARAM,
@@ -36,6 +37,7 @@ import {
   type OnboardingAgentGate,
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
+import { clearGitHubSetupParams, useGitHubCallbackSync } from "./useGitHubCallbackSync";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
@@ -65,13 +67,18 @@ const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
 function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen {
   const requestedStep = searchParams.get("step");
   if (isWizardStepId(requestedStep)) return SCREEN_FOR_STEP[requestedStep];
-  return searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ? "connect" : "welcome";
+  return hasCallbackMarker(searchParams) ? "connect" : "welcome";
 }
 
 function startConnectOnPicker(searchParams: URLSearchParams): boolean {
   const step = searchParams.get("step");
   if (step === "vcs") return true;
-  return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
+  return step === null && hasCallbackMarker(searchParams);
+}
+
+function hasCallbackMarker(searchParams: URLSearchParams): boolean {
+  const value = searchParams.get(GITHUB_SETUP_REQUEST_PARAM);
+  return value === GITHUB_SETUP_REQUEST_VALUE || value === GITHUB_SETUP_COMPLETE_VALUE;
 }
 
 function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
@@ -120,25 +127,35 @@ function useGitHubConnectionState(model: OnboardingPageModel, organizationId: st
   const { data: me, isPending: meLoading } = useMe(true, organizationId);
   const [searchParams, setSearchParams] = useSearchParams();
   const callbackIntegrationId = searchParams.get(GITHUB_SETUP_INTEGRATION_PARAM)?.trim() || undefined;
+  const callbackSync = useGitHubCallbackSync({
+    searchParams,
+    setSearchParams,
+    integrationId: callbackIntegrationId,
+    syncGithubConnection: model.syncGithubConnection,
+  });
   const resolved = resolveGitHubConnection(model, me?.id, callbackIntegrationId);
   const requestConnection = resolved.requestConnection;
-  const callbackRequestPending = model.githubConnectionsLoading && hasRequestMarker(searchParams);
+  const callbackRequestPending =
+    hasRequestMarker(searchParams) && (callbackSync.active || model.githubConnectionsLoading);
 
   useEffect(() => {
-    if (model.githubConnectionsLoading || requestConnection || !hasRequestMarker(searchParams)) return;
+    if (callbackSync.active || model.githubConnectionsLoading || requestConnection || !hasRequestMarker(searchParams)) {
+      return;
+    }
     const next = new URLSearchParams(searchParams);
-    next.delete(GITHUB_SETUP_REQUEST_PARAM);
-    next.delete(GITHUB_SETUP_ORG_PARAM);
-    next.delete(GITHUB_SETUP_INTEGRATION_PARAM);
+    clearGitHubSetupParams(next);
     setSearchParams(next, { replace: true });
-  }, [model.githubConnectionsLoading, requestConnection, searchParams, setSearchParams]);
+  }, [callbackSync.active, model.githubConnectionsLoading, requestConnection, searchParams, setSearchParams]);
 
   return {
     ...resolved,
     callbackIntegrationId,
     installRequested: Boolean(requestConnection) || callbackRequestPending,
     githubOrganizations: requestedOrganizations(requestConnection, callbackRequestPending, searchParams),
-    sourcesLoading: meLoading || model.githubConnectionsLoading,
+    sourcesLoading: meLoading || model.githubConnectionsLoading || callbackSync.loading,
+    callbackSyncActive: callbackSync.active,
+    callbackSyncError: callbackSync.error,
+    retryCallbackSync: callbackSync.retry,
     startOnPicker: startConnectOnPicker(searchParams),
     initialScreen: initialFirstRunScreen(searchParams),
   };
@@ -220,8 +237,12 @@ function useFirstRunNavigation(
       model.setup.issuesChoice,
       model.jiraProjectId,
     ),
-    pickerShowing: pickerOpen && Boolean(connection.accountPicker),
-    pickerLoading: pickerOpen && !connection.accountPicker && connection.sourcesLoading,
+    pickerShowing: pickerOpen && (Boolean(connection.accountPicker) || connection.callbackSyncActive),
+    pickerLoading:
+      pickerOpen &&
+      (connection.callbackSyncActive
+        ? connection.callbackSyncError === undefined
+        : !connection.accountPicker && connection.sourcesLoading),
     closePicker: () => setPickerOpen(false),
     goToScreen,
   };
@@ -484,7 +505,9 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   useRecheckGitHubInstallRequest(
     organizationId,
     connection.requestConnection?.id ?? connection.accountPicker?.id,
-    navigation.screen === "connect" && (connection.installRequested || navigation.pickerShowing),
+    navigation.screen === "connect" &&
+      !connection.callbackSyncActive &&
+      (connection.installRequested || navigation.pickerShowing),
   );
 
   return {
@@ -506,6 +529,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     githubOrganizations: connection.githubOrganizations,
     requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,
     accountPicker: connection.accountPicker,
+    githubCallbackSyncError: connection.callbackSyncError,
+    retryGithubCallbackSync: connection.retryCallbackSync,
     blockingAction: blocking.action,
     busy: blocking.busy || model.saving,
   };
