@@ -63,8 +63,10 @@ clone cannot leak into the next task.
 
 The Compose worker image (`runner/Dockerfile.local`) includes bash, Python 3,
 Node.js 22, git, GitHub CLI (`gh`), jq, openssl, Docker CLI, Claude Code,
-OpenCode, and Codex. Factory line apps can run on this worker. Do not install
-those CLIs on the host. Host NVM binaries are not on the container PATH.
+OpenCode, Codex, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model at
+`/usr/local/share/whisper/ggml-tiny.bin`. Factory line apps can run on this
+worker. Do not install those CLIs on the host. Host NVM binaries are not on
+the container PATH. Video and audio tasks must not download models.
 
 Check the tools after `make dev.server`:
 

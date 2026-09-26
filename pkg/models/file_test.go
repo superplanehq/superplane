@@ -38,12 +38,20 @@ func TestAllowedFileContentTypes(t *testing.T) {
 		"image/heif",
 		"APPLICATION/JSON",
 		"text/yaml; charset=utf-8",
+		"audio/mpeg",
+		"audio/mp4",
+		"audio/wav",
+		"audio/webm",
+		"audio/ogg",
+		"audio/mp3",
+		"audio/x-wav",
+		"audio/x-m4a",
 	}
 	for _, contentType := range allowed {
 		assert.True(t, IsAllowedFileContentType(contentType), contentType)
 	}
 
-	rejected := []string{"video/mp4", "application/zip", "text/html", "application/octet-stream", "image/svg+xml"}
+	rejected := []string{"application/zip", "text/html", "application/octet-stream", "image/svg+xml"}
 	for _, contentType := range rejected {
 		assert.False(t, IsAllowedFileContentType(contentType), contentType)
 	}
@@ -78,7 +86,7 @@ func TestCreatePendingFileNormalizesYamlContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-yaml")
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -94,7 +102,22 @@ func TestCreatePendingFileRejectsDisallowedContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-type")
 
-	_, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	_, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "payload.zip",
+		ContentType:    "application/zip",
+		CreatedByID:    userID,
+	})
+	assert.ErrorIs(t, err, ErrFileContentType)
+}
+
+func TestCreatePendingFileAcceptsVideoContentType(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "file-video")
+
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -102,14 +125,34 @@ func TestCreatePendingFileRejectsDisallowedContentType(t *testing.T) {
 		ContentType:    "video/mp4",
 		CreatedByID:    userID,
 	})
-	assert.ErrorIs(t, err, ErrFileContentType)
+	require.NoError(t, err)
+	assert.Equal(t, "video/mp4", file.ContentType)
+	assert.True(t, IsInlineVideoContentType(file.ContentType))
+}
+
+func TestCreatePendingFileAcceptsAudioContentType(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "file-audio")
+
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "note.mp3",
+		ContentType:    "audio/mpeg",
+		CreatedByID:    userID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "audio/mpeg", file.ContentType)
+	assert.True(t, IsInlineAudioContentType(file.ContentType))
+	assert.False(t, IsInlineVideoContentType(file.ContentType))
 }
 
 func TestCreatePendingFileStoresWorkspaceScope(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-create")
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -131,7 +174,7 @@ func TestReparentToTaskUpdatesScopeAndKey(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "With file", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,

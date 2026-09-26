@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,7 +121,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec, "", nil, nil)
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
@@ -164,8 +165,8 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git repo", requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content)
 
-	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
-	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
+	assert.Equal(t, runner.AttachmentAgentInstructions+"\n\nFix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
+	assert.Equal(t, runner.AttachmentAgentInstructions+"\n\nRun the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
 
 	assert.Contains(t, runScript, "stream-json")
 	assert.Contains(t, runScript, "--append-system-prompt")
@@ -194,6 +195,40 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "workdir")
 }
 
+func TestBuildClaudeCodeBrokerTaskRewritesImagePromptPaths(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := runner.MintAgentStepFileRefs(
+		[]runner.AgentStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+	}
+	task := buildClaudeCodeBrokerTask(spec, "", nil, dispatched, []runner.TaskAttachment{{
+		ID:          fileID,
+		URL:         signed,
+		Filename:    "bug.png",
+		ContentType: "image/png",
+	}})
+
+	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
+	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.Contains(t, prompt, "inspect_attachment")
+	assert.NotContains(t, prompt, signed)
+	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
+	assert.Equal(t, "Fetch task attachments", task.Commands[1].Name)
+	assert.Equal(t, "Process task attachments", task.Commands[2].Name)
+}
+
 func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
 	t.Parallel()
 
@@ -204,7 +239,7 @@ func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
-	task := buildClaudeCodeBrokerTask(spec, "", nil, nil)
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'sonnet' 'high'`)
 }
 
@@ -237,7 +272,7 @@ func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) 
 
 	task := buildClaudeCodeBrokerTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
 		{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
-	}, nil)
+	}, nil, nil)
 	require.Len(t, task.Commands, 3)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, "Set up Semaphore", task.Commands[1].Name)
@@ -247,7 +282,7 @@ func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) 
 	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, task.Files, "setup/01-set-up-semaphore.sh").Content)
 	assert.Equal(
 		t,
-		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
+		runner.AttachmentAgentInstructions+"\n\nThe gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
 		requireTaskFile(t, task.Files, "prompts/01-fix-tests.txt").Content,
 	)
 }
@@ -276,7 +311,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildClaudeCodeBrokerTask(spec, "", nil, nil)
+	base := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil)
 	got := applyPlanningFollowUp(base, nil, spec)
 	assert.Len(t, got.Commands, len(base.Commands))
 	assert.Len(t, got.Files, len(base.Files))
@@ -292,7 +327,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildClaudeCodeBrokerTask(spec, "", nil, nil)
+	base := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
@@ -305,6 +340,8 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	assert.Contains(t, last.Command, `node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" 'opus'`)
 	assert.Contains(t, last.Command, `cd "$_sp_root"/'repo'`)
 	assert.Equal(t, runner.FollowUpLoopFile().Content, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
+	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentFetchScriptPath).Content)
+	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
 }
 
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {

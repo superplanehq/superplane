@@ -12,6 +12,7 @@ const {
   isAllowedSignedDownloadURL,
   materializeFollowUpAttachments,
   nextAction,
+  prepareIncomingAttachments,
   persistAnalysisContinuation,
   runLoop,
   runPromptFile,
@@ -34,11 +35,149 @@ test("exits when the session ends", () => {
   assert.deepEqual(nextAction({ status: "ended" }), { type: "exit", code: 0 });
 });
 
-test("turns a user message into the next prompt", () => {
-  assert.deepEqual(nextAction({ status: "message", text: " Add a Size field " }), {
-    type: "prompt",
-    text: "Add a Size field",
-  });
+test("turns a user message with files into the next prompt", () => {
+  assert.deepEqual(
+    nextAction({
+      status: "message",
+      text: "See this clip",
+      files: [{ id: "file-1", filename: "clip.mp4", content_type: "video/mp4", url: "https://files.example/clip.mp4" }],
+    }),
+    {
+      type: "prompt",
+      text: "See this clip",
+      files: [{ id: "file-1", filename: "clip.mp4", content_type: "video/mp4", url: "https://files.example/clip.mp4" }],
+    },
+  );
+});
+
+test("prepareIncomingAttachments downloads unseen files and processes videos", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-files-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      size_bytes: 12,
+      checksum: "abc",
+      url: "https://files.example/clip.mp4",
+    },
+  ]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].dest, "01-clip.mp4");
+  assert.equal(manifest.files[0].kind, "video");
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments skips files already in the manifest", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-skip-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+  prepareIncomingAttachments(taskDir, incoming);
+  const manifestPath = path.join(taskDir, "attachments", "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.files[0].status = "ready";
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+  prepareIncomingAttachments(taskDir, incoming);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments retries a pending download", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-retry-"));
+  const attempts = path.join(taskDir, "attempts.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash
+count=0
+[ ! -f ${JSON.stringify(attempts)} ] || count=$(cat ${JSON.stringify(attempts)})
+count=$((count + 1))
+printf '%s' "$count" > ${JSON.stringify(attempts)}
+[ "$count" -gt 1 ]
+`,
+  );
+  fs.writeFileSync(path.join(taskDir, "process_video_attachments.sh"), "#!/bin/bash\nexit 0\n");
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+
+  assert.throws(() => prepareIncomingAttachments(taskDir, incoming), /fetch_task_attachments\.sh failed/);
+  prepareIncomingAttachments(taskDir, incoming);
+
+  assert.equal(fs.readFileSync(attempts, "utf8"), "2");
+});
+
+test("prepareIncomingAttachments processes image-only follow-ups", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-image-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-2",
+      filename: "shot.png",
+      content_type: "image/png",
+      url: "https://files.example/shot.png",
+    },
+  ]);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments processes audio follow-ups", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-audio-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  prepareIncomingAttachments(taskDir, [
+    {
+      id: "file-3",
+      filename: "note.mp3",
+      content_type: "audio/mpeg",
+      url: "https://files.example/note.mp3",
+    },
+  ]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].kind, "audio");
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
 });
 
 test("ignores an empty user message", () => {
@@ -59,6 +198,63 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+test("runLoop retries attachment preparation before running the prompt", async () => {
+  const prompts = [];
+  const logs = [];
+  const sleeps = [];
+  const results = [{ status: "message", text: "See this clip", files: [{ id: "file-1" }] }, { status: "ended" }];
+  let attempts = 0;
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    prepareAttachments: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("temporary download failure");
+      }
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => sleeps.push(ms),
+    log: (message) => logs.push(message),
+    writeLiveLogRecord: () => {},
+  });
+
+  assert.equal(code, 0);
+  assert.equal(attempts, 2);
+  assert.deepEqual(prompts, ["See this clip"]);
+  assert.deepEqual(sleeps, [1000]);
+  assert.match(logs[0], /attachment preparation failed; retrying/i);
+});
+
+test("runLoop continues after permanent attachment preparation failure", async () => {
+  const prompts = [];
+  const sleeps = [];
+  const results = [{ status: "message", text: "See this clip", files: [{ id: "file-1" }] }, { status: "ended" }];
+  let attempts = 0;
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    prepareAttachments: async () => {
+      attempts += 1;
+      throw new Error("download denied");
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async (ms) => sleeps.push(ms),
+    log: () => {},
+    writeLiveLogRecord: () => {},
+  });
+
+  assert.equal(code, 0);
+  assert.equal(attempts, 3);
+  assert.deepEqual(sleeps, [1000, 1000]);
+  assert.match(prompts[0], /could not prepare the attached files/i);
+  assert.match(prompts[0], /See this clip/);
 });
 
 test("persistAnalysisContinuation writes a wait continuation for the next rewind", () => {
@@ -570,6 +766,75 @@ test("materializeFollowUpAttachments does not follow a redirect to an unexpected
   assert.deepEqual(calls, [signed]);
   assert.match(rewritten, /SuperPlane could not download 1 user image/);
   assert.doesNotMatch(rewritten, /sp_file=1/);
+});
+
+test("materializeFollowUpAttachments reuses indexed files without downloading", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-indexed-"));
+  const attachments = path.join(taskDir, "attachments");
+  fs.mkdirSync(attachments);
+  const dest = "01-shot.png";
+  fs.writeFileSync(path.join(attachments, dest), PNG_BYTES);
+  fs.writeFileSync(
+    path.join(attachments, "manifest.json"),
+    JSON.stringify({
+      version: 1,
+      files: [
+        {
+          id: FILE_ID,
+          filename: "shot.png",
+          content_type: "image/png",
+          dest,
+          kind: "image",
+          url: gcsSignedURL(),
+          status: "ready",
+        },
+      ],
+    }),
+  );
+  const signed = gcsSignedURL();
+  let calls = 0;
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${signed})`,
+    async () => {
+      calls += 1;
+      throw new Error("must not fetch indexed attachments");
+    },
+  );
+  assert.equal(calls, 0);
+  assert.doesNotMatch(rewritten, /sp_file=1/);
+  assert.match(rewritten, /inspect_attachment/);
+  assert.match(rewritten, new RegExp(dest.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.deepEqual(fs.readdirSync(attachments).sort(), ["01-shot.png", "manifest.json"]);
+});
+
+test("materializeFollowUpAttachments allows images up to 50 MiB", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-50mib-"));
+  const signed = gcsSignedURL();
+  const elevenMiB = 11 * 1024 * 1024;
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${signed})`,
+    async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name) => {
+          const key = String(name).toLowerCase();
+          if (key === "content-length") {
+            return String(elevenMiB);
+          }
+          if (key === "content-type") {
+            return "image/png";
+          }
+          return null;
+        },
+      },
+      arrayBuffer: async () => PNG_BYTES,
+    }),
+  );
+  assert.doesNotMatch(rewritten, /could not download/);
+  assert.match(rewritten, /inspect_attachment/);
 });
 
 test("materializeFollowUpAttachments rejects an oversized Content-Length", async () => {
