@@ -1,0 +1,16 @@
+{
+  "data": {
+    "url": "https://service.example.com/ready",
+    "resolvedUrl": "https://service.example.com/ready",
+    "status": 200,
+    "body": {
+      "status": "ready"
+    },
+    "attempts": 3,
+    "startedAt": "2026-08-01T06:00:00Z",
+    "finishedAt": "2026-08-01T06:00:20Z",
+    "elapsedMs": 20000
+  },
+  "timestamp": "2026-08-01T06:00:20Z",
+  "type": "endpoint.ready"
+}
