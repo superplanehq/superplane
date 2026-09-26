@@ -86,7 +86,7 @@ func TestCreatePendingFileNormalizesYamlContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-yaml")
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -102,7 +102,7 @@ func TestCreatePendingFileRejectsDisallowedContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-type")
 
-	_, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	_, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -117,7 +117,7 @@ func TestCreatePendingFileAcceptsVideoContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-video")
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -134,7 +134,7 @@ func TestCreatePendingFileAcceptsAudioContentType(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-audio")
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -152,7 +152,7 @@ func TestCreatePendingFileStoresWorkspaceScope(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "file-create")
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -174,7 +174,7 @@ func TestReparentToTaskUpdatesScopeAndKey(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "With file", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	file, err := CreatePendingFile(database.Conn(), CreateFileParams{
+	file, err := CreatePendingFile(database.DB(t.Context()), CreateFileParams{
 		Scope:          blob.ScopeWorkspace,
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
