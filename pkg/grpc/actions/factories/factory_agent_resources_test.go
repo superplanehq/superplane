@@ -12,10 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
@@ -205,6 +207,46 @@ func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 		Enabled:   true,
 	})
 	require.Error(t, err)
+}
+
+func Test__CreateFactoryAgentResourceRejectsConnectedURL(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_MCP_SERVER,
+		Name:      "docs",
+		Enabled:   true,
+		Url:       "https://mcp.example.com/mcp",
+		Auth:      pb.FactoryAgentResource_AUTH_HEADERS,
+		Headers: []*pb.FactoryAgentResource_Header{{
+			Name:       "Authorization",
+			SecretName: "vendor-mcp",
+			SecretKey:  "token",
+		}},
+	})
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_MCP_SERVER,
+		Name:      "docs-copy",
+		Enabled:   true,
+		Url:       "https://mcp.example.com/mcp/",
+		Auth:      pb.FactoryAgentResource_AUTH_HEADERS,
+		Headers: []*pb.FactoryAgentResource_Header{{
+			Name:       "Authorization",
+			SecretName: "vendor-mcp",
+			SecretKey:  "token",
+		}},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	assert.Equal(t, "This MCP server is already connected.", grpcerrors.StatusMessage(err))
 }
 
 func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {

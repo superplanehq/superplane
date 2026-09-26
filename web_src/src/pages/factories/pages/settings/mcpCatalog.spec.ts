@@ -12,14 +12,7 @@ import {
 
 describe("MCP_CATALOG", () => {
   it("includes a HTTPS URL and a SuperPlane-ready auth method on every entry", () => {
-    expect(MCP_CATALOG.map((entry) => entry.id)).toEqual([
-      "github",
-      "jira",
-      "linear",
-      "circleci",
-      "semaphore",
-      "sentry",
-    ]);
+    expect(MCP_CATALOG.map((entry) => entry.id)).toEqual(["github", "jira", "linear", "semaphore", "sentry"]);
     for (const entry of MCP_CATALOG) {
       expect(entry.url.startsWith("https://")).toBe(true);
       expect(entry.instruction).toBeDefined();
@@ -105,7 +98,7 @@ describe("filterMCPCatalog", () => {
   it("matches label, name, id, or category", () => {
     expect(filterMCPCatalog(MCP_CATALOG, "GitHub").map((entry) => entry.id)).toEqual(["github"]);
     expect(filterMCPCatalog(MCP_CATALOG, "linear").map((entry) => entry.id)).toEqual(["linear"]);
-    expect(filterMCPCatalog(MCP_CATALOG, "circle").map((entry) => entry.id)).toEqual(["circleci"]);
+    expect(filterMCPCatalog(MCP_CATALOG, "sema").map((entry) => entry.id)).toEqual(["semaphore"]);
     expect(
       filterMCPCatalog(MCP_CATALOG, "observability")
         .map((entry) => entry.id)
@@ -123,10 +116,7 @@ describe("groupMCPCatalog", () => {
       "Jira",
       "Linear",
     ]);
-    expect(groups.find((group) => group.id === "cicd")?.entries.map((entry) => entry.label)).toEqual([
-      "CircleCI",
-      "Semaphore",
-    ]);
+    expect(groups.find((group) => group.id === "cicd")?.entries.map((entry) => entry.label)).toEqual(["Semaphore"]);
     expect(groups.find((group) => group.id === "observability")?.entries.map((entry) => entry.label)).toEqual([
       "Sentry",
     ]);

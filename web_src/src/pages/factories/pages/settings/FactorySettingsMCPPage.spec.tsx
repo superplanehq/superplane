@@ -4,7 +4,11 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
-import { HEADER_MCP_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE } from "../../__fixtures__/agentResourceFixtures";
+import {
+  HEADER_MCP_RESOURCE,
+  OAUTH_CONNECTED_RESOURCE,
+  OAUTH_NOT_CONNECTED_RESOURCE,
+} from "../../__fixtures__/agentResourceFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -206,6 +210,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-search")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("mcp-catalog-circleci")).not.toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-category-code")).toHaveTextContent("Code");
     expect(screen.getByTestId("mcp-catalog-category-observability")).toHaveTextContent("Observability");
     expect(screen.getByTestId("mcp-catalog-custom")).toHaveTextContent("Add custom");
@@ -453,6 +458,59 @@ describe("FactorySettingsMCPPage", () => {
     expect(screen.getByTestId(`agent-resource-edit-${sentryResource.id}`)).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resource-edit-resource-2")).not.toBeInTheDocument();
     vi.unstubAllGlobals();
+  }, 10000);
+
+  it("does not open Sign in from Add when the catalog OAuth server is already connected", async () => {
+    const user = userEvent.setup();
+    const sentryResource = {
+      ...OAUTH_CONNECTED_RESOURCE,
+      id: "resource-sentry-connected",
+      name: "sentry",
+      url: "https://mcp.sentry.dev/mcp",
+    };
+    render(
+      <FactoriesHarness
+        pathSuffix={`${mcpPath}?dialog=add`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 });
+    await user.click(screen.getByTestId("mcp-catalog-sentry"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("mcp-add-picker")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId(`agent-resource-edit-${sentryResource.id}`)).toBeInTheDocument();
+  }, 10000);
+
+  it("opens Sign in when a connected catalog OAuth server is edited", async () => {
+    const user = userEvent.setup();
+    const sentryResource = {
+      ...OAUTH_CONNECTED_RESOURCE,
+      id: "resource-sentry-connected",
+      name: "sentry",
+      url: "https://mcp.sentry.dev/mcp",
+    };
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.click(await screen.findByTestId(`agent-resource-edit-${sentryResource.id}`, {}, { timeout: 8000 }));
+    expect(await screen.findByTestId("mcp-catalog-setup-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resource-connection-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-setup-sign-in")).toHaveTextContent("Sign in");
   }, 10000);
 
   it("opens the form when a header server uses a catalog OAuth URL", async () => {
