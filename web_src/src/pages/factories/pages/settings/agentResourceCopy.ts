@@ -1,6 +1,6 @@
 /** User-facing copy for workspace MCP servers and skills. STE. */
 
-export type AgentResourceInstructionStep =
+export type AgentResourceInstruction =
   | string
   | {
       before: string;
@@ -20,6 +20,7 @@ export const AGENT_RESOURCES_COPY = {
   refinementNote:
     "These MCP servers can change systems outside SuperPlane during refinement. The repository stays read-only.",
   addConnection: "Add MCP server",
+  addServerTitle: (label: string) => `Add ${label}`,
   editConnection: "Edit MCP server",
   dialogDescription: "Agents on every run in this workspace can use this MCP server.",
   catalogDescription: "Choose a common server, or add a custom MCP URL.",
@@ -64,6 +65,7 @@ export const AGENT_RESOURCES_COPY = {
   enableToolLabel: (name: string) => `Enable ${name}`,
   close: "Close",
   connect: "Connect",
+  signIn: "Sign in",
   reconnect: "Reconnect",
   disconnect: "Disconnect",
   edit: "Edit",
@@ -81,6 +83,8 @@ export const AGENT_RESOURCES_COPY = {
   headersLabel: "Headers",
   headerNameLabel: "Header name",
   headerSecretLabel: "Secret",
+  tokenLabel: "Personal access token",
+  tokenRequired: "Personal access token is required.",
   addHeader: "Add header",
   removeHeader: "Remove header",
   loading: "Loading MCP servers...",
@@ -95,32 +99,17 @@ export const AGENT_RESOURCES_COPY = {
   urlInvalid: "Enter an https URL.",
   markdownRequired: "SKILL.md content is required.",
   headersHelper: "Add a header only when the server needs a credential.",
-  catalogInstructionsTitle: "How to connect",
-  githubInstructions: [
-    "GitHub does not support SuperPlane sign-in.",
-    {
-      before: "Create a ",
-      href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
-      label: "GitHub personal access token",
-      after: ".",
-    },
-    "Store Bearer, a space, and the token as one secret value.",
-    "Select that secret for the Authorization header.",
-  ],
-  jiraInstructions: [
-    "Add the MCP server.",
-    "Select Connect on the server.",
-    "Sign in with Atlassian and grant access to Jira.",
-  ],
-  linearInstructions: ["Add the MCP server.", "Select Connect on the server.", "Sign in with Linear."],
-  circleciInstructions: ["Add the MCP server.", "Select Connect on the server.", "Sign in with CircleCI."],
-  semaphoreInstructions: [
-    "Ask Semaphore support to enable MCP for your organization.",
-    "Add the MCP server.",
-    "Select Connect on the server.",
-    "Sign in with Semaphore.",
-  ],
-  sentryInstructions: ["Add the MCP server.", "Select Connect on the server.", "Sign in with Sentry."],
+  githubInstruction: {
+    before: "Create a ",
+    href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+    label: "GitHub personal access token",
+    after: " and paste it here.",
+  },
+  jiraInstruction: "Sign in with Atlassian to grant access to Jira.",
+  linearInstruction: "Sign in with Linear.",
+  circleciInstruction: "Sign in with CircleCI.",
+  semaphoreInstruction: "Ask Semaphore support to enable MCP for your organization, then sign in.",
+  sentryInstruction: "Sign in with Sentry.",
   headerIncomplete: "Each header needs a name and a secret.",
   created: "MCP server added.",
   updated: "MCP server updated.",
