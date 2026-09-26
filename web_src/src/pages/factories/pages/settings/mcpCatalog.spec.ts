@@ -42,6 +42,9 @@ describe("MCP_CATALOG", () => {
       label: "GitHub personal access token",
       after: ".",
     });
+    expect(AGENT_RESOURCES_COPY.githubInstructions[2]).toBe(
+      "Store Bearer, a space, and the token as one secret value.",
+    );
   });
 
   it("omits instructions for a custom MCP server", () => {

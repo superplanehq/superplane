@@ -104,7 +104,7 @@ export const AGENT_RESOURCES_COPY = {
       label: "GitHub personal access token",
       after: ".",
     },
-    "Store Bearer and the token in an organization secret.",
+    "Store Bearer, a space, and the token as one secret value.",
     "Select that secret for the Authorization header.",
   ],
   jiraInstructions: [
