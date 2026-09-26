@@ -103,13 +103,8 @@ func checkOrganizationRulePermission(
 	organizationID string,
 	rule AuthorizationRule,
 ) (bool, error) {
-	allowed, err := checkOrganizationPermission(ctx, auth, userID, organizationID, rule.Resource, rule.Action)
-	if err != nil || allowed {
-		return allowed, err
-	}
-
-	for _, action := range rule.LegacyActions {
-		allowed, err = checkOrganizationPermission(ctx, auth, userID, organizationID, rule.Resource, action)
+	for _, grant := range rule.Grants() {
+		allowed, err := checkOrganizationPermission(ctx, auth, userID, organizationID, grant.Resource, grant.Action)
 		if err != nil || allowed {
 			return allowed, err
 		}

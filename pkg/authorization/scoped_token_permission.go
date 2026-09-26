@@ -21,9 +21,23 @@ func hasRequiredScopedTokenPermissionForScopes(
 		return false
 	}
 
-	actions := rule.AllowedActions()
+	for _, grant := range rule.Grants() {
+		if scopedTokenHasGrant(permissions, pathParams, rule.ResourcePathParams, grant) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func scopedTokenHasGrant(
+	permissions []jwt.Permission,
+	pathParams map[string]string,
+	pathParamKeys []string,
+	grant PermissionGrant,
+) bool {
 	for _, permission := range permissions {
-		if permission.ResourceType != rule.Resource || !slices.Contains(actions, permission.Action) {
+		if permission.ResourceType != grant.Resource || permission.Action != grant.Action {
 			continue
 		}
 
@@ -31,7 +45,7 @@ func hasRequiredScopedTokenPermissionForScopes(
 			return true
 		}
 
-		resourceIDs := resourceIDsFromPathParams(pathParams, rule.ResourcePathParams)
+		resourceIDs := resourceIDsFromPathParams(pathParams, pathParamKeys)
 		if len(resourceIDs) == 0 {
 			continue
 		}
