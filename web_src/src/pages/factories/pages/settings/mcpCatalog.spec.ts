@@ -15,6 +15,7 @@ describe("MCP_CATALOG", () => {
     ]);
     for (const entry of MCP_CATALOG) {
       expect(entry.url.startsWith("https://")).toBe(true);
+      expect(entry.instruction).toBeDefined();
     }
     const github = MCP_CATALOG.find((entry) => entry.id === "github");
     expect(github?.auth).toBe("AUTH_HEADERS");
@@ -22,32 +23,26 @@ describe("MCP_CATALOG", () => {
     expect(MCP_CATALOG.filter((entry) => entry.id !== "github").every((entry) => entry.auth === "AUTH_OAUTH")).toBe(
       true,
     );
-    for (const entry of MCP_CATALOG) {
-      expect(entry.instructions?.length).toBeGreaterThan(0);
-    }
   });
 
-  it("prefills GitHub header auth and setup instructions", () => {
+  it("prefills GitHub header auth and a token instruction", () => {
     const github = MCP_CATALOG.find((entry) => entry.id === "github");
     expect(catalogConnectionDefaults(github)).toEqual({
       name: "github",
       url: "https://api.githubcopilot.com/mcp/",
       auth: "AUTH_HEADERS",
       headers: [{ name: "Authorization" }],
-      instructions: AGENT_RESOURCES_COPY.githubInstructions,
+      instruction: AGENT_RESOURCES_COPY.githubInstruction,
     });
-    expect(AGENT_RESOURCES_COPY.githubInstructions[1]).toEqual({
+    expect(AGENT_RESOURCES_COPY.githubInstruction).toEqual({
       before: "Create a ",
       href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
       label: "GitHub personal access token",
-      after: ".",
+      after: " and paste it here.",
     });
-    expect(AGENT_RESOURCES_COPY.githubInstructions[2]).toBe(
-      "Store Bearer, a space, and the token as one secret value.",
-    );
   });
 
-  it("omits instructions for a custom MCP server", () => {
+  it("omits defaults for a custom MCP server", () => {
     expect(catalogConnectionDefaults(undefined)).toBeUndefined();
   });
 });

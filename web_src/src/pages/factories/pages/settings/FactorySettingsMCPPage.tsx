@@ -10,6 +10,7 @@ import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { MCPAddPicker } from "./MCPAddPicker";
+import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
 import { useMCPPage } from "./useMCPPage";
 
@@ -86,11 +87,18 @@ export function FactorySettingsMCPPage() {
         onClose={() => page.setAddPickerOpen(false)}
         onSelect={page.openCatalogEntry}
       />
+      <MCPCatalogSetupDialog
+        open={page.catalogSetupOpen}
+        entry={page.catalogEntry}
+        isSaving={page.isSaving}
+        onClose={page.closeCatalogSetup}
+        onSignIn={page.startCatalogOAuth}
+        onSaveToken={page.saveCatalogToken}
+      />
       <AgentResourceConnectionDialog
         open={page.connectionOpen}
         organizationId={page.organizationId}
         resource={page.editResource}
-        defaults={page.catalogDefaults}
         isSaving={page.isSaving}
         onClose={page.closeConnection}
         onSave={page.saveConnection}
