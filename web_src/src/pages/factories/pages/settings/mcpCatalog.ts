@@ -1,6 +1,6 @@
 import type { FactoryAgentResourceAuth } from "@/api-client";
 
-import { AGENT_RESOURCES_COPY, type AgentResourceInstructionStep } from "./agentResourceCopy";
+import { AGENT_RESOURCES_COPY, type AgentResourceInstruction } from "./agentResourceCopy";
 
 export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
 
@@ -13,7 +13,7 @@ export type MCPCatalogEntry = {
   url: string;
   auth: FactoryAgentResourceAuth;
   headerName?: string;
-  instructions?: readonly AgentResourceInstructionStep[];
+  instruction: AgentResourceInstruction;
 };
 
 export type MCPCatalogGroup = {
@@ -27,7 +27,7 @@ export type MCPCatalogConnectionDefaults = {
   url: string;
   auth: FactoryAgentResourceAuth;
   headers?: { name: string }[];
-  instructions?: readonly AgentResourceInstructionStep[];
+  instruction: AgentResourceInstruction;
 };
 
 export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogConnectionDefaults | undefined {
@@ -38,9 +38,30 @@ export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogCo
     name: entry.name,
     url: entry.url,
     auth: entry.auth,
+    instruction: entry.instruction,
     ...(entry.headerName ? { headers: [{ name: entry.headerName }] } : {}),
-    ...(entry.instructions?.length ? { instructions: entry.instructions } : {}),
   };
+}
+
+export function catalogEntryForResource(resource?: {
+  url?: string;
+  auth?: FactoryAgentResourceAuth;
+}): MCPCatalogEntry | undefined {
+  const url = resource?.url?.trim();
+  if (!url) {
+    return undefined;
+  }
+  return MCP_CATALOG.find((entry) => entry.url === url && entry.auth === resource.auth);
+}
+
+export function catalogOAuthResourceForEntry<T extends { url?: string; auth?: FactoryAgentResourceAuth }>(
+  resources: T[],
+  entry: MCPCatalogEntry,
+): T | undefined {
+  if (entry.auth !== "AUTH_OAUTH") {
+    return undefined;
+  }
+  return resources.find((resource) => resource.auth === "AUTH_OAUTH" && resource.url?.trim() === entry.url);
 }
 
 export const CUSTOM_MCP_CATALOG_ID = "custom";
@@ -101,7 +122,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     url: "https://api.githubcopilot.com/mcp/",
     auth: "AUTH_HEADERS",
     headerName: "Authorization",
-    instructions: AGENT_RESOURCES_COPY.githubInstructions,
+    instruction: AGENT_RESOURCES_COPY.githubInstruction,
   },
   {
     id: "jira",
@@ -111,7 +132,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "issues",
     url: "https://mcp.atlassian.com/v2/mcp",
     auth: "AUTH_OAUTH",
-    instructions: AGENT_RESOURCES_COPY.jiraInstructions,
+    instruction: AGENT_RESOURCES_COPY.jiraInstruction,
   },
   {
     id: "linear",
@@ -121,7 +142,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "issues",
     url: "https://mcp.linear.app/mcp",
     auth: "AUTH_OAUTH",
-    instructions: AGENT_RESOURCES_COPY.linearInstructions,
+    instruction: AGENT_RESOURCES_COPY.linearInstruction,
   },
   {
     id: "circleci",
@@ -131,7 +152,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "cicd",
     url: "https://mcp.circleci.com/v1/mcp",
     auth: "AUTH_OAUTH",
-    instructions: AGENT_RESOURCES_COPY.circleciInstructions,
+    instruction: AGENT_RESOURCES_COPY.circleciInstruction,
   },
   {
     id: "semaphore",
@@ -141,7 +162,7 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "cicd",
     url: "https://mcp.semaphoreci.com/mcp",
     auth: "AUTH_OAUTH",
-    instructions: AGENT_RESOURCES_COPY.semaphoreInstructions,
+    instruction: AGENT_RESOURCES_COPY.semaphoreInstruction,
   },
   {
     id: "sentry",
@@ -151,6 +172,6 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "observability",
     url: "https://mcp.sentry.dev/mcp",
     auth: "AUTH_OAUTH",
-    instructions: AGENT_RESOURCES_COPY.sentryInstructions,
+    instruction: AGENT_RESOURCES_COPY.sentryInstruction,
   },
 ];
