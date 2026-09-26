@@ -30,6 +30,10 @@ type fakeFactoryGitHub struct {
 	mergedMethod  string
 	mergedSHA     string
 	mergeCalls    int
+	editErr       error
+	editFailAfter int
+	editCalls     int
+	onEdit        func()
 	getPullErr    error
 	combinedErr   error
 	checkRunsErr  error
@@ -103,6 +107,23 @@ func (f *fakeFactoryGitHub) MergePullRequest(_ context.Context, _ string, _ int,
 		return nil, nil, f.mergeErr
 	}
 	return &github.PullRequestMergeResult{Merged: github.Ptr(true)}, nil, nil
+}
+
+func (f *fakeFactoryGitHub) EditPullRequest(_ context.Context, _ string, _ int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
+	f.editCalls++
+	if f.onEdit != nil {
+		f.onEdit()
+	}
+	if f.editFailAfter > 0 {
+		if f.editCalls > f.editFailAfter {
+			return nil, nil, f.editErr
+		}
+		return pullRequest, nil, nil
+	}
+	if f.editErr != nil {
+		return nil, nil, f.editErr
+	}
+	return pullRequest, nil, nil
 }
 
 func mergeableGitHubPullRequest(sha string) *github.PullRequest {

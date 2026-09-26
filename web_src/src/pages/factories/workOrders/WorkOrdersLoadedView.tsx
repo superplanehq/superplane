@@ -8,7 +8,7 @@ import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
@@ -30,6 +30,7 @@ import {
 import { WorkOrdersHeader } from "./header/WorkOrdersHeader";
 import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
+import { WorkOrderClosedStatusDialog } from "./WorkOrderClosedStatusDialog";
 
 interface WorkOrdersLoadedViewProps {
   organizationId: string;
@@ -62,6 +63,7 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { organizationId, workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const [closedStatusDialog, setClosedStatusDialog] = useState<"failed" | "rejected" | null>(null);
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,
@@ -159,10 +161,26 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
           showPullRequestMerge={showPullRequestMerge}
+          onOpenStatusDialog={setClosedStatusDialog}
         />
       </div>
 
       <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
+      {closedStatusDialog && factory.id ? (
+        <WorkOrderClosedStatusDialog
+          open
+          status={closedStatusDialog}
+          organizationId={organizationId}
+          factoryId={factory.id}
+          factoryKey={props.factoryKey}
+          canManage={props.canDispatch}
+          onOpenChange={(open) => {
+            if (!open) {
+              setClosedStatusDialog(null);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -242,6 +242,11 @@ func (s *FactoryService) UpdateWorkOrderStatus(ctx context.Context, req *pb.Upda
 	return actions.UpdateWorkOrderStatus(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SendWorkOrderToBacklog(ctx context.Context, req *pb.SendWorkOrderToBacklogRequest) (*pb.SendWorkOrderToBacklogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SendWorkOrderToBacklog(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) AddWorkOrderComment(ctx context.Context, req *pb.AddWorkOrderCommentRequest) (*pb.AddWorkOrderCommentResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.AddWorkOrderComment(ctx, organizationID, req)

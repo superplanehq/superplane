@@ -69,10 +69,7 @@ function markGlyph(status: WorkOrderDisplayStatus): ReactNode {
   if (status === "failed") {
     return <XGlyph />;
   }
-  if (status === "rejected") {
-    return <BanGlyph />;
-  }
-  return <MinusGlyph />;
+  return <BanGlyph />;
 }
 
 function Glyph({ children, ...props }: SVGProps<SVGSVGElement>) {
@@ -119,14 +116,6 @@ function BanGlyph() {
   return (
     <Glyph>
       <path d="M4.2 11.8 11.8 4.2" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
-    </Glyph>
-  );
-}
-
-function MinusGlyph() {
-  return (
-    <Glyph>
-      <path d="M4.2 8 H11.8" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
     </Glyph>
   );
 }

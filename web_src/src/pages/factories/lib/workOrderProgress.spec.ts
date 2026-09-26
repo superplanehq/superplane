@@ -56,6 +56,11 @@ describe("WORK_ORDER_BOARD_LANES", () => {
     expect(review?.title).toBe("Waiting");
     expect(review?.description).toBe("Tasks that wait for a human decision.");
   });
+
+  it("keeps only completed tasks in Done", () => {
+    const done = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "done");
+    expect(done?.statuses).toEqual(["completed"]);
+  });
 });
 
 describe("getWorkOrderDisplayStatus", () => {
@@ -134,7 +139,7 @@ describe("getWorkOrderDisplayStatus", () => {
     expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
   });
 
-  it("maps a canceled line dispatch to Canceled when the order is not completed", () => {
+  it("maps a canceled line dispatch to Rejected when the order is not completed", () => {
     expect(
       getWorkOrderDisplayStatus(
         order({
@@ -143,7 +148,7 @@ describe("getWorkOrderDisplayStatus", () => {
           lineDispatches: [{ id: "d1", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
         }),
       ),
-    ).toBe("cancelled");
+    ).toBe("rejected");
   });
 });
 
@@ -181,8 +186,7 @@ describe("filterWorkOrdersByStatus", () => {
     expect(idsFilteredBy(all, "running")).toEqual([running.id]);
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
     expect(idsFilteredBy(all, "failed")).toEqual([closedFailed.id]);
-    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
-    expect(idsFilteredBy(all, "cancelled")).toEqual([closedCancelled.id]);
+    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id, closedCancelled.id]);
   });
 
   it("countActiveWorkOrders matches the size of the default `active` filter", () => {
@@ -213,7 +217,7 @@ describe("groupWorkOrdersByLane", () => {
       backlog: ["d"],
       running: ["r"],
       review: ["w"],
-      done: ["c", "f", "x"],
+      done: ["c"],
     });
   });
 });

@@ -823,6 +823,8 @@ type ListFactoryWorkOrdersFilters struct {
 	// BeforeID is a keyset cursor. The query returns rows older than that
 	// order in updated_at DESC, id DESC order.
 	BeforeID *uuid.UUID
+	// LineID keeps orders that ran on this line, plus orders with no line.
+	LineID *uuid.UUID
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
@@ -847,6 +849,7 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	query = applyWorkOrderUserFilters(query, filters)
+	query = applyWorkOrderLineFilter(query, filters.LineID)
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -916,6 +919,24 @@ func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilt
 			)
 			OR factory_work_orders.created_by_id = ?
 		)`, *filters.UserID, *filters.UserID)
+}
+
+func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
+	if lineID == nil {
+		return query
+	}
+	return query.Where(`
+		(
+			EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
+		)`, *lineID)
 }
 
 func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
