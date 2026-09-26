@@ -65,6 +65,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
+    syncGithubConnection: vi.fn().mockResolvedValue(undefined),
     githubConnectionsLoading: false,
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,
@@ -144,7 +145,7 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
   });
 
-  it("keeps the connect screen locked after GitHub navigation starts", async () => {
+  it("keeps the connect screen locked while GitHub navigation starts", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
@@ -163,16 +164,43 @@ describe("FirstRunSetup reliability", () => {
       await navigation.promise;
     });
 
-    expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.openingGitHub);
-    expect(connect).toBeDisabled();
-    expect(screen.getByTestId("first-run-back")).toBeDisabled();
+    await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(connect).toBeEnabled();
+    expect(screen.getByTestId("first-run-back")).toBeEnabled();
+  });
+
+  it("releases a browser-action lock before a later intake action", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      openSection: "vcs",
+      requestConnect: vi.fn().mockResolvedValue(true),
+    });
+    const view = renderSetup(model, "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByTestId("first-run-connect-github"));
+    await waitFor(() => expect(model.requestConnect).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+        <FirstRunSetup model={{ ...model, openSection: "issues" }} />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByTestId("first-run-analyze-tickets"));
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });
 
   it("unlocks the connect screen when GitHub navigation does not start", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
     const requestConnect = vi.fn(() => navigation.promise);
-    renderSetup(pageModel({ openSection: "vcs", requestConnect }), "/org-1/workspaces/PAY/setup?step=vcs");
+    const refreshGithubConnections = vi.fn().mockResolvedValue(undefined);
+    renderSetup(
+      pageModel({ openSection: "vcs", requestConnect, refreshGithubConnections }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+    await waitFor(() => expect(refreshGithubConnections).toHaveBeenCalledTimes(1));
 
     const connect = screen.getByTestId("first-run-connect-github");
     await user.click(connect);
@@ -182,6 +210,7 @@ describe("FirstRunSetup reliability", () => {
     });
 
     await waitFor(() => expect(connect).toHaveTextContent(FIRST_RUN_COPY.connect.connectAction));
+    expect(refreshGithubConnections).toHaveBeenCalledTimes(2);
     expect(connect).toBeEnabled();
     expect(screen.getByTestId("first-run-back")).toBeEnabled();
   });
@@ -214,13 +243,75 @@ describe("FirstRunSetup reliability", () => {
     expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
   });
 
+  it("keeps a newly bound repository available on the ticket step", async () => {
+    const user = userEvent.setup();
+    const setup = setupState();
+    let backlogRepository: string | null = null;
+    setup.selectRepo = vi.fn((repository: string) => {
+      setup.selectedRepo = repository;
+      setup.issuesRepo = repository;
+      backlogRepository = repository;
+    });
+    const selectVcsConnection = vi.fn(async () => {
+      // React keeps the setup snapshot from this render while the connection
+      // switch clears the repository for the next render.
+      backlogRepository = null;
+      return true;
+    });
+    const saveIssues = vi.fn(async () => Boolean(backlogRepository));
+    const picker = githubConnection("int-new", {
+      startedByUserID: "user-1",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: 1, name: "acme/api" }] }],
+    });
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        setup,
+        saveIssues,
+        selectVcsConnection,
+        githubConnections: githubConnections([picker]),
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+    await user.click(await screen.findByRole("option", { name: "acme/api" }));
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+    await user.click(await screen.findByTestId("first-run-analyze-tickets"));
+
+    expect(setup.selectRepo).toHaveBeenCalledTimes(3);
+    expect(setup.selectRepo).toHaveBeenLastCalledWith("acme/api");
+    expect(saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
+  it("keeps the ticket source when the repository does not change", async () => {
+    const user = userEvent.setup();
+    const setup = {
+      ...setupState(),
+      selectedRepo: "acme/api",
+      issuesRepo: "acme/api",
+      issuesChoice: "vcs" as const,
+      selectRepo: vi.fn(),
+    };
+    renderSetup(pageModel({ openSection: "repo", setup }), "/org-1/workspaces/PAY/setup?step=repo");
+
+    await user.click(screen.getByTestId("first-run-continue-to-tickets"));
+
+    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(setup.selectRepo).not.toHaveBeenCalled();
+    expect(setup.issuesChoice).toBe("vcs");
+  });
+
   it("shows only the current user's GitHub account picker", () => {
     const picker = (userId: string) =>
       githubConnection("int-1", {
         startedByUserID: userId,
         state: "csrf",
         githubApp: { slug: "superplane" },
-        pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+        pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
       });
     const mine = renderSetup(
       pageModel({ openSection: "vcs", githubConnections: githubConnections([picker("user-1")]) }),
@@ -244,7 +335,7 @@ describe("FirstRunSetup reliability", () => {
       startedByUserID: "user-1",
       state: "csrf",
       githubApp: { slug: "superplane" },
-      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
     });
     renderSetup(
       pageModel({ openSection: "vcs", githubConnections: githubConnections([picker]) }),
@@ -255,14 +346,17 @@ describe("FirstRunSetup reliability", () => {
     expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true);
   });
 
-  it("opens the waiting screen from a GitHub request return", () => {
+  it("opens the waiting screen from a GitHub request return", async () => {
     const request = githubConnection("int-1", { startedByUserID: "user-1", installRequested: true });
     renderSetup(
-      pageModel({ openSection: "vcs", githubConnections: githubConnections([request]) }),
+      pageModel({
+        openSection: "vcs",
+        githubConnections: githubConnections([request]),
+        syncGithubConnection: vi.fn().mockResolvedValue(request),
+      }),
       "/org-1/workspaces/PAY/setup?githubSetup=request&githubIntegrationId=int-1",
     );
-    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
+    expect(await screen.findByTestId("first-run-github-install-requested")).toHaveTextContent(
       FIRST_RUN_COPY.connect.installRequested,
     );
   });
@@ -299,7 +393,7 @@ describe("FirstRunSetup reliability", () => {
           readyInstances: [existing],
         },
       }),
-      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubIntegrationId=request-integration",
+      "/org-1/workspaces/PAY/setup?step=vcs",
     );
 
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("requested-org");
@@ -340,11 +434,11 @@ describe("FirstRunSetup reliability", () => {
       state: "csrf",
       githubApp: { slug: "superplane" },
       installRequests: [],
-      pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+      pendingInstallations: [{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }],
     });
     const view = renderSetup(
       pageModel({ openSection: "vcs", githubConnections: githubConnections([waiting]) }),
-      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubIntegrationId=int-1",
+      "/org-1/workspaces/PAY/setup?step=vcs",
     );
     expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
 

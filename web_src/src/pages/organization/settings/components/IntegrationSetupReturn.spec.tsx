@@ -122,6 +122,19 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
+  it("forwards a completed GitHub setup onto the stored return path", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt(
+      "/org-1/settings/integrations/abc?githubSetup=complete&githubIntegrationId=int-1",
+      <div>integration details</div>,
+    );
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.getByText("githubSetup=complete&githubIntegrationId=int-1")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+  });
+
   it("forwards the GitHub organization waiting for approval", async () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
 
@@ -132,14 +145,23 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
-  it("stays on the integration page when setupStay is set", async () => {
-    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+  it("stays on the integration page when setupStay is set outside onboarding", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, "/org-1/settings/integrations");
 
     renderAt("/org-1/settings/integrations/abc?setupStay=1", <div>integration details</div>);
 
     expect(await screen.findByText("integration details")).toBeInTheDocument();
     expect(screen.queryByText("workspace setup")).not.toBeInTheDocument();
-    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe(SETUP_PATH);
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe("/org-1/settings/integrations");
+  });
+
+  it("never renders legacy integration details for an onboarding return", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/org-1/settings/integrations/abc?setupStay=1", <div>integration details</div>);
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
   it("renders the page when no setup is in progress", () => {
