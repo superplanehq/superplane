@@ -55,7 +55,9 @@ func Test__FactoryAgentResource(t *testing.T) {
 		require.NoError(t, err)
 		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, headerConfig)
 		require.NoError(t, err)
-		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", false, headerConfig)
+		other := headerConfig
+		other.URL = "https://mcp.other.example/mcp"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", false, other)
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceNameTaken)
 	})
 
@@ -129,7 +131,9 @@ func Test__FactoryAgentResource(t *testing.T) {
 		require.NoError(t, err)
 		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "on", true, headerConfig)
 		require.NoError(t, err)
-		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "off", false, headerConfig)
+		off := headerConfig
+		off.URL = "https://mcp.example.com/mcp-off"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "off", false, off)
 		require.NoError(t, err)
 
 		enabled, err := factory.ListEnabledMCPServers(db)
@@ -238,12 +242,14 @@ func Test__FactoryAgentResource(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		for i := range models.MaxEnabledFactoryMCPServers {
+			cfg := headerConfig
+			cfg.URL = fmt.Sprintf("https://mcp.example.com/mcp/%02d", i)
 			_, err = factory.CreateAgentResource(
 				db,
 				models.FactoryAgentResourceKindMCPServer,
 				fmt.Sprintf("mcp-%02d", i),
 				true,
-				headerConfig,
+				cfg,
 			)
 			require.NoError(t, err)
 		}
@@ -255,6 +261,84 @@ func Test__FactoryAgentResource(t *testing.T) {
 		enabled := true
 		err = extra.Update(db, nil, &enabled, nil)
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceMCPCapReached)
+	})
+
+	t.Run("rejects a second connected MCP at the same URL", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, headerConfig)
+		require.NoError(t, err)
+
+		duplicate := headerConfig
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs-copy", true, duplicate)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
+
+		slash := headerConfig
+		slash.URL = "https://mcp.example.com/mcp/"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs-slash", false, slash)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
+	})
+
+	t.Run("rejects a root URL with or without a trailing slash", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		root := headerConfig
+		root.URL = "https://mcp.example.com"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "root", true, root)
+		require.NoError(t, err)
+		slash := root
+		slash.URL = "https://mcp.example.com/"
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "root-slash", true, slash)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
+	})
+
+	t.Run("allows a second OAuth server that is not connected yet", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		oauth := models.FactoryAgentResourceConfig{
+			Transport: "http",
+			URL:       "https://api.mobbin.com/mcp",
+			Auth:      models.FactoryAgentResourceAuthOAuth,
+		}
+		first, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin", true, oauth)
+		require.NoError(t, err)
+		second, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin-retry", true, oauth)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryAgentResourceOAuthNotConnected, first.OAuthState())
+		assert.Equal(t, models.FactoryAgentResourceOAuthNotConnected, second.OAuthState())
+
+		require.NoError(t, first.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
+		err = second.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
+		assert.Equal(t, models.FactoryAgentResourceOAuthNotConnected, second.OAuthState())
+	})
+
+	t.Run("allows an update that keeps the same connected URL", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, headerConfig)
+		require.NoError(t, err)
+		same := resource.Config.Data()
+		require.NoError(t, resource.Update(db, nil, nil, &same))
+		assert.Equal(t, headerConfig.URL, resource.Config.Data().URL)
+	})
+
+	t.Run("rejects an update that reuses another connected URL", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, headerConfig)
+		require.NoError(t, err)
+		other := headerConfig
+		other.URL = "https://mcp.other.example/mcp"
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "other", true, other)
+		require.NoError(t, err)
+		collide := other
+		collide.URL = headerConfig.URL
+		err = resource.Update(db, nil, nil, &collide)
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceURLTaken)
+		reloaded, err := factory.FindAgentResource(db, resource.ID)
+		require.NoError(t, err)
+		assert.Equal(t, other.URL, reloaded.Config.Data().URL)
 	})
 }
 
@@ -312,4 +396,12 @@ func Test__FactoryAgentResourceConfigValidateMCP(t *testing.T) {
 	assert.False(t, oauth.InvalidatesOAuth(oauth))
 
 	_ = uuid.Nil
+}
+
+func Test__CanonicalMCPServerURL(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp"), models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp/"))
+	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp"), models.CanonicalMCPServerURL("https://MCP.Sentry.DEV/mcp"))
+	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.example.com"), models.CanonicalMCPServerURL("https://mcp.example.com/"))
+	assert.Empty(t, models.CanonicalMCPServerURL("  "))
 }
