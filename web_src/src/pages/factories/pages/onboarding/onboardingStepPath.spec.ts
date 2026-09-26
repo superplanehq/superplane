@@ -15,13 +15,13 @@ describe("onboardingStepPath", () => {
     );
   });
 
-  // githubSetup=request and githubOrg are one-shot return flags for the
+  // GitHub setup params are one-shot return flags for the
   // waiting connect screen. Carrying them onto step=repo remounts the wizard
   // on Connect and keeps rechecking a request that is already done.
-  it("drops install-request flags when leaving the vcs step", () => {
+  it("drops GitHub setup-return flags when leaving the vcs step", () => {
     expect(
       onboardingStepPath(
-        "/onboarding?attempt=attempt-1&githubSetup=request&githubOrg=acme&step=vcs&pick=newest",
+        "/onboarding?attempt=attempt-1&githubSetup=request&githubOrg=acme&githubIntegrationId=int-1&step=vcs&pick=newest",
         "repo",
       ),
     ).toBe("/onboarding?attempt=attempt-1&step=repo");
