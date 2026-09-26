@@ -768,6 +768,75 @@ test("materializeFollowUpAttachments does not follow a redirect to an unexpected
   assert.doesNotMatch(rewritten, /sp_file=1/);
 });
 
+test("materializeFollowUpAttachments reuses indexed files without downloading", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-indexed-"));
+  const attachments = path.join(taskDir, "attachments");
+  fs.mkdirSync(attachments);
+  const dest = "01-shot.png";
+  fs.writeFileSync(path.join(attachments, dest), PNG_BYTES);
+  fs.writeFileSync(
+    path.join(attachments, "manifest.json"),
+    JSON.stringify({
+      version: 1,
+      files: [
+        {
+          id: FILE_ID,
+          filename: "shot.png",
+          content_type: "image/png",
+          dest,
+          kind: "image",
+          url: gcsSignedURL(),
+          status: "ready",
+        },
+      ],
+    }),
+  );
+  const signed = gcsSignedURL();
+  let calls = 0;
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${signed})`,
+    async () => {
+      calls += 1;
+      throw new Error("must not fetch indexed attachments");
+    },
+  );
+  assert.equal(calls, 0);
+  assert.doesNotMatch(rewritten, /sp_file=1/);
+  assert.match(rewritten, /inspect_attachment/);
+  assert.match(rewritten, new RegExp(dest.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.deepEqual(fs.readdirSync(attachments).sort(), ["01-shot.png", "manifest.json"]);
+});
+
+test("materializeFollowUpAttachments allows images up to 50 MiB", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-50mib-"));
+  const signed = gcsSignedURL();
+  const elevenMiB = 11 * 1024 * 1024;
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${signed})`,
+    async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name) => {
+          const key = String(name).toLowerCase();
+          if (key === "content-length") {
+            return String(elevenMiB);
+          }
+          if (key === "content-type") {
+            return "image/png";
+          }
+          return null;
+        },
+      },
+      arrayBuffer: async () => PNG_BYTES,
+    }),
+  );
+  assert.doesNotMatch(rewritten, /could not download/);
+  assert.match(rewritten, /inspect_attachment/);
+});
+
 test("materializeFollowUpAttachments rejects an oversized Content-Length", async () => {
   const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-size-"));
   const signed = gcsSignedURL();

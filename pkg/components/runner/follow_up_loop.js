@@ -27,7 +27,7 @@ const IMAGE_CONTENT_TYPES = {
   "image/gif": ".gif",
   "image/webp": ".webp",
 };
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_ATTACHMENT_REDIRECTS = 3;
 
@@ -415,6 +415,42 @@ function replaceURL(text, url, replacement) {
   return text.split(url).join(replacement);
 }
 
+function indexedAttachmentForURL(taskDir, url) {
+  const id = fileIDFromSignedURL(url);
+  const files = loadManifest(taskDir).files || [];
+  for (const file of files) {
+    const dest = file && file.dest;
+    if (!dest) {
+      continue;
+    }
+    const local = path.join(taskDir, "attachments", dest);
+    if (!fs.existsSync(local)) {
+      continue;
+    }
+    if (file.url && file.url === url) {
+      return { file, local };
+    }
+    if (id && file.id === id) {
+      return { file, local };
+    }
+  }
+  return null;
+}
+
+function indexedAttachmentIsImage(file) {
+  const type = String((file && file.content_type) || "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  if (type.startsWith("image/")) {
+    return true;
+  }
+  if (file && file.kind === "image") {
+    return true;
+  }
+  return /\.(png|jpe?g|gif|webp)$/i.test(String((file && (file.dest || file.filename)) || ""));
+}
+
 async function materializeFollowUpAttachments(taskDir, text, fetchImpl, env = process.env) {
   const urls = signedFileURLs(text);
   if (!taskDir || urls.length === 0) {
@@ -428,6 +464,14 @@ async function materializeFollowUpAttachments(taskDir, text, fetchImpl, env = pr
   const saved = [];
   let failed = 0;
   for (const url of urls) {
+    const indexed = indexedAttachmentForURL(taskDir, url);
+    if (indexed) {
+      next = replaceURL(next, url, indexed.local);
+      if (indexedAttachmentIsImage(indexed.file)) {
+        saved.push({ path: indexed.local });
+      }
+      continue;
+    }
     if (!isAllowedSignedDownloadURL(url, env)) {
       failed += 1;
       next = replaceURL(next, url, "");
