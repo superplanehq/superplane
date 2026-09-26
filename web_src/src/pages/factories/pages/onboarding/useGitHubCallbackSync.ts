@@ -17,6 +17,8 @@ type GitHubCallbackSyncState = {
 };
 
 type SetSearchParams = (searchParams: URLSearchParams, options: { replace: boolean }) => void;
+type GitHubConnectionSync = (integrationId: string) => Promise<OrganizationsIntegration>;
+type StartedSync = { key: string; promise: ReturnType<GitHubConnectionSync> };
 
 export function useGitHubCallbackSync({
   searchParams,
@@ -27,28 +29,30 @@ export function useGitHubCallbackSync({
   searchParams: URLSearchParams;
   setSearchParams: SetSearchParams;
   integrationId?: string;
-  syncGithubConnection: (integrationId: string) => Promise<OrganizationsIntegration>;
+  syncGithubConnection: GitHubConnectionSync;
 }) {
   const setup = searchParams.get(GITHUB_SETUP_REQUEST_PARAM);
   const callbackKind =
     setup === GITHUB_SETUP_REQUEST_VALUE || setup === GITHUB_SETUP_COMPLETE_VALUE ? setup : undefined;
   const callbackKey = callbackKind && integrationId ? `${callbackKind}:${integrationId}` : "";
-  const startedKey = useRef("");
+  const startedSync = useRef<StartedSync | undefined>(undefined);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<GitHubCallbackSyncState>();
 
   useEffect(() => {
     if (!callbackKey || !integrationId) {
-      startedKey.current = "";
+      startedSync.current = undefined;
       return;
     }
     const attemptKey = `${callbackKey}:${attempt}`;
-    if (startedKey.current === attemptKey) return;
-    startedKey.current = attemptKey;
+    if (startedSync.current?.key !== attemptKey) {
+      startedSync.current = { key: attemptKey, promise: syncGithubConnection(integrationId) };
+    }
+    const sync = startedSync.current.promise;
 
     let cancelled = false;
     setState({ key: callbackKey, status: "loading" });
-    void syncGithubConnection(integrationId).then(
+    void sync.then(
       () => {
         if (!cancelled) setState({ key: callbackKey, status: "success" });
       },

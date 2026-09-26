@@ -1,5 +1,6 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -99,9 +100,11 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
 
 function renderSetup(model: OnboardingPageModel, path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <FirstRunSetup model={model} />
-    </MemoryRouter>,
+    <StrictMode>
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={model} />
+      </MemoryRouter>
+    </StrictMode>,
   );
 }
 
