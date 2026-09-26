@@ -15,7 +15,7 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
-import { GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentResourceCopy";
+import { CIRCLECI_PERSONAL_API_TOKEN_URL, GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentResourceCopy";
 
 const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
@@ -210,7 +210,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-search")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-github")).toBeInTheDocument();
-    expect(screen.queryByTestId("mcp-catalog-circleci")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-circleci")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-category-code")).toHaveTextContent("Code");
     expect(screen.getByTestId("mcp-catalog-category-observability")).toHaveTextContent("Observability");
     expect(screen.getByTestId("mcp-catalog-custom")).toHaveTextContent("Add custom");
@@ -270,6 +270,41 @@ describe("FactorySettingsMCPPage", () => {
     );
     expect(
       within(instruction).getByRole("link", { name: "GitHub personal access token" }).querySelector("svg"),
+    ).not.toBeNull();
+  }, 10000);
+
+  it("opens CircleCI from the catalog with a token field", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${mcpPath}?dialog=add`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 });
+    await user.click(screen.getByTestId("mcp-catalog-circleci"));
+
+    expect(await screen.findByTestId("mcp-catalog-setup-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("mcp-add-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resource-connection-dialog")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resource-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resource-url")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resource-auth")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mcp-catalog-setup-sign-in")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-setup-icon")).toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-setup-token")).toBeInTheDocument();
+    expect(screen.getByLabelText("Personal access token")).toBeInTheDocument();
+
+    const instruction = screen.getByTestId("mcp-catalog-setup-instruction");
+    expect(instruction).toHaveTextContent("Create a CircleCI personal API token and paste it here.");
+    expect(within(instruction).getByRole("link", { name: "CircleCI personal API token" })).toHaveAttribute(
+      "href",
+      CIRCLECI_PERSONAL_API_TOKEN_URL,
+    );
+    expect(
+      within(instruction).getByRole("link", { name: "CircleCI personal API token" }).querySelector("svg"),
     ).not.toBeNull();
   }, 10000);
 
@@ -337,6 +372,27 @@ describe("FactorySettingsMCPPage", () => {
 
     expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toHaveTextContent(
       "github",
+    );
+    expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("creates a CircleCI server from a pasted token", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${mcpPath}?dialog=add`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 });
+    await user.click(screen.getByTestId("mcp-catalog-circleci"));
+    await user.type(await screen.findByTestId("mcp-catalog-setup-token"), "cci_example");
+    await user.click(screen.getByTestId("mcp-catalog-setup-save"));
+
+    expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toHaveTextContent(
+      "circleci",
     );
     expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
   }, 10000);
