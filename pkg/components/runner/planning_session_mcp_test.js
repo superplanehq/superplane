@@ -13,6 +13,7 @@ const {
   proposeClarity,
   proposeConfidence,
   createTask,
+  inspectAttachment,
   recordAgentMessage,
   writeAnalysisOutputs,
   parseFrames,
@@ -42,18 +43,18 @@ test("planningTools omits disabled score tools", () => {
   const { planningTools } = require("./planning_session_mcp");
   assert.deepEqual(
     planningTools({ SUPERPLANE_PLANNING_CLARITY: "false" }).map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey", "create_task"],
+    ["propose_spec", "propose_confidence", "survey", "create_task", "inspect_attachment"],
   );
   assert.deepEqual(
     planningTools({ SUPERPLANE_PLANNING_CONFIDENCE: "false" }).map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "survey", "create_task"],
+    ["propose_spec", "propose_clarity", "survey", "create_task", "inspect_attachment"],
   );
   assert.deepEqual(
     planningTools({
       SUPERPLANE_PLANNING_CLARITY: "false",
       SUPERPLANE_PLANNING_CONFIDENCE: "false",
     }).map((tool) => tool.name),
-    ["propose_spec", "survey", "create_task"],
+    ["propose_spec", "survey", "create_task", "inspect_attachment"],
   );
 });
 
@@ -81,6 +82,9 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /only after those calls/);
   assert.match(pack, /Do not leave a written plan unpublished/);
   assert.match(pack, /Call create_task only after the user confirms a split/);
+  assert.match(pack, /inspect_attachment/);
+  assert.match(pack, /Do not curl a signed URL/);
+  assert.match(pack, /Do not use OCR/);
   assert.match(pack, /Never create a task the user did not confirm/);
   assert.match(pack, /narrow the specification to the part that stays/);
   assert.match(pack, /If create_task fails, say that SuperPlane could not create the task/);
@@ -344,9 +348,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const tools = replies[1].result.tools;
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task", "inspect_attachment"],
   );
-  const [spec, clarity, confidence, survey, createTaskTool] = tools;
+  const [spec, clarity, confidence, survey, createTaskTool, inspectTool] = tools;
   assert.deepEqual(spec.inputSchema.required, ["body"]);
   assert.match(spec.description, /Do not leave a written plan unpublished/);
   assert.match(clarity.description, /how well the task is defined/);
@@ -371,6 +375,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.match(createTaskTool.description, /only after the user confirms/i);
   assert.match(createTaskTool.description, /one call per task/i);
   assert.match(createTaskTool.inputSchema.properties.description.description, /self-contained/i);
+  assert.deepEqual(inspectTool.inputSchema.required, ["path"]);
+  assert.match(inspectTool.description, /user image/);
+  assert.match(inspectTool.description, /Do not use OCR/);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -385,8 +392,73 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task", "inspect_attachment"],
   );
+});
+
+test("inspectAttachment returns an image block for a saved PNG", () => {
+  const value = attachmentFixture();
+  const result = inspectAttachment({ path: value.file }, value.env);
+
+  assert.equal(result.content[0].type, "text");
+  assert.deepEqual(result.content[1], {
+    type: "image",
+    data: Buffer.from("png").toString("base64"),
+    mimeType: "image/png",
+  });
+  assert.equal(result.structuredContent.data, undefined);
+  assert.equal(result.structuredContent.filename, "01-shot.png");
+  assert.match(result.structuredContent.sha256, /^[a-f0-9]{64}$/);
+});
+
+test("inspectAttachment sniffs a PNG without an extension", () => {
+  const value = attachmentFixture();
+  const file = path.join(value.attachments, "02-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  fs.writeFileSync(file, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+  const result = inspectAttachment({ path: file }, value.env);
+  assert.equal(result.content[1].mimeType, "image/png");
+});
+
+test("inspectAttachment accepts a filename relative to attachments", () => {
+  const value = attachmentFixture();
+  const result = inspectAttachment({ path: "01-shot.png" }, value.env);
+  assert.equal(result.content[1].mimeType, "image/png");
+});
+
+test("inspectAttachment rejects paths outside the attachments directory", () => {
+  const value = attachmentFixture();
+  const outside = path.join(value.taskDir, "outside.png");
+  fs.writeFileSync(outside, "png");
+  assert.throws(
+    () => inspectAttachment({ path: outside }, value.env),
+    /inside the task attachments directory/,
+  );
+});
+
+test("inspectAttachment rejects symlinks", () => {
+  const value = attachmentFixture();
+  const link = path.join(value.attachments, "linked.png");
+  fs.symlinkSync(value.file, link);
+  assert.throws(() => inspectAttachment({ path: link }, value.env), /regular file/);
+});
+
+test("returns inspect_attachment image content over JSON-RPC", async () => {
+  const value = attachmentFixture();
+  const replies = await exchangeMCP(
+    "ndjson",
+    [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "inspect_attachment", arguments: { path: value.file } },
+      },
+    ],
+    value.env,
+  );
+  assert.equal(replies[0].result.content[1].type, "image");
+  assert.equal(replies[0].result.content[1].data, Buffer.from("png").toString("base64"));
+  assert.equal(replies[0].result.structuredContent.data, undefined);
 });
 
 test("createTask posts the new task with the activity id and rejects empty input", async () => {
@@ -503,13 +575,13 @@ function feedParseFrames(frame, chunkSize) {
   return { messages, rest: buffer };
 }
 
-async function exchangeMCP(format, messages) {
+async function exchangeMCP(format, messages, extraEnv = {}) {
   const child = spawn(
     process.execPath,
     [path.join(__dirname, "planning_session_mcp.js")],
     {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env },
+      env: { ...process.env, ...extraEnv },
     },
   );
   const replies = [];
@@ -579,4 +651,18 @@ function drainReplies(buffer, format) {
     }
   }
   return { messages, rest: Buffer.from(leftover, "utf8") };
+}
+
+function attachmentFixture() {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "planning-attachments-"));
+  const attachments = path.join(taskDir, "attachments");
+  fs.mkdirSync(attachments);
+  const file = path.join(attachments, "01-shot.png");
+  fs.writeFileSync(file, Buffer.from("png"));
+  return {
+    taskDir,
+    attachments,
+    file,
+    env: { SUPERPLANE_TASK_DIR: taskDir },
+  };
 }
