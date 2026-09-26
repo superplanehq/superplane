@@ -35,4 +35,4 @@ wrk3.yml
 /web_src/src/api-client/
 /api/swagger/*
 !/api/swagger/swagger-ui.html
-server
+/server
