@@ -633,7 +633,21 @@ function organizationSecretsRoutes(): FactoriesRoute[] {
   return [
     {
       pattern: re("/api/v1/secrets"),
-      resolve: (_match, method) => {
+      resolve: (_match, method, body) => {
+        if (method === "POST") {
+          const request = (body ?? {}) as {
+            secret?: { metadata?: { name?: string }; spec?: { local?: { data?: Record<string, string> } } };
+          };
+          const name = request.secret?.metadata?.name ?? "created-secret";
+          return {
+            json: {
+              secret: {
+                metadata: { id: `secret-${name}`, name },
+                spec: { local: { data: request.secret?.spec?.local?.data ?? { token: "••••••••" } } },
+              },
+            },
+          };
+        }
         if (method !== "GET") return { json: {} };
         return { json: { secrets: STORYBOOK_ORG_SECRETS } };
       },
