@@ -175,8 +175,7 @@ export function WorkOrderDescriptionEditor({
   });
 
   editorRef.current = editor;
-  const lastFileUrlsRef = useRef<Record<string, string> | undefined>(undefined);
-  const lastEditorRef = useRef<Editor | null>(null);
+  useWorkOrderEditorResolvedSrc(editor, fileUrls, fileContentTypes);
 
   useEffect(() => {
     if (!editor) {
@@ -191,45 +190,6 @@ export function WorkOrderDescriptionEditor({
     }
     editor.commands.focus("end");
   }, [autoFocus, disabled, editor]);
-
-  useEffect(() => {
-    if (!editor) {
-      return;
-    }
-    const urls = fileUrls ?? {};
-    editor.storage.image = {
-      ...(editor.storage.image ?? {}),
-      downloadUrls: urls,
-      contentTypes: { ...(editor.storage.image?.contentTypes ?? {}), ...(fileContentTypes ?? {}) },
-    };
-    const isNewEditor = editor !== lastEditorRef.current;
-    const urlsChanged = !areUrlMapsEqual(lastFileUrlsRef.current, fileUrls);
-    if (!isNewEditor && !urlsChanged) {
-      return;
-    }
-    lastEditorRef.current = editor;
-    lastFileUrlsRef.current = fileUrls;
-    if (Object.keys(urls).length === 0 && !urlsChanged) {
-      return;
-    }
-
-    const { state, view } = editor;
-    const tr = state.tr;
-    state.doc.descendants((node, pos) => {
-      if (node.type.name === "image") {
-        const resolved = resolveWorkOrderFileSrc(node.attrs.src as string | undefined, urls);
-        if (node.attrs.resolvedSrc !== resolved) {
-          tr.setNodeMarkup(pos, undefined, {
-            ...node.attrs,
-            resolvedSrc: resolved,
-          });
-        }
-      }
-    });
-    if (tr.docChanged) {
-      view.dispatch(tr);
-    }
-  }, [editor, fileUrls, fileContentTypes]);
 
   useEffect(() => {
     if (!editor) {
@@ -289,6 +249,54 @@ export function WorkOrderDescriptionEditor({
       </div>
     </>
   );
+}
+
+function useWorkOrderEditorResolvedSrc(
+  editor: Editor | null,
+  fileUrls?: Record<string, string>,
+  fileContentTypes?: Record<string, string>,
+) {
+  const lastFileUrlsRef = useRef<Record<string, string> | undefined>(undefined);
+  const lastEditorRef = useRef<Editor | null>(null);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+    const urls = fileUrls ?? {};
+    editor.storage.image = {
+      ...(editor.storage.image ?? {}),
+      downloadUrls: urls,
+      contentTypes: { ...(editor.storage.image?.contentTypes ?? {}), ...(fileContentTypes ?? {}) },
+    };
+    const isNewEditor = editor !== lastEditorRef.current;
+    const urlsChanged = !areUrlMapsEqual(lastFileUrlsRef.current, fileUrls);
+    if (!isNewEditor && !urlsChanged) {
+      return;
+    }
+    lastEditorRef.current = editor;
+    lastFileUrlsRef.current = fileUrls;
+    if (Object.keys(urls).length === 0 && !urlsChanged) {
+      return;
+    }
+
+    const { state, view } = editor;
+    const tr = state.tr;
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === "image") {
+        const resolved = resolveWorkOrderFileSrc(node.attrs.src as string | undefined, urls);
+        if (node.attrs.resolvedSrc !== resolved) {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            resolvedSrc: resolved,
+          });
+        }
+      }
+    });
+    if (tr.docChanged) {
+      view.dispatch(tr);
+    }
+  }, [editor, fileUrls, fileContentTypes]);
 }
 
 function tryUploadClipboardFiles(
