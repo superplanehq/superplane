@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -331,14 +332,13 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 		return nestedString(payload, "data", "attributes", "title")
 	case models.FactoryIntakeSourceDependabotAlerts:
 		name := nestedString(payload, "alert", "dependency", "package", "name")
-		manifest := nestedString(payload, "alert", "dependency", "manifest_path")
-		if name != "" && manifest != "" {
-			return "Bump " + name + " in " + manifest
+		if name == "" {
+			return ""
 		}
-		if name != "" {
-			return "Bump " + name
-		}
-		return ""
+		return ghdependabot.TaskTitle(ghdependabot.PackageRef{
+			Name:      name,
+			Ecosystem: nestedString(payload, "alert", "dependency", "package", "ecosystem"),
+		})
 	case models.FactoryIntakeSourceJiraIssues:
 		summary := nestedString(payload, "issue", "fields", "summary")
 		key := nestedString(payload, "issue", "key")
