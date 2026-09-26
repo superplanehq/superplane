@@ -201,7 +201,7 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      // Board inventory: 4 backlog, 3 implement, 2 verify, 4 done.
+      // Board inventory: 4 backlog, 3 implement, 2 verify, 1 completed in Done.
       // Two cards in each column carry a pull request.
       ...BOARD_REVIEW_CANDIDATE_WORK_ORDERS,
       DRAFT_WORK_ORDER,

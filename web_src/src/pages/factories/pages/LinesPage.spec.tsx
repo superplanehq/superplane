@@ -50,17 +50,14 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import {
-  BOARD_DONE_REJECTED_ORDER,
-  BOARD_IMPLEMENT_FAILED_ORDER,
-  BOARD_IMPLEMENT_NOTIFY_ORDER,
-} from "../__fixtures__/lineMetricsBoardOrders";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "../__fixtures__/workOrderCheckFixtures";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
@@ -199,6 +196,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -425,12 +431,12 @@ describe("LinesPage board", () => {
   it("shows a score on a draft card and hides it on other columns", () => {
     const draft = withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS)[0];
     useFactoryWorkOrders.mockReturnValue({
-      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checkScores: draft.checkScores }],
+      data: [draft, { ...BOARD_IMPLEMENT_NOTIFY_ORDER, checkScores: draft.checkScores }],
     });
     renderLinesBoard();
 
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toBeInTheDocument();
-    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-notify")).not.toBeInTheDocument();
   });
 
   it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
@@ -1363,14 +1369,14 @@ describe("LinesPage board pull request", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          ...BOARD_IMPLEMENT_NOTIFY_ORDER,
           pullRequests: [
             {
-              id: "pr-106",
-              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-              number: "106",
-              url: "https://github.com/acme/payments/pull/106",
-              title: "Fix refund dispatcher timeout loop",
+              id: "pr-114",
+              workOrderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+              number: "114",
+              url: "https://github.com/acme/payments/pull/114",
+              title: "Notify on status change after a reopen",
               state: "STATE_CLOSED",
             },
           ],
@@ -1379,10 +1385,10 @@ describe("LinesPage board pull request", () => {
     });
     renderLinesBoard();
 
-    const card = screen.getByTestId("work-order-card-wo-board-implement-failed");
-    const pill = within(card).getByRole("link", { name: "Closed pull request #106." });
-    expect(pill).toHaveTextContent("Closed #106");
-    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/106");
+    const card = screen.getByTestId("work-order-card-wo-board-implement-notify");
+    const pill = within(card).getByRole("link", { name: "Closed pull request #114." });
+    expect(pill).toHaveTextContent("Closed #114");
+    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/114");
   });
 });
 
@@ -1675,6 +1681,19 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
+  it("opens Failed tasks from the Status filter", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-statuses"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-failed"));
+
+    expect(await screen.findByTestId("work-order-failed-dialog")).toBeInTheDocument();
+    expect(screen.getByText("These tasks closed as failed.")).toBeInTheDocument();
+    expect(screen.getByText("No failed tasks.")).toBeInTheDocument();
+  });
+
   it("treats a leftover Active scope as All and keeps every card", () => {
     window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "active");
     useFactoryWorkOrders.mockReturnValue({
@@ -1705,11 +1724,11 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
@@ -1718,7 +1737,7 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
-    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
@@ -1727,14 +1746,14 @@ describe("LinesPage board editing", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          ...dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!),
           pullRequests: [
             {
               id: "pr-review",
-              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-              number: "106",
-              url: "https://github.com/acme/payments/pull/106",
-              title: "Fix refund dispatcher timeout loop",
+              workOrderId: OPEN_WORK_ORDER.id,
+              number: "101",
+              url: "https://github.com/acme/payments/pull/101",
+              title: "Reconcile duplicate refunds in ledger",
               state: "STATE_OPEN",
             },
           ],
@@ -1744,7 +1763,7 @@ describe("LinesPage board editing", () => {
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
@@ -1753,25 +1772,25 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Label is Review")).toBeInTheDocument();
-    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {
     const user = userEvent.setup();
     useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_DONE_REJECTED_ORDER],
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
-    expect(screen.getByText("Replace the refund batch exporter")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-search-trigger"));
-    await user.type(screen.getByTestId("work-orders-search-input"), "timeout");
+    await user.type(screen.getByTestId("work-orders-search-input"), "reconcile");
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
-    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
+    expect(screen.queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("does not show a line overflow Edit menu", () => {

@@ -85,6 +85,8 @@ interface RequestBody {
   model?: unknown;
   result?: unknown;
   state?: unknown;
+  closePullRequests?: unknown;
+  clearArtifacts?: unknown;
   steps?: unknown;
   body?: unknown;
 }
@@ -884,18 +886,68 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   return { json: { order } };
 }
 
+function isCloseableFixturePullRequest(state: string | undefined): boolean {
+  return state === "STATE_OPEN" || state === "STATE_DRAFT" || state === "open" || state === "draft";
+}
+
+function sendWorkOrderToBacklogFixture(
+  fixture: FactoriesFixture,
+  factoryId: string,
+  orderId: string,
+  request: RequestBody,
+): { json: { order?: FactoriesWorkOrder } } {
+  const order = findOrder(fixture, factoryId, orderId);
+  if (!order || order.state !== "STATE_CLOSED") {
+    return { json: {} };
+  }
+
+  const closePullRequests = request.closePullRequests === true;
+  const clearArtifacts = request.clearArtifacts === true;
+  if (closePullRequests) {
+    const current = orderPullRequests(fixture, orderId);
+    const next = current.map((pullRequest) =>
+      isCloseableFixturePullRequest(pullRequest.state)
+        ? { ...pullRequest, state: "STATE_CLOSED" as const }
+        : pullRequest,
+    );
+    fixture.pullRequestsByOrderId = { ...(fixture.pullRequestsByOrderId ?? {}), [orderId]: next };
+    order.pullRequests = next;
+  }
+  if (clearArtifacts) {
+    fixture.artifactsByOrderId = { ...(fixture.artifactsByOrderId ?? {}), [orderId]: [] };
+  }
+  order.state = "STATE_DRAFT";
+  order.result = "RESULT_UNSPECIFIED";
+  order.updatedAt = new Date().toISOString();
+  return { json: { order } };
+}
+
 function listWorkOrdersFixture(
   fixture: FactoriesFixture,
   orders: FactoriesWorkOrder[],
   url: URL,
 ): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
   const states = url.searchParams.getAll("states");
+  const results = url.searchParams.getAll("results");
   const userId = url.searchParams.get("userId");
   const unassigned = url.searchParams.get("unassigned") === "true";
   const limit = Number(url.searchParams.get("limit") ?? "0");
   const beforeId = url.searchParams.get("beforeId");
   let filtered =
     states.length > 0 ? orders.filter((order) => order.state && states.includes(order.state)) : [...orders];
+  if (results.length > 0) {
+    filtered = filtered.filter((order) => order.result && results.includes(order.result));
+  }
+  const lineId = url.searchParams.get("lineId");
+  if (lineId) {
+    filtered = filtered.filter((order) => {
+      const dispatches = order.lineDispatches ?? [];
+      if (dispatches.length === 0) {
+        return true;
+      }
+      return dispatches.some((dispatch) => dispatch.line?.id === lineId);
+    });
+  }
   if (userId || unassigned) {
     filtered = filtered.filter((order) => {
       const owners = (order.assignees ?? []).flatMap((assignee) => (assignee.id ? [assignee.id] : []));
@@ -1002,6 +1054,13 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         order.result = stringOrEmpty(request.result) === "RESULT_REJECTED" ? "RESULT_REJECTED" : "RESULT_COMPLETED";
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/backlog"),
+      resolve: (match, method, body) => {
+        if (method !== "PATCH") return null;
+        return sendWorkOrderToBacklogFixture(fixture, match[1], match[2], (body ?? {}) as RequestBody);
       },
     },
     {

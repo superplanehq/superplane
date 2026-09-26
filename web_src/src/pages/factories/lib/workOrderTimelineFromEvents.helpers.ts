@@ -35,6 +35,13 @@ export function describeArtifactAdded(artifact: { type?: string; data?: Record<s
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }
 
+export function describeArtifactsCleared(count: number): string {
+  if (count === 1) {
+    return "cleared 1 artifact";
+  }
+  return `cleared ${count} artifacts`;
+}
+
 export function resolveUserDisplayName(
   userId: string | undefined,
   resolveUserName?: UserNameLookup,
