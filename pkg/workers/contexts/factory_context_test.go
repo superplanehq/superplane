@@ -359,7 +359,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		existing, err := factoryModel.CreateWorkOrderWithOrigin(
 			database.Conn(),
 			"Fix Dependabot alerts for lodash (npm)",
-			"## Alerts\n\n### #7 Prototype pollution\nhttps://github.com/acme/payments/security/dependabot/7\n\n"+ghdependabot.InstructionsHeading+"\nUpdate the direct dependency.",
+			"## Alerts\n\n### #7 Prototype pollution\nhttps://github.com/acme/payments/security/dependabot/7",
 			nil,
 			nil,
 			nil,
@@ -379,7 +379,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
 		require.NoError(t, err)
 		assert.Contains(t, reloaded.Description, "### #8 Prototype pollution in lodash\nSeverity: high\nManifest: package-lock.json")
-		assert.Contains(t, reloaded.Description, "https://github.com/acme/payments/security/dependabot/8\n\n"+ghdependabot.InstructionsHeading)
+		assert.Contains(t, reloaded.Description, "https://github.com/acme/payments/security/dependabot/7\n\n### #8")
 	})
 
 	t.Run("opens a new Dependabot task when the package task is closed", func(t *testing.T) {

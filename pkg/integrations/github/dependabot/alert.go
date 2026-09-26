@@ -25,12 +25,18 @@ const AlertsUnavailableMessage = "SuperPlane could not read Dependabot alerts fo
 // AlertPayloadType is the canvas event type emitted by github.onDependabotAlert.
 const AlertPayloadType = "github.dependabotAlert"
 
-// InstructionsHeading marks the per-intake instructions that the Create Task
-// component appends to a task description. A merged alert goes before it.
-const InstructionsHeading = "## Instructions"
-
 // alertsHeading opens the list of alerts in a package task description.
 const alertsHeading = "## Alerts"
+
+// packageFixGuidance tells the agent how to fix the package. It sits in the
+// task description, before the alert list, so a later alert can be appended
+// and the guidance stays where it is.
+const packageFixGuidance = `First check if the package is a direct dependency in the manifest.
+If it is direct, update it to the patched version or later.
+If it is transitive, find the direct dependency that requires it.
+Update that direct dependency to a release that requires the patched version.
+Use a version override or resolution only when no such release exists, and say so in the pull request.
+Update the lockfile so every listed manifest is fixed.`
 
 // PackageRef identifies one vulnerable package in a repository. GitHub raises
 // one alert per advisory per manifest, and the fix for all of them is one
@@ -146,7 +152,7 @@ func TaskCopyFromAlerts(ref PackageRef, alerts []*github.DependabotAlert) TaskCo
 
 	return TaskCopy{
 		Title:       TaskTitle(ref),
-		Description: taskIntro(ref) + "\n\n" + alertsHeading + "\n\n" + strings.Join(sections, "\n\n"),
+		Description: taskDescription(ref, sections),
 	}
 }
 
@@ -177,10 +183,9 @@ func AlertSectionFromEventData(eventData any) (string, bool) {
 	return AlertSection(alert), true
 }
 
-// MergeAlertSection adds one alert block to an existing task description. The
-// block goes before the per-intake instructions when the description has
-// them, so the agent still reads the instructions last. A block whose alert
-// URL is already in the description is not added twice.
+// MergeAlertSection appends one alert block to an existing task description.
+// The fix guidance stays at the top, so a new alert goes at the end. A block
+// whose alert URL is already in the description is not added twice.
 func MergeAlertSection(description, section string) string {
 	section = strings.TrimSpace(section)
 	if section == "" {
@@ -188,11 +193,6 @@ func MergeAlertSection(description, section string) string {
 	}
 	if page := lastLine(section); strings.HasPrefix(page, "http") && strings.Contains(description, page) {
 		return description
-	}
-
-	if index := strings.Index(description, InstructionsHeading); index >= 0 {
-		before := strings.TrimRight(description[:index], "\n")
-		return before + "\n\n" + section + "\n\n" + description[index:]
 	}
 
 	return strings.TrimRight(description, "\n") + "\n\n" + section
@@ -285,6 +285,10 @@ func packageLabel(ref PackageRef) string {
 
 func taskIntro(ref PackageRef) string {
 	return "Fix every open Dependabot alert for " + packageLabel(ref) + "."
+}
+
+func taskDescription(ref PackageRef, sections []string) string {
+	return taskIntro(ref) + "\n" + packageFixGuidance + "\n\n" + alertsHeading + "\n\n" + strings.Join(sections, "\n\n")
 }
 
 func ecosystemQualifier(ecosystem string) string {

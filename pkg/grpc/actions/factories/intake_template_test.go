@@ -134,8 +134,11 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		description := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["description"].(string)), data)
 		require.IsType(t, "", description)
-		assert.True(t, strings.HasSuffix(description.(string), "\n\n"+ghdependabot.AlertSection(alert)), description)
-		assert.Contains(t, description, "Relationship: transitive")
+		text := description.(string)
+		assert.True(t, strings.HasSuffix(text, "\n\n"+ghdependabot.AlertSection(alert)), text)
+		assert.Contains(t, text, "Relationship: transitive")
+		assert.Contains(t, text, "find the direct dependency that requires it")
+		assert.Less(t, strings.Index(text, "find the direct dependency"), strings.Index(text, "## Alerts"))
 	})
 
 	t.Run("PagerDuty creates a work order without a filter", func(t *testing.T) {
