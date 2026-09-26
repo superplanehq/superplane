@@ -17,7 +17,12 @@ const {
   recordAgentMessage,
   writeAnalysisOutputs,
   parseFrames,
+  MAX_INSPECTABLE_ATTACHMENT_BYTES,
 } = require("./planning_session_mcp");
+
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+const GIF_BYTES = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00]);
+const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0x00]);
 
 test("analysis protocol omits a disabled score tool", () => {
   const clarityOnly = analysisProtocol({ SUPERPLANE_PLANNING_CONFIDENCE: "false" });
@@ -403,7 +408,7 @@ test("inspectAttachment returns an image block for a saved PNG", () => {
   assert.equal(result.content[0].type, "text");
   assert.deepEqual(result.content[1], {
     type: "image",
-    data: Buffer.from("png").toString("base64"),
+    data: PNG_BYTES.toString("base64"),
     mimeType: "image/png",
   });
   assert.equal(result.structuredContent.data, undefined);
@@ -414,9 +419,42 @@ test("inspectAttachment returns an image block for a saved PNG", () => {
 test("inspectAttachment sniffs a PNG without an extension", () => {
   const value = attachmentFixture();
   const file = path.join(value.attachments, "02-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-  fs.writeFileSync(file, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+  fs.writeFileSync(file, PNG_BYTES);
   const result = inspectAttachment({ path: file }, value.env);
   assert.equal(result.content[1].mimeType, "image/png");
+});
+
+test("inspectAttachment sniffs GIF and JPEG bytes over the filename", () => {
+  const value = attachmentFixture();
+  const gif = path.join(value.attachments, "shot.png");
+  fs.writeFileSync(gif, GIF_BYTES);
+  assert.equal(inspectAttachment({ path: gif }, value.env).content[1].mimeType, "image/gif");
+
+  const jpeg = path.join(value.attachments, "shot.gif");
+  fs.writeFileSync(jpeg, JPEG_BYTES);
+  assert.equal(inspectAttachment({ path: jpeg }, value.env).content[1].mimeType, "image/jpeg");
+});
+
+test("inspectAttachment rejects a PNG filename that is not an image", () => {
+  const value = attachmentFixture();
+  const file = path.join(value.attachments, "fake.png");
+  fs.writeFileSync(file, Buffer.from("png"));
+  assert.throws(
+    () => inspectAttachment({ path: file }, value.env),
+    /PNG, JPEG, GIF, or WebP/,
+  );
+});
+
+test("inspectAttachment rejects files above the work-order size limit", () => {
+  const value = attachmentFixture();
+  const oversized = path.join(value.attachments, "large.png");
+  const descriptor = fs.openSync(oversized, "w");
+  fs.ftruncateSync(descriptor, MAX_INSPECTABLE_ATTACHMENT_BYTES + 1);
+  fs.closeSync(descriptor);
+  assert.throws(
+    () => inspectAttachment({ path: oversized }, value.env),
+    /attachment exceeds/,
+  );
 });
 
 test("inspectAttachment accepts a filename relative to attachments", () => {
@@ -457,7 +495,7 @@ test("returns inspect_attachment image content over JSON-RPC", async () => {
     value.env,
   );
   assert.equal(replies[0].result.content[1].type, "image");
-  assert.equal(replies[0].result.content[1].data, Buffer.from("png").toString("base64"));
+  assert.equal(replies[0].result.content[1].data, PNG_BYTES.toString("base64"));
   assert.equal(replies[0].result.structuredContent.data, undefined);
 });
 
@@ -658,7 +696,7 @@ function attachmentFixture() {
   const attachments = path.join(taskDir, "attachments");
   fs.mkdirSync(attachments);
   const file = path.join(attachments, "01-shot.png");
-  fs.writeFileSync(file, Buffer.from("png"));
+  fs.writeFileSync(file, PNG_BYTES);
   return {
     taskDir,
     attachments,

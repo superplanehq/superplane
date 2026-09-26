@@ -7,7 +7,9 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   FOLLOW_UP_CMD_INDEX_BASE,
+  MAX_ATTACHMENT_BYTES,
   interpretWaitResponse,
+  isAllowedSignedDownloadURL,
   materializeFollowUpAttachments,
   nextAction,
   persistAnalysisContinuation,
@@ -431,6 +433,7 @@ test("runPromptFile forwards extra argv to run.js", async () => {
 
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 const FILE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const APP_ENV = { SUPERPLANE_BASE_URL: "https://app.example" };
 
 function gcsSignedURL(fileID = FILE_ID) {
   return `https://storage.googleapis.com/bucket/orgs/x/workspaces/y/tasks/z/${fileID}?sp_file=1`;
@@ -445,6 +448,7 @@ function pngFetch(expectedURL) {
     assert.equal(url, expectedURL);
     return {
       ok: true,
+      status: 200,
       headers: { get: (name) => (String(name).toLowerCase() === "content-type" ? "image/png" : null) },
       arrayBuffer: async () => PNG_BYTES,
     };
@@ -463,6 +467,13 @@ test("signedFileURLs ignores unsigned URLs", () => {
     signedFileURLs("See https://example.test/shot.png and https://app.example/api/v1/public/files/not-a-uuid?sp_file=1"),
     [],
   );
+});
+
+test("isAllowedSignedDownloadURL rejects HMAC URLs on an unexpected host", () => {
+  const forged = `https://127.0.0.1/api/v1/public/files/${FILE_ID}?sp_file=1`;
+  assert.equal(isAllowedSignedDownloadURL(forged, APP_ENV), false);
+  assert.equal(isAllowedSignedDownloadURL(hmacSignedURL(), APP_ENV), true);
+  assert.equal(isAllowedSignedDownloadURL(gcsSignedURL(), APP_ENV), true);
 });
 
 test("materializeFollowUpAttachments downloads signed images and rewrites the prompt", async () => {
@@ -495,6 +506,7 @@ test("materializeFollowUpAttachments continues numbering after existing files", 
     taskDir,
     `See ![shot.png](${signed})`,
     pngFetch(signed),
+    APP_ENV,
   );
   const saved = fs.readdirSync(attachments).sort();
   assert.deepEqual(saved, ["01-existing.png", `02-${FILE_ID}.png`]);
@@ -502,18 +514,85 @@ test("materializeFollowUpAttachments continues numbering after existing files", 
   assert.doesNotMatch(rewritten, /sp_file=1/);
 });
 
-test("materializeFollowUpAttachments strips signed URLs when download fails", async () => {
+test("materializeFollowUpAttachments notes failed downloads and strips signed URLs", async () => {
   const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-fail-"));
   const signed = gcsSignedURL();
   const rewritten = await materializeFollowUpAttachments(
     taskDir,
     `See ![shot.png](${signed})`,
-    async () => ({ ok: false }),
+    async () => ({ ok: false, status: 500 }),
   );
   assert.doesNotMatch(rewritten, /sp_file=1/);
   assert.doesNotMatch(rewritten, /inspect_attachment/);
+  assert.match(rewritten, /SuperPlane could not download 1 user image/);
   assert.equal(fs.existsSync(path.join(taskDir, "attachments")), true);
   assert.deepEqual(fs.readdirSync(path.join(taskDir, "attachments")), []);
+});
+
+test("materializeFollowUpAttachments does not fetch HMAC URLs on an unexpected host", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-ssrf-"));
+  const forged = `https://127.0.0.1/api/v1/public/files/${FILE_ID}?sp_file=1`;
+  let calls = 0;
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${forged})`,
+    async () => {
+      calls += 1;
+      throw new Error("must not fetch");
+    },
+    APP_ENV,
+  );
+  assert.equal(calls, 0);
+  assert.doesNotMatch(rewritten, /127\.0\.0\.1/);
+  assert.doesNotMatch(rewritten, /sp_file=1/);
+  assert.match(rewritten, /SuperPlane could not download 1 user image/);
+});
+
+test("materializeFollowUpAttachments does not follow a redirect to an unexpected host", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-redirect-"));
+  const signed = gcsSignedURL();
+  const calls = [];
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${signed})`,
+    async (url) => {
+      calls.push(url);
+      if (url === signed) {
+        return {
+          ok: false,
+          status: 302,
+          headers: { get: (name) => (String(name).toLowerCase() === "location" ? "http://127.0.0.1/secret" : null) },
+        };
+      }
+      throw new Error("must not follow");
+    },
+  );
+  assert.deepEqual(calls, [signed]);
+  assert.match(rewritten, /SuperPlane could not download 1 user image/);
+  assert.doesNotMatch(rewritten, /sp_file=1/);
+});
+
+test("materializeFollowUpAttachments rejects an oversized Content-Length", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-size-"));
+  const signed = gcsSignedURL();
+  let arrayBufferCalls = 0;
+  const rewritten = await materializeFollowUpAttachments(
+    taskDir,
+    `See ![shot.png](${signed})`,
+    async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name) => (String(name).toLowerCase() === "content-length" ? String(MAX_ATTACHMENT_BYTES + 1) : null),
+      },
+      arrayBuffer: async () => {
+        arrayBufferCalls += 1;
+        return PNG_BYTES;
+      },
+    }),
+  );
+  assert.equal(arrayBufferCalls, 0);
+  assert.match(rewritten, /SuperPlane could not download 1 user image/);
 });
 
 test("runLoop downloads follow-up images before the prompt", async () => {

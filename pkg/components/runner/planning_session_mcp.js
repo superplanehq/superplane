@@ -6,13 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
 
-const MAX_INSPECTABLE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-const ATTACHMENT_IMAGE_TYPES = new Map([
-  [".png", "image/png"],
-  [".jpg", "image/jpeg"],
-  [".jpeg", "image/jpeg"],
-  [".webp", "image/webp"],
-]);
+const MAX_INSPECTABLE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 /**
  * Stdio MCP server for task refinement.
@@ -206,6 +200,12 @@ function sniffImageMime(bytes) {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
     return "image/jpeg";
   }
+  if (bytes.length >= 6) {
+    const header = bytes.toString("ascii", 0, 6);
+    if (header === "GIF87a" || header === "GIF89a") {
+      return "image/gif";
+    }
+  }
   if (
     bytes.length >= 12 &&
     bytes.toString("ascii", 0, 4) === "RIFF" &&
@@ -255,7 +255,6 @@ function resolveAttachmentFile(inputPath, env = process.env) {
   return {
     absolute: resolved,
     filename: path.basename(resolved),
-    contentType: ATTACHMENT_IMAGE_TYPES.get(path.extname(resolved).toLowerCase()) || "",
     sizeBytes: fileInfo.size,
     root: attachmentsRoot,
   };
@@ -264,9 +263,9 @@ function resolveAttachmentFile(inputPath, env = process.env) {
 function inspectAttachment(input, env = process.env) {
   const file = resolveAttachmentFile(input && input.path, env);
   const bytes = fs.readFileSync(file.absolute);
-  const mimeType = file.contentType || sniffImageMime(bytes);
+  const mimeType = sniffImageMime(bytes);
   if (!mimeType) {
-    throw new Error("attachment must be a PNG, JPEG, or WebP file");
+    throw new Error("attachment must be a PNG, JPEG, GIF, or WebP file");
   }
   const metadata = {
     path: path.relative(file.root, file.absolute),
@@ -413,7 +412,7 @@ const TOOLS = [
   {
     name: "inspect_attachment",
     description:
-      "Inspect a user image from the task attachments directory. Returns the image so you can see it. Call this for every user image. Do not use OCR or the file command.",
+      "Inspect a user image from the task attachments directory. Returns the image so you can see it. Call this for every PNG, JPEG, GIF, or WebP user image. Do not use OCR or the file command.",
     inputSchema: {
       type: "object",
       properties: { path: { type: "string" } },
@@ -673,4 +672,5 @@ module.exports = {
   writeAnalysisOutputs,
   analysisOutputPaths,
   parseFrames,
+  MAX_INSPECTABLE_ATTACHMENT_BYTES,
 };
