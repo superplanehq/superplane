@@ -64,4 +64,26 @@ describe("useFactoryWorkOrdersPage", () => {
     await waitFor(() => expect(result.current.orders).toEqual([{ id: "wo-2" }]));
     expect(result.current.isPlaceholderData).toBe(false);
   });
+
+  it("sends close results on the list query", async () => {
+    factoriesListWorkOrders.mockResolvedValueOnce(ordersPage([{ id: "wo-failed" }]));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(
+      () =>
+        useFactoryWorkOrdersPage("org-1", "factory-1", ["STATE_CLOSED"], BOARD_BACKLOG_PAGE_SIZE, {
+          results: ["RESULT_FAILED"],
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.orders).toEqual([{ id: "wo-failed" }]));
+    expect(factoriesListWorkOrders).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({
+          states: ["STATE_CLOSED"],
+          results: ["RESULT_FAILED"],
+        }),
+      }),
+    );
+  });
 });

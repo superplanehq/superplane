@@ -15,6 +15,7 @@ import {
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
+  factoriesSendWorkOrderToBacklog,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -43,7 +44,10 @@ import {
   BOARD_BACKLOG_PAGE_SIZE,
   BOARD_BACKLOG_STATES,
   BOARD_DONE_PAGE_SIZE,
+  BOARD_DONE_RESULTS,
   BOARD_DONE_STATES,
+  BOARD_OPEN_PAGE_SIZE,
+  BOARD_OPEN_STATES,
   BOARD_OPEN_PAGE_SIZE,
   BOARD_OPEN_STATES,
   factoryWorkOrdersPageKey,
@@ -208,6 +212,7 @@ function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions):
   return normalizeWorkOrdersPageQuery({
     userId: options?.userId,
     unassigned: options?.unassigned,
+    results: options?.results,
   });
 }
 
@@ -231,6 +236,7 @@ export function useFactoryWorkOrdersPage(
             limit: pageSize,
             ...(pageQuery.userId ? { userId: pageQuery.userId } : {}),
             ...(pageQuery.unassigned ? { unassigned: true } : {}),
+            ...(pageQuery.results.length > 0 ? { results: [...pageQuery.results] } : {}),
             ...(pageParam ? { beforeId: pageParam.beforeId } : {}),
           },
         }),
@@ -300,7 +306,10 @@ export function useFactoryBoardWorkOrders(
     options,
   );
   const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, options);
-  const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, options);
+  const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
+    ...options,
+    results: BOARD_DONE_RESULTS,
+  });
 
   return {
     workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
@@ -672,6 +681,41 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
       });
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useSendWorkOrderToBacklog(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; closePullRequests: boolean; clearArtifacts: boolean }) => {
+      const response = await factoriesSendWorkOrderToBacklog(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            closePullRequests: input.closePullRequests,
+            clearArtifacts: input.clearArtifacts,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to send task to the Backlog");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderArtifactsKey(organizationId, factoryId, variables.orderId),
       });
     },
   });

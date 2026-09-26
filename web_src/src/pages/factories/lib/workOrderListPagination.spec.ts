@@ -69,10 +69,23 @@ describe("workOrderListPagination", () => {
     expect(workOrdersPageQueryFromKey(key)).toEqual({
       userId: "user-1",
       unassigned: true,
+      results: [],
     });
     expect(workOrdersPageQueryFromKey(factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_DRAFT"]))).toEqual({
       userId: undefined,
       unassigned: false,
+      results: [],
+    });
+  });
+
+  it("stores results on the page key", () => {
+    const key = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_CLOSED"], {
+      results: ["RESULT_FAILED", "RESULT_COMPLETED"],
+    });
+    expect(workOrdersPageQueryFromKey(key)).toEqual({
+      userId: undefined,
+      unassigned: false,
+      results: ["RESULT_COMPLETED", "RESULT_FAILED"],
     });
   });
 
@@ -83,8 +96,12 @@ describe("workOrderListPagination", () => {
   });
 
   it("matches unassigned or the selected user", () => {
-    expect(workOrderMatchesPageQuery({ assignees: [] }, { userId: "alex", unassigned: true })).toBe(true);
-    expect(workOrderMatchesPageQuery({ assignees: [{ id: "alex" }] }, { userId: "alex", unassigned: true })).toBe(true);
-    expect(workOrderMatchesPageQuery({ assignees: [{ id: "zoe" }] }, { userId: "alex", unassigned: true })).toBe(false);
+    expect(workOrderMatchesPageQuery({ assignees: [] }, { userId: "alex", unassigned: true, results: [] })).toBe(true);
+    expect(
+      workOrderMatchesPageQuery({ assignees: [{ id: "alex" }] }, { userId: "alex", unassigned: true, results: [] }),
+    ).toBe(true);
+    expect(
+      workOrderMatchesPageQuery({ assignees: [{ id: "zoe" }] }, { userId: "alex", unassigned: true, results: [] }),
+    ).toBe(false);
   });
 });
