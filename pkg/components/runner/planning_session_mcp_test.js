@@ -446,6 +446,7 @@ test("inspectAttachment rejects a PNG filename that is not an image", () => {
 });
 
 test("inspectAttachment rejects files above the work-order size limit", () => {
+  assert.equal(MAX_INSPECTABLE_ATTACHMENT_BYTES, 50 * 1024 * 1024);
   const value = attachmentFixture();
   const oversized = path.join(value.attachments, "large.png");
   const descriptor = fs.openSync(oversized, "w");

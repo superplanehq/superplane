@@ -741,8 +741,10 @@ func normalizeFetchedContentType(header, rawURL string) string {
 		return "video/webm"
 	case ".mov":
 		return "video/quicktime"
-	case ".ogv", ".ogg":
+	case ".ogv":
 		return "video/ogg"
+	case ".ogg":
+		return "audio/ogg"
 	case ".m4v":
 		return "video/x-m4v"
 	case ".mkv":

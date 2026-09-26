@@ -124,7 +124,7 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 // Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
 // Node and per-step workingDirectory cds from the task launch directory so
 // each broker command starts in the configured workspace.
-func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment) ClaudeCodeBrokerTask {
+func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
 	thinking := strings.TrimSpace(spec.ThinkingLevel)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
@@ -148,7 +148,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, thinking, workdir, attachments)
+		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, thinking, workdir, attachments, inspectImages)
 		files = append(files, file)
 		stepCommands = append(stepCommands, command)
 	}
@@ -167,15 +167,11 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 }
 
 func BuildBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup) ClaudeCodeBrokerTask {
-	return buildClaudeCodeBrokerTask(spec, usage, setups, nil, nil)
+	return buildClaudeCodeBrokerTask(spec, usage, setups, nil, nil, false)
 }
 
-func BuildDispatchedBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments ...[]runner.TaskAttachment) ClaudeCodeBrokerTask {
-	var extra []runner.TaskAttachment
-	if len(attachments) > 0 {
-		extra = attachments[0]
-	}
-	return buildClaudeCodeBrokerTask(spec, usage, setups, dispatched, extra)
+func BuildDispatchedBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) ClaudeCodeBrokerTask {
+	return buildClaudeCodeBrokerTask(spec, usage, setups, dispatched, attachments, inspectImages)
 }
 
 func ApplyPlanningFollowUp(task ClaudeCodeBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
@@ -220,7 +216,7 @@ func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
 	return strings.TrimSpace(spec.WorkingDirectory)
 }
 
-func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, thinking, nodeWorkingDirectory string, attachments []runner.TaskAttachment) (runner.BrokerTaskFile, runner.BrokerCommand) {
+func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, thinking, nodeWorkingDirectory string, attachments []runner.TaskAttachment, inspectImages bool) (runner.BrokerTaskFile, runner.BrokerCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
 	switch runner.NormalizeAgentStepType(original.Type) {
@@ -251,7 +247,7 @@ func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, us
 		promptName := stepSlug + ".txt"
 		return runner.BrokerTaskFile{
 			Path:    "prompts/" + promptName,
-			Content: runner.ApplyAttachmentInstructions(runner.ApplyIntegrationUsage(runner.RewritePromptLocalAttachmentPaths(dispatchedPrompt, attachments), usage)),
+			Content: runner.FormatAgentPrompt(dispatchedPrompt, usage, attachments, inspectImages),
 			Mode:    "0644",
 		}, claudePromptStepBrokerCommand(original.Name, promptName, prompt, model, thinking, workingDirectory)
 	}

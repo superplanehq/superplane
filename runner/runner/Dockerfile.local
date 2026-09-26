@@ -83,6 +83,7 @@ RUN apt-get update \
   && command -v ffmpeg \
   && command -v ffprobe \
   && command -v whisper-cli \
+  && whisper-cli --help >/dev/null \
   && test -s /usr/local/share/whisper/ggml-tiny.bin \
   && rm -rf /var/lib/apt/lists/*
 

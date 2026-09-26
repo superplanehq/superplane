@@ -58,11 +58,14 @@ describe("workOrderFiles", () => {
     expect(isInlineWorkOrderAudio("audio/ogg")).toBe(true);
     expect(isWorkOrderAudioSource({ contentType: "audio/ogg", src: "clip.ogg", alt: "clip.ogg" })).toBe(true);
     expect(isWorkOrderVideoSource({ contentType: "audio/ogg", src: "clip.ogg", alt: "clip.ogg" })).toBe(false);
-    expect(isWorkOrderVideoSource({ src: "clip.ogg", alt: "clip.ogg" })).toBe(true);
+    expect(isWorkOrderVideoSource({ src: "clip.ogg", alt: "clip.ogg" })).toBe(false);
+    expect(isWorkOrderAudioSource({ src: "clip.ogg", alt: "clip.ogg" })).toBe(true);
+    expect(isWorkOrderVideoSource({ src: "clip.ogv", alt: "clip.ogv" })).toBe(true);
     expect(isWorkOrderAudioSource({ src: "note.mp3", alt: "note.mp3" })).toBe(true);
     expect(resolveWorkOrderFileMimeType({ name: "note.mp3", type: "" })).toBe("audio/mpeg");
     expect(resolveWorkOrderFileMimeType({ name: "clip.ogg", type: "audio/ogg" })).toBe("audio/ogg");
-    expect(resolveWorkOrderFileMimeType({ name: "clip.ogg", type: "" })).toBe("video/ogg");
+    expect(resolveWorkOrderFileMimeType({ name: "clip.ogg", type: "" })).toBe("audio/ogg");
+    expect(resolveWorkOrderFileMimeType({ name: "clip.ogv", type: "" })).toBe("video/ogg");
   });
 
   it("accepts the allowed text data files", () => {

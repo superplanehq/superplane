@@ -49,8 +49,8 @@ export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   ...ALLOWED_WORK_ORDER_AUDIO_TYPES,
 ] as const;
 
-const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"] as const;
-const AUDIO_EXTENSIONS = [".mp3", ".m4a", ".wav", ".oga"] as const;
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".m4v", ".mkv"] as const;
+const AUDIO_EXTENSIONS = [".mp3", ".m4a", ".wav", ".oga", ".ogg"] as const;
 
 const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
   ".png": "image/png",
@@ -74,7 +74,7 @@ const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
   ".webm": "video/webm",
   ".mov": "video/quicktime",
   ".ogv": "video/ogg",
-  ".ogg": "video/ogg",
+  ".ogg": "audio/ogg",
   ".m4v": "video/x-m4v",
   ".mkv": "video/x-matroska",
   ".mp3": "audio/mpeg",
@@ -159,7 +159,7 @@ export function isBrowserPlayableWorkOrderVideo(contentType?: string, src?: stri
     return false;
   }
   const name = `${alt ?? ""} ${src ?? ""}`.toLowerCase();
-  return [".mp4", ".webm", ".ogv", ".ogg"].some((extension) => name.split("?")[0]?.endsWith(extension));
+  return [".mp4", ".webm", ".ogv"].some((extension) => name.split("?")[0]?.endsWith(extension));
 }
 
 export function isBrowserPlayableWorkOrderAudio(contentType?: string, src?: string, alt?: string): boolean {

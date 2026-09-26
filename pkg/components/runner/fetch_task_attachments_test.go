@@ -3,6 +3,7 @@ package runner
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -47,7 +48,7 @@ func TestFetchTaskAttachmentsScriptVerifiesChecksum(t *testing.T) {
 	assert.Equal(t, payload, got)
 }
 
-func TestFetchTaskAttachmentsScriptRejectsChecksumMismatch(t *testing.T) {
+func TestFetchTaskAttachmentsScriptMarksChecksumMismatchFailed(t *testing.T) {
 	if _, err := exec.LookPath("curl"); err != nil {
 		t.Skip("curl is not installed")
 	}
@@ -71,12 +72,14 @@ func TestFetchTaskAttachmentsScriptRejectsChecksumMismatch(t *testing.T) {
 	cmd := exec.Command("bash", "fetch_task_attachments.sh")
 	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+dir)
 	out, err := cmd.CombinedOutput()
-	require.Error(t, err)
+	require.NoError(t, err, string(out))
 	assert.Contains(t, string(out), "checksum mismatch")
 	assert.NoFileExists(t, filepath.Join(attachments, "01-clip.mp4"))
+	assert.Equal(t, "failed", fetchManifestFile(t, attachments, "01-clip.mp4")["status"])
+	assert.Equal(t, "checksum_mismatch", fetchManifestFile(t, attachments, "01-clip.mp4")["reason"])
 }
 
-func TestFetchTaskAttachmentsScriptRejectsSizeMismatch(t *testing.T) {
+func TestFetchTaskAttachmentsScriptMarksSizeMismatchFailed(t *testing.T) {
 	if _, err := exec.LookPath("curl"); err != nil {
 		t.Skip("curl is not installed")
 	}
@@ -100,6 +103,64 @@ func TestFetchTaskAttachmentsScriptRejectsSizeMismatch(t *testing.T) {
 	cmd := exec.Command("bash", "fetch_task_attachments.sh")
 	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+dir)
 	out, err := cmd.CombinedOutput()
-	require.Error(t, err)
+	require.NoError(t, err, string(out))
 	assert.Contains(t, string(out), "does not match")
+	assert.Equal(t, "failed", fetchManifestFile(t, attachments, "01-clip.mp4")["status"])
+}
+
+func TestFetchTaskAttachmentsScriptContinuesAfterOneFailure(t *testing.T) {
+	if _, err := exec.LookPath("curl"); err != nil {
+		t.Skip("curl is not installed")
+	}
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is not installed")
+	}
+
+	payload := []byte("ok-file")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/missing" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(payload)
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	attachments := filepath.Join(dir, "attachments")
+	require.NoError(t, os.MkdirAll(attachments, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "files": [
+    {"filename":"missing.png","dest":"01-missing.png","url":"`+server.URL+`/missing"},
+    {"filename":"ok.png","dest":"02-ok.png","url":"`+server.URL+`/ok"}
+  ]
+}`), 0o644))
+
+	cmd := exec.Command("bash", "fetch_task_attachments.sh")
+	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+dir)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "failed", fetchManifestFile(t, attachments, "01-missing.png")["status"])
+	assert.Equal(t, "downloaded", fetchManifestFile(t, attachments, "02-ok.png")["status"])
+	got, err := os.ReadFile(filepath.Join(attachments, "02-ok.png"))
+	require.NoError(t, err)
+	assert.Equal(t, payload, got)
+}
+
+func fetchManifestFile(t *testing.T, attachments, dest string) map[string]any {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(attachments, "manifest.json"))
+	require.NoError(t, err)
+	var manifest struct {
+		Files []map[string]any `json:"files"`
+	}
+	require.NoError(t, json.Unmarshal(body, &manifest))
+	for _, file := range manifest.Files {
+		if file["dest"] == dest {
+			return file
+		}
+	}
+	t.Fatalf("missing dest %s", dest)
+	return nil
 }

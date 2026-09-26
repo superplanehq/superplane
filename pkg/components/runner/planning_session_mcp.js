@@ -6,7 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
 
-const MAX_INSPECTABLE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_INSPECTABLE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 /**
  * Stdio MCP server for task refinement.

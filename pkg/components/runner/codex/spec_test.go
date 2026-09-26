@@ -85,14 +85,14 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildCodexBrokerTask(spec, "", nil, nil, nil)
+	task := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
 	require.Len(t, task.Commands, 3)
 	assert.Equal(t, "Prepare Codex", task.Commands[0].Name)
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
 	assert.Equal(t, "Fix panic", task.Commands[2].Name)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'gpt-5'`)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
-	assert.Equal(t, runner.AttachmentAgentInstructions+"\n\nFix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
+	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 }
 
 func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
@@ -105,7 +105,7 @@ func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
-	task := buildCodexBrokerTask(spec, "", nil, nil, nil)
+	task := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'gpt-5' 'medium'`)
 }
 
@@ -118,7 +118,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildCodexBrokerTask(spec, "", nil, nil, nil)
+	base := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
 	got := applyPlanningFollowUp(base, nil, spec)
 	assert.Len(t, got.Commands, len(base.Commands))
 	assert.Len(t, got.Files, len(base.Files))
@@ -134,7 +134,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildCodexBrokerTask(spec, "", nil, nil, nil)
+	base := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
 	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",

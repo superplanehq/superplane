@@ -134,6 +134,7 @@ func TestProcessVideoAttachmentsScriptMarksWhisperFailurePartial(t *testing.T) {
 	item := manifestFile(t, attachments, "01-clip.mp4")
 	assert.Equal(t, "partial", item["status"])
 	assert.Equal(t, "transcription_failed", item["reason"])
+	assert.Equal(t, float64(1), item["transcript_attempts"])
 	assert.NotEmpty(t, item["frames"])
 }
 
@@ -156,8 +157,9 @@ func TestProcessVideoAttachmentsScriptIndexesImagesWithoutMediaTools(t *testing.
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	index := readIndex(t, attachments)
-	assert.Contains(t, index, "inspect_attachment")
+	assert.Contains(t, index, "image:")
 	assert.Contains(t, index, "$SUPERPLANE_TASK_DIR/attachments/01-shot.png")
+	assert.NotContains(t, index, "inspect_attachment")
 	assert.Equal(t, "ready", manifestFile(t, attachments, "01-shot.png")["status"])
 }
 
@@ -210,6 +212,28 @@ func TestProcessVideoAttachmentsScriptRetriesPartialWithoutToolchain(t *testing.
 	out, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(out), "WHISPER_MODEL")
+}
+
+func TestProcessVideoAttachmentsScriptStopsPartialAfterMaxAttempts(t *testing.T) {
+	t.Parallel()
+
+	dir, attachments := newAttachmentDir(t)
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "01-note.wav"), []byte("audio"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "files": [{"filename":"note.wav","content_type":"audio/wav","dest":"01-note.wav","kind":"audio","status":"partial","reason":"transcription_failed","transcript_attempts":3}]
+}`), 0o644))
+
+	cmd := exec.Command("bash", "process_video_attachments.sh")
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_TASK_DIR="+dir,
+		"PATH=/usr/bin:/bin",
+		"WHISPER_MODEL="+filepath.Join(dir, "missing.bin"),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "No video or audio files in task attachments.")
+	assert.Equal(t, "failed", manifestFile(t, attachments, "01-note.wav")["status"])
 }
 
 func TestProcessVideoAttachmentsScriptRetriesPartialAudioTranscript(t *testing.T) {

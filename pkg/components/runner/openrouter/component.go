@@ -154,7 +154,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
-	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments)
+	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)

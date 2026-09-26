@@ -134,7 +134,7 @@ func attachmentKind(attachment TaskAttachment) string {
 
 func looksLikeAudioName(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".mp3", ".m4a", ".wav", ".oga":
+	case ".mp3", ".m4a", ".wav", ".oga", ".ogg":
 		return true
 	default:
 		return false
@@ -143,7 +143,7 @@ func looksLikeAudioName(name string) bool {
 
 func looksLikeVideoName(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv":
+	case ".mp4", ".webm", ".mov", ".ogv", ".m4v", ".mkv":
 		return true
 	default:
 		return false

@@ -36,14 +36,20 @@ func TestHasVideoAttachmentUsesTypeAndName(t *testing.T) {
 	assert.True(t, HasVideoAttachment([]TaskAttachment{{Filename: "note.mp3", ContentType: "audio/mpeg"}}))
 	assert.True(t, HasVideoAttachment([]TaskAttachment{{Filename: "voice.m4a"}}))
 	assert.Equal(t, "audio", attachmentKind(TaskAttachment{Filename: "clip.ogg", ContentType: "audio/ogg"}))
-	assert.Equal(t, "video", attachmentKind(TaskAttachment{Filename: "clip.ogg"}))
+	assert.Equal(t, "audio", attachmentKind(TaskAttachment{Filename: "clip.ogg"}))
+	assert.Equal(t, "video", attachmentKind(TaskAttachment{Filename: "clip.ogv"}))
+	assert.Equal(t, "audio", attachmentKind(TaskAttachment{Filename: "clip.webm", ContentType: "audio/webm"}))
+	assert.Equal(t, "video", attachmentKind(TaskAttachment{Filename: "clip.webm"}))
 }
 
 func TestApplyAttachmentInstructionsPrependsFragment(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, AttachmentAgentInstructions, ApplyAttachmentInstructions(""))
-	assert.True(t, strings.HasPrefix(ApplyAttachmentInstructions("do the work"), AttachmentAgentInstructions))
+	files := []TaskAttachment{{Filename: "clip.mp4", ContentType: "video/mp4"}}
+	assert.Equal(t, "do the work", ApplyAttachmentInstructions("do the work", nil))
+	assert.Equal(t, AttachmentAgentInstructions, ApplyAttachmentInstructions("", files))
+	assert.True(t, strings.HasPrefix(ApplyAttachmentInstructions("do the work", files), AttachmentAgentInstructions))
+	assert.NotContains(t, AttachmentAgentInstructions, "inspect_attachment")
 }
 
 func TestRewritePromptLocalAttachmentPathsNamesInspectAttachment(t *testing.T) {
@@ -58,6 +64,26 @@ func TestRewritePromptLocalAttachmentPathsNamesInspectAttachment(t *testing.T) {
 	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
 	assert.Contains(t, prompt, "inspect_attachment")
 	assert.NotContains(t, prompt, signed)
+}
+
+func TestFormatAgentPromptKeepsLineImageURLs(t *testing.T) {
+	t.Parallel()
+
+	signed := "https://app.example/api/v1/public/files/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1"
+	files := []TaskAttachment{{
+		URL:         signed,
+		Filename:    "bug.png",
+		ContentType: "image/png",
+	}}
+	line := FormatAgentPrompt("See ![bug]("+signed+")", "", files, false)
+	assert.Contains(t, line, signed)
+	assert.Contains(t, line, AttachmentAgentInstructions)
+	assert.NotContains(t, line, "inspect_attachment")
+
+	planning := FormatAgentPrompt("See ![bug]("+signed+")", "", files, true)
+	assert.Contains(t, planning, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.Contains(t, planning, "inspect_attachment")
+	assert.NotContains(t, planning, signed)
 }
 
 func TestAttachmentSetupProcessesImages(t *testing.T) {

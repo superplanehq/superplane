@@ -104,7 +104,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-features
-  timeoutSec: 30
+  timeoutSec: 900
   connectionDraining:
     drainingTimeoutSec: 60
   logging:

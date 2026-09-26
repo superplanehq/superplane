@@ -32,6 +32,7 @@ type AgentBrokerTaskInput struct {
 	Model           string
 	PromptCommand   AgentPromptCommand
 	Attachments     []TaskAttachment
+	InspectImages   bool
 }
 
 type TaskAttachment struct {
@@ -68,7 +69,7 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 	commands = append(commands, setupCommands...)
 
 	for i, step := range input.Steps {
-		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand, attachments)
+		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand, attachments, input.InspectImages)
 		files = append(files, file)
 		commands = append(commands, command)
 	}
@@ -131,7 +132,7 @@ func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []Broker
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand, attachments []TaskAttachment) (BrokerTaskFile, BrokerCommand) {
+func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand, attachments []TaskAttachment, inspectImages bool) (BrokerTaskFile, BrokerCommand) {
 	stepSlug := AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
 	switch NormalizeAgentStepType(original.Type) {
@@ -153,7 +154,7 @@ func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingD
 		promptName := stepSlug + ".txt"
 		return BrokerTaskFile{
 				Path:    "prompts/" + promptName,
-				Content: ApplyAttachmentInstructions(ApplyIntegrationUsage(RewritePromptLocalAttachmentPaths(stringPtrValue(dispatched.Prompt), attachments), usage)),
+				Content: FormatAgentPrompt(stringPtrValue(dispatched.Prompt), usage, attachments, inspectImages),
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(original.Name, promptName),

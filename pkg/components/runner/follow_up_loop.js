@@ -636,10 +636,10 @@ function attachmentKind(file) {
     return "video";
   }
   const name = String((file && (file.filename || file.dest)) || "").toLowerCase();
-  if (/\.(mp3|m4a|wav|oga)$/.test(name)) {
+  if (/\.(mp3|m4a|wav|oga|ogg)$/.test(name)) {
     return "audio";
   }
-  return /\.(mp4|webm|mov|ogv|ogg|m4v|mkv)$/.test(name) ? "video" : "file";
+  return /\.(mp4|webm|mov|ogv|m4v|mkv)$/.test(name) ? "video" : "file";
 }
 
 function sanitizeDestName(name, index) {

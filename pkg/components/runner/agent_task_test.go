@@ -246,7 +246,7 @@ func TestBuildAgentBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	assert.Equal(t, "echo install-sem-ai", requireBrokerFile(t, files, "setup/01-set-up-semaphore.sh").Content)
 	assert.Equal(
 		t,
-		AttachmentAgentInstructions+"\n\nThe gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
 		requireBrokerFile(t, files, "prompts/01-implement.txt").Content,
 	)
 }
@@ -293,7 +293,10 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 	assert.Contains(t, requireBrokerFile(t, files, "fetch_task_attachments.sh").Content, "attachments/manifest.json")
 	assert.Contains(t, requireBrokerFile(t, files, "process_video_attachments.sh").Content, "extract bounded timestamped frames")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "sp_file=1")
-	assert.Contains(t, requireBrokerFile(t, files, "prompts/01-implement.txt").Content, "inspect_attachment")
+	promptFile := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
+	assert.Contains(t, promptFile, AttachmentAgentInstructions)
+	assert.Contains(t, promptFile, "sp_file=1")
+	assert.NotContains(t, promptFile, "inspect_attachment")
 	assert.Equal(t, "Implement", commands[3].Name)
 }
 
@@ -366,9 +369,10 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	})
 
 	prompt := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
-	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.Contains(t, prompt, "inspect_attachment")
-	assert.NotContains(t, prompt, signed)
+	assert.Contains(t, prompt, signed)
+	assert.Contains(t, prompt, AttachmentAgentInstructions)
+	assert.NotContains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.NotContains(t, prompt, "inspect_attachment")
 	assert.NotContains(t, prompt, "sp-file://")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "sp_file=1")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "01-bug.png")
@@ -379,6 +383,48 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	assert.Equal(t, "Implement", commands[3].Name)
 	assert.Contains(t, commands[3].Preview, "sp-file://"+fileID)
 	assert.NotContains(t, commands[3].Preview, "sp_file=1")
+}
+
+func TestBuildAgentBrokerTaskRewritesPlanningImagePaths(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := MintAgentStepFileRefs(
+		[]AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	_, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:     "Prepare",
+		PrepareScript:   NodePrepareScript("", "", ""),
+		RunScriptName:   "run.js",
+		RunScript:       "echo run",
+		Steps:           []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}},
+		DispatchedSteps: dispatched,
+		Attachments: []TaskAttachment{{
+			ID:          fileID,
+			URL:         signed,
+			Filename:    "bug.png",
+			ContentType: "image/png",
+		}},
+		InspectImages: true,
+		Model:         "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	prompt := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
+	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.Contains(t, prompt, "inspect_attachment")
+	assert.Contains(t, prompt, AttachmentAgentInstructions)
+	assert.NotContains(t, prompt, signed)
+	assert.NotContains(t, prompt, "sp-file://")
 }
 
 func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {

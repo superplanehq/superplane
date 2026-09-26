@@ -149,7 +149,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
-	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments)
+	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)

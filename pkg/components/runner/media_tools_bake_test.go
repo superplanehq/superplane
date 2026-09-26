@@ -18,7 +18,7 @@ func TestMediaToolchainIsWiredInRunnerBake(t *testing.T) {
 			"ffmpeg", "ffprobe", "whisper-cli", "ggml-tiny.bin",
 		},
 		"runner/runner/Dockerfile.local": {
-			"ffmpeg", "ffprobe", "whisper-cli", "install-media-tools.sh", "ggml-tiny.bin",
+			"ffmpeg", "ffprobe", "whisper-cli", "whisper-cli --help", "install-media-tools.sh", "ggml-tiny.bin",
 		},
 		"runner/packer/scripts/install.sh": {
 			"ffmpeg", "ffprobe", "WHISPER_MODEL=/usr/local/share/whisper/ggml-tiny.bin",

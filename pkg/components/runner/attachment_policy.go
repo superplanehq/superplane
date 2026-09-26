@@ -22,7 +22,7 @@ const (
 
 // AttachmentAgentInstructions tell every agent CLI to read processed
 // artifacts instead of original video or audio bytes.
-const AttachmentAgentInstructions = `If $SUPERPLANE_TASK_DIR/attachments/INDEX.md exists, read that file first. Use the listed frames and transcript for any video. Use the listed transcript for any audio. For an image, call inspect_attachment on the listed path. Do not ingest original video or audio bytes.`
+const AttachmentAgentInstructions = `If $SUPERPLANE_TASK_DIR/attachments/INDEX.md exists, read that file first. Use the listed frames and transcript for any video. Use the listed transcript for any audio. Do not ingest original video or audio bytes.`
 
 type AttachmentPolicy struct {
 	MaxDurationSeconds    int   `json:"max_duration_seconds"`
@@ -46,11 +46,22 @@ func DefaultAttachmentPolicy() AttachmentPolicy {
 	}
 }
 
-func ApplyAttachmentInstructions(prompt string) string {
+func ApplyAttachmentInstructions(prompt string, attachments []TaskAttachment) string {
+	if len(attachments) == 0 {
+		return prompt
+	}
 	if prompt == "" {
 		return AttachmentAgentInstructions
 	}
 	return AttachmentAgentInstructions + "\n\n" + prompt
+}
+
+func FormatAgentPrompt(prompt, usage string, attachments []TaskAttachment, inspectImages bool) string {
+	next := ApplyIntegrationUsage(prompt, usage)
+	if inspectImages {
+		next = RewritePromptLocalAttachmentPaths(next, attachments)
+	}
+	return ApplyAttachmentInstructions(next, attachments)
 }
 
 func LocalAttachmentPath(dest string) string {

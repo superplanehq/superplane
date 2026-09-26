@@ -16,6 +16,7 @@ MAX_HEIGHT="${VIDEO_MAX_FRAME_HEIGHT:-1280}"
 MAX_SOURCE_PIXELS="${VIDEO_MAX_SOURCE_PIXELS:-16777216}"
 PROCESS_TIMEOUT="${VIDEO_PROCESS_TIMEOUT_SECONDS:-120}"
 DISK_BUDGET_BYTES="${VIDEO_DISK_BUDGET_BYTES:-2147483648}"
+MAX_TRANSCRIPT_ATTEMPTS="${VIDEO_MAX_TRANSCRIPT_ATTEMPTS:-3}"
 
 if [ ! -d "$attachments" ]; then
   printf 'attachments directory is missing.\n' >&2
@@ -30,7 +31,7 @@ export ATTACHMENTS_DIR="$attachments"
 export MANIFEST_PATH="$manifest"
 export INDEX_PATH="$index"
 export WHISPER_MODEL
-export MAX_DURATION_SECONDS MAX_FRAMES MAX_WIDTH MAX_HEIGHT MAX_SOURCE_PIXELS PROCESS_TIMEOUT DISK_BUDGET_BYTES
+export MAX_DURATION_SECONDS MAX_FRAMES MAX_WIDTH MAX_HEIGHT MAX_SOURCE_PIXELS PROCESS_TIMEOUT DISK_BUDGET_BYTES MAX_TRANSCRIPT_ATTEMPTS
 
 python3 - <<'PY'
 import json
@@ -52,6 +53,7 @@ max_height = int(os.environ["MAX_HEIGHT"])
 max_source_pixels = int(os.environ["MAX_SOURCE_PIXELS"])
 process_timeout = int(os.environ["PROCESS_TIMEOUT"])
 disk_budget = int(os.environ["DISK_BUDGET_BYTES"])
+max_transcript_attempts = int(os.environ["MAX_TRANSCRIPT_ATTEMPTS"])
 
 VIDEO_TYPES = {
     "video/mp4",
@@ -61,7 +63,7 @@ VIDEO_TYPES = {
     "video/x-m4v",
     "video/x-matroska",
 }
-VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv"}
+VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".ogv", ".m4v", ".mkv"}
 AUDIO_TYPES = {
     "audio/mpeg",
     "audio/mp4",
@@ -69,7 +71,7 @@ AUDIO_TYPES = {
     "audio/webm",
     "audio/ogg",
 }
-AUDIO_SUFFIXES = {".mp3", ".m4a", ".wav", ".oga"}
+AUDIO_SUFFIXES = {".mp3", ".m4a", ".wav", ".oga", ".ogg"}
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
@@ -295,7 +297,7 @@ def write_index(manifest):
         "Read this index first. Original files stay in this directory.",
         "For a video, use the listed frames and transcript.",
         "For audio, use the listed transcript.",
-        "For an image, call inspect_attachment on the original path.",
+        "For an image, open the listed original path.",
         "Do not ingest original video or audio bytes into the model.",
         "",
         "## Policy",
@@ -333,7 +335,7 @@ def write_index(manifest):
             lines.append(f"- transcript: attachments/{item['transcript']}")
         if looks_like_image(item, dest_path):
             lines.append(
-                f"- inspect: call inspect_attachment on $SUPERPLANE_TASK_DIR/attachments/{dest}"
+                f"- image: $SUPERPLANE_TASK_DIR/attachments/{dest}"
             )
         lines.append("")
     index_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
@@ -369,8 +371,17 @@ def finish_transcript(item, dest, duration, frame_count=None):
     if transcript_path.is_file():
         item["transcript"] = transcript_name
     if transcribe_reason:
-        item["status"] = "partial"
+        attempts = int(item.get("transcript_attempts") or 0) + 1
+        item["transcript_attempts"] = attempts
         item["reason"] = transcribe_reason
+        if attempts >= max_transcript_attempts:
+            item["status"] = "failed"
+            if frame_count is None:
+                print(f"{dest.name}: transcript failed after {attempts} attempts")
+            else:
+                print(f"{dest.name}: {frame_count} frames, transcription failed after {attempts} attempts")
+            return
+        item["status"] = "partial"
         if frame_count is None:
             print(f"{dest.name}: transcript failed")
         else:
@@ -378,6 +389,7 @@ def finish_transcript(item, dest, duration, frame_count=None):
         return
     item["status"] = "ready"
     item["reason"] = ""
+    item["transcript_attempts"] = 0
     if frame_count is None:
         print(f"{dest.name}: transcript ready")
     else:
@@ -525,9 +537,21 @@ def process_audio(item, dest):
 PROCESSED_MEDIA_STATUSES = {"ready", "failed"}
 
 
+def transcript_attempts_of(item) -> int:
+    try:
+        return int(item.get("transcript_attempts") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def needs_media_processing(item) -> bool:
     status = str(item.get("status") or "").strip().lower()
-    return status not in PROCESSED_MEDIA_STATUSES
+    if status in PROCESSED_MEDIA_STATUSES:
+        return False
+    if status == "partial" and transcript_attempts_of(item) >= max_transcript_attempts:
+        item["status"] = "failed"
+        return False
+    return True
 
 
 manifest = load_manifest()
