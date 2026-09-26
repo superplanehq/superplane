@@ -117,6 +117,11 @@ build {
     pause_before    = "15s"
   }
 
+  provisioner "shell" {
+    script          = "packer/scripts/install-media-tools.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
+  }
+
   post-processor "manifest" {
     output     = "packer/manifest.json"
     strip_path = true
@@ -131,6 +136,11 @@ build {
     script          = "packer/scripts/install.sh"
     execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
     pause_before    = "15s"
+  }
+
+  provisioner "shell" {
+    script          = "packer/scripts/install-media-tools.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
   }
 
   post-processor "manifest" {
