@@ -24,7 +24,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     }
   }, [value, field.defaultValue, onChange]);
 
-  const currentValue = (value as string) ?? "";
+  const currentValue = String(value ?? "");
 
   if (!allowExpressions) {
     return (
