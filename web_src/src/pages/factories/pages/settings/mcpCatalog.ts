@@ -47,7 +47,10 @@ export function catalogEntryForResource(resource?: {
   url?: string;
   auth?: FactoryAgentResourceAuth;
 }): MCPCatalogEntry | undefined {
-  const url = resource?.url?.trim();
+  if (!resource) {
+    return undefined;
+  }
+  const url = resource.url?.trim();
   if (!url) {
     return undefined;
   }
