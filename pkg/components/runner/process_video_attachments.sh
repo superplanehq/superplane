@@ -353,7 +353,42 @@ def mark_ready_non_media(manifest, videos, audios):
             item["reason"] = ""
 
 
+def is_partial(item) -> bool:
+    return str(item.get("status") or "").strip().lower() == "partial"
+
+
+def has_existing_frames(item) -> bool:
+    frames = item.get("frames") or []
+    return any((attachments / str(frame.get("path") or "")).is_file() for frame in frames)
+
+
+def finish_transcript(item, dest, duration, frame_count=None):
+    transcript_name = dest.name + ".transcript.txt"
+    transcript_path = attachments / transcript_name
+    transcribe_reason = transcribe(dest, transcript_path, duration)
+    if transcript_path.is_file():
+        item["transcript"] = transcript_name
+    if transcribe_reason:
+        item["status"] = "partial"
+        item["reason"] = transcribe_reason
+        if frame_count is None:
+            print(f"{dest.name}: transcript failed")
+        else:
+            print(f"{dest.name}: {frame_count} frames, transcription failed")
+        return
+    item["status"] = "ready"
+    item["reason"] = ""
+    if frame_count is None:
+        print(f"{dest.name}: transcript ready")
+    else:
+        print(f"{dest.name}: {frame_count} frames, transcript ready")
+
+
 def process_video(item, dest):
+    if is_partial(item) and has_existing_frames(item):
+        finish_transcript(item, dest, float(item.get("duration_seconds") or 0), len(item.get("frames") or []))
+        return
+
     if dir_size(attachments) > disk_budget:
         item["status"] = "failed"
         item["reason"] = "disk_budget_exceeded"
@@ -447,23 +482,14 @@ def process_video(item, dest):
         print(f"{dest.name}: {len(frames)} frames, no audio")
         return
 
-    transcript_name = dest.name + ".transcript.txt"
-    transcript_path = attachments / transcript_name
-    transcribe_reason = transcribe(dest, transcript_path, duration)
-    if transcript_path.is_file():
-        item["transcript"] = transcript_name
-    if transcribe_reason:
-        item["status"] = "partial"
-        item["reason"] = transcribe_reason
-        print(f"{dest.name}: {len(frames)} frames, transcription failed")
-        return
-
-    item["status"] = "ready"
-    item["reason"] = ""
-    print(f"{dest.name}: {len(frames)} frames, transcript ready")
+    finish_transcript(item, dest, duration, len(frames))
 
 
 def process_audio(item, dest):
+    if is_partial(item):
+        finish_transcript(item, dest, float(item.get("duration_seconds") or 0))
+        return
+
     if dir_size(attachments) > disk_budget:
         item["status"] = "failed"
         item["reason"] = "disk_budget_exceeded"
@@ -493,23 +519,10 @@ def process_audio(item, dest):
         print(f"{dest.name}: duration {duration:.1f}s exceeds {max_duration:.0f}s")
         return
 
-    transcript_name = dest.name + ".transcript.txt"
-    transcript_path = attachments / transcript_name
-    transcribe_reason = transcribe(dest, transcript_path, duration)
-    if transcript_path.is_file():
-        item["transcript"] = transcript_name
-    if transcribe_reason:
-        item["status"] = "partial"
-        item["reason"] = transcribe_reason
-        print(f"{dest.name}: transcript failed")
-        return
-
-    item["status"] = "ready"
-    item["reason"] = ""
-    print(f"{dest.name}: transcript ready")
+    finish_transcript(item, dest, duration)
 
 
-PROCESSED_MEDIA_STATUSES = {"ready", "partial", "failed"}
+PROCESSED_MEDIA_STATUSES = {"ready", "failed"}
 
 
 def needs_media_processing(item) -> bool:

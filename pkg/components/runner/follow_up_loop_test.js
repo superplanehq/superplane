@@ -105,6 +105,35 @@ test("prepareIncomingAttachments skips files already in the manifest", () => {
   assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
 });
 
+test("prepareIncomingAttachments retries a partial transcript", () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-partial-"));
+  const ran = path.join(taskDir, "ran.txt");
+  fs.writeFileSync(
+    path.join(taskDir, "fetch_task_attachments.sh"),
+    `#!/bin/bash\nprintf 'fetch\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(taskDir, "process_video_attachments.sh"),
+    `#!/bin/bash\nprintf 'process\\n' >> ${JSON.stringify(ran)}\n`,
+  );
+  const incoming = [
+    {
+      id: "file-1",
+      filename: "clip.mp4",
+      content_type: "video/mp4",
+      url: "https://files.example/clip.mp4",
+    },
+  ];
+  prepareIncomingAttachments(taskDir, incoming);
+  const manifestPath = path.join(taskDir, "attachments", "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.files[0].status = "partial";
+  manifest.files[0].reason = "transcription_failed";
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+  prepareIncomingAttachments(taskDir, incoming);
+  assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\nfetch\nprocess\n");
+});
+
 test("prepareIncomingAttachments retries a pending download", () => {
   const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-retry-"));
   const attempts = path.join(taskDir, "attempts.txt");

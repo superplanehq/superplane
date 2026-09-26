@@ -700,7 +700,8 @@ function mergeManifestFiles(taskDir, incoming) {
     files.some(
       (file) =>
         file.status === "pending" ||
-        ((file.kind === "video" || file.kind === "audio") && file.status === "downloaded"),
+        ((file.kind === "video" || file.kind === "audio") &&
+          (file.status === "downloaded" || file.status === "partial")),
     );
   return { manifest, needsPreparation };
 }

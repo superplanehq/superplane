@@ -166,16 +166,14 @@ func TestProcessVideoAttachmentsScriptSkipsProcessedMediaWithoutToolchain(t *tes
 
 	dir, attachments := newAttachmentDir(t)
 	require.NoError(t, os.WriteFile(filepath.Join(attachments, "01-ready.mp4"), []byte("ready"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(attachments, "02-partial.mp4"), []byte("partial"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(attachments, "03-failed.mp4"), []byte("failed"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(attachments, "04-note.wav"), []byte("audio"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "02-failed.mp4"), []byte("failed"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "03-note.wav"), []byte("audio"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
   "version": 1,
   "files": [
     {"filename":"ready.mp4","content_type":"video/mp4","dest":"01-ready.mp4","kind":"video","status":"ready"},
-    {"filename":"partial.mp4","content_type":"video/mp4","dest":"02-partial.mp4","kind":"video","status":"partial","reason":"transcription_failed"},
-    {"filename":"failed.mp4","content_type":"video/mp4","dest":"03-failed.mp4","kind":"video","status":"failed","reason":"undecodable"},
-    {"filename":"note.wav","content_type":"audio/wav","dest":"04-note.wav","kind":"audio","status":"ready"}
+    {"filename":"failed.mp4","content_type":"video/mp4","dest":"02-failed.mp4","kind":"video","status":"failed","reason":"undecodable"},
+    {"filename":"note.wav","content_type":"audio/wav","dest":"03-note.wav","kind":"audio","status":"ready"}
   ]
 }`), 0o644))
 
@@ -189,9 +187,90 @@ func TestProcessVideoAttachmentsScriptSkipsProcessedMediaWithoutToolchain(t *tes
 	require.NoError(t, err, string(out))
 	assert.Contains(t, string(out), "No video or audio files in task attachments.")
 	assert.Equal(t, "ready", manifestFile(t, attachments, "01-ready.mp4")["status"])
-	assert.Equal(t, "partial", manifestFile(t, attachments, "02-partial.mp4")["status"])
-	assert.Equal(t, "failed", manifestFile(t, attachments, "03-failed.mp4")["status"])
-	assert.Equal(t, "ready", manifestFile(t, attachments, "04-note.wav")["status"])
+	assert.Equal(t, "failed", manifestFile(t, attachments, "02-failed.mp4")["status"])
+	assert.Equal(t, "ready", manifestFile(t, attachments, "03-note.wav")["status"])
+}
+
+func TestProcessVideoAttachmentsScriptRetriesPartialWithoutToolchain(t *testing.T) {
+	t.Parallel()
+
+	dir, attachments := newAttachmentDir(t)
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "01-note.wav"), []byte("audio"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "files": [{"filename":"note.wav","content_type":"audio/wav","dest":"01-note.wav","kind":"audio","status":"partial","reason":"transcription_failed"}]
+}`), 0o644))
+
+	cmd := exec.Command("bash", "process_video_attachments.sh")
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_TASK_DIR="+dir,
+		"PATH=/usr/bin:/bin",
+		"WHISPER_MODEL="+filepath.Join(dir, "missing.bin"),
+	)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "WHISPER_MODEL")
+}
+
+func TestProcessVideoAttachmentsScriptRetriesPartialAudioTranscript(t *testing.T) {
+	requireLookPath(t, "ffmpeg", "ffprobe", "python3")
+	dir, attachments := newAttachmentDir(t)
+	clip := filepath.Join(attachments, "01-note.wav")
+	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", clip)
+	require.NoError(t, cmd.Run())
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "policy": {"max_duration_seconds": 900, "max_frames": 24, "max_frame_width": 1280, "process_timeout_seconds": 120, "disk_budget_bytes": 2147483648},
+  "files": [{"filename":"note.wav","content_type":"audio/wav","dest":"01-note.wav","kind":"audio","status":"partial","reason":"transcription_failed","duration_seconds":1}]
+}`), 0o644))
+
+	binDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "whisper-cli"), []byte("#!/bin/sh\nwhile [ $# -gt 0 ]; do\n  if [ \"$1\" = \"-of\" ]; then printf 'hello\\n' > \"$2.txt\"; shift 2; continue; fi\n  shift\ndone\n"), 0o755))
+	model := filepath.Join(binDir, "ggml-tiny.bin")
+	require.NoError(t, os.WriteFile(model, []byte("x"), 0o644))
+	env := replaceEnv(replaceEnv(os.Environ(), "PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH")), "WHISPER_MODEL", model)
+
+	out := runProcessVideo(t, dir, env)
+	assert.Contains(t, string(out), "transcript ready")
+	item := manifestFile(t, attachments, "01-note.wav")
+	assert.Equal(t, "ready", item["status"])
+	assert.Equal(t, "", item["reason"])
+	assert.Equal(t, "01-note.wav.transcript.txt", item["transcript"])
+}
+
+func TestProcessVideoAttachmentsScriptRetriesPartialVideoWithoutReframing(t *testing.T) {
+	requireLookPath(t, "ffmpeg", "ffprobe", "python3")
+	dir, attachments := newAttachmentDir(t)
+	clip := filepath.Join(attachments, "01-clip.mp4")
+	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+		"-f", "lavfi", "-i", "color=c=black:s=16x16:d=1",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+		"-shortest", clip)
+	require.NoError(t, cmd.Run())
+	framesDir := filepath.Join(attachments, "01-clip.mp4.frames")
+	require.NoError(t, os.MkdirAll(framesDir, 0o755))
+	framePath := filepath.Join(framesDir, "frame-000.000.jpg")
+	require.NoError(t, os.WriteFile(framePath, []byte("kept-frame"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "policy": {"max_duration_seconds": 900, "max_frames": 24, "max_frame_width": 1280, "process_timeout_seconds": 120, "disk_budget_bytes": 2147483648},
+  "files": [{"filename":"clip.mp4","content_type":"video/mp4","dest":"01-clip.mp4","kind":"video","status":"partial","reason":"transcription_failed","duration_seconds":1,"frames_dir":"01-clip.mp4.frames","frames":[{"path":"01-clip.mp4.frames/frame-000.000.jpg","timestamp_seconds":0}]}]
+}`), 0o644))
+
+	binDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "whisper-cli"), []byte("#!/bin/sh\nwhile [ $# -gt 0 ]; do\n  if [ \"$1\" = \"-of\" ]; then printf 'hello\\n' > \"$2.txt\"; shift 2; continue; fi\n  shift\ndone\n"), 0o755))
+	model := filepath.Join(binDir, "ggml-tiny.bin")
+	require.NoError(t, os.WriteFile(model, []byte("x"), 0o644))
+	env := replaceEnv(replaceEnv(os.Environ(), "PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH")), "WHISPER_MODEL", model)
+
+	out := runProcessVideo(t, dir, env)
+	assert.Contains(t, string(out), "transcript ready")
+	item := manifestFile(t, attachments, "01-clip.mp4")
+	assert.Equal(t, "ready", item["status"])
+	assert.Equal(t, "", item["reason"])
+	body, err := os.ReadFile(framePath)
+	require.NoError(t, err)
+	assert.Equal(t, "kept-frame", string(body))
 }
 
 func TestProcessVideoAttachmentsScriptTranscribesAudioWithoutFrames(t *testing.T) {
