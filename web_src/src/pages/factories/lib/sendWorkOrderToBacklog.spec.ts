@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   CLOSED_STATUS_DIALOG_RESULTS,
+  closedStatusEmptyLabel,
   closedStatusTaskMatchesSearch,
   workOrderHasClearableArtifacts,
   workOrderHasCloseablePullRequests,
@@ -10,6 +11,14 @@ import {
 describe("CLOSED_STATUS_DIALOG_RESULTS", () => {
   it("loads Failed and Rejected together", () => {
     expect(CLOSED_STATUS_DIALOG_RESULTS).toEqual(["RESULT_FAILED", "RESULT_REJECTED"]);
+  });
+});
+
+describe("closedStatusEmptyLabel", () => {
+  it("explains an empty search when more pages remain", () => {
+    expect(closedStatusEmptyLabel(false, false)).toBe("No closed tasks.");
+    expect(closedStatusEmptyLabel(true, false)).toBe("No tasks match this search.");
+    expect(closedStatusEmptyLabel(true, true)).toBe("No matching tasks on this page.");
   });
 });
 

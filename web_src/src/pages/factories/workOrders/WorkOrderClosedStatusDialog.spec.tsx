@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -129,6 +129,46 @@ describe("WorkOrderClosedStatusDialog", () => {
     await user.clear(screen.getByTestId("work-order-closed-status-search"));
     await user.type(screen.getByTestId("work-order-closed-status-search"), "no-such-task");
     expect(screen.getByText("No tasks match this search.")).toBeInTheDocument();
+  });
+
+  it("loads more pages when search has no match on the loaded list", async () => {
+    const user = userEvent.setup();
+    const fetchNextPage = vi.fn();
+    useFactoryWorkOrdersPage.mockReturnValue({
+      orders: [
+        {
+          id: "wo-failed",
+          number: "106",
+          title: "Fix refund dispatcher timeout loop",
+          key: "RF-106",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+        },
+      ],
+      isLoading: false,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      fetchNextPage,
+    });
+
+    render(
+      <MemoryRouter>
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId="org-1"
+          factoryId="factory-1"
+          factoryKey="RF"
+          onOpenChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByTestId("work-order-closed-status-search"), "invoice");
+    await waitFor(() => {
+      expect(fetchNextPage).toHaveBeenCalled();
+    });
+    expect(screen.getByText("No matching tasks on this page.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
   });
 
   it("explains the empty list", () => {

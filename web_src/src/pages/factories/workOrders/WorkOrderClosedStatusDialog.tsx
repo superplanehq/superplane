@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
 import type { FactoriesWorkOrderSummary } from "@/api-client";
@@ -15,6 +15,7 @@ import {
   CLOSED_STATUS_DIALOG_COPY,
   CLOSED_STATUS_DIALOG_RESULTS,
   SEND_WORK_ORDER_TO_BACKLOG_COPY,
+  closedStatusEmptyLabel,
   closedStatusTaskMatchesSearch,
 } from "../lib/sendWorkOrderToBacklog";
 import { SendWorkOrderToBacklogForm } from "./SendWorkOrderToBacklogForm";
@@ -50,6 +51,24 @@ export function WorkOrderClosedStatusDialog({
   );
   const searchActive = search.trim().length > 0;
   const showSearch = !page.isLoading && (page.orders.length > 0 || searchActive);
+
+  useEffect(() => {
+    if (!open || !searchActive || visibleOrders.length > 0) {
+      return;
+    }
+    if (page.isLoading || page.isFetchingNextPage || !page.hasNextPage) {
+      return;
+    }
+    void page.fetchNextPage();
+  }, [
+    open,
+    page.fetchNextPage,
+    page.hasNextPage,
+    page.isFetchingNextPage,
+    page.isLoading,
+    searchActive,
+    visibleOrders.length,
+  ]);
 
   return (
     <Dialog
@@ -87,7 +106,7 @@ export function WorkOrderClosedStatusDialog({
           factoryId={factoryId}
           factoryKey={factoryKey}
           canManage={canManage}
-          emptyLabel={searchActive ? CLOSED_STATUS_DIALOG_COPY.searchEmpty : CLOSED_STATUS_DIALOG_COPY.empty}
+          emptyLabel={closedStatusEmptyLabel(searchActive, page.hasNextPage)}
           orders={visibleOrders}
           isLoading={page.isLoading}
           hasNextPage={page.hasNextPage}

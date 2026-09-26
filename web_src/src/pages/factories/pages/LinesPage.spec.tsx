@@ -1681,7 +1681,7 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
-  it("opens Failed tasks from the Status filter", async () => {
+  it("opens closed tasks from the Status filter", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1689,9 +1689,11 @@ describe("LinesPage board editing", () => {
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-failed"));
 
-    expect(await screen.findByTestId("work-order-failed-dialog")).toBeInTheDocument();
-    expect(screen.getByText("These tasks closed as failed.")).toBeInTheDocument();
-    expect(screen.getByText("No failed tasks.")).toBeInTheDocument();
+    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("Failed, Rejected, and Canceled tasks. Send a task to Backlog to work on it again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
   });
 
   it("treats a leftover Active scope as All and keeps every card", () => {

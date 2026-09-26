@@ -23,6 +23,7 @@ export const CLOSED_STATUS_DIALOG_COPY = {
   description: "Failed, Rejected, and Canceled tasks. Send a task to Backlog to work on it again.",
   empty: "No closed tasks.",
   searchEmpty: "No tasks match this search.",
+  searchMore: "No matching tasks on this page.",
   searchPlaceholder: "Search tasks",
 } as const;
 
@@ -30,6 +31,16 @@ export const CLOSED_STATUS_DIALOG_RESULTS = [
   "RESULT_FAILED",
   "RESULT_REJECTED",
 ] as const satisfies readonly FactoriesWorkOrderResult[];
+
+export function closedStatusEmptyLabel(searchActive: boolean, hasMorePages: boolean): string {
+  if (!searchActive) {
+    return CLOSED_STATUS_DIALOG_COPY.empty;
+  }
+  if (hasMorePages) {
+    return CLOSED_STATUS_DIALOG_COPY.searchMore;
+  }
+  return CLOSED_STATUS_DIALOG_COPY.searchEmpty;
+}
 
 export function closedStatusTaskMatchesSearch(
   order: FactoriesWorkOrderSummary,
