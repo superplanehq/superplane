@@ -1,8 +1,18 @@
 #!/usr/bin/env node
 "use strict";
 
+const crypto = require("crypto");
 const fs = require("fs");
+const path = require("path");
 const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
+
+const MAX_INSPECTABLE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ATTACHMENT_IMAGE_TYPES = new Map([
+  [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".webp", "image/webp"],
+]);
 
 /**
  * Stdio MCP server for task refinement.
@@ -175,6 +185,118 @@ async function createTask(input) {
   });
 }
 
+function requiredEnv(name, env = process.env) {
+  const value = String(env[name] || "").trim();
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+function sniffImageMime(bytes) {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return "image/webp";
+  }
+  return "";
+}
+
+function resolveAttachmentFile(inputPath, env = process.env) {
+  const candidate = String(inputPath || "").trim();
+  if (!candidate) {
+    throw new Error("path is required");
+  }
+  const taskDir = path.resolve(requiredEnv("SUPERPLANE_TASK_DIR", env));
+  const attachmentsDir = path.join(taskDir, "attachments");
+  fs.mkdirSync(attachmentsDir, { recursive: true });
+  const attachmentsInfo = fs.lstatSync(attachmentsDir);
+  if (attachmentsInfo.isSymbolicLink() || !attachmentsInfo.isDirectory()) {
+    throw new Error("task attachments directory must be a regular directory");
+  }
+  const attachmentsRoot = fs.realpathSync(attachmentsDir);
+  const expanded = candidate
+    .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
+    .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir);
+  const absolute = path.isAbsolute(expanded)
+    ? path.resolve(expanded)
+    : path.resolve(attachmentsDir, expanded);
+  const fileInfo = fs.lstatSync(absolute);
+  if (fileInfo.isSymbolicLink() || !fileInfo.isFile()) {
+    throw new Error("attachment path must be a regular file");
+  }
+  const resolved = fs.realpathSync(absolute);
+  if (
+    resolved !== attachmentsRoot &&
+    !resolved.startsWith(`${attachmentsRoot}${path.sep}`)
+  ) {
+    throw new Error("attachment path must be inside the task attachments directory");
+  }
+  if (fileInfo.size <= 0) {
+    throw new Error("attachment file is empty");
+  }
+  if (fileInfo.size > MAX_INSPECTABLE_ATTACHMENT_BYTES) {
+    throw new Error(`attachment exceeds ${MAX_INSPECTABLE_ATTACHMENT_BYTES} bytes`);
+  }
+  return {
+    absolute: resolved,
+    filename: path.basename(resolved),
+    contentType: ATTACHMENT_IMAGE_TYPES.get(path.extname(resolved).toLowerCase()) || "",
+    sizeBytes: fileInfo.size,
+    root: attachmentsRoot,
+  };
+}
+
+function inspectAttachment(input, env = process.env) {
+  const file = resolveAttachmentFile(input && input.path, env);
+  const bytes = fs.readFileSync(file.absolute);
+  const mimeType = file.contentType || sniffImageMime(bytes);
+  if (!mimeType) {
+    throw new Error("attachment must be a PNG, JPEG, or WebP file");
+  }
+  const metadata = {
+    path: path.relative(file.root, file.absolute),
+    filename: file.filename,
+    mimeType,
+    sizeBytes: bytes.length,
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  };
+  return {
+    content: [
+      { type: "text", text: JSON.stringify(metadata) },
+      { type: "image", data: bytes.toString("base64"), mimeType },
+    ],
+    structuredContent: metadata,
+  };
+}
+
+function toolCallResult(result) {
+  if (result && Array.isArray(result.content)) {
+    return {
+      content: result.content,
+      structuredContent: result.structuredContent,
+    };
+  }
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    structuredContent: result,
+  };
+}
+
 async function recordAgentMessage(text) {
   const body = String(text || "").trim();
   if (!body || isCompactStatusText(body)) {
@@ -288,6 +410,16 @@ const TOOLS = [
       required: ["title", "description"],
     },
   },
+  {
+    name: "inspect_attachment",
+    description:
+      "Inspect a user image from the task attachments directory. Returns the image so you can see it. Call this for every user image. Do not use OCR or the file command.",
+    inputSchema: {
+      type: "object",
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
 ];
 
 let replyFormat = "ndjson";
@@ -358,14 +490,13 @@ async function handleRequest(message) {
         result = await proposeSurvey(args);
       } else if (name === "create_task") {
         result = await createTask(args);
+      } else if (name === "inspect_attachment") {
+        result = inspectAttachment(args);
       } else {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
       }
-      sendResult(id, {
-        content: [{ type: "text", text: JSON.stringify(result) }],
-        structuredContent: result,
-      });
+      sendResult(id, toolCallResult(result));
     } catch (err) {
       sendResult(id, {
         content: [
@@ -534,6 +665,7 @@ module.exports = {
   proposeConfidence,
   proposeSurvey,
   createTask,
+  inspectAttachment,
   recordAgentMessage,
   surveyQuestions,
   TOOLS,

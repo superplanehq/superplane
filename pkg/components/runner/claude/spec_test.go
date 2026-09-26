@@ -188,6 +188,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "mcp__superplane__propose_plan")
 	assert.Contains(t, runScript, "mcp__superplane__survey")
 	assert.Contains(t, runScript, "mcp__superplane__create_task")
+	assert.Contains(t, runScript, "mcp__superplane__inspect_attachment")
 	assert.NotContains(t, runScript, "mcp__superplane__say")
 	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")
