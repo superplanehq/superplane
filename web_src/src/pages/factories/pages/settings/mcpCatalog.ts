@@ -147,16 +147,21 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     auth: "AUTH_OAUTH",
     instruction: AGENT_RESOURCES_COPY.linearInstruction,
   },
-  {
-    id: "circleci",
-    name: "circleci",
-    label: "CircleCI",
-    icon: "circleci",
-    category: "cicd",
-    url: "https://mcp.circleci.com/v1/mcp",
-    auth: "AUTH_OAUTH",
-    instruction: AGENT_RESOURCES_COPY.circleciInstruction,
-  },
+  // CircleCI MCP OAuth DCR only accepts RFC 8252 loopback redirects
+  // (http://127.0.0.1, http://[::1], http://localhost) or a hosted
+  // redirect CircleCI already allows. SuperPlane registers
+  // https://<app>/api/v1/mcp-oauth/callback, so production Sign in
+  // fails with invalid_redirect_uri.
+  // {
+  //   id: "circleci",
+  //   name: "circleci",
+  //   label: "CircleCI",
+  //   icon: "circleci",
+  //   category: "cicd",
+  //   url: "https://mcp.circleci.com/v1/mcp",
+  //   auth: "AUTH_OAUTH",
+  //   instruction: AGENT_RESOURCES_COPY.circleciInstruction,
+  // },
   {
     id: "semaphore",
     name: "semaphore",
