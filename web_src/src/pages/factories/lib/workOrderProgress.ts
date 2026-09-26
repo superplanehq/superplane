@@ -106,13 +106,23 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "cancelled",
 ];
 
-/** Statuses that stay on the board. Canceled, Failed, and Rejected open the closed-tasks dialog. */
-export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = ["draft", "running", "waiting", "completed"];
+/** Statuses that stay on the board. Rejected and Canceled open the closed-tasks dialog. */
+export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = [
+  "draft",
+  "running",
+  "waiting",
+  "completed",
+  "failed",
+];
 
-export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["failed", "rejected", "cancelled"];
+export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["rejected", "cancelled"];
 
-export function isWorkOrderDialogStatus(status: string): status is "failed" | "rejected" | "cancelled" {
-  return status === "failed" || status === "rejected" || status === "cancelled";
+export function isWorkOrderDialogStatus(status: string): status is "rejected" | "cancelled" {
+  return status === "rejected" || status === "cancelled";
+}
+
+export function isWorkOrderRecoveryStatus(status: string): status is "failed" | "rejected" | "cancelled" {
+  return status === "failed" || isWorkOrderDialogStatus(status);
 }
 
 /** Board lanes used across every layout. Order matters — Board renders them left-to-right. */
@@ -147,8 +157,8 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
     id: "done",
     title: "Done",
-    description: "Completed work.",
-    statuses: ["completed"],
+    description: "Completed and failed work.",
+    statuses: ["completed", "failed"],
   },
 ];
 

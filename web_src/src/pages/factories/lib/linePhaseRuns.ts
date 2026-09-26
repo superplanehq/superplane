@@ -135,9 +135,9 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
 }
 
 /**
- * Completed work that belongs on this line, plus open work still on a Done or
- * PR-closure step. Newest orders come first. Failed and rejected tasks stay
- * off this column. Find them from Status in Filter.
+ * Completed and failed work that belongs on this line, plus open work still on
+ * a Done or PR-closure step. Newest orders come first. Rejected and canceled
+ * tasks stay off this column. Find them from Status in Filter.
  */
 export function collectLineDoneOrders(
   workOrders: FactoriesWorkOrder[],
@@ -147,10 +147,13 @@ export function collectLineDoneOrders(
   const doneById = new Map<string, FactoriesWorkOrder>();
 
   for (const order of workOrders) {
-    if (!order.id || getWorkOrderDisplayStatus(order) !== "completed" || !belongsToLineBoard(order, line.id)) {
+    if (!order.id || !belongsToLineBoard(order, line.id)) {
       continue;
     }
-    doneById.set(order.id, order);
+    const status = getWorkOrderDisplayStatus(order);
+    if (status === "completed" || status === "failed") {
+      doneById.set(order.id, order);
+    }
   }
 
   for (const column of board) {

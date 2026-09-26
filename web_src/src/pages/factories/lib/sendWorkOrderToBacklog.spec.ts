@@ -10,8 +10,8 @@ import {
 } from "./sendWorkOrderToBacklog";
 
 describe("CLOSED_STATUS_DIALOG_RESULTS", () => {
-  it("loads Failed and Rejected together", () => {
-    expect(CLOSED_STATUS_DIALOG_RESULTS).toEqual(["RESULT_FAILED", "RESULT_REJECTED"]);
+  it("loads Rejected closed tasks", () => {
+    expect(CLOSED_STATUS_DIALOG_RESULTS).toEqual(["RESULT_REJECTED"]);
   });
 });
 

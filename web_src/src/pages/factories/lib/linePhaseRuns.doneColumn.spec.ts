@@ -85,7 +85,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
     const board = buildLinePhaseBoard(LINE, [failed], APPS);
 
     expect(board.flatMap((column) => column.runs)).toEqual([]);
-    expect(collectLineDoneOrders([failed], LINE, board)).toEqual([]);
+    expect(collectLineDoneOrders([failed], LINE, board).map((entry) => entry.id)).toEqual(["wo-failed"]);
   });
 
   it("moves completed work off a line that ends with its own Done automation", () => {
@@ -105,7 +105,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
 });
 
 describe("collectLineDoneOrders", () => {
-  it("returns completed orders of this line, newest first", () => {
+  it("returns completed and failed orders of this line, newest first", () => {
     const completed = closedOrder({
       id: "wo-completed",
       result: "RESULT_COMPLETED",
@@ -117,6 +117,12 @@ describe("collectLineDoneOrders", () => {
       result: "RESULT_COMPLETED",
       lineId: "line-1",
       updatedAt: "2026-08-11T11:00:00.000Z",
+    });
+    const failed = closedOrder({
+      id: "wo-failed",
+      result: "RESULT_FAILED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T12:30:00.000Z",
     });
     const rejected = closedOrder({
       id: "wo-rejected",
@@ -132,9 +138,9 @@ describe("collectLineDoneOrders", () => {
       updatedAt: "2026-08-11T13:00:00.000Z",
     });
 
-    const done = collectLineDoneOrders([completed, olderCompleted, rejected, canceled], LINE);
+    const done = collectLineDoneOrders([completed, olderCompleted, failed, rejected, canceled], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-completed", "wo-completed-old"]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-failed", "wo-completed", "wo-completed-old"]);
   });
 
   it("leaves out open orders and orders of another line", () => {
