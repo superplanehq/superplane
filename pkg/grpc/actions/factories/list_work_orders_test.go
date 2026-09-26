@@ -171,3 +171,44 @@ func Test__ListWorkOrders_FiltersByLine(t *testing.T) {
 	ids := []string{resp.Orders[0].GetId(), resp.Orders[1].GetId()}
 	assert.ElementsMatch(t, []string{onA.ID.String(), unassigned.ID.String()}, ids)
 }
+
+func Test__ListWorkOrders_LineFilterKeepsFactoryAndState(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "Line Scope", "", "LS")
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "alpha", nil)
+	require.NoError(t, err)
+
+	closedOnLine, err := factoryModel.CreateWorkOrder(db, "Closed on line", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = closedOnLine.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	_, err = closedOnLine.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultFailed,
+	})
+	require.NoError(t, err)
+	support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, closedOnLine.ID, line.ID, line.Name, nil)
+
+	draftHere, err := factoryModel.CreateWorkOrder(db, "Draft here", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, "Other Line Scope", "", "OL")
+	require.NoError(t, err)
+	otherDraft, err := otherFactory.CreateWorkOrder(db, "Other factory draft", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	resp, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		LineId:    line.ID.String(),
+		States:    []pb.WorkOrder_State{pb.WorkOrder_STATE_CLOSED},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Orders, 1)
+	assert.Equal(t, closedOnLine.ID.String(), resp.Orders[0].GetId())
+	assert.NotEqual(t, draftHere.ID.String(), resp.Orders[0].GetId())
+	assert.NotEqual(t, otherDraft.ID.String(), resp.Orders[0].GetId())
+}

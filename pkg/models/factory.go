@@ -926,14 +926,16 @@ func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
 		return query
 	}
 	return query.Where(`
-		EXISTS (
-			SELECT 1 FROM factory_work_order_line_dispatches
-			WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
-			AND factory_work_order_line_dispatches.line_id = ?
-		)
-		OR NOT EXISTS (
-			SELECT 1 FROM factory_work_order_line_dispatches
-			WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+		(
+			EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
 		)`, *lineID)
 }
 
