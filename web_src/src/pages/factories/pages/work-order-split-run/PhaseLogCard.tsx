@@ -148,11 +148,9 @@ function StreamLineTitle({
 }
 
 /**
- * Full bash command or prompt text. It is clamped to two lines so a long
- * prompt does not fill the sticky step header. An expanded title scrolls in a
- * capped box, because the sticky header would otherwise cover the log. A
- * subtle toggle shows the rest and hides it again when the text does not fit
- * in two lines.
+ * Full bash command or prompt text. The text is clamped to two lines, and a
+ * toggle appears when it does not fit. An expanded title scrolls in a capped
+ * box, because the sticky step header would otherwise cover the log.
  */
 function CollapsibleStreamTitle({ text }: { text: string }) {
   const textRef = useRef<HTMLSpanElement>(null);
