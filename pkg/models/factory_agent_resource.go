@@ -235,7 +235,7 @@ func CanonicalMCPServerURL(raw string) string {
 	if strings.HasSuffix(parsed.Path, "/") {
 		parsed.Path = strings.TrimRight(parsed.Path, "/")
 	}
-	return strings.TrimRight(parsed.String(), "/")
+	return parsed.String()
 }
 
 func NormalizeDisabledTools(names []string) []string {

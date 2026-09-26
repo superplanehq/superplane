@@ -403,5 +403,6 @@ func Test__CanonicalMCPServerURL(t *testing.T) {
 	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp"), models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp/"))
 	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.sentry.dev/mcp"), models.CanonicalMCPServerURL("https://MCP.Sentry.DEV/mcp"))
 	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.example.com"), models.CanonicalMCPServerURL("https://mcp.example.com/"))
+	assert.NotEqual(t, models.CanonicalMCPServerURL("https://mcp.example.com/sse?token=abc/"), models.CanonicalMCPServerURL("https://mcp.example.com/sse?token=abc"))
 	assert.Empty(t, models.CanonicalMCPServerURL("  "))
 }
