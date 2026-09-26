@@ -105,7 +105,7 @@ func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
-	task := buildCodexBrokerTask(spec, "", nil, nil)
+	task := buildCodexBrokerTask(spec, "", nil, nil, nil)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'gpt-5' 'medium'`)
 }
 

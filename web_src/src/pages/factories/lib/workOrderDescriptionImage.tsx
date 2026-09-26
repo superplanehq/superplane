@@ -26,7 +26,7 @@ function workOrderMediaHTML(
   contentType: string | undefined,
   src: string | undefined,
   alt: string | undefined,
-) {
+): readonly [string, ...unknown[]] {
   if (isWorkOrderAudioSource({ contentType, src, alt })) {
     if (isBrowserPlayableWorkOrderAudio(contentType, src, alt)) {
       return ["audio", mergeAttributes(attrs, { controls: "" })];
