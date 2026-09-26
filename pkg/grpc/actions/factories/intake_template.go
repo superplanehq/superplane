@@ -148,13 +148,16 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 }
 
-// dependabotAlertCreateTitle names the package and the manifest file.
-const dependabotAlertCreateTitle = `Bump {{ root().data.alert.dependency.package.name ?? "dependency" }} in {{ root().data.alert.dependency.manifest_path ?? "the manifest" }}`
+// dependabotAlertCreateTitle names the package, not the manifest, because
+// every alert for one package lands on one task. It must match
+// dependabot.TaskTitle.
+const dependabotAlertCreateTitle = `{{ "Fix Dependabot alerts for " + (root().data.alert.dependency.package.name ?? "a dependency") + ((root().data.alert.dependency.package.ecosystem ?? "") != "" ? " (" + root().data.alert.dependency.package.ecosystem + ")" : "") }}`
 
-// dependabotAlertCreateDescription carries the fields an agent needs to
-// apply the patched version. One expression keeps a missing field from
-// failing the whole description.
-const dependabotAlertCreateDescription = `{{ (root().data.alert.security_advisory.summary ?? "") + "\n\nPackage: " + (root().data.alert.dependency.package.name ?? "") + " (" + (root().data.alert.dependency.package.ecosystem ?? "") + ")\nManifest: " + (root().data.alert.dependency.manifest_path ?? "") + "\nVulnerable versions: " + (root().data.alert.security_vulnerability.vulnerable_version_range ?? "") + "\nPatched version: " + (root().data.alert.security_vulnerability.first_patched_version?.identifier ?? "") + "\nSeverity: " + (root().data.alert.security_advisory.severity ?? "") + "\n" + (root().data.alert.html_url ?? "") }}`
+// dependabotAlertCreateDescription opens the task with the first alert. A
+// later alert for the same package is merged in by the Create Task
+// component, so the alert block must match dependabot.AlertSection. One
+// expression keeps a missing field from failing the whole description.
+const dependabotAlertCreateDescription = `{{ "Fix every open Dependabot alert for " + (root().data.alert.dependency.package.name ?? "a dependency") + ((root().data.alert.dependency.package.ecosystem ?? "") != "" ? " (" + root().data.alert.dependency.package.ecosystem + ")" : "") + ".\n\n## Alerts\n\n### #" + string(root().data.alert.number ?? 0) + " " + (root().data.alert.security_advisory.summary ?? "") + "\nSeverity: " + (root().data.alert.security_advisory.severity ?? "") + "\nManifest: " + (root().data.alert.dependency.manifest_path ?? "") + "\nVulnerable versions: " + (root().data.alert.security_vulnerability.vulnerable_version_range ?? "") + "\nPatched version: " + (root().data.alert.security_vulnerability.first_patched_version?.identifier ?? "") + ((root().data.alert.dependency.relationship ?? "") in ["direct", "transitive"] ? "\nRelationship: " + root().data.alert.dependency.relationship : "") + "\n" + (root().data.alert.html_url ?? "") }}`
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {
 	for source, spec := range intakeSpecsBySource {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,120 +22,193 @@ import (
 // GitHub App that cannot read them, both look like this.
 const AlertsUnavailableMessage = "SuperPlane could not read Dependabot alerts for this repository. Turn on Dependabot alerts and allow the GitHub App to read them."
 
-// AlertRef identifies one Dependabot alert in a repository.
-type AlertRef struct {
-	Repository string
-	Number     int
-}
-
 // AlertPayloadType is the canvas event type emitted by github.onDependabotAlert.
 const AlertPayloadType = "github.dependabotAlert"
 
-// TaskCopy is the backlog title and description for one alert.
+// InstructionsHeading marks the per-intake instructions that the Create Task
+// component appends to a task description. A merged alert goes before it.
+const InstructionsHeading = "## Instructions"
+
+// alertsHeading opens the list of alerts in a package task description.
+const alertsHeading = "## Alerts"
+
+// PackageRef identifies one vulnerable package in a repository. GitHub raises
+// one alert per advisory per manifest, and the fix for all of them is one
+// dependency update, so every alert for the package maps to one task.
+type PackageRef struct {
+	Repository string
+	Ecosystem  string
+	Name       string
+}
+
+// TaskCopy is the backlog title and description for one package.
 type TaskCopy struct {
 	Title       string
 	Description string
 }
 
-// TaskCopyFromAlert builds the task a factory creates for an alert.
-func TaskCopyFromAlert(alert *github.DependabotAlert) TaskCopy {
-	if alert == nil {
-		return TaskCopy{Title: "Update a vulnerable dependency"}
+// OriginURL is the repository's Dependabot alerts page filtered to the
+// package. It is the task origin and the key that finds the open task again.
+func (r PackageRef) OriginURL() string {
+	query := url.Values{}
+	query.Set("q", strings.TrimSpace("is:open package:"+r.Name+" "+ecosystemQualifier(r.Ecosystem)))
+	return "https://github.com/" + r.Repository + "/security/dependabot?" + query.Encode()
+}
+
+// OriginLabel names the package in the task origin chip.
+func (r PackageRef) OriginLabel() string {
+	return "Dependabot: " + r.Name
+}
+
+// Origin is the work order origin of the package task.
+func (r PackageRef) Origin() models.WorkOrderOrigin {
+	return models.WorkOrderOrigin{URL: r.OriginURL(), Label: r.OriginLabel()}
+}
+
+// Matches reports whether both refs point at the same package. Repository
+// names are case-insensitive on GitHub.
+func (r PackageRef) Matches(other PackageRef) bool {
+	return strings.EqualFold(r.Repository, other.Repository) &&
+		strings.EqualFold(r.Ecosystem, other.Ecosystem) &&
+		r.Name == other.Name
+}
+
+// PackageRefFromAlert reads the package of one API alert.
+func PackageRefFromAlert(repository string, alert *github.DependabotAlert) (PackageRef, bool) {
+	if alert == nil || alert.Dependency == nil || alert.Dependency.Package == nil {
+		return PackageRef{}, false
+	}
+	return newPackageRef(repository, alert.Dependency.Package.GetEcosystem(), alert.Dependency.Package.GetName())
+}
+
+// PackageRefFromEventData reads the package from a canvas root event. The
+// envelope looks like:
+//
+//	{ "type": "github.dependabotAlert", "data": { "alert": { "html_url": "...", "dependency": {...} } } }
+func PackageRefFromEventData(eventData any) (PackageRef, bool) {
+	alert, ok := alertFromEventData(eventData)
+	if !ok {
+		return PackageRef{}, false
 	}
 
-	name := alertPackageName(alert)
-	manifest := ""
-	if alert.Dependency != nil {
-		manifest = strings.TrimSpace(alert.Dependency.GetManifestPath())
-	}
-	title := "Bump " + name
-	if manifest != "" {
-		title += " in " + manifest
+	page, _ := alert["html_url"].(string)
+	repository, ok := repositoryFromAlertURL(page)
+	if !ok {
+		return PackageRef{}, false
 	}
 
-	lines := []string{}
-	if summary := alertSummary(alert); summary != "" {
-		lines = append(lines, summary, "")
+	return newPackageRef(repository, nestedString(alert, "dependency", "package", "ecosystem"), nestedString(alert, "dependency", "package", "name"))
+}
+
+// PackageRefFromURL reads the package back out of an origin URL built by
+// PackageRef.OriginURL.
+func PackageRefFromURL(rawURL string) (PackageRef, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+		return PackageRef{}, false
 	}
-	lines = append(lines,
-		"Package: "+name+" ("+alertEcosystem(alert)+")",
-		"Manifest: "+manifest,
-		"Vulnerable versions: "+alertVulnerableRange(alert),
-		"Patched version: "+alertPatchedVersion(alert),
-		"Severity: "+alertSeverity(alert),
-	)
-	if page := strings.TrimSpace(alert.GetHTMLURL()); page != "" {
-		lines = append(lines, page)
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] != "security" || parts[3] != "dependabot" {
+		return PackageRef{}, false
+	}
+
+	name, ecosystem := "", ""
+	for _, qualifier := range strings.Fields(parsed.Query().Get("q")) {
+		if value, ok := strings.CutPrefix(qualifier, "package:"); ok {
+			name = value
+		}
+		if value, ok := strings.CutPrefix(qualifier, "ecosystem:"); ok {
+			ecosystem = value
+		}
+	}
+
+	return newPackageRef(parts[0]+"/"+parts[1], ecosystem, name)
+}
+
+// TaskTitle names the package the task fixes. It does not name a manifest or
+// say "bump", because the right fix for a transitive package is often an
+// update of the direct dependency that pulls it in.
+func TaskTitle(ref PackageRef) string {
+	return "Fix Dependabot alerts for " + packageLabel(ref)
+}
+
+// TaskCopyFromAlerts builds the task for every open alert of one package.
+func TaskCopyFromAlerts(ref PackageRef, alerts []*github.DependabotAlert) TaskCopy {
+	sections := make([]string, 0, len(alerts))
+	for _, alert := range alerts {
+		payload, err := alertPayload(alert)
+		if err != nil {
+			continue
+		}
+		sections = append(sections, AlertSection(payload))
 	}
 
 	return TaskCopy{
-		Title:       title,
-		Description: strings.Join(lines, "\n"),
+		Title:       TaskTitle(ref),
+		Description: taskIntro(ref) + "\n\n" + alertsHeading + "\n\n" + strings.Join(sections, "\n\n"),
 	}
+}
+
+// AlertSection renders one alert as a block of the task description. The
+// canvas description expression writes the same block for the first alert;
+// keep the two in step.
+func AlertSection(alert map[string]any) string {
+	lines := []string{
+		"### #" + alertNumber(alert) + " " + nestedString(alert, "security_advisory", "summary"),
+		"Severity: " + nestedString(alert, "security_advisory", "severity"),
+		"Manifest: " + nestedString(alert, "dependency", "manifest_path"),
+		"Vulnerable versions: " + nestedString(alert, "security_vulnerability", "vulnerable_version_range"),
+		"Patched version: " + nestedString(alert, "security_vulnerability", "first_patched_version", "identifier"),
+	}
+	if relationship := nestedString(alert, "dependency", "relationship"); relationship == "direct" || relationship == "transitive" {
+		lines = append(lines, "Relationship: "+relationship)
+	}
+	lines = append(lines, nestedString(alert, "html_url"))
+	return strings.Join(lines, "\n")
+}
+
+// AlertSectionFromEventData renders the alert carried by a canvas root event.
+func AlertSectionFromEventData(eventData any) (string, bool) {
+	alert, ok := alertFromEventData(eventData)
+	if !ok {
+		return "", false
+	}
+	return AlertSection(alert), true
+}
+
+// MergeAlertSection adds one alert block to an existing task description. The
+// block goes before the per-intake instructions when the description has
+// them, so the agent still reads the instructions last. A block whose alert
+// URL is already in the description is not added twice.
+func MergeAlertSection(description, section string) string {
+	section = strings.TrimSpace(section)
+	if section == "" {
+		return description
+	}
+	if page := lastLine(section); strings.HasPrefix(page, "http") && strings.Contains(description, page) {
+		return description
+	}
+
+	if index := strings.Index(description, InstructionsHeading); index >= 0 {
+		before := strings.TrimRight(description[:index], "\n")
+		return before + "\n\n" + section + "\n\n" + description[index:]
+	}
+
+	return strings.TrimRight(description, "\n") + "\n\n" + section
 }
 
 // AlertEvent shapes an API alert like the dependabot_alert webhook body, so
 // a seeded item and a received webhook take the same path through the canvas.
 func AlertEvent(alert *github.DependabotAlert) (map[string]any, error) {
-	encoded, err := json.Marshal(alert)
+	body, err := alertPayload(alert)
 	if err != nil {
-		return nil, err
-	}
-	body := map[string]any{}
-	if err := json.Unmarshal(encoded, &body); err != nil {
 		return nil, err
 	}
 	return map[string]any{
 		"action": "created",
 		"alert":  body,
 	}, nil
-}
-
-// AlertRefFromEventData reads the repository and alert number from a canvas
-// root event. The envelope looks like:
-//
-//	{ "type": "github.dependabotAlert", "data": { "alert": { "html_url": "..." } } }
-func AlertRefFromEventData(eventData any) (AlertRef, bool) {
-	envelope, ok := eventData.(map[string]any)
-	if !ok {
-		return AlertRef{}, false
-	}
-	if typeName, _ := envelope["type"].(string); typeName != AlertPayloadType {
-		return AlertRef{}, false
-	}
-	webhook, ok := envelope["data"].(map[string]any)
-	if !ok {
-		return AlertRef{}, false
-	}
-	alert, ok := webhook["alert"].(map[string]any)
-	if !ok {
-		return AlertRef{}, false
-	}
-	page, _ := alert["html_url"].(string)
-	return AlertRefFromURL(page)
-}
-
-// AlertRefFromURL reads owner/repo and the alert number from a Dependabot
-// alert page such as https://github.com/acme/payments/security/dependabot/7.
-func AlertRefFromURL(rawURL string) (AlertRef, bool) {
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
-		return AlertRef{}, false
-	}
-
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) < 5 || parts[2] != "security" || parts[3] != "dependabot" {
-		return AlertRef{}, false
-	}
-	number, err := strconv.Atoi(parts[4])
-	if err != nil || number <= 0 || parts[0] == "" || parts[1] == "" {
-		return AlertRef{}, false
-	}
-
-	return AlertRef{
-		Repository: parts[0] + "/" + parts[1],
-		Number:     number,
-	}, true
 }
 
 // Unavailable reports whether GitHub refused the alerts API because alerts
@@ -153,89 +227,156 @@ func UnavailableError(err error) error {
 	return err
 }
 
-// LockAlertWorkOrder serializes work-order creation for one alert in this
+// LockPackageWorkOrder serializes work-order creation for one package in this
 // factory. The lock is held until the caller commits tx.
-func LockAlertWorkOrder(tx *gorm.DB, factory *models.Factory, ref AlertRef) error {
-	if tx == nil || factory == nil || ref.Number <= 0 {
+func LockPackageWorkOrder(tx *gorm.DB, factory *models.Factory, ref PackageRef) error {
+	if tx == nil || factory == nil || ref.Name == "" {
 		return nil
 	}
-	return tx.Exec("SELECT pg_advisory_xact_lock(?)", alertLockKey(factory.ID, ref)).Error
+	return tx.Exec("SELECT pg_advisory_xact_lock(?)", packageLockKey(factory.ID, ref)).Error
 }
 
-// AlertHasWorkOrder reports whether this factory already has a work order for
-// the alert. Matching covers every work-order state.
-func AlertHasWorkOrder(tx *gorm.DB, factory *models.Factory, ref AlertRef) (bool, error) {
-	if factory == nil || ref.Number <= 0 || strings.TrimSpace(ref.Repository) == "" {
-		return false, nil
+// FindOpenPackageWorkOrder returns the factory's open task for the package,
+// or nil. A closed task does not count: a new advisory after the fix starts a
+// new task.
+func FindOpenPackageWorkOrder(tx *gorm.DB, factory *models.Factory, ref PackageRef) (*models.FactoryWorkOrder, error) {
+	if factory == nil || ref.Name == "" || strings.TrimSpace(ref.Repository) == "" {
+		return nil, nil
 	}
 
-	urls, err := factory.ListWorkOrderOriginURLsContaining(tx, "/security/dependabot/"+strconv.Itoa(ref.Number))
+	orders, err := factory.ListWorkOrdersByOriginURLFragment(tx, "/security/dependabot?q=")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	for _, rawURL := range urls {
-		found, ok := AlertRefFromURL(rawURL)
-		if ok && found.Number == ref.Number && strings.EqualFold(found.Repository, ref.Repository) {
-			return true, nil
+	openStates := []string{models.FactoryWorkOrderStateDraft, models.FactoryWorkOrderStateOpen}
+	for i := range orders {
+		order := &orders[i]
+		if order.OriginURL == nil || !slices.Contains(openStates, order.State) {
+			continue
+		}
+		found, ok := PackageRefFromURL(*order.OriginURL)
+		if ok && found.Matches(ref) {
+			return order, nil
 		}
 	}
 
-	return false, nil
+	return nil, nil
 }
 
-func alertLockKey(factoryID uuid.UUID, ref AlertRef) int64 {
+func newPackageRef(repository, ecosystem, name string) (PackageRef, bool) {
+	ref := PackageRef{
+		Repository: strings.TrimSpace(repository),
+		Ecosystem:  strings.ToLower(strings.TrimSpace(ecosystem)),
+		Name:       strings.TrimSpace(name),
+	}
+	if ref.Repository == "" || ref.Name == "" {
+		return PackageRef{}, false
+	}
+	return ref, true
+}
+
+func packageLabel(ref PackageRef) string {
+	if ref.Ecosystem == "" {
+		return ref.Name
+	}
+	return ref.Name + " (" + ref.Ecosystem + ")"
+}
+
+func taskIntro(ref PackageRef) string {
+	return "Fix every open Dependabot alert for " + packageLabel(ref) + "."
+}
+
+func ecosystemQualifier(ecosystem string) string {
+	if ecosystem == "" {
+		return ""
+	}
+	return "ecosystem:" + ecosystem
+}
+
+func alertPayload(alert *github.DependabotAlert) (map[string]any, error) {
+	encoded, err := json.Marshal(alert)
+	if err != nil {
+		return nil, err
+	}
+	body := map[string]any{}
+	if err := json.Unmarshal(encoded, &body); err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+func alertFromEventData(eventData any) (map[string]any, bool) {
+	envelope, ok := eventData.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	if typeName, _ := envelope["type"].(string); typeName != AlertPayloadType {
+		return nil, false
+	}
+	webhook, ok := envelope["data"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	alert, ok := webhook["alert"].(map[string]any)
+	return alert, ok
+}
+
+// repositoryFromAlertURL reads owner/repo from an alert page such as
+// https://github.com/acme/payments/security/dependabot/7.
+func repositoryFromAlertURL(rawURL string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+		return "", false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] != "security" || parts[3] != "dependabot" {
+		return "", false
+	}
+	return parts[0] + "/" + parts[1], true
+}
+
+func alertNumber(alert map[string]any) string {
+	switch number := alert["number"].(type) {
+	case float64:
+		return strconv.Itoa(int(number))
+	case int:
+		return strconv.Itoa(number)
+	case int64:
+		return strconv.FormatInt(number, 10)
+	case json.Number:
+		return number.String()
+	default:
+		return "0"
+	}
+}
+
+func nestedString(value map[string]any, path ...string) string {
+	current := any(value)
+	for _, key := range path {
+		next, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current = next[key]
+	}
+	text, _ := current.(string)
+	return strings.TrimSpace(text)
+}
+
+func lastLine(text string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+func packageLockKey(factoryID uuid.UUID, ref PackageRef) int64 {
 	sum := sha256.New()
-	sum.Write([]byte("dependabot-alert-work-order:"))
+	sum.Write([]byte("dependabot-package-work-order:"))
 	sum.Write(factoryID[:])
 	sum.Write([]byte(strings.ToLower(ref.Repository)))
-	sum.Write([]byte(strconv.Itoa(ref.Number)))
+	sum.Write([]byte(ref.Ecosystem))
+	sum.Write([]byte(ref.Name))
 	digest := sum.Sum(nil)
 	return int64(binary.BigEndian.Uint64(digest[:8]))
-}
-
-func alertPackageName(alert *github.DependabotAlert) string {
-	if alert.Dependency == nil || alert.Dependency.Package == nil {
-		return "dependency"
-	}
-	name := strings.TrimSpace(alert.Dependency.Package.GetName())
-	if name == "" {
-		return "dependency"
-	}
-	return name
-}
-
-func alertEcosystem(alert *github.DependabotAlert) string {
-	if alert.Dependency == nil || alert.Dependency.Package == nil {
-		return ""
-	}
-	return strings.TrimSpace(alert.Dependency.Package.GetEcosystem())
-}
-
-func alertSummary(alert *github.DependabotAlert) string {
-	if alert.SecurityAdvisory == nil {
-		return ""
-	}
-	return strings.TrimSpace(alert.SecurityAdvisory.GetSummary())
-}
-
-func alertSeverity(alert *github.DependabotAlert) string {
-	if alert.SecurityAdvisory == nil {
-		return ""
-	}
-	return strings.TrimSpace(alert.SecurityAdvisory.GetSeverity())
-}
-
-func alertVulnerableRange(alert *github.DependabotAlert) string {
-	if alert.SecurityVulnerability == nil {
-		return ""
-	}
-	return strings.TrimSpace(alert.SecurityVulnerability.GetVulnerableVersionRange())
-}
-
-func alertPatchedVersion(alert *github.DependabotAlert) string {
-	if alert.SecurityVulnerability == nil || alert.SecurityVulnerability.FirstPatchedVersion == nil {
-		return ""
-	}
-	return strings.TrimSpace(alert.SecurityVulnerability.FirstPatchedVersion.GetIdentifier())
 }

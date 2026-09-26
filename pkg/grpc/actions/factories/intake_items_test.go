@@ -2,12 +2,14 @@ package factories
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 )
@@ -33,19 +35,66 @@ func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
 	}, gitHubIssueItem(issue))
 }
 
-func TestDependabotAlertItem_OnlyAcceptsOpenAlerts(t *testing.T) {
-	alert := &github.DependabotAlert{
-		Number:  github.Ptr(7),
-		State:   github.Ptr("open"),
-		HTMLURL: github.Ptr("https://github.com/acme/payments/security/dependabot/7"),
+func dependabotTestAlert(number int, name, manifest, severity, state string) *github.DependabotAlert {
+	return &github.DependabotAlert{
+		Number:  github.Ptr(number),
+		State:   github.Ptr(state),
+		HTMLURL: github.Ptr("https://github.com/acme/payments/security/dependabot/" + strconv.Itoa(number)),
+		Dependency: &github.Dependency{
+			Package:      &github.VulnerabilityPackage{Name: github.Ptr(name), Ecosystem: github.Ptr("npm")},
+			ManifestPath: github.Ptr(manifest),
+		},
+		SecurityAdvisory: &github.DependabotSecurityAdvisory{
+			Summary:  github.Ptr("Vulnerability in " + name),
+			Severity: github.Ptr(severity),
+		},
 	}
+}
 
-	item, ok := dependabotAlertItem(alert)
-	assert.True(t, ok)
-	assert.Equal(t, "7", item.ID)
+func TestDependabotPackageGroups_OneGroupPerPackage(t *testing.T) {
+	groups := dependabotPackageGroups("acme/payments", []*github.DependabotAlert{
+		dependabotTestAlert(12, "astro", "package-lock.json", "high", "open"),
+		dependabotTestAlert(11, "fflate", "package-lock.json", "medium", "open"),
+		dependabotTestAlert(10, "astro", "package.json", "high", "open"),
+		dependabotTestAlert(9, "astro", "package.json", "low", "fixed"),
+	}, nil)
 
-	alert.State = github.Ptr("fixed")
-	_, ok = dependabotAlertItem(alert)
+	require.Len(t, groups, 2)
+	assert.Equal(t, "astro", groups[0].ref.Name)
+	assert.Len(t, groups[0].alerts, 2)
+	assert.Equal(t, "fflate", groups[1].ref.Name)
+	assert.Len(t, groups[1].alerts, 1)
+
+	item := dependabotPackageItem(groups[0])
+	assert.Equal(t, "npm:astro", item.ID)
+	assert.Equal(t, "2 alerts", item.Key)
+	assert.Equal(t, "Fix Dependabot alerts for astro (npm)", item.Title)
+	assert.Contains(t, item.Body, "### #12 Vulnerability in astro")
+	assert.Contains(t, item.Body, "### #10 Vulnerability in astro")
+	assert.Equal(t, "https://github.com/acme/payments/security/dependabot?q=is%3Aopen+package%3Aastro+ecosystem%3Anpm", item.URL)
+	assert.Equal(t, "1 alert", dependabotPackageItem(groups[1]).Key)
+}
+
+func TestDependabotPackageGroups_KeepsConfiguredSeverities(t *testing.T) {
+	groups := dependabotPackageGroups("acme/payments", []*github.DependabotAlert{
+		dependabotTestAlert(12, "astro", "package-lock.json", "high", "open"),
+		dependabotTestAlert(11, "fflate", "package-lock.json", "medium", "open"),
+		dependabotTestAlert(10, "astro", "package.json", "low", "open"),
+	}, []string{"critical", "high"})
+
+	require.Len(t, groups, 1)
+	assert.Equal(t, "astro", groups[0].ref.Name)
+	assert.Len(t, groups[0].alerts, 1)
+}
+
+func TestDependabotPackageRefFromItemID(t *testing.T) {
+	ref, ok := dependabotPackageRefFromItemID("acme/payments", "npm:@babel/core")
+	require.True(t, ok)
+	assert.Equal(t, "npm", ref.Ecosystem)
+	assert.Equal(t, "@babel/core", ref.Name)
+	assert.Equal(t, "acme/payments", ref.Repository)
+
+	_, ok = dependabotPackageRefFromItemID("acme/payments", "7")
 	assert.False(t, ok)
 }
 
