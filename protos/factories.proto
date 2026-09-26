@@ -1157,6 +1157,12 @@ message FactoryIntake {
     // Severities that still create a task. Empty means every severity.
     // Dependabot alert intakes only. Values: critical, high, medium, low.
     repeated string dependabot_severities = 17;
+    // Text that SuperPlane adds to the end of every task description this
+    // intake creates, under an "## Instructions" heading. The line
+    // implementation prompt reads the description, so this is how one intake
+    // gives its tasks different guidance from another. Omit to keep the
+    // current value; send an empty string to remove it.
+    optional string instructions = 18;
   }
 
   string id = 1;

@@ -15,6 +15,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
+import { IntakeInstructionsField } from "./IntakeInstructionsField";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
@@ -339,6 +340,7 @@ function IntakeGeneralTab({
             integrationId={integrationId}
             projectId={resourceId}
           />
+          <IntakeInstructionsField settings={draft} onSettingsChange={onDraftChange} />
         </div>
       </div>
       <IntakeSourceSettingsFooter

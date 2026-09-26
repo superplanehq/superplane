@@ -2,6 +2,7 @@ package factory
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -20,6 +21,41 @@ type CreateWorkOrder struct{}
 type CreateWorkOrderConfiguration struct {
 	Title       string `json:"title" mapstructure:"title"`
 	Description string `json:"description" mapstructure:"description"`
+	// Instructions go to the end of the description under InstructionsHeading.
+	Instructions string `json:"instructions" mapstructure:"instructions"`
+}
+
+// InstructionsHeading opens the instructions block at the end of a task
+// description. Code that adds to a description keeps its text above it, so
+// the agent reads the instructions last.
+const InstructionsHeading = "## Instructions"
+
+// AppendInstructions returns the description with the instructions block at
+// the end. Empty instructions leave the description as it is.
+func AppendInstructions(description, instructions string) string {
+	instructions = strings.TrimSpace(instructions)
+	if instructions == "" {
+		return description
+	}
+	description = strings.TrimRight(description, "\n")
+	if description == "" {
+		return InstructionsHeading + "\n" + instructions
+	}
+	return description + "\n\n" + InstructionsHeading + "\n" + instructions
+}
+
+// InsertBeforeInstructions adds a block to a description above the
+// instructions when the description has them, and at the end otherwise.
+func InsertBeforeInstructions(description, block string) string {
+	block = strings.TrimSpace(block)
+	if block == "" {
+		return description
+	}
+	if index := strings.Index(description, InstructionsHeading); index >= 0 {
+		before := strings.TrimRight(description[:index], "\n")
+		return before + "\n\n" + block + "\n\n" + description[index:]
+	}
+	return strings.TrimRight(description, "\n") + "\n\n" + block
 }
 
 func (c *CreateWorkOrder) Name() string {
@@ -80,6 +116,13 @@ func (c *CreateWorkOrder) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 		},
+		{
+			Name:        "instructions",
+			Label:       "Instructions",
+			Description: "Added to the end of the task description under an Instructions heading",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+		},
 	}
 }
 
@@ -91,7 +134,7 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 
 	workOrder, created, err := ctx.Factory.CreateWorkOrder(core.WorkOrderParams{
 		Title:       config.Title,
-		Description: config.Description,
+		Description: AppendInstructions(config.Description, config.Instructions),
 	})
 	if err != nil {
 		return err

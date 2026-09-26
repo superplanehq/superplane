@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/blob"
+	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -75,6 +76,9 @@ func ImportFactoryIntakeItem(
 	}
 
 	origin := models.WorkOrderOrigin{URL: item.URL, Label: models.OriginLabelFromURL(item.URL)}
+	// A hand-picked item skips the intake canvas, so the per-intake
+	// instructions are added here.
+	item.Body = factorycomp.AppendInstructions(item.Body, intakeInstructions(db, intake))
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
