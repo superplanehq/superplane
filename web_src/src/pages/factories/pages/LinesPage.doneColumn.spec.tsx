@@ -220,6 +220,25 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
   });
 
+  it("collects failed tasks in the Done column", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-failed",
+          title: "Fix refund dispatcher timeout loop",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+          lineDispatches: [{ id: "dispatch-failed", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+      ] as FactoriesWorkOrder[],
+    });
+    renderBoard();
+
+    const done = screen.getByTestId("lines-done-column");
+    expect(within(done).getByRole("button", { name: "Open Fix refund dispatcher timeout loop" })).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
+  });
+
   it("does not show a draft rejected out of the Backlog in Done — it archives off the board", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
