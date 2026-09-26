@@ -18,7 +18,7 @@ function HeaderHarness({
   canCreate?: boolean;
   intakes?: FactoriesFactoryIntake[];
   showPullRequestMerge?: boolean;
-  onOpenStatusDialog?: (status: "failed" | "rejected") => void;
+  onOpenStatusDialog?: () => void;
 }) {
   const state = useWorkOrderListState("factory-1");
   return (
@@ -111,7 +111,7 @@ describe("WorkOrdersHeader", () => {
     expect(screen.getByTestId("work-orders-filter-sourceIds")).toHaveTextContent("Source");
   });
 
-  it("opens Failed and Rejected from Status instead of applying a board filter", async () => {
+  it("opens Canceled, Failed, and Rejected from Status instead of applying a board filter", async () => {
     const user = userEvent.setup();
     const onOpenStatusDialog = vi.fn();
     render(<HeaderHarness onCreateWorkOrder={vi.fn()} onOpenStatusDialog={onOpenStatusDialog} />);
@@ -120,13 +120,18 @@ describe("WorkOrdersHeader", () => {
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-failed"));
 
-    expect(onOpenStatusDialog).toHaveBeenCalledWith("failed");
+    expect(onOpenStatusDialog).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("work-orders-filter-trigger")).toHaveAttribute("aria-expanded", "false");
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
-    expect(onOpenStatusDialog).toHaveBeenCalledWith("rejected");
+    expect(onOpenStatusDialog).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-statuses"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-cancelled"));
+    expect(onOpenStatusDialog).toHaveBeenCalledTimes(3);
   });
 
   it("shows a removable Source chip for a selected tool", async () => {

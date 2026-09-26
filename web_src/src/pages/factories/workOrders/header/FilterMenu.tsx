@@ -30,7 +30,7 @@ interface FilterMenuProps {
   assigneeOptions: WorkOrderFilterOption[];
   /** When false, hide Mergeable so the menu matches the card pill. */
   showPullRequestMerge?: boolean;
-  onOpenStatusDialog?: (status: "failed" | "rejected") => void;
+  onOpenStatusDialog?: () => void;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
@@ -121,7 +121,7 @@ interface FilterSubMenuProps {
   state: WorkOrderListState;
   options: WorkOrderFilterOption[];
   emptyLabel?: string;
-  onOpenStatusDialog?: (status: "failed" | "rejected") => void;
+  onOpenStatusDialog?: () => void;
 }
 
 function FilterSubMenu({
@@ -165,7 +165,7 @@ function FilterSubMenu({
                 event.preventDefault();
                 if (dimension === "statuses" && isWorkOrderDialogStatus(option.value)) {
                   state.setFilterMenuOpen(false);
-                  onOpenStatusDialog?.(option.value);
+                  onOpenStatusDialog?.();
                   return;
                 }
                 state.toggleFilter(dimension, option.value);

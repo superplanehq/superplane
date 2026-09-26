@@ -832,7 +832,7 @@ function LineDetailHeader({
   const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
-  const [closedStatusDialog, setClosedStatusDialog] = useState<"failed" | "rejected" | null>(null);
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const factoryKey = factory?.key ?? "";
 
   const handleRename = async (name: string) => {
@@ -883,7 +883,7 @@ function LineDetailHeader({
               sourceOptions={sourceOptions}
               assigneeOptions={assigneeOptions}
               showPullRequestMerge={showPullRequestMerge}
-              onOpenStatusDialog={setClosedStatusDialog}
+              onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
             />
             <SearchField
               inputRef={searchRef}
@@ -912,10 +912,9 @@ function LineDetailHeader({
           ) : undefined
         }
       />
-      {closedStatusDialog ? (
+      {closedStatusDialogOpen ? (
         <WorkOrderClosedStatusDialog
           open
-          status={closedStatusDialog}
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
@@ -923,7 +922,7 @@ function LineDetailHeader({
           canManage={canUpdate}
           onOpenChange={(open) => {
             if (!open) {
-              setClosedStatusDialog(null);
+              setClosedStatusDialogOpen(false);
             }
           }}
         />

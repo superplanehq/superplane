@@ -36,7 +36,7 @@ interface WorkOrdersHeaderProps {
   hostedCreditHeaderKicker?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
   showPullRequestMerge?: boolean;
-  onOpenStatusDialog?: (status: "failed" | "rejected") => void;
+  onOpenStatusDialog?: () => void;
 }
 
 /**

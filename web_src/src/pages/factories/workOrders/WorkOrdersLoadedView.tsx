@@ -63,7 +63,7 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { organizationId, workOrders, factory, state, currentUserId, pullRequests = [] } = props;
-  const [closedStatusDialog, setClosedStatusDialog] = useState<"failed" | "rejected" | null>(null);
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,
@@ -161,22 +161,21 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
           showPullRequestMerge={showPullRequestMerge}
-          onOpenStatusDialog={setClosedStatusDialog}
+          onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
         />
       </div>
 
       <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
-      {closedStatusDialog && factory.id ? (
+      {closedStatusDialogOpen && factory.id ? (
         <WorkOrderClosedStatusDialog
           open
-          status={closedStatusDialog}
           organizationId={organizationId}
           factoryId={factory.id}
           factoryKey={props.factoryKey}
           canManage={props.canDispatch}
           onOpenChange={(open) => {
             if (!open) {
-              setClosedStatusDialog(null);
+              setClosedStatusDialogOpen(false);
             }
           }}
         />

@@ -139,7 +139,7 @@ describe("getWorkOrderDisplayStatus", () => {
     expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
   });
 
-  it("maps a canceled line dispatch to Rejected when the order is not completed", () => {
+  it("maps a canceled line dispatch to Canceled when the order is not completed", () => {
     expect(
       getWorkOrderDisplayStatus(
         order({
@@ -148,7 +148,7 @@ describe("getWorkOrderDisplayStatus", () => {
           lineDispatches: [{ id: "d1", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
         }),
       ),
-    ).toBe("rejected");
+    ).toBe("cancelled");
   });
 });
 
@@ -186,7 +186,8 @@ describe("filterWorkOrdersByStatus", () => {
     expect(idsFilteredBy(all, "running")).toEqual([running.id]);
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
     expect(idsFilteredBy(all, "failed")).toEqual([closedFailed.id]);
-    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id, closedCancelled.id]);
+    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
+    expect(idsFilteredBy(all, "cancelled")).toEqual([closedCancelled.id]);
   });
 
   it("countActiveWorkOrders matches the size of the default `active` filter", () => {

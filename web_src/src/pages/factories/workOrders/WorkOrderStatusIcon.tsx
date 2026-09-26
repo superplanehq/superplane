@@ -6,6 +6,23 @@ import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../l
 const DISK = "inline-flex size-3.5 shrink-0 items-center justify-center rounded-full";
 const GLYPH = "size-[9px] text-white dark:text-zinc-950";
 
+export function WorkOrderStatusBadge({ status, className }: { status: WorkOrderDisplayStatus; className?: string }) {
+  const meta = getWorkOrderDisplayStatusMeta(status);
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+        meta.className,
+        className,
+      )}
+      data-testid={`work-order-status-badge-${status}`}
+    >
+      <span className={cn("size-1.5 rounded-full", meta.dotClassName)} aria-hidden />
+      {meta.label}
+    </span>
+  );
+}
+
 /**
  * Compact status mark next to a task title.
  *

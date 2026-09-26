@@ -305,6 +305,7 @@ describe("availableSplitRunStopChoices", () => {
     expect(availableSplitRunStopChoices("completed").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("rejected").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("failed").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("cancelled").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(defaultSplitRunStopChoice("completed")).toBe("reopen");
   });
 });

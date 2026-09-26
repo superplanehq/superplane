@@ -1,7 +1,7 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 
 import { SEND_WORK_ORDER_TO_BACKLOG_COPY } from "./sendWorkOrderToBacklog";
-import type { WorkOrderDisplayStatus } from "./workOrderProgress";
+import { isWorkOrderDialogStatus, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
 export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen" | "send-to-backlog";
 
@@ -41,7 +41,7 @@ export function buildWorkOrderStatusActions(input: WorkOrderStatusActionInput): 
   }
 
   if (input.isClosed) {
-    if (input.displayStatus === "failed" || input.displayStatus === "rejected") {
+    if (isWorkOrderDialogStatus(input.displayStatus)) {
       actions.push({
         kind: "send-to-backlog",
         label: SEND_WORK_ORDER_TO_BACKLOG_COPY.action,

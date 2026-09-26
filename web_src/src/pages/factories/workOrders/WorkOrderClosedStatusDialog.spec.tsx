@@ -20,10 +20,36 @@ describe("WorkOrderClosedStatusDialog", () => {
     useFactoryWorkOrdersPage.mockReset();
   });
 
-  it("loads failed tasks and offers Send to backlog on each row", async () => {
+  it("loads Failed and Rejected together and shows a status badge on each row", async () => {
     const user = userEvent.setup();
     useFactoryWorkOrdersPage.mockReturnValue({
-      orders: [{ id: "wo-failed", number: "106", title: "Fix refund dispatcher timeout loop", key: "RF-106" }],
+      orders: [
+        {
+          id: "wo-failed",
+          number: "106",
+          title: "Fix refund dispatcher timeout loop",
+          key: "RF-106",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+        },
+        {
+          id: "wo-rejected",
+          number: "107",
+          title: "Archive stale invoice matcher",
+          key: "RF-107",
+          state: "STATE_CLOSED",
+          result: "RESULT_REJECTED",
+        },
+        {
+          id: "wo-cancelled",
+          number: "108",
+          title: "Stop and close stale intake retry",
+          key: "RF-108",
+          state: "STATE_CLOSED",
+          result: "RESULT_UNSPECIFIED",
+          lineDispatches: [{ id: "d-cancel", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
+        },
+      ],
       isLoading: false,
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -34,7 +60,6 @@ describe("WorkOrderClosedStatusDialog", () => {
       <MemoryRouter>
         <WorkOrderClosedStatusDialog
           open
-          status="failed"
           organizationId="org-1"
           factoryId="factory-1"
           factoryKey="RF"
@@ -45,16 +70,68 @@ describe("WorkOrderClosedStatusDialog", () => {
     );
 
     expect(useFactoryWorkOrdersPage).toHaveBeenCalledWith("org-1", "factory-1", ["STATE_CLOSED"], 20, {
-      results: ["RESULT_FAILED"],
+      results: ["RESULT_FAILED", "RESULT_REJECTED"],
       lineId: "line-1",
     });
-    expect(screen.getByTestId("work-order-failed-dialog")).toHaveTextContent("These tasks closed as failed.");
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-closed-status-dialog")).toHaveTextContent(
+      "Failed, Rejected, and Canceled tasks.",
+    );
+    expect(screen.getByTestId("work-order-status-badge-failed")).toHaveTextContent("Failed");
+    expect(screen.getByTestId("work-order-status-badge-rejected")).toHaveTextContent("Rejected");
+    expect(screen.getByTestId("work-order-status-badge-cancelled")).toHaveTextContent("Canceled");
     await user.click(screen.getByTestId("send-to-backlog-wo-failed"));
     expect(screen.getByTestId("send-work-order-to-backlog-form")).toBeInTheDocument();
   });
 
-  it("explains Rejected and shows the empty state", () => {
+  it("filters the loaded list with search", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrdersPage.mockReturnValue({
+      orders: [
+        {
+          id: "wo-failed",
+          number: "106",
+          title: "Fix refund dispatcher timeout loop",
+          key: "RF-106",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+        },
+        {
+          id: "wo-rejected",
+          number: "107",
+          title: "Archive stale invoice matcher",
+          key: "RF-107",
+          state: "STATE_CLOSED",
+          result: "RESULT_REJECTED",
+        },
+      ],
+      isLoading: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId="org-1"
+          factoryId="factory-1"
+          factoryKey="RF"
+          onOpenChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByTestId("work-order-closed-status-search"), "invoice");
+    expect(screen.getByText("Archive stale invoice matcher")).toBeInTheDocument();
+    expect(screen.queryByText("Fix refund dispatcher timeout loop")).not.toBeInTheDocument();
+
+    await user.clear(screen.getByTestId("work-order-closed-status-search"));
+    await user.type(screen.getByTestId("work-order-closed-status-search"), "no-such-task");
+    expect(screen.getByText("No tasks match this search.")).toBeInTheDocument();
+  });
+
+  it("explains the empty list", () => {
     useFactoryWorkOrdersPage.mockReturnValue({
       orders: [],
       isLoading: false,
@@ -67,7 +144,6 @@ describe("WorkOrderClosedStatusDialog", () => {
       <MemoryRouter>
         <WorkOrderClosedStatusDialog
           open
-          status="rejected"
           organizationId="org-1"
           factoryId="factory-1"
           factoryKey="RF"
@@ -77,12 +153,10 @@ describe("WorkOrderClosedStatusDialog", () => {
     );
 
     expect(useFactoryWorkOrdersPage).toHaveBeenCalledWith("org-1", "factory-1", ["STATE_CLOSED"], 20, {
-      results: ["RESULT_REJECTED"],
+      results: ["RESULT_FAILED", "RESULT_REJECTED"],
       lineId: undefined,
     });
-    expect(screen.getByTestId("work-order-rejected-dialog")).toHaveTextContent(
-      "Archive, Reject, and Stop and Close mark a task as Rejected.",
-    );
-    expect(screen.getByText("No rejected tasks.")).toBeInTheDocument();
+    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-closed-status-search")).not.toBeInTheDocument();
   });
 });

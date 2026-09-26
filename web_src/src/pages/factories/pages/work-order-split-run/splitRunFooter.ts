@@ -85,7 +85,7 @@ export function splitRunCloseNeedsConfirm(kind: SplitRunFooterKind): boolean {
 }
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
-  return status === "completed" || status === "failed" || status === "rejected";
+  return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
 }
 
 export function isSplitRunStopChoiceAvailable(choice: SplitRunStopChoice, status?: WorkOrderDisplayStatus): boolean {
@@ -284,7 +284,7 @@ function closedDecisionNote(
 }
 
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
-  if (status === "failed" || status === "rejected") {
+  if (status === "failed" || status === "rejected" || status === "cancelled") {
     return [SEND_TO_BACKLOG, REOPEN];
   }
   return [];

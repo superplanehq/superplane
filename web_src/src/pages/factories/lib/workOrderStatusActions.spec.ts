@@ -49,6 +49,14 @@ describe("buildWorkOrderStatusActions", () => {
         isClosed: true,
       }),
     ).toEqual(["Send to backlog", "Reopen"]);
+    expect(
+      labelsOf({
+        displayStatus: "cancelled",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Send to backlog", "Reopen"]);
   });
 
   it("offers Reopen for a completed order", () => {

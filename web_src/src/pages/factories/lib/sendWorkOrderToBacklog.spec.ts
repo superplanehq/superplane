@@ -1,15 +1,38 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  closedWorkOrderResultForDialogStatus,
+  CLOSED_STATUS_DIALOG_RESULTS,
+  closedStatusTaskMatchesSearch,
   workOrderHasClearableArtifacts,
   workOrderHasCloseablePullRequests,
 } from "./sendWorkOrderToBacklog";
 
-describe("closedWorkOrderResultForDialogStatus", () => {
-  it("maps Failed and Rejected onto the stored close results", () => {
-    expect(closedWorkOrderResultForDialogStatus("failed")).toBe("RESULT_FAILED");
-    expect(closedWorkOrderResultForDialogStatus("rejected")).toBe("RESULT_REJECTED");
+describe("CLOSED_STATUS_DIALOG_RESULTS", () => {
+  it("loads Failed and Rejected together", () => {
+    expect(CLOSED_STATUS_DIALOG_RESULTS).toEqual(["RESULT_FAILED", "RESULT_REJECTED"]);
+  });
+});
+
+describe("closedStatusTaskMatchesSearch", () => {
+  const failed = {
+    id: "wo-failed",
+    number: "106",
+    title: "Fix refund dispatcher timeout loop",
+    key: "RF-106",
+    result: "RESULT_FAILED" as const,
+    state: "STATE_CLOSED" as const,
+  };
+
+  it("keeps every task when the query is empty", () => {
+    expect(closedStatusTaskMatchesSearch(failed, "RF", "")).toBe(true);
+    expect(closedStatusTaskMatchesSearch(failed, "RF", "   ")).toBe(true);
+  });
+
+  it("matches title, key, and status label", () => {
+    expect(closedStatusTaskMatchesSearch(failed, "RF", "refund")).toBe(true);
+    expect(closedStatusTaskMatchesSearch(failed, "RF", "rf-106")).toBe(true);
+    expect(closedStatusTaskMatchesSearch(failed, "RF", "failed")).toBe(true);
+    expect(closedStatusTaskMatchesSearch(failed, "RF", "rejected")).toBe(false);
   });
 });
 
