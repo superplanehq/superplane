@@ -23,10 +23,14 @@ const SCORE_TEST_IDS = {
 /** The verdict text repeats the button for pending and ready, so only warnings keep it. */
 const VERDICT_WITH_TEXT: readonly DraftReadinessTone[] = ["blocked", "caution"];
 
+/** Keeps a strip item on one line until the panel is narrower than its content. */
+const STRIP_ROW_ITEM_CLASS = "min-w-[min(100%,max-content)] max-w-full shrink-0";
+
 /**
  * Decision strip above the refine composer. Row one is the verdict alone.
  * Row two is the evidence, both scores, then the controls in the order the
- * user reads them: Plan, model, Start.
+ * user reads them: Plan, model, Start. On a narrow strip the controls wrap
+ * to the next line instead of being clipped by the panel.
  */
 export function ComposerPlanStack({
   open,
@@ -63,8 +67,12 @@ export function ComposerPlanStack({
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
       <FramePanel fit className="flex flex-col gap-1.5 px-3 py-2" data-testid="split-run-intent-plan-updated">
         <Verdict readiness={readiness} />
-        <div className="flex min-w-0 items-center gap-2" data-testid="split-run-intent-composer-chips">
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+          data-testid="split-run-intent-composer-chips"
+        >
           <ScoreEvidenceRow
+            className={STRIP_ROW_ITEM_CLASS}
             clarity={clarity}
             confidence={confidence}
             showClarity={showClarity}
@@ -73,12 +81,15 @@ export function ComposerPlanStack({
             testIds={SCORE_TEST_IDS}
           />
           {showControls ? (
-            <div className="ml-auto flex shrink-0 items-center gap-1" data-testid="split-run-intent-settings">
+            <div
+              className={cn("ml-auto flex flex-wrap items-center justify-end gap-1", STRIP_ROW_ITEM_CLASS)}
+              data-testid="split-run-intent-settings"
+            >
               {canTogglePlan ? (
                 <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
               ) : null}
               {modelSelect}
-              {actions ? <div className="ml-1 flex items-center">{actions}</div> : null}
+              {actions ? <div className="ml-1 flex shrink-0 items-center">{actions}</div> : null}
             </div>
           ) : null}
         </div>
