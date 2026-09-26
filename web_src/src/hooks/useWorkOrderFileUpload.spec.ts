@@ -71,6 +71,20 @@ describe("useWorkOrderFileUpload", () => {
     expect(showErrorToast).toHaveBeenCalledWith("The file could not be stored.");
   });
 
+  it("explains when the user cannot create a workspace file", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "Not found" },
+      response: new Response("Not found", { status: 404 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
   it("rejects a file type that SuperPlane does not store", async () => {
     const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
 
