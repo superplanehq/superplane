@@ -126,6 +126,7 @@ import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills, type ScopePillOption } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
+import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -831,6 +832,8 @@ function LineDetailHeader({
   const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
+  const factoryKey = factory?.key ?? "";
 
   const handleRename = async (name: string) => {
     if (!line.id) {
@@ -844,69 +847,87 @@ function LineDetailHeader({
   };
 
   return (
-    <WorkspacePageHeader
-      className={factorySectionHeaderClassName}
-      data-testid="lines-detail-header"
-      title={
-        <ClickToRename
-          value={title}
-          onSave={(name) => void handleRename(name)}
-          canEdit={canUpdate && Boolean(line.id)}
-          busy={updateLine.isPending}
-          testId="lines-board-title"
-          ariaLabel="Line name"
-          inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
-        />
-      }
-      leading={
-        nextStepsRestore || hostedCreditHeaderKicker ? (
+    <>
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        data-testid="lines-detail-header"
+        title={
+          <ClickToRename
+            value={title}
+            onSave={(name) => void handleRename(name)}
+            canEdit={canUpdate && Boolean(line.id)}
+            busy={updateLine.isPending}
+            testId="lines-board-title"
+            ariaLabel="Line name"
+            inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
+          />
+        }
+        leading={
+          nextStepsRestore || hostedCreditHeaderKicker ? (
+            <>
+              {hostedCreditHeaderKicker}
+              {nextStepsRestore}
+            </>
+          ) : undefined
+        }
+        actions={
           <>
-            {hostedCreditHeaderKicker}
-            {nextStepsRestore}
+            <ScopePills
+              value={lineBoardWorkOrderScope(state.scope)}
+              onChange={state.setScope}
+              options={LINE_BOARD_SCOPES}
+              testIdPrefix="work-orders-scope"
+            />
+            <FilterMenu
+              state={state}
+              sourceOptions={sourceOptions}
+              assigneeOptions={assigneeOptions}
+              showPullRequestMerge={showPullRequestMerge}
+              onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
+            />
+            <SearchField
+              inputRef={searchRef}
+              open={state.searchOpen}
+              value={state.search}
+              onOpen={state.openSearch}
+              onChange={state.setSearch}
+              onClose={state.closeSearch}
+            />
+            <LineBoardViewMenu
+              view={automationView}
+              onViewChange={onAutomationViewChange}
+              colorView={colorView}
+              onColorViewChange={onColorViewChange}
+            />
           </>
-        ) : undefined
-      }
-      actions={
-        <>
-          <ScopePills
-            value={lineBoardWorkOrderScope(state.scope)}
-            onChange={state.setScope}
-            options={LINE_BOARD_SCOPES}
-            testIdPrefix="work-orders-scope"
-          />
-          <FilterMenu
-            state={state}
-            sourceOptions={sourceOptions}
-            assigneeOptions={assigneeOptions}
-            showPullRequestMerge={showPullRequestMerge}
-          />
-          <SearchField
-            inputRef={searchRef}
-            open={state.searchOpen}
-            value={state.search}
-            onOpen={state.openSearch}
-            onChange={state.setSearch}
-            onClose={state.closeSearch}
-          />
-          <LineBoardViewMenu
-            view={automationView}
-            onViewChange={onAutomationViewChange}
-            colorView={colorView}
-            onColorViewChange={onColorViewChange}
-          />
-        </>
-      }
-      belowRow={
-        visibleFilterCount > 0 ? (
-          <FilterChips
-            state={state}
-            sourceOptions={sourceOptions}
-            assigneeOptions={assigneeOptions}
-            showPullRequestMerge={showPullRequestMerge}
-          />
-        ) : undefined
-      }
-    />
+        }
+        belowRow={
+          visibleFilterCount > 0 ? (
+            <FilterChips
+              state={state}
+              sourceOptions={sourceOptions}
+              assigneeOptions={assigneeOptions}
+              showPullRequestMerge={showPullRequestMerge}
+            />
+          ) : undefined
+        }
+      />
+      {closedStatusDialogOpen ? (
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={line.id}
+          canManage={canUpdate}
+          onOpenChange={(open) => {
+            if (!open) {
+              setClosedStatusDialogOpen(false);
+            }
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

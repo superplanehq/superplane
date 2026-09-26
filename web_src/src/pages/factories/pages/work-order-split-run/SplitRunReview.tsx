@@ -24,6 +24,7 @@ import {
   type SplitRunFooterAction,
   type SplitRunStopChoice,
 } from "./splitRunFooter";
+import { SendWorkOrderToBacklogDialog } from "../../workOrders/SendWorkOrderToBacklogDialog";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
@@ -147,6 +148,7 @@ export function SplitRunReview({
   startTone?: DraftReadinessTone;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [backlogConfirmOpen, setBacklogConfirmOpen] = useState(false);
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
@@ -170,6 +172,13 @@ export function SplitRunReview({
     void onStart?.();
   };
   const onAction = footerActionHandler({ requestStart, onArchive, onReject, onStop });
+  const handleAction = (action: SplitRunFooterAction) => {
+    if (action.kind === "send-to-backlog") {
+      setBacklogConfirmOpen(true);
+      return;
+    }
+    onAction(action);
+  };
 
   return (
     <div
@@ -193,7 +202,7 @@ export function SplitRunReview({
         orderId={orderId}
         pullRequests={pullRequests}
         canAct={canAct}
-        onAction={onAction}
+        onAction={handleAction}
       />
       {confirmUnclearStart ? (
         <StartConfirmDialog
@@ -201,6 +210,17 @@ export function SplitRunReview({
           scores={splitRunFooterScores(footer)}
           onOpenChange={setConfirmOpen}
           onConfirm={confirmStart}
+        />
+      ) : null}
+      {organizationId && factoryId && orderId ? (
+        <SendWorkOrderToBacklogDialog
+          open={backlogConfirmOpen}
+          onOpenChange={setBacklogConfirmOpen}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
+          pullRequests={pullRequests}
+          canSubmit={canAct}
         />
       ) : null}
     </div>

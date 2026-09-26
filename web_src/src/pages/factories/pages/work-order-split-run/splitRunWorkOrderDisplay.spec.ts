@@ -13,7 +13,7 @@ describe("displayStatusForLineStatus", () => {
     expect(displayStatusForLineStatus("passed")).toBe("completed");
     expect(displayStatusForLineStatus("waiting")).toBe("waiting");
     expect(displayStatusForLineStatus("failed")).toBe("failed");
-    expect(displayStatusForLineStatus("cancelled")).toBe("cancelled");
+    expect(displayStatusForLineStatus("cancelled")).toBe("rejected");
     expect(displayStatusForLineStatus("pending")).toBe("draft");
   });
 });

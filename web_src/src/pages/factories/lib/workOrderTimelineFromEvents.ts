@@ -3,6 +3,7 @@ import { formatWorkOrderResult } from "./workOrderPresentation";
 import { isPullRequestArtifactType, pullRequestFromEventPayload } from "./workOrderPullRequest";
 import {
   describeArtifactAdded,
+  describeArtifactsCleared,
   describeAssigneesUpdated,
   describePullRequestEvent,
   findAutomationStep,
@@ -83,6 +84,7 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  count?: number;
   pullRequest?: EventPullRequestPayload;
   check?: EventCheckPayload;
 }
@@ -101,6 +103,7 @@ const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.comment.added": 45,
   "order.check.reported": 46,
   "order.artifact.added": 47,
+  "order.artifacts.cleared": 50,
   "order.pull_request.added": 48,
   "order.pull_request.updated": 49,
 };
@@ -172,6 +175,9 @@ function applyApiEventToTimeline(
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.artifacts.cleared":
+      appendArtifactsClearedEvent(state, index, payload, at, resolveUserName);
       return;
     case "order.pull_request.added":
       appendPullRequestEvent(state, {
@@ -393,6 +399,23 @@ function appendArtifactEvent(
     actorAutomation: automationActor,
     artifact: timelineArtifact,
     title: describeArtifactAdded(artifact),
+  });
+}
+
+function appendArtifactsClearedEvent(
+  state: TimelineBuildState,
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  state.events.push({
+    id: `artifacts-cleared-${index}`,
+    kind: "artifactsCleared",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    title: describeArtifactsCleared(payload.count ?? 0),
   });
 }
 

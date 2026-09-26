@@ -220,8 +220,9 @@ export const BOARD_DONE_CANCELED_ORDER: FactoriesWorkOrder = boardDoneOrder({
   number: "113",
   key: "RF-113",
   title: "Migrate refunds to the v2 provider API",
-  description: "The v2 migration stopped when the provider delayed the cutover. The task was canceled.",
-  result: "RESULT_UNSPECIFIED",
+  description:
+    "The v2 migration stopped when the provider delayed the cutover. SuperPlane marked the task as Rejected.",
+  result: "RESULT_REJECTED",
   dispatchResult: "RESULT_CANCELLED",
   doneResult: "RESULT_CANCELLED",
   updatedAt: TWO_HOURS_AGO,
