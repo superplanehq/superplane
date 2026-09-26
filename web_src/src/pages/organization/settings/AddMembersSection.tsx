@@ -1,4 +1,12 @@
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
@@ -19,12 +27,108 @@ export interface AddMembersSectionRef {
   refreshExistingMembers: () => void;
 }
 
+type AddableMember = {
+  metadata?: { id?: string; email?: string };
+  spec?: { displayName?: string };
+  status?: { accountProviders?: Array<{ avatarUrl?: string }> };
+};
+
+function memberMatchesSearch(member: AddableMember, searchTerm: string): boolean {
+  const needle = searchTerm.toLowerCase();
+  return (
+    Boolean(member.spec?.displayName?.toLowerCase().includes(needle)) ||
+    Boolean(member.metadata?.email?.toLowerCase().includes(needle))
+  );
+}
+
+function filterExistingMembers(members: AddableMember[], searchTerm: string): AddableMember[] {
+  if (!searchTerm) return members;
+  return members.filter((member) => memberMatchesSearch(member, searchTerm));
+}
+
+function AddMembersList({
+  loadingMembers,
+  memberSearchTerm,
+  filteredMembers,
+  selectedMembers,
+  setSelectedMembers,
+}: {
+  loadingMembers: boolean;
+  memberSearchTerm: string;
+  filteredMembers: AddableMember[];
+  selectedMembers: Set<string>;
+  setSelectedMembers: Dispatch<SetStateAction<Set<string>>>;
+}) {
+  if (loadingMembers) {
+    return (
+      <div className="flex justify-center items-center h-32">
+        <p className="text-gray-500 dark:text-gray-400">Loading members...</p>
+      </div>
+    );
+  }
+
+  if (filteredMembers.length === 0) {
+    return (
+      <div className="max-h-96 overflow-y-auto">
+        <div className="text-center py-8">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {memberSearchTerm
+              ? "No members found matching your search"
+              : "All organization members are already in this group"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-96 overflow-y-auto">
+      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        {filteredMembers.map((member) => (
+          <div
+            key={member.metadata!.id!}
+            className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <Checkbox
+              checked={selectedMembers.has(member.metadata!.id!)}
+              onCheckedChange={(checked) => {
+                const isChecked = checked === true;
+                setSelectedMembers((prev) => {
+                  const next = new Set(prev);
+                  if (isChecked) {
+                    next.add(member.metadata!.id!);
+                  } else {
+                    next.delete(member.metadata!.id!);
+                  }
+                  return next;
+                });
+              }}
+            />
+            <Avatar
+              src={member.status?.accountProviders?.[0]?.avatarUrl}
+              initials={member.spec?.displayName?.charAt(0) || "U"}
+              className="size-8"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                {member.spec?.displayName || member.metadata!.id!}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {member.metadata?.email || "API Key"}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSectionProps>(
   ({ organizationId, groupName, onMemberAdded, className }, ref) => {
     const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
     const [memberSearchTerm, setMemberSearchTerm] = useState("");
 
-    // React Query hooks
     const {
       data: orgUsers = [],
       isLoading: loadingOrgUsers,
@@ -36,21 +140,18 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       error: groupUsersError,
     } = useOrganizationGroupUsers(organizationId, groupName);
 
-    // Mutations
     const addUserToGroupMutation = useAddUserToGroup(organizationId);
-
     const isInviting = addUserToGroupMutation.isPending;
     const error = orgUsersError || groupUsersError;
 
-    // Calculate available members (org users who aren't in the group)
     const existingMembers = useMemo(() => {
       const existingMemberIds = new Set(groupUsers.map((user) => user.metadata?.id));
       return orgUsers.filter((user) => !existingMemberIds.has(user.metadata?.id));
     }, [orgUsers, groupUsers]);
 
     const loadingMembers = loadingOrgUsers || loadingGroupUsers;
+    const filteredMembers = filterExistingMembers(existingMembers, memberSearchTerm);
 
-    // Expose refresh function to parent
     useImperativeHandle(
       ref,
       () => ({
@@ -67,7 +168,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       try {
         const selectedUsers = existingMembers.filter((member) => selectedMembers.has(member.metadata?.id || ""));
 
-        // Process each selected member
         for (const member of selectedUsers) {
           await addUserToGroupMutation.mutateAsync({
             groupName,
@@ -83,16 +183,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       } catch {
         showErrorToast("Failed to add existing members");
       }
-    };
-
-    const getFilteredExistingMembers = () => {
-      if (!memberSearchTerm) return existingMembers;
-
-      return existingMembers.filter(
-        (member) =>
-          member.spec?.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
-          member.metadata?.email?.toLowerCase().includes(memberSearchTerm.toLowerCase()),
-      );
     };
 
     return (
@@ -119,7 +209,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 aria-label="Search members"
                 className="w-full pl-9"
                 value={memberSearchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMemberSearchTerm(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setMemberSearchTerm(e.target.value)}
               />
             </div>
             <div className="flex items-center justify-end">
@@ -136,61 +226,13 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             </div>
           </div>
 
-          {loadingMembers ? (
-            <div className="flex justify-center items-center h-32">
-              <p className="text-gray-500 dark:text-gray-400">Loading members...</p>
-            </div>
-          ) : (
-            <div className="max-h-96 overflow-y-auto">
-              {getFilteredExistingMembers().length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {memberSearchTerm
-                      ? "No members found matching your search"
-                      : "All organization members are already in this group"}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {getFilteredExistingMembers().map((member) => (
-                    <div
-                      key={member.metadata!.id!}
-                      className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800"
-                    >
-                      <Checkbox
-                        checked={selectedMembers.has(member.metadata!.id!)}
-                        onCheckedChange={(checked) => {
-                          const isChecked = checked === true;
-                          setSelectedMembers((prev) => {
-                            const newSet = new Set(prev);
-                            if (isChecked) {
-                              newSet.add(member.metadata!.id!);
-                            } else {
-                              newSet.delete(member.metadata!.id!);
-                            }
-                            return newSet;
-                          });
-                        }}
-                      />
-                      <Avatar
-                        src={member.status?.accountProviders?.[0]?.avatarUrl}
-                        initials={member.spec?.displayName?.charAt(0) || "U"}
-                        className="size-8"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 dark:text-white truncate">
-                          {member.spec?.displayName || member.metadata!.id!}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {member.metadata?.email || "API Key"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <AddMembersList
+            loadingMembers={loadingMembers}
+            memberSearchTerm={memberSearchTerm}
+            filteredMembers={filteredMembers}
+            selectedMembers={selectedMembers}
+            setSelectedMembers={setSelectedMembers}
+          />
         </div>
       </div>
     );

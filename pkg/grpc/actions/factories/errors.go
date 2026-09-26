@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -138,6 +139,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
 		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
+	case errors.Is(err, models.ErrFactoryAgentResourceURLTaken):
+		return grpcerrors.AlreadyExists(err, "This MCP server is already connected.")
 	case errors.Is(err, models.ErrFactoryAgentResourceAuthInvalid):
 		return grpcerrors.InvalidArgument(err, "auth must be headers or oauth")
 	case errors.Is(err, models.ErrFactoryAgentResourceURLRequired):
@@ -160,6 +163,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
 		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
+	case errors.Is(err, ghdependabot.ErrAlertsDisabled):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsDisabledMessage)
+	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsUnreadableMessage)
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
@@ -180,6 +187,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
+	case errors.Is(err, errWorkspaceMCPDisabled):
+		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
+	case errors.Is(err, errWorkspaceSkillsDisabled):
+		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -195,6 +206,8 @@ var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
+var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
+var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

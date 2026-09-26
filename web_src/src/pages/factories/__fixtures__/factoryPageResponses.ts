@@ -388,7 +388,7 @@ export interface FactoriesFixture {
   /** Workspace agent resources (MCP connections and skill shells). */
   agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */
-  agentResourceToolsById?: Record<string, Array<{ name: string; description?: string }>>;
+  agentResourceToolsById?: Record<string, Array<{ name: string; description?: string; readOnly?: boolean }>>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

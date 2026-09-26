@@ -101,6 +101,7 @@ export function WorkOrderDetailPanel({
       derived={derived}
       factoryLines={factory!.lines ?? []}
       organizationId={organizationId}
+      factoryId={factoryId}
       factoryKey={factoryKey}
       chrome={chrome}
       events={events}
@@ -165,6 +166,7 @@ interface LoadedWorkOrderDetailProps {
   derived: ReturnType<typeof getWorkOrderDetailDerived>;
   factoryLines: FactoriesFactoryLine[];
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   chrome?: "page" | "dialog";
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
@@ -183,6 +185,7 @@ function LoadedWorkOrderDetail({
   derived,
   factoryLines,
   organizationId,
+  factoryId,
   factoryKey,
   chrome = "page",
   events,
@@ -199,6 +202,7 @@ function LoadedWorkOrderDetail({
     <WorkOrderDetailLoadedView
       statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined)}
       organizationId={organizationId}
+      factoryId={factoryId}
       factoryKey={factoryKey}
       chrome={chrome}
       order={order}

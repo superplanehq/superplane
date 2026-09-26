@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -96,6 +97,10 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 				return invalidArgument("model is not available on this line")
 			}
 		}
+		thinkingLevel, err := runner.NormalizeDispatchThinkingLevel(req.GetThinkingLevel())
+		if err != nil {
+			return invalidArgument(err.Error())
+		}
 
 		startIndex := int(req.GetStartStepIndex())
 		fromState = order.State
@@ -127,7 +132,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model)
+		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model, thinkingLevel)
 		if err != nil {
 			return err
 		}

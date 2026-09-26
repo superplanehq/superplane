@@ -19,7 +19,11 @@ export const BROWSER_PLAYABLE_WORK_ORDER_VIDEO_TYPES = ["video/mp4", "video/webm
 
 export const ALLOWED_WORK_ORDER_FILE_TYPES = [
   ...ALLOWED_WORK_ORDER_IMAGE_TYPES,
+  "image/heic",
+  "image/heif",
   "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
   "text/markdown",
   "application/json",
@@ -32,11 +36,15 @@ const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".ogv", ".ogg", ".m4v", ".mkv
 
 const WORK_ORDER_FILE_TYPES_BY_EXTENSION: Record<string, string> = {
   ".png": "image/png",
-  ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
   ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ".txt": "text/plain",
   ".markdown": "text/markdown",
   ".md": "text/markdown",
@@ -183,12 +191,18 @@ export function normalizeWorkOrderFileType(contentType: string | undefined): str
   if (value === "text/yaml" || value === "application/x-yaml") {
     return "application/yaml";
   }
+  if (value === "text/x-csv" || value === "application/csv" || value === "text/comma-separated-values") {
+    return "text/csv";
+  }
   return value;
 }
 
 /** Resolves the MIME type a file is stored with. Browsers send an empty type or application/octet-stream for many text files, so the filename decides. */
 export function resolveWorkOrderFileMimeType(file: Pick<File, "name" | "type">): string {
   const declared = normalizeWorkOrderFileType(file.type);
+  if (file.name.toLowerCase().endsWith(".csv") && declared === "application/vnd.ms-excel") {
+    return "text/csv";
+  }
   if (declared && declared !== "application/octet-stream") {
     return declared;
   }

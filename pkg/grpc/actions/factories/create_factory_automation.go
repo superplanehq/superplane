@@ -66,7 +66,6 @@ func CreateFactoryAutomation(
 		&factoryID,
 		nil,
 		nil,
-		deps.UsageService,
 	)
 	if err != nil {
 		return nil, err

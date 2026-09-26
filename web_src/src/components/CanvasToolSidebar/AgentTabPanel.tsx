@@ -257,5 +257,14 @@ function ComposerWithCanvasData({
   const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
   const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
 
-  return <ChatComposer {...composerProps} canvasId={canvasId} nodes={nodes} runs={runs} />;
+  return (
+    <ChatComposer
+      {...composerProps}
+      canvasId={canvasId}
+      organizationId={organizationId}
+      factoryId={canvas?.metadata?.factoryId ?? ""}
+      nodes={nodes}
+      runs={runs}
+    />
+  );
 }

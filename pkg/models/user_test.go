@@ -1,14 +1,31 @@
 package models_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+func TestMapAPIKeyNameUniqueConstraintError(t *testing.T) {
+	conflict := &pgconn.PgError{ConstraintName: "unique_api_key_in_organization"}
+
+	assert.ErrorIs(t, models.MapAPIKeyNameUniqueConstraintError(conflict), models.ErrAPIKeyNameAlreadyExists)
+	assert.ErrorIs(t, models.MapAPIKeyNameUniqueConstraintError(fmt.Errorf("insert: %w", conflict)), models.ErrAPIKeyNameAlreadyExists)
+	assert.Nil(t, models.MapAPIKeyNameUniqueConstraintError(nil))
+
+	other := errors.New("boom")
+	assert.ErrorIs(t, models.MapAPIKeyNameUniqueConstraintError(other), other)
+
+	otherConstraint := &pgconn.PgError{ConstraintName: "other_constraint"}
+	assert.Equal(t, otherConstraint, models.MapAPIKeyNameUniqueConstraintError(otherConstraint))
+}
 
 func TestFindFirstHumanUserByOrganizationSkipsDeletedUsers(t *testing.T) {
 	r := support.Setup(t)

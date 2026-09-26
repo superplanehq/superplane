@@ -71,6 +71,10 @@ vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
   useAgentSessionWebsocket: () => undefined,
 }));
 
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: () => [],
+}));
+
 vi.mock("./FactoryRichMessage", () => ({
   FactoryRichMessage: ({ content }: { content: string }) => <div data-testid="rich-message">{content}</div>,
 }));

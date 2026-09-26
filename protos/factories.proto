@@ -389,6 +389,17 @@ service Factories {
     };
   }
 
+  rpc SearchDependabotIntakeSetupItems(SearchDependabotIntakeSetupItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/dependabot-intake-setup-items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview Dependabot packages for intake setup";
+      description: "Lists open alert packages before the Dependabot intake exists";
+      tags: "Factory";
+    };
+  }
+
   rpc ImportFactoryIntakeItem(ImportFactoryIntakeItemRequest) returns (ImportFactoryIntakeItemResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/intakes/{intake_id}/imports"
@@ -1074,6 +1085,7 @@ message FactoryIntake {
     SOURCE_PAGERDUTY_INCIDENTS = 3;
     SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
+    SOURCE_DEPENDABOT_ALERTS = 6;
   }
 
   enum InitialImportStatus {
@@ -1147,6 +1159,15 @@ message FactoryIntake {
     // Issue levels that still create a task. Empty means every level.
     // Sentry exception intakes only.
     repeated string sentry_levels = 14;
+    // When true, skip Productive.io key tasks (milestones). Productive task
+    // intakes only.
+    optional bool exclude_key_tasks = 15;
+    // Task list ids that still create a task. Empty means every task list.
+    // Productive task intakes only.
+    repeated string task_list_ids = 16;
+    // Severities that still create a task. Empty means every severity.
+    // Dependabot alert intakes only. Values: critical, high, medium, low.
+    repeated string dependabot_severities = 17;
   }
 
   string id = 1;
@@ -1527,6 +1548,12 @@ message SearchFactoryIntakeItemsRequest {
   int32 limit = 4;
 }
 
+message SearchDependabotIntakeSetupItemsRequest {
+  string factory_id = 1;
+  repeated string dependabot_severities = 2;
+  int32 limit = 3;
+}
+
 message SearchFactoryIntakeItemsResponse {
   repeated FactoryIntakeItem items = 1;
 }
@@ -1779,6 +1806,9 @@ message WorkOrderLineDispatch {
   // Model chosen at Start. Empty means Auto: each runner keeps the model
   // stored on the live automation canvas.
   string model = 10;
+  // Thinking chosen at Start. Empty means Auto: each runner keeps the
+  // thinking level stored on the live automation canvas.
+  string thinking_level = 11;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -1890,6 +1920,8 @@ message DispatchWorkOrderRequest {
   bool replace_active = 5;
   // Optional model override for this start. Empty means Auto.
   string model = 6;
+  // Optional thinking override for this start. Empty means Auto.
+  string thinking_level = 7;
 }
 
 message DispatchWorkOrderResponse {
@@ -2458,6 +2490,7 @@ message FactoryAgentResource {
   string ref = 16;
   string path = 17;
   string markdown = 18;
+  repeated string disabled_tools = 19;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2493,6 +2526,8 @@ message UpdateFactoryAgentResourceRequest {
   optional FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
   optional string markdown = 8;
+  repeated string disabled_tools = 9;
+  optional bool replace_disabled_tools = 10;
 }
 
 message UpdateFactoryAgentResourceResponse {
@@ -2528,6 +2563,7 @@ message DisconnectFactoryAgentResourceOAuthResponse {
 message FactoryAgentResourceTool {
   string name = 1;
   string description = 2;
+  bool read_only = 3;
 }
 
 message ListFactoryAgentResourceToolsRequest {

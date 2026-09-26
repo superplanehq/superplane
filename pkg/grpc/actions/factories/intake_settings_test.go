@@ -377,8 +377,8 @@ func Test__intakeSettingsFromGraph_Labels(t *testing.T) {
 }
 
 func Test__intakeSentryActionsFor(t *testing.T) {
-	t.Run("listens for created and unresolved issues by default", func(t *testing.T) {
-		assert.Equal(t, []any{"created", "unresolved"}, intakeSentryActionsFor(defaultSentryIntakeSettings()))
+	t.Run("listens for created issues by default", func(t *testing.T) {
+		assert.Equal(t, []any{"created"}, intakeSentryActionsFor(defaultSentryIntakeSettings()))
 	})
 
 	t.Run("maps each event checkbox to its webhook action", func(t *testing.T) {
@@ -414,6 +414,29 @@ func Test__intakeFilterExpressionFor_SentryLevels(t *testing.T) {
 	})
 }
 
+func Test__intakeFilterExpressionFor_DependabotSeverities(t *testing.T) {
+	t.Run("accepts every severity when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, defaultDependabotIntakeSettings())
+		assert.Equal(t, "true", expression)
+	})
+
+	t.Run("builds a severity membership check in a stable order", func(t *testing.T) {
+		settings := defaultDependabotIntakeSettings()
+		settings.DependabotSeverities = []string{"low", "critical", "unknown"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, settings)
+
+		assert.Equal(t, `(root().data.alert.security_advisory.severity ?? "") in ["critical","low"]`, expression)
+	})
+
+	t.Run("treats every known severity as all severities", func(t *testing.T) {
+		settings := defaultDependabotIntakeSettings()
+		settings.DependabotSeverities = []string{"low", "medium", "high", "critical"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, settings)
+
+		assert.Equal(t, "true", expression)
+	})
+}
+
 func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 	newSpec := func(actions []any, expression string) models.LiveCanvasSpec {
 		return models.LiveCanvasSpec{
@@ -433,6 +456,7 @@ func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 
 	t.Run("reads the trigger actions and level list", func(t *testing.T) {
 		settings := defaultSentryIntakeSettings()
+		settings.SentryRegressedIssues = true
 		settings.SentryAssignedIssues = true
 		settings.SentryLevels = []string{"warning", "error"}
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceSentryExceptions, settings)
@@ -470,7 +494,7 @@ func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 				Nodes: []models.Node{
 					{
 						ID:            intakeTriggerNodeID,
-						Configuration: map[string]any{"actions": []any{"created", "unresolved"}},
+						Configuration: map[string]any{"actions": []any{"created"}},
 					},
 				},
 			},
@@ -595,5 +619,150 @@ func Test__applyIntakeSettingsToGraph_Sentry(t *testing.T) {
 
 		trigger := findModelNode(t, updated, intakeTriggerNodeID)
 		assert.Empty(t, trigger.Configuration["actions"])
+	})
+}
+
+func Test__intakeFilterExpressionFor_ProductiveKeyTasks(t *testing.T) {
+	t.Run("excludes key tasks by default", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(
+			models.FactoryIntakeSourceProductiveTasks,
+			defaultProductiveIntakeSettings(),
+		)
+		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, expression)
+	})
+
+	t.Run("passes every task when the filter is off", func(t *testing.T) {
+		settings := defaultProductiveIntakeSettings()
+		settings.ExcludeKeyTasks = false
+		assert.Equal(t, "true", intakeFilterExpressionFor(models.FactoryIntakeSourceProductiveTasks, settings))
+	})
+
+	regularTask := map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{"type_id": 1, "title": "Fix payment retries"},
+		},
+	}
+	keyTask := map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{"type_id": 3, "title": "Key task 1"},
+		},
+	}
+
+	t.Run("drops a key task and keeps a regular task", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(
+			models.FactoryIntakeSourceProductiveTasks,
+			defaultProductiveIntakeSettings(),
+		)
+		assert.Equal(t, true, evalRootDataExpression(t, expression, regularTask))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, keyTask))
+	})
+
+	t.Run("keeps a task only when it is in a selected task list", func(t *testing.T) {
+		settings := defaultProductiveIntakeSettings()
+		settings.ExcludeKeyTasks = false
+		settings.TaskListIDs = []string{"list-a", "list-b"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceProductiveTasks, settings)
+		assert.Equal(
+			t,
+			`(root().data.data.relationships.task_list.data.id ?? "") in ["list-a","list-b"]`,
+			expression,
+		)
+
+		inList := map[string]any{
+			"data": map[string]any{
+				"relationships": map[string]any{
+					"task_list": map[string]any{"data": map[string]any{"id": "list-a"}},
+				},
+			},
+		}
+		otherList := map[string]any{
+			"data": map[string]any{
+				"relationships": map[string]any{
+					"task_list": map[string]any{"data": map[string]any{"id": "list-c"}},
+				},
+			},
+		}
+		assert.Equal(t, true, evalRootDataExpression(t, expression, inList))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, otherList))
+
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, intakeGraph{FilterNodeID: intakeFilterNodeID}, models.LiveCanvasSpec{
+			Nodes: []models.Node{{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": expression},
+			}},
+		})
+		assert.Equal(t, []string{"list-a", "list-b"}, parsed.TaskListIDs)
+	})
+}
+
+func Test__intakeSettingsFromGraph_ProductiveKeyTasks(t *testing.T) {
+	graph := intakeGraph{FilterNodeID: intakeFilterNodeID}
+
+	t.Run("defaults to excluding key tasks when the filter is absent", func(t *testing.T) {
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, intakeGraph{}, models.LiveCanvasSpec{})
+		assert.True(t, parsed.ExcludeKeyTasks)
+	})
+
+	t.Run("reads the filter expression", func(t *testing.T) {
+		on := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, graph, models.LiveCanvasSpec{
+			Nodes: []models.Node{{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": intakeProductiveExcludeKeyTasksCondition},
+			}},
+		})
+		assert.True(t, on.ExcludeKeyTasks)
+
+		off := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, graph, models.LiveCanvasSpec{
+			Nodes: []models.Node{{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": "true"},
+			}},
+		})
+		assert.False(t, off.ExcludeKeyTasks)
+	})
+}
+
+func Test__serializeIntakeSettings_ProductiveKeyTasks(t *testing.T) {
+	settings := defaultProductiveIntakeSettings()
+	serialized := serializeIntakeSettings(models.FactoryIntakeSourceProductiveTasks, settings)
+	assert.True(t, serialized.GetExcludeKeyTasks())
+
+	settings.ExcludeKeyTasks = false
+	serialized = serializeIntakeSettings(models.FactoryIntakeSourceProductiveTasks, settings)
+	assert.False(t, serialized.GetExcludeKeyTasks())
+}
+
+func Test__applyIntakeSettingsToGraph_Productive(t *testing.T) {
+	legacyNodes := func() []models.Node {
+		return []models.Node{
+			{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"actions": []any{"created"}},
+			},
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+	}
+	legacyEdges := []models.Edge{
+		{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+	}
+	legacyGraph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, CreateNodeID: intakeCreateNodeID}
+
+	t.Run("inserts a filter that drops key tasks", func(t *testing.T) {
+		nodes, edges, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceProductiveTasks,
+			legacyGraph,
+			models.LiveCanvasSpec{Nodes: legacyNodes(), Edges: legacyEdges},
+			&pb.FactoryIntake_Settings{ExcludeKeyTasks: proto.Bool(true)},
+			legacyNodes(),
+			append([]models.Edge{}, legacyEdges...),
+		)
+		require.NoError(t, err)
+
+		filter := findModelNode(t, nodes, intakeFilterNodeID)
+		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
+		assert.ElementsMatch(t, []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, edges)
 	})
 }

@@ -112,7 +112,8 @@ func intakeSourceSupportsPause(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceJiraIssues ||
-		source == models.FactoryIntakeSourceProductiveTasks
+		source == models.FactoryIntakeSourceProductiveTasks ||
+		source == models.FactoryIntakeSourceDependabotAlerts
 }
 
 func resolveUpdatedIntakeBinding(
@@ -130,7 +131,7 @@ func resolveUpdatedIntakeBinding(
 			"failed to update factory intake",
 		)
 	}
-	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues || intake.Source == models.FactoryIntakeSourceDependabotAlerts {
 		return nil, factoryErrorToStatus(
 			invalidArgument("GitHub intake connection follows workspace setup"),
 			"failed to update factory intake",
@@ -276,17 +277,16 @@ func applyIntakeSettingsToGraph(
 		graph.TriggerNodeID == "" {
 		return nil, nil, invalidArgument("intake automation has no trigger to update")
 	}
+	expression := intakeFilterExpressionFor(source, updated)
 	if graph.FilterNodeID == "" &&
 		intakeSourceHasFilterNode(source) &&
-		intakeSettingsChangeFilters(current, updated) {
+		(intakeSettingsChangeFilters(current, updated) || expression != "true") {
 		var err error
 		nodes, edges, graph, err = ensureIntakeFilterNode(nodes, edges, graph)
 		if err != nil {
 			return nil, nil, invalidArgument(err.Error())
 		}
 	}
-
-	expression := intakeFilterExpressionFor(source, updated)
 	for i := range nodes {
 		switch nodes[i].ID {
 		case graph.TriggerNodeID:

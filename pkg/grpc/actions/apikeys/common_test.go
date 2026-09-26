@@ -1,14 +1,44 @@
 package apikeys
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
+
+func TestMapAPIKeyWriteError(t *testing.T) {
+	t.Run("maps unique name violation to already exists", func(t *testing.T) {
+		err := mapAPIKeyWriteError(&pgconn.PgError{
+			Code:           "23505",
+			ConstraintName: "unique_api_key_in_organization",
+		}, "failed to create API key")
+
+		require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+		require.Equal(t, apiKeyNameAlreadyExistsMessage, grpcerrors.StatusMessage(err))
+	})
+
+	t.Run("maps model duplicate name error to already exists", func(t *testing.T) {
+		err := mapAPIKeyWriteError(models.ErrAPIKeyNameAlreadyExists, "failed to update API key")
+
+		require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+		require.Equal(t, apiKeyNameAlreadyExistsMessage, grpcerrors.StatusMessage(err))
+	})
+
+	t.Run("wraps unrelated errors as internal", func(t *testing.T) {
+		err := mapAPIKeyWriteError(errors.New("connection reset"), "failed to create API key")
+
+		require.Equal(t, codes.Internal, grpcerrors.Code(err))
+		require.Equal(t, "failed to create API key", grpcerrors.StatusMessage(err))
+	})
+}
 
 func TestSerializeAPIKey_WithCreator(t *testing.T) {
 	orgID := uuid.New()

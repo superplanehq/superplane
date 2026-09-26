@@ -167,10 +167,11 @@ func TestParsedSuperPlaneOpenRouterModelsArePriced(t *testing.T) {
 	cases := []struct {
 		name  string
 		model string
+		want  string
 	}{
-		{name: "anthropic prefix", model: "anthropic/claude-sonnet-4-6"},
-		{name: "openrouter gateway", model: "openrouter/anthropic/claude-sonnet-4-6"},
-		{name: "gemini", model: "google/gemini-3.7-flash"},
+		{name: "anthropic prefix", model: "anthropic/claude-sonnet-4-6", want: "anthropic/claude-sonnet-4-6"},
+		{name: "openrouter gateway", model: "openrouter/anthropic/claude-sonnet-4-6", want: "anthropic/claude-sonnet-4-6"},
+		{name: "gemini", model: "google/gemini-3.7-flash", want: "google/gemini-3.7-flash"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -189,8 +190,8 @@ func TestParsedSuperPlaneOpenRouterModelsArePriced(t *testing.T) {
 				result,
 			)
 			require.True(t, ok)
-			assert.Equal(t, tc.model, record.Model)
-			assert.True(t, pricebook.IsPriced(record.Model))
+			assert.Equal(t, tc.want, record.Model)
+			assert.True(t, pricebook.IsPriced(record.Provider, record.Model))
 		})
 	}
 }

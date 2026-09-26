@@ -12,7 +12,7 @@ import { Header } from "./Header";
 import { IntegrationTabs } from "./IntegrationTabs";
 import { useIntegrationDetailsState } from "./useIntegrationDetailsState";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, type NavigateFunction } from "react-router";
 
 interface CapabilityBasedIntegrationDetailsProps {
   organizationId: string;
@@ -40,16 +40,6 @@ export function CapabilityBasedIntegrationDetails({
   const integrationDef = integration ? availableIntegrations.find((i) => i.name === providerName) : undefined;
   const detailsState = useIntegrationDetailsState(integration);
   const integrationMutations = useIntegrationMutations(organizationId, integrationId || "");
-
-  const handleDelete = async () => {
-    if (!canDeleteIntegrations) return;
-    try {
-      await integrationMutations.deleteMutation.mutateAsync({ integrationName: providerName });
-      navigate(integrationsHref);
-    } catch {
-      showErrorToast("Failed to delete integration");
-    }
-  };
 
   const handleCapabilitiesSubmit = async (newStates: IntegrationCapabilityState[]) => {
     if (!canUpdateIntegrations || newStates.length === 0) return;
@@ -146,9 +136,35 @@ export function CapabilityBasedIntegrationDetails({
         canDeleteIntegrations={canDeleteIntegrations}
         isDeleting={integrationMutations.deleteMutation.isPending}
         hasDeleteError={integrationMutations.deleteMutation.isError}
-        onDelete={handleDelete}
+        onDelete={() =>
+          deleteCapabilityBasedIntegration({
+            canDeleteIntegrations,
+            deleteMutation: integrationMutations.deleteMutation,
+            providerName,
+            navigate,
+            integrationsHref,
+          })
+        }
         onClose={() => setShowDeleteConfirm(false)}
       />
     </div>
   );
+}
+
+type DeleteIntegrationMutation = ReturnType<typeof useIntegrationMutations>["deleteMutation"];
+
+async function deleteCapabilityBasedIntegration(args: {
+  canDeleteIntegrations: boolean;
+  deleteMutation: DeleteIntegrationMutation;
+  providerName: string;
+  navigate: NavigateFunction;
+  integrationsHref: string;
+}) {
+  if (!args.canDeleteIntegrations) return;
+  try {
+    await args.deleteMutation.mutateAsync({ integrationName: args.providerName });
+    args.navigate(args.integrationsHref);
+  } catch {
+    showErrorToast("Failed to delete integration");
+  }
 }

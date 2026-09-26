@@ -107,9 +107,23 @@ func Test__jiraWebhookHasRemoteID(t *testing.T) {
 	assert.True(t, jiraWebhookHasRemoteID(map[string]any{"webhookId": int64(1000)}))
 }
 
+func Test__productiveWebhookHasRemoteID(t *testing.T) {
+	assert.False(t, productiveWebhookHasRemoteID(nil))
+	assert.False(t, productiveWebhookHasRemoteID(map[string]any{}))
+	assert.False(t, productiveWebhookHasRemoteID(map[string]any{"ids": []any{}}))
+	assert.True(t, productiveWebhookHasRemoteID(map[string]any{"ids": []any{"555"}}))
+	assert.True(t, productiveWebhookHasRemoteID(map[string]any{"ids": []string{"555", "556"}}))
+	assert.True(t, productiveWebhookHasRemoteID(map[string]any{"id": "555"}))
+}
+
 func Test__jiraIntakeWebhookHealth(t *testing.T) {
 	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, jiraIntakeWebhookHealth(nil, uuid.Nil, intakeTriggerNodeID))
 	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, jiraIntakeWebhookHealth(nil, uuid.New(), ""))
+}
+
+func Test__productiveIntakeWebhookHealth(t *testing.T) {
+	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, productiveIntakeWebhookHealth(nil, uuid.Nil, intakeTriggerNodeID))
+	assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_NOT_READY, productiveIntakeWebhookHealth(nil, uuid.New(), ""))
 }
 
 func Test__IntakeTriggerBinding(t *testing.T) {

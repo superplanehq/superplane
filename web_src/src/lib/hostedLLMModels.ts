@@ -57,17 +57,18 @@ export function filterModelIds(ids: string[], query: string): string[] {
   return ids.filter((id) => id.toLowerCase().includes(needle));
 }
 
-const PREFERRED_MODEL_SUBSTRING: Record<string, string> = {
-  anthropic: "sonnet",
-  openai: "gpt-5",
-  openrouter: "sonnet",
+const PREFERRED_MODEL_SUBSTRINGS: Record<string, readonly string[]> = {
+  // Claude Opus 5.5 is published as claude-opus-5-5, and sometimes as claude-opus-5.5.
+  anthropic: ["opus-5-5", "opus-5.5", "sonnet"],
+  openai: ["gpt-5"],
+  // Grok 4.7 is published as x-ai/grok-4.7.
+  openrouter: ["grok-4.7", "sonnet"],
 };
 
 /** Prefer a known default from the provider allowlist; otherwise use the first id. */
 export function pickHostedModel(provider: string, modelIds: string[]): string | undefined {
   const ids = uniqueSortedModelIds(modelIds);
-  const preferred = PREFERRED_MODEL_SUBSTRING[provider];
-  if (preferred) {
+  for (const preferred of PREFERRED_MODEL_SUBSTRINGS[provider] ?? []) {
     const match = ids.find((id) => id.toLowerCase().includes(preferred));
     if (match) return match;
   }
@@ -85,7 +86,7 @@ export function pickModelMatching(modelIds: string[], hint: string): string | un
   return uniqueSortedModelIds(modelIds).find((id) => id.toLowerCase().includes(needle));
 }
 
-/** Prefer a Sonnet id from the Anthropic hosted allowlist; otherwise use the first id. */
+/** Prefer Claude Opus 5.5, then a Sonnet id; otherwise use the first id. */
 export function pickHostedAnthropicModel(modelIds: string[]): string | undefined {
   return pickHostedModel("anthropic", modelIds);
 }

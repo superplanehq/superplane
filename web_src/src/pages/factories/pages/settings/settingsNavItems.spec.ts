@@ -19,8 +19,9 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
       "organization-models",
     );
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/agent-resources")?.id).toBe(
-      "workspace-agent-resources",
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/mcp")?.id).toBe("workspace-mcp");
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/skills")?.id).toBe(
+      "workspace-skills",
     );
   });
 
@@ -44,8 +45,8 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
-      "Agent resources",
-      "Models",
+      "MCP servers",
+      "Skills",
       "Usage",
       "General",
       "Members",
@@ -83,8 +84,8 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
-      "workspace-agent-resources",
-      "workspace-models",
+      "workspace-mcp",
+      "workspace-skills",
       "workspace-usage",
     ]);
   });

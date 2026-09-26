@@ -37,6 +37,10 @@ const FeatureFactoryJiraIntake = "factory_jira_intake"
 // available.
 const FeatureFactoryProductiveIntake = "factory_productive_intake"
 
+// FeatureFactoryDependabotIntake gates Dependabot alert intake from the
+// Backlog column menu until the flow is generally available.
+const FeatureFactoryDependabotIntake = "factory_dependabot_intake"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -49,9 +53,11 @@ const FeatureOrganizationBYOK = "organization_byok"
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
-// FeatureWorkspaceAgentResources gates the workspace Agent resources settings
-// page until MCP servers are ready for general use.
-const FeatureWorkspaceAgentResources = "workspace_agent_resources"
+// FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
+const FeatureWorkspaceMCP = "workspace_mcp"
+
+// FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
+const FeatureWorkspaceSkills = "workspace_skills"
 
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
@@ -69,11 +75,13 @@ var registry = []Feature{
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column"},
 	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
-	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
+	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
+	{ID: FeatureFactoryDependabotIntake, Label: "Factory Dependabot Intake", Description: "Add Dependabot alert intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
-	{ID: FeatureWorkspaceAgentResources, Label: "Agent Resources", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 }
 

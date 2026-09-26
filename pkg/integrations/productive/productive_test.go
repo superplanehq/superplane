@@ -140,6 +140,27 @@ func Test__Productive__ListResources(t *testing.T) {
 	})
 }
 
+func Test__Productive__Instructions(t *testing.T) {
+	p := &Productive{}
+
+	instructions := p.Instructions()
+
+	assert.Contains(t, instructions, "Settings > API Integrations")
+	assert.Contains(t, instructions, "read and write permissions")
+	assert.NotContains(t, instructions, "profile")
+}
+
+func Test__Productive__Configuration(t *testing.T) {
+	p := &Productive{}
+
+	fields := p.Configuration()
+
+	require.Len(t, fields, 3)
+	assert.Equal(t, "apiToken", fields[0].Name)
+	assert.Equal(t, "Personal access token from Productive Settings > API Integrations, with read and write permissions.", fields[0].Description)
+	assert.Equal(t, "The numeric organization id in your Productive URL", fields[1].Description)
+}
+
 // authorizedIntegration returns an integration context with valid Productive.io
 // credentials configured, for tests that need a working client.
 func authorizedIntegration() *contexts.IntegrationContext {

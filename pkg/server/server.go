@@ -22,13 +22,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
-	"github.com/superplanehq/superplane/pkg/components/runner"
+	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -37,7 +38,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
 )
@@ -241,35 +241,6 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
-	var workerUsageService usage.Service
-	initWorkerUsageService := func() (usage.Service, error) {
-		if workerUsageService != nil {
-			return workerUsageService, nil
-		}
-
-		service, err := usage.NewServiceFromEnv()
-		if err != nil {
-			return nil, err
-		}
-		workerUsageService = service
-		return workerUsageService, nil
-	}
-	getRequiredWorkerUsageService := func() usage.Service {
-		service, err := initWorkerUsageService()
-		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
-		}
-		return service
-	}
-	getOptionalWorkerUsageService := func() usage.Service {
-		service, err := initWorkerUsageService()
-		if err != nil {
-			log.Printf("usage service unavailable for agent canvas tool: %v", err)
-			return nil
-		}
-		return service
-	}
-
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
@@ -298,10 +269,23 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
+		log.Println("Starting Price Book Sync Worker")
+
+		w := workers.NewPriceBookSyncWorker(encryptor, registry)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Planning Session Cleanup Worker")
 
 		w := workers.NewPlanningSessionCleanupWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" {
+		log.Println("Starting Event Retention Worker")
+		w := workers.NewEventRetentionWorker()
 		go w.Start(context.Background())
 	}
 
@@ -312,31 +296,13 @@ func startWorkers(
 			ComponentRegistry: registry,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
-			UsageService:      getOptionalWorkerUsageService(),
 		})
-		w := workers.NewAgentStreamWorkerWithUsageService(
+		w := workers.NewAgentStreamWorker(
 			agentProvider,
 			rabbitMQURL,
-			getOptionalWorkerUsageService(),
 			agentToolRegistry,
 		)
 		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService := getRequiredWorkerUsageService()
-
-		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
-			log.Println("Starting Event Retention Worker")
-			w := workers.NewEventRetentionWorker(usageService)
-			go w.Start(context.Background())
-		}
-
-		if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" && usageService.Enabled() {
-			log.Println("Starting Usage Sync Worker")
-			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
-			go w.Start(context.Background())
-		}
 	}
 
 }
@@ -349,22 +315,35 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 		FromName:          os.Getenv("EMAIL_FROM_NAME"),
 		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
 	})
-	if emailService == nil {
+	discord := services.NewDiscordWebhookClient(os.Getenv("DISCORD_FEEDBACK_WEBHOOK_URL"))
+
+	if emailService == nil && !discord.Enabled() {
 		log.Warn("Email Consumers not started - missing required environment variables")
 		return
 	}
 
-	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL)
+	startEmailConsumersWithService(rabbitMQURL, emailService, discord, baseURL)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
-	log.Println("Starting Magic Code Email Consumer")
-	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go magicCodeEmailConsumer.Start()
+func startEmailConsumersWithService(
+	rabbitMQURL string,
+	emailService services.EmailService,
+	discord *services.DiscordWebhookClient,
+	baseURL string,
+) {
+	if emailService != nil {
+		log.Println("Starting Magic Code Email Consumer")
+		magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
+		go magicCodeEmailConsumer.Start()
 
-	log.Println("Starting Factory Notification Consumer")
-	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
-	go factoryNotificationConsumer.Start()
+		log.Println("Starting Factory Notification Consumer")
+		factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
+		go factoryNotificationConsumer.Start()
+	}
+
+	log.Println("Starting Support Feedback Consumer")
+	supportFeedbackConsumer := workers.NewSupportFeedbackConsumer(rabbitMQURL, emailService, discord)
+	go supportFeedbackConsumer.Start()
 }
 
 func startFactorySentryResolveConsumer(
@@ -396,11 +375,6 @@ func buildGRPCServices(
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
 ) (*grpc.Services, error) {
-	usageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		return nil, fmt.Errorf("initialize usage service: %w", err)
-	}
-
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
@@ -409,7 +383,6 @@ func buildGRPCServices(
 		Registry:        registry,
 		OIDCProvider:    oidcProvider,
 		AgentService:    agentService,
-		UsageService:    usageService,
 	})
 }
 
@@ -427,10 +400,6 @@ func startPublicAPI(
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
-	usageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		log.Panicf("failed to initialize usage service for public api: %v", err)
-	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	server, err := public.NewServer(
@@ -444,7 +413,6 @@ func startPublicAPI(
 		appEnv,
 		templateDir,
 		authService,
-		usageService,
 		blockSignup,
 	)
 	if err != nil {
@@ -613,6 +581,10 @@ func Start() {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
+	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
+		log.WithError(err).Error("development hosted OpenRouter seed skipped")
+	}
+
 	authService, err := authorization.NewAuthService()
 	if err != nil {
 		log.Fatalf("failed to create auth service: %v", err)
@@ -688,14 +660,6 @@ func Start() {
 
 	agentProvider, agentService := buildAgentService(authService)
 
-	runnerUsageService, err := usage.NewServiceFromEnv()
-	if err != nil {
-		log.Fatalf("failed to initialize usage service for runner limits: %v", err)
-	}
-	runner.SetRunnerMinutesLimitChecker(func(organizationID string) error {
-		return usage.EnsureCanStartRunnerTask(context.Background(), runnerUsageService, organizationID)
-	})
-
 	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
@@ -760,6 +724,9 @@ func newBlobProvider() (blob.Provider, error) {
 	case blob.ProviderGCS:
 		log.Println("Creating GCS blob storage provider")
 		return gcs.NewProvider()
+	case blob.ProviderS3:
+		log.Println("Creating S3 blob storage provider")
+		return s3blob.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
 		return filesystem.NewProvider()

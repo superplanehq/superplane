@@ -252,12 +252,10 @@ func newRunnerArtifactTestServer(
 		"http://localhost",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), nil)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	return server
 }
 
@@ -379,6 +377,18 @@ func TestServePublicArtifactSupportsFilesystemRanges(t *testing.T) {
 	assert.Equal(t, http.StatusPartialContent, response.Code)
 	assert.Equal(t, "2345", response.Body.String())
 	assert.Equal(t, "bytes 2-5/10", response.Header().Get("Content-Range"))
+}
+
+func TestServePublicArtifactRedirectsS3Gets(t *testing.T) {
+	provider := &artifactProvider{name: blob.ProviderS3, signedURL: "https://s3.example/signed"}
+	file := &models.File{Filename: "screen.png", ContentType: "image/png", SizeBytes: 8, StorageKey: "artifact/screen"}
+	response := httptest.NewRecorder()
+
+	servePublicArtifact(response, httptest.NewRequest(http.MethodGet, "/artifact", nil), provider, file)
+
+	assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
+	assert.Equal(t, provider.signedURL, response.Header().Get("Location"))
+	assert.Equal(t, 5*time.Minute, provider.signedTTL)
 }
 
 func TestServePublicArtifactRedirectsGCSGets(t *testing.T) {

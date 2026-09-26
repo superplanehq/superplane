@@ -83,7 +83,7 @@
     "elkjs": "^0.10.0",
     "embla-carousel-react": "^8.6.0",
     "html-to-image": "^1.11.11",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.3.2",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.545.0",
     "mermaid": "^11.17.2",
@@ -152,6 +152,13 @@
     "trailingComma": "all"
   },
   "overrides": {
+    "js-yaml": "$js-yaml",
+    "@humanfs/node": "0.16.8",
+    "brace-expansion@1": "1.1.21",
+    "brace-expansion@5": "5.0.12",
+    "posthog-js": {
+      "fflate": "0.4.9"
+    },
     "monaco-editor": {
       "dompurify": "^3.4.14"
     },

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -27,21 +28,21 @@ func (t *OnTask) Label() string {
 }
 
 func (t *OnTask) Description() string {
-	return "Listen to task events from Productive.io"
+	return "Listen to task events from Productive"
 }
 
 func (t *OnTask) Documentation() string {
-	return `The On Task trigger starts a workflow execution when task events occur in a Productive.io project.
+	return `The On Task trigger starts a workflow execution when task events occur in a Productive project.
 
 ## Use Cases
 
 - **Backlog intake**: Create a work order when a new task is added to a project
-- **Sync workflows**: Mirror Productive.io tasks into another tracker
+- **Sync workflows**: Mirror Productive tasks into another tracker
 - **Notifications**: Alert a channel when a task is created or updated
 
 ## Configuration
 
-- **Project** (required): Productive.io project to monitor
+- **Project** (required): Productive project to monitor
 - **Actions** (required): Which task actions to listen for (created, updated). Default: created.
 
 ## Outputs
@@ -52,10 +53,16 @@ func (t *OnTask) Documentation() string {
 
 ## Webhook Setup
 
-This trigger registers a Productive.io webhook automatically when configured, and removes it when the
-trigger is deleted. Productive.io sells webhooks as a plan feature and rejects registration with a 403
-"webhooks_limit_exceeded" response on plans that do not include it, in which case setup fails until the
-organization upgrades to a plan with webhooks.`
+This trigger registers Productive webhooks automatically when configured, and removes them when the
+trigger is deleted. Productive webhooks are organization-wide and need the Ultimate plan. SuperPlane
+registers one remote webhook for task created and one for task updated, both pointing at
+` + "`{WEBHOOKS_BASE_URL}/api/v1/webhooks/{id}`" + `. Deliveries for other projects are ignored.
+
+Productive puts the task resource under ` + "`object.data`" + `. Each remote webhook has its own
+signature, and SuperPlane uses that signature to tell a created task from an updated task.
+
+Productive rejects registration with a 403 "webhooks_limit_exceeded" response on plans that do not
+include webhooks, in which case setup fails until the organization upgrades.`
 }
 
 func (t *OnTask) Icon() string {
@@ -73,7 +80,7 @@ func (t *OnTask) Configuration() []configuration.Field {
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Productive.io project to monitor",
+			Description: "The Productive project to monitor",
 			Placeholder: "Select a project",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -146,7 +153,17 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	event := ctx.Headers.Get(EventHeader)
+	//
+	// Productive.io does not send an event header. The signature token of
+	// the remote webhook that delivered the body is the event name.
+	//
+	event, code, err := signedWebhookEvent(ctx)
+	if err != nil {
+		return code, nil, err
+	}
+	if event == "" {
+		event = deliveryEventName(ctx)
+	}
 	if event == "" {
 		return http.StatusBadRequest, nil, fmt.Errorf("missing %s header", EventHeader)
 	}
@@ -161,23 +178,29 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
-	code, err := verifyWebhookSignature(ctx)
+	document, err := taskDocument(ctx.Body)
 	if err != nil {
-		return code, nil, err
-	}
-
-	payload := struct {
-		Data map[string]any `json:"data"`
-	}{}
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
-
-	if payload.Data == nil {
+	if document == nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("missing task data")
 	}
 
-	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, payload.Data)); err != nil {
+	//
+	// Productive.io webhooks are organization-wide. A delivery for another
+	// project is not this node's news.
+	//
+	if taskProjectID(document) != config.Project {
+		return http.StatusOK, nil, nil
+	}
+
+	// Productive.io task webhooks often omit the task list. The intake
+	// filter reads that relationship, so load it before the event is emitted.
+	if err := ensureTaskList(ctx, document); err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
+	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document)); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
@@ -186,6 +209,73 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// productiveDelivery is the body Productive.io posts for a task webhook.
+// The JSON:API task is under object.data. A fetch of the task uses a
+// top-level data field, and a real delivery does not.
+type productiveDelivery struct {
+	Object struct {
+		Data map[string]any `json:"data"`
+	} `json:"object"`
+}
+
+const taskListFetchAttempts = 3
+
+func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) error {
+	if taskListID(document) != "" || ctx.HTTP == nil || ctx.Integration == nil {
+		return nil
+	}
+
+	id, _ := document["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+		task, err := client.GetTask(id)
+		if err == nil {
+			setTaskListID(document, task.TaskListID)
+			return nil
+		}
+		lastErr = err
+	}
+
+	if ctx.Logger != nil {
+		ctx.Logger.WithError(lastErr).Warnf(
+			"productive task %s: task list unavailable after %d attempts",
+			id,
+			taskListFetchAttempts,
+		)
+	}
+	return fmt.Errorf("productive task %s: task list unavailable: %v", id, lastErr)
+}
+
+func taskDocument(body []byte) (map[string]any, error) {
+	delivery := productiveDelivery{}
+	if err := json.Unmarshal(body, &delivery); err != nil {
+		return nil, err
+	}
+	return delivery.Object.Data, nil
+}
+
+// deliveryEventName reads the event SuperPlane put on the webhook URL, then
+// the custom header. The URL event is a path segment or a query value.
+// The signature token is checked before this name is trusted.
+func deliveryEventName(ctx core.WebhookRequestContext) string {
+	if ctx.Query != nil {
+		if event := strings.TrimSpace(ctx.Query.Get("event")); event != "" {
+			return event
+		}
+	}
+	return strings.TrimSpace(ctx.Headers.Get(EventHeader))
 }
 
 func decodeOnTaskConfiguration(raw any) (OnTaskConfiguration, error) {

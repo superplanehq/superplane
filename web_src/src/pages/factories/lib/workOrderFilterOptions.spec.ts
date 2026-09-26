@@ -4,6 +4,7 @@ import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder } fro
 
 import {
   buildAssigneeFilterOptions,
+  buildLabelFilterOptions,
   buildLineFilterOptions,
   buildSourceFilterOptions,
   buildStatusFilterOptions,
@@ -43,7 +44,20 @@ describe("buildStatusFilterOptions", () => {
       "cancelled",
     ]);
     expect(options.every((option) => Boolean(option.dot))).toBe(true);
-    expect(options.find((option) => option.value === "waiting")?.label).toBe("Needs attention");
+    expect(options.find((option) => option.value === "waiting")?.label).toBe("Waiting");
+  });
+});
+
+describe("buildLabelFilterOptions", () => {
+  it("lists Review only when the merge pill is off", () => {
+    expect(buildLabelFilterOptions()).toEqual([{ value: "review", label: "Review" }]);
+  });
+
+  it("lists Review and Mergeable when the merge pill is on", () => {
+    expect(buildLabelFilterOptions(true)).toEqual([
+      { value: "review", label: "Review" },
+      { value: "mergeable", label: "Mergeable" },
+    ]);
   });
 });
 
@@ -133,21 +147,29 @@ describe("buildWorkOrderFilterChips", () => {
     const chips = buildWorkOrderFilterChips(
       {
         statuses: ["running"],
+        labels: ["review", "mergeable"],
         lineIds: ["line-a"],
         sourceIds: ["github-issues", MANUAL_FILTER_VALUE],
         assigneeIds: ["u1", UNASSIGNED_FILTER_VALUE],
       },
-      options,
+      { ...options, showPullRequestMerge: true },
     );
 
     expect(chips.map((chip) => chip.label)).toEqual([
       "Status is Running",
+      "Label is Review",
+      "Label is Mergeable",
       "Line is hotfix",
       "Source is GitHub issues",
       "Created manually",
       "Owner is Alex",
       "No Owner",
     ]);
+  });
+
+  it("hides a stored Mergeable chip when the merge pill is off", () => {
+    const chips = buildWorkOrderFilterChips({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["review", "mergeable"] }, options);
+    expect(chips.map((chip) => chip.label)).toEqual(["Label is Review"]);
   });
 
   it("returns nothing when no filter is applied", () => {

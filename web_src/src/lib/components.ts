@@ -3,6 +3,7 @@
  */
 
 import type { ConfigurationField } from "../api-client";
+import { THINKING_LEVEL_KEY } from "./thinkingLevel";
 
 /**
  * Validates a cron expression
@@ -128,6 +129,10 @@ export function filterVisibleConfiguration(
     }
 
     filtered[field.name] = filterFieldValueByVisibility(field, fieldValue);
+  }
+
+  if (fields.some((field) => field.type === "hosted-model") && configuration[THINKING_LEVEL_KEY] !== undefined) {
+    filtered[THINKING_LEVEL_KEY] = configuration[THINKING_LEVEL_KEY];
   }
 
   return filtered;

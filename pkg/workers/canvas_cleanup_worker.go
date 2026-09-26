@@ -175,7 +175,7 @@ func (w *CanvasCleanupWorker) cleanCanvasRuns(db *gorm.DB, canvas models.Canvas)
 		// delete must be atomic, but batching many runs in a single transaction
 		// risks statement timeouts and rolls back all progress on failure; per-run
 		// transactions commit incrementally and match the list-then-lock pattern
-		// used elsewhere (EventRouter, NodeExecutor, EventRetentionWorker).
+		// used elsewhere (EventRouter, NodeExecutor).
 		var summary *models.RunDeletionSummary
 		err := db.Transaction(func(tx *gorm.DB) error {
 			locked, err := models.LockCanvasRun(tx, canvas.ID, run.ID)

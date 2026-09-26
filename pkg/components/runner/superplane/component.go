@@ -152,9 +152,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
-	if err := runner.EnsureRunnerMinutesAvailable(ctx); err != nil {
-		return err
-	}
 
 	broker, err := runner.NewBrokerClient(ctx.HTTP)
 	if err != nil {
@@ -299,6 +296,7 @@ func buildSuperPlaneBrokerTask(
 			MachineType:             spec.MachineType,
 			Steps:                   spec.Steps,
 			Model:                   model,
+			ThinkingLevel:           spec.ThinkingLevel,
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
@@ -309,6 +307,7 @@ func buildSuperPlaneBrokerTask(
 			MachineType:             spec.MachineType,
 			Steps:                   spec.Steps,
 			Model:                   model,
+			ThinkingLevel:           spec.ThinkingLevel,
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
@@ -319,6 +318,7 @@ func buildSuperPlaneBrokerTask(
 			MachineType:             spec.MachineType,
 			Steps:                   spec.Steps,
 			Model:                   model,
+			ThinkingLevel:           spec.ThinkingLevel,
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}

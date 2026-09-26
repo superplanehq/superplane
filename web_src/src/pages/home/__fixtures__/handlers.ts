@@ -96,7 +96,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         return null;
       },
     },
-    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
       resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
@@ -168,9 +167,14 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the organization LLM Models settings page",
             },
             {
-              id: "workspace_agent_resources",
-              label: "Agent Resources",
+              id: "workspace_mcp",
+              label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",
+            },
+            {
+              id: "workspace_skills",
+              label: "Workspace Skills",
+              description: "Add skills for workspace agents",
             },
           ],
         },
@@ -430,7 +434,7 @@ export async function matchFactorySetupFixture(
   orgIntegrations: StorybookOrgIntegration[],
 ): Promise<FixtureResult> {
   if (url.pathname === "/api/v1/integrations" && method === "GET") {
-    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS } };
+    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS, githubAppConfigured: true } };
   }
 
   const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);

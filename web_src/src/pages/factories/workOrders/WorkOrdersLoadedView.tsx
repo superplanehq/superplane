@@ -5,6 +5,8 @@ import type {
   FactoriesWorkOrder,
 } from "@/api-client";
 import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
 import {
@@ -13,6 +15,8 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  countWorkOrderFilters,
+  visibleWorkOrderFilters,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
@@ -68,16 +72,21 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   } = usePRFeedbackWorkOrderAttention(pullRequests);
   const { data: factoryIntakes } = useFactoryIntakes(organizationId, factory.id ?? "");
   const intakes = factoryIntakes ?? [];
+  const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
     [entries, state.scope, currentUserId],
   );
-  const filtered = useMemo(() => applyWorkOrderFilters(scoped, state.filters), [scoped, state.filters]);
+  const filtered = useMemo(
+    () => applyWorkOrderFilters(scoped, state.filters, { showPullRequestMerge }),
+    [scoped, state.filters, showPullRequestMerge],
+  );
   const searched = useMemo(() => applyWorkOrderSearch(filtered, state.search), [filtered, state.search]);
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
+  const visibleFilterCount = countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge));
   const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
@@ -91,7 +100,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       );
     }
     if (ordered.length === 0) {
-      if (state.scope !== "all" && state.filterCount === 0 && state.search.trim().length === 0) {
+      if (state.scope !== "all" && visibleFilterCount === 0 && state.search.trim().length === 0) {
         return (
           <WorkOrdersScopedEmptyState
             scopeLabel={state.scope === "my" ? "your work" : "active work"}
@@ -149,6 +158,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           permissionsLoading={props.permissionsLoading}
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
+          showPullRequestMerge={showPullRequestMerge}
         />
       </div>
 

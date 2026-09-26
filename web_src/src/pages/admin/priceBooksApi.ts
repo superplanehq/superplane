@@ -5,6 +5,7 @@ export type PriceBookVersion = {
 };
 
 export type PriceBookModelRate = {
+  provider: string;
   match_key: string;
   match_mode: string;
   input_cents_per_million: number;
@@ -70,13 +71,25 @@ export async function savePriceBooks(
   return response.json();
 }
 
-export async function syncPriceBooks(): Promise<PriceBookSyncResponse> {
-  const response = await fetch("/admin/api/price-books/sync", {
+export async function syncPriceBooks(provider = "openrouter"): Promise<PriceBookSyncResponse> {
+  const response = await fetch(`/admin/api/price-books/sync?provider=${encodeURIComponent(provider)}`, {
     method: "POST",
     credentials: "include",
   });
   if (!response.ok) {
     throw new Error(await readAdminError(response, "Failed to update model rates"));
+  }
+
+  return response.json();
+}
+
+export async function deletePriceBook(version: string): Promise<PriceBooksResponse> {
+  const response = await fetch(`/admin/api/price-books?version=${encodeURIComponent(version)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(await readAdminError(response, "Failed to delete price book"));
   }
 
   return response.json();

@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -33,6 +34,10 @@ const (
 	// intakeSentrySeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
 	intakeSentrySeedEventWindow = 200
+
+	// intakeProductiveSeedSize is how many open Productive.io tasks a new
+	// intake imports. The wizard tells the user this number.
+	intakeProductiveSeedSize = 10
 
 	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
 	// imports. The wizard tells the user this number.
@@ -85,6 +90,8 @@ func seedIntake(
 		return seedSentryIssues(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceJiraIssues:
 		return seedJiraIssues(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return seedDependabotAlerts(ctx, deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -195,6 +202,41 @@ func seedGitHubIssues(
 	}
 
 	if err := emitIntakeEvents(tx, canvasID, intakeGitHubIssuePayloadType, payloads); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(payloads)}, nil
+}
+
+func seedDependabotAlerts(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeGitHubClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	repository, _ := binding.Configuration["repository"].(string)
+	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeSeedSize)
+	if err != nil {
+		return intakeSeedResult{}, ghdependabot.UnavailableError(fmt.Errorf("failed to list Dependabot alerts of %s: %w", repository, err))
+	}
+
+	payloads := make([]map[string]any, 0, len(alerts))
+	for _, alert := range alerts {
+		event, err := ghdependabot.AlertEvent(alert)
+		if err != nil {
+			return intakeSeedResult{}, err
+		}
+		payloads = append(payloads, event)
+	}
+	slices.Reverse(payloads)
+
+	if err := emitIntakeEvents(tx, canvasID, ghdependabot.AlertPayloadType, payloads); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(payloads)}, nil
@@ -329,7 +371,13 @@ func seedProductiveTasks(
 	}
 
 	project, _ := binding.Configuration["project"].(string)
-	documents, err := client.ListNewestOpenTaskDocuments(project, intakeSeedSize)
+	settings := productiveIntakeSettings(tx, canvasID)
+	documents, err := newestProductiveSeedDocuments(
+		client,
+		project,
+		settings.ExcludeKeyTasks,
+		settings.TaskListIDs,
+	)
 	if err != nil {
 		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
 	}
@@ -338,6 +386,15 @@ func seedProductiveTasks(
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(documents)}, nil
+}
+
+func newestProductiveSeedDocuments(
+	client *productive.Client,
+	project string,
+	regularOnly bool,
+	taskListIDs []string,
+) ([]map[string]any, error) {
+	return client.ListNewestOpenTaskDocuments(project, intakeProductiveSeedSize, regularOnly, taskListIDs)
 }
 
 // productiveTaskEvents shapes each task of a newest-first page like the event
@@ -354,6 +411,24 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	slices.Reverse(events)
 
 	return events
+}
+
+func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
+	return liveIntakeSettings(tx, models.FactoryIntakeSourceProductiveTasks, canvasID, defaultProductiveIntakeSettings())
+}
+
+// liveIntakeSettings reads the settings out of the intake's live canvas. It
+// returns fallback when the canvas cannot be read.
+func liveIntakeSettings(tx *gorm.DB, source string, canvasID uuid.UUID, fallback intakeSettings) intakeSettings {
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{canvasID})
+	if err != nil {
+		return fallback
+	}
+	spec, ok := specs[canvasID]
+	if !ok {
+		return fallback
+	}
+	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 }
 
 func seedSentryIssues(
@@ -576,7 +651,7 @@ func newIntakeProductiveClient(
 	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
 	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
+		return nil, fmt.Errorf("failed to build Productive client: %w", err)
 	}
 
 	return client, nil

@@ -13,6 +13,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
+	assert.Empty(t, thinkingArgsFromScript(t, ""))
+	assert.Empty(t, thinkingArgsFromScript(t, "default"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="low"`}, thinkingArgsFromScript(t, "low"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="medium"`}, thinkingArgsFromScript(t, "medium"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="high"`}, thinkingArgsFromScript(t, "HIGH"))
+}
+
+func thinkingArgsFromScript(t *testing.T, thinking string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { thinkingArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(thinkingArgs(process.argv[2])));`,
+		script,
+		thinking,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
 func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{}, "gpt-5", "/task/planning_session_mcp.js")
 
@@ -59,6 +85,16 @@ func TestCodexExecArgsMergesWorkspaceMCP(t *testing.T) {
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
 	assert.Contains(t, joined, `mcp_servers.docs.http_headers.Authorization="Bearer tok"`)
+}
+
+func TestCodexExecArgsDisablesWorkspaceMCPTools(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","disabledTools":["create_issue","search"]}]}`), 0o644))
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	}, "gpt-5", "/task/planning_session_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `mcp_servers.docs.disabled_tools=["create_issue", "search"]`)
 }
 
 func TestCodexExecArgsReadsWorkspaceMCPFromTaskDir(t *testing.T) {

@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { MentionDropdown } from "@/components/AgentSidebar/MentionDropdown";
+import { SkillSlashDropdown } from "@/components/AgentSidebar/SkillSlashMenu";
 import { useFlushAgentComposerSend } from "@/components/AgentSidebar/useFlushAgentComposerSend";
 import { useMentionCandidates } from "@/components/AgentSidebar/useMentionCandidates";
 import { useMentions } from "@/components/AgentSidebar/useMentions";
@@ -11,12 +12,16 @@ import {
   useImageAttachments,
 } from "@/components/AgentSidebar/useImageAttachments";
 import { mimeToApiImageMediaType, type AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
+import { useSkillSlashCandidates } from "@/hooks/useSkillSlashCandidates";
+import type { SkillSlashCandidate } from "@/lib/skillSlash";
 import { FactoryComposerToolbar } from "./FactoryComposerToolbar";
 import { FactoryImageAttachmentPreviews } from "./FactoryImageAttachmentPreviews";
 import { FactoryMentionTextarea } from "./FactoryMentionTextarea";
 
 type ChatComposerProps = {
   canvasId: string;
+  organizationId?: string;
+  factoryId?: string;
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
   onClearChat: () => void;
@@ -33,6 +38,8 @@ const COMPOSER_PLACEHOLDER = "Describe the change to build...";
 
 export function FactoryChatComposer({
   canvasId,
+  organizationId,
+  factoryId,
   onSend,
   onStop,
   onClearChat,
@@ -44,7 +51,7 @@ export function FactoryChatComposer({
   nodes,
   runs,
 }: ChatComposerProps) {
-  const c = useComposerController({ canvasId, onSend, sendPending, nodes, runs });
+  const c = useComposerController({ canvasId, organizationId, factoryId, onSend, sendPending, nodes, runs });
 
   return (
     <footer className="px-3 pb-3 pt-2">
@@ -87,28 +94,50 @@ export function FactoryChatComposer({
           keyboardRef={c.mentionKeyboardRef}
         />
       ) : null}
+      {c.showSkillDropdown ? (
+        <SkillSlashDropdown
+          candidates={c.skillCandidates}
+          visible={c.showSkillDropdown}
+          anchorEl={c.containerRef.current}
+          onSelect={c.handleSkillSelect}
+          onDismiss={c.handleDismiss}
+          keyboardRef={c.mentionKeyboardRef}
+        />
+      ) : null}
     </footer>
   );
 }
 
 type ComposerControllerArgs = {
   canvasId: string;
+  organizationId?: string;
+  factoryId?: string;
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   sendPending: boolean;
   nodes?: SuperplaneComponentsNode[];
   runs?: CanvasesCanvasRun[];
 };
 
-function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: ComposerControllerArgs) {
+function useComposerController({
+  canvasId,
+  organizationId,
+  factoryId,
+  onSend,
+  sendPending,
+  nodes,
+  runs,
+}: ComposerControllerArgs) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const mentionKeyboardRef = useRef<((e: React.KeyboardEvent) => boolean) | null>(null);
   const mentionsApi = useMentions();
-  const { value, setValue, showDropdown, filter, setCursorPos, getMarkdown, mentions, isEmpty } = mentionsApi;
+  const { value, setValue, showDropdown, showSkillDropdown, filter, setCursorPos, getMarkdown, mentions, isEmpty } =
+    mentionsApi;
   const { images, addFiles, removeImage, clear: clearImages } = useImageAttachments();
 
   const candidates = useMentionCandidates(nodes, runs, filter, showDropdown);
+  const skillCandidates = useSkillSlashCandidates(organizationId, factoryId, filter, showSkillDropdown);
   const hasImages = images.length > 0;
   const canSend = (!isEmpty || hasImages) && !sendPending;
   const canAttach = images.length < MAX_IMAGE_ATTACHMENTS;
@@ -156,6 +185,20 @@ function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: C
     [mentionsApi],
   );
 
+  const handleSkillSelect = useCallback(
+    (candidate: SkillSlashCandidate) => {
+      const pos = mentionsApi.insertSkill(candidate.command);
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(pos, pos);
+        }
+      });
+    },
+    [mentionsApi],
+  );
+
   const handleDismiss = useCallback(() => {
     mentionsApi.dismiss();
     textareaRef.current?.focus();
@@ -187,7 +230,9 @@ function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: C
     setCursorPos,
     mentions,
     showDropdown,
+    showSkillDropdown,
     candidates,
+    skillCandidates,
     images,
     addFiles,
     removeImage,
@@ -196,6 +241,7 @@ function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: C
     handleSend,
     handlePaste,
     handleMentionSelect,
+    handleSkillSelect,
     handleDismiss,
     handleKeyDown,
     handleToolbarSend,

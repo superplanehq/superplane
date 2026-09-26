@@ -7,19 +7,30 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
+func enableWorkspaceMCPAndSkills(t *testing.T, orgID uuid.UUID) {
+	t.Helper()
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceMCP))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceSkills))
+}
+
 func Test__DeleteFactoryAgentResourceRevokesOAuth(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -59,6 +70,7 @@ func Test__DeleteFactoryAgentResourceRevokesOAuth(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -101,6 +113,7 @@ func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -161,6 +174,7 @@ func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -181,6 +195,7 @@ func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -192,4 +207,95 @@ func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 		Enabled:   true,
 	})
 	require.Error(t, err)
+}
+
+func Test__CreateFactoryAgentResourceRejectsConnectedURL(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_MCP_SERVER,
+		Name:      "docs",
+		Enabled:   true,
+		Url:       "https://mcp.example.com/mcp",
+		Auth:      pb.FactoryAgentResource_AUTH_HEADERS,
+		Headers: []*pb.FactoryAgentResource_Header{{
+			Name:       "Authorization",
+			SecretName: "vendor-mcp",
+			SecretKey:  "token",
+		}},
+	})
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_MCP_SERVER,
+		Name:      "docs-copy",
+		Enabled:   true,
+		Url:       "https://mcp.example.com/mcp/",
+		Auth:      pb.FactoryAgentResource_AUTH_HEADERS,
+		Headers: []*pb.FactoryAgentResource_Header{{
+			Name:       "Authorization",
+			SecretName: "vendor-mcp",
+			SecretKey:  "token",
+		}},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	assert.Equal(t, "This MCP server is already connected.", grpcerrors.StatusMessage(err))
+}
+
+func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.example.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+	replaceDisabled := true
+	response, err := UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+		FactoryId:            factory.ID.String(),
+		ResourceId:           resource.ID.String(),
+		DisabledTools:        []string{"create_issue", " search "},
+		ReplaceDisabledTools: &replaceDisabled,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"create_issue", "search"}, response.GetResource().GetDisabledTools())
+}
+
+func Test__finishFactoryAgentResourceOAuthConnectRejectsDuplicateURL(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	oauth := models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://api.mobbin.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthOAuth,
+	}
+	first, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin", true, oauth)
+	require.NoError(t, err)
+	second, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "mobbin-retry", true, oauth)
+	require.NoError(t, err)
+	require.NoError(t, first.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
+	require.NoError(t, second.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, []byte("refresh")))
+	require.NoError(t, second.UpsertSecret(db, models.FactoryAgentResourceSecretAccessToken, []byte("access")))
+
+	finishFactoryAgentResourceOAuthConnect(db, second)
+
+	assert.Equal(t, models.FactoryAgentResourceOAuthNeedsReconnect, second.OAuthState())
+	assert.Equal(t, "This MCP server is already connected.", second.OAuthError)
+	_, err = second.FindSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
+	_, err = second.FindSecret(db, models.FactoryAgentResourceSecretAccessToken)
+	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
 }

@@ -96,15 +96,15 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
   });
 
-  it("keeps Needs attention when a pull request is attached", () => {
-    const stalledOrder = { ...waitingOrder, id: "wo-stalled", statusNotes: [] };
+  it("does not show an attention badge when idle waiting has a pull request", () => {
+    const idleOrder = { ...waitingOrder, id: "wo-idle", statusNotes: [] };
     renderCard({
-      entry: buildWorkOrderListEntry(stalledOrder, factory),
-      pullRequests: [{ ...openPullRequest, workOrderId: "wo-stalled" }],
+      entry: buildWorkOrderListEntry(idleOrder, factory),
+      pullRequests: [{ ...openPullRequest, workOrderId: "wo-idle" }],
     });
 
     expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
-    expect(screen.getByText("Needs attention")).toBeInTheDocument();
+    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
   });
 
   it("shows the completed check-wait title after checks pass", () => {

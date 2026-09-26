@@ -69,17 +69,23 @@ func resolveIntakeBinding(
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
 	}
-	if source != models.FactoryIntakeSourceGitHubIssues {
+	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
 	}
 
 	config := factory.OnboardingConfigValue()
 	if config.VCSIntegrationID == "" || config.BacklogRepository == "" {
+		if source == models.FactoryIntakeSourceDependabotAlerts {
+			return nil, invalidArgument("GitHub connection and backlog repository are required")
+		}
 		return nil, nil
 	}
 
 	integration := findIntakeGitHubIntegration(tx, factory, config.VCSIntegrationID)
 	if integration == nil {
+		if source == models.FactoryIntakeSourceDependabotAlerts {
+			return nil, invalidArgument("workspace GitHub integration is not ready")
+		}
 		return nil, nil
 	}
 
@@ -146,23 +152,23 @@ func resolveProductiveIntakeBinding(
 		return nil, nil
 	}
 	if integrationID == "" || projectID == "" {
-		return nil, invalidArgument("Productive.io integration and project are required")
+		return nil, invalidArgument("Productive integration and project are required")
 	}
 
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, invalidArgument("Productive.io integration is invalid")
+		return nil, invalidArgument("Productive integration is invalid")
 	}
 
 	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
 	if err != nil {
-		return nil, invalidArgument("Productive.io integration was not found")
+		return nil, invalidArgument("Productive integration was not found")
 	}
 	if integration.AppName != intakeProductiveAppName {
-		return nil, invalidArgument("selected integration is not Productive.io")
+		return nil, invalidArgument("selected integration is not Productive")
 	}
 	if integration.State != models.IntegrationStateReady {
-		return nil, invalidArgument("Productive.io integration is not ready")
+		return nil, invalidArgument("Productive integration is not ready")
 	}
 
 	return &intakeBinding{

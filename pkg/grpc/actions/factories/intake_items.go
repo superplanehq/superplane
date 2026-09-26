@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -51,6 +53,7 @@ func registerIntakeItemSource(triggerComponent string, builder intakeItemSourceB
 
 func init() {
 	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
+	registerIntakeItemSource("github.onDependabotAlert", newDependabotIntakeItemSource)
 	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
@@ -75,6 +78,8 @@ type productiveIntakeItemSource struct {
 	productive            *productive.Client
 	projectID             string
 	organizationID        string
+	taskListIDs           []string
+	excludeKeyTasks       bool
 	projectProbe          sync.Once
 	projectReadabilityErr error
 }
@@ -108,7 +113,20 @@ func newLiveIntakeItemSource(
 		return unsupportedIntakeItemSource{}, nil
 	}
 
-	return builder(ctx, deps, tx, trigger, integration)
+	source, err := builder(ctx, deps, tx, trigger, integration)
+	if err != nil {
+		return nil, err
+	}
+	if productiveSource, ok := source.(*productiveIntakeItemSource); ok {
+		settings := productiveIntakeSettings(tx, intake.CanvasID)
+		productiveSource.excludeKeyTasks = settings.ExcludeKeyTasks
+		productiveSource.taskListIDs = settings.TaskListIDs
+	}
+	if dependabotSource, ok := source.(*dependabotIntakeItemSource); ok {
+		settings := liveIntakeSettings(tx, models.FactoryIntakeSourceDependabotAlerts, intake.CanvasID, defaultDependabotIntakeSettings())
+		dependabotSource.severities = settings.DependabotSeverities
+	}
+	return source, nil
 }
 
 func newGitHubIntakeItemSource(
@@ -227,6 +245,10 @@ func (s *jiraIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool)
 	return issueKey, true
 }
 
+func (s *jiraIntakeItemSource) IssueFiles(ctx context.Context, issueKey, description string) ([]jira.IssueFile, error) {
+	return s.jira.IssueFiles(ctx, issueKey, description)
+}
+
 func (s *jiraIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
 	issueKey := strings.TrimSpace(id)
 	if issueKey == "" {
@@ -340,9 +362,10 @@ func newProductiveIntakeItemSource(
 	}
 
 	return &productiveIntakeItemSource{
-		productive:     client,
-		projectID:      projectID,
-		organizationID: client.OrganizationID,
+		productive:      client,
+		projectID:       projectID,
+		organizationID:  client.OrganizationID,
+		excludeKeyTasks: true,
 	}, nil
 }
 
@@ -425,6 +448,165 @@ func (s *gitHubIntakeItemSource) IsItemAvailable(ctx context.Context, id string)
 	return !strings.EqualFold(issue.GetState(), "closed"), nil
 }
 
+// dependabotIntakeItemSource lists one item per vulnerable package. GitHub
+// raises one alert per advisory per manifest, and one dependency update fixes
+// them all, so the picker and the import work on packages.
+type dependabotIntakeItemSource struct {
+	github     *common.Client
+	repository string
+	// Severities that still create a task. Empty means every severity.
+	severities []string
+}
+
+func newDependabotIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	repository, _ := trigger.Configuration["repository"].(string)
+	repository = strings.TrimSpace(repository)
+	if repository == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeGitHubClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	return &dependabotIntakeItemSource{github: client, repository: repository}, nil
+}
+
+func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
+	query = strings.ToLower(strings.TrimSpace(query))
+	groups, err := s.packageGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]IntakeItem, 0, len(groups))
+	for _, group := range groups {
+		item := dependabotPackageItem(group)
+		if query != "" && !strings.Contains(strings.ToLower(item.Title+" "+item.Body), query) {
+			continue
+		}
+		items = append(items, item)
+		if len(items) >= limit {
+			break
+		}
+	}
+	return items, nil
+}
+
+func (s *dependabotIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
+	ref, ok := dependabotPackageRefFromItemID(s.repository, id)
+	if !ok {
+		return nil, errIntakeItemNotFound
+	}
+
+	groups, err := s.packageGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		if group.ref.Matches(ref) {
+			item := dependabotPackageItem(group)
+			return &item, nil
+		}
+	}
+	return nil, errIntakeItemNotFound
+}
+
+func (s *dependabotIntakeItemSource) packageGroups(ctx context.Context) ([]dependabotPackageGroup, error) {
+	alerts, err := s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
+	if err != nil {
+		return nil, ghdependabot.UnavailableError(err)
+	}
+	return dependabotPackageGroups(s.repository, alerts, s.severities), nil
+}
+
+// dependabotPackageGroup is every open alert of one package, newest first.
+type dependabotPackageGroup struct {
+	ref    ghdependabot.PackageRef
+	alerts []*github.DependabotAlert
+}
+
+// dependabotPackageGroups folds open alerts into one group per package. It
+// keeps the order of first appearance, so a package with a newer alert
+// lists first. Alerts outside the configured severities are dropped.
+func dependabotPackageGroups(repository string, alerts []*github.DependabotAlert, severities []string) []dependabotPackageGroup {
+	groups := []dependabotPackageGroup{}
+	for _, alert := range alerts {
+		if !dependabotAlertImportable(alert, severities) {
+			continue
+		}
+		ref, ok := ghdependabot.PackageRefFromAlert(repository, alert)
+		if !ok {
+			continue
+		}
+		index := slices.IndexFunc(groups, func(group dependabotPackageGroup) bool {
+			return group.ref.Matches(ref)
+		})
+		if index < 0 {
+			groups = append(groups, dependabotPackageGroup{ref: ref})
+			index = len(groups) - 1
+		}
+		groups[index].alerts = append(groups[index].alerts, alert)
+	}
+	return groups
+}
+
+func dependabotAlertImportable(alert *github.DependabotAlert, severities []string) bool {
+	if alert == nil || alert.GetNumber() <= 0 || !strings.EqualFold(alert.GetState(), "open") {
+		return false
+	}
+	if strings.TrimSpace(alert.GetHTMLURL()) == "" {
+		return false
+	}
+	if len(severities) == 0 {
+		return true
+	}
+	severity := ""
+	if alert.SecurityAdvisory != nil {
+		severity = strings.ToLower(strings.TrimSpace(alert.SecurityAdvisory.GetSeverity()))
+	}
+	return slices.Contains(severities, severity)
+}
+
+func dependabotPackageItem(group dependabotPackageGroup) IntakeItem {
+	copy := ghdependabot.TaskCopyFromAlerts(group.ref, group.alerts)
+	key := "1 alert"
+	if len(group.alerts) != 1 {
+		key = strconv.Itoa(len(group.alerts)) + " alerts"
+	}
+	return IntakeItem{
+		ID:    dependabotPackageItemID(group.ref),
+		Key:   key,
+		Title: copy.Title,
+		Body:  copy.Description,
+		URL:   group.ref.OriginURL(),
+	}
+}
+
+// dependabotPackageItemID is `ecosystem:name`, such as `npm:lodash`.
+func dependabotPackageItemID(ref ghdependabot.PackageRef) string {
+	return ref.Ecosystem + ":" + ref.Name
+}
+
+func dependabotPackageRefFromItemID(repository, id string) (ghdependabot.PackageRef, bool) {
+	ecosystem, name, ok := strings.Cut(strings.TrimSpace(id), ":")
+	if !ok || strings.TrimSpace(name) == "" {
+		return ghdependabot.PackageRef{}, false
+	}
+	return ghdependabot.PackageRef{
+		Repository: repository,
+		Ecosystem:  strings.ToLower(strings.TrimSpace(ecosystem)),
+		Name:       strings.TrimSpace(name),
+	}, true
+}
+
 func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
 	number, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(id), "#"))
 	if err != nil || number <= 0 {
@@ -452,7 +634,7 @@ func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeIte
 }
 
 func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	tasks, err := s.productive.ListTasks(s.projectID, query, limit)
+	tasks, err := s.productive.ListTasks(s.projectID, query, limit, s.excludeKeyTasks, s.taskListIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -464,12 +646,19 @@ func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, l
 	return items, nil
 }
 
+func (s *productiveIntakeItemSource) TaskFiles(ctx context.Context, taskID, description string) ([]productive.TaskFile, error) {
+	return s.productive.TaskFiles(ctx, taskID, description)
+}
+
 func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
 	task, err := s.productive.GetTask(strings.TrimSpace(id))
 	if err != nil {
 		return nil, err
 	}
 	if task.ProjectID != "" && task.ProjectID != s.projectID {
+		return nil, errIntakeItemNotFound
+	}
+	if !s.acceptsTask(*task) {
 		return nil, errIntakeItemNotFound
 	}
 
@@ -503,7 +692,20 @@ func (s *productiveIntakeItemSource) IsItemAvailable(_ context.Context, id strin
 	if err != nil {
 		return false, err
 	}
+	if !s.acceptsTask(*task) {
+		return false, nil
+	}
 	return !task.Closed, nil
+}
+
+func (s *productiveIntakeItemSource) acceptsTask(task productive.Task) bool {
+	if s.excludeKeyTasks && task.IsKeyTask() {
+		return false
+	}
+	if len(s.taskListIDs) == 0 {
+		return true
+	}
+	return slices.Contains(s.taskListIDs, task.TaskListID)
 }
 
 func productiveTaskItem(task productive.Task, organizationID string) IntakeItem {

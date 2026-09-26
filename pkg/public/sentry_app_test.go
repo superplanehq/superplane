@@ -58,7 +58,7 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 	signer := jwt.NewSigner("test-client-secret")
 	server, err := NewServer(
 		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+		"", "", "", "test", "/app/templates", r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestHandleSentryAppWebhook_listenerCannotStartRun(t *testing.T) {
 	signer := jwt.NewSigner("test-client-secret")
 	server, err := NewServer(
 		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+		"", "", "", "test", "/app/templates", r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -286,7 +286,7 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 	signer := jwt.NewSigner("test-client-secret")
 	server, err := NewServer(
 		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+		"", "", "", "test", "/app/templates", r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -322,7 +322,7 @@ func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
 	signer := jwt.NewSigner("test-client-secret")
 	server, err := NewServer(
 		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, nil, false,
+		"", "", "", "test", "/app/templates", r.AuthService, false,
 	)
 	require.NoError(t, err)
 

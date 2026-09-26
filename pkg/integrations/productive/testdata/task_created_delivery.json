@@ -1,0 +1,38 @@
+{
+  "event": "create_task",
+  "item_type": "task",
+  "item_id": 20305431,
+  "created": "2026-09-23T18:46:58.988+02:00",
+  "object": {
+    "data": {
+      "id": "20305431",
+      "type": "tasks",
+      "attributes": {
+        "title": "webhook test 100000",
+        "description": "",
+        "type_id": 1,
+        "closed": false
+      },
+      "relationships": {
+        "project": {
+          "data": {
+            "type": "projects",
+            "id": "1049891"
+          }
+        },
+        "assignee": {
+          "data": null
+        }
+      }
+    },
+    "included": [
+      {
+        "id": "1049891",
+        "type": "projects",
+        "attributes": {
+          "name": "sentry-intake-test-project"
+        }
+      }
+    ]
+  }
+}

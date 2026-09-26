@@ -80,7 +80,7 @@ describe("confidenceScore", () => {
     expect(workOrderCheckStatus({ name: "Confidence score", score: 5, level: "positive" }).label).toBe("High");
     expect(workOrderCheckStatus({ name: "Confidence score", score: 3, level: "neutral" }).label).toBe("Medium");
     expect(workOrderCheckStatus({ name: "Clarity score", score: 2, level: "critical" }).label).toBe("Low");
-    expect(workOrderCheckStatus({ name: "Risk score", score: 65, level: "caution" }).label).toBe("Needs attention");
+    expect(workOrderCheckStatus({ name: "Risk score", score: 65, level: "caution" }).label).toBe("Caution");
   });
 
   it("summarizes how suitable the issue is for an agent", () => {

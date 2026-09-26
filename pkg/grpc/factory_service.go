@@ -8,7 +8,6 @@ import (
 	actions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 type FactoryService struct {
@@ -25,7 +24,6 @@ func NewFactoryService(
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
 	webhookBaseURL string,
-	usageService usage.Service,
 ) *FactoryService {
 	return &FactoryService{
 		registry: reg,
@@ -34,7 +32,6 @@ func NewFactoryService(
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
-			UsageService:   usageService,
 		},
 	}
 }
@@ -182,6 +179,11 @@ func (s *FactoryService) MergeFactoryPullRequest(ctx context.Context, req *pb.Me
 func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) SearchDependabotIntakeSetupItems(ctx context.Context, req *pb.SearchDependabotIntakeSetupItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchDependabotIntakeSetupItems(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {

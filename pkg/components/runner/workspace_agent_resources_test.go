@@ -29,7 +29,7 @@ func TestAttachWorkspaceAgentResourcesSkipsNonFactoryCanvas(t *testing.T) {
 func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("NO_ENCRYPTION", "yes")
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 
 func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testi
 
 func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
 
 func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -211,7 +211,8 @@ func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 
 func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -241,7 +242,8 @@ func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
 
 func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -291,9 +293,81 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 	assert.Equal(t, "deepwiki", payload.Servers[0].Name)
 }
 
+func TestAttachWorkspaceAgentResourcesMergesDisabledTools(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport:     "http",
+		URL:           "https://mcp.example.com/mcp",
+		Auth:          models.FactoryAgentResourceAuthHeaders,
+		DisabledTools: []string{"search"},
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
+		Source:   models.FactoryAgentResourceSourceInline,
+		Markdown: "# Review copy",
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration: map[string]any{
+			"disabledAgentResourceTools": map[string]any{
+				resource.ID.String(): []any{"create_issue"},
+			},
+		},
+	}, nil, nil)
+	require.Len(t, environment, 1)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
+	var payload struct {
+		Servers []struct {
+			Name          string   `json:"name"`
+			DisabledTools []string `json:"disabledTools"`
+		} `json:"servers"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.Len(t, payload.Servers, 1)
+	assert.Equal(t, "docs", payload.Servers[0].Name)
+	assert.Equal(t, []string{"search", "create_issue"}, payload.Servers[0].DisabledTools)
+}
+
+func TestAttachWorkspaceAgentResourcesAttachesMCPOnlyWhenSkillsFlagIsOff(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.example.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
+		Source:   models.FactoryAgentResourceSourceInline,
+		Markdown: "# Review copy",
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	require.Len(t, environment, 1)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
+}
+
 func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgentResources))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

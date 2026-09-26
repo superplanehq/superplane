@@ -56,6 +56,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"github.onBranchCreated":   "{{ root().data.ref }}",
 	"github.onCheckRun":        "{{ root().data.check_run.name }} {{ root().data.check_run.conclusion }} - {{ root().data.check_run.head_sha[:7] }}",
 	"github.onCommitStatus":    "{{ root().data.context }} {{ root().data.state }} - {{ root().data.sha[:7] }}",
+	"github.onDependabotAlert": "#{{ root().data.alert.number }} - {{ root().data.alert.dependency.package.name }} in {{ root().data.alert.dependency.manifest_path }}",
 	"github.onIssue":           "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onIssueComment":    "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onPRComment":       "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",

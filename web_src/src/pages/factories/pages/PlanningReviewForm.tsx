@@ -1,13 +1,17 @@
+import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
 import { useComponent } from "@/hooks/useComponentData";
+import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 import { cn } from "@/lib/utils";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
+import { disabledAgentResourceTools } from "./PlanningReviewDisabledTools";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
 
@@ -79,6 +83,32 @@ function AgentPanel({
   };
   const { data: action } = useComponent(organizationId ?? "", component.component ?? "");
   const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
+  const modelProvider = modelUsedField?.typeOptions?.hostedModel?.provider ?? "";
+  const currentModel = typeof component.configuration.model === "string" ? component.configuration.model : "";
+  const byokModelDefault = useByokRunnerModelDefault({
+    enabled:
+      modelUsedField?.type === "hosted-model" && modelProvider !== "" && modelProvider !== HOSTED_MODEL_ALL_PROVIDERS,
+    organizationId,
+    factoryId,
+    provider: modelProvider,
+    current: currentModel,
+  });
+
+  const componentRef = useRef(component);
+  componentRef.current = component;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    if (!byokModelDefault) {
+      return;
+    }
+    const current = componentRef.current;
+    onChangeRef.current({
+      ...current,
+      configuration: { ...current.configuration, model: byokModelDefault },
+    });
+  }, [byokModelDefault]);
 
   return (
     <div className="flex flex-col gap-4" data-testid={`planning-review-component-${component.id}`}>
@@ -109,10 +139,18 @@ function AgentPanel({
         {modelUsedField ? (
           <ConfigurationFieldRenderer
             field={modelUsedField}
-            value={component.configuration.model}
+            value={byokModelDefault ?? component.configuration.model}
             onChange={(value) => setConfigurationField("model", value)}
+            onValuesChange={(patch) => {
+              const configuration = { ...component.configuration, ...patch };
+              if (!patch.thinkingLevel) {
+                delete configuration.thinkingLevel;
+              }
+              onChange({ ...component, configuration });
+            }}
             allValues={component.configuration}
             organizationId={organizationId}
+            factoryId={factoryId}
             allowExpressions
             autocompleteExampleObj={EXPRESSION_CONTEXT}
             fieldPath="model"
@@ -140,7 +178,9 @@ function AgentPanel({
         factoryId={factoryId}
         factoryKey={factoryKey}
         disabledIds={disabledAgentResourceIds(component.configuration)}
+        disabledTools={disabledAgentResourceTools(component.configuration)}
         onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
+        onDisabledToolsChange={(tools) => setConfigurationField("disabledAgentResourceTools", tools)}
       />
     </div>
   );

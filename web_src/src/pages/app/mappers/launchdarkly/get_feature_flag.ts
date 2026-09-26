@@ -98,18 +98,34 @@ export const getFeatureFlagMapper: ComponentBaseMapper = {
     const flag = outputs.default[0].data as FeatureFlagOutput;
     if (!flag) return details;
 
-    if (flag.projectKey) details["Project"] = flag.projectKey;
-    if (flag.key) details["Key"] = flag.key;
-    if (flag.name) details["Name"] = flag.name;
-    if (flag.description) details["Description"] = flag.description;
-    if (flag.kind) details["Kind"] = flag.kind;
-    if (flag.archived !== undefined) details["Archived"] = flag.archived ? "Yes" : "No";
-    if (flag.temporary !== undefined) details["Temporary"] = flag.temporary ? "Yes" : "No";
-    if (flag.creationDate) details["Created At"] = new Date(flag.creationDate).toLocaleString();
-    if (flag.projectKey && flag.key) {
-      details["URL"] = `https://app.launchdarkly.com/projects/${flag.projectKey}/flags/${flag.key}`;
-    }
-
-    return details;
+    return {
+      ...featureFlagCoreDetails(flag),
+      ...featureFlagStatusDetails(flag),
+    };
   },
 };
+
+function featureFlagCoreDetails(flag: FeatureFlagOutput): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (flag.projectKey) details["Project"] = flag.projectKey;
+  if (flag.key) details["Key"] = flag.key;
+  if (flag.name) details["Name"] = flag.name;
+  if (flag.description) details["Description"] = flag.description;
+  if (flag.kind) details["Kind"] = flag.kind;
+
+  return details;
+}
+
+function featureFlagStatusDetails(flag: FeatureFlagOutput): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (flag.archived !== undefined) details["Archived"] = flag.archived ? "Yes" : "No";
+  if (flag.temporary !== undefined) details["Temporary"] = flag.temporary ? "Yes" : "No";
+  if (flag.creationDate) details["Created At"] = new Date(flag.creationDate).toLocaleString();
+  if (flag.projectKey && flag.key) {
+    details["URL"] = `https://app.launchdarkly.com/projects/${flag.projectKey}/flags/${flag.key}`;
+  }
+
+  return details;
+}

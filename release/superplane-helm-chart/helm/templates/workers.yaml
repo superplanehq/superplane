@@ -19,6 +19,9 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-workers
     spec:
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -45,7 +48,13 @@ spec:
             - secretRef:
                 name: {{ include "secrets.email.name" . }}
             - secretRef:
+                name: {{ include "secrets.feedback.name" . }}
+            - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            {{- if .Values.polar.enabled }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
           env:
             - name: START_CONSUMERS
               value: "yes"
@@ -79,7 +88,11 @@ spec:
               value: "yes"
             - name: START_FACTORY_VELOCITY_SYNC_WORKER
               value: "yes"
+            - name: START_PRICE_BOOK_SYNC_WORKER
+              value: "yes"
             - name: START_PLANNING_SESSION_CLEANUP_WORKER
+              value: "yes"
+            - name: START_EVENT_RETENTION_WORKER
               value: "yes"
             - name: START_NODE_REQUEST_CLEANUP_WORKER
               value: "yes"
@@ -113,6 +126,8 @@ spec:
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
+            - name: BLOB_STORAGE_REGION
+              value: {{ .Values.blobStorage.region | quote }}
             - name: BLOB_STORAGE_LOCAL_PATH
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE

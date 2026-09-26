@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -66,7 +67,7 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	if strings.TrimSpace(string(apiToken)) == "" {
-		return nil, fmt.Errorf("missing Productive.io API token")
+		return nil, fmt.Errorf("missing Productive API token")
 	}
 
 	organizationID, err := ctx.GetConfig("organizationId")
@@ -75,7 +76,7 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	if strings.TrimSpace(string(organizationID)) == "" {
-		return nil, fmt.Errorf("missing Productive.io organization id")
+		return nil, fmt.Errorf("missing Productive organization id")
 	}
 
 	baseURL := BaseURL
@@ -201,7 +202,19 @@ type Task struct {
 	Title       string
 	Description string
 	ProjectID   string
+	TaskListID  string
 	Closed      bool
+	TypeID      int
+}
+
+// TaskList is a Productive.io task list inside one project.
+type TaskList struct {
+	ID   string
+	Name string
+}
+
+func (t Task) IsKeyTask() bool {
+	return t.TypeID == TaskTypeMilestone
 }
 
 func projectFromDocument(doc resourceDocument) Project {
@@ -220,7 +233,9 @@ func taskFromDocument(doc resourceDocument) Task {
 		Title:       title,
 		Description: description,
 		ProjectID:   projectID,
+		TaskListID:  doc.Relationships["task_list"].Data.ID,
 		Closed:      closed,
+		TypeID:      numberAttribute(doc.Attributes["type_id"]),
 	}
 }
 
@@ -288,21 +303,27 @@ func (c *Client) GetProject(id string) (*Project, error) {
 
 // taskListOptions describes one page of a project's tasks.
 type taskListOptions struct {
-	projectID string
-	query     string
-	openOnly  bool
-	sort      string
-	pageSize  int
+	projectID   string
+	query       string
+	openOnly    bool
+	regularOnly bool
+	taskListIDs []string
+	sort        string
+	pageSize    int
 }
 
 // ListTasks returns open tasks from one project, optionally filtered by text.
-func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
+// When regularOnly is set, key tasks (milestones) are omitted. A non-empty
+// taskListIDs keeps tasks that belong to those task lists.
+func (c *Client) ListTasks(projectID, query string, limit int, regularOnly bool, taskListIDs []string) ([]Task, error) {
 	url := c.taskListURL(taskListOptions{
-		projectID: projectID,
-		query:     query,
-		openOnly:  true,
-		sort:      sortNewestCreated,
-		pageSize:  limit,
+		projectID:   projectID,
+		query:       query,
+		openOnly:    true,
+		regularOnly: regularOnly,
+		taskListIDs: taskListIDs,
+		sort:        sortNewestCreated,
+		pageSize:    limit,
 	})
 
 	body, err := c.execRequest(http.MethodGet, url, nil)
@@ -326,12 +347,14 @@ func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
 // open task in the project, newest first. Seeding an intake replays these
 // through the graph the trigger feeds, and that graph reads attributes Task
 // does not keep.
-func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int) ([]map[string]any, error) {
+func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int, regularOnly bool, taskListIDs []string) ([]map[string]any, error) {
 	return c.listTaskDocuments(taskListOptions{
-		projectID: projectID,
-		openOnly:  true,
-		sort:      sortNewestCreated,
-		pageSize:  limit,
+		projectID:   projectID,
+		openOnly:    true,
+		regularOnly: regularOnly,
+		taskListIDs: taskListIDs,
+		sort:        sortNewestCreated,
+		pageSize:    limit,
 	})
 }
 
@@ -348,6 +371,30 @@ func (c *Client) listTaskDocuments(options taskListOptions) ([]map[string]any, e
 		return nil, fmt.Errorf("error parsing tasks: %v", err)
 	}
 
+	for i := range response.Data {
+		if taskListID(response.Data[i]) != "" {
+			continue
+		}
+		if len(options.taskListIDs) == 1 {
+			// A list filtered to one task list can omit the relationship.
+			// The intake filter reads that id, so write the only possible value.
+			setTaskListID(response.Data[i], options.taskListIDs[0])
+			continue
+		}
+		if len(options.taskListIDs) > 1 {
+			id, _ := response.Data[i]["id"].(string)
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			task, err := c.GetTask(id)
+			if err != nil || task.TaskListID == "" {
+				continue
+			}
+			setTaskListID(response.Data[i], task.TaskListID)
+		}
+	}
+
 	return response.Data, nil
 }
 
@@ -362,16 +409,67 @@ func (c *Client) taskListURL(options taskListOptions) string {
 		params.Set("filter[status]", "1")
 	}
 
+	if options.regularOnly {
+		params.Set("filter[type_id]", strconv.Itoa(TaskTypeRegular))
+	}
+
 	if query := strings.TrimSpace(options.query); query != "" {
 		params.Set("filter[query]", query)
+	}
+
+	if len(options.taskListIDs) > 0 {
+		params.Set("filter[task_list_id]", strings.Join(options.taskListIDs, ","))
+		params.Set("include", "task_list")
 	}
 
 	return fmt.Sprintf("%s/tasks?%s", c.BaseURL, params.Encode())
 }
 
+// ListTaskLists returns the active task lists of one project. Productive.io
+// paginates responses, so pages are walked until a short page ends them.
+func (c *Client) ListTaskLists(projectID string) ([]TaskList, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("project is required")
+	}
+
+	lists := []TaskList{}
+	for page := 1; page <= maxProjectPages; page++ {
+		params := url.Values{}
+		params.Set("filter[project_id]", projectID)
+		params.Set("filter[status]", "1")
+		params.Set("page[number]", strconv.Itoa(page))
+		params.Set("page[size]", strconv.Itoa(projectsPageSize))
+
+		body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/task_lists?%s", c.BaseURL, params.Encode()), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		response := resourceListResponse{}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, fmt.Errorf("error parsing task lists: %v", err)
+		}
+
+		for _, doc := range response.Data {
+			name, _ := doc.Attributes["name"].(string)
+			lists = append(lists, TaskList{ID: doc.ID, Name: name})
+		}
+
+		if len(response.Data) < projectsPageSize {
+			break
+		}
+	}
+
+	sort.Slice(lists, func(i, j int) bool {
+		return strings.ToLower(lists[i].Name) < strings.ToLower(lists[j].Name)
+	})
+	return lists, nil
+}
+
 // GetTask returns one task by its Productive.io resource id.
 func (c *Client) GetTask(id string) (*Task, error) {
-	body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/tasks/%s", c.BaseURL, url.PathEscape(id)), nil)
+	body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/tasks/%s?include=task_list", c.BaseURL, url.PathEscape(id)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -388,29 +486,34 @@ func (c *Client) GetTask(id string) (*Task, error) {
 	return &task, nil
 }
 
-// Webhook is a Productive.io webhook subscription, scoped to one project.
+// Webhook is a Productive.io webhook subscription. Productive.io webhooks
+// are organization-wide and fire for one event_id each.
 type Webhook struct {
-	ID string `json:"id"`
+	ID             string
+	SignatureToken string
 }
 
-// CreateWebhook registers a webhook that forwards task created and task
-// updated events for one project to url, signed with secret. Productive.io
-// answers 403 webhooks_limit_exceeded (surfaced as ErrWebhooksLimitExceeded)
-// on plans that do not include webhooks.
-func (c *Client) CreateWebhook(projectID, webhookURL, secret string) (*Webhook, error) {
+// CreateWebhook registers an organization webhook that POSTs eventID
+// deliveries to webhookURL. eventName is sent back on each delivery as
+// EventHeader. Productive.io answers 403 webhooks_limit_exceeded (surfaced
+// as ErrWebhooksLimitExceeded) on plans that do not include webhooks.
+func (c *Client) CreateWebhook(webhookURL string, eventID int, eventName string) (*Webhook, error) {
+	attributes := map[string]any{
+		"name":       "SuperPlane",
+		"event_id":   eventID,
+		"target_url": webhookURL,
+		"type_id":    WebhookTypeStandard,
+	}
+	if eventName != "" {
+		attributes["custom_headers"] = map[string]string{
+			EventHeader: eventName,
+		}
+	}
+
 	payload := map[string]any{
 		"data": map[string]any{
-			"type": "webhooks",
-			"attributes": map[string]any{
-				"url":         webhookURL,
-				"secret":      secret,
-				"event_types": []string{TaskCreatedEvent, TaskUpdatedEvent},
-			},
-			"relationships": map[string]any{
-				"project": map[string]any{
-					"data": map[string]any{"type": "projects", "id": projectID},
-				},
-			},
+			"type":       "webhooks",
+			"attributes": attributes,
 		},
 	}
 
@@ -433,7 +536,8 @@ func (c *Client) CreateWebhook(projectID, webhookURL, secret string) (*Webhook, 
 		return nil, fmt.Errorf("productive.io did not return a webhook id")
 	}
 
-	return &Webhook{ID: response.Data.ID}, nil
+	token, _ := response.Data.Attributes["signature_token"].(string)
+	return &Webhook{ID: response.Data.ID, SignatureToken: token}, nil
 }
 
 // DeleteWebhook removes a webhook by its Productive.io resource id.

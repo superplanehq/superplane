@@ -95,6 +95,20 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, runner.AttachmentAgentInstructions+"\n\nFix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 }
 
+func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
+	t.Parallel()
+
+	spec := RunCodexSpec{
+		Model:         "gpt-5",
+		ThinkingLevel: "medium",
+		Steps: []runner.AgentStep{
+			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
+		},
+	}
+	task := buildCodexBrokerTask(spec, "", nil, nil)
+	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'gpt-5' 'medium'`)
+}
+
 func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 	t.Parallel()
 

@@ -59,7 +59,6 @@ const {
       integrationsCalls: 0,
       loading: false,
       organizationEnabledValues: [] as Array<boolean | undefined>,
-      usageEnabledValues: [] as boolean[],
     },
     permissionsState: { permissions: defaultPermissions },
     writeTextMock: vi.fn(),
@@ -136,13 +135,6 @@ vi.mock("@/hooks/useOrganizationData", () => ({
           name: "Acme",
         },
       },
-    };
-  },
-  useOrganizationUsage: (_organizationId: string, enabled: boolean) => {
-    paletteQueryState.usageEnabledValues.push(enabled);
-    return {
-      data: { enabled: true },
-      error: null,
     };
   },
   useOrganizationInviteLink: (_organizationId: string, enabled: boolean) => {
@@ -230,7 +222,6 @@ describe("GlobalCommandPalette", () => {
     paletteQueryState.integrationsCalls = 0;
     paletteQueryState.loading = false;
     paletteQueryState.organizationEnabledValues = [];
-    paletteQueryState.usageEnabledValues = [];
     inviteLinkQueryState.enabledValues = [];
     inviteLinkState.data = { token: "test-invite-token", enabled: true };
     permissionsState.permissions = [...defaultPermissions];
@@ -266,7 +257,6 @@ describe("GlobalCommandPalette", () => {
     expect(inviteLinkQueryState.enabledValues).toEqual([]);
     expect(paletteQueryState.canvasEnabledValues).not.toContain(true);
     expect(paletteQueryState.organizationEnabledValues).not.toContain(true);
-    expect(paletteQueryState.usageEnabledValues).not.toContain(true);
 
     openPalette();
 
@@ -276,7 +266,6 @@ describe("GlobalCommandPalette", () => {
     expect(inviteLinkQueryState.enabledValues).toContain(true);
     expect(paletteQueryState.canvasEnabledValues).toContain(true);
     expect(paletteQueryState.organizationEnabledValues).toContain(true);
-    expect(paletteQueryState.usageEnabledValues).toContain(true);
   });
 
   it("shows a loading state while searchable data loads", async () => {

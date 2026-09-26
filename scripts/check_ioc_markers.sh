@@ -27,6 +27,7 @@ exclude_dirs=(
 	--exclude-dir=storybook-static
 	--exclude-dir=.cursor
 	--exclude-dir=canvases
+	--exclude-dir=runner
 )
 
 echo "==> IoC marker scan"

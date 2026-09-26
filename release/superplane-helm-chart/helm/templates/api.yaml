@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 {{- if eq .Values.ingress.className "gce" }}
   annotations:
-    cloud.google.com/backend-config: '{"default": "ingress-backend-config"}'
+    cloud.google.com/backend-config: '{"default": "ingress-api-backend-config"}'
     cloud.google.com/neg: '{"ingress": true}'
 {{- end }}
 spec:
@@ -40,6 +40,9 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-api
     spec:
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -69,11 +72,21 @@ spec:
                 name: {{ include "secrets.sentry.name" . }}
             - secretRef:
                 name: {{ include "secrets.dash0Web.name" . }}
+            {{- if .Values.posthog.enabled }}
+            - secretRef:
+                name: {{ include "secrets.posthog.name" . }}
+            {{- end }}
+            {{- if .Values.polar.enabled }}
+            - secretRef:
+                name: {{ include "secrets.polar.name" . }}
+            {{- end }}
           env:
             - name: START_PUBLIC_API
               value: "yes"
             - name: START_EVENT_DISTRIBUTER
-              value: "yes"
+              value: "no"
+            - name: START_WEBSOCKET_SERVER
+              value: "no"
             - name: START_WEB_SERVER
               value: "yes"
             - name: START_RBAC_POLICY_RELOAD_CONSUMER
@@ -126,6 +139,8 @@ spec:
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
+            - name: BLOB_STORAGE_REGION
+              value: {{ .Values.blobStorage.region | quote }}
             - name: BLOB_STORAGE_LOCAL_PATH
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE

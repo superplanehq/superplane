@@ -757,6 +757,7 @@ export const ComponentSidebar = ({
                     concurrencyMaxOnly={nodeConcurrencyMaxOnly}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
+                    blockName={blockName}
                     customField={customField}
                     integrationName={integrationName}
                     integrationRef={integrationRef}

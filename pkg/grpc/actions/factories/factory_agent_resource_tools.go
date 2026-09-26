@@ -40,6 +40,9 @@ func ListFactoryAgentResourceTools(
 	if resource.Kind != models.FactoryAgentResourceKindMCPServer {
 		return nil, factoryErrorToStatus(invalidArgument("this resource is not an MCP server"), "failed to list MCP tools")
 	}
+	if err := requireAgentResourceKindFeature(orgID, resource.Kind); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list MCP tools")
+	}
 
 	headers, err := mcpHeadersForResource(ctx, deps, db, orgID, resource)
 	if err != nil {
@@ -55,6 +58,7 @@ func ListFactoryAgentResourceTools(
 		out = append(out, &pb.FactoryAgentResourceTool{
 			Name:        tool.Name,
 			Description: tool.Description,
+			ReadOnly:    tool.ReadOnly,
 		})
 	}
 	return &pb.ListFactoryAgentResourceToolsResponse{Tools: out}, nil

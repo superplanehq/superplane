@@ -160,13 +160,7 @@ CREATE TABLE public.agent_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     heartbeat_at timestamp with time zone,
     agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
-    context_replayed_at timestamp with time zone,
-    tracked_usage_input_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_output_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_cache_read_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_cache_write_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_total_tokens bigint DEFAULT 0 NOT NULL,
-    tracked_usage_initialized boolean DEFAULT true NOT NULL
+    context_replayed_at timestamp with time zone
 );
 
 
@@ -807,7 +801,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
-    model text DEFAULT ''::text NOT NULL
+    model text DEFAULT ''::text NOT NULL,
+    thinking_level text DEFAULT ''::text NOT NULL
 );
 
 
@@ -1063,9 +1058,7 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    usage_synced_at timestamp with time zone,
-    usage_retention_window_days integer,
-    usage_limits_synced_at timestamp with time zone,
+    usage_retention_window_days integer DEFAULT 180,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
@@ -1149,6 +1142,7 @@ CREATE TABLE public.usage_price_book_rates (
     cache_write_cents_per_million bigint DEFAULT 0 NOT NULL,
     reasoning_cents_per_million bigint DEFAULT 0 NOT NULL,
     micros_per_second bigint DEFAULT 0 NOT NULL,
+    provider text DEFAULT ''::text NOT NULL,
     CONSTRAINT usage_price_book_rates_match_mode_check CHECK ((match_mode = ANY (ARRAY['exact'::text, 'prefix'::text, 'family'::text]))),
     CONSTRAINT usage_price_book_rates_usage_kind_check CHECK ((usage_kind = ANY (ARRAY['model'::text, 'compute'::text])))
 );
@@ -2142,11 +2136,11 @@ ALTER TABLE ONLY public.usage_price_book_rates
 
 
 --
--- Name: usage_price_book_rates usage_price_book_rates_version_usage_kind_match_key_match_m_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: usage_price_book_rates usage_price_book_rates_version_kind_provider_key_mode_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.usage_price_book_rates
-    ADD CONSTRAINT usage_price_book_rates_version_usage_kind_match_key_match_m_key UNIQUE (version, usage_kind, match_key, match_mode);
+    ADD CONSTRAINT usage_price_book_rates_version_kind_provider_key_mode_key UNIQUE (version, usage_kind, provider, match_key, match_mode);
 
 
 --
@@ -4507,7 +4501,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260922193722	f
+20260924170742	f
 \.
 
 
@@ -4543,7 +4537,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260907234118	f
+20260925105000	f
 \.
 
 

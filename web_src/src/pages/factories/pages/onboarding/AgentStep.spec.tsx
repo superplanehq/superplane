@@ -62,14 +62,14 @@ describe("AgentStep", () => {
     expect(screen.queryByTestId("hosted-credit-grant")).not.toBeInTheDocument();
   });
 
-  it("shows Anthropic, OpenAI, and OpenRouter as connectable, and Cursor as coming soon", () => {
+  it("shows Anthropic, OpenAI, and OpenRouter as connectable", () => {
     renderAgentStep({ spend: { remainingCreditCents: "0", grantTotalCents: "0" } });
 
     expect(screen.getByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect OpenRouter" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Connect Cursor/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
   it("asks to connect a provider when a grant exists but remaining credit is empty", () => {

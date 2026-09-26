@@ -56,18 +56,14 @@ import (
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 )
@@ -79,8 +75,6 @@ const (
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
 )
-
-var errUsageServiceUnavailable = errors.New("usage service unavailable")
 
 type Server struct {
 	httpServer            *http.Server
@@ -98,7 +92,6 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
-	usageService          usage.Service
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -180,7 +173,6 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
-	usageService usage.Service,
 	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
@@ -202,7 +194,6 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
-		usageService:          usageService,
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
@@ -419,6 +410,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/files/{file_id}/content",
 		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
 	).Methods(http.MethodPut)
+
+	s.Router.Handle(
+		"/api/v1/me/feedback",
+		orgAuthMiddleware(http.HandlerFunc(s.handleSubmitFeedback)),
+	).Methods(http.MethodPost)
 
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
@@ -691,6 +687,11 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
 		Methods("POST")
+	// The extra segment names the event. Productive.io does not send an
+	// event header, and a shared signature token does not name it either.
+	publicRoute.
+		HandleFunc(s.BasePath+"/webhooks/{webhookID}/{event}", s.HandleWebhook).
+		Methods("POST")
 
 	//
 	// HTTP endpoints for app installations
@@ -755,6 +756,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
 	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
+	adminRoute.HandleFunc("/price-books", s.adminDeletePriceBook).Methods("DELETE")
 	adminRoute.HandleFunc("/price-books/sync", s.adminSyncPriceBooks).Methods("POST")
 	adminRoute.HandleFunc("/price-books/current", s.adminActivatePriceBook).Methods("PUT")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
@@ -908,9 +910,7 @@ type initialWorkspaceResponse struct {
 
 type organizationCreationStatusResponse struct {
 	Allowed              bool   `json:"allowed"`
-	UsageEnabled         bool   `json:"usageEnabled"`
 	CurrentOrganizations int32  `json:"currentOrganizations"`
-	MaxOrganizations     int32  `json:"maxOrganizations"`
 	Message              string `json:"message,omitempty"`
 }
 
@@ -921,7 +921,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response, err := s.describeOrganizationCreationStatus(r.Context(), database.DB(r.Context()), account.ID.String())
+	response, err := s.describeOrganizationCreationStatus(database.DB(r.Context()), account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields, so we don't repeat
@@ -937,7 +937,6 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) describeOrganizationCreationStatus(
-	ctx context.Context,
 	tx *gorm.DB,
 	accountID string,
 ) (*organizationCreationStatusResponse, error) {
@@ -950,100 +949,13 @@ func (s *Server) describeOrganizationCreationStatus(
 		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
 	}
 
-	response := &organizationCreationStatusResponse{
+	return &organizationCreationStatusResponse{
 		Allowed:              true,
-		UsageEnabled:         s.usageService != nil && s.usageService.Enabled(),
 		CurrentOrganizations: int32(organizationCount),
-	}
-
-	if !response.UsageEnabled {
-		return response, nil
-	}
-
-	checkResponse, err := s.checkAccountOrganizationCreationLimits(
-		ctx,
-		accountID,
-		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
-	)
-	if err != nil {
-		log.WithError(err).
-			WithField("account_id", accountID).
-			WithField("stage", "check_account_limits").
-			WithField("grpc_code", status.Code(err).String()).
-			Error("failed to check account organization creation limits")
-		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
-	}
-
-	response.MaxOrganizations = checkResponse.GetLimits().GetMaxOrganizations()
-
-	if violationErr := usage.LimitViolationError(checkResponse.GetViolations()); violationErr != nil {
-		response.Allowed = false
-		response.Message = status.Convert(violationErr).Message()
-	}
-
-	return response, nil
-}
-
-func (s *Server) checkAccountOrganizationCreationLimits(
-	ctx context.Context,
-	accountID string,
-	state *usagepb.AccountState,
-) (*usagepb.CheckAccountLimitsResponse, error) {
-	if s.usageService == nil || !s.usageService.Enabled() {
-		return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
-	}
-
-	response, err := s.usageService.CheckAccountLimits(ctx, accountID, state)
-	if err == nil {
-		return response, nil
-	}
-
-	if isTransientUsageServiceError(err) {
-		return nil, fmt.Errorf("%w: check account limits: %w", errUsageServiceUnavailable, err)
-	}
-
-	if status.Code(err) != codes.NotFound {
-		return nil, err
-	}
-
-	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
-		log.WithError(setupErr).
-			WithField("account_id", accountID).
-			WithField("grpc_code", status.Code(setupErr).String()).
-			Error("failed to lazily provision account in usage service")
-		return nil, setupErr
-	}
-
-	response, err = s.usageService.CheckAccountLimits(ctx, accountID, state)
-	if err != nil {
-		log.WithError(err).
-			WithField("account_id", accountID).
-			WithField("grpc_code", status.Code(err).String()).
-			Error("failed to check account limits after lazy provisioning")
-		if isTransientUsageServiceError(err) {
-			return nil, fmt.Errorf("%w: check account limits after lazy provisioning: %w", errUsageServiceUnavailable, err)
-		}
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func isTransientUsageServiceError(err error) bool {
-	switch status.Code(err) {
-	case codes.Unavailable, codes.DeadlineExceeded:
-		return true
-	default:
-		return false
-	}
+	}, nil
 }
 
 func writeOrganizationCreationStatusError(w http.ResponseWriter, fallbackMessage string, err error) {
-	if errors.Is(err, errUsageServiceUnavailable) {
-		http.Error(w, "Usage service unavailable", http.StatusServiceUnavailable)
-		return
-	}
-
 	http.Error(w, fallbackMessage, http.StatusInternalServerError)
 }
 
@@ -1080,7 +992,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), tx, account.ID.String())
+	creationStatus, err := s.describeOrganizationCreationStatus(tx, account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields.
@@ -1163,11 +1075,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
-	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
-	if err := organizationCreatedMessage.Publish(); err != nil {
-		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
-	}
-
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
 	response["slug"] = organization.Slug
@@ -1242,7 +1149,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), creationLock, account.ID.String())
+	creationStatus, err := s.describeOrganizationCreationStatus(creationLock, account.ID.String())
 	if err != nil {
 		writeOrganizationCreationStatusError(w, "Failed to create workspace", err)
 		return
@@ -1263,10 +1170,6 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace creation")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
-	}
-
-	if err := messages.NewOrganizationCreatedMessage(organization.ID.String()).Publish(); err != nil {
-		log.WithError(err).WithField("organization_id", organization.ID).Error("failed to publish organization created message")
 	}
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
@@ -1698,6 +1601,66 @@ func (s *Server) Close() {
 	}
 }
 
+// webhookDeliveryQuery returns the query the trigger should read.
+// The event can be a path segment or a query value. A proxy can drop
+// the query and still forward the path. Use the path when the query
+// does not name the event. Read the last path segment even when Gorilla
+// mux vars are missing, because some proxies forward the path without
+// matching the extra route.
+func webhookDeliveryQuery(r *http.Request) url.Values {
+	query := r.URL.Query()
+	if strings.TrimSpace(query.Get("event")) != "" {
+		return query
+	}
+
+	event := strings.TrimSpace(mux.Vars(r)["event"])
+	if event == "" {
+		event = eventNameFromPath(r.URL.Path)
+	}
+	if event == "" && r.RequestURI != "" {
+		parsed, err := url.ParseRequestURI(r.RequestURI)
+		if err == nil {
+			if value := strings.TrimSpace(parsed.Query().Get("event")); value != "" {
+				return parsed.Query()
+			}
+			event = eventNameFromPath(parsed.Path)
+		}
+	}
+	if event == "" {
+		return query
+	}
+
+	cloned := make(url.Values, len(query)+1)
+	for key, values := range query {
+		cloned[key] = append([]string(nil), values...)
+	}
+	cloned.Set("event", event)
+	return cloned
+}
+
+// eventNameFromPath returns the segment after a webhook UUID.
+// `/webhooks/{id}/task.created` yields `task.created`. A path that
+// ends on the webhook id has no event.
+func eventNameFromPath(rawPath string) string {
+	parts := strings.Split(strings.Trim(rawPath, "/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	last := strings.TrimSpace(parts[len(parts)-1])
+	webhookID := strings.TrimSpace(parts[len(parts)-2])
+	if last == "" {
+		return ""
+	}
+	if _, err := uuid.Parse(webhookID); err != nil {
+		return ""
+	}
+	if _, err := uuid.Parse(last); err == nil {
+		return ""
+	}
+	return last
+}
+
 func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	webhookIDFromRequest := vars["webhookID"]
@@ -1770,8 +1733,13 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents, recordExecution)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"webhook_id": webhookID.String(),
+				"path":       r.URL.Path,
+				"status":     code,
+			}).Errorf("error handling webhook: %v", err)
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
@@ -1813,15 +1781,15 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
-		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
+		return s.executeTriggerNode(ctx, body, headers, query, node, onNewEvents)
 	}
 
-	return s.executeActionNode(ctx, body, headers, node, onNewEvents, recordExecution)
+	return s.executeActionNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
 	if err != nil {
@@ -1852,6 +1820,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
+		Query:         query,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
@@ -1864,7 +1833,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -1887,6 +1856,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 	return action.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
+		Query:         query,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),

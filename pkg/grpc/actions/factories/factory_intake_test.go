@@ -82,16 +82,17 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
 
 		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
-		assert.Equal(t, "Productive.io tasks", intake.GetName())
+		assert.Equal(t, "Productive tasks", intake.GetName())
 		assert.False(t, intake.GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, intake.GetHealth())
+		assert.True(t, intake.GetSettings().GetExcludeKeyTasks())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		require.NoError(t, err)
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 2)
-		assert.Len(t, liveVersion.Edges, 1)
+		assert.Len(t, liveVersion.Nodes, 3)
+		assert.Len(t, liveVersion.Edges, 2)
 
 		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
 		assert.Equal(t, "productive.onTask", trigger.ComponentName())
@@ -128,7 +129,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "payments", trigger.Configuration["project"])
-		assert.Equal(t, []any{"created", "unresolved"}, trigger.Configuration["actions"])
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
 		assert.Equal(t, integrationID, intake.GetIntegrationId())
 		assert.Equal(t, "payments", intake.GetResourceId())
 		assert.True(t, intake.GetHealthy())
@@ -455,6 +456,19 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
 		assert.Nil(t, trigger.IntegrationID)
 		assert.NotContains(t, trigger.Configuration, "repository")
+	})
+
+	t.Run("a Dependabot intake requires workspace GitHub setup", func(t *testing.T) {
+		factory := newFactory(t)
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryIntake_SOURCE_DEPENDABOT_ALERTS,
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, err.Error(), "GitHub connection and backlog repository are required")
 	})
 
 	t.Run("creating an intake also creates Backlog template version 3", func(t *testing.T) {

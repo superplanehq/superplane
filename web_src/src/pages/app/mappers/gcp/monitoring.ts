@@ -108,26 +108,58 @@ interface PolicyDetailsOptions {
   includeFirstCondition?: boolean;
 }
 
+function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
+  if (value) {
+    details[key] = value;
+  }
+}
+
+function addDefinedDetail(details: Record<string, string>, key: string, value: string | number | undefined) {
+  if (value !== undefined) {
+    details[key] = String(value);
+  }
+}
+
+function addYesNoDetail(details: Record<string, string>, key: string, value: boolean | undefined) {
+  if (value !== undefined) {
+    details[key] = value ? "Yes" : "No";
+  }
+}
+
+function addFirstConditionDetail(
+  details: Record<string, string>,
+  includeFirstCondition: boolean,
+  result: AlertingPolicyOutputData,
+) {
+  if (!includeFirstCondition || !result.comparison || result.thresholdValue === undefined) {
+    return;
+  }
+
+  details["First Condition"] = `${comparisonLabels[result.comparison] || result.comparison} ${result.thresholdValue}`;
+}
+
 function policyDetails(
   context: ExecutionDetailsContext,
   { includeId = true, includeFirstCondition = true }: PolicyDetailsOptions = {},
 ): Record<string, string> {
   const details: Record<string, string> = {};
-  if (context.execution.createdAt) {
-    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
-  }
+  addDetail(
+    details,
+    "Executed At",
+    context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : undefined,
+  );
   const result = getPolicyOutput(context);
   if (!result) return details;
 
-  if (result.displayName) details["Display Name"] = result.displayName;
-  if (includeId && result.id) details["Policy ID"] = result.id;
-  if (result.enabled !== undefined) details["Enabled"] = result.enabled ? "Yes" : "No";
-  if (result.severity) details["Severity"] = result.severity;
-  if (result.conditionsCount !== undefined) details["Conditions"] = String(result.conditionsCount);
-  if (includeFirstCondition && result.comparison && result.thresholdValue !== undefined) {
-    details["First Condition"] = `${comparisonLabels[result.comparison] || result.comparison} ${result.thresholdValue}`;
+  addDetail(details, "Display Name", result.displayName);
+  if (includeId) {
+    addDetail(details, "Policy ID", result.id);
   }
-  if (result.duration) details["Duration"] = result.duration;
+  addYesNoDetail(details, "Enabled", result.enabled);
+  addDetail(details, "Severity", result.severity);
+  addDefinedDetail(details, "Conditions", result.conditionsCount);
+  addFirstConditionDetail(details, includeFirstCondition, result);
+  addDetail(details, "Duration", result.duration);
   return details;
 }
 

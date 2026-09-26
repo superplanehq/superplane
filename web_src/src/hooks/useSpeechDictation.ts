@@ -39,6 +39,7 @@ type SpeechWindow = Window & {
 
 export type UseSpeechDictationArgs = {
   onFinalPhrase: (phrase: string) => void;
+  onInterimPhrase?: (phrase: string) => void;
 };
 
 export type UseSpeechDictationResult = {
@@ -62,16 +63,21 @@ function isSpeechDictationSupported(): boolean {
   return Boolean(speechRecognitionConstructor());
 }
 
-export function useSpeechDictation({ onFinalPhrase }: UseSpeechDictationArgs): UseSpeechDictationResult {
+export function useSpeechDictation({
+  onFinalPhrase,
+  onInterimPhrase,
+}: UseSpeechDictationArgs): UseSpeechDictationResult {
   const [isListening, setIsListening] = useState(false);
   const [interimPhrase, setInterimPhrase] = useState("");
   const [permissionError, setPermissionError] = useState(false);
   const onFinalPhraseRef = useRef(onFinalPhrase);
+  const onInterimPhraseRef = useRef(onInterimPhrase);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const listeningWantedRef = useRef(false);
   const mountedRef = useRef(true);
 
   onFinalPhraseRef.current = onFinalPhrase;
+  onInterimPhraseRef.current = onInterimPhrase;
 
   const stopRecognition = useCallback(() => {
     listeningWantedRef.current = false;
@@ -121,6 +127,7 @@ export function useSpeechDictation({ onFinalPhrase }: UseSpeechDictationArgs): U
         }
       }
       setInterimPhrase(interim);
+      onInterimPhraseRef.current?.(interim);
     };
     recognition.onerror = (event) => {
       listeningWantedRef.current = false;

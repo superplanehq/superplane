@@ -88,21 +88,6 @@ func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
 		return nil
 	}
 
-	switch strings.ToLower(message) {
-	case "account organization limit exceeded":
-		return usageLimitError("usage limit reached: this account has reached its organization limit")
-	case "organization canvas limit exceeded":
-		return usageLimitError("usage limit reached: this organization has reached its canvas limit")
-	case "canvas node limit exceeded":
-		return usageLimitError("usage limit reached: this canvas exceeds the plan node limit")
-	case "organization user limit exceeded":
-		return usageLimitError("usage limit reached: this organization has reached its member limit")
-	case "organization integration limit exceeded":
-		return usageLimitError("usage limit reached: this organization has reached its integration limit")
-	case "organization exceeds configured account usage limits":
-		return usageLimitError("usage limit reached: this organization is blocked by account-level usage limits")
-	}
-
 	if prefix := grpcCodePrefix(status.GetCode()); prefix != "" {
 		return fmt.Errorf("%s: %s", prefix, message)
 	}
@@ -206,8 +191,4 @@ func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
 
 func grpcCodePrefix(code int32) string {
 	return grpcCodePrefixes[codes.Code(code)]
-}
-
-func usageLimitError(message string) error {
-	return fmt.Errorf("%s\nSee current limits with: superplane usage get", message)
 }

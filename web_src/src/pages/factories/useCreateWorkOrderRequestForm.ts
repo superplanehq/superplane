@@ -93,7 +93,7 @@ export function useCreateWorkOrderRequestForm({
       countCreateWorkOrderRequestImages(description, attachedFilesRef.current),
     );
     if (selected.rejectedCount > 0) {
-      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images or videos.`);
+      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
     }
     if (selected.accepted.length === 0) {
       return [];
@@ -102,7 +102,7 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleAttach = async (files: FileList | File[]) => {
-    // The create dialog keeps its image and video attach stack. Text files stay on the description editor.
+    // The create dialog keeps its image, video, and audio attach stack. Other files stay on the description editor.
     const visualFiles = Array.from(files).filter(
       (file) => isSupportedImageFile(file) || isInlineWorkOrderVideo(resolveWorkOrderFileMimeType(file)),
     );
@@ -125,7 +125,8 @@ export function useCreateWorkOrderRequestForm({
   return {
     attachedFiles,
     busy,
-    canAttach: !busy && countCreateWorkOrderRequestImages(description, attachedFiles) < MAX_IMAGE_ATTACHMENTS,
+    canAttach: !busy,
+    pendingFiles: attachedFiles.filter((file) => !file.isImage),
     canCreate,
     derivedTitle,
     titleDirty,

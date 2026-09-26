@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,76 +26,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
-
-type fakePublicUsageService struct {
-	checkAccountResponse *usagepb.CheckAccountLimitsResponse
-	checkAccountErr      error
-	checkAccount         func(*usagepb.AccountState) *usagepb.CheckAccountLimitsResponse
-}
-
-func (s *fakePublicUsageService) Enabled() bool {
-	return true
-}
-
-func (s *fakePublicUsageService) SetupAccount(context.Context, string) (*usagepb.SetupAccountResponse, error) {
-	return &usagepb.SetupAccountResponse{}, nil
-}
-
-func (s *fakePublicUsageService) SetupOrganization(context.Context, string, string, usage.SetupOrganizationDetails) (*usagepb.SetupOrganizationResponse, error) {
-	return &usagepb.SetupOrganizationResponse{}, nil
-}
-
-func (s *fakePublicUsageService) DescribeAccountLimits(context.Context, string) (*usagepb.DescribeAccountLimitsResponse, error) {
-	return &usagepb.DescribeAccountLimitsResponse{}, nil
-}
-
-func (s *fakePublicUsageService) DescribeOrganizationLimits(context.Context, string) (*usagepb.DescribeOrganizationLimitsResponse, error) {
-	return &usagepb.DescribeOrganizationLimitsResponse{}, nil
-}
-
-func (s *fakePublicUsageService) DescribeOrganizationUsage(context.Context, string) (*usagepb.DescribeOrganizationUsageResponse, error) {
-	return &usagepb.DescribeOrganizationUsageResponse{}, nil
-}
-
-func (s *fakePublicUsageService) CheckAccountLimits(
-	_ context.Context,
-	_ string,
-	state *usagepb.AccountState,
-) (*usagepb.CheckAccountLimitsResponse, error) {
-	if s.checkAccountErr != nil {
-		return nil, s.checkAccountErr
-	}
-
-	if s.checkAccount != nil {
-		return s.checkAccount(state), nil
-	}
-
-	if s.checkAccountResponse != nil {
-		return s.checkAccountResponse, nil
-	}
-
-	return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
-}
-
-func (s *fakePublicUsageService) CheckOrganizationLimits(
-	context.Context,
-	string,
-	*usagepb.OrganizationState,
-	*usagepb.CanvasState,
-) (*usagepb.CheckOrganizationLimitsResponse, error) {
-	return &usagepb.CheckOrganizationLimitsResponse{Allowed: true}, nil
-}
-
-var _ usage.Service = (*fakePublicUsageService)(nil)
 
 func Test__HealthCheckEndpoint(t *testing.T) {
 	authService, err := authorization.NewAuthService()
@@ -106,7 +40,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -127,7 +61,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -198,10 +132,10 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
 	require.NoError(t, err)
 
-	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider, nil)
+	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider)
 
 	response := execRequest(server, requestParams{
 		method: "GET",
@@ -227,9 +161,7 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 		"http://localhost",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -291,9 +223,7 @@ func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.
 		"http://localhost",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -540,9 +470,7 @@ func Test__CreateInitialWorkspaceRequiresHostedGitHubApp(t *testing.T) {
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -576,9 +504,7 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -660,9 +586,7 @@ func Test__CreateInitialWorkspaceReusesPendingOrganization(t *testing.T) {
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -723,9 +647,7 @@ func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -744,90 +666,6 @@ func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
 	workspaces, err := models.ListFactories(database.DB(t.Context()), organization.ID)
 	require.NoError(t, err)
 	require.Len(t, workspaces, 1)
-}
-
-func Test__OrganizationCreationSerializesLimitChecks(t *testing.T) {
-	configureHostedGitHubApp(t)
-	r := support.Setup(t)
-	require.NoError(t, models.SaveAccountLinkedAccount(
-		database.DB(t.Context()),
-		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "github-owner-id", "github-owner", "GitHub Owner", ""),
-	))
-	initialOrganizations, err := models.CountOrganizationsByBillingAccount(database.DB(t.Context()), r.Account.ID.String())
-	require.NoError(t, err)
-	maxOrganizations := int32(initialOrganizations + 1)
-	var limitChecks atomic.Int32
-	concurrentLimitChecks := make(chan struct{})
-
-	usageService := &fakePublicUsageService{
-		checkAccount: func(state *usagepb.AccountState) *usagepb.CheckAccountLimitsResponse {
-			if limitChecks.Add(1) == 1 {
-				select {
-				case <-concurrentLimitChecks:
-				case <-time.After(100 * time.Millisecond):
-				}
-			} else {
-				close(concurrentLimitChecks)
-			}
-			response := &usagepb.CheckAccountLimitsResponse{
-				Allowed: state.GetOrganizations() <= maxOrganizations,
-				Limits:  &usagepb.AccountLimits{MaxOrganizations: maxOrganizations},
-			}
-			if response.Allowed {
-				return response
-			}
-			response.Violations = []*usagepb.LimitViolation{{
-				Limit:           usagepb.LimitName_LIMIT_NAME_MAX_ORGANIZATIONS,
-				ConfiguredLimit: int64(maxOrganizations),
-				CurrentValue:    int64(state.GetOrganizations()),
-			}}
-			return response
-		},
-	}
-	server, err := NewServer(
-		r.Encryptor,
-		r.Registry,
-		jwt.NewSigner("test"),
-		support.NewOIDCProvider(),
-		"",
-		"localhost",
-		"",
-		"test",
-		"/app/templates",
-		r.AuthService,
-		usageService,
-		false,
-	)
-	require.NoError(t, err)
-
-	onboardingBody, err := json.Marshal(initialWorkspaceRequest{Owner: "GitHub Owner", AttemptID: uuid.NewString()})
-	require.NoError(t, err)
-	organizationBody, err := json.Marshal(OrganizationCreationRequest{Name: "Manual Organization"})
-	require.NoError(t, err)
-
-	responses := []*httptest.ResponseRecorder{httptest.NewRecorder(), httptest.NewRecorder()}
-	start := make(chan struct{})
-	var requests sync.WaitGroup
-	requests.Add(2)
-	go func() {
-		defer requests.Done()
-		<-start
-		request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(onboardingBody))
-		server.createInitialWorkspace(responses[0], request.WithContext(accountContext(r.Account)))
-	}()
-	go func() {
-		defer requests.Done()
-		<-start
-		request := httptest.NewRequest(http.MethodPost, "/organizations", bytes.NewReader(organizationBody))
-		server.createOrganization(responses[1], request.WithContext(accountContext(r.Account)))
-	}()
-	close(start)
-	requests.Wait()
-
-	assert.ElementsMatch(t, []int{http.StatusOK, http.StatusTooManyRequests}, []int{responses[0].Code, responses[1].Code})
-	organizations, err := models.CountOrganizationsByBillingAccount(database.DB(t.Context()), r.Account.ID.String())
-	require.NoError(t, err)
-	assert.Equal(t, initialOrganizations+1, organizations)
 }
 
 func Test__CreateOrganization(t *testing.T) {
@@ -859,7 +697,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, nil, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, false)
 		require.NoError(t, err)
 
 		//
@@ -910,7 +748,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, false)
 		require.NoError(t, err)
 
 		//
@@ -973,7 +811,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, false)
 		require.NoError(t, err)
 
 		body, err := json.Marshal(OrganizationCreationRequest{Name: "Duplicate Organization"})
@@ -1029,232 +867,50 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.Equal(t, int64(0), secondCredit.GrantMicros)
 	})
 
-	t.Run("organization creation returns 429 when account limit is reached", func(t *testing.T) {
-		require.NoError(t, database.TruncateTables())
-
-		account, err := models.CreateAccount("limited@example.com", "Limited User")
-		require.NoError(t, err)
-		signer := jwt.NewSigner("test")
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
-		require.NoError(t, err)
-
-		authService, err := authorization.NewAuthService()
-		require.NoError(t, err)
-
-		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
-		require.NoError(t, err)
-		oidcProvider := support.NewOIDCProvider()
-		usageService := &fakePublicUsageService{
-			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
-				Allowed: false,
-				Violations: []*usagepb.LimitViolation{
-					{
-						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_ORGANIZATIONS,
-						ConfiguredLimit: 0,
-						CurrentValue:    1,
-					},
-				},
-			},
-		}
-		server, err := NewServer(
-			encryptor,
-			r,
-			signer,
-			oidcProvider,
-			"",
-			"localhost",
-			"",
-			"test",
-			"/app/templates",
-			authService,
-			usageService,
-			false,
-		)
-		require.NoError(t, err)
-
-		body, err := json.Marshal(OrganizationCreationRequest{Name: "Blocked Organization"})
-		require.NoError(t, err)
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        "/organizations",
-			body:        body,
-			authCookie:  token,
-			contentType: "application/json",
-		})
-		assert.Equal(t, http.StatusTooManyRequests, response.Code)
-		assert.Contains(t, response.Body.String(), "account organization limit exceeded")
-
-		_, err = models.FindOrganizationByName("Blocked Organization")
-		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	})
 }
 
 func Test__GetOrganizationCreationStatus(t *testing.T) {
-	t.Run("returns allowed when the account can create another organization", func(t *testing.T) {
-		require.NoError(t, database.TruncateTables())
+	require.NoError(t, database.TruncateTables())
 
-		account, err := models.CreateAccount("status-ok@example.com", "Status Ok")
-		require.NoError(t, err)
-		signer := jwt.NewSigner("test")
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
-		require.NoError(t, err)
+	account, err := models.CreateAccount("status-ok@example.com", "Status Ok")
+	require.NoError(t, err)
+	signer := jwt.NewSigner("test")
+	token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
 
-		authService, err := authorization.NewAuthService()
-		require.NoError(t, err)
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
 
-		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
-		require.NoError(t, err)
-		oidcProvider := support.NewOIDCProvider()
-		usageService := &fakePublicUsageService{
-			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
-				Allowed: true,
-				Limits: &usagepb.AccountLimits{
-					MaxOrganizations: 3,
-				},
-			},
-		}
-		server, err := NewServer(
-			encryptor,
-			r,
-			signer,
-			oidcProvider,
-			"",
-			"localhost",
-			"",
-			"test",
-			"/app/templates",
-			authService,
-			usageService,
-			false,
-		)
-		require.NoError(t, err)
+	encryptor := &crypto.NoOpEncryptor{}
+	r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+	require.NoError(t, err)
+	server, err := NewServer(
+		encryptor,
+		r,
+		signer,
+		support.NewOIDCProvider(),
+		"",
+		"localhost",
+		"",
+		"test",
+		"/app/templates",
+		authService,
+		false,
+	)
+	require.NoError(t, err)
 
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/account/limits",
-			authCookie: token,
-		})
-
-		require.Equal(t, http.StatusOK, response.Code)
-
-		var data organizationCreationStatusResponse
-		err = json.Unmarshal(response.Body.Bytes(), &data)
-		require.NoError(t, err)
-		assert.True(t, data.Allowed)
-		assert.True(t, data.UsageEnabled)
-		assert.Equal(t, int32(0), data.CurrentOrganizations)
-		assert.Equal(t, int32(3), data.MaxOrganizations)
-		assert.Empty(t, data.Message)
+	response := execRequest(server, requestParams{
+		method:     "GET",
+		path:       "/account/limits",
+		authCookie: token,
 	})
 
-	t.Run("returns blocked when the account has reached the max organizations limit", func(t *testing.T) {
-		require.NoError(t, database.TruncateTables())
+	require.Equal(t, http.StatusOK, response.Code)
 
-		account, err := models.CreateAccount("status-blocked@example.com", "Status Blocked")
-		require.NoError(t, err)
-		signer := jwt.NewSigner("test")
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
-		require.NoError(t, err)
-
-		authService, err := authorization.NewAuthService()
-		require.NoError(t, err)
-
-		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
-		require.NoError(t, err)
-		oidcProvider := support.NewOIDCProvider()
-		usageService := &fakePublicUsageService{
-			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
-				Allowed: false,
-				Limits: &usagepb.AccountLimits{
-					MaxOrganizations: 1,
-				},
-				Violations: []*usagepb.LimitViolation{
-					{
-						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_ORGANIZATIONS,
-						ConfiguredLimit: 1,
-						CurrentValue:    2,
-					},
-				},
-			},
-		}
-		server, err := NewServer(
-			encryptor,
-			r,
-			signer,
-			oidcProvider,
-			"",
-			"localhost",
-			"",
-			"test",
-			"/app/templates",
-			authService,
-			usageService,
-			false,
-		)
-		require.NoError(t, err)
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/account/limits",
-			authCookie: token,
-		})
-
-		require.Equal(t, http.StatusOK, response.Code)
-
-		var data organizationCreationStatusResponse
-		err = json.Unmarshal(response.Body.Bytes(), &data)
-		require.NoError(t, err)
-		assert.False(t, data.Allowed)
-		assert.True(t, data.UsageEnabled)
-		assert.Equal(t, int32(1), data.MaxOrganizations)
-		assert.Equal(t, "account organization limit exceeded", data.Message)
-	})
-
-	t.Run("returns 503 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
-		require.NoError(t, database.TruncateTables())
-
-		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
-		require.NoError(t, err)
-		signer := jwt.NewSigner("test")
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
-		require.NoError(t, err)
-
-		authService, err := authorization.NewAuthService()
-		require.NoError(t, err)
-
-		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
-		require.NoError(t, err)
-		oidcProvider := support.NewOIDCProvider()
-		usageService := &fakePublicUsageService{
-			checkAccountErr: status.Error(codes.Unavailable, "usage service unreachable"),
-		}
-		server, err := NewServer(
-			encryptor,
-			r,
-			signer,
-			oidcProvider,
-			"",
-			"localhost",
-			"",
-			"test",
-			"/app/templates",
-			authService,
-			usageService,
-			false,
-		)
-		require.NoError(t, err)
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/account/limits",
-			authCookie: token,
-		})
-
-		require.Equal(t, http.StatusServiceUnavailable, response.Code)
-		assert.Contains(t, response.Body.String(), "Usage service unavailable")
-	})
+	var data organizationCreationStatusResponse
+	err = json.Unmarshal(response.Body.Bytes(), &data)
+	require.NoError(t, err)
+	assert.True(t, data.Allowed)
+	assert.Equal(t, int32(0), data.CurrentOrganizations)
+	assert.Empty(t, data.Message)
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -178,6 +182,27 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 	r := support.Setup(t)
 	defer r.Close()
 
+	dependabotPayload := func(number int, manifest string) map[string]any {
+		return map[string]any{
+			"type": ghdependabot.AlertPayloadType,
+			"data": map[string]any{
+				"action": "created",
+				"alert": map[string]any{
+					"number":   number,
+					"html_url": "https://github.com/acme/payments/security/dependabot/" + strconv.Itoa(number),
+					"dependency": map[string]any{
+						"package":       map[string]any{"name": "lodash", "ecosystem": "npm"},
+						"manifest_path": manifest,
+					},
+					"security_advisory": map[string]any{
+						"summary":  "Prototype pollution in lodash",
+						"severity": "high",
+					},
+				},
+			},
+		}
+	}
+
 	sentryPayload := func(issueID string) map[string]any {
 		return map[string]any{
 			"type": "sentry.issue",
@@ -325,6 +350,71 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))
+	})
+
+	t.Run("merges a Dependabot alert into the open task for its package", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		packageRef := ghdependabot.PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}
+		existing, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Fix Dependabot alerts for lodash (npm)",
+			"## Alerts\n\n### #7 Prototype pollution\nhttps://github.com/acme/payments/security/dependabot/7",
+			nil,
+			nil,
+			nil,
+			packageRef.Origin(),
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, dependabotPayload(8, "package-lock.json"))
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Fix Dependabot alerts for lodash (npm)"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		assert.Contains(t, reloaded.Description, "### #8 Prototype pollution in lodash\nSeverity: high\nManifest: package-lock.json")
+		assert.Contains(t, reloaded.Description, "https://github.com/acme/payments/security/dependabot/7\n\n### #8")
+	})
+
+	t.Run("opens a new Dependabot task when the package task is closed", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		packageRef := ghdependabot.PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}
+		closed, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Fix Dependabot alerts for lodash (npm)",
+			"",
+			nil,
+			nil,
+			nil,
+			packageRef.Origin(),
+		)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(closed).Update("state", models.FactoryWorkOrderStateClosed).Error)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, dependabotPayload(9, "package.json"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceDependabotAlerts)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Fix Dependabot alerts for lodash (npm)"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(order.ID))
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.OriginURL)
+		assert.Equal(t, packageRef.OriginURL(), *reloaded.OriginURL)
+		require.NotNil(t, reloaded.OriginLabel)
+		assert.Equal(t, "Dependabot: lodash", *reloaded.OriginLabel)
 	})
 
 	t.Run("serializes concurrent creates for the same Sentry issue", func(t *testing.T) {
@@ -1538,6 +1628,176 @@ func TestFactoryContext_CreateWorkOrderIngestsGitHubImagesBeforeEmit(t *testing.
 	url, ok := item["url"].(string)
 	require.True(t, ok)
 	assert.Contains(t, url, "/api/v1/public/files/"+files[0].ID.String())
+}
+
+func TestFactoryContext_CreateWorkOrderStoresProductiveAttachments(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	inline := "https://files.productive.io/attachments/files/1/original/shot.png"
+	canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+		"type": productive.TaskPayloadType,
+		"data": map[string]any{
+			"meta": map[string]any{"event": productive.TaskCreatedEvent},
+			"data": map[string]any{"id": "20305431", "type": "tasks"},
+		},
+	})
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithProductiveTaskFiles(
+		func(context.Context, string, string) ([]productive.TaskFile, error) {
+			return []productive.TaskFile{
+				{
+					Name:        "shot.png",
+					ContentType: "image/png",
+					Body:        []byte("png-bytes"),
+					ReplaceURLs: []string{inline},
+				},
+				{
+					Name:        "notes.pdf",
+					ContentType: "application/pdf",
+					Body:        []byte("pdf-bytes"),
+				},
+			}, nil
+		},
+	)
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From Productive.io task",
+		Description: "See ![shot](" + inline + ")",
+	})
+	require.True(t, inserted)
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.NotContains(t, persisted.Description, inline)
+	assert.Contains(t, persisted.Description, "![shot]("+blob.FileRefScheme+"://")
+	assert.Contains(t, persisted.Description, "[notes.pdf]("+blob.FileRefScheme+"://")
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 2)
+}
+
+func TestFactoryContext_CreateWorkOrderIngestsJiraIssueFiles(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	inline := testProxyURL("/rest/api/3/attachment/content/10001")
+	canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+		"type": jira.IssueEventPayloadType,
+		"data": map[string]any{
+			"url":   "https://acme.atlassian.net/browse/ENG-5",
+			"issue": map[string]any{"key": "ENG-5"},
+		},
+	})
+
+	ctx := NewFactoryContext(db, canvas, nodeExecution).WithJiraIssueFiles(
+		func(context.Context, string, string) ([]jira.IssueFile, error) {
+			return []jira.IssueFile{
+				{
+					Name:        "shot.png",
+					ContentType: "image/png",
+					Body:        []byte("png-bytes"),
+					ReplaceURLs: []string{inline},
+				},
+				{
+					Name:        "notes.pdf",
+					ContentType: "application/pdf",
+					Body:        []byte("pdf-bytes"),
+				},
+			}, nil
+		},
+	)
+	created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		Title:       "From Jira issue",
+		Description: "See ![shot](" + inline + ")",
+	})
+	require.True(t, inserted)
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.NotContains(t, persisted.Description, inline)
+	assert.Contains(t, persisted.Description, "![shot]("+blob.FileRefScheme+"://")
+	assert.Contains(t, persisted.Description, "[notes.pdf]("+blob.FileRefScheme+"://")
+
+	files, err := models.ListReadyTaskFiles(db, persisted.ID)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	payload := onWorkOrderEventWorkOrder(t, events[0])
+	assert.Equal(t, persisted.Description, payload["description"])
+	listed, ok := payload["files"].([]any)
+	require.True(t, ok)
+	require.Len(t, listed, 2)
+}
+
+func testProxyURL(path string) string {
+	return jira.APIProxyHost + "/" + "35273b54-3f06-40d2-880f-dd28cf6daafa" + path
 }
 
 func TestFactoryContext_CreateWorkOrderDefersFileCleanupUntilCallerApplies(t *testing.T) {

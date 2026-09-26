@@ -4,6 +4,22 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: (
+    _organizationId: string | undefined,
+    _factoryId: string | undefined,
+    filter: string,
+    enabled: boolean,
+  ) => {
+    if (!enabled) {
+      return [];
+    }
+    const all = [{ id: "1", command: "oypirate", title: "Oy Pirate!", description: "Talk like a pirate." }];
+    const needle = filter.trim().toLowerCase();
+    return needle ? all.filter((candidate) => candidate.command.includes(needle)) : all;
+  },
+}));
+
 const PASTED_MARKDOWN = `## Papercuts
 These are small improvements or issues that improve quality of life.
 
@@ -441,6 +457,34 @@ describe("WorkOrderDescriptionEditor", () => {
       const next = onChange.mock.calls.at(-1)?.[0] as string;
       expect(next).toContain("Refunds fail.");
       expect(next).not.toContain(`sp-file://${fileId}`);
+    });
+  });
+
+  it("inserts a skill command from the slash menu", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value=""
+        maxLength={5000}
+        disabled={false}
+        organizationId="org-1"
+        factoryId="factory-1"
+        onChange={onChange}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard("/oy");
+
+    expect(await screen.findByTestId("skill-slash-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("skill-slash-menu")).toHaveClass("fixed", "z-[70]");
+    await user.click(screen.getByTestId("skill-slash-option-oypirate"));
+
+    await waitFor(() => {
+      expect(String(onChange.mock.calls.at(-1)?.[0])).toContain("/oypirate");
     });
   });
 });

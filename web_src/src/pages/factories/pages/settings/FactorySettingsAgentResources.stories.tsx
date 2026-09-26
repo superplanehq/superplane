@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_WORKSPACE_AGENT_RESOURCES } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -21,7 +21,7 @@ import {
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
 const meta = {
-  title: "Factories/Pages/Settings/Agent resources",
+  title: "Factories/Pages/Settings/MCP and skills",
   component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof FactorySettingsLayout>;
@@ -30,16 +30,14 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const connectionsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`;
-const skillsPath = `${connectionsPath}?tab=skills`;
-const addDialogPath = `${connectionsPath}?dialog=add`;
-const addSkillDialogPath = `${connectionsPath}?tab=skills&dialog=add`;
+const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
+const skillsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
 
-function withResources(resources: typeof MIXED_AGENT_RESOURCES, pathSuffix = connectionsPath) {
+function withResources(resources: typeof MIXED_AGENT_RESOURCES, pathSuffix = mcpPath) {
   return (
     <FactoriesHarness
       pathSuffix={pathSuffix}
-      experimentalFeatures={[FEATURE_WORKSPACE_AGENT_RESOURCES]}
+      experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         agentResourcesByFactoryId: {
@@ -50,8 +48,12 @@ function withResources(resources: typeof MIXED_AGENT_RESOURCES, pathSuffix = con
   );
 }
 
-export const Empty: Story = {
+export const MCPEmpty: Story = {
   render: () => withResources([]),
+};
+
+export const MCPCatalog: Story = {
+  render: () => withResources([], `${mcpPath}?dialog=add`),
 };
 
 export const HeaderAuth: Story = {
@@ -62,7 +64,7 @@ export const OAuthNotConnected: Story = {
   render: () => withResources([OAUTH_NOT_CONNECTED_RESOURCE]),
 };
 
-export const OAuthConnected: Story = {
+export const ConnectedGreenDot: Story = {
   render: () => withResources([OAUTH_CONNECTED_RESOURCE]),
 };
 
@@ -78,10 +80,6 @@ export const Mixed: Story = {
   render: () => withResources(MIXED_AGENT_RESOURCES),
 };
 
-export const AddConnectionDialog: Story = {
-  render: () => withResources([], addDialogPath),
-};
-
 export const SkillsEmpty: Story = {
   render: () => withResources([], skillsPath),
 };
@@ -94,6 +92,6 @@ export const SkillsGitHub: Story = {
   render: () => withResources([UI_UX_PRO_MAX_SKILL], skillsPath),
 };
 
-export const AddSkillDialog: Story = {
-  render: () => withResources([], addSkillDialogPath),
+export const SkillEditor: Story = {
+  render: () => withResources([INLINE_SKILL], `${skillsPath}/new`),
 };

@@ -36,11 +36,16 @@ vi.mock("@/hooks/useFactoryData", () => {
 
 vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
+    organizationId: "organization-1",
+    factoryId: "factory-1",
     session: null,
     isLoading: lookupState.sessionLoading,
     queryError: lookupState.queryError,
     view: { machineStatus: "waiting", messages: [], executionId: "", canvasId: "" },
+    composer: "",
     canSend: false,
+    onComposerChange: () => undefined,
+    onSend: async () => false,
     onSubmitSurvey: () => undefined,
   }),
 }));

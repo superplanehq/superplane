@@ -255,5 +255,5 @@ func fileUploadPermission(scope string) (resource, action string) {
 	if scope == blob.ScopeTask {
 		return "work_orders", "update"
 	}
-	return "factories", "update"
+	return "work_orders", "create"
 }

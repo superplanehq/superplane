@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ var (
 	ErrFactoryAgentResourceNameTaken        = errors.New("factory agent resource name already exists")
 	ErrFactoryAgentResourceAuthInvalid      = errors.New("factory agent resource auth is not valid")
 	ErrFactoryAgentResourceURLRequired      = errors.New("MCP URL is required")
+	ErrFactoryAgentResourceURLTaken         = errors.New("factory agent resource URL already connected")
 	ErrFactoryAgentResourceHeaderInvalid    = errors.New("MCP header is not valid")
 	ErrFactoryAgentResourceKindNotSupported = errors.New("factory agent resource kind is not supported yet")
 	ErrFactoryAgentResourceMCPCapReached    = errors.New("workspace already has the maximum number of enabled MCP connections")
@@ -81,15 +83,16 @@ type FactoryAgentResource struct {
 }
 
 type FactoryAgentResourceConfig struct {
-	Transport  string                       `json:"transport,omitempty"`
-	URL        string                       `json:"url,omitempty"`
-	Auth       string                       `json:"auth,omitempty"`
-	Headers    []FactoryAgentResourceHeader `json:"headers,omitempty"`
-	Source     string                       `json:"source,omitempty"`
-	Repository string                       `json:"repository,omitempty"`
-	Ref        string                       `json:"ref,omitempty"`
-	Path       string                       `json:"path,omitempty"`
-	Markdown   string                       `json:"markdown,omitempty"`
+	Transport     string                       `json:"transport,omitempty"`
+	URL           string                       `json:"url,omitempty"`
+	Auth          string                       `json:"auth,omitempty"`
+	Headers       []FactoryAgentResourceHeader `json:"headers,omitempty"`
+	Source        string                       `json:"source,omitempty"`
+	Repository    string                       `json:"repository,omitempty"`
+	Ref           string                       `json:"ref,omitempty"`
+	Path          string                       `json:"path,omitempty"`
+	Markdown      string                       `json:"markdown,omitempty"`
+	DisabledTools []string                     `json:"disabledTools,omitempty"`
 }
 
 type FactoryAgentResourceHeader struct {
@@ -208,7 +211,54 @@ func (c FactoryAgentResourceConfig) NormalizedSkill() FactoryAgentResourceConfig
 	c.URL = ""
 	c.Auth = ""
 	c.Headers = nil
+	c.DisabledTools = nil
 	return c
+}
+
+func (c FactoryAgentResourceConfig) NormalizedMCP() FactoryAgentResourceConfig {
+	c.DisabledTools = NormalizeDisabledTools(c.DisabledTools)
+	return c
+}
+
+func CanonicalMCPServerURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return strings.ToLower(strings.TrimRight(trimmed, "/"))
+	}
+	parsed.Fragment = ""
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Host = strings.ToLower(parsed.Host)
+	if strings.HasSuffix(parsed.Path, "/") {
+		parsed.Path = strings.TrimRight(parsed.Path, "/")
+	}
+	return parsed.String()
+}
+
+func NormalizeDisabledTools(names []string) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (r *FactoryAgentResource) OAuthState() string {
@@ -219,6 +269,16 @@ func (r *FactoryAgentResource) OAuthState() string {
 		return ""
 	}
 	return r.OAuthStatus
+}
+
+func (r *FactoryAgentResource) MCPConnectionEstablished() bool {
+	if r.Kind != FactoryAgentResourceKindMCPServer {
+		return false
+	}
+	if r.Config.Data().MCPAuth() != FactoryAgentResourceAuthOAuth {
+		return true
+	}
+	return r.OAuthState() == FactoryAgentResourceOAuthConnected
 }
 
 func mapFactoryAgentResourceNameError(err error) error {
@@ -250,6 +310,7 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 		if err := config.ValidateMCP(); err != nil {
 			return nil, err
 		}
+		config = config.NormalizedMCP()
 	}
 	now := time.Now()
 	resource := &FactoryAgentResource{
@@ -270,6 +331,11 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 	err := tx.Transaction(func(inner *gorm.DB) error {
 		if enabled && kind == FactoryAgentResourceKindMCPServer {
 			if err := f.ensureEnabledMCPCapacity(inner, uuid.Nil); err != nil {
+				return err
+			}
+		}
+		if kind == FactoryAgentResourceKindMCPServer {
+			if err := f.ensureUniqueConnectedMCPURL(inner, uuid.Nil, config.URL); err != nil {
 				return err
 			}
 		}
@@ -370,6 +436,13 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 				config = &normalized
 			} else if err := config.ValidateMCP(); err != nil {
 				return err
+			} else {
+				normalized := config.NormalizedMCP()
+				config = &normalized
+				factory := &Factory{ID: r.FactoryID, OrganizationID: r.OrganizationID}
+				if err := factory.ensureUniqueConnectedMCPURL(inner, r.ID, config.URL); err != nil {
+					return err
+				}
 			}
 			if r.Kind == FactoryAgentResourceKindMCPServer && r.Config.Data().InvalidatesOAuth(*config) {
 				if err := r.DeleteSecrets(inner); err != nil {
@@ -427,29 +500,37 @@ func (r *FactoryAgentResource) Delete(tx *gorm.DB) error {
 }
 
 func (r *FactoryAgentResource) SetOAuthStatus(tx *gorm.DB, status, message string, connectedBy *uuid.UUID) error {
-	now := time.Now()
-	updates := map[string]any{
-		"oauth_status": status,
-		"oauth_error":  strings.TrimSpace(message),
-		"updated_at":   now,
-	}
-	r.OAuthStatus = status
-	r.OAuthError = strings.TrimSpace(message)
-	if status == FactoryAgentResourceOAuthConnected {
-		updates["oauth_connected_at"] = now
-		r.OAuthConnectedAt = &now
-		if connectedBy != nil {
-			updates["oauth_connected_by"] = *connectedBy
-			r.OAuthConnectedBy = connectedBy
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if status == FactoryAgentResourceOAuthConnected {
+			factory := &Factory{ID: r.FactoryID, OrganizationID: r.OrganizationID}
+			if err := factory.ensureUniqueConnectedMCPURL(inner, r.ID, r.Config.Data().URL); err != nil {
+				return err
+			}
 		}
-	}
-	if status == FactoryAgentResourceOAuthNotConnected {
-		updates["oauth_connected_at"] = nil
-		updates["oauth_connected_by"] = nil
-		r.OAuthConnectedAt = nil
-		r.OAuthConnectedBy = nil
-	}
-	return tx.Model(r).Updates(updates).Error
+		now := time.Now()
+		updates := map[string]any{
+			"oauth_status": status,
+			"oauth_error":  strings.TrimSpace(message),
+			"updated_at":   now,
+		}
+		r.OAuthStatus = status
+		r.OAuthError = strings.TrimSpace(message)
+		if status == FactoryAgentResourceOAuthConnected {
+			updates["oauth_connected_at"] = now
+			r.OAuthConnectedAt = &now
+			if connectedBy != nil {
+				updates["oauth_connected_by"] = *connectedBy
+				r.OAuthConnectedBy = connectedBy
+			}
+		}
+		if status == FactoryAgentResourceOAuthNotConnected {
+			updates["oauth_connected_at"] = nil
+			updates["oauth_connected_by"] = nil
+			r.OAuthConnectedAt = nil
+			r.OAuthConnectedBy = nil
+		}
+		return inner.Model(r).Updates(updates).Error
+	})
 }
 
 func (r *FactoryAgentResource) SetOAuthConnector(tx *gorm.DB, userID uuid.UUID) error {
@@ -583,6 +664,33 @@ func (f *Factory) ensureEnabledMCPCapacity(tx *gorm.DB, exceptID uuid.UUID) erro
 	}
 	if count >= MaxEnabledFactoryMCPServers {
 		return fmt.Errorf("%w", ErrFactoryAgentResourceMCPCapReached)
+	}
+	return nil
+}
+
+func (f *Factory) ensureUniqueConnectedMCPURL(tx *gorm.DB, exceptID uuid.UUID, rawURL string) error {
+	canonical := CanonicalMCPServerURL(rawURL)
+	if canonical == "" {
+		return nil
+	}
+	if err := f.lockAgentResourceCapacity(tx); err != nil {
+		return err
+	}
+	resources, err := f.ListAgentResources(tx, FactoryAgentResourceKindMCPServer)
+	if err != nil {
+		return err
+	}
+	for i := range resources {
+		resource := &resources[i]
+		if exceptID != uuid.Nil && resource.ID == exceptID {
+			continue
+		}
+		if !resource.MCPConnectionEstablished() {
+			continue
+		}
+		if CanonicalMCPServerURL(resource.Config.Data().URL) == canonical {
+			return ErrFactoryAgentResourceURLTaken
+		}
 	}
 	return nil
 }

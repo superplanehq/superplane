@@ -1,0 +1,12 @@
+{{- if and .Values.polar.enabled (eq .Values.polar.secretName "") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.polar.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  POLAR_ACCESS_TOKEN: {{ .Values.polar.accessToken | required ".Values.polar.accessToken is required." | b64enc }}
+  POLAR_ENVIRONMENT: {{ .Values.polar.environment | default "sandbox" | b64enc }}
+  POLAR_WEBHOOK_SECRET: {{ .Values.polar.webhookSecret | required ".Values.polar.webhookSecret is required." | b64enc }}
+{{- end }}

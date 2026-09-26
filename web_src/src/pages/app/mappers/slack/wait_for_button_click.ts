@@ -126,30 +126,16 @@ export const waitForButtonClickMapper: ComponentBaseMapper = {
 
     const details: Record<string, string> = {};
 
-    // Add "Sent at" timestamp from execution creation
     if (context.execution.createdAt) {
       details["Sent at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    // Add "Clicked at" if button was clicked
-    if (receivedData?.clicked_at) {
-      details["Clicked at"] = formatTimestamp(receivedData.clicked_at);
-    }
-
-    if ((receivedData?.clicked_by as Record<string, unknown>)?.username) {
-      details["Clicked by"] = (receivedData?.clicked_by as Record<string, unknown>)?.username as string;
-    }
-
-    // Add selected button value if available
-    if (metadata?.selectedButton) {
-      details["Selected Button"] = metadata.selectedButton;
-    }
-
-    // Add timeout information if execution timed out
-    const timeoutData = outputs?.timeout?.[0]?.data as Record<string, unknown> | undefined;
-    if (timeoutData?.timeout_at) {
-      details["Timed out at"] = formatTimestamp(timeoutData.timeout_at);
-    }
+    assignClickDetails(
+      details,
+      receivedData,
+      metadata,
+      outputs?.timeout?.[0]?.data as Record<string, unknown> | undefined,
+    );
 
     return details;
   },
@@ -159,6 +145,30 @@ export const waitForButtonClickMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function assignClickDetails(
+  details: Record<string, string>,
+  receivedData: Record<string, unknown> | undefined,
+  metadata: WaitForButtonClickMetadata | undefined,
+  timeoutData: Record<string, unknown> | undefined,
+) {
+  if (receivedData?.clicked_at) {
+    details["Clicked at"] = formatTimestamp(receivedData.clicked_at);
+  }
+
+  const username = (receivedData?.clicked_by as Record<string, unknown> | undefined)?.username;
+  if (username) {
+    details["Clicked by"] = username as string;
+  }
+
+  if (metadata?.selectedButton) {
+    details["Selected Button"] = metadata.selectedButton;
+  }
+
+  if (timeoutData?.timeout_at) {
+    details["Timed out at"] = formatTimestamp(timeoutData.timeout_at);
+  }
+}
 
 function waitForButtonClickMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

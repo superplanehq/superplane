@@ -56,6 +56,8 @@ function CreateWorkOrderRequestSession({
       maxLength={composer.maxDescriptionLength}
       isCreating={composer.isCreating}
       isUploading={fileUpload.isUploading}
+      organizationId={organizationId}
+      factoryId={factoryId}
       onClose={() => {
         if (!composer.isCreating && !fileUpload.isUploading) {
           onClose();
@@ -149,6 +151,8 @@ function CreateWorkOrderDialogSession({
               value={composer.description}
               maxLength={composer.maxDescriptionLength}
               disabled={composer.isCreating || fileUpload.isUploading}
+              organizationId={organizationId}
+              factoryId={factoryId}
               onChange={composer.updateDescription}
               onFocus={dictation.rememberDescription}
               onUploadFiles={fileUpload.uploadFiles}

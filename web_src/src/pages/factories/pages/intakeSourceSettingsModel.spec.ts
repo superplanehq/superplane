@@ -8,7 +8,7 @@ import {
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
-  intakeSupportsPause,
+  intakeSupportsDelete,
   jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
@@ -120,7 +120,7 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.superplaneLabelAdded).toBe(true);
   });
 
-  it("round-trips Sentry events and levels through the API shape", () => {
+  it("round-trips Sentry new-issue and level fields and turns off hidden triggers", () => {
     const settings = intakeSettingsFromApi("Sentry exceptions", {
       sentryNewIssues: false,
       sentryRegressedIssues: true,
@@ -134,13 +134,13 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.sentryLevels).toEqual(["fatal", "error"]);
     expect(intakeSettingsToApi(settings)).toMatchObject({
       sentryNewIssues: false,
-      sentryRegressedIssues: true,
-      sentryAssignedIssues: true,
+      sentryRegressedIssues: false,
+      sentryAssignedIssues: false,
       sentryLevels: ["fatal", "error"],
     });
   });
 
-  it("defaults Sentry events on when the API omits them", () => {
+  it("defaults omitted Sentry event toggles from the Sentry intake defaults", () => {
     const settings = intakeSettingsFromApi("Sentry exceptions", {});
 
     expect(settings.sentryNewIssues).toBe(DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues);
@@ -149,11 +149,36 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.sentryLevels).toEqual([]);
   });
 
-  it("offers pause for GitHub, Sentry, Jira, and Productive.io intakes", () => {
-    expect(intakeSupportsPause("github-issues")).toBe(true);
-    expect(intakeSupportsPause("sentry-exceptions")).toBe(true);
-    expect(intakeSupportsPause("jira-issues")).toBe(true);
-    expect(intakeSupportsPause("productive-tasks")).toBe(true);
-    expect(intakeSupportsPause("pagerduty-incidents")).toBe(false);
+  it("defaults excludeKeyTasks on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Productive tasks", {});
+
+    expect(settings.excludeKeyTasks).toBe(true);
+    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(true);
+  });
+
+  it("round-trips excludeKeyTasks through the API shape", () => {
+    const settings = intakeSettingsFromApi("Productive tasks", { excludeKeyTasks: false });
+
+    expect(settings.excludeKeyTasks).toBe(false);
+    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
+  });
+
+  it("round-trips selected Productive.io task lists and drops blanks", () => {
+    const settings = intakeSettingsFromApi("Productive tasks", {
+      taskListIds: [" list-a ", "list-a", "", "list-b"],
+    });
+
+    expect(settings.taskListIds).toEqual(["list-a", "list-b"]);
+    expect(intakeSettingsToApi(settings).taskListIds).toEqual(["list-a", "list-b"]);
+    expect(intakeSettingsFromApi("Productive tasks", {}).taskListIds).toEqual([]);
+  });
+
+  it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
+    expect(intakeSupportsDelete("github-issues")).toBe(true);
+    expect(intakeSupportsDelete("dependabot-alerts")).toBe(true);
+    expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
+    expect(intakeSupportsDelete("jira-issues")).toBe(true);
+    expect(intakeSupportsDelete("productive-tasks")).toBe(true);
+    expect(intakeSupportsDelete("pagerduty-incidents")).toBe(false);
   });
 });

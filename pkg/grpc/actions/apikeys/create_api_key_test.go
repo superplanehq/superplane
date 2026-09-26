@@ -39,6 +39,29 @@ func TestCreateAPIKeyStoresExpirationAndCanvasScope(t *testing.T) {
 	require.Equal(t, expiresAt.Unix(), user.APIKeyExpiresAt.Unix())
 }
 
+func TestCreateAPIKeyRejectsDuplicateName(t *testing.T) {
+	r := support.Setup(t)
+
+	_, err := CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
+		Name: "ci-bot",
+		Role: models.RoleOrgOperator,
+	}, r.AuthService)
+	require.NoError(t, err)
+
+	_, err = CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
+		Name: "  ci-bot  ",
+		Role: models.RoleOrgOperator,
+	}, r.AuthService)
+	require.Error(t, err)
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	require.Equal(t, "API key with the same name already exists", grpcerrors.StatusMessage(err))
+
+	keys, err := models.FindAPIKeysByOrganization(database.Conn(), r.Organization.ID.String())
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	require.Equal(t, "ci-bot", keys[0].Name)
+}
+
 func TestCreateAPIKeyRejectsInvalidCanvasScope(t *testing.T) {
 	r := support.Setup(t)
 

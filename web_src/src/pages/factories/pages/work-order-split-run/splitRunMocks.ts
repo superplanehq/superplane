@@ -57,7 +57,6 @@ import {
   doneFooterForStatus,
   SPLIT_RUN_DRAFT_NOTE,
   SPLIT_RUN_FAILED_NOTE_TEXT,
-  SPLIT_RUN_WAITING_NOTE,
   type SplitRunFooter,
   type SplitRunFooterKind,
   type SplitRunFooterTone,
@@ -73,6 +72,7 @@ import type {
 import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
 import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
 import { withNotifyImplementLog } from "./splitRunNotifyFixture";
+import { trackedPullRequestReviewNote } from "./splitRunPullRequestReview";
 
 export type SplitRunPhaseId = string;
 
@@ -242,12 +242,6 @@ function footerRun(current: FactoriesWorkOrderExecution | undefined): { appId: s
   return { appId, runId };
 }
 
-const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
-  key: "waiting-person",
-  headline: SPLIT_RUN_WAITING_NOTE.headline,
-  text: SPLIT_RUN_WAITING_NOTE.text ?? "",
-};
-
 const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
 
 const FIXES_PAUSED_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
@@ -338,7 +332,7 @@ export function phaseById(fixture: SplitRunFixture, id: SplitRunPhaseId): SplitR
 export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
   if (status === "passed") return "Completed";
   if (status === "running") return "Running";
-  if (status === "waiting") return "Needs attention";
+  if (status === "waiting") return "Waiting";
   if (status === "failed") return "Failed";
   if (status === "cancelled") return "Canceled";
   return "Pending";
@@ -558,10 +552,11 @@ function waitingReviewSurface(
       checks,
     );
   }
+  const note = notes[0] ?? trackedPullRequestReviewNote(order.pullRequests, order.id);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
-      note: notes[0] ?? WAITING_FALLBACK_NOTE,
+      note,
       status: displayStatus,
     }),
     notes,

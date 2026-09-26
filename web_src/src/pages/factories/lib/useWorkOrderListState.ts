@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   EMPTY_WORK_ORDER_FILTERS,
+  WORK_ORDER_FILTER_LABELS,
   WORK_ORDER_LAYOUTS,
   WORK_ORDER_ORDERINGS,
   WORK_ORDER_SCOPES,
   countWorkOrderFilters,
+  type WorkOrderFilterLabel,
   type WorkOrderFilters,
   type WorkOrderLayoutId,
   type WorkOrderOrdering,
@@ -66,6 +68,7 @@ const VALID_LAYOUTS = new Set(WORK_ORDER_LAYOUTS.map((item) => item.id));
 const VALID_ORDERINGS = new Set(WORK_ORDER_ORDERINGS.map((item) => item.id));
 const VALID_SCOPES = new Set(WORK_ORDER_SCOPES.map((item) => item.id));
 const VALID_DISPLAY_STATUSES = new Set<string>(WORK_ORDER_DISPLAY_STATUSES);
+const VALID_FILTER_LABELS = new Set<string>(WORK_ORDER_FILTER_LABELS);
 
 /** Per-factory key, falling back to a bare key when `factoryId` is unavailable. */
 function scopedStorageKey(prefix: string, factoryId: string): string {
@@ -116,6 +119,15 @@ function sanitizeIds(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
+function sanitizeLabels(value: unknown): WorkOrderFilterLabel[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (entry): entry is WorkOrderFilterLabel => typeof entry === "string" && VALID_FILTER_LABELS.has(entry),
+  );
+}
+
 function readPersistedFilters(key: string): WorkOrderFilters {
   if (typeof window === "undefined") {
     return EMPTY_WORK_ORDER_FILTERS;
@@ -131,6 +143,7 @@ function readPersistedFilters(key: string): WorkOrderFilters {
     }
     return {
       statuses: sanitizeStatuses(parsed.statuses),
+      labels: sanitizeLabels(parsed.labels),
       lineIds: sanitizeIds(parsed.lineIds),
       sourceIds: sanitizeIds(parsed.sourceIds),
       assigneeIds: sanitizeIds(parsed.assigneeIds),

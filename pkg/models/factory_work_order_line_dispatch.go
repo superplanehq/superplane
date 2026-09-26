@@ -46,10 +46,13 @@ type FactoryWorkOrderLineDispatch struct {
 	Result         string
 	// Model is the optional Start override for this traversal. Empty means
 	// Auto: each runner keeps the model stored on the live canvas.
-	Model      string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	FinishedAt *time.Time
+	Model string
+	// ThinkingLevel is the optional Start thinking override. Empty means
+	// Auto: each runner keeps the thinking level stored on the live canvas.
+	ThinkingLevel string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	FinishedAt    *time.Time
 }
 
 func (FactoryWorkOrderLineDispatch) TableName() string {
@@ -76,12 +79,12 @@ func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWo
 // startIndex. Rerun from the start uses 0. Rerun this step uses the
 // current step. The model stays Auto.
 func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIndex int) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
-	return l.DispatchFromWithModel(tx, order, startIndex, "")
+	return l.DispatchFromWithModel(tx, order, startIndex, "", "")
 }
 
-// DispatchFromWithModel is DispatchFrom with an optional Start model
-// override. Empty model means Auto.
-func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder, startIndex int, model string) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
+// DispatchFromWithModel is DispatchFrom with optional Start model and
+// thinking overrides. Empty model or thinking means Auto.
+func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder, startIndex int, model, thinkingLevel string) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
 	if len(l.Steps) == 0 {
 		return nil, nil, ErrFactoryLineHasNoSteps
 	}
@@ -101,6 +104,7 @@ func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder
 		State:          FactoryWorkOrderLineDispatchStateActive,
 		Result:         "",
 		Model:          strings.TrimSpace(model),
+		ThinkingLevel:  strings.TrimSpace(thinkingLevel),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

@@ -53,8 +53,8 @@ export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactor
 /**
  * An open Review pill already asks for review. A merged request is
  * already done, so hide the review wait until the task closes. Keep
- * other attention, including Needs attention, next to a closed
- * request. A Mergeable pill already says checks passed.
+ * other attention next to a closed request. A Mergeable pill already
+ * says checks passed.
  */
 export function visibleWorkOrderCardAttentionReasons(
   reasons: WorkOrderAttentionReason[],

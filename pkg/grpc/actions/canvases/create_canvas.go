@@ -7,19 +7,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -38,7 +34,6 @@ func CreateCanvas(
 	factoryID *uuid.UUID,
 	nodes []models.Node,
 	edges []models.Edge,
-	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -53,23 +48,6 @@ func CreateCanvas(
 	createdBy, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, grpcerrors.Unauthenticated(err, "user not authenticated")
-	}
-
-	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to count organization canvases")
-	}
-
-	err = usage.EnsureOrganizationWithinLimits(
-		ctx,
-		usageService,
-		organizationID.String(),
-		&usagepb.OrganizationState{Canvases: int32(canvasCount + 1)},
-		&usagepb.CanvasState{Nodes: int32(len(nodes))},
-	)
-
-	if err != nil {
-		return nil, classifyCanvasCreateError(err)
 	}
 
 	canvasID := uuid.New()
@@ -164,10 +142,6 @@ func CreateCanvas(
 
 	if err != nil {
 		return nil, classifyCanvasCreateError(err)
-	}
-
-	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
-		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
 	var user *models.User

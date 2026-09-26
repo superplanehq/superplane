@@ -12,7 +12,12 @@ import {
   buildLineFilterOptions,
   buildSourceFilterOptions,
 } from "../../lib/workOrderFilterOptions";
-import { WORK_ORDER_SCOPES, type WorkOrderListEntry } from "../../lib/workOrderListModel";
+import {
+  countWorkOrderFilters,
+  visibleWorkOrderFilters,
+  WORK_ORDER_SCOPES,
+  type WorkOrderListEntry,
+} from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
 import { FilterChips } from "./FilterChips";
 import { FilterMenu } from "./FilterMenu";
@@ -30,6 +35,7 @@ interface WorkOrdersHeaderProps {
   permissionsLoading: boolean;
   hostedCreditHeaderKicker?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
+  showPullRequestMerge?: boolean;
 }
 
 /**
@@ -49,11 +55,13 @@ export function WorkOrdersHeader({
   permissionsLoading,
   hostedCreditHeaderKicker,
   brokenIntegrationsBanner,
+  showPullRequestMerge = false,
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const lineOptions = buildLineFilterOptions(factoryLines);
   const sourceOptions = buildSourceFilterOptions(intakes, entries);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
+  const visibleFilterCount = countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge));
 
   return (
     <WorkspacePageHeader
@@ -74,6 +82,7 @@ export function WorkOrdersHeader({
             lineOptions={lineOptions}
             sourceOptions={sourceOptions}
             assigneeOptions={assigneeOptions}
+            showPullRequestMerge={showPullRequestMerge}
           />
           <SearchField
             inputRef={searchRef}
@@ -102,15 +111,16 @@ export function WorkOrdersHeader({
         </>
       }
       belowRow={
-        brokenIntegrationsBanner || state.filterCount > 0 ? (
+        brokenIntegrationsBanner || visibleFilterCount > 0 ? (
           <>
             {brokenIntegrationsBanner}
-            {state.filterCount > 0 ? (
+            {visibleFilterCount > 0 ? (
               <FilterChips
                 state={state}
                 lineOptions={lineOptions}
                 sourceOptions={sourceOptions}
                 assigneeOptions={assigneeOptions}
+                showPullRequestMerge={showPullRequestMerge}
               />
             ) : null}
           </>

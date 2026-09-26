@@ -47,30 +47,7 @@ export const createCheckRuleMapper: ComponentBaseMapper = {
       return { Response: "No data returned" };
     }
 
-    const details: Record<string, string> = {};
-
-    if (payload?.timestamp) {
-      details["Created At"] = new Date(payload.timestamp).toLocaleString();
-    }
-
-    if (responseData.name) details["Name"] = String(responseData.name);
-    if (responseData.id) details["ID"] = String(responseData.id);
-    if (responseData.expression) {
-      const expr = String(responseData.expression);
-      details["Expression"] = expr.length > 100 ? expr.substring(0, 100) + "..." : expr;
-    }
-
-    if (responseData.thresholds) {
-      const parts: string[] = [];
-      if (responseData.thresholds.degraded != null) parts.push(`Degraded: ${responseData.thresholds.degraded}`);
-      if (responseData.thresholds.critical != null) parts.push(`Critical: ${responseData.thresholds.critical}`);
-      if (parts.length > 0) details["Thresholds"] = parts.join(", ");
-    }
-
-    if (responseData.interval) details["Interval"] = String(responseData.interval);
-    if (responseData.enabled != null) details["Enabled"] = responseData.enabled ? "Yes" : "No";
-
-    return details;
+    return detailsFromCreatedCheckRule(payload, responseData);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -78,6 +55,50 @@ export const createCheckRuleMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function detailsFromCreatedCheckRule(payload: OutputPayload, responseData: CheckRulePayload): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (payload?.timestamp) {
+    details["Created At"] = new Date(payload.timestamp).toLocaleString();
+  }
+
+  addCheckRuleFieldDetails(details, responseData);
+  return details;
+}
+
+function addCheckRuleFieldDetails(details: Record<string, string>, responseData: CheckRulePayload) {
+  if (responseData.name) details["Name"] = String(responseData.name);
+  if (responseData.id) details["ID"] = String(responseData.id);
+  if (responseData.expression) {
+    details["Expression"] = truncatedExpression(String(responseData.expression));
+  }
+
+  const thresholds = thresholdSummary(responseData.thresholds);
+  if (thresholds) details["Thresholds"] = thresholds;
+
+  if (responseData.interval) details["Interval"] = String(responseData.interval);
+  if (responseData.enabled != null) details["Enabled"] = responseData.enabled ? "Yes" : "No";
+}
+
+function truncatedExpression(expr: string): string {
+  return expr.length > 100 ? expr.substring(0, 100) + "..." : expr;
+}
+
+function thresholdSummary(thresholds?: CheckRulePayload["thresholds"]): string | undefined {
+  if (!thresholds) {
+    return undefined;
+  }
+
+  const parts: string[] = [];
+  if (thresholds.degraded != null) parts.push(`Degraded: ${thresholds.degraded}`);
+  if (thresholds.critical != null) parts.push(`Critical: ${thresholds.critical}`);
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  return parts.join(", ");
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

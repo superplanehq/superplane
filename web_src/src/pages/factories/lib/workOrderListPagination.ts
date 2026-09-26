@@ -18,10 +18,26 @@ export type WorkOrdersPage = {
   hasNextPage: boolean;
 };
 
+export function uniqueWorkOrdersById<T extends { id?: string }>(orders: T[]): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const order of orders) {
+    const id = order.id;
+    if (id) {
+      if (seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+    }
+    unique.push(order);
+  }
+  return unique;
+}
+
 export function flattenWorkOrdersPages(
   pages: Array<WorkOrdersPage | undefined> | undefined,
 ): FactoriesWorkOrderSummary[] {
-  return pages?.flatMap((page) => page?.orders ?? []) ?? [];
+  return uniqueWorkOrdersById(pages?.flatMap((page) => page?.orders ?? []) ?? []);
 }
 
 export function getWorkOrdersNextPageParam(lastPage: WorkOrdersPage | undefined): WorkOrdersPageCursor | undefined {

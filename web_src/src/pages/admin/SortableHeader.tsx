@@ -8,6 +8,7 @@ interface SortableHeaderProps<TField extends string> {
   currentSort: TField;
   currentDirection: SortDirection;
   onSort: (field: TField) => void;
+  align?: "left" | "right";
   className?: string;
 }
 
@@ -17,16 +18,18 @@ export function SortableHeader<TField extends string>({
   currentSort,
   currentDirection,
   onSort,
+  align = "left",
   className = "",
 }: SortableHeaderProps<TField>) {
   const isActive = currentSort === field;
   const ariaSort = isActive ? (currentDirection === "asc" ? "ascending" : "descending") : "none";
+  const alignClass = align === "right" ? "justify-end text-right" : "justify-start text-left";
 
   return (
     <th className={`px-4 py-2.5 ${className}`} aria-sort={ariaSort}>
       <button
         type="button"
-        className="inline-flex w-full items-center gap-1 text-left text-gray-500 font-medium select-none hover:text-gray-700 transition-colors dark:text-gray-400 dark:hover:text-gray-200"
+        className={`inline-flex w-full items-center gap-1 font-medium text-gray-500 select-none transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 ${alignClass}`}
         onClick={() => onSort(field)}
       >
         <span>{label}</span>

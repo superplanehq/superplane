@@ -174,3 +174,18 @@ describe("createFixtureFetch agent gates", () => {
     });
   });
 });
+
+describe("createFixtureFetch integrations", () => {
+  it("defaults githubAppConfigured to true", async () => {
+    const response = await fetchFixture("/api/v1/integrations");
+    await expect(response.json()).resolves.toMatchObject({ githubAppConfigured: true });
+  });
+
+  it("keeps an explicit githubAppConfigured false from the fixture", async () => {
+    const response = await fetchFixture("/api/v1/integrations", {
+      ...baseFixture,
+      integrations: { integrations: [], githubAppConfigured: false },
+    });
+    await expect(response.json()).resolves.toMatchObject({ githubAppConfigured: false });
+  });
+});

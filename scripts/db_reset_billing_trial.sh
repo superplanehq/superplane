@@ -55,22 +55,6 @@ WHERE total_tokens <> 0
    OR cost_cents <> 0
    OR duration_seconds <> 0;
 
-UPDATE agent_sessions
-SET
-  tracked_usage_input_tokens = 0,
-  tracked_usage_output_tokens = 0,
-  tracked_usage_cache_read_tokens = 0,
-  tracked_usage_cache_write_tokens = 0,
-  tracked_usage_total_tokens = 0,
-  tracked_usage_initialized = TRUE,
-  updated_at = NOW()
-WHERE tracked_usage_input_tokens <> 0
-   OR tracked_usage_output_tokens <> 0
-   OR tracked_usage_cache_read_tokens <> 0
-   OR tracked_usage_cache_write_tokens <> 0
-   OR tracked_usage_total_tokens <> 0
-   OR tracked_usage_initialized IS DISTINCT FROM TRUE;
-
 COMMIT;
 
 SELECT

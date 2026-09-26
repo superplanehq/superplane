@@ -12,6 +12,7 @@ import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
@@ -120,7 +121,8 @@ function AnalysisWorkOrderPopup({
   const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
+  const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
+  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel, draftThinking);
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
@@ -134,7 +136,11 @@ function AnalysisWorkOrderPopup({
     fixture: viewFixture,
     analysis,
     draftModel,
-    onDraftModelChange: setDraftModel,
+    draftThinking,
+    onDraftStartChange: ({ model, thinkingLevel }) => {
+      setDraftModel(model);
+      setDraftThinking(thinkingLevel);
+    },
     disabled: isDispatching || !canDispatch,
   });
   const reviewArgs = analysisReviewArgs({
@@ -363,7 +369,8 @@ function analysisDraftChrome(args: {
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   draftModel: string;
-  onDraftModelChange: (value: string) => void;
+  draftThinking: string;
+  onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled: boolean;
 }) {
   if (!factoryPlanningEnabled(args.factory)) {
@@ -373,8 +380,9 @@ function analysisDraftChrome(args: {
     organizationId: args.organizationId,
     factoryId: args.factoryId,
     fixture: args.fixture,
-    value: args.draftModel,
-    onChange: args.onDraftModelChange,
+    model: args.draftModel,
+    thinkingLevel: args.draftThinking,
+    onChange: args.onDraftStartChange,
     disabled: args.disabled,
   });
   return {
@@ -451,8 +459,9 @@ function draftModelSelects(args: {
   organizationId?: string;
   factoryId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
-  value: string;
-  onChange: (value: string) => void;
+  model: string;
+  thinkingLevel: string;
+  onChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled: boolean;
 }): { footer?: ReactNode; strip?: ReactNode } {
   const { fixture, ...select } = args;

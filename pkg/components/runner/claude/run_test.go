@@ -14,6 +14,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestThinkingArgsMapsEffortFlags(t *testing.T) {
+	assert.Empty(t, thinkingArgsFromScript(t, ""))
+	assert.Empty(t, thinkingArgsFromScript(t, "default"))
+	assert.Equal(t, []string{"--effort", "low"}, thinkingArgsFromScript(t, "low"))
+	assert.Equal(t, []string{"--effort", "medium"}, thinkingArgsFromScript(t, "MEDIUM"))
+	assert.Equal(t, []string{"--effort", "high"}, thinkingArgsFromScript(t, "high"))
+}
+
+func thinkingArgsFromScript(t *testing.T, thinking string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { thinkingArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(thinkingArgs(process.argv[2])));`,
+		script,
+		thinking,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
 func TestAllowedClaudeToolsRejectsUnknownPlanningKind(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
@@ -52,6 +78,7 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
 	assert.Contains(t, tools, "mcp__superplane__survey")
 	assert.Contains(t, tools, "mcp__superplane__create_task")
+	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
 	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
 	assert.NotContains(t, tools, "Edit")
 	assert.NotContains(t, tools, "Write")
@@ -91,6 +118,15 @@ func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 }
 
+func TestDisallowedClaudeToolsIncludesWorkspaceMCPTools(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp","disabledTools":["create_issue"]}]}`), 0o644))
+	tools := disallowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_WORKSPACE_MCP_CONFIG": configPath,
+	})
+	assert.Equal(t, "mcp__docs__create_issue", tools)
+}
+
 func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 	taskDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_mcp.json"), []byte(`{"servers":[{"name":"deepwiki","url":"https://mcp.deepwiki.com/mcp"}]}`), 0o644))
@@ -120,6 +156,9 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.Contains(t, analysis, "does not publish the specification or the score")
 	assert.Contains(t, analysis, "Do not leave a written plan unpublished")
 	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
+	assert.Contains(t, analysis, "inspect_attachment")
+	assert.Contains(t, analysis, "Do not curl a signed URL")
+	assert.Contains(t, analysis, "Do not use OCR")
 	assert.Contains(t, analysis, "Do not name files")
 	assert.Contains(t, analysis, "Do not add an Open questions section")
 	assert.NotContains(t, analysis, "Talk like a colleague")
@@ -646,6 +685,18 @@ func allowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
 	payload, err := json.Marshal(env)
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `const { allowedClaudeTools } = require(process.argv[1]); process.stdout.write(allowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func disallowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { disallowedClaudeTools } = require(process.argv[1]); process.stdout.write(disallowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)

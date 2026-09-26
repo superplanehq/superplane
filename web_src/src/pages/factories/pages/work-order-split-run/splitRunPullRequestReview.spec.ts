@@ -23,7 +23,7 @@ describe("pullRequestReviewNote", () => {
 
   it("ignores notes without a link", () => {
     expect(pullRequestReviewNote({ headline: "Implement did not pass", cta: { label: "Debug" } })).toBeUndefined();
-    expect(pullRequestReviewNote({ headline: "This task needs a decision" })).toBeUndefined();
+    expect(pullRequestReviewNote({ headline: "No pull request" })).toBeUndefined();
   });
 
   it("ignores links that are not pull requests", () => {

@@ -48,7 +48,14 @@ describe("compareModelLabels", () => {
 });
 
 describe("pickHostedAnthropicModel", () => {
-  it("prefers a Sonnet id from the allowlist", () => {
+  it("prefers Claude Opus 5.5 from the allowlist", () => {
+    expect(
+      pickHostedAnthropicModel(["claude-opus-4-6", "claude-sonnet-4-6", "claude-opus-5-5", "claude-haiku-4-5"]),
+    ).toBe("claude-opus-5-5");
+    expect(pickHostedAnthropicModel(["claude-sonnet-4-6", "claude-opus-5.5"])).toBe("claude-opus-5.5");
+  });
+
+  it("prefers a Sonnet id when Opus 5.5 is not allowlisted", () => {
     expect(pickHostedAnthropicModel(["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"])).toBe(
       "claude-sonnet-4-6",
     );
@@ -68,7 +75,13 @@ describe("pickHostedModel", () => {
     expect(pickHostedModel("openai", ["gpt-4.1", "gpt-5", "o3"])).toBe("gpt-5");
   });
 
-  it("prefers a Sonnet id from the OpenRouter allowlist", () => {
+  it("prefers Grok 4.7 from the OpenRouter allowlist", () => {
+    expect(pickHostedModel("openrouter", ["anthropic/claude-sonnet-4-6", "x-ai/grok-4.7", "openai/gpt-4.1"])).toBe(
+      "x-ai/grok-4.7",
+    );
+  });
+
+  it("prefers a Sonnet id from the OpenRouter allowlist when Grok 4.7 is absent", () => {
     expect(pickHostedModel("openrouter", ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"])).toBe(
       "anthropic/claude-sonnet-4-6",
     );

@@ -301,11 +301,21 @@ func TestSpendingModelDisplayName(t *testing.T) {
 	assert.Equal(t, "gpt-4o", models.SpendingModelDisplayName("gpt-4o", nil))
 	assert.Equal(t, "sonnet", models.SpendingModelDisplayName("sonnet", nil))
 	assert.Equal(t, "sonnet", models.SpendingModelDisplayName("sonnet", []string{"sonnet"}))
+	assert.Equal(t, "x-ai/grok-4.6", models.SpendingModelDisplayName("openrouter/x-ai/grok-4.6", nil))
+	assert.Equal(t, "x-ai/grok-4.6", models.SpendingModelDisplayName("x-ai/grok-4.6", nil))
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", models.SpendingModelDisplayName("openrouter/openrouter/anthropic/claude-sonnet-4-6", nil))
+	assert.Equal(t, "openrouter/free", models.SpendingModelDisplayName("openrouter/free", nil))
 }
 
 func TestSpendingBreakdownLabelUsesFundingSourceNames(t *testing.T) {
 	assert.Equal(t, "SuperPlane-hosted", models.SpendingBreakdownLabel("hosted", models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
 	assert.Equal(t, "Your keys", models.SpendingBreakdownLabel("byok", models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
+}
+
+func TestSpendingBreakdownLabelStripsOpenRouterPrefix(t *testing.T) {
+	assert.Equal(t, "x-ai/grok-4.6", models.SpendingBreakdownLabel("openrouter/x-ai/grok-4.6", models.SpendingCatalogs{}, models.SpendingGroupByModel))
+	assert.Equal(t, "x-ai/grok-4.6", models.SpendingBreakdownLabel("openrouter/openrouter/x-ai/grok-4.6", models.SpendingCatalogs{}, models.SpendingGroupByModel))
+	assert.Equal(t, "openrouter/free", models.SpendingBreakdownLabel("openrouter/openrouter/free", models.SpendingCatalogs{}, models.SpendingGroupByModel))
 }
 
 func TestParseUsageFundingSource(t *testing.T) {

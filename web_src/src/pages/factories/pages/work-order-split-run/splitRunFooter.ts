@@ -160,11 +160,6 @@ const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun"
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 
-export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
-  headline: "This task needs a decision",
-  text: "Every automation finished. This task is ready to complete.",
-};
-
 export const SPLIT_RUN_FAILED_NOTE_TEXT = "This automation did not finish. Fix the error, then run this step again.";
 
 export const SPLIT_RUN_STOPPED_NOTE_TEXT = "This automation did not finish. This task still needs a decision.";
@@ -348,7 +343,7 @@ function draftDecisionActions(): SplitRunFooterAction[] {
 function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: input.kind,
-    sentence: input.kind === "running" ? "This task is running." : "This task needs attention.",
+    sentence: splitRunKindSentence(input.kind),
     note,
     actions: [],
   });
@@ -390,7 +385,7 @@ function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
   if (input.kind === "failed") {
     return withFooterMeta(input, {
       kind: "failed",
-      sentence: "This task needs attention.",
+      sentence: splitRunKindSentence("failed"),
       note: closedNote,
       attentionCard: true,
       actions: closedDecisionActions(input.status ?? "failed"),
@@ -416,7 +411,7 @@ function stoppedNote(note: SplitRunFooterNote | undefined, actor?: OrgUserDispla
 function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: "stopped",
-    sentence: "This task needs attention.",
+    sentence: splitRunKindSentence("stopped"),
     note: stoppedNote(note, input.actor),
     attentionCard: true,
     actions: [REJECT, RERUN],
@@ -424,14 +419,31 @@ function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): S
 }
 
 function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  if (input.kind === "waiting" && !note) {
+    return hiddenDecisionFooter(input);
+  }
+
   const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
   return withFooterMeta(input, {
     kind: input.kind,
-    sentence: "This task needs attention.",
-    note: note ?? (input.kind === "waiting" ? { ...SPLIT_RUN_WAITING_NOTE } : undefined),
+    sentence: splitRunKindSentence(input.kind),
+    note,
     attentionCard: true,
     actions,
   });
+}
+
+function splitRunKindSentence(kind: FooterInput["kind"]): string {
+  if (kind === "running") {
+    return "This task is running.";
+  }
+  if (kind === "failed") {
+    return "This task failed.";
+  }
+  if (kind === "stopped") {
+    return "This task stopped.";
+  }
+  return "This task is waiting.";
 }
 
 export function buildSplitRunFooter(input: FooterInput): SplitRunFooter {

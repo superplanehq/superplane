@@ -115,26 +115,24 @@ describe("visibleWorkOrderCardAttentionReasons", () => {
 
   it("hides Waiting for user review when the shown pull request is merged", () => {
     expect(
-      visibleWorkOrderCardAttentionReasons(["approval", "stalled"], {
+      visibleWorkOrderCardAttentionReasons(["approval", "failed"], {
         pullRequest: pr({ state: "STATE_MERGED" }),
         extraCount: 0,
       }),
-    ).toEqual(["stalled"]);
+    ).toEqual(["failed"]);
   });
 
-  it("keeps Needs attention and review when the pull request is not open", () => {
+  it("keeps review when the pull request is not open", () => {
     expect(
-      visibleWorkOrderCardAttentionReasons(["approval", "stalled"], {
+      visibleWorkOrderCardAttentionReasons(["approval", "failed"], {
         pullRequest: pr({ state: "STATE_CLOSED" }),
         extraCount: 0,
       }),
-    ).toEqual(["approval", "stalled"]);
+    ).toEqual(["approval", "failed"]);
   });
 
-  it("keeps Needs attention next to an open pull request", () => {
-    expect(visibleWorkOrderCardAttentionReasons(["stalled"], { pullRequest: pr(), extraCount: 0 })).toEqual([
-      "stalled",
-    ]);
+  it("does not invent an idle attention reason next to an open pull request", () => {
+    expect(visibleWorkOrderCardAttentionReasons([], { pullRequest: pr(), extraCount: 0 })).toEqual([]);
   });
 });
 

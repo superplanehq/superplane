@@ -18,11 +18,11 @@ vi.mock("posthog-js", () => ({
 vi.mock("react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: "/", search: "", hash: "", state: null, key: "default" }),
 }));
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({ data: { metadata: { name: "Acme Corp" } } }),
-  useOrganizationUsage: () => ({ data: null, error: null }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -39,10 +39,6 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
-}));
-
-vi.mock("@/lib/env", () => ({
-  isUsagePageForced: () => false,
 }));
 
 import { AccountProvider } from "@/contexts/AccountProvider";

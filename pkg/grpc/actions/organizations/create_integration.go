@@ -21,22 +21,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig)
-}
-
-func CreateIntegrationWithUsage(
+func CreateIntegration(
 	ctx context.Context,
-	usageService usage.Service,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	baseURL string,
@@ -62,17 +55,6 @@ func CreateIntegrationWithUsage(
 	_, err = models.FindIntegrationByName(database.Conn(), org, name)
 	if err == nil {
 		return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
-	}
-
-	integrationCount, err := models.CountIntegrationsByOrganization(orgID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to count integrations")
-	}
-
-	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID, &usagepb.OrganizationState{
-		Integrations: int32(integrationCount + 1),
-	}, nil); err != nil {
-		return nil, err
 	}
 
 	//

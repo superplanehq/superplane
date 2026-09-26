@@ -19,7 +19,6 @@ func TestIsCriticalHTTPRoute(t *testing.T) {
 	t.Run("critical auth and org endpoints", func(t *testing.T) {
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/me"))
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/organizations/{id}"))
-		assert.True(t, IsCriticalHTTPRoute("/api/v1/organizations/{id}/usage"))
 	})
 
 	t.Run("non-critical endpoints", func(t *testing.T) {

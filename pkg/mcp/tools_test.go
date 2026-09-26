@@ -42,7 +42,7 @@ func TestListToolsReturnsJSONTools(t *testing.T) {
 				"id":      2,
 				"result": map[string]any{
 					"tools": []map[string]any{
-						{"name": "search", "description": "Search the catalog."},
+						{"name": "search", "description": "Search the catalog.", "annotations": map[string]any{"readOnlyHint": true}},
 						{"name": "create_issue", "description": "Create an issue."},
 					},
 				},
@@ -58,7 +58,7 @@ func TestListToolsReturnsJSONTools(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []Tool{
-		{Name: "search", Description: "Search the catalog."},
+		{Name: "search", Description: "Search the catalog.", ReadOnly: true},
 		{Name: "create_issue", Description: "Create an issue."},
 	}, tools)
 }

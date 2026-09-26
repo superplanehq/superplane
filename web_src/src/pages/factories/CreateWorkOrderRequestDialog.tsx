@@ -9,12 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
+import { isSkillSlashMenuTarget } from "@/lib/skillSlashMenu";
 import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { DictateButton } from "./DictateButton";
+import { PendingWorkOrderFileChips } from "./PendingWorkOrderFileChips";
 import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
 import { MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 import { useCreateWorkOrderRequestForm } from "./useCreateWorkOrderRequestForm";
@@ -38,6 +41,8 @@ export interface CreateWorkOrderRequestDialogProps {
   onCreate: (draft: CreateWorkOrderRequestDraft) => void;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   initialAttachedFiles?: UploadedWorkOrderFile[];
+  organizationId?: string;
+  factoryId?: string;
 }
 
 export function CreateWorkOrderRequestDialog({
@@ -52,6 +57,8 @@ export function CreateWorkOrderRequestDialog({
   onCreate,
   onUploadFiles,
   initialAttachedFiles = [],
+  organizationId,
+  factoryId,
 }: CreateWorkOrderRequestDialogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -106,6 +113,9 @@ export function CreateWorkOrderRequestDialog({
             : "h-auto max-h-[min(36rem,calc(100dvh-2rem))] w-[min(32rem,calc(100%-2rem))] max-w-[32rem] sm:max-w-[32rem]",
         )}
         data-testid="create-work-order-request-dialog"
+        onPointerDownOutside={preventSkillSlashMenuOutside}
+        onFocusOutside={preventSkillSlashMenuOutside}
+        onInteractOutside={preventSkillSlashMenuOutside}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           const description = contentRef.current?.querySelector<HTMLElement>("#work-order-description-input");
@@ -125,11 +135,19 @@ export function CreateWorkOrderRequestDialog({
           isUploading={isUploading}
           maxLength={maxLength}
           showAttach={Boolean(onUploadFiles)}
+          organizationId={organizationId}
+          factoryId={factoryId}
           onDescriptionChange={onDescriptionChange}
         />
       </DialogContent>
     </Dialog>
   );
+}
+
+function preventSkillSlashMenuOutside(event: { target: EventTarget | null; preventDefault: () => void }) {
+  if (isSkillSlashMenuTarget(event.target)) {
+    event.preventDefault();
+  }
 }
 
 function RequestDialogForm({
@@ -142,6 +160,8 @@ function RequestDialogForm({
   isUploading,
   maxLength,
   showAttach,
+  organizationId,
+  factoryId,
   onDescriptionChange,
 }: {
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
@@ -153,6 +173,8 @@ function RequestDialogForm({
   isUploading: boolean;
   maxLength: number;
   showAttach: boolean;
+  organizationId?: string;
+  factoryId?: string;
   onDescriptionChange: (next: string) => void;
 }) {
   return (
@@ -190,6 +212,8 @@ function RequestDialogForm({
             onUploadFiles={form.uploadAcceptedFiles}
             isUploading={isUploading}
             canRemoveImages
+            organizationId={organizationId}
+            factoryId={factoryId}
             onChange={onDescriptionChange}
             onFocus={dictation.rememberDescription}
           />
@@ -200,6 +224,7 @@ function RequestDialogForm({
         canAttach={showAttach && form.canAttach}
         canCreate={form.canCreate}
         isCreating={isCreating}
+        pendingFiles={form.pendingFiles}
         showAttach={showAttach}
         dictate={<DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={form.busy} />}
         onAttach={(files) => void form.handleAttach(files)}
@@ -283,6 +308,7 @@ function RequestDialogFooter({
   canAttach,
   canCreate,
   isCreating,
+  pendingFiles,
   showAttach,
   dictate,
   onAttach,
@@ -292,6 +318,7 @@ function RequestDialogFooter({
   canAttach: boolean;
   canCreate: boolean;
   isCreating: boolean;
+  pendingFiles: UploadedWorkOrderFile[];
   showAttach: boolean;
   dictate: ReactNode;
   onAttach: (files: FileList | File[]) => void;
@@ -303,10 +330,19 @@ function RequestDialogFooter({
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
       <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
         <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {showAttach ? <CreateWorkOrderRequestAttachButton disabled={!canAttach} onAttach={onAttach} /> : null}
+          {showAttach ? (
+            <CreateWorkOrderRequestAttachButton
+              accept={WORK_ORDER_FILE_ACCEPT}
+              disabled={!canAttach}
+              onAttach={onAttach}
+            />
+          ) : null}
           {dictate}
           {attachedImages.length > 0 ? (
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
+          ) : null}
+          {pendingFiles.length > 0 ? (
+            <PendingWorkOrderFileChips files={pendingFiles} onRemove={onRemoveAttachment} />
           ) : null}
         </div>
         <div className="ms-auto flex items-center gap-1.5">

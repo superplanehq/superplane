@@ -12,7 +12,6 @@ import (
 var criticalHTTPRoutes = map[string]struct{}{
 	"/api/v1/me":                            {},
 	"/api/v1/organizations/{id}":            {},
-	"/api/v1/organizations/{id}/usage":      {},
 	"/api/v1/canvases/{canvas_id}":          {},
 	"/api/v1/canvases/{canvas_id}/versions": {},
 	"/api/v1/canvases/{canvas_id}/runs":     {},
@@ -27,7 +26,6 @@ var criticalHTTPHandlers = map[string]struct{}{
 var criticalGRPCMethods = map[string]struct{}{
 	pbMe.Me_Me_FullMethodName: {},
 	pbOrganizations.Organizations_DescribeOrganization_FullMethodName: {},
-	pbOrganizations.Organizations_DescribeUsage_FullMethodName:        {},
 	pbCanvases.Canvases_DescribeCanvas_FullMethodName:                 {},
 	pbCanvases.Canvases_ListCanvasVersions_FullMethodName:             {},
 	pbCanvases.Canvases_ListRuns_FullMethodName:                       {},
@@ -70,10 +68,6 @@ func MayTraceHTTPRequest(r *http.Request) bool {
 		if len(parts) == 1 && parts[0] != "" {
 			return true
 		}
-		if len(parts) == 2 && parts[1] == "usage" {
-			return true
-		}
-
 		return false
 	}
 

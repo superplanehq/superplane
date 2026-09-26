@@ -1,7 +1,6 @@
 package models
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
@@ -9,63 +8,37 @@ import (
 
 // CatalogModelPrice is one provider model id with cents-per-million rates.
 type CatalogModelPrice struct {
-	ModelID string
-	Rate    pricebook.Rate
+	Provider string
+	ModelID  string
+	Rate     pricebook.Rate
 }
 
-// ApplyCatalogPrices updates existing prefix/family rows from catalog prices
-// and adds a prefix row only when no current key covers the model.
+// ApplyCatalogPrices updates or adds exact rows for catalog prices.
+// It copies other providers and compute rates unchanged.
 func ApplyCatalogPrices(rows []UsagePriceBookRate, prices []CatalogModelPrice) ([]UsagePriceBookRate, int, int) {
 	next := CloneUsagePriceBookRates(rows)
-	prefixes, families := catalogMatchLists(next)
-
-	type assignment struct {
-		index    int
-		modelLen int
-	}
-	assigned := map[string]assignment{}
 	updated := 0
 	added := 0
 
-	sorted := slices.Clone(prices)
-	slices.SortFunc(sorted, func(a, b CatalogModelPrice) int {
-		return len(strings.TrimSpace(b.ModelID)) - len(strings.TrimSpace(a.ModelID))
-	})
-
-	for _, price := range sorted {
-		if strings.TrimSpace(price.ModelID) == "" {
+	for _, price := range prices {
+		provider := strings.ToLower(strings.TrimSpace(price.Provider))
+		key := strings.ToLower(strings.TrimSpace(pricebook.CatalogModelID(price.ModelID)))
+		if provider == "" || key == "" {
 			continue
 		}
 
-		match, ok := pricebook.MatchModel(price.ModelID, prefixes, families)
-		if ok {
-			id := match.Key + "\x00" + match.Mode
-			if prev, exists := assigned[id]; exists && prev.modelLen >= len(price.ModelID) {
-				continue
-			}
-			index := findModelRateIndex(next, match.Key, match.Mode)
-			if index < 0 {
-				continue
-			}
+		index := findModelRateIndex(next, provider, key, UsagePriceBookMatchExact)
+		if index >= 0 {
 			applyModelRate(&next[index], price.Rate)
-			if _, exists := assigned[id]; !exists {
-				updated++
-			}
-			assigned[id] = assignment{index: index, modelLen: len(price.ModelID)}
+			updated++
 			continue
 		}
 
-		key := pricebook.NormalizeModelID(price.ModelID)
-		if key == "" {
-			continue
-		}
-		if findModelRateIndex(next, key, UsagePriceBookMatchPrefix) >= 0 {
-			continue
-		}
 		row := UsagePriceBookRate{
 			UsageKind: UsageKindModel,
+			Provider:  provider,
 			MatchKey:  key,
-			MatchMode: UsagePriceBookMatchPrefix,
+			MatchMode: UsagePriceBookMatchExact,
 		}
 		applyModelRate(&row, price.Rate)
 		next = append(next, NormalizeUsagePriceBookRate(row))
@@ -75,33 +48,12 @@ func ApplyCatalogPrices(rows []UsagePriceBookRate, prices []CatalogModelPrice) (
 	return next, updated, added
 }
 
-func catalogMatchLists(rows []UsagePriceBookRate) ([]pricebook.PrefixRate, []pricebook.FamilyRate) {
-	prefixes := make([]pricebook.PrefixRate, 0)
-	families := make([]pricebook.FamilyRate, 0)
-	for _, row := range rows {
-		if row.UsageKind != UsageKindModel {
-			continue
-		}
-		rate := pricebook.Rate{
-			Input:      row.InputCentsPerMillion,
-			Output:     row.OutputCentsPerMillion,
-			CacheRead:  row.CacheReadCentsPerMillion,
-			CacheWrite: row.CacheWriteCentsPerMillion,
-			Reasoning:  row.ReasoningCentsPerMillion,
-		}
-		switch row.MatchMode {
-		case UsagePriceBookMatchPrefix:
-			prefixes = append(prefixes, pricebook.PrefixRate{Prefix: row.MatchKey, Rate: rate})
-		case UsagePriceBookMatchFamily:
-			families = append(families, pricebook.FamilyRate{Token: row.MatchKey, Rate: rate})
-		}
-	}
-	return prefixes, families
-}
-
-func findModelRateIndex(rows []UsagePriceBookRate, matchKey, matchMode string) int {
+func findModelRateIndex(rows []UsagePriceBookRate, provider, matchKey, matchMode string) int {
 	for i, row := range rows {
-		if row.UsageKind == UsageKindModel && row.MatchKey == matchKey && row.MatchMode == matchMode {
+		if row.UsageKind == UsageKindModel &&
+			row.Provider == provider &&
+			row.MatchKey == matchKey &&
+			row.MatchMode == matchMode {
 			return i
 		}
 	}

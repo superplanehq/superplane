@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 // Dependencies are shared by registered tools that need backend services to
@@ -23,7 +22,6 @@ type Dependencies struct {
 	ComponentRegistry *componentregistry.Registry
 	WebhookBaseURL    string
 	AuthService       authorization.Authorization
-	UsageService      usage.Service
 }
 
 // Definition is the provider-facing metadata for a managed-agent custom tool.

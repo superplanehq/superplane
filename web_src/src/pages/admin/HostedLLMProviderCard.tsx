@@ -36,8 +36,6 @@ export function HostedLLMProviderCard({
 }) {
   const modelChoices = uniqueSortedModelIds([...form.listedModels, ...form.allowedModels]);
   const enabledId = providerFieldId(provider.provider, "enabled");
-  const apiKeyId = providerFieldId(provider.provider, "api-key");
-  const baseUrlId = providerFieldId(provider.provider, "base-url");
   return (
     <div className="rounded-md border border-slate-200 p-4 dark:border-gray-700/70">
       <div className="flex items-center justify-between gap-4">
@@ -64,37 +62,7 @@ export function HostedLLMProviderCard({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div>
-          <Label htmlFor={apiKeyId} className="mb-2 block text-left">
-            API key
-          </Label>
-          <InputGroup>
-            <Input
-              id={apiKeyId}
-              type="password"
-              className="ph-no-capture"
-              data-testid={apiKeyId}
-              value={form.apiKey}
-              onChange={(event) => onFormChange(provider.provider, { apiKey: event.target.value })}
-              placeholder={provider.api_key_configured ? "Leave blank to keep the current key" : "Provider API key"}
-            />
-          </InputGroup>
-        </div>
-        <div>
-          <Label htmlFor={baseUrlId} className="mb-2 block text-left">
-            Base URL (optional)
-          </Label>
-          <InputGroup>
-            <Input
-              id={baseUrlId}
-              value={form.baseURL}
-              onChange={(event) => onFormChange(provider.provider, { baseURL: event.target.value })}
-              placeholder="Use the provider default"
-            />
-          </InputGroup>
-        </div>
-      </div>
+      <HostedProviderCredentialFields provider={provider} form={form} onFormChange={onFormChange} />
 
       {provider.provider === "openrouter" && (
         <OpenRouterProvisioningKeyField provider={provider} form={form} onFormChange={onFormChange} />
@@ -137,6 +105,52 @@ export function HostedLLMProviderCard({
         >
           {savingProvider === provider.provider ? "Saving..." : `Save ${hostedProviderLabel(provider.provider)}`}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function HostedProviderCredentialFields({
+  provider,
+  form,
+  onFormChange,
+}: {
+  provider: HostedLLMProvider;
+  form: ProviderForm;
+  onFormChange: (provider: string, patch: Partial<ProviderForm>) => void;
+}) {
+  const apiKeyId = providerFieldId(provider.provider, "api-key");
+  const baseUrlId = providerFieldId(provider.provider, "base-url");
+  return (
+    <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <Label htmlFor={apiKeyId} className="mb-2 block text-left">
+          API key
+        </Label>
+        <InputGroup>
+          <Input
+            id={apiKeyId}
+            type="password"
+            className="ph-no-capture"
+            data-testid={apiKeyId}
+            value={form.apiKey}
+            onChange={(event) => onFormChange(provider.provider, { apiKey: event.target.value })}
+            placeholder={provider.api_key_configured ? "Leave blank to keep the current key" : "Provider API key"}
+          />
+        </InputGroup>
+      </div>
+      <div>
+        <Label htmlFor={baseUrlId} className="mb-2 block text-left">
+          Base URL (optional)
+        </Label>
+        <InputGroup>
+          <Input
+            id={baseUrlId}
+            value={form.baseURL}
+            onChange={(event) => onFormChange(provider.provider, { baseURL: event.target.value })}
+            placeholder="Use the provider default"
+          />
+        </InputGroup>
       </div>
     </div>
   );

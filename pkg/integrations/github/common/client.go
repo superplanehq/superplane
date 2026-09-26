@@ -469,6 +469,63 @@ func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber in
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
 }
 
+// ListOpenDependabotAlerts reads open Dependabot alerts for a repository,
+// newest first. GitHub returns 403 when alerts are turned off or the app
+// cannot read them.
+func (c *Client) ListOpenDependabotAlerts(ctx context.Context, repository string, limit int) ([]*github.DependabotAlert, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	state := "open"
+	sort := "created"
+	direction := "desc"
+	return c.underlying.Dependabot.ListRepoAlerts(ctx, owner, name, &github.ListAlertsOptions{
+		State:     &state,
+		Sort:      &sort,
+		Direction: &direction,
+		ListOptions: github.ListOptions{
+			PerPage: limit,
+		},
+	})
+}
+
+func (c *Client) ListAllOpenDependabotAlerts(ctx context.Context, repository string) ([]*github.DependabotAlert, error) {
+	owner, name := c.ownerAndName(repository)
+	state := "open"
+	sort := "created"
+	direction := "desc"
+	options := &github.ListAlertsOptions{
+		State:     &state,
+		Sort:      &sort,
+		Direction: &direction,
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	alerts := []*github.DependabotAlert{}
+	for {
+		page, response, err := c.underlying.Dependabot.ListRepoAlerts(ctx, owner, name, options)
+		if err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, page...)
+		if response.NextPage == 0 {
+			return alerts, nil
+		}
+		options.ListOptions.Page = response.NextPage
+	}
+}
+
+func (c *Client) GetDependabotAlert(ctx context.Context, repository string, number int) (*github.DependabotAlert, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Dependabot.GetRepoAlert(ctx, owner, name, number)
+}
+
 func (c *Client) EditIssue(ctx context.Context, repository string, issueNumber int, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.Edit(ctx, owner, name, issueNumber, issue)

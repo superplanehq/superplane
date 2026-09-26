@@ -169,14 +169,14 @@ describe("buildColumnAutomations", () => {
     });
   });
 
-  it("marks an unhealthy intake as needs-repair", () => {
+  it("does not mark an unhealthy intake as needs-repair", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
       intakes: [UNHEALTHY_SENTRY],
     });
 
-    expect(automations[0]?.health).toBe("needs-repair");
-    expect(columnAutomationsNeedRepair(automations)).toBe(true);
+    expect(automations[0]?.health).toBe("healthy");
+    expect(columnAutomationsNeedRepair(automations)).toBe(false);
   });
 
   it("builds a phase agent sentence from the column name", () => {

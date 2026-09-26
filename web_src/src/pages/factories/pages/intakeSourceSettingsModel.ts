@@ -41,6 +41,12 @@ export interface IntakeSourceSettings {
   sentryAssignedIssues: boolean;
   /** Issue levels that still create a task. Empty means every level. */
   sentryLevels: string[];
+  /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
+  excludeKeyTasks: boolean;
+  /** Productive.io task list ids that still create a task. Empty means every task list. */
+  taskListIds: string[];
+  /** Severities that still create a task. Empty means every severity. */
+  dependabotSeverities: string[];
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -57,20 +63,39 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   jiraMoveOnComplete: true,
   jiraCompletionColumn: "",
   sentryNewIssues: true,
-  sentryRegressedIssues: true,
+  sentryRegressedIssues: false,
   sentryAssignedIssues: false,
   sentryLevels: [],
+  excludeKeyTasks: true,
+  taskListIds: [],
+  dependabotSeverities: [],
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
+
+export const DEPENDABOT_INTAKE_SEVERITIES = ["critical", "high", "medium", "low"] as const;
+
+export const DEPENDABOT_INTAKE_SETTINGS_COPY = {
+  severitySection: "Create a task for these severities:",
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+} as const;
 
 export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
   ...DEFAULT_GITHUB_INTAKE_SETTINGS,
   name: "Sentry exceptions",
   sentryNewIssues: true,
-  sentryRegressedIssues: true,
+  sentryRegressedIssues: false,
   sentryAssignedIssues: false,
   sentryLevels: [],
+};
+
+export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Productive tasks",
+  excludeKeyTasks: true,
 };
 
 export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
@@ -106,24 +131,19 @@ export const INTAKE_SETTINGS_COPY = {
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
-  pause: "Pause intake",
-  resume: "Resume intake",
-  pausing: "Pausing",
-  resuming: "Resuming",
-  pauseHelper: "SuperPlane stops new items. Tasks in Backlog stay.",
   delete: "Delete intake",
   deleteTitle: "Delete this intake?",
   deleteDescription:
     "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
   deleteCancel: "Keep intake",
   deleteConfirm: "Delete intake",
-  pauseError: "SuperPlane could not change the intake. Try again.",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
 
-export function intakeSupportsPause(sourceId: LineIntakeSourceId): boolean {
+export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
   return (
     sourceId === "github-issues" ||
+    sourceId === "dependabot-alerts" ||
     sourceId === "sentry-exceptions" ||
     sourceId === "jira-issues" ||
     sourceId === "productive-tasks"
@@ -141,13 +161,62 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
   }
   return [...labels, next];
 }
-export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
+export function normalizeIntakeSourceSettings(
+  draft: IntakeSourceSettings,
+  sourceId?: LineIntakeSourceId,
+): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
   const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
+  const dependabotSeverities = normalizeDependabotSeverities(draft.dependabotSeverities);
+  const hiddenSentryTriggers =
+    sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
+  const taskListIds = normalizeTaskListIds(draft.taskListIds);
   if (!draft.filterByLabel) {
-    return { ...draft, confidencePct, labels: [], labelFilterMode: "include", sentryLevels };
+    return {
+      ...draft,
+      ...hiddenSentryTriggers,
+      confidencePct,
+      labels: [],
+      labelFilterMode: "include",
+      sentryLevels,
+      dependabotSeverities,
+      taskListIds,
+    };
   }
-  return { ...draft, confidencePct, sentryLevels };
+  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels, dependabotSeverities, taskListIds };
+}
+
+export function normalizeDependabotSeverities(severities: string[]): string[] {
+  const selected = DEPENDABOT_INTAKE_SEVERITIES.filter((severity) => severities.includes(severity));
+  if (selected.length === 0 || selected.length === DEPENDABOT_INTAKE_SEVERITIES.length) {
+    return [];
+  }
+  return [...selected];
+}
+
+export function dependabotSeveritySelected(severities: string[], severity: string): boolean {
+  if (severities.length === 0) {
+    return true;
+  }
+  return severities.includes(severity);
+}
+
+export function toggleDependabotSeverity(severities: string[], severity: string): string[] {
+  const current = severities.length === 0 ? [...DEPENDABOT_INTAKE_SEVERITIES] : [...severities];
+  const next = current.includes(severity) ? current.filter((entry) => entry !== severity) : [...current, severity];
+  return normalizeDependabotSeverities(next);
+}
+
+function normalizeTaskListIds(ids: string[]): string[] {
+  const normalized: string[] = [];
+  for (const id of ids) {
+    const next = id.trim();
+    if (next.length === 0 || normalized.includes(next)) {
+      continue;
+    }
+    normalized.push(next);
+  }
+  return normalized;
 }
 
 type IntakeToggles = Pick<
@@ -190,6 +259,17 @@ export function intakeSettingsFromApi(
     jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    dependabotSeverities: normalizeDependabotSeverities(settings?.dependabotSeverities ?? []),
+    ...productiveFiltersFromApi(settings),
+  };
+}
+
+function productiveFiltersFromApi(
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): Pick<IntakeSourceSettings, "excludeKeyTasks" | "taskListIds"> {
+  return {
+    excludeKeyTasks: settings?.excludeKeyTasks ?? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS.excludeKeyTasks,
+    taskListIds: normalizeTaskListIds(settings?.taskListIds ?? []),
   };
 }
 
@@ -212,9 +292,12 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     jiraMoveOnComplete: settings.jiraMoveOnComplete,
     jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
     sentryNewIssues: settings.sentryNewIssues,
-    sentryRegressedIssues: settings.sentryRegressedIssues,
-    sentryAssignedIssues: settings.sentryAssignedIssues,
+    sentryRegressedIssues: false,
+    sentryAssignedIssues: false,
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
+    dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
+    excludeKeyTasks: settings.excludeKeyTasks,
+    taskListIds: normalizeTaskListIds(settings.taskListIds),
   };
 }
 

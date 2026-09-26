@@ -54,7 +54,8 @@ describe("createHomeFixtureFetch", () => {
     await expect(features.json()).resolves.toMatchObject({
       features: expect.arrayContaining([
         expect.objectContaining({ id: "claude_managed_agents", released: true }),
-        expect.objectContaining({ id: "workspace_agent_resources" }),
+        expect.objectContaining({ id: "workspace_mcp" }),
+        expect.objectContaining({ id: "workspace_skills" }),
       ]),
     });
   });

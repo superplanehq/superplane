@@ -88,6 +88,10 @@ vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
   },
 }));
 
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: () => [],
+}));
+
 vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
   RichMessage: ({ content }: { content: string }) => {
     richMessageRenderSpy();

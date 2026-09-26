@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -25,7 +24,6 @@ type CanvasService struct {
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
 	webhookBaseURL string
-	usageService   usage.Service
 }
 
 func NewCanvasService(
@@ -33,14 +31,12 @@ func NewCanvasService(
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
 	webhookBaseURL string,
-	usageService usage.Service,
 ) *CanvasService {
 	return &CanvasService{
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
 		webhookBaseURL: webhookBaseURL,
-		usageService:   usageService,
 	}
 }
 
@@ -84,7 +80,6 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		factoryID,
 		nil,
 		nil,
-		s.usageService,
 	)
 }
 
@@ -412,7 +407,15 @@ func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasS
 		return nil, err
 	}
 
-	state, err := canvases.PutCanvasStaging(ctx, db, canvas, req.Operations)
+	var state *pb.StagingSummary
+	switch {
+	case req.GetReplaceIfStale():
+		state, err = canvases.PutCanvasStagingReplacingStale(ctx, db, canvas, req.Operations)
+	case len(req.GetExpectedCanvasYaml()) > 0:
+		state, err = canvases.PutCanvasStagingMatchingCanvas(ctx, db, canvas, req.Operations, string(req.GetExpectedCanvasYaml()))
+	default:
+		state, err = canvases.PutCanvasStaging(ctx, db, canvas, req.Operations)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +460,6 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 	return canvases.CommitCanvasStaging(
 		ctx,
 		db,
-		s.usageService,
 		s.encryptor,
 		s.registry,
 		canvas,

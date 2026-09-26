@@ -5,6 +5,7 @@ import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
@@ -41,23 +42,30 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     iconSrc: githubIcon,
   },
   {
+    id: "dependabot-alerts",
+    name: "Dependabot alerts",
+    description: "Creates tasks from Dependabot alerts.",
+    iconSrc: githubIcon,
+    featureId: FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  },
+  {
     id: "jira-issues",
     name: "Jira issues",
-    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
+    description: "Creates tasks from Jira issues.",
     iconSrc: jiraIcon,
     featureId: FEATURE_FACTORY_JIRA_INTAKE,
   },
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Adds the 10 newest unresolved issues. New issues become tasks.",
+    description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     featureId: FEATURE_FACTORY_SENTRY_INTAKE,
   },
   {
     id: "productive-tasks",
-    name: "Productive.io tasks",
-    description: "Creates tasks from Productive.io tasks.",
+    name: "Productive tasks",
+    description: "Creates tasks from Productive tasks.",
     iconSrc: productiveIcon,
     featureId: FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   },

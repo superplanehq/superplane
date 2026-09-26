@@ -1,0 +1,101 @@
+package agent
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
+	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
+)
+
+// HostExecutor runs tasks directly on the host process. It is a thin
+// wrapper around the existing host shell directive path (PTY+markers or
+// pipe-bundle via RUNNER_SHELL_USE_PIPE) and the argv-subprocess path.
+type HostExecutor struct {
+	MaxOutputBytes int
+	TaskWorkDir    string
+	// ResetTaskHome gives each host task a fresh HOME and cwd under
+	// TaskWorkDir/.superplane/homes/<task-id>, then deletes that tree.
+	// Local long-lived workers set this so leftover clone dirs cannot leak.
+	ResetTaskHome bool
+}
+
+func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (int, string, error) {
+	max := h.MaxOutputBytes
+	if max <= 0 {
+		max = 512 * 1024
+	}
+	env, err := processEnvironment(task.Environment)
+	if err != nil {
+		return 1, "", err
+	}
+	workDir := h.TaskWorkDir
+	if h.ResetTaskHome {
+		isolated, err := createIsolatedTaskHome(h.TaskWorkDir, task.ID)
+		if err != nil {
+			return 1, "", err
+		}
+		defer os.RemoveAll(isolated)
+		workDir = isolated
+		env = withHomeEnv(env, isolated)
+	}
+	taskDir, err := materializeTaskFiles(hostTaskFilesRoot(workDir, task.ID), task.Files)
+	if err != nil {
+		return 1, "", err
+	}
+	if taskDir != "" {
+		defer os.RemoveAll(taskDir)
+		env = withTaskDirEnv(env, taskDir)
+	}
+	switch api.RunModeForTask(task) {
+	case models.RunModeJavaScript:
+		return runJavaScriptHost(ctx, max, workDir, task, env, live, resultHostPath)
+	case models.RunModePython:
+		return runPythonHost(ctx, max, workDir, task, env, live, resultHostPath)
+	case models.RunModeBash:
+		return runBashHost(ctx, max, workDir, task, env, live, resultHostPath)
+	}
+	if len(task.Commands) > 0 {
+		return runHostShellDirectiveList(ctx, max, workDir, directivesFromCommands(task.Commands), env, live, resultHostPath)
+	}
+	if len(task.Command) == 0 {
+		return 1, "", errors.New("empty command")
+	}
+	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
+	cmd.Dir = workDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
+	applyCmdEnv(cmd, env, resultHostPath)
+	var buf bytes.Buffer
+	if live != nil {
+		mw := io.MultiWriter(&buf, live)
+		cmd.Stdout = mw
+		cmd.Stderr = mw
+	} else {
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+	}
+	startedAt := time.Now()
+	writeLiveLogCommandStart(live, 0, strings.Join(task.Command, " "), "", "", startedAt)
+	err = cmd.Run()
+	out := truncateString(buf.String(), max)
+	exit := 0
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			exit = ee.ExitCode()
+		} else {
+			exit = 1
+		}
+		writeLiveLogCommandEnd(live, 0, exit, time.Since(startedAt))
+		return exit, out, err
+	}
+	writeLiveLogCommandEnd(live, 0, exit, time.Since(startedAt))
+	return exit, out, nil
+}

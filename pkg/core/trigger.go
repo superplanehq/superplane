@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"net/http"
+	"net/url"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -133,6 +134,7 @@ type EventContext interface {
 type WebhookRequestContext struct {
 	Body          []byte
 	Headers       http.Header
+	Query         url.Values
 	WorkflowID    string
 	NodeID        string
 	Configuration any

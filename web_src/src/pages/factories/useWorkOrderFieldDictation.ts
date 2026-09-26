@@ -1,7 +1,7 @@
 import { useRef } from "react";
 
-import { useSpeechDictation, type UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
-import { appendSpokenPhrase } from "@/lib/appendSpokenPhrase";
+import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
+import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
 
 export type WorkOrderDictationField = "title" | "description";
 
@@ -28,27 +28,49 @@ export function useWorkOrderFieldDictation({
   const descriptionRef = useRef(description);
   titleRef.current = title;
   descriptionRef.current = description;
-  const dictation = useSpeechDictation({
-    onFinalPhrase: (phrase) => {
+
+  const fieldRef = useRef<SpokenPhraseField>({
+    key: lastFieldRef.current,
+    getValue: () => descriptionRef.current,
+    setValue: onDescriptionChange,
+    get maxLength() {
+      return maxDescriptionLength;
+    },
+  });
+  fieldRef.current = {
+    key: lastFieldRef.current,
+    getValue: () => (lastFieldRef.current === "title" ? titleRef.current : descriptionRef.current),
+    setValue: (next) => {
       if (lastFieldRef.current === "title") {
-        const next = appendSpokenPhrase(titleRef.current, phrase, maxTitleLength);
         titleRef.current = next;
         onTitleChange(next);
         return;
       }
-      const next = appendSpokenPhrase(descriptionRef.current, phrase, maxDescriptionLength);
       descriptionRef.current = next;
       onDescriptionChange(next);
     },
-  });
+    get maxLength() {
+      return lastFieldRef.current === "title" ? maxTitleLength : maxDescriptionLength;
+    },
+  };
+
+  const { activateField, ...dictation } = useSpokenPhraseDictation(fieldRef);
 
   return {
     ...dictation,
     rememberTitle: () => {
+      if (lastFieldRef.current === "title") {
+        return;
+      }
       lastFieldRef.current = "title";
+      activateField("title");
     },
     rememberDescription: () => {
+      if (lastFieldRef.current === "description") {
+        return;
+      }
       lastFieldRef.current = "description";
+      activateField("description");
     },
   };
 }

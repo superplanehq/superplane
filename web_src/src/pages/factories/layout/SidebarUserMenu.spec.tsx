@@ -116,7 +116,27 @@ describe("SidebarUserMenu", () => {
     expect(screen.queryByTestId("factories-sidebar-plan-status")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Installation Admin" })).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-sidebar-appearance")).toHaveTextContent("Appearance");
+    expect(screen.getByRole("menuitem", { name: "Report issue" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Send feedback" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("opens the shared feedback screen from Report issue and Send feedback", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Report issue" }));
+
+    expect(screen.getByRole("heading", { name: "Send feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("feedback-category-bug")).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Send feedback" }));
+
+    expect(screen.getByRole("heading", { name: "Send feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("feedback-category-other")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows the plan below the organization name in the open menu", async () => {

@@ -1,5 +1,8 @@
 import type { FactoriesWorkOrderCheckScore, FactoriesWorkOrderSummary } from "@/api-client";
-import { useMemo, type ComponentProps } from "react";
+import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
+import { useMemo, type ComponentProps, type ReactNode, type Ref } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
@@ -7,10 +10,65 @@ import {
   clarityScoreFromChecks,
   confidenceScoreFromChecks,
 } from "../lib/confidenceScore";
+import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { draftCardAgentIsWorking, planningSessionHasPendingSurvey } from "./planningSessionView";
 import { factoryShowsClarity, factoryShowsConfidence } from "./planningSettingsModel";
+
+const FILTER_CARD_SKELETON_COUNT = 3;
+const FILTER_LOADING_LABEL = "Loading tasks";
+
+export function LineBoardOrderCardSkeleton() {
+  return (
+    <div className="w-full rounded-md border border-border bg-card p-2.5 shadow-sm">
+      <Skeleton className="h-4 w-3/4" />
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="size-5 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
+export function LineBoardColumnCardList({
+  pending,
+  className,
+  testId,
+  onScroll,
+  children,
+  ref,
+}: {
+  pending: boolean;
+  className: string;
+  testId?: string;
+  onScroll?: (element: HTMLElement) => void;
+  children: ReactNode;
+  ref?: Ref<HTMLUListElement>;
+}) {
+  const reveal = useRevealAfterPending(pending);
+
+  return (
+    <ul
+      ref={ref}
+      className={cn(className, reveal && LOADING_REVEAL_CLASSNAME)}
+      data-testid={testId}
+      data-reveal={reveal ? "" : undefined}
+      role={pending ? "status" : undefined}
+      aria-label={pending ? FILTER_LOADING_LABEL : undefined}
+      aria-busy={pending || undefined}
+      onScroll={onScroll ? (event) => onScroll(event.currentTarget) : undefined}
+    >
+      {pending
+        ? Array.from({ length: FILTER_CARD_SKELETON_COUNT }, (_, index) => (
+            <li key={index}>
+              <LineBoardOrderCardSkeleton />
+            </li>
+          ))
+        : children}
+    </ul>
+  );
+}
 
 export function LineBoardOrderCard({
   order,

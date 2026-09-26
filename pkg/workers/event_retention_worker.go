@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 const (
@@ -20,23 +19,16 @@ const (
 )
 
 type EventRetentionWorker struct {
-	logger       *log.Entry
-	usageService usage.Service
+	logger *log.Entry
 }
 
-func NewEventRetentionWorker(usageService usage.Service) *EventRetentionWorker {
+func NewEventRetentionWorker() *EventRetentionWorker {
 	return &EventRetentionWorker{
-		logger:       log.WithFields(log.Fields{"worker": "EventRetentionWorker"}),
-		usageService: usageService,
+		logger: log.WithFields(log.Fields{"worker": "EventRetentionWorker"}),
 	}
 }
 
 func (w *EventRetentionWorker) Start(ctx context.Context) {
-	if w.usageService == nil || !w.usageService.Enabled() {
-		w.logger.Info("Event retention worker not started because usage is disabled")
-		return
-	}
-
 	w.tick(ctx)
 
 	ticker := time.NewTicker(eventRetentionEvery)

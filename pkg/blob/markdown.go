@@ -13,6 +13,7 @@ const FileRefScheme = "sp-file"
 var (
 	markdownLinkPattern = regexp.MustCompile(`(!?\[[^\]]*]\()([^)\s]+)(\))`)
 	htmlSrcPattern      = regexp.MustCompile(`(?i)(<img\b[^>]*?\bsrc\s*=\s*["'])([^"']+)(["'])`)
+	htmlHrefPattern     = regexp.MustCompile(`(?i)(<a\b[^>]*?\bhref\s*=\s*["'])([^"']+)(["'])`)
 )
 
 func FileRef(id uuid.UUID) string {
@@ -70,6 +71,9 @@ func FileIDsInMarkdown(markdown string) []uuid.UUID {
 	for _, match := range htmlSrcPattern.FindAllStringSubmatch(markdown, -1) {
 		collect(match[2])
 	}
+	for _, match := range htmlHrefPattern.FindAllStringSubmatch(markdown, -1) {
+		collect(match[2])
+	}
 	return ids
 }
 
@@ -92,8 +96,15 @@ func RewriteFileRefs(markdown string, urls map[uuid.UUID]string) string {
 		}
 		return parts[1] + replace(parts[2]) + parts[3]
 	})
-	return htmlSrcPattern.ReplaceAllStringFunc(out, func(match string) string {
+	out = htmlSrcPattern.ReplaceAllStringFunc(out, func(match string) string {
 		parts := htmlSrcPattern.FindStringSubmatch(match)
+		if len(parts) != 4 {
+			return match
+		}
+		return parts[1] + replace(parts[2]) + parts[3]
+	})
+	return htmlHrefPattern.ReplaceAllStringFunc(out, func(match string) string {
+		parts := htmlHrefPattern.FindStringSubmatch(match)
 		if len(parts) != 4 {
 			return match
 		}
@@ -109,6 +120,16 @@ func ReplaceURL(markdown, from, to string) string {
 }
 
 func HTTPImageURLs(markdown string) []string {
+	return httpTargets(markdown, true)
+}
+
+// HTTPResourceURLs returns http and https targets from markdown links,
+// image tags, and anchor tags. Image-only callers use HTTPImageURLs.
+func HTTPResourceURLs(markdown string) []string {
+	return httpTargets(markdown, false)
+}
+
+func httpTargets(markdown string, imagesOnly bool) []string {
 	seen := map[string]struct{}{}
 	var urls []string
 	collect := func(raw string) {
@@ -126,12 +147,18 @@ func HTTPImageURLs(markdown string) []string {
 		urls = append(urls, raw)
 	}
 	for _, match := range markdownLinkPattern.FindAllStringSubmatch(markdown, -1) {
-		if strings.HasPrefix(match[1], "!") {
-			collect(match[2])
+		if imagesOnly && !strings.HasPrefix(match[1], "!") {
+			continue
 		}
+		collect(match[2])
 	}
 	for _, match := range htmlSrcPattern.FindAllStringSubmatch(markdown, -1) {
 		collect(match[2])
+	}
+	if !imagesOnly {
+		for _, match := range htmlHrefPattern.FindAllStringSubmatch(markdown, -1) {
+			collect(match[2])
+		}
 	}
 	return urls
 }

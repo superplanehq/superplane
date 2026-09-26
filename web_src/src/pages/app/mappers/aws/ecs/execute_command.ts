@@ -47,14 +47,8 @@ export const executeCommandMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const data = outputs?.default?.[0]?.data as ExecuteCommandOutput | undefined;
     const command = data?.command;
-    const timestamp = context.execution.updatedAt
-      ? new Date(context.execution.updatedAt).toLocaleString()
-      : context.execution.createdAt
-        ? new Date(context.execution.createdAt).toLocaleString()
-        : "-";
-
     const details: Record<string, string> = {
-      "Executed At": timestamp,
+      "Executed At": executeCommandExecutedAt(context.execution),
     };
     if (command) {
       details["Task ARN"] = stringOrDash(command.taskArn);
@@ -76,6 +70,16 @@ export const executeCommandMapper: ComponentBaseMapper = {
     return ecsSubtitle(context);
   },
 };
+
+function executeCommandExecutedAt(execution: ExecutionDetailsContext["execution"]): string {
+  if (execution.updatedAt) {
+    return new Date(execution.updatedAt).toLocaleString();
+  }
+  if (execution.createdAt) {
+    return new Date(execution.createdAt).toLocaleString();
+  }
+  return "-";
+}
 
 function executeCommandMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as ExecuteCommandConfiguration | undefined;

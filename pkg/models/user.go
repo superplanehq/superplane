@@ -5,12 +5,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const apiKeyNameUniqueConstraint = "unique_api_key_in_organization"
+
+var ErrAPIKeyNameAlreadyExists = errors.New("API key name already exists")
 
 type User struct {
 	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
@@ -44,6 +49,19 @@ func (u *User) IsExpiredAPIKey() bool {
 
 func (u *User) HasAPIKeyCanvasScope() bool {
 	return u.IsAPIKey() && len(u.APIKeyCanvasIDs) > 0
+}
+
+func MapAPIKeyNameUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == apiKeyNameUniqueConstraint {
+		return ErrAPIKeyNameAlreadyExists
+	}
+
+	return err
 }
 
 func (u *User) GetEmail() string {

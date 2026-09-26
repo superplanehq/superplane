@@ -144,37 +144,36 @@ function buildEventSubtitle(eventData: NewRelicIssuePayload, createdAt?: string)
 function getDetailsForIssue(eventData: NewRelicIssuePayload): Record<string, string> {
   const details: Record<string, string> = {};
 
-  if (eventData?.issueId) {
-    details["Issue ID"] = eventData.issueId;
-  }
-
-  if (eventData?.state) {
-    details["State"] = stateLabels[eventData.state] || eventData.state;
-  }
-
-  if (eventData?.priority) {
-    details["Priority"] = priorityLabels[eventData.priority] || eventData.priority;
-  }
-
-  if (eventData?.policyName) {
-    details["Policy"] = eventData.policyName;
-  }
-
-  if (eventData?.conditionName) {
-    details["Condition"] = eventData.conditionName;
-  }
-
-  if (eventData?.accountId) {
-    details["Account ID"] = String(eventData.accountId);
-  }
-
-  if (eventData?.createdAt) {
-    details["Created At"] = new Date(eventData.createdAt).toLocaleString();
-  }
-
-  if (eventData?.issueUrl) {
-    details["Issue URL"] = eventData.issueUrl;
+  for (const [label, value] of issueDetailFields(eventData)) {
+    addDetailIfPresent(details, label, value);
   }
 
   return details;
+}
+
+function issueDetailFields(eventData: NewRelicIssuePayload): Array<[string, string | undefined]> {
+  return [
+    ["Issue ID", eventData?.issueId],
+    ["State", mappedLabel(eventData?.state, stateLabels)],
+    ["Priority", mappedLabel(eventData?.priority, priorityLabels)],
+    ["Policy", eventData?.policyName],
+    ["Condition", eventData?.conditionName],
+    ["Account ID", eventData?.accountId ? String(eventData.accountId) : undefined],
+    ["Created At", eventData?.createdAt ? new Date(eventData.createdAt).toLocaleString() : undefined],
+    ["Issue URL", eventData?.issueUrl],
+  ];
+}
+
+function mappedLabel(value: string | undefined, labels: Record<string, string>): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return labels[value] || value;
+}
+
+function addDetailIfPresent(details: Record<string, string>, label: string, value?: string) {
+  if (value) {
+    details[label] = value;
+  }
 }
