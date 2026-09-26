@@ -4,6 +4,7 @@ import {
   CLOSED_STATUS_DIALOG_RESULTS,
   closedStatusEmptyLabel,
   closedStatusTaskMatchesSearch,
+  shouldLoadClosedStatusSearchPage,
   workOrderHasClearableArtifacts,
   workOrderHasCloseablePullRequests,
 } from "./sendWorkOrderToBacklog";
@@ -19,6 +20,32 @@ describe("closedStatusEmptyLabel", () => {
     expect(closedStatusEmptyLabel(false, false)).toBe("No closed tasks.");
     expect(closedStatusEmptyLabel(true, false)).toBe("No tasks match this search.");
     expect(closedStatusEmptyLabel(true, true)).toBe("No matching tasks on this page.");
+  });
+});
+
+describe("shouldLoadClosedStatusSearchPage", () => {
+  const ready = {
+    open: true,
+    searchActive: true,
+    matchCount: 0,
+    isLoading: false,
+    isFetchingNextPage: false,
+    hasNextPage: true,
+    isFetchNextPageError: false,
+  };
+
+  it("loads the next page only when search has no match and more pages remain", () => {
+    expect(shouldLoadClosedStatusSearchPage(ready)).toBe(true);
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, open: false })).toBe(false);
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, searchActive: false })).toBe(false);
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, matchCount: 1 })).toBe(false);
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, hasNextPage: false })).toBe(false);
+  });
+
+  it("does not request the same page again after a failed load", () => {
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, isLoading: true })).toBe(false);
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, isFetchingNextPage: true })).toBe(false);
+    expect(shouldLoadClosedStatusSearchPage({ ...ready, isFetchNextPageError: true })).toBe(false);
   });
 });
 

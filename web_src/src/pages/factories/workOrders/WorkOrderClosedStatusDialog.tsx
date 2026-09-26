@@ -17,6 +17,7 @@ import {
   SEND_WORK_ORDER_TO_BACKLOG_COPY,
   closedStatusEmptyLabel,
   closedStatusTaskMatchesSearch,
+  shouldLoadClosedStatusSearchPage,
 } from "../lib/sendWorkOrderToBacklog";
 import { SendWorkOrderToBacklogForm } from "./SendWorkOrderToBacklogForm";
 import { WorkOrderStatusBadge } from "./WorkOrderStatusIcon";
@@ -41,31 +42,40 @@ export function WorkOrderClosedStatusDialog({
   onOpenChange,
 }: WorkOrderClosedStatusDialogProps) {
   const [search, setSearch] = useState("");
-  const page = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
-    results: [...CLOSED_STATUS_DIALOG_RESULTS],
-    lineId,
-  });
+  const { orders, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage, isFetchNextPageError } =
+    useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
+      results: [...CLOSED_STATUS_DIALOG_RESULTS],
+      lineId,
+    });
   const visibleOrders = useMemo(
-    () => page.orders.filter((order) => closedStatusTaskMatchesSearch(order, factoryKey, search)),
-    [factoryKey, page.orders, search],
+    () => orders.filter((order) => closedStatusTaskMatchesSearch(order, factoryKey, search)),
+    [factoryKey, orders, search],
   );
   const searchActive = search.trim().length > 0;
-  const showSearch = !page.isLoading && (page.orders.length > 0 || searchActive);
+  const showSearch = !isLoading && (orders.length > 0 || searchActive);
 
   useEffect(() => {
-    if (!open || !searchActive || visibleOrders.length > 0) {
+    if (
+      !shouldLoadClosedStatusSearchPage({
+        open,
+        searchActive,
+        matchCount: visibleOrders.length,
+        isLoading,
+        isFetchingNextPage,
+        hasNextPage,
+        isFetchNextPageError,
+      })
+    ) {
       return;
     }
-    if (page.isLoading || page.isFetchingNextPage || !page.hasNextPage) {
-      return;
-    }
-    void page.fetchNextPage();
+    void fetchNextPage();
   }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    isLoading,
     open,
-    page.fetchNextPage,
-    page.hasNextPage,
-    page.isFetchingNextPage,
-    page.isLoading,
     searchActive,
     visibleOrders.length,
   ]);
@@ -106,13 +116,14 @@ export function WorkOrderClosedStatusDialog({
           factoryId={factoryId}
           factoryKey={factoryKey}
           canManage={canManage}
-          emptyLabel={closedStatusEmptyLabel(searchActive, page.hasNextPage)}
+          emptyLabel={closedStatusEmptyLabel(searchActive, hasNextPage)}
           orders={visibleOrders}
-          isLoading={page.isLoading}
-          hasNextPage={page.hasNextPage}
-          isFetchingNextPage={page.isFetchingNextPage}
+          isLoading={isLoading}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          isFetchNextPageError={isFetchNextPageError}
           onLoadMore={() => {
-            void page.fetchNextPage();
+            void fetchNextPage();
           }}
         />
       </DialogContent>
@@ -130,6 +141,7 @@ function ClosedStatusTaskList({
   isLoading,
   hasNextPage,
   isFetchingNextPage,
+  isFetchNextPageError,
   onLoadMore,
 }: {
   organizationId: string;
@@ -141,6 +153,7 @@ function ClosedStatusTaskList({
   isLoading: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
   onLoadMore: () => void;
 }) {
   if (isLoading) {
@@ -167,6 +180,9 @@ function ClosedStatusTaskList({
             </li>
           ))}
         </ul>
+      ) : null}
+      {isFetchNextPageError ? (
+        <p className="text-[13px] text-muted-foreground">{CLOSED_STATUS_DIALOG_COPY.searchLoadError}</p>
       ) : null}
       {hasNextPage ? (
         <Button type="button" variant="outline" size="sm" disabled={isFetchingNextPage} onClick={onLoadMore}>

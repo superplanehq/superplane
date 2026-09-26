@@ -25,6 +25,7 @@ export const CLOSED_STATUS_DIALOG_COPY = {
   searchEmpty: "No tasks match this search.",
   searchMore: "No matching tasks on this page.",
   searchPlaceholder: "Search tasks",
+  searchLoadError: "SuperPlane could not load more tasks.",
 } as const;
 
 export const CLOSED_STATUS_DIALOG_RESULTS = [
@@ -40,6 +41,24 @@ export function closedStatusEmptyLabel(searchActive: boolean, hasMorePages: bool
     return CLOSED_STATUS_DIALOG_COPY.searchMore;
   }
   return CLOSED_STATUS_DIALOG_COPY.searchEmpty;
+}
+
+export function shouldLoadClosedStatusSearchPage(args: {
+  open: boolean;
+  searchActive: boolean;
+  matchCount: number;
+  isLoading: boolean;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
+  isFetchNextPageError: boolean;
+}): boolean {
+  if (!args.open || !args.searchActive || args.matchCount > 0) {
+    return false;
+  }
+  if (args.isLoading || args.isFetchingNextPage || !args.hasNextPage) {
+    return false;
+  }
+  return !args.isFetchNextPageError;
 }
 
 export function closedStatusTaskMatchesSearch(

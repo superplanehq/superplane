@@ -53,6 +53,7 @@ describe("WorkOrderClosedStatusDialog", () => {
       isLoading: false,
       hasNextPage: false,
       isFetchingNextPage: false,
+      isFetchNextPageError: false,
       fetchNextPage: vi.fn(),
     });
 
@@ -107,6 +108,7 @@ describe("WorkOrderClosedStatusDialog", () => {
       isLoading: false,
       hasNextPage: false,
       isFetchingNextPage: false,
+      isFetchNextPageError: false,
       fetchNextPage: vi.fn(),
     });
 
@@ -148,6 +150,7 @@ describe("WorkOrderClosedStatusDialog", () => {
       isLoading: false,
       hasNextPage: true,
       isFetchingNextPage: false,
+      isFetchNextPageError: false,
       fetchNextPage,
     });
 
@@ -171,12 +174,52 @@ describe("WorkOrderClosedStatusDialog", () => {
     expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
   });
 
+  it("does not retry a failed next page and explains the error", async () => {
+    const user = userEvent.setup();
+    const fetchNextPage = vi.fn();
+    useFactoryWorkOrdersPage.mockReturnValue({
+      orders: [
+        {
+          id: "wo-failed",
+          number: "106",
+          title: "Fix refund dispatcher timeout loop",
+          key: "RF-106",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+        },
+      ],
+      isLoading: false,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: true,
+      fetchNextPage,
+    });
+
+    render(
+      <MemoryRouter>
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId="org-1"
+          factoryId="factory-1"
+          factoryKey="RF"
+          onOpenChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByTestId("work-order-closed-status-search"), "invoice");
+    expect(fetchNextPage).not.toHaveBeenCalled();
+    expect(screen.getByText("SuperPlane could not load more tasks.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+
   it("explains the empty list", () => {
     useFactoryWorkOrdersPage.mockReturnValue({
       orders: [],
       isLoading: false,
       hasNextPage: false,
       isFetchingNextPage: false,
+      isFetchNextPageError: false,
       fetchNextPage: vi.fn(),
     });
 

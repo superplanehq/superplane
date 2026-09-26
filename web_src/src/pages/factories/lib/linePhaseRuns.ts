@@ -158,7 +158,11 @@ export function collectLineDoneOrders(
       continue;
     }
     for (const run of column.runs) {
-      if (run.order.id && getWorkOrderDisplayStatus(run.order) === "completed") {
+      if (!run.order.id) {
+        continue;
+      }
+      const status = getWorkOrderDisplayStatus(run.order);
+      if (status === "completed" || status === "running" || status === "waiting") {
         doneById.set(run.order.id, run.order);
       }
     }

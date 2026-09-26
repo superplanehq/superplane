@@ -257,6 +257,7 @@ export function useFactoryWorkOrdersPage(
     hasNextPage: Boolean(query.hasNextPage),
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
   };
 }
 
