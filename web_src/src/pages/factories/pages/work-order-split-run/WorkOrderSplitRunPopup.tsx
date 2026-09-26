@@ -108,6 +108,7 @@ function AnalysisWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  initialTab,
   analysis,
   popupData,
 }: WorkOrderSplitRunPopupProps & {
@@ -118,7 +119,7 @@ function AnalysisWorkOrderPopup({
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
-  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
+  const [tab, setTab] = useState(() => initialTab ?? defaultSplitRunPopupTab(fixture));
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
