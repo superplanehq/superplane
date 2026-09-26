@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -24,10 +25,6 @@ const AlertsUnavailableMessage = "SuperPlane could not read Dependabot alerts fo
 
 // AlertPayloadType is the canvas event type emitted by github.onDependabotAlert.
 const AlertPayloadType = "github.dependabotAlert"
-
-// InstructionsHeading marks the per-intake instructions that the Create Task
-// component appends to a task description. A merged alert goes before it.
-const InstructionsHeading = "## Instructions"
 
 // alertsHeading opens the list of alerts in a package task description.
 const alertsHeading = "## Alerts"
@@ -189,13 +186,7 @@ func MergeAlertSection(description, section string) string {
 	if page := lastLine(section); strings.HasPrefix(page, "http") && strings.Contains(description, page) {
 		return description
 	}
-
-	if index := strings.Index(description, InstructionsHeading); index >= 0 {
-		before := strings.TrimRight(description[:index], "\n")
-		return before + "\n\n" + section + "\n\n" + description[index:]
-	}
-
-	return strings.TrimRight(description, "\n") + "\n\n" + section
+	return factory.InsertBeforeInstructions(description, section)
 }
 
 // AlertEvent shapes an API alert like the dependabot_alert webhook body, so

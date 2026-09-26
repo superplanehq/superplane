@@ -173,6 +173,14 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsFromApi("Productive tasks", {}).taskListIds).toEqual([]);
   });
 
+  it("round-trips the intake instructions and trims them", () => {
+    const settings = intakeSettingsFromApi("Dependabot alerts", { instructions: "  Update the direct dependency.\n" });
+
+    expect(settings.instructions).toBe("Update the direct dependency.");
+    expect(intakeSettingsToApi({ ...settings, instructions: " Keep it small. " }).instructions).toBe("Keep it small.");
+    expect(intakeSettingsFromApi("GitHub issues", {}).instructions).toBe("");
+  });
+
   it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
     expect(intakeSupportsDelete("github-issues")).toBe(true);
     expect(intakeSupportsDelete("dependabot-alerts")).toBe(true);

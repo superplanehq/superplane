@@ -20,6 +20,7 @@ import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   DEFAULT_PRODUCTIVE_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
+  INTAKE_INSTRUCTIONS_COPY,
   INTAKE_SETTINGS_COPY,
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
@@ -389,6 +390,27 @@ describe("IntakeSourceSettingsPopup", () => {
     );
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+    "saves the edited instructions for a %s intake",
+    async (sourceId) => {
+      const onSave = vi.fn();
+      const user = userEvent.setup();
+      renderPopup({ sourceId, onSave });
+
+      const field = screen.getByTestId("intake-instructions");
+      expect(screen.getByLabelText(INTAKE_INSTRUCTIONS_COPY.label)).toBe(field);
+      await user.clear(field);
+      await user.type(field, "Open one pull request per task.");
+      await user.click(screen.getByTestId("intake-source-settings-save"));
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ instructions: "Open one pull request per task." }),
+        ),
+      );
+    },
+  );
 
   it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "hides connection, project, and pause controls for a %s intake",

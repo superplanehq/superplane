@@ -100,18 +100,7 @@ func CreateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
-	settings := defaultIntakeSettings()
-	switch source {
-	case models.FactoryIntakeSourceJiraIssues:
-		settings = defaultJiraIntakeSettings()
-	case models.FactoryIntakeSourceSentryExceptions:
-		settings = defaultSentryIntakeSettings()
-	case models.FactoryIntakeSourceProductiveTasks:
-		settings = defaultProductiveIntakeSettings()
-	case models.FactoryIntakeSourceDependabotAlerts:
-		settings = defaultDependabotIntakeSettings()
-	}
-	settings = parseIntakeSettings(settings, req.GetSettings())
+	settings := parseIntakeSettings(defaultIntakeSettingsFor(source), req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
 		settings.ConfidencePct = DefaultIntakeConfidencePct
 	}

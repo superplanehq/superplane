@@ -6,6 +6,8 @@ export const DEPENDABOT_INTAKE_SETUP_COPY = {
       : `SuperPlane imports open Dependabot alerts from ${repository} and listens for new alerts.`,
   repositorySection: "Repository",
   repositoryFallback: "Workspace backlog repository",
+  instructionsNote:
+    "Each task tells the agent to update the direct dependency that pulls in a vulnerable package. You can change this text in the intake settings.",
   setupRequired: "Connect GitHub and select a backlog repository in workspace setup before you create this intake.",
   create: "Create intake",
   creating: "Creating intake...",

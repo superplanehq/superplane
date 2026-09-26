@@ -33,6 +33,9 @@ describe("DependabotIntakeSetupDialog", () => {
     );
 
     expect(screen.getByTestId("dependabot-setup-repository")).toHaveTextContent("acme/payments");
+    expect(screen.getByTestId("dependabot-setup-instructions-note")).toHaveTextContent(
+      "You can change this text in the intake settings.",
+    );
     await user.click(screen.getByRole("checkbox", { name: "Low" }));
     await user.click(screen.getByTestId("dependabot-skip-initial-import"));
     await user.click(screen.getByRole("button", { name: "Create intake" }));

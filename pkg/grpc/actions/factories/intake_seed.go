@@ -417,6 +417,12 @@ func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
 	return liveIntakeSettings(tx, models.FactoryIntakeSourceProductiveTasks, canvasID, defaultProductiveIntakeSettings())
 }
 
+// intakeInstructions reads the per-intake instructions off the live canvas.
+// An unreadable canvas gives none rather than a source default.
+func intakeInstructions(tx *gorm.DB, intake *models.FactoryIntake) string {
+	return liveIntakeSettings(tx, intake.Source, intake.CanvasID, intakeSettings{}).Instructions
+}
+
 // liveIntakeSettings reads the settings out of the intake's live canvas. It
 // returns fallback when the canvas cannot be read.
 func liveIntakeSettings(tx *gorm.DB, source string, canvasID uuid.UUID, fallback intakeSettings) intakeSettings {

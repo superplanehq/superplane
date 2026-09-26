@@ -622,6 +622,99 @@ func Test__applyIntakeSettingsToGraph_Sentry(t *testing.T) {
 	})
 }
 
+func Test__intakeInstructions(t *testing.T) {
+	createNode := func(instructions string) models.Node {
+		node := componentNode(intakeCreateNodeID, intakeCreateComponent)
+		node.Configuration = map[string]any{"title": "{{ root().data.issue.title }}"}
+		if instructions != "" {
+			node.Configuration[intakeInstructionsConfigurationKey] = instructions
+		}
+		return node
+	}
+	graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, CreateNodeID: intakeCreateNodeID}
+
+	t.Run("a new Dependabot intake carries the default instructions", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceDependabotAlerts})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, dependabotDefaultInstructions, create.Configuration[intakeInstructionsConfigurationKey])
+		assert.Contains(t, dependabotDefaultInstructions, "update that direct dependency")
+	})
+
+	t.Run("other sources start without instructions", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.NotContains(t, create.Configuration, intakeInstructionsConfigurationKey)
+	})
+
+	t.Run("the request wins over the source default", func(t *testing.T) {
+		settings := parseIntakeSettings(defaultDependabotIntakeSettings(), &pb.FactoryIntake_Settings{
+			Instructions: proto.String("  Open one pull request per manifest.  "),
+		})
+		assert.Equal(t, "Open one pull request per manifest.", settings.Instructions)
+
+		kept := parseIntakeSettings(defaultDependabotIntakeSettings(), &pb.FactoryIntake_Settings{})
+		assert.Equal(t, dependabotDefaultInstructions, kept.Instructions)
+
+		cleared := parseIntakeSettings(defaultDependabotIntakeSettings(), &pb.FactoryIntake_Settings{Instructions: proto.String("")})
+		assert.Empty(t, cleared.Instructions)
+	})
+
+	t.Run("reads the instructions off the Create Task node, not the default", func(t *testing.T) {
+		spec := models.LiveCanvasSpec{Nodes: []models.Node{
+			triggerNode(intakeTriggerNodeID, "github.onDependabotAlert"),
+			createNode("Ask before a major version update."),
+		}}
+		settings := intakeSettingsFromGraph(models.FactoryIntakeSourceDependabotAlerts, graph, spec)
+		assert.Equal(t, "Ask before a major version update.", settings.Instructions)
+
+		legacy := models.LiveCanvasSpec{Nodes: []models.Node{
+			triggerNode(intakeTriggerNodeID, "github.onDependabotAlert"),
+			createNode(""),
+		}}
+		assert.Empty(t, intakeSettingsFromGraph(models.FactoryIntakeSourceDependabotAlerts, graph, legacy).Instructions)
+
+		serialized := serializeIntakeSettings(models.FactoryIntakeSourceDependabotAlerts, settings)
+		assert.Equal(t, "Ask before a major version update.", serialized.GetInstructions())
+	})
+
+	t.Run("an update writes the instructions on the Create Task node", func(t *testing.T) {
+		nodes := []models.Node{
+			triggerNode(intakeTriggerNodeID, "github.onIssue"),
+			componentNode(intakeFilterNodeID, intakeFilterComponent),
+			createNode(""),
+		}
+		fullGraph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID, CreateNodeID: intakeCreateNodeID}
+
+		updated, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceGitHubIssues,
+			fullGraph,
+			models.LiveCanvasSpec{Nodes: nodes},
+			&pb.FactoryIntake_Settings{Instructions: proto.String("Keep the change small.")},
+			nodes,
+			nil,
+		)
+		require.NoError(t, err)
+		create := findModelNode(t, updated, intakeCreateNodeID)
+		assert.Equal(t, "Keep the change small.", create.Configuration[intakeInstructionsConfigurationKey])
+		assert.Equal(t, "{{ root().data.issue.title }}", create.Configuration["title"])
+
+		cleared, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceGitHubIssues,
+			fullGraph,
+			models.LiveCanvasSpec{Nodes: updated},
+			&pb.FactoryIntake_Settings{Instructions: proto.String("")},
+			updated,
+			nil,
+		)
+		require.NoError(t, err)
+		assert.NotContains(t, findModelNode(t, cleared, intakeCreateNodeID).Configuration, intakeInstructionsConfigurationKey)
+	})
+}
+
 func Test__intakeFilterExpressionFor_ProductiveKeyTasks(t *testing.T) {
 	t.Run("excludes key tasks by default", func(t *testing.T) {
 		expression := intakeFilterExpressionFor(

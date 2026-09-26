@@ -49,6 +49,10 @@ const (
 	intakeSentryActionCreated    = "created"
 	intakeSentryActionUnresolved = "unresolved"
 	intakeSentryActionAssigned   = "assigned"
+
+	// intakeInstructionsConfigurationKey is the Create Task node field that
+	// holds the per-intake instructions.
+	intakeInstructionsConfigurationKey = "instructions"
 )
 
 // intakeSettings is what a user can change about an intake without editing the
@@ -84,6 +88,9 @@ type intakeSettings struct {
 	// Task list ids that still create a task. Empty means every task list.
 	// Productive task intakes only.
 	TaskListIDs []string
+	// Text added to the end of every task description under an
+	// "## Instructions" heading. Stored on the Create Task node.
+	Instructions string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -135,7 +142,34 @@ func defaultProductiveIntakeSettings() intakeSettings {
 func defaultDependabotIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.DependabotSeverities = []string{}
+	settings.Instructions = dependabotDefaultInstructions
 	return settings
+}
+
+// dependabotDefaultInstructions tell the agent to fix the alert at its
+// source. A vulnerable transitive package is fixed for good by an update of
+// the direct dependency that pulls it in, not by a version override.
+const dependabotDefaultInstructions = `Fix every open Dependabot alert for this package.
+First check if the package is a direct dependency in the manifest.
+If it is direct, update it to the patched version or later.
+If it is transitive, find the direct dependency that requires it and update that direct dependency to a release that requires the patched version.
+Use a version override or resolution only when no such release exists, and say so in the pull request.
+Update the lockfile so every listed manifest is fixed.`
+
+// defaultIntakeSettingsFor returns the defaults of one source.
+func defaultIntakeSettingsFor(source string) intakeSettings {
+	switch source {
+	case models.FactoryIntakeSourceJiraIssues:
+		return defaultJiraIntakeSettings()
+	case models.FactoryIntakeSourceSentryExceptions:
+		return defaultSentryIntakeSettings()
+	case models.FactoryIntakeSourceProductiveTasks:
+		return defaultProductiveIntakeSettings()
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return defaultDependabotIntakeSettings()
+	default:
+		return defaultIntakeSettings()
+	}
 }
 
 func intakeSourceHasFilterNode(source string) bool {
@@ -168,6 +202,7 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
+	s.Instructions = strings.TrimSpace(s.Instructions)
 
 	return s
 }
@@ -456,18 +491,9 @@ var intakeProductiveTaskListsPattern = regexp.MustCompile(
 // expression. A hand-edited expression that no longer matches reports defaults
 // rather than a wrong value.
 func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveCanvasSpec) intakeSettings {
-	settings := defaultIntakeSettings()
-	switch source {
-	case models.FactoryIntakeSourceJiraIssues:
-		settings = defaultJiraIntakeSettings()
-	case models.FactoryIntakeSourceSentryExceptions:
-		settings = defaultSentryIntakeSettings()
-	case models.FactoryIntakeSourceProductiveTasks:
-		settings = defaultProductiveIntakeSettings()
-	case models.FactoryIntakeSourceDependabotAlerts:
-		settings = defaultDependabotIntakeSettings()
-	}
+	settings := defaultIntakeSettingsFor(source)
 	settings.ConfidencePct = graph.ConfidencePct
+	settings.Instructions = intakeInstructionsFromNode(findIntakeNode(spec.Nodes, graph.CreateNodeID))
 
 	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
 	if trigger != nil {
@@ -609,7 +635,18 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		serialized.DependabotSeverities = settings.DependabotSeverities
 	}
+	serialized.Instructions = proto.String(settings.Instructions)
 	return serialized
+}
+
+// intakeInstructionsFromNode reads the instructions off the Create Task node.
+// A graph created before the setting existed has none.
+func intakeInstructionsFromNode(node *models.Node) string {
+	if node == nil {
+		return ""
+	}
+	instructions, _ := node.Configuration[intakeInstructionsConfigurationKey].(string)
+	return strings.TrimSpace(instructions)
 }
 
 // parseIntakeSettings merges a request over what the graph already says, so a
@@ -658,6 +695,9 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
 	}
 	updated.TaskListIDs = requested.GetTaskListIds()
+	if requested.Instructions != nil {
+		updated.Instructions = requested.GetInstructions()
+	}
 
 	return updated.normalized()
 }

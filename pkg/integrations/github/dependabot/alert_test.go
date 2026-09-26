@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/factory"
 )
 
 func lodashAlert(number int, manifest string) *github.DependabotAlert {
@@ -74,9 +75,9 @@ func TestMergeAlertSection(t *testing.T) {
 	})
 
 	t.Run("keeps the alert before the instructions", func(t *testing.T) {
-		withInstructions := first + "\n\n" + InstructionsHeading + "\nUpdate the direct dependency."
+		withInstructions := first + "\n\n" + factory.InstructionsHeading + "\nUpdate the direct dependency."
 		merged := MergeAlertSection(withInstructions, second)
-		assert.Equal(t, first+"\n\n"+second+"\n\n"+InstructionsHeading+"\nUpdate the direct dependency.", merged)
+		assert.Equal(t, first+"\n\n"+second+"\n\n"+factory.InstructionsHeading+"\nUpdate the direct dependency.", merged)
 	})
 
 	t.Run("does not add the same alert twice", func(t *testing.T) {

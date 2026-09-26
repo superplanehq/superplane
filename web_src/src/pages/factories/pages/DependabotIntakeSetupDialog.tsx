@@ -80,6 +80,9 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
             settings={settings}
             onSettingsChange={setSettings}
           />
+          <p className="text-[13px] leading-5 text-muted-foreground" data-testid="dependabot-setup-instructions-note">
+            {DEPENDABOT_INTAKE_SETUP_COPY.instructionsNote}
+          </p>
         </div>
 
         <IntakeSkipInitialImportField

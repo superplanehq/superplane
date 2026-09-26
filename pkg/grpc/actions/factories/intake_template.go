@@ -191,6 +191,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		name = spec.name
 	}
 
+	settings := intakeSettingsOrDefault(request.Source, request.Settings)
 	nodes := []yaml.Node{
 		{
 			ID:            intakeTriggerNodeID,
@@ -207,7 +208,6 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	createY := 260
 
 	if intakeSourceHasFilterNode(request.Source) {
-		settings := intakeSettingsOrDefault(request.Source, request.Settings)
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
@@ -229,16 +229,13 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	}
 
 	nodes = append(nodes, yaml.Node{
-		ID:        intakeCreateNodeID,
-		Name:      intakeCreateNodeName,
-		Type:      yaml.NodeTypeAction,
-		Component: intakeCreateComponent,
-		Configuration: map[string]any{
-			"title":       spec.createTitle,
-			"description": spec.createDescription,
-		},
-		Concurrency: intakeConcurrency(),
-		Position:    yaml.Position{X: 160, Y: createY},
+		ID:            intakeCreateNodeID,
+		Name:          intakeCreateNodeName,
+		Type:          yaml.NodeTypeAction,
+		Component:     intakeCreateComponent,
+		Configuration: intakeCreateConfiguration(spec, settings),
+		Concurrency:   intakeConcurrency(),
+		Position:      yaml.Position{X: 160, Y: createY},
 	})
 
 	return &yaml.Canvas{
@@ -253,6 +250,20 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Nodes: nodes,
 		},
 	}, nil
+}
+
+// intakeCreateConfiguration is the Create Task node configuration. The
+// instructions are stored as the user wrote them; only the title and the
+// description are expressions.
+func intakeCreateConfiguration(spec intakeSpec, settings intakeSettings) map[string]any {
+	configuration := map[string]any{
+		"title":       spec.createTitle,
+		"description": spec.createDescription,
+	}
+	if instructions := strings.TrimSpace(settings.Instructions); instructions != "" {
+		configuration[intakeInstructionsConfigurationKey] = instructions
+	}
+	return configuration
 }
 
 // intakeConcurrency returns the concurrency of one intake node. Each node owns
@@ -442,19 +453,7 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	if settings.ConfidencePct != 0 {
 		return settings
 	}
-	if source == models.FactoryIntakeSourceJiraIssues {
-		return defaultJiraIntakeSettings()
-	}
-	if source == models.FactoryIntakeSourceSentryExceptions {
-		return defaultSentryIntakeSettings()
-	}
-	if source == models.FactoryIntakeSourceProductiveTasks {
-		return defaultProductiveIntakeSettings()
-	}
-	if source == models.FactoryIntakeSourceDependabotAlerts {
-		return defaultDependabotIntakeSettings()
-	}
-	return defaultIntakeSettings()
+	return defaultIntakeSettingsFor(source)
 }
 
 func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[string]any {

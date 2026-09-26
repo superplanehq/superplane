@@ -15,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -278,6 +279,33 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Contains(t, response.GetOrder().GetDescription(), importedCommentsHeader)
 		require.NotNil(t, response.GetOrder().GetOrigin())
 		assert.Equal(t, itemWithComments.URL, response.GetOrder().GetOrigin().GetUrl())
+	})
+
+	t.Run("adds the intake instructions to the description", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		create := componentNode(intakeCreateNodeID, intakeCreateComponent)
+		create.Configuration = map[string]any{
+			"title":                            "{{ root().data.issue.title }}",
+			intakeInstructionsConfigurationKey: "Keep the change small.",
+		}
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, intake.CanvasID)
+		require.NoError(t, err)
+		require.NoError(t, database.DB(t.Context()).
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", canvas.LiveVersionID).
+			Update("nodes", datatypes.NewJSONSlice([]models.Node{
+				triggerNode(intakeTriggerNodeID, "github.onIssue"),
+				create,
+			})).Error)
+
+		response, err := ImportFactoryIntakeItem(ctx, deps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    item.ID,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, item.Body+"\n\n## Instructions\nKeep the change small.", response.GetOrder().GetDescription())
 	})
 
 	t.Run("importing a chosen item still works while the intake is paused", func(t *testing.T) {

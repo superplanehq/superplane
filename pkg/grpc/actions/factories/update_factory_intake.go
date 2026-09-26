@@ -315,6 +315,20 @@ func applyIntakeSettingsToGraph(
 			}
 			configuration["expression"] = expression
 			nodes[i].Configuration = configuration
+		case graph.CreateNodeID:
+			if current.Instructions == updated.Instructions {
+				continue
+			}
+			configuration := maps.Clone(nodes[i].Configuration)
+			if configuration == nil {
+				configuration = map[string]any{}
+			}
+			if updated.Instructions == "" {
+				delete(configuration, intakeInstructionsConfigurationKey)
+			} else {
+				configuration[intakeInstructionsConfigurationKey] = updated.Instructions
+			}
+			nodes[i].Configuration = configuration
 		}
 	}
 

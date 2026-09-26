@@ -47,6 +47,8 @@ export interface IntakeSourceSettings {
   taskListIds: string[];
   /** Severities that still create a task. Empty means every severity. */
   dependabotSeverities: string[];
+  /** Text added to the end of every task description this intake creates. */
+  instructions: string;
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -69,7 +71,14 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   excludeKeyTasks: true,
   taskListIds: [],
   dependabotSeverities: [],
+  instructions: "",
 };
+
+export const INTAKE_INSTRUCTIONS_COPY = {
+  label: "Instructions for the agent",
+  help: "SuperPlane adds this text to the end of every task this intake creates. The agent reads it with the task.",
+  placeholder: "Example: Keep the change small. Open one pull request per task.",
+} as const;
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
 
@@ -173,6 +182,7 @@ export function normalizeIntakeSourceSettings(
   const hiddenSentryTriggers =
     sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
   const taskListIds = normalizeTaskListIds(draft.taskListIds);
+  const instructions = draft.instructions.trim();
   if (!draft.filterByLabel) {
     return {
       ...draft,
@@ -183,9 +193,18 @@ export function normalizeIntakeSourceSettings(
       sentryLevels,
       dependabotSeverities,
       taskListIds,
+      instructions,
     };
   }
-  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels, dependabotSeverities, taskListIds };
+  return {
+    ...draft,
+    ...hiddenSentryTriggers,
+    confidencePct,
+    sentryLevels,
+    dependabotSeverities,
+    taskListIds,
+    instructions,
+  };
 }
 
 export function normalizeDependabotSeverities(severities: string[]): string[] {
@@ -262,6 +281,7 @@ export function intakeSettingsFromApi(
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
     dependabotSeverities: normalizeDependabotSeverities(settings?.dependabotSeverities ?? []),
+    instructions: settings?.instructions?.trim() ?? "",
     ...productiveFiltersFromApi(settings),
   };
 }
@@ -300,6 +320,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
     excludeKeyTasks: settings.excludeKeyTasks,
     taskListIds: normalizeTaskListIds(settings.taskListIds),
+    instructions: settings.instructions.trim(),
   };
 }
 
