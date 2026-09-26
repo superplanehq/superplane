@@ -148,7 +148,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, thinking, workdir)
+		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, thinking, workdir, attachments)
 		files = append(files, file)
 		stepCommands = append(stepCommands, command)
 	}
@@ -220,7 +220,7 @@ func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
 	return strings.TrimSpace(spec.WorkingDirectory)
 }
 
-func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, thinking, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
+func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, thinking, nodeWorkingDirectory string, attachments []runner.TaskAttachment) (runner.BrokerTaskFile, runner.BrokerCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
 	switch runner.NormalizeAgentStepType(original.Type) {
@@ -251,7 +251,7 @@ func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, us
 		promptName := stepSlug + ".txt"
 		return runner.BrokerTaskFile{
 			Path:    "prompts/" + promptName,
-			Content: runner.ApplyAttachmentInstructions(runner.ApplyIntegrationUsage(dispatchedPrompt, usage)),
+			Content: runner.ApplyAttachmentInstructions(runner.ApplyIntegrationUsage(runner.RewritePromptLocalAttachmentPaths(dispatchedPrompt, attachments), usage)),
 			Mode:    "0644",
 		}, claudePromptStepBrokerCommand(original.Name, promptName, prompt, model, thinking, workingDirectory)
 	}

@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -194,6 +195,40 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "workdir")
 }
 
+func TestBuildClaudeCodeBrokerTaskRewritesImagePromptPaths(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := runner.MintAgentStepFileRefs(
+		[]runner.AgentStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+	}
+	task := buildClaudeCodeBrokerTask(spec, "", nil, dispatched, []runner.TaskAttachment{{
+		ID:          fileID,
+		URL:         signed,
+		Filename:    "bug.png",
+		ContentType: "image/png",
+	}})
+
+	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
+	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.Contains(t, prompt, "inspect_attachment")
+	assert.NotContains(t, prompt, signed)
+	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
+	assert.Equal(t, "Fetch task attachments", task.Commands[1].Name)
+	assert.Equal(t, "Process task attachments", task.Commands[2].Name)
+}
+
 func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
 	t.Parallel()
 
@@ -204,7 +239,7 @@ func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
-	task := buildClaudeCodeBrokerTask(spec, "", nil, nil)
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'sonnet' 'high'`)
 }
 

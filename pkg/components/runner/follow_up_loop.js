@@ -545,7 +545,7 @@ async function runFollowUpPrompt(action, helpers, followUpIndex) {
   const attachmentError = await prepareAttachmentsWithRetry(action.files || [], helpers);
   const prompt = attachmentError
     ? `SuperPlane could not prepare the attached files after ${MAX_ATTACHMENT_PREPARE_ATTEMPTS} attempts. Tell the user to upload them again.\n\n${text}`
-    : text;
+    : await prepareFollowUpText(text, helpers);
   emitFollowUpCommandStart(prompt, index, startedAt, writeRecord);
   const code = await helpers.runPrompt(prompt);
   emitFollowUpCommandEnd(index, code, startedAt, now(), writeRecord);
