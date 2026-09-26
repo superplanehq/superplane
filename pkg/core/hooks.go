@@ -18,6 +18,10 @@ type Hook struct {
 	Parameters []configuration.Field
 }
 
+type RunStateContext interface {
+	HasActive() (bool, error)
+}
+
 /*
  * Context for executing a action hook.
  */
@@ -53,6 +57,7 @@ type TriggerHookContext struct {
 	Events        EventContext
 	Webhook       NodeWebhookContext
 	Integration   IntegrationContext
+	Runs          RunStateContext
 }
 
 /*
