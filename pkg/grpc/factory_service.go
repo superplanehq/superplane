@@ -181,6 +181,11 @@ func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.S
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) SearchDependabotIntakeSetupItems(ctx context.Context, req *pb.SearchDependabotIntakeSetupItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchDependabotIntakeSetupItems(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)

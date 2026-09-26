@@ -137,7 +137,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 	models.FactoryIntakeSourceDependabotAlerts: {
 		name:             "Dependabot alerts",
-		description:      "Create a task when GitHub reports a Dependabot alert. Turn on Dependabot alerts for the repository.",
+		description:      "Create a task when GitHub reports a Dependabot alert.",
 		triggerComponent: "github.onDependabotAlert",
 		triggerName:      "On Dependabot Alert",
 		triggerConfiguration: map[string]any{

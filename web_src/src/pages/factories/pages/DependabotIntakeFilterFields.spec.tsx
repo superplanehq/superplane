@@ -56,7 +56,7 @@ describe("DependabotIntakeFilterFields", () => {
     );
 
     expect(screen.getByRole("checkbox", { name: "Critical" })).toBeChecked();
-    expect(screen.getByText(/Turn on Dependabot alerts/)).toBeInTheDocument();
+    expect(screen.queryByText(/Turn on Dependabot alerts/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("checkbox", { name: "Low" }));
     await user.click(screen.getByRole("button", { name: "Save" }));

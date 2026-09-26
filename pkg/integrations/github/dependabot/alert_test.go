@@ -1,6 +1,8 @@
 package dependabot
 
 import (
+	"errors"
+	"net/http"
 	"strconv"
 	"testing"
 
@@ -123,4 +125,23 @@ func TestPackageRefFromEventData(t *testing.T) {
 		"data": map[string]any{"alert": map[string]any{"html_url": "https://github.com/acme/payments/security/dependabot/7"}},
 	})
 	assert.False(t, ok)
+}
+
+func TestUnavailableError_NamesTheCause(t *testing.T) {
+	disabled := &github.ErrorResponse{
+		Response: &http.Response{StatusCode: http.StatusForbidden},
+		Message:  "Dependabot alerts are disabled for this repository.",
+	}
+	err := UnavailableError(disabled)
+	assert.ErrorIs(t, err, ErrAlertsDisabled)
+
+	unreadable := &github.ErrorResponse{
+		Response: &http.Response{StatusCode: http.StatusForbidden},
+		Message:  "Resource not accessible by integration",
+	}
+	err = UnavailableError(unreadable)
+	assert.ErrorIs(t, err, ErrAlertsUnreadable)
+
+	other := errors.New("connection reset")
+	assert.Equal(t, other, UnavailableError(other))
 }

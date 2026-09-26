@@ -52,7 +52,6 @@ export function DependabotIntakeFilterFields({
           />
         ))}
       </div>
-      <p className="mt-2 text-[13px] leading-5 text-muted-foreground">{DEPENDABOT_INTAKE_SETTINGS_COPY.severityHelp}</p>
     </fieldset>
   );
 }
@@ -69,16 +68,15 @@ function SeverityCheckbox({
   onChange: () => void;
 }) {
   return (
-    <div
+    <Label
+      htmlFor={id}
       className={cn(
-        "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+        "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
         checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
       )}
     >
       <Checkbox id={id} checked={checked} onChange={onChange} />
-      <Label htmlFor={id} className="min-w-0 cursor-pointer text-[13px] font-medium tracking-[-0.01em] text-foreground">
-        {title}
-      </Label>
-    </div>
+      <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
+    </Label>
   );
 }

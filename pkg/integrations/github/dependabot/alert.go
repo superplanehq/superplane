@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -17,10 +19,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// AlertsUnavailableMessage is what SuperPlane says when GitHub refuses the
-// Dependabot alerts API. A private repository with alerts turned off, and a
-// GitHub App that cannot read them, both look like this.
-const AlertsUnavailableMessage = "SuperPlane could not read Dependabot alerts for this repository. Turn on Dependabot alerts and allow the GitHub App to read them."
+// ErrAlertsDisabled means GitHub refused the alerts API because Dependabot
+// alerts are turned off for the repository.
+var ErrAlertsDisabled = errors.New("dependabot alerts are disabled")
+
+// ErrAlertsUnreadable means GitHub refused the alerts API because the app
+// cannot read them.
+var ErrAlertsUnreadable = errors.New("dependabot alerts are not readable")
+
+// AlertsDisabledMessage tells the user to turn Dependabot alerts on.
+const AlertsDisabledMessage = "Dependabot alerts are off for this repository. Turn them on in the repository security settings."
+
+// AlertsUnreadableMessage tells the user to allow the GitHub App to read alerts.
+const AlertsUnreadableMessage = "The GitHub App cannot read Dependabot alerts. Allow that permission for the app, then try again."
 
 // AlertPayloadType is the canvas event type emitted by github.onDependabotAlert.
 const AlertPayloadType = "github.dependabotAlert"
@@ -217,14 +228,28 @@ func Unavailable(err error) bool {
 	return common.IsForbiddenError(err)
 }
 
+// UnavailableError turns a GitHub refusal into a reason the caller can show.
+// GitHub uses one status code for both causes and names the cause in the body.
 func UnavailableError(err error) error {
-	if err == nil {
-		return nil
+	if err == nil || !Unavailable(err) {
+		return err
 	}
-	if Unavailable(err) {
-		return fmt.Errorf("%s", AlertsUnavailableMessage)
+	if strings.Contains(strings.ToLower(githubErrorMessage(err)), "alerts are disabled") {
+		return fmt.Errorf("%w", ErrAlertsDisabled)
 	}
-	return err
+	return fmt.Errorf("%w", ErrAlertsUnreadable)
+}
+
+func githubErrorMessage(err error) string {
+	var response *github.ErrorResponse
+	if errors.As(err, &response) {
+		return response.Message
+	}
+	var installation *ghinstallation.HTTPError
+	if errors.As(err, &installation) {
+		return installation.Message
+	}
+	return ""
 }
 
 // LockPackageWorkOrder serializes work-order creation for one package in this

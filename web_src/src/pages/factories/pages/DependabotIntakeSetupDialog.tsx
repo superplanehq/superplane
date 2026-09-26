@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { useCreateFactoryIntake, useImportFactoryIntakeItem } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
@@ -25,49 +25,56 @@ interface DependabotIntakeSetupDialogProps {
 const STEP_COUNT = 2;
 
 /**
- * Two steps: choose the alert filters and create the intake, then pick the
- * packages with open alerts to import. The intake is created with
- * `skipInitialImport` so a repository with many old alerts does not flood
- * the Backlog before the user has a say.
+ * Two steps: choose alert filters, then pick packages to import. The intake is
+ * created only when the user finishes step two. Until then nothing listens
+ * for Dependabot alerts.
  */
 export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogProps) {
   const [settings, setSettings] = useState<IntakeSourceSettings>({
     ...DEFAULT_GITHUB_INTAKE_SETTINGS,
     name: "Dependabot alerts",
   });
-  const [intakeId, setIntakeId] = useState<string>();
+  const [step, setStep] = useState(0);
   const [importBusy, setImportBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number }>();
   const [error, setError] = useState<string>();
   const createIntake = useCreateFactoryIntake(props.organizationId, props.factoryId);
+  const importItem = useImportFactoryIntakeItem(props.organizationId, props.factoryId);
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
+  const dependabotSeverities = normalizeDependabotSeverities(settings.dependabotSeverities);
 
-  const create = async () => {
-    if (!props.setupReady) return;
+  const finishWizard = async (packageIds: string[]) => {
     setError(undefined);
+    setImportBusy(true);
     try {
       const intake = await createIntake.mutateAsync({
         source: "SOURCE_DEPENDABOT_ALERTS",
-        settings: {
-          dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
-        },
+        settings: { dependabotSeverities },
         skipInitialImport: true,
       });
       if (!intake.id) {
         props.onCreated();
         return;
       }
-      setIntakeId(intake.id);
+      for (const [index, itemId] of packageIds.entries()) {
+        setImportProgress({ done: index, total: packageIds.length });
+        await importItem.mutateAsync({ intakeId: intake.id, itemId });
+      }
+      props.onCreated();
     } catch (cause) {
       setError(getApiErrorMessage(cause, DEPENDABOT_INTAKE_SETUP_COPY.createError));
+    } finally {
+      setImportProgress(undefined);
+      setImportBusy(false);
     }
   };
 
-  if (intakeId) {
+  if (step === 1) {
     return (
       <FirstRunShell
         testId="dependabot-intake-setup"
         busy={importBusy}
-        chrome={{ stepIndex: 1, stepCount: STEP_COUNT }}
+        chrome={{ stepIndex: 1, stepCount: STEP_COUNT, onBack: () => setStep(0) }}
         sphere={{
           testId: "dependabot-intake-setup-sphere",
           level: 0.82,
@@ -78,9 +85,13 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
         <DependabotIntakeImportStep
           organizationId={props.organizationId}
           factoryId={props.factoryId}
-          intakeId={intakeId}
-          onBusyChange={setImportBusy}
-          onDone={props.onCreated}
+          repository={repository}
+          dependabotSeverities={dependabotSeverities}
+          importProgress={importProgress}
+          error={error}
+          onSkip={() => void finishWizard([])}
+          onChangeFilters={() => setStep(0)}
+          onImportSelected={(ids) => void finishWizard(ids)}
         />
       </FirstRunShell>
     );
@@ -89,7 +100,6 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
   return (
     <FirstRunShell
       testId="dependabot-intake-setup"
-      busy={createIntake.isPending}
       chrome={{ stepIndex: 0, stepCount: STEP_COUNT, onBack: props.onClose }}
       sphere={{
         testId: "dependabot-intake-setup-sphere",
@@ -123,20 +133,14 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
           </p>
         ) : null}
 
-        {error ? (
-          <p className="workspace-body-text text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-
         <Button
           type="button"
           className="w-full"
-          disabled={!props.setupReady || createIntake.isPending}
-          onClick={() => void create()}
+          disabled={!props.setupReady}
+          onClick={() => setStep(1)}
           data-testid="dependabot-setup-finish"
         >
-          {createIntake.isPending ? DEPENDABOT_INTAKE_SETUP_COPY.creating : DEPENDABOT_INTAKE_SETUP_COPY.create}
+          {DEPENDABOT_INTAKE_SETUP_COPY.continue}
         </Button>
       </div>
     </FirstRunShell>

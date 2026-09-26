@@ -1,24 +1,29 @@
 export const DEPENDABOT_INTAKE_SETUP_COPY = {
   pageTitle: "Which Dependabot alerts should create tasks?",
-  helper: (repository: string) =>
-    `SuperPlane listens for new Dependabot alerts from ${repository}. In the next step you choose which open alerts to import.`,
+  helper: (repository: string) => `SuperPlane listens for new Dependabot alerts from ${repository}.`,
   repositorySection: "Repository",
   repositoryFallback: "Workspace backlog repository",
   setupRequired: "Connect GitHub and select a backlog repository in workspace setup before you create this intake.",
-  create: "Create intake",
-  creating: "Creating intake...",
+  continue: "Continue",
+  continuing: "Continuing...",
   createError: "SuperPlane could not create the Dependabot intake.",
   import: {
     pageTitle: "Which open alerts should become tasks?",
     helper: "SuperPlane creates one task per package. New alerts for a package join its open task.",
     loading: "Loading open alerts...",
     loadError: "SuperPlane could not load the open alerts.",
+    alertsDisabledMessage:
+      "Dependabot alerts are off for this repository. Turn them on in the repository security settings.",
+    openSecuritySettings: "Open security settings on GitHub",
     retry: "Try again",
     matchCount: (count: number) =>
       count === 1
         ? "1 package has open alerts that match your filters."
         : `${count} packages have open alerts that match your filters.`,
-    empty: "No open alerts match your filters.",
+    emptyTitle: "No open alerts match your filters.",
+    emptyBody: "SuperPlane can still listen for new alerts. New alerts can create tasks in the Backlog.",
+    finishWithoutImporting: "Turn on Dependabot intake",
+    changeFilters: "Change severity filters",
     selectAll: "Select all",
     clearSelection: "Clear selection",
     importSelected: (count: number) => `Import selected (${count})`,

@@ -389,6 +389,17 @@ service Factories {
     };
   }
 
+  rpc SearchDependabotIntakeSetupItems(SearchDependabotIntakeSetupItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/dependabot-intake-setup-items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview Dependabot packages for intake setup";
+      description: "Lists open alert packages before the Dependabot intake exists";
+      tags: "Factory";
+    };
+  }
+
   rpc ImportFactoryIntakeItem(ImportFactoryIntakeItemRequest) returns (ImportFactoryIntakeItemResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/intakes/{intake_id}/imports"
@@ -1535,6 +1546,12 @@ message SearchFactoryIntakeItemsRequest {
   string intake_id = 2;
   string query = 3;
   int32 limit = 4;
+}
+
+message SearchDependabotIntakeSetupItemsRequest {
+  string factory_id = 1;
+  repeated string dependabot_severities = 2;
+  int32 limit = 3;
 }
 
 message SearchFactoryIntakeItemsResponse {
