@@ -70,6 +70,17 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return reader, nil
 }
 
+func (s *Store) GetRange(ctx context.Context, key string, offset, length int64) (io.ReadCloser, error) {
+	reader, err := s.client.Bucket(s.bucket).Object(key).NewRangeReader(ctx, offset, length)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			return nil, blob.ErrNotFound
+		}
+		return nil, fmt.Errorf("read GCS object range: %w", err)
+	}
+	return reader, nil
+}
+
 func (s *Store) Head(ctx context.Context, key string) (*blob.ObjectInfo, error) {
 	attrs, err := s.client.Bucket(s.bucket).Object(key).Attrs(ctx)
 	if err != nil {

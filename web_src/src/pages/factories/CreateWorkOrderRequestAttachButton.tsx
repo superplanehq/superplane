@@ -1,7 +1,7 @@
 import { Paperclip } from "lucide-react";
 import { useRef } from "react";
 
-import { ALLOWED_IMAGE_TYPES } from "@/components/AgentSidebar/useImageAttachments";
+import { WORK_ORDER_VISUAL_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { Button } from "@/components/ui/button";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
@@ -14,7 +14,7 @@ export interface CreateWorkOrderRequestAttachButtonProps {
 
 export function CreateWorkOrderRequestAttachButton({
   disabled = false,
-  accept = ALLOWED_IMAGE_TYPES.join(","),
+  accept = WORK_ORDER_VISUAL_FILE_ACCEPT,
   onAttach,
 }: CreateWorkOrderRequestAttachButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
