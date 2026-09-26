@@ -48,8 +48,6 @@ import {
   BOARD_DONE_STATES,
   BOARD_OPEN_PAGE_SIZE,
   BOARD_OPEN_STATES,
-  BOARD_OPEN_PAGE_SIZE,
-  BOARD_OPEN_STATES,
   factoryWorkOrdersPageKey,
   factoryWorkOrdersPagePrefix,
   flattenWorkOrdersPages,

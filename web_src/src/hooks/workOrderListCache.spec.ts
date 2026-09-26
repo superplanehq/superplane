@@ -15,7 +15,12 @@ import {
 } from "./workOrderListCache";
 
 function pages(
-  orders: Array<{ id: string; title?: string; state?: FactoriesWorkOrder["state"] }>,
+  orders: Array<{
+    id: string;
+    title?: string;
+    state?: FactoriesWorkOrder["state"];
+    result?: FactoriesWorkOrder["result"];
+  }>,
 ): InfiniteData<WorkOrdersPage> {
   return {
     pageParams: [undefined],

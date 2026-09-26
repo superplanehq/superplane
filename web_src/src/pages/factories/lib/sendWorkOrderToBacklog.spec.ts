@@ -35,8 +35,8 @@ describe("workOrderHasClearableArtifacts", () => {
     expect(workOrderHasClearableArtifacts([{ type: "TYPE_FILE" }])).toBe(true);
   });
 
-  it("is false for pull request rows and empty lists", () => {
-    expect(workOrderHasClearableArtifacts([{ type: "TYPE_PR" }])).toBe(false);
+  it("is false for unspecified types and empty lists", () => {
+    expect(workOrderHasClearableArtifacts([{ type: "TYPE_UNSPECIFIED" }])).toBe(false);
     expect(workOrderHasClearableArtifacts([])).toBe(false);
     expect(workOrderHasClearableArtifacts(undefined)).toBe(false);
   });
