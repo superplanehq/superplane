@@ -1,5 +1,16 @@
 /** User-facing copy for workspace MCP servers and skills. STE. */
 
+export type AgentResourceInstructionStep =
+  | string
+  | {
+      before: string;
+      href: string;
+      label: string;
+      after: string;
+    };
+
+export const GITHUB_PERSONAL_ACCESS_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+
 export const AGENT_RESOURCES_COPY = {
   mcpTitle: "MCP servers",
   skillsTitle: "Skills",
@@ -84,6 +95,32 @@ export const AGENT_RESOURCES_COPY = {
   urlInvalid: "Enter an https URL.",
   markdownRequired: "SKILL.md content is required.",
   headersHelper: "Add a header only when the server needs a credential.",
+  catalogInstructionsTitle: "How to connect",
+  githubInstructions: [
+    "GitHub does not support SuperPlane sign-in.",
+    {
+      before: "Create a ",
+      href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+      label: "GitHub personal access token",
+      after: ".",
+    },
+    "Store Bearer and the token in an organization secret.",
+    "Select that secret for the Authorization header.",
+  ],
+  jiraInstructions: [
+    "Add the MCP server.",
+    "Select Connect on the server.",
+    "Sign in with Atlassian and grant access to Jira.",
+  ],
+  linearInstructions: ["Add the MCP server.", "Select Connect on the server.", "Sign in with Linear."],
+  circleciInstructions: ["Add the MCP server.", "Select Connect on the server.", "Sign in with CircleCI."],
+  semaphoreInstructions: [
+    "Ask Semaphore support to enable MCP for your organization.",
+    "Add the MCP server.",
+    "Select Connect on the server.",
+    "Sign in with Semaphore.",
+  ],
+  sentryInstructions: ["Add the MCP server.", "Select Connect on the server.", "Sign in with Sentry."],
   headerIncomplete: "Each header needs a name and a secret.",
   created: "MCP server added.",
   updated: "MCP server updated.",

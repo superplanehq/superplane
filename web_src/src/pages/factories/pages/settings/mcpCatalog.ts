@@ -1,5 +1,7 @@
 import type { FactoryAgentResourceAuth } from "@/api-client";
 
+import { AGENT_RESOURCES_COPY, type AgentResourceInstructionStep } from "./agentResourceCopy";
+
 export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
 
 export type MCPCatalogEntry = {
@@ -8,8 +10,10 @@ export type MCPCatalogEntry = {
   label: string;
   icon: string;
   category: MCPCatalogCategory;
-  url?: string;
-  auth?: FactoryAgentResourceAuth;
+  url: string;
+  auth: FactoryAgentResourceAuth;
+  headerName?: string;
+  instructions?: readonly AgentResourceInstructionStep[];
 };
 
 export type MCPCatalogGroup = {
@@ -17,6 +21,27 @@ export type MCPCatalogGroup = {
   label: string;
   entries: MCPCatalogEntry[];
 };
+
+export type MCPCatalogConnectionDefaults = {
+  name: string;
+  url: string;
+  auth: FactoryAgentResourceAuth;
+  headers?: { name: string }[];
+  instructions?: readonly AgentResourceInstructionStep[];
+};
+
+export function catalogConnectionDefaults(entry?: MCPCatalogEntry): MCPCatalogConnectionDefaults | undefined {
+  if (!entry) {
+    return undefined;
+  }
+  return {
+    name: entry.name,
+    url: entry.url,
+    auth: entry.auth,
+    ...(entry.headerName ? { headers: [{ name: entry.headerName }] } : {}),
+    ...(entry.instructions?.length ? { instructions: entry.instructions } : {}),
+  };
+}
 
 export const CUSTOM_MCP_CATALOG_ID = "custom";
 
@@ -65,7 +90,7 @@ export function groupMCPCatalog(entries: MCPCatalogEntry[]): MCPCatalogGroup[] {
   });
 }
 
-/** Common remote MCP servers that match SuperPlane integrations. URLs are set only when the vendor documents an https MCP endpoint. */
+/** Remote MCP servers that SuperPlane can open with a documented HTTPS URL and auth method. */
 export const MCP_CATALOG: MCPCatalogEntry[] = [
   {
     id: "github",
@@ -74,10 +99,20 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     icon: "github",
     category: "code",
     url: "https://api.githubcopilot.com/mcp/",
-    auth: "AUTH_OAUTH",
+    auth: "AUTH_HEADERS",
+    headerName: "Authorization",
+    instructions: AGENT_RESOURCES_COPY.githubInstructions,
   },
-  { id: "gitlab", name: "gitlab", label: "GitLab", icon: "gitlab", category: "code" },
-  { id: "bitbucket", name: "bitbucket", label: "Bitbucket", icon: "bitbucket", category: "code" },
+  {
+    id: "jira",
+    name: "jira",
+    label: "Jira",
+    icon: "jira",
+    category: "issues",
+    url: "https://mcp.atlassian.com/v2/mcp",
+    auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.jiraInstructions,
+  },
   {
     id: "linear",
     name: "linear",
@@ -86,12 +121,28 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "issues",
     url: "https://mcp.linear.app/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.linearInstructions,
   },
-  { id: "jira", name: "jira", label: "Jira", icon: "jira", category: "issues" },
-  { id: "slack", name: "slack", label: "Slack", icon: "slack", category: "chat" },
-  { id: "discord", name: "discord", label: "Discord", icon: "discord", category: "chat" },
-  { id: "teams", name: "teams", label: "Microsoft Teams", icon: "teams", category: "chat" },
-  { id: "circleci", name: "circleci", label: "CircleCI", icon: "circleci", category: "cicd" },
+  {
+    id: "circleci",
+    name: "circleci",
+    label: "CircleCI",
+    icon: "circleci",
+    category: "cicd",
+    url: "https://mcp.circleci.com/v1/mcp",
+    auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.circleciInstructions,
+  },
+  {
+    id: "semaphore",
+    name: "semaphore",
+    label: "Semaphore",
+    icon: "semaphore",
+    category: "cicd",
+    url: "https://mcp.semaphoreci.com/mcp",
+    auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.semaphoreInstructions,
+  },
   {
     id: "sentry",
     name: "sentry",
@@ -100,16 +151,6 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     category: "observability",
     url: "https://mcp.sentry.dev/mcp",
     auth: "AUTH_OAUTH",
+    instructions: AGENT_RESOURCES_COPY.sentryInstructions,
   },
-  { id: "datadog", name: "datadog", label: "Datadog", icon: "datadog", category: "observability" },
-  { id: "grafana", name: "grafana", label: "Grafana", icon: "grafana", category: "observability" },
-  { id: "logfire", name: "logfire", label: "Logfire", icon: "logfire", category: "observability" },
-  { id: "honeycomb", name: "honeycomb", label: "Honeycomb", icon: "honeycomb", category: "observability" },
-  { id: "newrelic", name: "newrelic", label: "New Relic", icon: "newrelic", category: "observability" },
-  { id: "pagerduty", name: "pagerduty", label: "PagerDuty", icon: "pagerduty", category: "incident" },
-  { id: "incident", name: "incident", label: "incident.io", icon: "incident", category: "incident" },
-  { id: "rootly", name: "rootly", label: "Rootly", icon: "rootly", category: "incident" },
-  { id: "firehydrant", name: "firehydrant", label: "FireHydrant", icon: "firehydrant", category: "incident" },
-  { id: "cloudflare", name: "cloudflare", label: "Cloudflare", icon: "cloudflare", category: "infrastructure" },
-  { id: "launchdarkly", name: "launchdarkly", label: "LaunchDarkly", icon: "launchdarkly", category: "infrastructure" },
 ];

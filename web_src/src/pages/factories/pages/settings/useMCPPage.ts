@@ -14,10 +14,10 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
-import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
+import type { AgentResourceConnectionDefaults, AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-import type { MCPCatalogEntry } from "./mcpCatalog";
+import { catalogConnectionDefaults, type MCPCatalogEntry } from "./mcpCatalog";
 
 function useMCPAddDialog() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -56,7 +56,7 @@ export function useMCPPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("factories", "update") && !permissionsLoading;
   const { addPickerOpen, setAddPickerOpen } = useMCPAddDialog();
-  const [catalogDefaults, setCatalogDefaults] = useState<Partial<AgentResourceConnectionDraft> | undefined>();
+  const [catalogDefaults, setCatalogDefaults] = useState<AgentResourceConnectionDefaults | undefined>();
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [editResource, setEditResource] = useState<FactoriesFactoryAgentResource | undefined>();
   const [pendingDelete, setPendingDelete] = useState<FactoriesFactoryAgentResource | undefined>();
@@ -85,7 +85,7 @@ export function useMCPPage() {
     openCatalogEntry: (entry?: MCPCatalogEntry) => {
       setAddPickerOpen(false);
       closeConnection();
-      setCatalogDefaults(entry ? { name: entry.name, url: entry.url, auth: entry.auth } : undefined);
+      setCatalogDefaults(catalogConnectionDefaults(entry));
       setConnectionOpen(true);
     },
     startOAuthRedirect: (resource: FactoriesFactoryAgentResource) => startOAuthRedirect(mutations, resource),
