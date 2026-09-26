@@ -140,12 +140,7 @@ async function createPendingWorkOrderFile(
       );
 
   if (created.error !== undefined) {
-    const status = created.response?.status;
-    if (status === 403 || status === 404) {
-      showErrorToast("You do not have permission to attach files here.");
-      return null;
-    }
-    showErrorToast(getApiErrorMessage(created.error, "The file could not be stored."));
+    showErrorToast(workOrderFileCreateFailureMessage(created.error, created.response?.status));
     return null;
   }
 
@@ -157,4 +152,32 @@ async function createPendingWorkOrderFile(
   }
 
   return { id, uploadUrl };
+}
+
+const attachPermissionMessage = "You do not have permission to attach files here.";
+const missingAttachTargetMessage = "This workspace or task no longer exists. Refresh the page and try again.";
+const missingResourceApiMessage = "resource not found";
+
+function workOrderFileCreateFailureMessage(error: unknown, status: number | undefined): string {
+  if (isAttachPermissionFailure(error, status)) {
+    return attachPermissionMessage;
+  }
+  if (status === 404) {
+    return missingAttachTargetMessage;
+  }
+  return getApiErrorMessage(error, "The file could not be stored.");
+}
+
+function isAttachPermissionFailure(error: unknown, status: number | undefined): boolean {
+  if (status === 403) {
+    return true;
+  }
+  if (status !== 404) {
+    return false;
+  }
+  return normalizedApiMessage(error) !== missingResourceApiMessage;
+}
+
+function normalizedApiMessage(error: unknown): string {
+  return getApiErrorMessage(error, "").trim().toLowerCase();
 }
