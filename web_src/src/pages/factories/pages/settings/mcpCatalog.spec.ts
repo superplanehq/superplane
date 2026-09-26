@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { AGENT_RESOURCES_COPY, GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentResourceCopy";
+import {
+  AGENT_RESOURCES_COPY,
+  CIRCLECI_PERSONAL_API_TOKEN_URL,
+  GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+} from "./agentResourceCopy";
 import {
   catalogConnectionDefaults,
   catalogEntryForResource,
@@ -12,17 +16,29 @@ import {
 
 describe("MCP_CATALOG", () => {
   it("includes a HTTPS URL and a SuperPlane-ready auth method on every entry", () => {
-    expect(MCP_CATALOG.map((entry) => entry.id)).toEqual(["github", "jira", "linear", "semaphore", "sentry"]);
+    expect(MCP_CATALOG.map((entry) => entry.id)).toEqual([
+      "github",
+      "jira",
+      "linear",
+      "circleci",
+      "semaphore",
+      "sentry",
+    ]);
     for (const entry of MCP_CATALOG) {
       expect(entry.url.startsWith("https://")).toBe(true);
       expect(entry.instruction).toBeDefined();
     }
     const github = MCP_CATALOG.find((entry) => entry.id === "github");
+    const circleci = MCP_CATALOG.find((entry) => entry.id === "circleci");
     expect(github?.auth).toBe("AUTH_HEADERS");
     expect(github?.headerName).toBe("Authorization");
-    expect(MCP_CATALOG.filter((entry) => entry.id !== "github").every((entry) => entry.auth === "AUTH_OAUTH")).toBe(
-      true,
-    );
+    expect(circleci?.auth).toBe("AUTH_HEADERS");
+    expect(circleci?.headerName).toBe("Authorization");
+    expect(
+      MCP_CATALOG.filter((entry) => entry.id !== "github" && entry.id !== "circleci").every(
+        (entry) => entry.auth === "AUTH_OAUTH",
+      ),
+    ).toBe(true);
   });
 
   it("prefills GitHub header auth and a token instruction", () => {
@@ -42,6 +58,23 @@ describe("MCP_CATALOG", () => {
     });
   });
 
+  it("prefills CircleCI header auth and a token instruction", () => {
+    const circleci = MCP_CATALOG.find((entry) => entry.id === "circleci");
+    expect(catalogConnectionDefaults(circleci)).toEqual({
+      name: "circleci",
+      url: "https://mcp.circleci.com/v1/mcp",
+      auth: "AUTH_HEADERS",
+      headers: [{ name: "Authorization" }],
+      instruction: AGENT_RESOURCES_COPY.circleciInstruction,
+    });
+    expect(AGENT_RESOURCES_COPY.circleciInstruction).toEqual({
+      before: "Create a ",
+      href: CIRCLECI_PERSONAL_API_TOKEN_URL,
+      label: "CircleCI personal API token",
+      after: " and paste it here.",
+    });
+  });
+
   it("omits defaults for a custom MCP server", () => {
     expect(catalogConnectionDefaults(undefined)).toBeUndefined();
   });
@@ -52,6 +85,9 @@ describe("MCP_CATALOG", () => {
     expect(catalogEntryForResource({ url: "https://api.githubcopilot.com/mcp/", auth: "AUTH_HEADERS" })?.id).toBe(
       "github",
     );
+    expect(catalogEntryForResource({ url: "https://mcp.circleci.com/v1/mcp", auth: "AUTH_HEADERS" })?.id).toBe(
+      "circleci",
+    );
     expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_HEADERS" })).toBeUndefined();
     expect(catalogEntryForResource({ url: "https://mcp.example.com/mcp", auth: "AUTH_OAUTH" })).toBeUndefined();
     expect(catalogEntryForResource(undefined)).toBeUndefined();
@@ -61,6 +97,7 @@ describe("MCP_CATALOG", () => {
 describe("catalogOAuthResourceForEntry", () => {
   const sentry = MCP_CATALOG.find((entry) => entry.id === "sentry");
   const github = MCP_CATALOG.find((entry) => entry.id === "github");
+  const circleci = MCP_CATALOG.find((entry) => entry.id === "circleci");
 
   it("finds an OAuth server that already uses the catalog URL", () => {
     expect(sentry).toBeDefined();
@@ -87,6 +124,10 @@ describe("catalogOAuthResourceForEntry", () => {
     expect(
       catalogOAuthResourceForEntry([{ url: "https://api.githubcopilot.com/mcp/", auth: "AUTH_HEADERS" }], github!),
     ).toBeUndefined();
+    expect(circleci).toBeDefined();
+    expect(
+      catalogOAuthResourceForEntry([{ url: "https://mcp.circleci.com/v1/mcp", auth: "AUTH_HEADERS" }], circleci!),
+    ).toBeUndefined();
   });
 });
 
@@ -99,6 +140,7 @@ describe("filterMCPCatalog", () => {
     expect(filterMCPCatalog(MCP_CATALOG, "GitHub").map((entry) => entry.id)).toEqual(["github"]);
     expect(filterMCPCatalog(MCP_CATALOG, "linear").map((entry) => entry.id)).toEqual(["linear"]);
     expect(filterMCPCatalog(MCP_CATALOG, "sema").map((entry) => entry.id)).toEqual(["semaphore"]);
+    expect(filterMCPCatalog(MCP_CATALOG, "circle").map((entry) => entry.id)).toEqual(["circleci"]);
     expect(
       filterMCPCatalog(MCP_CATALOG, "observability")
         .map((entry) => entry.id)
@@ -116,7 +158,10 @@ describe("groupMCPCatalog", () => {
       "Jira",
       "Linear",
     ]);
-    expect(groups.find((group) => group.id === "cicd")?.entries.map((entry) => entry.label)).toEqual(["Semaphore"]);
+    expect(groups.find((group) => group.id === "cicd")?.entries.map((entry) => entry.label)).toEqual([
+      "CircleCI",
+      "Semaphore",
+    ]);
     expect(groups.find((group) => group.id === "observability")?.entries.map((entry) => entry.label)).toEqual([
       "Sentry",
     ]);
