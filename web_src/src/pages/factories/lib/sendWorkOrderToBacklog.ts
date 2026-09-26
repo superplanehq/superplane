@@ -20,7 +20,7 @@ export const SEND_WORK_ORDER_TO_BACKLOG_COPY = {
 
 export const CLOSED_STATUS_DIALOG_COPY = {
   title: "Closed tasks",
-  description: "Failed, Rejected, and Canceled tasks. Send a task to Backlog to work on it again.",
+  description: "Rejected and Canceled tasks. Send a task to Backlog to work on it again.",
   empty: "No closed tasks.",
   searchEmpty: "No tasks match this search.",
   searchMore: "No matching tasks on this page.",
@@ -28,10 +28,7 @@ export const CLOSED_STATUS_DIALOG_COPY = {
   searchLoadError: "SuperPlane could not load more tasks.",
 } as const;
 
-export const CLOSED_STATUS_DIALOG_RESULTS = [
-  "RESULT_FAILED",
-  "RESULT_REJECTED",
-] as const satisfies readonly FactoriesWorkOrderResult[];
+export const CLOSED_STATUS_DIALOG_RESULTS = ["RESULT_REJECTED"] as const satisfies readonly FactoriesWorkOrderResult[];
 
 export function closedStatusEmptyLabel(searchActive: boolean, hasMorePages: boolean): string {
   if (!searchActive) {

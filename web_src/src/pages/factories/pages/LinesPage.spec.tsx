@@ -1687,11 +1687,11 @@ describe("LinesPage board editing", () => {
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
-    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-failed"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
 
     expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
     expect(
-      screen.getByText("Failed, Rejected, and Canceled tasks. Send a task to Backlog to work on it again."),
+      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
     ).toBeInTheDocument();
     expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
   });

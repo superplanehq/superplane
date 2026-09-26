@@ -15,7 +15,10 @@ export const WORK_ORDER_LIST_PAGE_SIZE = 100;
 export const BOARD_BACKLOG_STATES = ["STATE_DRAFT"] as const satisfies readonly FactoriesWorkOrderState[];
 export const BOARD_OPEN_STATES = ["STATE_OPEN"] as const satisfies readonly FactoriesWorkOrderState[];
 export const BOARD_DONE_STATES = ["STATE_CLOSED"] as const satisfies readonly FactoriesWorkOrderState[];
-export const BOARD_DONE_RESULTS = ["RESULT_COMPLETED"] as const satisfies readonly FactoriesWorkOrderResult[];
+export const BOARD_DONE_RESULTS = [
+  "RESULT_COMPLETED",
+  "RESULT_FAILED",
+] as const satisfies readonly FactoriesWorkOrderResult[];
 
 export type WorkOrdersPageCursor = {
   beforeId: string;
