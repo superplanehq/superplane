@@ -9,7 +9,21 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to Bitbucket build statuses, including Bitbucket Pipelines results" />
+  <LinkCard title="On Pull Request Comment" href="#on-pull-request-comment" description="Listen to comments on Bitbucket pull requests" />
+  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to Bitbucket pull request events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to Bitbucket push events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Pull Request Comment" href="#create-pull-request-comment" description="Post a comment on a Bitbucket pull request" />
+  <LinkCard title="Create Pull Request" href="#create-pull-request" description="Open a new pull request in a Bitbucket repository" />
+  <LinkCard title="Get Commit Status" href="#get-commit-status" description="Read the build statuses reported on a Bitbucket commit" />
+  <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a Bitbucket repository" />
+  <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Report a build status on a Bitbucket commit" />
+  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update an existing pull request in a Bitbucket repository" />
 </CardGrid>
 
 ## Instructions
@@ -26,6 +40,468 @@ To configure Bitbucket with SuperPlane:
    - Create a workspace access token.
 
 - **Copy the token** and your workspace slug (for example: `my-workspace`) below.
+
+<a id="on-commit-status"></a>
+
+## On Commit Status
+
+**Trigger key:** `bitbucket.onCommitStatus`
+
+The On Commit Status trigger starts a workflow execution when a build status is reported on a commit.
+
+Bitbucket Pipelines reports every pipeline result through the build status API, so this trigger is how a
+canvas reacts to a pipeline finishing. External CI systems that publish statuses to Bitbucket — including
+SuperPlane's own **Publish Commit Status** component — fire this trigger too.
+
+### Use Cases
+
+- **Deploy on green**: Start a deployment when the build for a commit reports `SUCCESSFUL`
+- **Fail fast**: Open an incident or notify a channel when a build reports `FAILED`
+- **Release gating**: Wait for a specific build key, such as `integration-tests`, before promoting a build
+
+### Configuration
+
+- **Repository** (required): The Bitbucket repository to monitor
+- **States** (required): Which build states should start a run. Default: Successful and Failed.
+- **Keys** (optional): Only fire for statuses whose key matches, e.g. `integration-tests`. Leave empty to accept every key.
+- **Refs** (optional): Only fire for statuses reported on a matching branch or tag. Leave empty to accept any ref.
+
+### Event Data
+
+Each event includes:
+- **commit_status**: The status, including `key`, `name`, `state`, `url`, `refname` and `links`
+- **repository**: Repository information
+- **actor**: The user or app that reported the status
+
+Common expression paths:
+- Build state: `root().data.commit_status.state`
+- Build key: `root().data.commit_status.key`
+- Build URL: `root().data.commit_status.url`
+- Branch: `root().data.commit_status.refname`
+
+The commit the status belongs to is referenced by `root().data.commit_status.links.commit.href`; its
+last path segment is the commit hash.
+
+### Webhook Setup
+
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "actor": {
+      "display_name": "John Doe",
+      "links": {
+        "avatar": {
+          "href": "https://bitbucket.org/account/johndoe/avatar/"
+        },
+        "html": {
+          "href": "https://bitbucket.org/johndoe/"
+        }
+      },
+      "nickname": "johndoe",
+      "type": "user",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+    },
+    "commit_status": {
+      "created_on": "2024-01-15T10:24:03.118093+00:00",
+      "description": "Pipeline succeeded",
+      "key": "BITBUCKETPIPELINE",
+      "links": {
+        "commit": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/709d658dc5b6d6afcd46049c2f332ee3f515a67d/statuses/build/BITBUCKETPIPELINE"
+        }
+      },
+      "name": "Pipeline #128 for main",
+      "refname": "main",
+      "state": "SUCCESSFUL",
+      "type": "build",
+      "updated_on": "2024-01-15T10:29:57.774502+00:00",
+      "url": "https://bitbucket.org/my-workspace/my-repo/pipelines/results/128"
+    },
+    "repository": {
+      "full_name": "my-workspace/my-repo",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo"
+        }
+      },
+      "name": "my-repo",
+      "type": "repository",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "bitbucket.commitStatus"
+}
+```
+
+<a id="on-pull-request-comment"></a>
+
+## On Pull Request Comment
+
+**Trigger key:** `bitbucket.onPRComment`
+
+The On Pull Request Comment trigger starts a workflow execution when someone comments on a Bitbucket pull request.
+
+### Use Cases
+
+- **ChatOps**: Let reviewers run a workflow by commenting `/deploy` or `/preview` on a pull request
+- **Agent hand-off**: Send a comment to a coding agent and post the result back on the pull request
+- **Review tracking**: Notify a channel when a discussion starts on an open pull request
+
+### Configuration
+
+- **Repository** (required): The Bitbucket repository to monitor
+- **Actions** (required): Which comment events to listen for. Default: Created.
+- **Content Filter** (optional): Regex pattern the comment body must match, e.g. `^/deploy`. Leave empty to accept every comment.
+
+### Event Data
+
+Each event includes:
+- **comment**: The comment, including `id` and `content.raw`
+- **pullrequest**: The pull request the comment belongs to
+- **repository**: Repository information
+- **actor**: The user that wrote the comment
+
+Common expression paths:
+- Comment body: `root().data.comment.content.raw`
+- Comment author: `root().data.actor.display_name`
+- Pull request ID: `root().data.pullrequest.id`
+- Source branch: `root().data.pullrequest.source.branch.name`
+
+### Webhook Setup
+
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "actor": {
+      "display_name": "John Doe",
+      "links": {
+        "avatar": {
+          "href": "https://bitbucket.org/account/johndoe/avatar/"
+        },
+        "html": {
+          "href": "https://bitbucket.org/johndoe/"
+        }
+      },
+      "nickname": "johndoe",
+      "type": "user",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+    },
+    "comment": {
+      "content": {
+        "html": "\u003cp\u003e/deploy staging\u003c/p\u003e",
+        "markup": "markdown",
+        "raw": "/deploy staging"
+      },
+      "created_on": "2024-01-15T10:31:12.884401+00:00",
+      "deleted": false,
+      "id": 481902337,
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo/pull-requests/42/_/diff#comment-481902337"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/pullrequests/42/comments/481902337"
+        }
+      },
+      "type": "pullrequest_comment",
+      "updated_on": "2024-01-15T10:31:12.884401+00:00",
+      "user": {
+        "display_name": "John Doe",
+        "links": {
+          "avatar": {
+            "href": "https://bitbucket.org/account/johndoe/avatar/"
+          },
+          "html": {
+            "href": "https://bitbucket.org/johndoe/"
+          }
+        },
+        "nickname": "johndoe",
+        "type": "user",
+        "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+      }
+    },
+    "pullrequest": {
+      "author": {
+        "display_name": "John Doe",
+        "links": {
+          "avatar": {
+            "href": "https://bitbucket.org/account/johndoe/avatar/"
+          },
+          "html": {
+            "href": "https://bitbucket.org/johndoe/"
+          }
+        },
+        "nickname": "johndoe",
+        "type": "user",
+        "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+      },
+      "close_source_branch": true,
+      "comment_count": 0,
+      "created_on": "2024-01-15T10:28:41.153217+00:00",
+      "description": "Adds the login page and wires it to the session API.",
+      "destination": {
+        "branch": {
+          "name": "main"
+        },
+        "commit": {
+          "hash": "1f4b0c6d9a2e5f8b3c7d0e1a4b6c9d2e5f8a1b3c",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo/commits/1f4b0c6d9a2e5f8b3c7d0e1a4b6c9d2e5f8a1b3c"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "full_name": "my-workspace/my-repo",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo"
+            }
+          },
+          "name": "my-repo",
+          "type": "repository",
+          "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+        }
+      },
+      "draft": false,
+      "id": 42,
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo/pull-requests/42"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/pullrequests/42"
+        }
+      },
+      "participants": [],
+      "reviewers": [],
+      "source": {
+        "branch": {
+          "name": "feature/login-page"
+        },
+        "commit": {
+          "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "full_name": "my-workspace/my-repo",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo"
+            }
+          },
+          "name": "my-repo",
+          "type": "repository",
+          "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+        }
+      },
+      "state": "OPEN",
+      "task_count": 0,
+      "title": "feat: add login page",
+      "type": "pullrequest",
+      "updated_on": "2024-01-15T10:28:41.153217+00:00"
+    },
+    "repository": {
+      "full_name": "my-workspace/my-repo",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo"
+        }
+      },
+      "name": "my-repo",
+      "type": "repository",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "bitbucket.pullRequestComment"
+}
+```
+
+<a id="on-pull-request"></a>
+
+## On Pull Request
+
+**Trigger key:** `bitbucket.onPullRequest`
+
+The On Pull Request trigger starts a workflow execution when a pull request changes state in a Bitbucket repository.
+
+### Use Cases
+
+- **Preview environments**: Provision an ephemeral environment when a pull request is opened, and tear it down when it is merged or declined
+- **Review automation**: Run checks, ask an agent for a review, or notify a channel when a pull request is opened or updated
+- **Merge gates**: React to approvals and change requests to drive a deployment decision
+- **Release automation**: Start a deploy when a pull request targeting `main` is merged
+
+### Configuration
+
+- **Repository** (required): The Bitbucket repository to monitor
+- **Actions** (required): Which pull request events to listen for. Default: Opened.
+- **Target Branches** (optional): Only fire when the pull request targets a matching branch. Leave empty to accept every target branch.
+
+### Event Data
+
+Each event includes:
+- **pullrequest**: The full pull request, including `id`, `title`, `state`, `source`, `destination` and `links`
+- **repository**: Repository information
+- **actor**: The user that triggered the event
+- **approval** / **changes_request**: Present on approval and change-request events
+
+Common expression paths:
+- Pull request ID: `root().data.pullrequest.id`
+- Title: `root().data.pullrequest.title`
+- State: `root().data.pullrequest.state`
+- Source branch: `root().data.pullrequest.source.branch.name`
+- Target branch: `root().data.pullrequest.destination.branch.name`
+- Head commit: `root().data.pullrequest.source.commit.hash`
+- Pull request URL: `root().data.pullrequest.links.html.href`
+
+Note that Bitbucket reports the merged state as the `fulfilled` action and the declined state as `rejected`.
+
+### Webhook Setup
+
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "actor": {
+      "display_name": "John Doe",
+      "links": {
+        "avatar": {
+          "href": "https://bitbucket.org/account/johndoe/avatar/"
+        },
+        "html": {
+          "href": "https://bitbucket.org/johndoe/"
+        }
+      },
+      "nickname": "johndoe",
+      "type": "user",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+    },
+    "pullrequest": {
+      "author": {
+        "display_name": "John Doe",
+        "links": {
+          "avatar": {
+            "href": "https://bitbucket.org/account/johndoe/avatar/"
+          },
+          "html": {
+            "href": "https://bitbucket.org/johndoe/"
+          }
+        },
+        "nickname": "johndoe",
+        "type": "user",
+        "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+      },
+      "close_source_branch": true,
+      "comment_count": 0,
+      "created_on": "2024-01-15T10:28:41.153217+00:00",
+      "description": "Adds the login page and wires it to the session API.",
+      "destination": {
+        "branch": {
+          "name": "main"
+        },
+        "commit": {
+          "hash": "1f4b0c6d9a2e5f8b3c7d0e1a4b6c9d2e5f8a1b3c",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo/commits/1f4b0c6d9a2e5f8b3c7d0e1a4b6c9d2e5f8a1b3c"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "full_name": "my-workspace/my-repo",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo"
+            }
+          },
+          "name": "my-repo",
+          "type": "repository",
+          "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+        }
+      },
+      "draft": false,
+      "id": 42,
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo/pull-requests/42"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/pullrequests/42"
+        }
+      },
+      "participants": [],
+      "reviewers": [],
+      "source": {
+        "branch": {
+          "name": "feature/login-page"
+        },
+        "commit": {
+          "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "full_name": "my-workspace/my-repo",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo"
+            }
+          },
+          "name": "my-repo",
+          "type": "repository",
+          "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+        }
+      },
+      "state": "OPEN",
+      "task_count": 0,
+      "title": "feat: add login page",
+      "type": "pullrequest",
+      "updated_on": "2024-01-15T10:28:41.153217+00:00"
+    },
+    "repository": {
+      "full_name": "my-workspace/my-repo",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo"
+        }
+      },
+      "name": "my-repo",
+      "type": "repository",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "bitbucket.pullRequest"
+}
+```
 
 <a id="on-push"></a>
 
@@ -154,6 +630,693 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
   },
   "timestamp": "2024-01-15T10:30:00Z",
   "type": "bitbucket.push"
+}
+```
+
+<a id="create-pull-request-comment"></a>
+
+## Create Pull Request Comment
+
+**Component key:** `bitbucket.createPRComment`
+
+The Create Pull Request Comment component posts a comment on a Bitbucket pull request.
+
+### Use Cases
+
+- **Preview environment URLs**: Post the URL of the environment provisioned for the pull request
+- **Agent output**: Return the result of a review or a test run to the people looking at the pull request
+- **Deployment feedback**: Report which environment the branch was deployed to, and when
+
+### Configuration
+
+- **Repository** (required): The repository containing the pull request
+- **Pull Request ID** (required): The numeric ID of the pull request (supports expressions)
+- **Body** (required): The comment body, in Markdown. Supports expressions.
+
+### Permissions
+
+The token needs the `pullrequest:write` scope on the repository.
+
+### Output
+
+The component emits the created comment, including:
+- **id**: The comment ID
+- **content.raw**: The Markdown that was posted
+- **links.html.href**: The URL of the comment on the pull request
+
+### Example Output
+
+```json
+{
+  "data": {
+    "content": {
+      "html": "\u003cp\u003ePreview environment is up: \u003ca href=\"https://pr-42.preview.superplane.dev\"\u003ehttps://pr-42.preview.superplane.dev\u003c/a\u003e\u003c/p\u003e",
+      "markup": "markdown",
+      "raw": "Preview environment is up: https://pr-42.preview.superplane.dev"
+    },
+    "created_on": "2026-08-11T09:41:03.774219+00:00",
+    "deleted": false,
+    "id": 481902337,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/pull-requests/42/_/diff#comment-481902337"
+      },
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/pullrequests/42/comments/481902337"
+      }
+    },
+    "updated_on": "2026-08-11T09:41:03.774219+00:00",
+    "user": {
+      "account_id": "712020:1f6a0d7c-5d54-4b1e-9a4f-6c2f9e0a7b31",
+      "display_name": "Anthony Foussette",
+      "nickname": "anthony",
+      "uuid": "{6b0b1d0e-6a1f-4f2f-9a2b-2f1d3a9c7e21}"
+    }
+  },
+  "timestamp": "2026-08-11T09:41:03.812905Z",
+  "type": "bitbucket.pullRequestComment"
+}
+```
+
+<a id="create-pull-request"></a>
+
+## Create Pull Request
+
+**Component key:** `bitbucket.createPullRequest`
+
+The Create Pull Request component opens a new pull request in a Bitbucket repository.
+
+### Use Cases
+
+- **Automated fixes**: An agent pushes a fix to a branch and opens a pull request for human review
+- **Dependency updates**: Open a pull request when a dependency bump or changelog is generated
+- **Release automation**: Promote a release branch into `main` through a reviewable pull request
+
+### Configuration
+
+- **Repository** (required): The repository where the pull request is opened
+- **Source Branch** (required): The branch holding the changes (supports expressions)
+- **Target Branch** (optional): The branch to merge into. Leave empty to use the repository's main branch.
+- **Title** (required): The title of the pull request
+- **Description** (optional): The pull request description, in Markdown
+- **Reviewers** (optional): Workspace members to request a review from
+- **Close Source Branch** (optional): Delete the source branch once the pull request is merged
+
+### Permissions
+
+The token needs the `pullrequest:write` scope on the repository.
+
+### Output
+
+The component emits the created pull request, including:
+- **id**: The pull request number used by every other Bitbucket component
+- **state**: `OPEN` for a freshly created pull request
+- **source.branch.name** and **destination.branch.name**: The branches involved
+- **links.html.href**: The URL to open the pull request in Bitbucket
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "account_id": "712020:1f6a0d7c-5d54-4b1e-9a4f-6c2f9e0a7b31",
+      "display_name": "Anthony Foussette",
+      "nickname": "anthony",
+      "uuid": "{6b0b1d0e-6a1f-4f2f-9a2b-2f1d3a9c7e21}"
+    },
+    "close_source_branch": true,
+    "comment_count": 0,
+    "created_on": "2026-08-11T09:14:22.512345+00:00",
+    "description": "Adds the login page and wires it to the session API.",
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          }
+        }
+      },
+      "repository": {
+        "full_name": "superplane/web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        },
+        "name": "web",
+        "slug": "web",
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}"
+      }
+    },
+    "draft": false,
+    "id": 42,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/pull-requests/42"
+      },
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/pullrequests/42"
+      }
+    },
+    "reviewers": [
+      {
+        "account_id": "712020:9c4e1b77-2a3d-4e58-b0c1-7f8a2d5e6c04",
+        "display_name": "Marta Silva",
+        "nickname": "marta",
+        "uuid": "{2a5f7c88-91b4-4f0a-8c62-1e7d9b0a4f13}"
+      }
+    ],
+    "source": {
+      "branch": {
+        "name": "feature/login-page"
+      },
+      "commit": {
+        "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          }
+        }
+      },
+      "repository": {
+        "full_name": "superplane/web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        },
+        "name": "web",
+        "slug": "web",
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}"
+      }
+    },
+    "state": "OPEN",
+    "task_count": 0,
+    "title": "Add login page",
+    "updated_on": "2026-08-11T09:14:22.512345+00:00"
+  },
+  "timestamp": "2026-08-11T09:14:22.618432Z",
+  "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="get-commit-status"></a>
+
+## Get Commit Status
+
+**Component key:** `bitbucket.getCommitStatus`
+
+The Get Commit Status component reads every build status reported on a commit and rolls them into a
+single verdict, so a workflow can decide whether a commit is safe to ship.
+
+### Use Cases
+
+- **Deploy gates**: Check that every build on the commit is green before promoting it
+- **Release readiness**: Verify a release candidate has passed all required checks
+- **Diagnostics**: Attach the list of failing checks to an incident or a pull request comment
+
+### Configuration
+
+- **Repository** (required): The repository containing the commit
+- **Commit** (required): The full commit hash to read (supports expressions)
+
+### Output
+
+The component emits an aggregate over the commit's build statuses:
+- **commit**: The commit that was read
+- **state**: The combined verdict, see the table below
+- **total_count**: How many statuses were reported on the commit
+- **statuses**: Every individual status, in the order Bitbucket returned them
+
+#### How the combined state is decided
+
+The combined state is the most severe individual state, in this order:
+
+| Combined state | When |
+| --- | --- |
+| `FAILED` | At least one status failed |
+| `STOPPED` | No failures, but at least one build was stopped |
+| `INPROGRESS` | Nothing failed or stopped, but at least one build is still running |
+| `SUCCESSFUL` | Every status succeeded |
+| `NO_STATUS` | The commit carries no build status at all |
+
+`NO_STATUS` is not a Bitbucket value — it exists so a gate can tell "nothing ran yet" apart from
+"everything passed", which are very different answers when deciding to deploy.
+
+### Permissions
+
+The token needs the `repository` read scope.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+    "state": "SUCCESSFUL",
+    "statuses": [
+      {
+        "commit": {
+          "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            },
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            }
+          }
+        },
+        "created_on": "2026-08-11T11:02:44.118093+00:00",
+        "description": "Pipeline succeeded",
+        "key": "BITBUCKETPIPELINE",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e/statuses/build/BITBUCKETPIPELINE"
+          }
+        },
+        "name": "Pipeline #128 for main",
+        "refname": "main",
+        "state": "SUCCESSFUL",
+        "type": "build",
+        "updated_on": "2026-08-11T11:09:31.774502+00:00",
+        "url": "https://bitbucket.org/superplane/web/pipelines/results/128"
+      },
+      {
+        "commit": {
+          "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            },
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            }
+          }
+        },
+        "created_on": "2026-08-11T11:24:18.402117+00:00",
+        "description": "Deployed to production",
+        "key": "superplane-deploy",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e/statuses/build/superplane-deploy"
+          }
+        },
+        "name": "SuperPlane deploy",
+        "refname": "main",
+        "state": "SUCCESSFUL",
+        "type": "build",
+        "updated_on": "2026-08-11T11:31:52.660984+00:00",
+        "url": "https://app.superplane.com/canvases/web-delivery/runs/8f2c1a44"
+      }
+    ],
+    "total_count": 2
+  },
+  "timestamp": "2026-08-11T11:32:10.559274Z",
+  "type": "bitbucket.commitStatuses"
+}
+```
+
+<a id="merge-pull-request"></a>
+
+## Merge Pull Request
+
+**Component key:** `bitbucket.mergePullRequest`
+
+The Merge Pull Request component merges an open Bitbucket pull request.
+
+### Use Cases
+
+- **Policy-gated merges**: Merge only after approvals, a green build and a manual approval step have all passed
+- **Auto-merge**: Merge dependency or changelog pull requests once CI reports success
+- **Release trains**: Merge a batch of ready pull requests as part of a coordinated release
+
+### Configuration
+
+- **Repository** (required): The repository containing the pull request
+- **Pull Request ID** (required): The numeric ID of the pull request (supports expressions)
+- **Merge Strategy** (required): How the merge is performed. Default: Merge commit.
+- **Message** (optional): The merge commit message. Leave empty to let Bitbucket generate it.
+- **Close Source Branch** (optional): Delete the source branch after merging
+
+#### Merge strategies
+
+| Strategy | Behaviour |
+| --- | --- |
+| **Merge commit** | Creates a merge commit, keeping the full branch history |
+| **Squash** | Combines every commit on the branch into a single commit |
+| **Fast forward** | Moves the target branch pointer, and fails if the branch has diverged |
+
+### Permissions
+
+The token needs the `pullrequest:write` scope, and the account must be allowed to write to the
+target branch. Branch restrictions, unresolved merge checks and merge conflicts all make this component fail
+with the reason reported by Bitbucket.
+
+### Output
+
+The component emits the merged pull request, including:
+- **state**: `MERGED`
+- **merge_commit.hash**: The commit created by the merge
+- **closed_by**: The account the merge was performed as
+
+If Bitbucket queues the merge asynchronously — which happens on very large repositories — the component
+fails rather than reporting a merge that has not completed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "account_id": "712020:1f6a0d7c-5d54-4b1e-9a4f-6c2f9e0a7b31",
+      "display_name": "Anthony Foussette",
+      "nickname": "anthony",
+      "uuid": "{6b0b1d0e-6a1f-4f2f-9a2b-2f1d3a9c7e21}"
+    },
+    "close_source_branch": true,
+    "closed_by": {
+      "account_id": "712020:9c4e1b77-2a3d-4e58-b0c1-7f8a2d5e6c04",
+      "display_name": "Marta Silva",
+      "nickname": "marta",
+      "uuid": "{2a5f7c88-91b4-4f0a-8c62-1e7d9b0a4f13}"
+    },
+    "comment_count": 3,
+    "created_on": "2026-08-11T09:14:22.512345+00:00",
+    "description": "Adds the login page and wires it to the session API.",
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          }
+        }
+      },
+      "repository": {
+        "full_name": "superplane/web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        },
+        "name": "web",
+        "slug": "web",
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}"
+      }
+    },
+    "draft": false,
+    "id": 42,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/pull-requests/42"
+      },
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/pullrequests/42"
+      }
+    },
+    "merge_commit": {
+      "hash": "7ab3c9d1e5f28046b1c3a7d9e2b4c6d8e0f1a2b3",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/superplane/web/commits/7ab3c9d1e5f28046b1c3a7d9e2b4c6d8e0f1a2b3"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/7ab3c9d1e5f28046b1c3a7d9e2b4c6d8e0f1a2b3"
+        }
+      }
+    },
+    "reviewers": [
+      {
+        "account_id": "712020:9c4e1b77-2a3d-4e58-b0c1-7f8a2d5e6c04",
+        "display_name": "Marta Silva",
+        "nickname": "marta",
+        "uuid": "{2a5f7c88-91b4-4f0a-8c62-1e7d9b0a4f13}"
+      }
+    ],
+    "source": {
+      "branch": {
+        "name": "feature/login-page"
+      },
+      "commit": {
+        "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          }
+        }
+      },
+      "repository": {
+        "full_name": "superplane/web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        },
+        "name": "web",
+        "slug": "web",
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}"
+      }
+    },
+    "state": "MERGED",
+    "task_count": 0,
+    "title": "Add login page",
+    "updated_on": "2026-08-11T11:20:05.104773+00:00"
+  },
+  "timestamp": "2026-08-11T11:20:05.211640Z",
+  "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="publish-commit-status"></a>
+
+## Publish Commit Status
+
+**Component key:** `bitbucket.publishCommitStatus`
+
+The Publish Commit Status component reports a build status on a Bitbucket commit, so the result of a
+SuperPlane workflow shows up next to the commit and on any pull request that contains it.
+
+### Use Cases
+
+- **Make SuperPlane a required check**: Publish `INPROGRESS` when a workflow starts and `SUCCESSFUL` or `FAILED` when it finishes, then require that key in a Bitbucket branch restriction
+- **Surface external results**: Report the outcome of a security scan, a load test or a manual approval directly on the commit
+- **Close the loop on deploys**: Mark the commit that reached production
+
+### Configuration
+
+- **Repository** (required): The repository containing the commit
+- **Commit** (required): The full commit hash to report on (supports expressions)
+- **Key** (required): A stable identifier for this check, e.g. `superplane-deploy`. Publishing again with the same key updates the existing status instead of adding a new one.
+- **Name** (optional): The human-readable name shown in Bitbucket. Defaults to the key.
+- **State** (required): The build state to report
+- **URL** (optional): A link to the run, so people can click through from Bitbucket
+- **Description** (optional): A short explanation shown next to the status
+
+### Permissions
+
+The token needs the `repository:write` scope on the repository.
+
+### Output
+
+The component emits the published status, including `key`, `state`, `url` and `refname`.
+
+Publishing a status fires the **On Commit Status** trigger, so be careful not to point that trigger at the
+same key this component writes — it would run the workflow again.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit": {
+      "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+        }
+      }
+    },
+    "created_on": "2026-08-11T11:24:18.402117+00:00",
+    "description": "Deployed to production",
+    "key": "superplane-deploy",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+      },
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e/statuses/build/superplane-deploy"
+      }
+    },
+    "name": "SuperPlane deploy",
+    "refname": "main",
+    "state": "SUCCESSFUL",
+    "type": "build",
+    "updated_on": "2026-08-11T11:31:52.660984+00:00",
+    "url": "https://app.superplane.com/canvases/web-delivery/runs/8f2c1a44"
+  },
+  "timestamp": "2026-08-11T11:31:52.704318Z",
+  "type": "bitbucket.commitStatus"
+}
+```
+
+<a id="update-pull-request"></a>
+
+## Update Pull Request
+
+**Component key:** `bitbucket.updatePullRequest`
+
+The Update Pull Request component modifies an existing Bitbucket pull request: its title, description, target branch, reviewers, or whether the source branch is deleted on merge.
+
+### Use Cases
+
+- **Progress reporting**: Rewrite the description as a workflow advances, so the pull request always shows current state
+- **Retargeting**: Move a pull request onto a different release branch
+- **Review routing**: Assign reviewers based on which files changed
+
+### Configuration
+
+- **Repository** (required): The repository containing the pull request
+- **Pull Request ID** (required): The numeric ID of the pull request (supports expressions)
+- **Title** (toggle): New title for the pull request
+- **Description** (toggle): New description for the pull request
+- **Target Branch** (toggle): Retarget the pull request onto a different branch
+- **Reviewers** (toggle): Workspace members to request a review from. Replaces the existing reviewers; selecting none clears them.
+- **Close Source Branch** (toggle): Whether the source branch is deleted when the pull request merges
+
+Each field besides Repository and Pull Request ID is toggled on individually, so only the fields you enable are sent. At least one must be enabled. Bitbucket rejects a blank title, so Title must have a value when enabled.
+
+### Permissions
+
+The token needs the `pullrequest:write` scope on the repository.
+
+### Output
+
+The component emits the updated pull request, in the same shape as **Create Pull Request**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "account_id": "712020:1f6a0d7c-5d54-4b1e-9a4f-6c2f9e0a7b31",
+      "display_name": "Anthony Foussette",
+      "nickname": "anthony",
+      "uuid": "{6b0b1d0e-6a1f-4f2f-9a2b-2f1d3a9c7e21}"
+    },
+    "close_source_branch": true,
+    "comment_count": 3,
+    "created_on": "2026-08-11T09:14:22.512345+00:00",
+    "description": "Adds the login page, wires it to the session API and covers it with tests.",
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          }
+        }
+      },
+      "repository": {
+        "full_name": "superplane/web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        },
+        "name": "web",
+        "slug": "web",
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}"
+      }
+    },
+    "draft": false,
+    "id": 42,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/pull-requests/42"
+      },
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/pullrequests/42"
+      }
+    },
+    "reviewers": [
+      {
+        "account_id": "712020:9c4e1b77-2a3d-4e58-b0c1-7f8a2d5e6c04",
+        "display_name": "Marta Silva",
+        "nickname": "marta",
+        "uuid": "{2a5f7c88-91b4-4f0a-8c62-1e7d9b0a4f13}"
+      }
+    ],
+    "source": {
+      "branch": {
+        "name": "feature/login-page"
+      },
+      "commit": {
+        "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          },
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          }
+        }
+      },
+      "repository": {
+        "full_name": "superplane/web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        },
+        "name": "web",
+        "slug": "web",
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}"
+      }
+    },
+    "state": "OPEN",
+    "task_count": 0,
+    "title": "Add login page and session handling",
+    "updated_on": "2026-08-11T10:02:47.881204+00:00"
+  },
+  "timestamp": "2026-08-11T10:02:47.925118Z",
+  "type": "bitbucket.pullRequest"
 }
 ```
 
