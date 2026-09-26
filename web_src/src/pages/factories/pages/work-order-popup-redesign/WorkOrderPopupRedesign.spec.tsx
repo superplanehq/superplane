@@ -184,17 +184,17 @@ describe("Line board job popup", () => {
         name: "Open Add refund reason enum to schema",
       }),
     ).toBeInTheDocument();
-    expect(within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(1);
+    expect(within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(2);
     expect(
       within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Send refund receipts after provider confirm",
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("lines-done-column")).queryByRole("button", {
+      within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Fix refund dispatcher timeout loop",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-done-column")).queryByRole("button", {
         name: "Open Replace the refund batch exporter",
