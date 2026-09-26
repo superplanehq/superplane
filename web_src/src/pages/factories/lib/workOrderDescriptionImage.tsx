@@ -21,6 +21,24 @@ declare module "@tiptap/core" {
   }
 }
 
+function workOrderMediaHTML(
+  attrs: Record<string, unknown>,
+  contentType: string | undefined,
+  src: string | undefined,
+  alt: string | undefined,
+) {
+  if (isWorkOrderAudioSource({ contentType, src, alt })) {
+    if (isBrowserPlayableWorkOrderAudio(contentType, src, alt)) {
+      return ["audio", mergeAttributes(attrs, { controls: "" })];
+    }
+    return ["span", { class: "work-order-video-fallback" }, alt || "Audio"];
+  }
+  if (isBrowserPlayableWorkOrderVideo(contentType, src, alt)) {
+    return ["video", mergeAttributes(attrs, { controls: "", playsinline: "" })];
+  }
+  return ["span", { class: "work-order-video-fallback" }, alt || "Video"];
+}
+
 function WorkOrderMediaView({ node, editor }: NodeViewProps) {
   const rawSrc = node.attrs.src as string | undefined;
   const src =
@@ -68,16 +86,7 @@ export const WorkOrderImage = Image.extend({
       class: "work-order-file-image",
     });
     if (isWorkOrderMediaSource({ contentType, src, alt: rest.alt as string | undefined })) {
-      if (isWorkOrderAudioSource({ contentType, src, alt: rest.alt as string | undefined })) {
-        if (isBrowserPlayableWorkOrderAudio(contentType, src, rest.alt as string | undefined)) {
-          return ["audio", mergeAttributes(attrs, { controls: "" })];
-        }
-        return ["span", { class: "work-order-video-fallback" }, rest.alt || "Audio"];
-      }
-      if (isBrowserPlayableWorkOrderVideo(contentType, src, rest.alt as string | undefined)) {
-        return ["video", mergeAttributes(attrs, { controls: "", playsinline: "" })];
-      }
-      return ["span", { class: "work-order-video-fallback" }, rest.alt || "Video"];
+      return workOrderMediaHTML(attrs, contentType, src, rest.alt as string | undefined);
     }
     return ["img", attrs];
   },

@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
+import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { showErrorToast } from "@/lib/toast";
-import {
-  isInlineWorkOrderAudio,
-  isInlineWorkOrderVideo,
-  resolveWorkOrderFileMimeType,
-  revokeWorkOrderFilePreviewUrl,
-} from "@/lib/workOrderFiles";
+import { revokeWorkOrderFilePreviewUrl } from "@/lib/workOrderFiles";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import type { CreateWorkOrderRequestDraft } from "./CreateWorkOrderRequestDialog";
@@ -104,14 +99,7 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleAttach = async (files: FileList | File[]) => {
-    // The create dialog keeps its image, video, and audio attach stack. Other files stay on the description editor.
-    const visualFiles = Array.from(files).filter(
-      (file) =>
-        isSupportedImageFile(file) ||
-        isInlineWorkOrderVideo(resolveWorkOrderFileMimeType(file)) ||
-        isInlineWorkOrderAudio(resolveWorkOrderFileMimeType(file)),
-    );
-    const uploaded = (await uploadAcceptedFiles(visualFiles)).filter(isVisualUploadedWorkOrderFile);
+    const uploaded = await uploadAcceptedFiles(files);
     if (uploaded.length === 0) {
       return;
     }

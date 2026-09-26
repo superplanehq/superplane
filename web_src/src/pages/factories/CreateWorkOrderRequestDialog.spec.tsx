@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-import { WORK_ORDER_VISUAL_FILE_ACCEPT } from "@/lib/workOrderFiles";
+import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 
 import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
@@ -143,7 +143,7 @@ describe("CreateWorkOrderRequestDialog", () => {
       CREATE_WORK_ORDER_REQUEST_COPY.attach,
     );
     expect(screen.getByTestId("create-work-order-request-image-input").getAttribute("accept")).toBe(
-      WORK_ORDER_VISUAL_FILE_ACCEPT,
+      WORK_ORDER_FILE_ACCEPT,
     );
     expect(screen.getByTestId("create-work-order-request-create")).toBeDisabled();
   });
@@ -350,7 +350,7 @@ describe("CreateWorkOrderRequestDialog", () => {
       new File(["notes"], "notes.txt", { type: "text/plain" }),
     ]);
 
-    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images, videos, or audio files.");
     expect(screen.getByTestId("create-work-order-request-file-file-txt")).toHaveTextContent("notes.txt");
   });
 
