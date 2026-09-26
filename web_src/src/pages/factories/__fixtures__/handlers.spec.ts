@@ -65,6 +65,68 @@ describe("matchFactoryPageFixture", () => {
     expect(body.hasNextPage).toBe(true);
   });
 
+  it("filters closed tasks by result", async () => {
+    const fixture = structuredClone(lineMetricsFactoriesFixture);
+    const failed = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_CLOSED&results=RESULT_FAILED&limit=20`,
+      undefined,
+      fixture,
+    );
+    const failedBody = (await failed.json()) as { orders: Array<{ id?: string; result?: string }> };
+    expect(failedBody.orders.length).toBeGreaterThan(0);
+    expect(failedBody.orders.every((order) => order.result === "RESULT_FAILED")).toBe(true);
+
+    const rejected = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_CLOSED&results=RESULT_REJECTED&limit=20`,
+      undefined,
+      fixture,
+    );
+    const rejectedBody = (await rejected.json()) as { orders: Array<{ result?: string }> };
+    expect(rejectedBody.orders.length).toBeGreaterThan(0);
+    expect(rejectedBody.orders.every((order) => order.result === "RESULT_REJECTED")).toBe(true);
+  });
+
+  it("sends a closed task to the Backlog and can close pull requests and clear artifacts", async () => {
+    const fixture = structuredClone(lineMetricsFactoriesFixture);
+    const orderId = "wo-board-implement-failed";
+    fixture.pullRequestsByOrderId = {
+      ...(fixture.pullRequestsByOrderId ?? {}),
+      [orderId]: [
+        {
+          id: "pr-open",
+          workOrderId: orderId,
+          number: "106",
+          state: "STATE_OPEN",
+          url: "https://github.com/acme/app/pull/106",
+        },
+      ],
+    };
+    fixture.artifactsByOrderId = {
+      ...(fixture.artifactsByOrderId ?? {}),
+      [orderId]: [{ id: "art-1", type: "TYPE_MARKDOWN" }],
+    };
+
+    const moved = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${orderId}/backlog`,
+      { method: "PATCH", body: JSON.stringify({ closePullRequests: true, clearArtifacts: true }) },
+      fixture,
+    );
+    const body = (await moved.json()) as {
+      order: { state?: string; result?: string; pullRequests?: Array<{ state?: string }> };
+    };
+    expect(body.order.state).toBe("STATE_DRAFT");
+    expect(body.order.result).toBe("RESULT_UNSPECIFIED");
+    expect(body.order.pullRequests?.[0]?.state).toBe("STATE_CLOSED");
+
+    const artifacts = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${orderId}/artifacts`,
+      undefined,
+      fixture,
+    );
+    const artifactsBody = (await artifacts.json()) as { artifacts: unknown[] };
+    expect(artifactsBody.artifacts).toEqual([]);
+  });
+
   it("serves factory usage, usage history, and organization workspace usage reports", async () => {
     const usage = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage`);
     await expect(usage.json()).resolves.toMatchObject({

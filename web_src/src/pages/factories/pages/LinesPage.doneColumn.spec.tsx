@@ -52,6 +52,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -153,24 +162,42 @@ describe("LinesPage Done column", () => {
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
-  it("puts a closed task in Done instead of the last stage", () => {
+  it("puts a completed task in Done instead of the last stage", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-completed",
+          title: "Publish refund SLA dashboard",
+          state: "STATE_CLOSED",
+          result: "RESULT_COMPLETED",
+          lineDispatches: [{ id: "dispatch-1", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+      ],
+    });
+    renderBoard();
+
+    expect(
+      within(screen.getByTestId("lines-done-column")).getByText("Publish refund SLA dashboard"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-0")).queryByText("Publish refund SLA dashboard"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-1")).queryByText("Publish refund SLA dashboard"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-verify-column")).queryByText("Publish refund SLA dashboard"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a rejected task out of Done", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [BOARD_DONE_REJECTED_ORDER],
     });
     renderBoard();
 
-    expect(
-      within(screen.getByTestId("lines-done-column")).getByText("Replace the refund batch exporter"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-phase-column-0")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-phase-column-1")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-verify-column")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
+    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
   });
 
   it("collects finished tasks in the Done column", () => {

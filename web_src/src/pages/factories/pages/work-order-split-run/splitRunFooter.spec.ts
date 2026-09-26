@@ -142,7 +142,7 @@ describe("buildSplitRunFooter", () => {
       "Rerun from start",
     ]);
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.description)).toEqual([
-      "Marks this task as Canceled",
+      "Marks this task as Rejected",
       "Marks this task as Completed",
       "Starts this step again",
       "Starts this task from the first step",
@@ -213,7 +213,7 @@ describe("buildSplitRunFooter", () => {
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 
-  it("explains a completed or rejected result without Reopen", () => {
+  it("offers Send to backlog and Reopen on failed and rejected footers", () => {
     expect(doneFooterForStatus("completed")).toEqual({
       kind: "done",
       sentence: "Task completed successfully.",
@@ -232,15 +232,10 @@ describe("buildSplitRunFooter", () => {
         text: "The work is done. The result did not meet the goal.",
       },
       attentionCard: true,
-      actions: [],
-    });
-    expect(doneFooterForStatus("cancelled")).toMatchObject({
-      sentence: "This task was canceled.",
-      note: {
-        headline: "This task is canceled",
-        text: "Reopen this task if the work should continue.",
-      },
-      actions: [REOPEN],
+      actions: [
+        { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+        REOPEN,
+      ],
     });
     expect(doneFooterForStatus("failed")).toMatchObject({
       sentence: "Closed as failed. Line execution did not pass.",
@@ -248,7 +243,10 @@ describe("buildSplitRunFooter", () => {
         headline: "This task is closed as failed",
         text: "Reopen this task to start the line again.",
       },
-      actions: [REOPEN],
+      actions: [
+        { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+        REOPEN,
+      ],
     });
   });
 
@@ -265,10 +263,13 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
-  it("offers Reopen on a closed failed footer instead of Reject and Approve", () => {
+  it("offers Send to backlog and Reopen on a closed failed footer", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, status: "failed" });
 
-    expect(footer.actions).toEqual([REOPEN]);
+    expect(footer.actions).toEqual([
+      { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+      REOPEN,
+    ]);
     expect(footer.attentionCard).toBe(true);
     expect(footer.note).toEqual({
       headline: "This task is closed as failed",
@@ -302,7 +303,6 @@ describe("availableSplitRunStopChoices", () => {
 
   it("offers Reopen when the task is already closed", () => {
     expect(availableSplitRunStopChoices("completed").map((choice) => choice.id)).toEqual(["reopen"]);
-    expect(availableSplitRunStopChoices("cancelled").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("rejected").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("failed").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(defaultSplitRunStopChoice("completed")).toBe("reopen");

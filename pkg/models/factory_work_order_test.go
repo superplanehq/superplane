@@ -307,6 +307,38 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 		assert.Equal(t, FactoryWorkOrderStateClosed, payload.FromState)
 		assert.Equal(t, FactoryWorkOrderStateOpen, payload.ToState)
 	})
+
+	t.Run("send to backlog from closed clears the result", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Backlog", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		for _, step := range []FactoryWorkOrderStatusUpdate{
+			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
+			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultFailed, Actor: &userID},
+		} {
+			_, err := order.UpdateStatus(database.Conn(), step)
+			require.NoError(t, err)
+		}
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
+		assert.Equal(t, "", order.Result)
+
+		events, err := order.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+		latest := findEventOfType(t, events, factory.EventTypeOrderStatusUpdated)
+		var payload factory.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(latest.Data, &payload))
+		assert.Equal(t, FactoryWorkOrderStateClosed, payload.FromState)
+		assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
+		assert.Equal(t, FactoryWorkOrderResultFailed, payload.FromResult)
+		assert.Equal(t, "", payload.ToResult)
+	})
 }
 
 func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
@@ -811,6 +843,44 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, artifact)
 	})
+}
+
+func TestFactoryWorkOrder_DeleteArtifacts(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "clear-artifacts")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Clear target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+		Type:      FactoryWorkOrderArtifactTypeMarkdown,
+		Data:      map[string]any{"title": "plan.md", "body": "# Plan"},
+		CreatedBy: &userID,
+	})
+	require.NoError(t, err)
+	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+		Type:      FactoryWorkOrderArtifactTypeBranch,
+		Data:      map[string]any{"name": "feature/clear"},
+		CreatedBy: &userID,
+	})
+	require.NoError(t, err)
+
+	count, err := order.DeleteArtifacts(database.Conn(), &userID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	remaining, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	assert.Empty(t, remaining)
+
+	events, err := order.ListEvents(database.Conn(), 20, nil)
+	require.NoError(t, err)
+	cleared := findEventOfType(t, events, factory.EventTypeOrderArtifactsCleared)
+	var payload factory.WorkOrderArtifactsCleared
+	require.NoError(t, json.Unmarshal(cleared.Data, &payload))
+	assert.Equal(t, 2, payload.Count)
+	require.NotNil(t, payload.User)
+	assert.Equal(t, userID, payload.User.ID)
 }
 
 func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {

@@ -1,4 +1,9 @@
-import type { FactoriesListWorkOrdersResponse, FactoriesWorkOrderState, FactoriesWorkOrderSummary } from "@/api-client";
+import type {
+  FactoriesListWorkOrdersResponse,
+  FactoriesWorkOrderResult,
+  FactoriesWorkOrderState,
+  FactoriesWorkOrderSummary,
+} from "@/api-client";
 
 export const BOARD_BACKLOG_PAGE_SIZE = 20;
 export const BOARD_OPEN_PAGE_SIZE = 50;
@@ -8,6 +13,7 @@ export const WORK_ORDER_LIST_PAGE_SIZE = 100;
 export const BOARD_BACKLOG_STATES = ["STATE_DRAFT"] as const satisfies readonly FactoriesWorkOrderState[];
 export const BOARD_OPEN_STATES = ["STATE_OPEN"] as const satisfies readonly FactoriesWorkOrderState[];
 export const BOARD_DONE_STATES = ["STATE_CLOSED"] as const satisfies readonly FactoriesWorkOrderState[];
+export const BOARD_DONE_RESULTS = ["RESULT_COMPLETED"] as const satisfies readonly FactoriesWorkOrderResult[];
 
 export type WorkOrdersPageCursor = {
   beforeId: string;
@@ -66,12 +72,14 @@ export function factoryWorkOrdersPagePrefix(organizationId: string, factoryId: s
 export type WorkOrdersPageQuery = {
   userId?: string;
   unassigned: boolean;
+  results: readonly FactoriesWorkOrderResult[];
 };
 
 export function normalizeWorkOrdersPageQuery(query?: Partial<WorkOrdersPageQuery>): WorkOrdersPageQuery {
   return {
     userId: query?.userId,
     unassigned: Boolean(query?.unassigned),
+    results: [...(query?.results ?? [])].sort(),
   };
 }
 
@@ -87,14 +95,20 @@ export function factoryWorkOrdersPageKey(
     [...states].sort().join(","),
     normalized.userId ?? "",
     normalized.unassigned ? "unassigned" : "",
+    normalized.results.join(","),
   ] as const;
 }
 
 export function workOrdersPageQueryFromKey(queryKey: readonly unknown[]): WorkOrdersPageQuery {
   const userId = queryKey[5];
+  const resultsJoined = queryKey[7];
   return normalizeWorkOrdersPageQuery({
     userId: typeof userId === "string" && userId.length > 0 ? userId : undefined,
     unassigned: queryKey[6] === "unassigned",
+    results:
+      typeof resultsJoined === "string" && resultsJoined.length > 0
+        ? (resultsJoined.split(",") as FactoriesWorkOrderResult[])
+        : [],
   });
 }
 

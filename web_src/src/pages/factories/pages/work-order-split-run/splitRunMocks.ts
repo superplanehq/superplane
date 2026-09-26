@@ -457,7 +457,7 @@ function reviewSurfaces(
       checks,
     );
   }
-  if (displayStatus === "completed" || displayStatus === "rejected" || displayStatus === "cancelled") {
+  if (displayStatus === "completed" || displayStatus === "rejected") {
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {

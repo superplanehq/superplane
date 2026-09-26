@@ -520,6 +520,18 @@ service Factories {
     };
   }
 
+  rpc SendWorkOrderToBacklog(SendWorkOrderToBacklogRequest) returns (SendWorkOrderToBacklogResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/backlog"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send work order to backlog";
+      description: "Moves a closed work order to draft and optionally closes pull requests and clears artifacts";
+      tags: "Factory";
+    };
+  }
+
   rpc AddWorkOrderComment(AddWorkOrderCommentRequest) returns (AddWorkOrderCommentResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/orders/{order_id}/comments"
@@ -1941,6 +1953,17 @@ message UpdateWorkOrderStatusRequest {
 }
 
 message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message SendWorkOrderToBacklogRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  bool close_pull_requests = 3;
+  bool clear_artifacts = 4;
+}
+
+message SendWorkOrderToBacklogResponse {
   WorkOrder order = 1;
 }
 

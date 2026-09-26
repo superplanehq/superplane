@@ -108,6 +108,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 

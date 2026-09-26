@@ -15,19 +15,11 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 
 /**
  * Display vocabulary for the Tasks workspace: Draft, Running, Waiting,
- * Completed, Failed, Rejected, Canceled. The idle-open key stays
- * `waiting` so stored filters keep working. Persisted state + result
- * columns in the database stay unchanged; this file is the single mapping
- * layer.
+ * Completed, Failed, Rejected. The idle-open key stays `waiting` so
+ * stored filters keep working. Persisted state + result columns in the
+ * database stay unchanged; this file is the single mapping layer.
  */
-export type WorkOrderDisplayStatus =
-  | "draft"
-  | "running"
-  | "waiting"
-  | "completed"
-  | "failed"
-  | "rejected"
-  | "cancelled";
+export type WorkOrderDisplayStatus = "draft" | "running" | "waiting" | "completed" | "failed" | "rejected";
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
@@ -87,14 +79,6 @@ const DISPLAY_STATUS_META: Record<
       "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
     dotClassName: "bg-[color:var(--status-failed-dot)]",
   },
-  cancelled: {
-    label: "Canceled",
-    filterLabel: "Canceled",
-    summary: "This task was canceled.",
-    className:
-      "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
-    dotClassName: "bg-[color:var(--status-cancelled-dot)]",
-  },
 };
 
 export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
@@ -104,8 +88,16 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "completed",
   "failed",
   "rejected",
-  "cancelled",
 ];
+
+/** Statuses that stay on the board. Failed and Rejected open a list dialog. */
+export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = ["draft", "running", "waiting", "completed"];
+
+export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["failed", "rejected"];
+
+export function isWorkOrderDialogStatus(status: string): status is "failed" | "rejected" {
+  return status === "failed" || status === "rejected";
+}
 
 /** Board lanes used across every layout. Order matters — Board renders them left-to-right. */
 export type WorkOrderBoardLaneId = "backlog" | "running" | "review" | "done";
@@ -139,8 +131,8 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
     id: "done",
     title: "Done",
-    description: "Completed, failed, rejected, or canceled work.",
-    statuses: ["completed", "failed", "rejected", "cancelled"],
+    description: "Completed work.",
+    statuses: ["completed"],
   },
 ];
 
@@ -178,7 +170,7 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
       order.result !== "RESULT_COMPLETED" &&
       (order.lineDispatches ?? []).some((dispatch) => dispatch.result === "RESULT_CANCELLED")
     ) {
-      return "cancelled";
+      return "rejected";
     }
     return "completed";
   }

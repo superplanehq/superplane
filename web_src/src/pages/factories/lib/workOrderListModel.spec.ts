@@ -530,6 +530,6 @@ describe("groupWorkOrderEntriesByLane", () => {
     expect(grouped.get("backlog")?.map((entry) => entry.id)).toEqual(["draft"]);
     expect(grouped.get("running")).toEqual([]);
     expect(grouped.get("review")?.map((entry) => entry.id)).toEqual(["waiting"]);
-    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed", "cancelled"]);
+    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed"]);
   });
 });

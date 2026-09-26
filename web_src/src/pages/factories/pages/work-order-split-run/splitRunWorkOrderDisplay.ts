@@ -34,7 +34,7 @@ export function displayStatusForLineStatus(status: SplitRunPhaseStatus): WorkOrd
   if (status === "passed") return "completed";
   if (status === "waiting") return "waiting";
   if (status === "failed") return "failed";
-  if (status === "cancelled") return "cancelled";
+  if (status === "cancelled") return "rejected";
   return "draft";
 }
 

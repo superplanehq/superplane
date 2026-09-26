@@ -32,7 +32,26 @@ describe("buildWorkOrderStatusActions", () => {
     ).toEqual(["Reject"]);
   });
 
-  it("offers Reopen for a closed order", () => {
+  it("offers Send to backlog and Reopen for a failed or rejected order", () => {
+    expect(
+      labelsOf({
+        displayStatus: "failed",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Send to backlog", "Reopen"]);
+    expect(
+      labelsOf({
+        displayStatus: "rejected",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Send to backlog", "Reopen"]);
+  });
+
+  it("offers Reopen for a completed order", () => {
     expect(
       labelsOf({
         displayStatus: "completed",
