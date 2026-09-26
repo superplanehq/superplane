@@ -138,6 +138,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
 		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
+	case errors.Is(err, models.ErrFactoryAgentResourceURLTaken):
+		return grpcerrors.AlreadyExists(err, "This MCP server is already connected.")
 	case errors.Is(err, models.ErrFactoryAgentResourceAuthInvalid):
 		return grpcerrors.InvalidArgument(err, "auth must be headers or oauth")
 	case errors.Is(err, models.ErrFactoryAgentResourceURLRequired):

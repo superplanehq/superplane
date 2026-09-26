@@ -118,6 +118,7 @@ export const AGENT_RESOURCES_COPY = {
   skillUpdated: "Skill updated.",
   skillDeleted: "Skill deleted.",
   disconnected: "MCP server disconnected.",
+  urlTaken: "This MCP server is already connected.",
   createFailed: "SuperPlane could not add the MCP server.",
   updateFailed: "SuperPlane could not update the MCP server.",
   deleteFailed: "SuperPlane could not delete the MCP server.",
