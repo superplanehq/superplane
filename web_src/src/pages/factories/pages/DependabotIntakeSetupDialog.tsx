@@ -4,8 +4,8 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
+import { DependabotIntakeImportStep } from "./DependabotIntakeImportStep";
 import { DEPENDABOT_INTAKE_SETUP_COPY } from "./dependabotIntakeSetupCopy";
-import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   normalizeDependabotSeverities,
@@ -22,12 +22,21 @@ interface DependabotIntakeSetupDialogProps {
   onCreated: () => void;
 }
 
+const STEP_COUNT = 2;
+
+/**
+ * Two steps: choose the alert filters and create the intake, then pick the
+ * packages with open alerts to import. The intake is created with
+ * `skipInitialImport` so a repository with many old alerts does not flood
+ * the Backlog before the user has a say.
+ */
 export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogProps) {
   const [settings, setSettings] = useState<IntakeSourceSettings>({
     ...DEFAULT_GITHUB_INTAKE_SETTINGS,
     name: "Dependabot alerts",
   });
-  const [skipInitialImport, setSkipInitialImport] = useState(false);
+  const [intakeId, setIntakeId] = useState<string>();
+  const [importBusy, setImportBusy] = useState(false);
   const [error, setError] = useState<string>();
   const createIntake = useCreateFactoryIntake(props.organizationId, props.factoryId);
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
@@ -36,24 +45,52 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
     if (!props.setupReady) return;
     setError(undefined);
     try {
-      await createIntake.mutateAsync({
+      const intake = await createIntake.mutateAsync({
         source: "SOURCE_DEPENDABOT_ALERTS",
         settings: {
           dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
         },
-        ...(skipInitialImport ? { skipInitialImport: true } : {}),
+        skipInitialImport: true,
       });
-      props.onCreated();
+      if (!intake.id) {
+        props.onCreated();
+        return;
+      }
+      setIntakeId(intake.id);
     } catch (cause) {
       setError(getApiErrorMessage(cause, DEPENDABOT_INTAKE_SETUP_COPY.createError));
     }
   };
 
+  if (intakeId) {
+    return (
+      <FirstRunShell
+        testId="dependabot-intake-setup"
+        busy={importBusy}
+        chrome={{ stepIndex: 1, stepCount: STEP_COUNT }}
+        sphere={{
+          testId: "dependabot-intake-setup-sphere",
+          level: 0.82,
+          caption: DEPENDABOT_INTAKE_SETUP_COPY.import.caption,
+          leftChip: { label: "Discover", value: "Dependabot alerts", tone: "ghost" },
+        }}
+      >
+        <DependabotIntakeImportStep
+          organizationId={props.organizationId}
+          factoryId={props.factoryId}
+          intakeId={intakeId}
+          onBusyChange={setImportBusy}
+          onDone={props.onCreated}
+        />
+      </FirstRunShell>
+    );
+  }
+
   return (
     <FirstRunShell
       testId="dependabot-intake-setup"
       busy={createIntake.isPending}
-      chrome={{ stepIndex: 0, stepCount: 1, onBack: props.onClose }}
+      chrome={{ stepIndex: 0, stepCount: STEP_COUNT, onBack: props.onClose }}
       sphere={{
         testId: "dependabot-intake-setup-sphere",
         level: 0.58,
@@ -62,9 +99,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
       }}
     >
       <FirstRunHeading headline={DEPENDABOT_INTAKE_SETUP_COPY.pageTitle}>
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          {DEPENDABOT_INTAKE_SETUP_COPY.helper(repository, skipInitialImport)}
-        </p>
+        <p className="text-[15px] leading-6 text-muted-foreground">{DEPENDABOT_INTAKE_SETUP_COPY.helper(repository)}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
@@ -81,12 +116,6 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
             onSettingsChange={setSettings}
           />
         </div>
-
-        <IntakeSkipInitialImportField
-          checked={skipInitialImport}
-          onCheckedChange={setSkipInitialImport}
-          testId="dependabot-skip-initial-import"
-        />
 
         {!props.setupReady ? (
           <p className="workspace-body-text text-destructive" role="alert">
