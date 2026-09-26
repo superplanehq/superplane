@@ -87,3 +87,68 @@ func TestFileContentUploadAndPublicDownload(t *testing.T) {
 	server.Router.ServeHTTP(badRec, badReq)
 	assert.Equal(t, http.StatusForbidden, badRec.Code)
 }
+
+func TestWorkspaceFileContentUploadUsesWorkOrderCreatePermission(t *testing.T) {
+	r := support.Setup(t)
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	operatorName := support.RandomName("operator")
+	operatorAccount, err := models.CreateAccount(operatorName, operatorName+"@test.com")
+	require.NoError(t, err)
+	operator, err := models.CreateUser(r.Organization.ID, operatorAccount.ID, operatorAccount.Email, operatorAccount.Name)
+	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(
+		operator.ID.String(), models.RoleOrgOperator, r.Organization.ID.String(), models.DomainTypeOrganization,
+	))
+	canCreateWorkOrders, err := r.AuthService.CheckOrganizationPermission(
+		t.Context(), operator.ID.String(), r.Organization.ID.String(), "work_orders", "create",
+	)
+	require.NoError(t, err)
+	require.True(t, canCreateWorkOrders)
+	canUpdateFactories, err := r.AuthService.CheckOrganizationPermission(
+		t.Context(), operator.ID.String(), r.Organization.ID.String(), "factories", "update",
+	)
+	require.NoError(t, err)
+	require.False(t, canUpdateFactories)
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService, false,
+	)
+	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	file, err := models.CreatePendingFile(database.Conn(), models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "rows.csv",
+		ContentType:    "text/csv",
+		CreatedByID:    operator.ID,
+	})
+	require.NoError(t, err)
+	token, err := authentication.GenerateAccountToken(signer, operatorAccount.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("a,b\n1,2")))
+	req.Header.Set("x-organization-id", r.Organization.ID.String())
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+}

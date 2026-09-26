@@ -53,6 +53,32 @@ describe("workOrderFiles", () => {
     expect(isAllowedWorkOrderFile(new File(["x"], "page.html", { type: "text/html" }))).toBe(false);
   });
 
+  it("accepts Word and HEIC files without treating them as inline images", () => {
+    const files = [
+      ["document.doc", "application/msword"],
+      ["document.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+      ["photo.heic", "image/heic"],
+      ["photo.heif", "image/heif"],
+    ] as const;
+
+    for (const [name, type] of files) {
+      expect(isAllowedWorkOrderFile(new File(["x"], name, { type }))).toBe(true);
+      expect(isAllowedWorkOrderFile(new File(["x"], name, { type: "" }))).toBe(true);
+      expect(isInlineWorkOrderImage(type)).toBe(false);
+    }
+  });
+
+  it("normalizes CSV browser aliases without accepting Excel files", () => {
+    const aliases = ["text/x-csv", "application/csv", "text/comma-separated-values"];
+    for (const type of aliases) {
+      expect(resolveWorkOrderFileMimeType({ name: "rows.csv", type })).toBe("text/csv");
+    }
+
+    expect(resolveWorkOrderFileMimeType({ name: "rows.csv", type: "application/vnd.ms-excel" })).toBe("text/csv");
+    expect(isAllowedWorkOrderFile(new File(["x"], "rows.csv", { type: "application/vnd.ms-excel" }))).toBe(true);
+    expect(isAllowedWorkOrderFile(new File(["x"], "sheet.xls", { type: "application/vnd.ms-excel" }))).toBe(false);
+  });
+
   it("resolves the MIME type from the filename when the browser sends none", () => {
     expect(resolveWorkOrderFileMimeType({ name: "notes.txt", type: "" })).toBe("text/plain");
     expect(resolveWorkOrderFileMimeType({ name: "readme.md", type: "application/octet-stream" })).toBe("text/markdown");
@@ -60,10 +86,13 @@ describe("workOrderFiles", () => {
     expect(resolveWorkOrderFileMimeType({ name: "rows.csv", type: "" })).toBe("text/csv");
     expect(resolveWorkOrderFileMimeType({ name: "config.yaml", type: "" })).toBe("application/yaml");
     expect(resolveWorkOrderFileMimeType({ name: "config.yml", type: "" })).toBe("application/yaml");
+    expect(resolveWorkOrderFileMimeType({ name: "report.pdf", type: "" })).toBe("application/pdf");
+    expect(resolveWorkOrderFileMimeType({ name: "photo.jpg", type: "" })).toBe("image/jpeg");
     expect(resolveWorkOrderFileMimeType({ name: "shot.png", type: "image/png" })).toBe("image/png");
     expect(resolveWorkOrderFileMimeType({ name: "archive", type: "" })).toBe("");
     expect(isAllowedWorkOrderFile(new File(["x"], "notes.md", { type: "" }))).toBe(true);
     expect(isAllowedWorkOrderFile(new File(["x"], "archive.zip", { type: "" }))).toBe(false);
+    expect(isAllowedWorkOrderFile(new File(["x"], "drawing.svg", { type: "image/svg+xml" }))).toBe(false);
   });
 
   it("treats http, https, and blob URLs as reachable image sources", () => {

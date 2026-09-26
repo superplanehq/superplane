@@ -21,6 +21,12 @@ export type UploadedWorkOrderFile = {
   isImage: boolean;
 };
 
+type WorkOrderFileUploadTarget = {
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+};
+
 export function useWorkOrderFileUpload({
   organizationId,
   factoryId,
@@ -60,7 +66,7 @@ export function useWorkOrderFileUpload({
 }
 
 async function uploadOneWorkOrderFile(
-  args: { organizationId: string; factoryId: string; orderId?: string },
+  args: WorkOrderFileUploadTarget,
   file: File,
 ): Promise<UploadedWorkOrderFile | null> {
   const contentType = resolveWorkOrderFileMimeType(file);
@@ -74,28 +80,11 @@ async function uploadOneWorkOrderFile(
   }
 
   try {
-    const created = args.orderId
-      ? await filesCreateWorkOrderFile(
-          withOrganizationHeader({
-            organizationId: args.organizationId,
-            path: { factoryId: args.factoryId, orderId: args.orderId },
-            body: { filename: file.name, contentType },
-          }),
-        )
-      : await filesCreateFactoryFile(
-          withOrganizationHeader({
-            organizationId: args.organizationId,
-            path: { factoryId: args.factoryId },
-            body: { filename: file.name, contentType },
-          }),
-        );
-    const createdFile = created.data?.file;
-    const id = createdFile?.id;
-    const uploadUrl = createdFile?.uploadUrl;
-    if (!id || !uploadUrl) {
-      showErrorToast("The file could not be stored.");
+    const pendingFile = await createPendingWorkOrderFile(args, file.name, contentType);
+    if (!pendingFile) {
       return null;
     }
+    const { id, uploadUrl } = pendingFile;
 
     const response = await fetch(uploadUrl, {
       method: "PUT",
@@ -125,4 +114,47 @@ async function uploadOneWorkOrderFile(
     showErrorToast(getApiErrorMessage(error, "The file could not be stored."));
     return null;
   }
+}
+
+async function createPendingWorkOrderFile(
+  args: WorkOrderFileUploadTarget,
+  filename: string,
+  contentType: string,
+): Promise<{ id: string; uploadUrl: string } | null> {
+  const created = args.orderId
+    ? await filesCreateWorkOrderFile<false>(
+        withOrganizationHeader({
+          organizationId: args.organizationId,
+          path: { factoryId: args.factoryId, orderId: args.orderId },
+          body: { filename, contentType },
+          throwOnError: false,
+        }),
+      )
+    : await filesCreateFactoryFile<false>(
+        withOrganizationHeader({
+          organizationId: args.organizationId,
+          path: { factoryId: args.factoryId },
+          body: { filename, contentType },
+          throwOnError: false,
+        }),
+      );
+
+  if (created.error !== undefined) {
+    const status = created.response?.status;
+    if (status === 403 || status === 404) {
+      showErrorToast("You do not have permission to attach files here.");
+      return null;
+    }
+    showErrorToast(getApiErrorMessage(created.error, "The file could not be stored."));
+    return null;
+  }
+
+  const id = created.data?.file?.id;
+  const uploadUrl = created.data?.file?.uploadUrl;
+  if (!id || !uploadUrl) {
+    showErrorToast("The file could not be stored.");
+    return null;
+  }
+
+  return { id, uploadUrl };
 }
