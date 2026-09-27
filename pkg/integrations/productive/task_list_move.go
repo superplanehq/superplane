@@ -55,6 +55,7 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 	activities := []taskActivity{}
 	var changeset any
 	var bestDelta time.Duration
+	var labelErr error
 	found := false
 	for page := 1; page <= maxTaskActivityPages; page++ {
 		body, err := c.execRequest(http.MethodGet, c.taskActivityURL(taskID, deliveredAt, page), nil)
@@ -69,9 +70,16 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 			return nil, false, fmt.Errorf("error parsing task activities: %v", err)
 		}
 
-		pageActivities, err := labels.withTaskListIDs(taskActivitiesFromDocuments(response.Data))
+		pageActivities := taskActivitiesFromDocuments(response.Data)
+		resolved, err := labels.withTaskListIDs(pageActivities)
 		if err != nil {
-			return nil, false, err
+			// A task list lookup can fail for a nearby list change. Keep the
+			// page so an update that does not name a list can still match.
+			// The error is returned only when an unresolved label may be
+			// this delivery.
+			labelErr = err
+		} else {
+			pageActivities = resolved
 		}
 		activities = append(activities, pageActivities...)
 		changeset, bestDelta, found = activityForDelivery(activities, deliveredAt, document)
@@ -85,6 +93,9 @@ func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, doc
 		}
 	}
 
+	if labelErr != nil && listLabelBlocksMatch(activities, deliveredAt, found, bestDelta) {
+		return nil, false, labelErr
+	}
 	return changeset, found, nil
 }
 
@@ -113,6 +124,52 @@ func taskActivitiesFromDocuments(documents []resourceDocument) []taskActivity {
 		activities = append(activities, taskActivity{at: at, changeset: activity.Attributes["changeset"]})
 	}
 	return activities
+}
+
+// listLabelBlocksMatch reports that an unresolved task list label may be
+// the activity for this delivery. A label farther from the delivery than a
+// matched update must not fail that update.
+func listLabelBlocksMatch(activities []taskActivity, deliveredAt time.Time, found bool, bestDelta time.Duration) bool {
+	for _, activity := range activities {
+		if activity.at.IsZero() || !changesetNeedsTaskListIDs(activity.changeset) {
+			continue
+		}
+		delta := activity.at.Sub(deliveredAt)
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta > taskActivityMatchWindow {
+			continue
+		}
+		if !found || delta <= bestDelta {
+			return true
+		}
+	}
+	return false
+}
+
+// changesetNeedsTaskListIDs reports that a changeset names a task list by
+// label. Productive.io writes "<folder name>: <list name>", not an id.
+func changesetNeedsTaskListIDs(changeset any) bool {
+	fields := changesetFields(changeset)
+	for _, key := range taskListChangeKeys {
+		value, found := fields[key]
+		if !found {
+			continue
+		}
+		from, to, ok := changePair(value)
+		if !ok {
+			continue
+		}
+		if taskListLabelNeedsID(from) || taskListLabelNeedsID(to) {
+			return true
+		}
+	}
+	return false
+}
+
+func taskListLabelNeedsID(value string) bool {
+	return value != "" && !isTaskListID(value)
 }
 
 // activityPageBeforeWindow reports that this page is older than the match
@@ -336,6 +393,8 @@ func (c *Client) taskListIDsByLabel(projectID string) (map[string]string, error)
 	ids := map[string]string{}
 	nameCounts := map[string]int{}
 	nameIDs := map[string]string{}
+	labelCounts := map[string]int{}
+	labelIDs := map[string]string{}
 	for page := 1; page <= maxProjectPages; page++ {
 		params := url.Values{}
 		params.Set("filter[project_id]", projectID)
@@ -367,7 +426,9 @@ func (c *Client) taskListIDsByLabel(projectID string) (map[string]string, error)
 			nameCounts[name]++
 			nameIDs[name] = list.ID
 			if folder := folderNames[list.Relationships["folder"].Data.ID]; folder != "" {
-				ids[folder+": "+name] = list.ID
+				label := folder + ": " + name
+				labelCounts[label]++
+				labelIDs[label] = list.ID
 			}
 		}
 
@@ -376,6 +437,13 @@ func (c *Client) taskListIDsByLabel(projectID string) (map[string]string, error)
 		}
 	}
 
+	// Two lists can share a folder name and a list name. Mapping that label
+	// to one id would record a move onto the wrong list.
+	for label, count := range labelCounts {
+		if count == 1 {
+			ids[label] = labelIDs[label]
+		}
+	}
 	for name, count := range nameCounts {
 		if _, taken := ids[name]; count == 1 && !taken {
 			ids[name] = nameIDs[name]

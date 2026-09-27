@@ -2,8 +2,10 @@ package productive
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -307,4 +309,111 @@ func Test__Client__TaskUpdateChangesetAt_KeepsReadingForACloserActivity(t *testi
 	require.True(t, ok)
 	assert.Equal(t, TaskListMove{From: "10", To: "20"}, move)
 	require.Len(t, httpContext.Requests, 2)
+}
+
+func Test__Client__TaskListIDsByLabel_SkipsSharedFolderAndListNames(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{"id":"1","type":"task_lists","attributes":{"name":"Bugs"},"relationships":{"folder":{"data":{"type":"folders","id":"a"}}}},
+			{"id":"2","type":"task_lists","attributes":{"name":"Bugs"},"relationships":{"folder":{"data":{"type":"folders","id":"b"}}}},
+			{"id":"3","type":"task_lists","attributes":{"name":"Factory"},"relationships":{"folder":{"data":{"type":"folders","id":"a"}}}}
+		],"included":[
+			{"id":"a","type":"folders","attributes":{"name":"Folder"}},
+			{"id":"b","type":"folders","attributes":{"name":"Folder"}}
+		]}`),
+	}}
+
+	ids, err := testClient(t, httpContext).taskListIDsByLabel("1052266")
+	require.NoError(t, err)
+	_, hasSharedLabel := ids["Folder: Bugs"]
+	assert.False(t, hasSharedLabel)
+	_, hasSharedName := ids["Bugs"]
+	assert.False(t, hasSharedName)
+	assert.Equal(t, "3", ids["Folder: Factory"])
+	assert.Equal(t, "3", ids["Factory"])
+}
+
+func Test__Client__TaskUpdateChangesetAt_KeepsTitleUpdateWhenListLookupFails(t *testing.T) {
+	delivered := testClock()
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		activitiesResponse([]activityRecord{
+			{
+				id: "title",
+				at: delivered,
+				changeset: map[string]any{
+					"title": []any{"Old title", "Fix payment retries"},
+				},
+			},
+			{
+				id: "move",
+				at: delivered.Add(30 * time.Second),
+				changeset: map[string]any{
+					"task_list": []any{
+						map[string]any{"value": "Folder: Factory"},
+						map[string]any{"value": "Folder: Bugs"},
+					},
+				},
+			},
+		}),
+		{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Unavailable"}]}`)),
+		},
+	}}
+	document := map[string]any{
+		"attributes": map[string]any{"title": "Fix payment retries"},
+		"relationships": map[string]any{
+			"project":   map[string]any{"data": map[string]any{"id": "1052266"}},
+			"task_list": map[string]any{"data": map[string]any{"id": "20"}},
+		},
+	}
+
+	changeset, found, err := testClient(t, httpContext).taskUpdateChangesetAt("91", delivered, document)
+	require.NoError(t, err)
+	require.True(t, found)
+	title, ok := changesetTitleAfter(changeset)
+	require.True(t, ok)
+	assert.Equal(t, "Fix payment retries", title)
+	_, ok = taskListMoveFromChangeset(changeset)
+	assert.False(t, ok)
+}
+
+func Test__Client__TaskUpdateChangesetAt_FailsWhenCloserListLabelCannotBeRead(t *testing.T) {
+	delivered := testClock()
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		activitiesResponse([]activityRecord{
+			{
+				id: "move",
+				at: delivered,
+				changeset: map[string]any{
+					"task_list": []any{
+						map[string]any{"value": "Folder: Factory"},
+						map[string]any{"value": "Folder: Bugs"},
+					},
+				},
+			},
+			{
+				id: "title",
+				at: delivered.Add(30 * time.Second),
+				changeset: map[string]any{
+					"title": []any{"Old title", "Fix payment retries"},
+				},
+			},
+		}),
+		{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"errors":[{"title":"Unavailable"}]}`)),
+		},
+	}}
+	document := map[string]any{
+		"attributes": map[string]any{"title": "Fix payment retries"},
+		"relationships": map[string]any{
+			"project":   map[string]any{"data": map[string]any{"id": "1052266"}},
+			"task_list": map[string]any{"data": map[string]any{"id": "2897278"}},
+		},
+	}
+
+	_, found, err := testClient(t, httpContext).taskUpdateChangesetAt("91", delivered, document)
+	require.Error(t, err)
+	assert.False(t, found)
 }
