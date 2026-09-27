@@ -32,8 +32,8 @@ const (
 	maxTaskActivityPages = 20
 )
 
-// errTaskUpdateActivityUnavailable means this delivery's changeset is not
-// available yet. The webhook handler returns an error so Productive.io retries.
+// errTaskUpdateActivityUnavailable means this delivery's changeset could not
+// be read.
 var errTaskUpdateActivityUnavailable = errors.New("task update activity unavailable")
 
 type taskActivity struct {
