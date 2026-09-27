@@ -38,6 +38,9 @@ export function ProductiveIntakeFilterFields({
         <div className="mt-2 flex flex-col gap-2">
           <div className="flex flex-col gap-1.5">
             <IntakeSettingsSectionTitle title={PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskList} />
+            <p className="px-1 text-[12px] leading-4 text-muted-foreground">
+              {PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskListHelper}
+            </p>
             <TaskListField
               organizationId={organizationId}
               integrationId={integrationId}

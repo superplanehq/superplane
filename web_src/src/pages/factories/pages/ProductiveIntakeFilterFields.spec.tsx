@@ -73,6 +73,7 @@ describe("ProductiveIntakeFilterFields", () => {
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Ignore key tasks" })).not.toBeInTheDocument();
     expect(screen.getByText(PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskList)).toBeInTheDocument();
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskListHelper)).toBeInTheDocument();
   });
 
   it("keeps excludeKeyTasks on the save payload", async () => {
