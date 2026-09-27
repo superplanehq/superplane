@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -167,6 +168,7 @@ type WebhookOptions struct {
 }
 
 type SyncContext struct {
+	Context         context.Context
 	Logger          *logrus.Entry
 	Configuration   any
 	BaseURL         string

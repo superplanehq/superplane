@@ -10,6 +10,8 @@ export const INTEGRATION_SETUP_STAY_PARAM = "setupStay";
 /** GitHub returned setup_action=request. A GitHub admin must approve the install. */
 export const GITHUB_SETUP_REQUEST_PARAM = "githubSetup";
 export const GITHUB_SETUP_REQUEST_VALUE = "request";
+/** GitHub completed an App install or update and the connection must refresh. */
+export const GITHUB_SETUP_COMPLETE_VALUE = "complete";
 /** GitHub organization the member asked an admin to approve. */
 export const GITHUB_SETUP_ORG_PARAM = "githubOrg";
 /** GitHub connection that received the installation request callback. */
@@ -142,6 +144,13 @@ function pathnameOf(path: string): string {
   return path.split("?")[0] ?? path;
 }
 
+export function isOnboardingSetupReturnPath(path: string | null | undefined): boolean {
+  if (!path) return false;
+
+  const pathname = pathnameOf(path);
+  return pathname === "/onboarding" || (pathname.includes("/workspaces/") && pathname.endsWith("/setup"));
+}
+
 /** Deletes the marker after the browser lands on the stored return page. */
 export function consumeIntegrationSetupReturnIfArrived(organizationId: string, currentPathname: string): void {
   const stored = peekIntegrationSetupReturn(organizationId);
@@ -160,6 +169,12 @@ export function hasGitHubSetupRequest(search: string): boolean {
   return new URLSearchParams(query).get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
 }
 
+export function hasGitHubSetupReturn(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  const value = new URLSearchParams(query).get(GITHUB_SETUP_REQUEST_PARAM);
+  return value === GITHUB_SETUP_REQUEST_VALUE || value === GITHUB_SETUP_COMPLETE_VALUE;
+}
+
 export function githubSetupRequestedOrganization(search: string): string {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(GITHUB_SETUP_ORG_PARAM)?.trim() ?? "";
@@ -170,13 +185,14 @@ export function githubSetupRequestedIntegration(search: string): string {
   return new URLSearchParams(query).get(GITHUB_SETUP_INTEGRATION_PARAM)?.trim() ?? "";
 }
 
-/** Copies githubSetup=request from the provider callback onto the stored return path. */
-export function withGitHubSetupRequest(path: string, search: string): string {
-  if (!hasGitHubSetupRequest(search)) return path;
+/** Copies a GitHub setup callback marker onto the stored return path. */
+export function withGitHubSetupReturn(path: string, search: string): string {
+  if (!hasGitHubSetupReturn(search)) return path;
 
   const [pathname, existing = ""] = path.split("?");
   const params = new URLSearchParams(existing);
-  params.set(GITHUB_SETUP_REQUEST_PARAM, GITHUB_SETUP_REQUEST_VALUE);
+  const callback = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  params.set(GITHUB_SETUP_REQUEST_PARAM, callback.get(GITHUB_SETUP_REQUEST_PARAM) ?? "");
   const organization = githubSetupRequestedOrganization(search);
   if (organization !== "") {
     params.set(GITHUB_SETUP_ORG_PARAM, organization);

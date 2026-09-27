@@ -48,8 +48,11 @@ export function finishOnboardingError(args: {
   jiraReady?: boolean;
   jiraProjectId?: string;
 }): string | null {
-  if (!args.appRepository || !args.backlogRepository || !args.githubReady) {
-    return "Connect GitHub, then select both repositories.";
+  if (!args.githubReady) {
+    return "GitHub is not connected. Return to the GitHub step and connect it.";
+  }
+  if (!args.appRepository || !args.backlogRepository) {
+    return "Select a GitHub repository.";
   }
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";

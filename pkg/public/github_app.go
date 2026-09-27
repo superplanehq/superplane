@@ -62,16 +62,12 @@ func githubAppSetupRedirectWithoutState(r *http.Request) (string, bool) {
 	}
 }
 
-func (s *Server) HandleGitHubAppOAuthCallback(w http.ResponseWriter, r *http.Request) {
-	s.dispatchGitHubAppByState(w, r)
-}
-
 func (s *Server) HandleGitHubAppBind(w http.ResponseWriter, r *http.Request) {
 	s.dispatchGitHubAppByState(w, r)
 }
 
 func (s *Server) dispatchGitHubAppByState(w http.ResponseWriter, r *http.Request) {
-	state := r.URL.Query().Get("state")
+	state := r.FormValue("state")
 	if state == "" {
 		http.Error(w, "missing state", http.StatusBadRequest)
 		return
@@ -111,7 +107,6 @@ func isHostedGitHubAppBrowserCallback(r *http.Request, integration *models.Integ
 
 	path := r.URL.Path
 	if !strings.HasSuffix(path, "/setup") &&
-		!strings.HasSuffix(path, "/oauth/callback") &&
 		!strings.HasSuffix(path, "/bind") {
 		return false
 	}
