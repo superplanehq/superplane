@@ -301,7 +301,22 @@ func Test__Client__CreateWebhook(t *testing.T) {
 
 		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
 		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrMissingWritePermission)
 		assert.False(t, errors.Is(err, ErrWebhooksLimitExceeded))
+	})
+
+	t.Run("401 is an authentication failure", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"401","title":"Unauthenticated","detail":"You are not authenticated"}]}`)),
+			},
+		}}
+
+		_, err := testClient(t, httpContext).CreateWebhook("https://superplane.example/webhooks/abc", EventNewTask, TaskCreatedEvent)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrMissingWritePermission)
+		assert.NotContains(t, err.Error(), "read and write access")
 	})
 }
 
