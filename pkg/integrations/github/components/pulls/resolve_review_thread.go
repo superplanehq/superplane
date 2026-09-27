@@ -159,7 +159,6 @@ func (c *ResolveReviewThread) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	// Collect thread IDs from both threadId and threadIds
 	var threadIDs []string
 	if len(config.ThreadIDs) > 0 {
 		for _, id := range config.ThreadIDs {

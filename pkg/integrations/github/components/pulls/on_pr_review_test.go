@@ -398,7 +398,6 @@ func reviewWebhookContext(
 }
 
 func reviewCommentsHTTPContext(body string) *contexts.HTTPContext {
-	// Add mock GraphQL response for review threads (empty)
 	graphQLResponse := mocks.GitHubResponse(http.StatusOK, `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}`)
 	return &contexts.HTTPContext{
 		Responses: []*http.Response{
