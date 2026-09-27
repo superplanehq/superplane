@@ -8,8 +8,10 @@ import type {
   FactoriesWorkOrderState,
 } from "@/api-client";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useState } from "react";
-import { factoryHomePath, firstFactoryLineId } from "./lib/factoryPagePaths";
+import { useLocation } from "react-router";
+import { factoryHomePath, firstFactoryLineId, workOrderBoardLineIdFromSearch } from "./lib/factoryPagePaths";
 import { latestDispatchForLine } from "./lib/workOrderNumberResolution";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
@@ -24,6 +26,7 @@ import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote"
 import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
 import { SendWorkOrderToBacklogDialog } from "./workOrders/SendWorkOrderToBacklogDialog";
+import { useDuplicateWorkOrder } from "./useDuplicateWorkOrder";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
@@ -83,6 +86,15 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
   const identifier = getWorkOrderDisplayKey(props.order, props.factoryKey);
   const isDialog = props.chrome === "dialog";
   const [backlogConfirmOpen, setBacklogConfirmOpen] = useState(false);
+  const { canAct } = usePermissions();
+  const canCreate = canAct("work_orders", "create") && Boolean(props.factoryId);
+  const location = useLocation();
+  const duplicateWorkOrder = useDuplicateWorkOrder({
+    organizationId: props.organizationId,
+    factoryId: props.factoryId,
+    factoryKey: props.factoryKey,
+    lineId: workOrderBoardLineIdFromSearch(location.search),
+  });
   return (
     <>
       <WorkOrderDetailHeader
@@ -103,6 +115,14 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
         onClose={props.onClose}
         onStatusChange={props.onStatusChange}
         onSendToBacklog={() => setBacklogConfirmOpen(true)}
+        canCreate={canCreate}
+        isDuplicating={duplicateWorkOrder.isPending}
+        onDuplicate={() => {
+          void duplicateWorkOrder.duplicate({
+            title: props.order.title,
+            description: props.order.description,
+          });
+        }}
         className={isDialog ? "max-w-none px-6 pt-4 pb-3 pr-12" : undefined}
       />
       <WorkOrderDetailBody {...props} onSendToBacklog={() => setBacklogConfirmOpen(true)} />
