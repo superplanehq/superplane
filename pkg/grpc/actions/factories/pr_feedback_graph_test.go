@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -125,6 +126,36 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 	})
 }
 
+func Test__PRFeedbackCanvasRoutesRunnerSuccessToResolve(t *testing.T) {
+	canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository: "acme/app",
+		Mention:    prFeedbackDefaultMention,
+	})
+
+	runnerNodes := map[string]bool{
+		prFeedbackRunnerNodeID:       true,
+		prFeedbackReviewRunnerNodeID: true,
+		prFeedbackReplyRunnerNodeID:  true,
+	}
+
+	for _, edge := range canvas.Spec.Edges {
+		if !runnerNodes[edge.SourceID] {
+			continue
+		}
+		assert.Equal(t, runner.PassedOutputChannel, edge.Channel,
+			"edge %s -> %s must hang off the runner success channel", edge.SourceID, edge.TargetID)
+	}
+
+	for source, target := range map[string]string{
+		prFeedbackReviewRunnerNodeID: prFeedbackResolveReviewNodeID,
+		prFeedbackReplyRunnerNodeID:  prFeedbackResolveReplyNodeID,
+	} {
+		assert.Contains(t, yamlEdgeChannels(canvas),
+			runner.PassedOutputChannel+":"+source+"->"+target,
+			"the resolve node must be reachable from the runner")
+	}
+}
+
 func Test__BuildPRFeedbackCanvas(t *testing.T) {
 	t.Run("the mention starts one run from comment, review, or reply", func(t *testing.T) {
 		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
@@ -141,12 +172,12 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
 			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
 			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
-			"default:" + prFeedbackReviewRunnerNodeID + "->" + prFeedbackResolveReviewNodeID,
+			runner.PassedOutputChannel + ":" + prFeedbackReviewRunnerNodeID + "->" + prFeedbackResolveReviewNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackAcknowledgeReviewNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
 			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
 			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
-			"default:" + prFeedbackReplyRunnerNodeID + "->" + prFeedbackResolveReplyNodeID,
+			runner.PassedOutputChannel + ":" + prFeedbackReplyRunnerNodeID + "->" + prFeedbackResolveReplyNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackAcknowledgeReviewReplyNodeID,
 		}, yamlEdgeChannels(canvas))
 

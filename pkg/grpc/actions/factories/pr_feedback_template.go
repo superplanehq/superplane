@@ -271,7 +271,7 @@ func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedb
 func (flow prFeedbackDiscussionFlowSpec) withResolveAfter(sourceID string, node yaml.Node) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
 	flow.edges = append(flow.edges, yaml.Edge{
-		Channel:  "default",
+		Channel:  runner.PassedOutputChannel,
 		SourceID: sourceID,
 		TargetID: node.ID,
 	})
