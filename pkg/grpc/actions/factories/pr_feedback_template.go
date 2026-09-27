@@ -403,7 +403,6 @@ func prFeedbackDiscussionFlowNodes(
 			request.Binding,
 		)
 		spec = spec.withResolve(resolveNode)
-		// Fix the edge to come from the runner
 		for i := range spec.edges {
 			if spec.edges[i].TargetID == flow.ResolveID {
 				spec.edges[i].SourceID = flow.RunnerID
