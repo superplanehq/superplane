@@ -50,10 +50,37 @@ func ListFactoryWorkOrderRunUsage(
 		return nil, grpcerrors.Internal(err, "failed to list factory work order run usage")
 	}
 
+	rows = resolveRunUsageModelAliases(rows)
+
 	return &pb.ListFactoryWorkOrderRunUsageResponse{
 		Rows:       serializeWorkOrderRunUsageRows(factory, rows),
 		TotalCount: uint32(total),
 	}, nil
+}
+
+func resolveRunUsageModelAliases(rows []models.WorkOrderRunUsage) []models.WorkOrderRunUsage {
+	for i := range rows {
+		rows[i].Models = resolveModelNames(rows[i].Models)
+		rows[i].BYOKModels = resolveModelNames(rows[i].BYOKModels)
+	}
+	return rows
+}
+
+func resolveModelNames(names []string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		concrete := models.ConcreteClaudeModelID(name, nil)
+		if _, dup := seen[concrete]; dup {
+			continue
+		}
+		seen[concrete] = struct{}{}
+		out = append(out, concrete)
+	}
+	return out
 }
 
 func resolveWorkOrderRunUsageWindow(req *pb.ListFactoryWorkOrderRunUsageRequest) (time.Time, time.Time, error) {

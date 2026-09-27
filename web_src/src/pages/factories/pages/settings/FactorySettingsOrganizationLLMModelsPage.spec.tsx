@@ -13,6 +13,7 @@ import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrganizationLLMModelsPage";
 
 const saveModels = vi.fn();
+const switchSource = vi.fn();
 let canUpdate = true;
 let hostedModels: Array<{ key: string; label: string }> = [];
 
@@ -44,6 +45,7 @@ vi.mock("@/hooks/useLLMModelAllowlists", () => ({
       error: null,
     },
   useUpdateBYOKLLMModels: () => ({ mutateAsync: saveModels, isPending: false }),
+  useSwitchFactoryModelSource: () => ({ mutateAsync: switchSource, isPending: false }),
 }));
 
 vi.mock("@/hooks/useSelectableLLMModels", () => ({
@@ -111,6 +113,8 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     hostedModels = [{ key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" }];
     saveModels.mockReset();
     saveModels.mockResolvedValue({});
+    switchSource.mockReset();
+    switchSource.mockResolvedValue({});
     setDisconnected("anthropic");
     setDisconnected("openai");
     setDisconnected("openrouter");
@@ -142,13 +146,15 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.getByText("2 of 2 models selected").className).not.toContain("text-red");
   });
 
-  it("shows each connected key when more than one provider is connected", () => {
+  it("shows the current key and offers the other providers", () => {
     setConnected("anthropic", ["claude-opus-4-6"]);
     setConnected("openrouter", ["openai/gpt-5"]);
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
 
     expect(screen.getByText("Your Claude key")).toBeInTheDocument();
-    expect(screen.getByText("Your OpenRouter key")).toBeInTheDocument();
+    expect(screen.queryByText("Your OpenRouter key")).not.toBeInTheDocument();
+    expect(screen.getByTestId("llm-models-connect-openrouter")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use SuperPlane" })).toBeInTheDocument();
   });
 
   it("asks for a provider when the workspace uses your keys without one", () => {
@@ -211,5 +217,60 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
 
     expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
+  });
+
+  it("offers Connect on the hosted page and asks for a key only after confirm", async () => {
+    const user = userEvent.setup();
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+
+    expect(screen.getByTestId("llm-models-connect-anthropic")).toBeInTheDocument();
+    await user.click(
+      within(screen.getByTestId("llm-models-connect-anthropic")).getByRole("button", { name: "Connect" }),
+    );
+
+    expect(screen.getByRole("heading", { name: "Switch automations to Claude?" })).toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Switch to Claude" }));
+    expect(screen.getByTestId("llm-models-switch-api-key")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save and switch" })).toBeDisabled();
+
+    await user.type(screen.getByTestId("llm-models-switch-api-key"), "sk-test");
+    await user.click(screen.getByRole("button", { name: "Save and switch" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "anthropic", apiKey: "sk-test" });
+  });
+
+  it("switches to a connected provider without asking for a key", async () => {
+    const user = userEvent.setup();
+    setConnected("anthropic", ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+
+    await user.click(
+      within(screen.getByTestId("llm-models-connect-anthropic")).getByRole("button", { name: "Connect" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Switch to Claude" }));
+
+    expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
+    expect(switchSource).toHaveBeenCalledWith({ source: "anthropic", apiKey: undefined });
+  });
+
+  it("returns to SuperPlane from the provider page and still edits the model checklist", async () => {
+    const user = userEvent.setup();
+    setConnected("anthropic", ["claude-opus-4-6", "claude-sonnet-4-6"], ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
+    await user.click(screen.getByText("claude-sonnet-4-6"));
+    await user.click(screen.getByRole("button", { name: "Save models" }));
+    expect(saveModels).toHaveBeenCalledWith({
+      provider: "anthropic",
+      allowedModels: ["claude-opus-4-6", "claude-sonnet-4-6"],
+    });
+
+    await user.click(screen.getByRole("button", { name: "Use SuperPlane" }));
+    expect(screen.getByRole("heading", { name: "Switch automations to SuperPlane?" })).toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
   });
 });

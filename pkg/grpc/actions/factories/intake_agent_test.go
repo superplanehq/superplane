@@ -51,7 +51,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	t.Run("an agent on an installation still names the model it runs", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 
-		for app, model := range map[string]string{"claude": "opus", "openai": "gpt-5"} {
+		for app, model := range map[string]string{"claude": "claude-opus-5-5", "openai": "gpt-5"} {
 			factory := newFactoryIn(t, organization.ID)
 			agentID := createReadyOnboardingIntegration(t, organization.ID, app)
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
