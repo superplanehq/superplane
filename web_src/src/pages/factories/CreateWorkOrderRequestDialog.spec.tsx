@@ -350,7 +350,7 @@ describe("CreateWorkOrderRequestDialog", () => {
       new File(["notes"], "notes.txt", { type: "text/plain" }),
     ]);
 
-    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images, videos, or audio files.");
     expect(screen.getByTestId("create-work-order-request-file-file-txt")).toHaveTextContent("notes.txt");
   });
 
@@ -394,7 +394,7 @@ describe("CreateWorkOrderRequestDialog", () => {
 
     expect(onUploadFiles).toHaveBeenCalledTimes(1);
     expect(Array.from(onUploadFiles.mock.calls[0][0] as File[])).toHaveLength(1);
-    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images.");
+    expect(showErrorToast).toHaveBeenCalledWith("Attachments are limited to 8 images, videos, or audio files.");
   });
 
   it("hides the dictate button when speech recognition is missing", () => {

@@ -71,6 +71,49 @@ describe("useWorkOrderFileUpload", () => {
     expect(showErrorToast).toHaveBeenCalledWith("The file could not be stored.");
   });
 
+  it("uploads a video file and returns an sp-file ref", async () => {
+    const id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "clip.mp4", { type: "video/mp4" })]);
+    });
+
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: false,
+        isVideo: true,
+      }),
+    ]);
+  });
+
+  it("uploads an audio file and returns an sp-file ref", async () => {
+    const id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "note.mp3", { type: "audio/mpeg" })]);
+    });
+
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: false,
+        isVideo: false,
+        isAudio: true,
+      }),
+    ]);
+  });
+
   it("explains an opaque not-found create as a permission failure", async () => {
     filesCreateFactoryFile.mockResolvedValue({
       error: { message: "Not found" },
@@ -123,7 +166,7 @@ describe("useWorkOrderFileUpload", () => {
 
     let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
     await act(async () => {
-      uploaded = await result.current.uploadFiles([new File(["x"], "clip.mp4", { type: "video/mp4" })]);
+      uploaded = await result.current.uploadFiles([new File(["x"], "payload.zip", { type: "application/zip" })]);
     });
 
     expect(uploaded).toEqual([]);

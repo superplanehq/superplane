@@ -22,7 +22,7 @@ const (
 	FilePurposeAttachment = "attachment"
 	FilePurposeArtifact   = "artifact"
 
-	MaxFileBytes             = 10 << 20
+	MaxFileBytes             = 50 << 20
 	MaxArtifactFileBytes     = 100 << 20
 	MaxFilesPerWorkOrder     = 20
 	MaxOrganizationFileBytes = 10 << 30
@@ -56,6 +56,17 @@ var allowedFileContentTypes = []string{
 	"application/yaml",
 	"text/yaml",
 	"application/x-yaml",
+	"video/mp4",
+	"video/webm",
+	"video/quicktime",
+	"video/ogg",
+	"video/x-m4v",
+	"video/x-matroska",
+	"audio/mpeg",
+	"audio/mp4",
+	"audio/wav",
+	"audio/webm",
+	"audio/ogg",
 }
 
 var allowedArtifactContentTypes = []string{
@@ -152,6 +163,28 @@ func IsInlineImageContentType(contentType string) bool {
 	default:
 		return false
 	}
+}
+
+func IsInlineVideoContentType(contentType string) bool {
+	switch normalizeContentType(contentType) {
+	case "video/mp4", "video/webm", "video/quicktime", "video/ogg", "video/x-m4v", "video/x-matroska":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsInlineAudioContentType(contentType string) bool {
+	switch normalizeContentType(contentType) {
+	case "audio/mpeg", "audio/mp4", "audio/wav", "audio/webm", "audio/ogg":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsInlineMediaContentType(contentType string) bool {
+	return IsInlineImageContentType(contentType) || IsInlineVideoContentType(contentType) || IsInlineAudioContentType(contentType)
 }
 
 func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
@@ -630,6 +663,15 @@ func normalizeContentType(contentType string) string {
 	}
 	if value == "text/x-csv" || value == "application/csv" || value == "text/comma-separated-values" {
 		return "text/csv"
+	}
+	if value == "audio/mp3" {
+		return "audio/mpeg"
+	}
+	if value == "audio/x-wav" || value == "audio/wave" {
+		return "audio/wav"
+	}
+	if value == "audio/x-m4a" {
+		return "audio/mp4"
 	}
 	return value
 }

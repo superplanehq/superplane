@@ -74,7 +74,8 @@
   }
 }
 
-.create-work-order-request-attachments .t-stack-card img {
+.create-work-order-request-attachments .t-stack-card img,
+.create-work-order-request-attachments .t-stack-card video {
   display: block;
   width: 100%;
   height: 100%;
@@ -128,6 +129,10 @@
   border-radius: inherit;
   object-fit: contain;
   pointer-events: none;
+}
+
+.create-work-order-request-attachments .t-resize-img[controls] {
+  pointer-events: auto;
 }
 
 .create-work-order-request-attachments .t-resize-actions {

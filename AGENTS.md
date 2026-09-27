@@ -119,13 +119,17 @@ for a personal token. See
 task-broker and runner workers. Set `TASK_BROKER_*` in `.env` only for a
 remote broker (see `.env.example`).
 
-The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
-`jq`. Factory line apps run on that worker. Do not install those CLIs on the
-host. Connect GitHub and Claude integrations in the organization before you
+The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
+`jq`, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model. Factory
+line apps run on that worker. Do not install those CLIs on the host.
+Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
 `ANTHROPIC_API_KEY`. Check tools with `make doctor-local` after `make
 dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 SuperPlane does not download OpenCode in the prompt prepare step.
+Video and audio task files need ffmpeg, ffprobe, whisper-cli, and the baked
+Whisper model. Missing media tools fail the setup step. Do not download
+models during a task.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
 in `.env` only when you need the SuperPlane-hosted provider. See
