@@ -200,7 +200,17 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, err
 	}
 
-	if err := ctx.Events.Emit(TaskPayloadType, TaskEnvelope(event, document)); err != nil {
+	envelope := TaskEnvelope(event, document, webhookOrganizationID(ctx))
+	if event == TaskUpdatedEvent {
+		// Do not emit until the changeset for this delivery is known. A 200
+		// without that changeset makes Productive.io drop the delivery, and
+		// intake then cannot tell a list move from an edit.
+		if err := stampTaskListMove(ctx, document, envelope); err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+	}
+
+	if err := ctx.Events.Emit(TaskPayloadType, envelope); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
@@ -209,6 +219,66 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 func (t *OnTask) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func stampTaskListMove(ctx core.WebhookRequestContext, document map[string]any, envelope map[string]any) error {
+	id, _ := document["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+
+	deliveredAt, ok := deliveryCreatedAt(ctx.Body)
+	if !ok || ctx.HTTP == nil || ctx.Integration == nil {
+		return fmt.Errorf("productive task %s: %w", id, errTaskUpdateActivityUnavailable)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+		changeset, found, err := client.taskUpdateChangesetAt(id, deliveredAt, document)
+		if err != nil {
+			lastErr = fmt.Errorf("%w: %v", errTaskUpdateActivityUnavailable, err)
+			continue
+		}
+		if !found {
+			lastErr = errTaskUpdateActivityUnavailable
+			continue
+		}
+		move, ok := taskListMoveFromChangeset(changeset)
+		if ok {
+			setTaskListMove(envelope, move)
+		}
+		return nil
+	}
+	return fmt.Errorf("productive task %s: %w", id, lastErr)
+}
+
+func setTaskListMove(envelope map[string]any, move TaskListMove) {
+	meta, _ := envelope["meta"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+		envelope["meta"] = meta
+	}
+	meta["task_list_move"] = map[string]any{
+		"from": move.From,
+		"to":   move.To,
+	}
+}
+
+func webhookOrganizationID(ctx core.WebhookRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+	value, err := ctx.Integration.GetConfig("organizationId")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(value))
 }
 
 // productiveDelivery is the body Productive.io posts for a task webhook.

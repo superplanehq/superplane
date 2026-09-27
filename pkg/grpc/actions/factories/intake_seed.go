@@ -382,7 +382,7 @@ func seedProductiveTasks(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents, client.OrganizationID)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(documents)}, nil
@@ -400,10 +400,10 @@ func newestProductiveSeedDocuments(
 // productiveTaskEvents shapes each task of a newest-first page like the event
 // the trigger emits when it polls, so the rest of the graph cannot tell a
 // seeded task from a polled one.
-func productiveTaskEvents(documents []map[string]any) []map[string]any {
+func productiveTaskEvents(documents []map[string]any, organizationID string) []map[string]any {
 	events := make([]map[string]any, 0, len(documents))
 	for _, document := range documents {
-		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document))
+		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document, organizationID))
 	}
 
 	// The intake lists its runs newest first. Emitting the oldest task first

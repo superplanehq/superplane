@@ -92,6 +92,7 @@ describe("ProductiveIntakeFilterFields", () => {
     const user = userEvent.setup();
     render(<FilterHarness sourceId="productive-tasks" initial={DEFAULT_PRODUCTIVE_INTAKE_SETTINGS} onSave={onSave} />);
 
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskListHelper)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Bugs" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskList }));
 
