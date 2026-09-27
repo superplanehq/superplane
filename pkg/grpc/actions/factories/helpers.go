@@ -107,6 +107,12 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		}
 	}
 
+	if req.GetLineId() != "" {
+		if lineID, err := uuid.Parse(req.GetLineId()); err == nil {
+			filters.LineID = &lineID
+		}
+	}
+
 	return filters
 }
 

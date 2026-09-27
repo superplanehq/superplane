@@ -284,6 +284,29 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 	return artifacts, nil
 }
 
+// DeleteArtifacts removes every artifact row for this order and records
+// one timeline event. It does not delete git branches.
+func (o *FactoryWorkOrder) DeleteArtifacts(tx *gorm.DB, actor *uuid.UUID) (int, error) {
+	artifacts, err := o.ListArtifacts(tx)
+	if err != nil {
+		return 0, err
+	}
+	if len(artifacts) == 0 {
+		return 0, nil
+	}
+
+	err = tx.Where("work_order_id = ?", o.ID).Delete(&FactoryWorkOrderArtifact{}).Error
+	if err != nil {
+		return 0, err
+	}
+
+	if err := o.RecordArtifactsCleared(tx, len(artifacts), actor); err != nil {
+		return 0, err
+	}
+
+	return len(artifacts), nil
+}
+
 // IsValidWorkOrderArtifactType reports whether CreateArtifact accepts t.
 func IsValidWorkOrderArtifactType(t string) bool {
 	switch t {

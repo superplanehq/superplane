@@ -205,7 +205,7 @@ func appendMissingDescriptionFileRefs(tx *gorm.DB, order *FactoryWorkOrder, spec
 func markdownFileRef(file File) string {
 	ref := blob.FileRef(file.ID)
 	label := blob.MarkdownLinkLabel(file.Filename)
-	if IsInlineImageContentType(file.ContentType) {
+	if IsInlineMediaContentType(file.ContentType) {
 		return fmt.Sprintf("![%s](%s)", label, ref)
 	}
 	return fmt.Sprintf("[%s](%s)", label, ref)

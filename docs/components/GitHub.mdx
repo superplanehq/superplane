@@ -322,7 +322,7 @@ The On Dependabot Alert trigger starts a workflow execution when GitHub reports 
 
 Each alert event includes:
 - **action**: The action that triggered the event (created, reopened, reintroduced, fixed, dismissed)
-- **alert**: The Dependabot alert, including the package, manifest, severity, and advisory
+- **alert**: The Dependabot alert, including the package, manifest, severity, advisory, and whether the dependency is direct or transitive
 - **repository**: Repository information
 - **sender**: User or app that triggered the event
 
@@ -344,7 +344,9 @@ The repository must have Dependabot alerts turned on. The GitHub App needs permi
         "package": {
           "ecosystem": "npm",
           "name": "lodash"
-        }
+        },
+        "relationship": "transitive",
+        "scope": "runtime"
       },
       "html_url": "https://github.com/acme/payments/security/dependabot/7",
       "number": 7,
@@ -357,7 +359,8 @@ The repository must have Dependabot alerts turned on. The GitHub App needs permi
           "identifier": "4.17.21"
         },
         "vulnerable_version_range": "\u003c 4.17.21"
-      }
+      },
+      "state": "open"
     }
   },
   "timestamp": "2026-09-25T09:00:00Z",

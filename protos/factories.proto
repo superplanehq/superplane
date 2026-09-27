@@ -389,6 +389,17 @@ service Factories {
     };
   }
 
+  rpc SearchDependabotIntakeSetupItems(SearchDependabotIntakeSetupItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/dependabot-intake-setup-items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview Dependabot packages for intake setup";
+      description: "Lists open alert packages before the Dependabot intake exists";
+      tags: "Factory";
+    };
+  }
+
   rpc ImportFactoryIntakeItem(ImportFactoryIntakeItemRequest) returns (ImportFactoryIntakeItemResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/intakes/{intake_id}/imports"
@@ -516,6 +527,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update work order status";
       description: "Transitions a work order between lifecycle states";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendWorkOrderToBacklog(SendWorkOrderToBacklogRequest) returns (SendWorkOrderToBacklogResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/backlog"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send work order to backlog";
+      description: "Moves a closed work order to draft and optionally closes pull requests and clears artifacts";
       tags: "Factory";
     };
   }
@@ -1537,6 +1560,12 @@ message SearchFactoryIntakeItemsRequest {
   int32 limit = 4;
 }
 
+message SearchDependabotIntakeSetupItemsRequest {
+  string factory_id = 1;
+  repeated string dependabot_severities = 2;
+  int32 limit = 3;
+}
+
 message SearchFactoryIntakeItemsResponse {
   repeated FactoryIntakeItem items = 1;
 }
@@ -1574,6 +1603,8 @@ message ListWorkOrdersRequest {
   uint32 limit = 6;
   // Return orders older than this id in updated_at DESC, id DESC order.
   string before_id = 7;
+  // When set, return orders that ran on this line, plus orders with no line.
+  string line_id = 8;
 }
 
 message ListWorkOrdersResponse {
@@ -1941,6 +1972,17 @@ message UpdateWorkOrderStatusRequest {
 }
 
 message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message SendWorkOrderToBacklogRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  bool close_pull_requests = 3;
+  bool clear_artifacts = 4;
+}
+
+message SendWorkOrderToBacklogResponse {
   WorkOrder order = 1;
 }
 
