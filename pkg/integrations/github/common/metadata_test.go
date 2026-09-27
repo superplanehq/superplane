@@ -64,3 +64,45 @@ func Test__Metadata_SetPendingInstallationsDeduplicatesByID(t *testing.T) {
 		{ID: "22", AccountLogin: "octo"},
 	}, metadata.PendingInstallations)
 }
+
+func Test__Metadata_PendingRepositories(t *testing.T) {
+	metadata := Metadata{
+		PendingInstallations: []PendingInstallation{
+			{
+				ID: "11",
+				Repositories: []Repository{
+					{ID: 1, Name: "acme/api"},
+					{ID: 2, Name: "acme/web"},
+				},
+			},
+		},
+	}
+
+	repositories, ok := metadata.PendingRepositories("11")
+	assert.True(t, ok)
+	assert.Equal(t, []Repository{{ID: 1, Name: "acme/api"}, {ID: 2, Name: "acme/web"}}, repositories)
+
+	_, ok = metadata.PendingRepositories("99")
+	assert.False(t, ok)
+}
+
+func Test__Metadata_SelectRepositories(t *testing.T) {
+	metadata := Metadata{
+		PendingInstallations: []PendingInstallation{
+			{
+				ID: "11",
+				Repositories: []Repository{
+					{ID: 1, Name: "acme/api"},
+					{ID: 2, Name: "acme/web"},
+				},
+			},
+		},
+	}
+
+	repositories, ok := metadata.SelectPendingRepositories("11", []int64{2})
+	assert.True(t, ok)
+	assert.Equal(t, []Repository{{ID: 2, Name: "acme/web"}}, repositories)
+
+	_, ok = metadata.SelectPendingRepositories("11", []int64{3})
+	assert.False(t, ok)
+}

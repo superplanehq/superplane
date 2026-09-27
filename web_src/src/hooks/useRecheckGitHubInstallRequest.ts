@@ -1,11 +1,8 @@
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-
 import type { OrganizationsIntegration } from "@/api-client";
-import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
-import { integrationKeys } from "@/hooks/useIntegrations";
 import { pendingGitHubRequestConnection } from "@/lib/startDirectGitHubConnect";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+
+import { useSyncGitHubConnection } from "./useSyncGitHubConnection";
 
 const RECHECK_INTERVAL_MS = 5_000;
 
@@ -28,7 +25,7 @@ export function pendingGitHubInstallRequestId(
  * request resolves or the page closes.
  */
 export function useRecheckGitHubInstallRequest(organizationId: string, integrationId?: string, enabled = true) {
-  const queryClient = useQueryClient();
+  const syncGitHubConnection = useSyncGitHubConnection(organizationId);
 
   useEffect(() => {
     if (!organizationId || !integrationId || !enabled) return;
@@ -37,18 +34,11 @@ export function useRecheckGitHubInstallRequest(organizationId: string, integrati
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const recheck = async () => {
       try {
-        await organizationsUpdateIntegration(
-          withOrganizationHeader({
-            organizationId,
-            path: { id: organizationId, integrationId },
-            body: {},
-          }),
-        );
+        await syncGitHubConnection(integrationId);
       } catch {
         // The connection stays in the waiting state; the next tick retries.
       }
       if (cancelled) return;
-      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
       if (!cancelled) timeout = setTimeout(() => void recheck(), RECHECK_INTERVAL_MS);
     };
 
@@ -57,5 +47,5 @@ export function useRecheckGitHubInstallRequest(organizationId: string, integrati
       cancelled = true;
       if (timeout) clearTimeout(timeout);
     };
-  }, [enabled, organizationId, integrationId, queryClient]);
+  }, [enabled, integrationId, organizationId, syncGitHubConnection]);
 }

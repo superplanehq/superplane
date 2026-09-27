@@ -109,6 +109,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
+    syncGithubConnection: vi.fn().mockResolvedValue(undefined),
     githubConnectionsLoading: false,
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,

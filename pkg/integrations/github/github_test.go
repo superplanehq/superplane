@@ -73,6 +73,7 @@ func Test__GitHub__Sync(t *testing.T) {
 
 	t.Run("hosted public app", func(t *testing.T) {
 		setHostedAppEnv(t)
+		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
@@ -102,6 +103,7 @@ func Test__GitHub__Sync(t *testing.T) {
 
 	t.Run("hosted public app stores a safe setup return path", func(t *testing.T) {
 		setHostedAppEnv(t)
+		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
@@ -119,6 +121,7 @@ func Test__GitHub__Sync(t *testing.T) {
 
 	t.Run("hosted public app ignores an unsafe setup return path", func(t *testing.T) {
 		setHostedAppEnv(t)
+		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
@@ -185,13 +188,12 @@ func Test__isInstallationRequestSetupAction(t *testing.T) {
 	assert.False(t, isInstallationRequestSetupAction(""))
 }
 
-func Test__handleInstallationDeletion_refreshesHostedOAuthState(t *testing.T) {
-	setHostedAppOAuthEnv(t)
+func Test__handleInstallationDeletion_refreshesHostedInstallState(t *testing.T) {
+	setHostedAppEnv(t)
 	integration := &contexts.IntegrationContext{
 		Metadata: common.Metadata{
 			State:          "old-state",
 			HostedApp:      true,
-			AuthorizeURL:   common.HostedAppAuthorizeURL("Iv1.abc", common.HostedAppOAuthCallbackURL("https://app.example"), "old-state"),
 			InstallationID: "11",
 			GitHubApp:      common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 			PendingInstallations: []common.PendingInstallation{
@@ -206,11 +208,9 @@ func Test__handleInstallationDeletion_refreshesHostedOAuthState(t *testing.T) {
 
 	metadata := integration.Metadata.(common.Metadata)
 	assert.NotEqual(t, "old-state", metadata.State)
-	assert.Contains(t, metadata.AuthorizeURL, "state="+url.QueryEscape(metadata.State))
-	assert.NotContains(t, metadata.AuthorizeURL, "state=old-state")
 	require.NotNil(t, integration.BrowserAction)
-	assert.Equal(t, metadata.AuthorizeURL, integration.BrowserAction.URL)
-	assert.Equal(t, hostedOAuthDescription, integration.BrowserAction.Description)
+	assert.Contains(t, integration.BrowserAction.URL, "https://github.com/apps/superplane/installations/new?state=")
+	assert.Equal(t, appInstallationDescription, integration.BrowserAction.Description)
 	assert.Equal(t, []common.PendingInstallation{{ID: "22", AccountLogin: "octo"}}, metadata.PendingInstallations)
 }
 
@@ -218,6 +218,10 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		NewSetupFlow:  true,
 		IntegrationID: "11111111-1111-1111-1111-111111111111",
+		Metadata: common.Metadata{
+			ObservedInstallRequestIDs:      []string{"existing-request"},
+			InstallRequestBaselineCaptured: true,
+		},
 		CurrentProperties: map[string]any{
 			common.PropertyAppState: "csrf",
 		},
@@ -237,8 +241,12 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 		rec.Header().Get("Location"),
 	)
 	require.NotNil(t, integration.Metadata)
-	assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
-	assert.Empty(t, integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.True(t, metadata.InstallRequested)
+	assert.Empty(t, metadata.InstallRequestedAccount)
+	require.Len(t, metadata.InstallRequests, 1)
+	assert.Equal(t, []string{"existing-request"}, metadata.InstallRequests[0].ExistingRequestIDs)
+	assert.True(t, metadata.InstallRequests[0].BaselineCaptured)
 }
 
 func Test__afterAppInstallation_installRequest_persistsAccount(t *testing.T) {
@@ -295,6 +303,23 @@ func Test__redirectToIntegrationSettingsURL(t *testing.T) {
 
 		assert.Equal(t, http.StatusSeeOther, rec.Code)
 		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
+	})
+
+	t.Run("adds a successful GitHub setup marker", func(t *testing.T) {
+		integration.Metadata = common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
+		}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)
+
+		redirectToIntegrationSettingsCompleted(ctx)
+
+		assert.Equal(
+			t,
+			"https://app.example/onboarding?attempt=1&githubIntegrationId=11111111-1111-1111-1111-111111111111&githubSetup=complete&step=vcs",
+			rec.Header().Get("Location"),
+		)
 	})
 
 	t.Run("uses cookie when metadata is empty", func(t *testing.T) {

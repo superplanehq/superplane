@@ -24,26 +24,30 @@ describe("bindHostedGitHubInstallation", () => {
     return fetchSpy;
   }
 
-  it("does not follow the success redirect, which can leave the page origin", async () => {
-    const fetchSpy = stubFetch({ type: "opaqueredirect", ok: false, status: 0 });
+  it("posts the selected installation and repository", async () => {
+    const fetchSpy = stubFetch({ type: "basic", ok: true, status: 204 });
 
-    await expect(bindHostedGitHubInstallation("csrf", "11")).resolves.toBeUndefined();
-    expect(fetchSpy).toHaveBeenCalledWith("/api/v1/github/app/bind?state=csrf&installation_id=11", {
+    await expect(bindHostedGitHubInstallation("csrf", "11", "22")).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith("/api/v1/github/app/bind", {
+      method: "POST",
       credentials: "same-origin",
-      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "state=csrf&installation_id=11&repository_id=22",
     });
   });
 
   it("accepts a plain success answer", async () => {
     stubFetch({ type: "basic", ok: true, status: 200 });
 
-    await expect(bindHostedGitHubInstallation("csrf", "11")).resolves.toBeUndefined();
+    await expect(bindHostedGitHubInstallation("csrf", "11", "22")).resolves.toBeUndefined();
   });
 
   it("throws on an error status", async () => {
     stubFetch({ type: "basic", ok: false, status: 404 });
 
-    await expect(bindHostedGitHubInstallation("csrf", "11")).rejects.toThrow("Failed to connect the GitHub account");
+    await expect(bindHostedGitHubInstallation("csrf", "11", "22")).rejects.toThrow(
+      "Failed to connect the GitHub account",
+    );
   });
 });
 
@@ -52,13 +56,23 @@ describe("pendingGitHubInstallations", () => {
     expect(
       pendingGitHubInstallations({
         pendingInstallations: [
-          { id: "11", accountLogin: "acme", accountType: "Organization" },
+          {
+            id: "11",
+            accountLogin: "acme",
+            accountType: "Organization",
+            repositories: [{ id: 7, name: "acme/api", url: "https://github.com/acme/api" }],
+          },
           { id: 22, accountLogin: "octo" },
         ],
       }),
     ).toEqual([
-      { id: "11", accountLogin: "acme", accountType: "Organization" },
-      { id: "22", accountLogin: "octo" },
+      {
+        id: "11",
+        accountLogin: "acme",
+        accountType: "Organization",
+        repositories: [{ id: "7", name: "acme/api", url: "https://github.com/acme/api" }],
+      },
+      { id: "22", accountLogin: "octo", repositories: [] },
     ]);
   });
 
@@ -89,7 +103,7 @@ describe("pendingGitHubInstallRequests", () => {
 
 describe("hosted GitHub URLs", () => {
   it("builds the public bind path", () => {
-    expect(hostedGitHubBindPath("csrf", "11")).toBe("/api/v1/github/app/bind?state=csrf&installation_id=11");
+    expect(hostedGitHubBindPath()).toBe("/api/v1/github/app/bind");
   });
 
   it("builds the GitHub install URL", () => {

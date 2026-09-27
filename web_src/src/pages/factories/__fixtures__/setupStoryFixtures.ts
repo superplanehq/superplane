@@ -56,8 +56,16 @@ export const PENDING_PICKER_INTEGRATION: StorybookOrgIntegration = {
       state: "csrf",
       githubApp: { slug: "superplane" },
       pendingInstallations: [
-        { id: "11", accountLogin: "forestigamer" },
-        { id: "22", accountLogin: "forestileao" },
+        {
+          id: "11",
+          accountLogin: "forestigamer",
+          repositories: [{ id: "101", name: "forestigamer/game" }],
+        },
+        {
+          id: "22",
+          accountLogin: "forestileao",
+          repositories: [{ id: "202", name: "forestileao/api" }],
+        },
       ],
     },
   },

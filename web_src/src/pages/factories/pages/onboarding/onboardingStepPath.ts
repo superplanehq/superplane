@@ -1,4 +1,8 @@
-import { GITHUB_SETUP_ORG_PARAM, GITHUB_SETUP_REQUEST_PARAM } from "@/lib/integrationSetupReturn";
+import {
+  GITHUB_SETUP_INTEGRATION_PARAM,
+  GITHUB_SETUP_ORG_PARAM,
+  GITHUB_SETUP_REQUEST_PARAM,
+} from "@/lib/integrationSetupReturn";
 
 import type { WizardStepId } from "./onboardingFixtures";
 
@@ -16,6 +20,7 @@ export function onboardingStepPath(basePath: string, step: WizardStepId): string
     // that already finished.
     searchParams.delete(GITHUB_SETUP_REQUEST_PARAM);
     searchParams.delete(GITHUB_SETUP_ORG_PARAM);
+    searchParams.delete(GITHUB_SETUP_INTEGRATION_PARAM);
   }
 
   return `${pathname}?${searchParams.toString()}`;

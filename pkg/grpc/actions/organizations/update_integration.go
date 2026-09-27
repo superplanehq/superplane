@@ -96,6 +96,7 @@ func UpdateIntegration(
 	userID, _ := authentication.GetUserIdFromMetadata(ctx)
 	logging.ForIntegration(*instance).WithField("source", "integration_update").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
+		Context:         ctx,
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            registry.HTTPContext(),
 		Configuration:   instance.Configuration.Data(),
@@ -110,7 +111,10 @@ func UpdateIntegration(
 	if syncErr != nil {
 		instance.State = "error"
 		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
-	} else {
+	} else if !integrationCtx.StateChanged() {
+		if instance.State == models.IntegrationStateError {
+			instance.State = models.IntegrationStatePending
+		}
 		instance.StateDescription = ""
 	}
 

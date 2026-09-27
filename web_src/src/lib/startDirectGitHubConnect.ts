@@ -9,7 +9,6 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
-  hostedGitHubAuthorizeURL,
   hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -19,7 +18,11 @@ import {
   type PendingGitHubInstallation,
 } from "@/lib/hostedGitHubInstall";
 import { integrationDetailPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
-import { INTEGRATION_SETUP_STAY_PARAM, rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import {
+  INTEGRATION_SETUP_STAY_PARAM,
+  isOnboardingSetupReturnPath,
+  rememberIntegrationSetupReturn,
+} from "@/lib/integrationSetupReturn";
 import { createWithGeneratedName } from "@/ui/IntegrationCreateDialog/generatedName";
 
 export const GITHUB_SETUP_RETURN_PATH = "setupReturnPath";
@@ -29,9 +32,7 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
-  /** GitHub OAuth authorize URL, to ask again which account to use. */
-  authorizeUrl: string;
-  /** GitHub login that authorized this connect. Empty when the field is absent. */
+  /** Linked GitHub login used to verify repository access. */
   githubLogin: string;
 };
 
@@ -53,23 +54,8 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     installations: pendingGitHubInstallations(item.status?.metadata),
     state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
-    authorizeUrl: authorizeURLWithState(hostedGitHubAuthorizeURL(item.status?.metadata), state),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
   };
-}
-
-function authorizeURLWithState(authorizeURL: string, state: string): string {
-  if (!authorizeURL || !state) return authorizeURL;
-
-  try {
-    const url = new URL(authorizeURL);
-    if (url.searchParams.get("state") === state) return authorizeURL;
-
-    url.searchParams.set("state", state);
-    return url.toString();
-  } catch {
-    return authorizeURL;
-  }
 }
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -128,6 +114,25 @@ function pendingOwnGitHubWithAction(
       item.status?.state !== "ready" &&
       Boolean(item.status?.browserAction?.url),
   );
+  return selectOwnPendingGitHub(candidates, currentUserId, preferredIntegrationId);
+}
+
+function pendingOwnFailedGitHub(
+  connected: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): OrganizationsIntegration | undefined {
+  const candidates = connected.filter(
+    (item) => item.metadata?.integrationName === "github" && item.status?.state === "error",
+  );
+  return selectOwnPendingGitHub(candidates, currentUserId, preferredIntegrationId);
+}
+
+function selectOwnPendingGitHub(
+  candidates: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): OrganizationsIntegration | undefined {
   const preferred = candidates.find(
     (item) => item.metadata?.id === preferredIntegrationId && isOwnPendingGitHub(item, currentUserId),
   );
@@ -202,19 +207,6 @@ export function githubAccountPickerFromConnection(
   return picker;
 }
 
-export function isOnboardingSetupReturnPath(path: string | undefined): boolean {
-  if (!path) {
-    return false;
-  }
-
-  const pathname = path.split("?")[0] ?? path;
-  if (pathname === "/onboarding") {
-    return true;
-  }
-
-  return pathname.includes("/workspaces/") && pathname.endsWith("/setup");
-}
-
 function setupReturnConfiguration(returnTo?: string): Record<string, unknown> | undefined {
   if (!returnTo) {
     return undefined;
@@ -239,13 +231,14 @@ export function hostedGitHubConnectUserGate(
 
 export function persistGitHubSetupReturnPath(organizationId: string) {
   return async (payload: { id: string; configuration: Record<string, unknown> }) => {
-    await organizationsUpdateIntegration(
+    const response = await organizationsUpdateIntegration(
       withOrganizationHeader({
         organizationId,
         path: { id: organizationId, integrationId: payload.id },
         body: { configuration: payload.configuration },
       }),
     );
+    return response.data?.integration;
   };
 }
 
@@ -263,43 +256,52 @@ type StartDirectGitHubConnectArgs = {
     name: string;
     configuration?: Record<string, unknown>;
   }) => Promise<OrganizationsCreateIntegrationResponse>;
-  update?: (payload: { id: string; configuration: Record<string, unknown> }) => Promise<void>;
+  update?: (payload: {
+    id: string;
+    configuration: Record<string, unknown>;
+  }) => Promise<OrganizationsIntegration | undefined>;
   goTo?: (path: string) => void;
 };
 
-async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
+type ResumePendingGitHubConnectResult = {
+  handled: boolean;
+  navigationStarted: boolean;
+};
+
+async function resumePendingGitHubConnect(
+  args: StartDirectGitHubConnectArgs,
+): Promise<ResumePendingGitHubConnectResult> {
   const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId, args.preferredIntegrationId);
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-    if (isOnboardingSetupReturnPath(args.returnTo)) {
-      // Onboarding asks again which GitHub account to use on every Connect
-      // click, so the click goes to GitHub authorization instead of the
-      // stored picker. Without a stored authorize URL the flow falls
-      // through and starts a fresh connect, which also opens authorization.
-      if (picker.authorizeUrl) {
-        return followBrowserAction({ method: "GET", url: picker.authorizeUrl });
-      }
-      return false;
-    }
-
-    const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);
-    if (args.goTo) {
-      args.goTo(path);
-      return true;
-    }
-    window.location.assign(path);
-    return true;
+    return { handled: true, navigationStarted: openGitHubAccountPicker(args, picker.id) };
   }
 
-  const pending = pendingOwnGitHubWithAction(args.connected, args.currentUserId, args.preferredIntegrationId);
-  const pendingAction = pending?.status?.browserAction;
-  if (!pendingAction) {
-    return false;
+  const pending =
+    pendingOwnGitHubWithAction(args.connected, args.currentUserId, args.preferredIntegrationId) ??
+    pendingOwnFailedGitHub(args.connected, args.currentUserId, args.preferredIntegrationId);
+  if (!pending) {
+    return { handled: false, navigationStarted: false };
   }
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  await persistSetupReturnPath(args.update, pending.metadata?.id, args.returnTo);
-  return followBrowserAction(pendingAction);
+  const refreshed = await persistSetupReturnPath(args.update, pending.metadata?.id, args.returnTo);
+  const connection = refreshed ?? pending;
+  const refreshedPicker = githubAccountPickerFromConnection(connection, args.currentUserId);
+  if (refreshedPicker) {
+    return { handled: true, navigationStarted: openGitHubAccountPicker(args, refreshedPicker.id) };
+  }
+  const action = connection.status?.browserAction;
+  if (action?.url) {
+    return { handled: true, navigationStarted: followBrowserAction(action) };
+  }
+  if (connection.status?.state === "error") {
+    throw new Error(connection.status.stateDescription || "SuperPlane could not connect to GitHub. Try again.");
+  }
+  if (connection.status?.state === "ready") {
+    return { handled: true, navigationStarted: false };
+  }
+  throw new Error("SuperPlane could not connect to GitHub. Try again.");
 }
 
 export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
@@ -307,8 +309,9 @@ export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArg
     return false;
   }
 
-  if (!args.forceNew && (await resumePendingGitHubConnect(args))) {
-    return true;
+  if (!args.forceNew) {
+    const resumed = await resumePendingGitHubConnect(args);
+    if (resumed.handled) return resumed.navigationStarted;
   }
 
   const { result } = await createWithGeneratedName({
@@ -325,24 +328,59 @@ export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArg
   });
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  const action = result.integration?.status?.browserAction;
+  const connection = await retryFailedGitHubDiscovery(args, result.integration);
+  const picker = githubAccountPickerFromConnection(connection, args.currentUserId);
+  if (picker) {
+    return openGitHubAccountPicker(args, picker.id);
+  }
+  const action = connection?.status?.browserAction;
   if (!action?.url) {
-    throw new Error("The GitHub App install page did not open.");
+    throw new Error(connection?.status?.stateDescription || "The GitHub App install page did not open.");
   }
   return followBrowserAction(action);
 }
 
-async function persistSetupReturnPath(
-  update: ((payload: { id: string; configuration: Record<string, unknown> }) => Promise<void>) | undefined,
-  integrationId: string | undefined,
-  returnTo: string | undefined,
-): Promise<void> {
-  const configuration = setupReturnConfiguration(returnTo);
-  if (!update || !integrationId || !configuration) {
-    return;
+async function retryFailedGitHubDiscovery(
+  args: StartDirectGitHubConnectArgs,
+  connection: OrganizationsIntegration | undefined,
+): Promise<OrganizationsIntegration | undefined> {
+  if (connection?.status?.browserAction?.url || connection?.status?.state !== "error") {
+    return connection;
   }
 
-  await update({ id: integrationId, configuration });
+  return (await persistSetupReturnPath(args.update, connection.metadata?.id, args.returnTo)) ?? connection;
+}
+
+async function persistSetupReturnPath(
+  update:
+    | ((payload: {
+        id: string;
+        configuration: Record<string, unknown>;
+      }) => Promise<OrganizationsIntegration | undefined>)
+    | undefined,
+  integrationId: string | undefined,
+  returnTo: string | undefined,
+): Promise<OrganizationsIntegration | undefined> {
+  const configuration = setupReturnConfiguration(returnTo);
+  if (!update || !integrationId || !configuration) {
+    return undefined;
+  }
+
+  return update({ id: integrationId, configuration });
+}
+
+function openGitHubAccountPicker(args: StartDirectGitHubConnectArgs, integrationId: string): boolean {
+  if (isOnboardingSetupReturnPath(args.returnTo)) {
+    return false;
+  }
+
+  const path = githubInstallPickerPath(args.organizationId, integrationId, args.integrationsBasePath);
+  if (args.goTo) {
+    args.goTo(path);
+    return true;
+  }
+  window.location.assign(path);
+  return true;
 }
 
 function githubInstallPickerPath(organizationId: string, integrationId: string, integrationsBasePath?: string) {
