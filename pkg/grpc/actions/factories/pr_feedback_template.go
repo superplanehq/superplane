@@ -18,7 +18,6 @@ const (
 	prFeedbackFindNodeID                   = "find-pull-request"
 	prFeedbackActivityNodeID               = "add-pr-activity"
 	prFeedbackRunnerNodeID                 = "address-pr-feedback"
-	prFeedbackResolveCommentNodeID         = "resolve-pr-comment-thread"
 	prFeedbackReviewFindNodeID             = "find-pull-request-for-review"
 	prFeedbackReviewActivityNodeID         = "add-pr-review-activity"
 	prFeedbackReviewRunnerNodeID           = "address-pr-review-feedback"
@@ -269,16 +268,6 @@ func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedb
 	return flow
 }
 
-func (flow prFeedbackDiscussionFlowSpec) withResolve(node yaml.Node) prFeedbackDiscussionFlowSpec {
-	flow.nodes = append(flow.nodes, node)
-	flow.edges = append(flow.edges, yaml.Edge{
-		Channel:  "default",
-		SourceID: flow.triggerID,
-		TargetID: node.ID,
-	})
-	return flow
-}
-
 func (flow prFeedbackDiscussionFlowSpec) withResolveAfter(sourceID string, node yaml.Node) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
 	flow.edges = append(flow.edges, yaml.Edge{
@@ -317,45 +306,32 @@ func prFeedbackAcknowledgePosition(flowY int) yaml.Position {
 	return yaml.Position{X: prFeedbackAcknowledgeX, Y: flowY - prFeedbackAcknowledgeOffsetY}
 }
 
-func prFeedbackResolveReviewThreadNode(
+func prFeedbackResolveThreadNode(
 	id string,
 	name string,
 	threadID string,
+	threadIDsExpression string,
 	position yaml.Position,
 	binding *intakeBinding,
 ) yaml.Node {
-	return yaml.Node{
-		ID:        id,
-		Name:      name,
-		Type:      yaml.NodeTypeAction,
-		Component: "github.resolveReviewThread",
-		Configuration: map[string]any{
-			"repository": "{{ root().data.repository.full_name }}",
-			"threadId":   threadID,
-		},
-		Integration: binding.integrationRef(),
-		Position:    position,
+	configuration := map[string]any{
+		"repository": "{{ root().data.repository.full_name }}",
 	}
-}
+	if threadID != "" {
+		configuration["threadId"] = threadID
+	}
+	if threadIDsExpression != "" {
+		configuration["threadIdsExpression"] = threadIDsExpression
+	}
 
-func prFeedbackResolveReviewThreadsNode(
-	id string,
-	name string,
-	threadIDs string,
-	position yaml.Position,
-	binding *intakeBinding,
-) yaml.Node {
 	return yaml.Node{
-		ID:        id,
-		Name:      name,
-		Type:      yaml.NodeTypeAction,
-		Component: "github.resolveReviewThread",
-		Configuration: map[string]any{
-			"repository": "{{ root().data.repository.full_name }}",
-			"threadIds":  threadIDs,
-		},
-		Integration: binding.integrationRef(),
-		Position:    position,
+		ID:            id,
+		Name:          name,
+		Type:          yaml.NodeTypeAction,
+		Component:     "github.resolveReviewThread",
+		Configuration: configuration,
+		Integration:   binding.integrationRef(),
+		Position:      position,
 	}
 }
 
@@ -363,26 +339,19 @@ func prFeedbackResolvePosition(flowY int) yaml.Position {
 	return yaml.Position{X: 1200, Y: flowY}
 }
 
+// prFeedbackResolveThreadIDExpression reads the thread of a single inline review comment.
 func prFeedbackResolveThreadIDExpression(triggerComponent string) string {
-	switch triggerComponent {
-	case "github.onPRReview":
-		return `unique(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
-	case "github.onPRReviewComment":
-		return `{{ root().data.comment.pull_request_review_thread?.id ?? "" }}`
-	default:
+	if triggerComponent != "github.onPRReviewComment" {
 		return ""
 	}
+	return `{{ root().data.comment.pull_request_review_thread?.id ?? "" }}`
 }
 
 func prFeedbackResolveThreadIDsExpression(triggerComponent string) string {
-	switch triggerComponent {
-	case "github.onPRReview":
-		return `unique(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
-	case "github.onPRReviewComment":
-		return `{{ root().data.comment.pull_request_review_thread?.id ?? "" }}`
-	default:
+	if triggerComponent != "github.onPRReview" {
 		return ""
 	}
+	return `uniq(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
 }
 
 func prFeedbackDiscussionFlowNodes(
@@ -437,25 +406,19 @@ func prFeedbackDiscussionFlowNodes(
 	}
 
 	if flow.ResolveID != "" {
-		var resolveNode yaml.Node
+		name := "Resolve Review Thread"
 		if flow.Trigger.Component == "github.onPRReview" {
-			resolveNode = prFeedbackResolveReviewThreadsNode(
-				flow.ResolveID,
-				"Resolve Review Threads",
-				prFeedbackResolveThreadIDsExpression(flow.Trigger.Component),
-				prFeedbackResolvePosition(flow.Y),
-				request.Binding,
-			)
-		} else {
-			resolveNode = prFeedbackResolveReviewThreadNode(
-				flow.ResolveID,
-				"Resolve Review Thread",
-				prFeedbackResolveThreadIDExpression(flow.Trigger.Component),
-				prFeedbackResolvePosition(flow.Y),
-				request.Binding,
-			)
+			name = "Resolve Review Threads"
 		}
-		spec = spec.withResolveAfter(flow.RunnerID, resolveNode)
+
+		spec = spec.withResolveAfter(flow.RunnerID, prFeedbackResolveThreadNode(
+			flow.ResolveID,
+			name,
+			prFeedbackResolveThreadIDExpression(flow.Trigger.Component),
+			prFeedbackResolveThreadIDsExpression(flow.Trigger.Component),
+			prFeedbackResolvePosition(flow.Y),
+			request.Binding,
+		))
 	}
 
 	return spec

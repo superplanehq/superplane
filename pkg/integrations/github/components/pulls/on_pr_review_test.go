@@ -109,6 +109,93 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	t.Run("inline comments are enriched with their review thread", func(t *testing.T) {
+		body := []byte(`{
+			"action":"submitted",
+			"review":{"id":987,"body":"Looks good","user":{"login":"jules","type":"User"}},
+			"pull_request":{"number":42,"title":"Add widget"},
+			"repository":{"full_name":"testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `[
+					{"id":101,"body":"@superplaneagent rename this"},
+					{"id":102,"body":"@superplaneagent drop this"}
+				]`),
+				mocks.GitHubResponse(http.StatusOK, `{
+					"data": {
+						"repository": {
+							"pullRequest": {
+								"reviewThreads": {
+									"nodes": [
+										{
+											"id": "PRRT_a",
+											"comments": {"nodes": [{"databaseId": 101, "id": "PRRC_a"}]}
+										},
+										{
+											"id": "PRRT_b",
+											"comments": {"nodes": [{"databaseId": 102, "id": "PRRC_b"}]}
+										}
+									]
+								}
+							}
+						}
+					}
+				}`),
+			},
+		}
+
+		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
+			"repository":    "hello",
+			"contentFilter": "@superplaneagent",
+		}))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "/graphql", httpCtx.Requests[1].URL.Path)
+
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		comments, ok := payload["review_comments"].([]any)
+		require.True(t, ok)
+		require.Len(t, comments, 2)
+
+		assert.Equal(t, "PRRT_a", reviewThreadID(t, comments[0]))
+		assert.Equal(t, "PRRT_b", reviewThreadID(t, comments[1]))
+	})
+
+	t.Run("emits the event when the review thread lookup fails", func(t *testing.T) {
+		body := []byte(reviewBody)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `[{"id":1,"body":"@superplaneagent nit"}]`),
+				mocks.GitHubResponse(http.StatusOK, `{"errors": [{"message": "Could not resolve to a Repository"}]}`),
+			},
+		}
+
+		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
+			"repository":    "hello",
+			"contentFilter": "@superplaneagent",
+		}))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		comments, ok := payload["review_comments"].([]any)
+		require.True(t, ok)
+		require.Len(t, comments, 1)
+		assert.NotContains(t, comments[0].(map[string]any), "pull_request_review_thread")
+	})
+
 	t.Run("paginated review comments are all fetched", func(t *testing.T) {
 		body := []byte(`{
 			"action":"submitted",
@@ -122,8 +209,11 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		page1 := mocks.GitHubResponse(http.StatusOK, `[{"id":1,"body":"page one"}]`)
 		page1.Header.Set("Link", `<https://api.github.com/repos/testhq/hello/pulls/42/reviews/987/comments?page=2>; rel="next"`)
 		page2 := mocks.GitHubResponse(http.StatusOK, `[{"id":2,"body":"@superplaneagent page two"}]`)
-		graphQLResponse := mocks.GitHubResponse(http.StatusOK, `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}`)
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{page1, page2, graphQLResponse}}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			page1,
+			page2,
+			mocks.GitHubResponse(http.StatusOK, reviewThreadsGraphQLResponse()),
+		}}
 
 		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
 			"repository":    "hello",
@@ -398,11 +488,26 @@ func reviewWebhookContext(
 }
 
 func reviewCommentsHTTPContext(body string) *contexts.HTTPContext {
-	graphQLResponse := mocks.GitHubResponse(http.StatusOK, `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}`)
 	return &contexts.HTTPContext{
 		Responses: []*http.Response{
 			mocks.GitHubResponse(http.StatusOK, body),
-			graphQLResponse,
+			mocks.GitHubResponse(http.StatusOK, reviewThreadsGraphQLResponse()),
 		},
 	}
+}
+
+func reviewThreadsGraphQLResponse() string {
+	return `{"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": []}}}}}`
+}
+
+func reviewThreadID(t *testing.T, comment any) any {
+	t.Helper()
+
+	commentMap, ok := comment.(map[string]any)
+	require.True(t, ok)
+
+	thread, ok := commentMap["pull_request_review_thread"].(map[string]any)
+	require.True(t, ok)
+
+	return thread["id"]
 }

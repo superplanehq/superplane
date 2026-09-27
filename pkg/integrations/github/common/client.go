@@ -380,20 +380,6 @@ func (c *Client) ResolveReviewThread(ctx context.Context, threadID string) error
 	return c.doGraphQL(ctx, mutation, map[string]any{"threadId": threadID}, nil)
 }
 
-func (c *Client) ResolveReviewThreads(ctx context.Context, threadIDs []string) error {
-	const mutation = `mutation($threadIds: [ID!]!) {
-	  resolveReviewThreads(input: {threadIds: $threadIds}) {
-	    threads {
-	      id
-	      isResolved
-	    }
-	  }
-	}`
-
-	variables := map[string]any{"threadIds": threadIDs}
-	return c.doGraphQL(ctx, mutation, variables, nil)
-}
-
 func (c *Client) GetPullRequestReviewThreads(ctx context.Context, repository string, pullNumber int) (map[int64]string, error) {
 	owner, name := c.ownerAndName(repository)
 

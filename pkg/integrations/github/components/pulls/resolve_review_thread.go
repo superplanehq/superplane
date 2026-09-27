@@ -12,12 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
+const ThreadIDsExpression = `uniq(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
+
 type ResolveReviewThread struct{}
 
 type ResolveReviewThreadConfiguration struct {
-	Repository string   `mapstructure:"repository" json:"repository"`
-	ThreadID   string   `mapstructure:"threadId" json:"threadId"`
-	ThreadIDs  []string `mapstructure:"threadIds" json:"threadIds"`
+	Repository          string `mapstructure:"repository" json:"repository"`
+	ThreadID            string `mapstructure:"threadId" json:"threadId"`
+	ThreadIDsExpression string `mapstructure:"threadIdsExpression" json:"threadIdsExpression"`
 }
 
 func (c *ResolveReviewThread) Name() string {
@@ -29,7 +31,7 @@ func (c *ResolveReviewThread) Label() string {
 }
 
 func (c *ResolveReviewThread) Description() string {
-	return "Mark a GitHub pull request review thread as resolved"
+	return "Mark one or more GitHub pull request review threads as resolved"
 }
 
 func (c *ResolveReviewThread) Documentation() string {
@@ -44,12 +46,16 @@ func (c *ResolveReviewThread) Documentation() string {
 
 - **Repository**: Select the GitHub repository containing the pull request
 - **Thread ID**: A single GitHub review thread node ID (PRRT_...). Supports expressions.
-- **Thread IDs**: A list of GitHub review thread node IDs. Use this to resolve multiple threads at once.
+- **Thread IDs Expression**: An expression that evaluates to a list of GitHub review thread node IDs (PRRT_...). Use this to resolve every thread of a review at once.
 
 ## Behavior
 
 This component is idempotent: if a thread is already resolved, it succeeds without error.
-If both Thread ID and Thread IDs are provided, Thread IDs takes precedence.
+If both Thread ID and Thread IDs Expression are set, Thread IDs Expression takes precedence.
+Empty values are dropped, so a review that opens no inline threads finishes with success and emits no output.
+
+The component resolves threads one by one. If one thread fails, the component resolves the
+remaining threads and reports an error only when every thread failed.
 
 ## Permissions
 
@@ -57,7 +63,13 @@ The integration must have write access to pull requests. GitHub only exposes thi
 
 ## Output
 
-Emits the thread object(s) after resolution including id and isResolved status.`
+Emits one object per resolved thread, including the thread id and its isResolved status.
+
+## Example
+
+Use this expression to resolve every thread of a submitted review:
+
+    uniq(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
 }
 
 func (c *ResolveReviewThread) Icon() string {
@@ -99,41 +111,31 @@ func (c *ResolveReviewThread) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "PRRT_... or {{ previous().data.thread.id }}",
-			Description: "GitHub review thread node ID (PRRT_...). Use for single thread. If the resolved value is blank, the component finishes with success and emits no output.",
+			Description: "GitHub review thread node ID (PRRT_...). Use for a single thread. If the resolved value is blank, the component finishes with success and emits no output.",
 		},
 		{
-			Name:        "threadIds",
-			Label:       "Thread IDs",
-			Type:        configuration.FieldTypeList,
+			Name:        "threadIdsExpression",
+			Label:       "Thread IDs Expression",
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "List of GitHub review thread node IDs (PRRT_...). Use to resolve multiple threads at once. Takes precedence over Thread ID.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Thread ID",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-				},
-			},
+			Placeholder: ThreadIDsExpression,
+			Description: "Expression that evaluates to a list of GitHub review thread node IDs (PRRT_...). Use this to resolve every thread of a review at once.",
 		},
 	}
 }
 
 func (c *ResolveReviewThread) Setup(ctx core.SetupContext) error {
-	var config ResolveReviewThreadConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeResolveReviewThreadConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	if config.Repository == "" {
 		return errors.New("repository is required")
 	}
 
-	hasThreadID := strings.TrimSpace(config.ThreadID) != "" || common.IsExpression(config.ThreadID)
-	hasThreadIDs := len(config.ThreadIDs) > 0
-
-	if !hasThreadID && !hasThreadIDs {
-		return errors.New("thread ID or thread IDs is required")
+	if !config.hasThreadInput() {
+		return errors.New("thread ID or thread IDs expression is required")
 	}
 
 	return common.EnsureRepoInMetadata(
@@ -145,33 +147,18 @@ func (c *ResolveReviewThread) Setup(ctx core.SetupContext) error {
 }
 
 func (c *ResolveReviewThread) Execute(ctx core.ExecutionContext) error {
-	var config ResolveReviewThreadConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeResolveReviewThreadConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	if strings.TrimSpace(config.Repository) == "" {
 		return errors.New("repository is required")
 	}
 
-	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	threadIDs, err := config.threadIDs(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize GitHub client: %w", err)
-	}
-
-	var threadIDs []string
-	if len(config.ThreadIDs) > 0 {
-		for _, id := range config.ThreadIDs {
-			trimmed := strings.TrimSpace(id)
-			if trimmed != "" {
-				threadIDs = append(threadIDs, trimmed)
-			}
-		}
-	} else {
-		threadID := strings.TrimSpace(config.ThreadID)
-		if threadID != "" {
-			threadIDs = append(threadIDs, threadID)
-		}
+		return err
 	}
 
 	if len(threadIDs) == 0 {
@@ -182,35 +169,34 @@ func (c *ResolveReviewThread) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
-	// Resolve all threads
-	var resolvedThreads []map[string]any
-	var errs []error
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return fmt.Errorf("failed to initialize GitHub client: %w", err)
+	}
+
+	resolved := make([]any, 0, len(threadIDs))
+	errs := make([]error, 0, len(threadIDs))
 
 	for _, threadID := range threadIDs {
-		err := client.ResolveReviewThread(context.Background(), threadID)
-		if err != nil {
+		if err := client.ResolveReviewThread(context.Background(), threadID); err != nil {
 			errs = append(errs, fmt.Errorf("failed to resolve thread %s: %w", threadID, err))
 			continue
 		}
-		resolvedThreads = append(resolvedThreads, map[string]any{
+
+		resolved = append(resolved, map[string]any{
 			"id":         threadID,
 			"isResolved": true,
 		})
 	}
 
-	if len(errs) > 0 && len(resolvedThreads) == 0 {
-		return fmt.Errorf("failed to resolve any review threads: %v", errs)
-	}
-
-	result := make([]any, len(resolvedThreads))
-	for i, t := range resolvedThreads {
-		result[i] = t
+	if len(errs) > 0 && len(resolved) == 0 {
+		return fmt.Errorf("failed to resolve any review threads: %w", errors.Join(errs...))
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.reviewThread",
-		result,
+		resolved,
 	)
 }
 
@@ -232,4 +218,66 @@ func (c *ResolveReviewThread) Hooks() []core.Hook {
 
 func (c *ResolveReviewThread) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+func decodeResolveReviewThreadConfiguration(raw any) (ResolveReviewThreadConfiguration, error) {
+	var config ResolveReviewThreadConfiguration
+	if err := mapstructure.Decode(raw, &config); err != nil {
+		return config, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+	return config, nil
+}
+
+func (c ResolveReviewThreadConfiguration) hasThreadInput() bool {
+	if strings.TrimSpace(c.ThreadIDsExpression) != "" {
+		return true
+	}
+	return strings.TrimSpace(c.ThreadID) != "" || common.IsExpression(c.ThreadID)
+}
+
+func (c ResolveReviewThreadConfiguration) threadIDs(ctx core.ExecutionContext) ([]string, error) {
+	var candidates []string
+
+	if strings.TrimSpace(c.ThreadIDsExpression) != "" {
+		evaluated, err := ctx.Expressions.Run(c.ThreadIDsExpression)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate thread IDs expression: %w", err)
+		}
+
+		items, ok := evaluated.([]any)
+		if !ok {
+			return nil, fmt.Errorf("thread IDs expression must evaluate to a list, got %T", evaluated)
+		}
+
+		for _, item := range items {
+			text, ok := item.(string)
+			if !ok {
+				continue
+			}
+			candidates = append(candidates, text)
+		}
+	} else {
+		candidates = append(candidates, c.ThreadID)
+	}
+
+	return uniqueNonBlank(candidates), nil
+}
+
+func uniqueNonBlank(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, found := seen[trimmed]; found {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+
+	return result
 }

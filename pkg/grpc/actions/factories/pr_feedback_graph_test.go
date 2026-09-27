@@ -141,10 +141,12 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
 			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
 			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
+			"default:" + prFeedbackReviewRunnerNodeID + "->" + prFeedbackResolveReviewNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackAcknowledgeReviewNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
 			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
 			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
+			"default:" + prFeedbackReplyRunnerNodeID + "->" + prFeedbackResolveReplyNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackAcknowledgeReviewReplyNodeID,
 		}, yamlEdgeChannels(canvas))
 

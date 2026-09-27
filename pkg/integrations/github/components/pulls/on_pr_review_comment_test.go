@@ -62,6 +62,103 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	t.Run("review comment is enriched with its review thread", func(t *testing.T) {
+		body := []byte(`{
+			"action": "created",
+			"comment": {"id": 202, "body": "please rename this"},
+			"pull_request": {"number": 42},
+			"repository": {"full_name": "testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"data": {
+						"repository": {
+							"pullRequest": {
+								"reviewThreads": {
+									"nodes": [
+										{
+											"id": "PRRT_a",
+											"comments": {"nodes": [{"databaseId": 202, "id": "PRRC_a"}]}
+										}
+									]
+								}
+							}
+						}
+					}
+				}`),
+			},
+		}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "hello",
+			},
+			Webhook:     &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:      events,
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "/graphql", httpCtx.Requests[0].URL.Path)
+
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		comment, ok := payload["comment"].(map[string]any)
+		require.True(t, ok)
+		thread, ok := comment["pull_request_review_thread"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "PRRT_a", thread["id"])
+	})
+
+	t.Run("emits the event when the review thread lookup fails", func(t *testing.T) {
+		body := []byte(`{
+			"action": "created",
+			"comment": {"id": 202, "body": "please rename this"},
+			"pull_request": {"number": 42},
+			"repository": {"full_name": "testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{"errors": [{"message": "Could not resolve to a Repository"}]}`),
+			},
+		}
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "hello",
+			},
+			Webhook:     &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:      events,
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		comment, ok := payload["comment"].(map[string]any)
+		require.True(t, ok)
+		assert.NotContains(t, comment, "pull_request_review_thread")
+	})
+
 	t.Run("pull_request_review_comment non-created action -> event is not emitted", func(t *testing.T) {
 		body := []byte(`{"action":"edited","comment":{"body":"some review comment"},"pull_request":{"number":1}}`)
 		headers := signedHeaders(body, "test-secret", eventType)
