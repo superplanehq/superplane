@@ -367,6 +367,19 @@ func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, pullRequestI
 	return c.doGraphQL(ctx, mutation, map[string]any{"pullRequestId": pullRequestID}, nil)
 }
 
+func (c *Client) ResolveReviewThread(ctx context.Context, threadID string) error {
+	const mutation = `mutation($threadId: ID!) {
+	  resolveReviewThread(input: {threadId: $threadId}) {
+	    thread {
+	      id
+	      isResolved
+	    }
+	  }
+	}`
+
+	return c.doGraphQL(ctx, mutation, map[string]any{"threadId": threadID}, nil)
+}
+
 func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Merge(ctx, owner, name, pullNumber, commitMessage, options)
