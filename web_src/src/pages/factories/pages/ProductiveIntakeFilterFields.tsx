@@ -114,6 +114,9 @@ function TaskListFilter({
         checked={filterByTaskList}
         onChange={() => toggleFilter()}
       />
+      <p className="px-1 text-[12px] leading-4 text-muted-foreground">
+        {PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskListHelper}
+      </p>
       {filterByTaskList ? (
         <div className="mb-1 ml-6 flex flex-col gap-2" data-testid="intake-task-list-options">
           <TaskListStatus
