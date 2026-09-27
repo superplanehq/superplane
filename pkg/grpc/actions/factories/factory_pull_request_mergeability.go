@@ -15,6 +15,7 @@ import (
 
 var (
 	errFactoryPullRequestNotGitHub             = errors.New("only GitHub pull requests can merge from SuperPlane")
+	errFactoryPullRequestMissing               = errors.New("GitHub did not return the pull request")
 	errFactoryPullRequestNotOpen               = errors.New("the pull request is not open")
 	errFactoryPullRequestNotMergeable          = errors.New("the pull request cannot merge")
 	errFactoryPullRequestMergeMethodNotAllowed = errors.New("the repository does not allow this merge method")
@@ -98,6 +99,9 @@ func evaluateFactoryPullRequestMergeability(
 	githubPR, _, err := client.GetPullRequest(ctx, pullRequest.Repository, int(pullRequest.Number))
 	if err != nil {
 		return nil, err
+	}
+	if githubPR == nil {
+		return nil, errFactoryPullRequestMissing
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
 
@@ -328,6 +332,9 @@ func workOrderHasActiveRun(db *gorm.DB, factory *models.Factory, workOrderID uui
 }
 
 func isConflictingPullRequest(pullRequest *github.PullRequest) bool {
+	if pullRequest == nil {
+		return false
+	}
 	if pullRequest.Mergeable != nil && !pullRequest.GetMergeable() {
 		return true
 	}

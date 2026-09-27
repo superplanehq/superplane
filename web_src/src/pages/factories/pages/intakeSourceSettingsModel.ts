@@ -81,8 +81,6 @@ export const DEPENDABOT_INTAKE_SETTINGS_COPY = {
   high: "High",
   medium: "Medium",
   low: "Low",
-  severityHelp:
-    "All severities create a task when every box is selected. Turn on Dependabot alerts for the repository. A repository with alerts turned off gives no tasks.",
 } as const;
 
 export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {

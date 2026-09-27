@@ -20,7 +20,6 @@ const CLOSED_RESULT_FOR_STATUS: Partial<Record<WorkOrderDisplayStatus, string>> 
   completed: "completed",
   rejected: "rejected",
   failed: "failed",
-  cancelled: "cancelled",
 };
 
 /**

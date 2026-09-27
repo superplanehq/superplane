@@ -1,10 +1,13 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	dependabotcomp "github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -111,6 +114,31 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, "true", filter.Configuration["expression"])
+	})
+
+	t.Run("a Dependabot work order matches the Go copy so later alerts merge in", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceDependabotAlerts})
+		require.NoError(t, err)
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+
+		example := (&dependabotcomp.OnAlert{}).ExampleData()
+		data, ok := example["data"].(map[string]any)
+		require.True(t, ok)
+		alert, ok := data["alert"].(map[string]any)
+		require.True(t, ok)
+		ref, ok := ghdependabot.PackageRefFromEventData(example)
+		require.True(t, ok)
+
+		title := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["title"].(string)), data)
+		assert.Equal(t, ghdependabot.TaskTitle(ref), title)
+
+		description := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["description"].(string)), data)
+		require.IsType(t, "", description)
+		text := description.(string)
+		assert.True(t, strings.HasSuffix(text, "\n\n"+ghdependabot.AlertSection(alert)), text)
+		assert.Contains(t, text, "Relationship: transitive")
+		assert.Contains(t, text, "find the direct dependency that requires it")
+		assert.Less(t, strings.Index(text, "find the direct dependency"), strings.Index(text, "## Alerts"))
 	})
 
 	t.Run("PagerDuty creates a work order without a filter", func(t *testing.T) {

@@ -28,7 +28,7 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   backlog: idleBoardPage(),
@@ -38,7 +38,7 @@ const useFactoryBoardWorkOrders = vi.fn(() => ({
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (...args: unknown[]) => useFactoryBoardWorkOrders(...args),
   useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -52,6 +52,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -153,24 +162,42 @@ describe("LinesPage Done column", () => {
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
-  it("puts a closed task in Done instead of the last stage", () => {
+  it("puts a completed task in Done instead of the last stage", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-completed",
+          title: "Publish refund SLA dashboard",
+          state: "STATE_CLOSED",
+          result: "RESULT_COMPLETED",
+          lineDispatches: [{ id: "dispatch-1", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+      ],
+    });
+    renderBoard();
+
+    expect(
+      within(screen.getByTestId("lines-done-column")).getByText("Publish refund SLA dashboard"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-0")).queryByText("Publish refund SLA dashboard"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-1")).queryByText("Publish refund SLA dashboard"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-verify-column")).queryByText("Publish refund SLA dashboard"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a rejected task out of Done", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [BOARD_DONE_REJECTED_ORDER],
     });
     renderBoard();
 
-    expect(
-      within(screen.getByTestId("lines-done-column")).getByText("Replace the refund batch exporter"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-phase-column-0")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-phase-column-1")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-verify-column")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
+    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
   });
 
   it("collects finished tasks in the Done column", () => {
@@ -191,6 +218,65 @@ describe("LinesPage Done column", () => {
     expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
+  });
+
+  it("asks the Done page for this line when no status filter is set", () => {
+    renderBoard();
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        done: {
+          lineId: REFUND_LINE_PLAN_ID,
+          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+        },
+      }),
+    );
+  });
+
+  it("asks the Done page for this line's failed tasks when Failed is selected", () => {
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({
+        statuses: ["failed"],
+        labels: [],
+        lineIds: [],
+        sourceIds: [],
+        assigneeIds: [],
+      }),
+    );
+    renderBoard();
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        done: {
+          lineId: REFUND_LINE_PLAN_ID,
+          results: ["RESULT_FAILED"],
+        },
+      }),
+    );
+  });
+
+  it("collects failed tasks in the Done column", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-failed",
+          title: "Fix refund dispatcher timeout loop",
+          state: "STATE_CLOSED",
+          result: "RESULT_FAILED",
+          lineDispatches: [{ id: "dispatch-failed", line: { id: REFUND_LINE_PLAN_ID } }],
+        },
+      ] as FactoriesWorkOrder[],
+    });
+    renderBoard();
+
+    const done = screen.getByTestId("lines-done-column");
+    expect(within(done).getByRole("button", { name: "Open Fix refund dispatcher timeout loop" })).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
   });
 
   it("does not show a draft rejected out of the Backlog in Done — it archives off the board", () => {
