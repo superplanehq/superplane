@@ -25,6 +25,7 @@ func TestMediaToolchainIsWiredInRunnerBake(t *testing.T) {
 		},
 		"runner/packer/scripts/install-media-tools.sh": {
 			"ffmpeg", "ffprobe", "whisper-cli", "ggml-tiny.bin", "v1.9.2",
+			"GGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16",
 		},
 		"runner/packer/runner.pkr.hcl": {
 			"install-media-tools.sh",
