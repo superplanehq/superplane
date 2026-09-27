@@ -90,8 +90,15 @@ Layout, top to bottom:
 3. One helper line under the button: SuperPlane does not change code
    without approval.
 
-Connecting GitHub opens the GitHub App installation. On return, the
-screen shows `Connected` and `Choose a repository`.
+If the user signed in with Google, connecting GitHub first links the
+user's GitHub identity with the `user:email` OAuth scope. This link does
+not grant repository access. SuperPlane then opens the GitHub App
+installation when the App is not installed on an accessible account.
+The GitHub App must not request user authorization during installation.
+
+After installation, SuperPlane verifies the user's write access on the
+server. The user selects an account or organization, and then selects a
+repository.
 
 ### Screen 3 — Choose repository
 

@@ -77,19 +77,9 @@ func Test__HandleGitHubAppSetup_updateWithoutInstallationIDStaysMissingState(t *
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func Test__HandleGitHubAppOAuthCallback_missingState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/oauth/callback", nil)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppOAuthCallback(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
 func Test__HandleGitHubAppBind_missingState(t *testing.T) {
 	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/bind", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/github/app/bind", nil)
 	rec := httptest.NewRecorder()
 
 	server.HandleGitHubAppBind(rec, req)

@@ -79,20 +79,22 @@ function FirstRunGitHubAccountPicker({
   const binding = bindingInstallationId !== undefined || disabled;
   return (
     <div className="space-y-3 text-left" data-testid="first-run-github-account-picker">
-      {installations.map((installation) => (
-        <LoadingButton
-          key={installation.id}
-          type="button"
-          className="w-full justify-start"
-          data-testid={`first-run-github-use-${installation.accountLogin}`}
-          loading={bindingInstallationId === installation.id}
-          loadingText={copy.connectingAccount(installation.accountLogin)}
-          disabled={binding}
-          onClick={() => onUseInstallation(installation)}
-        >
-          {copy.useAccount(installation.accountLogin)}
-        </LoadingButton>
-      ))}
+      {installations
+        .filter((installation) => installation.repositories.length > 0)
+        .map((installation) => (
+          <LoadingButton
+            key={installation.id}
+            type="button"
+            className="w-full justify-start"
+            data-testid={`first-run-github-use-${installation.accountLogin}`}
+            loading={bindingInstallationId === installation.id}
+            loadingText={copy.connectingAccount(installation.accountLogin)}
+            disabled={binding}
+            onClick={() => onUseInstallation(installation)}
+          >
+            {copy.useAccount(installation.accountLogin)}
+          </LoadingButton>
+        ))}
       {githubAppSlug !== "" ? (
         <p className="text-[13px] text-muted-foreground">
           {copy.missingAccount}{" "}
@@ -132,13 +134,16 @@ function connectScreenState({
   githubState: string;
 }) {
   const showAccountPicker = pendingInstallations.length >= 1 && githubState !== "";
-  // A picker that offers the requested organization means the request is
-  // approved, so the waiting state must not show next to it.
+  // A requested organization is ready only after the server verifies at
+  // least one repository that the member can use. An installation row with
+  // no repositories can be stale and must not clear the waiting state.
   const requestApproved =
     githubOrganizations.length > 0 &&
     githubOrganizations.every((organization) =>
       pendingInstallations.some(
-        (installation) => installation.accountLogin.toLowerCase() === organization.toLowerCase(),
+        (installation) =>
+          installation.accountLogin.toLowerCase() === organization.toLowerCase() &&
+          installation.repositories.length > 0,
       ),
     );
   return {
@@ -149,6 +154,7 @@ function connectScreenState({
 
 export function FirstRunConnectScreen({
   loading = false,
+  pickerExpected = false,
   installRequested = false,
   githubOrganization = "",
   githubOrganizations,
@@ -159,14 +165,18 @@ export function FirstRunConnectScreen({
   bindingInstallationId,
   connecting = false,
   connectError,
+  syncError,
   chrome,
   sphere,
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
+  onRetrySync,
 }: {
   /** True while the picker data still loads after a GitHub round trip. */
   loading?: boolean;
+  /** True after GitHub returns, while the organization picker synchronizes. */
+  pickerExpected?: boolean;
   installRequested?: boolean;
   githubOrganization?: string;
   githubOrganizations?: string[];
@@ -178,11 +188,13 @@ export function FirstRunConnectScreen({
   bindingInstallationId?: string;
   connecting?: boolean;
   connectError?: string;
+  syncError?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
+  onRetrySync?: () => void;
 }) {
   const requestedOrganizations = requestedGitHubOrganizations(githubOrganizations, githubOrganization);
   const { showAccountPicker, waitingForApproval } = connectScreenState({
@@ -199,11 +211,13 @@ export function FirstRunConnectScreen({
       busy={loading || connecting || bindingInstallationId !== undefined}
       sphere={sphere}
     >
-      <ConnectScreenHeading showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
+      <ConnectScreenHeading showAccountPicker={showAccountPicker || pickerExpected} githubLogin={githubLogin} />
 
       <div className="mt-8 space-y-6">
         {loading ? (
           <ConnectScreenLoading />
+        ) : syncError && pickerExpected ? (
+          <ConnectScreenSyncError error={syncError} onRetry={onRetrySync} />
         ) : (
           <ConnectScreenBody
             githubOrganizations={requestedOrganizations}
@@ -266,6 +280,23 @@ function ConnectScreenLoading() {
         <div className="mt-3 h-9 w-40 animate-pulse rounded-md bg-accent/40" />
       </div>
     </div>
+  );
+}
+
+function ConnectScreenSyncError({ error, onRetry }: { error: string; onRetry?: () => void }) {
+  return (
+    <FirstRunGithubStepper current="organization">
+      <div className="space-y-3 text-left">
+        <p className="text-[13px] text-destructive" role="alert">
+          {error}
+        </p>
+        {onRetry ? (
+          <LoadingButton type="button" size="sm" variant="outline" onClick={onRetry}>
+            {copy.tryAgain}
+          </LoadingButton>
+        ) : null}
+      </div>
+    </FirstRunGithubStepper>
   );
 }
 
