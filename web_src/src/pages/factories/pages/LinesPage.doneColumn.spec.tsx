@@ -28,7 +28,7 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   backlog: idleBoardPage(),

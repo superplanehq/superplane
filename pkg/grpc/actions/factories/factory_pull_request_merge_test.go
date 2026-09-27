@@ -977,6 +977,19 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		assert.Equal(t, first.GetAllowedMethods(), second.GetAllowedMethods())
 	})
 
+	t.Run("returns an error when GitHub omits the pull request", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{})
+
+		_, err := DescribeFactoryPullRequestMergeability(ctx, deps, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      pr.GetId(),
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errFactoryPullRequestMissing)
+	})
+
 	t.Run("reuses stored allowed merge methods", func(t *testing.T) {
 		factory := newFactory(t)
 		pr := createPR(t, factory)
