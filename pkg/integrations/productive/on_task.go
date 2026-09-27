@@ -2,14 +2,19 @@ package productive
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 type OnTask struct{}
@@ -196,15 +201,16 @@ func (t *OnTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 	// Productive.io task webhooks often omit the task list. The intake
 	// filter reads that relationship, so load it before the event is emitted.
-	if err := ensureTaskList(ctx, document); err != nil {
+	if err := ensureTaskList(ctx, document, event); err != nil {
 		return http.StatusInternalServerError, nil, err
 	}
 
 	envelope := TaskEnvelope(event, document, webhookOrganizationID(ctx))
 	if event == TaskUpdatedEvent {
-		// Do not emit until the changeset for this delivery is known. A 200
-		// without that changeset makes Productive.io drop the delivery, and
-		// intake then cannot tell a list move from an edit.
+		// Intake tells a list move from an edit by the changeset for this
+		// delivery. A transient lookup error fails the delivery so
+		// Productive.io retries. An update with no changeset activity is
+		// emitted without a list move.
 		if err := stampTaskListMove(ctx, document, envelope); err != nil {
 			return http.StatusInternalServerError, nil, err
 		}
@@ -228,34 +234,81 @@ func stampTaskListMove(ctx core.WebhookRequestContext, document map[string]any, 
 		return nil
 	}
 
-	deliveredAt, ok := deliveryCreatedAt(ctx.Body)
-	if !ok || ctx.HTTP == nil || ctx.Integration == nil {
-		return fmt.Errorf("productive task %s: %w", id, errTaskUpdateActivityUnavailable)
+	failure := taskWebhookFailure{
+		event:      TaskUpdatedEvent,
+		taskID:     id,
+		projectID:  taskProjectID(document),
+		taskListID: taskListID(document),
 	}
+	if ctx.HTTP == nil || ctx.Integration == nil {
+		failure.err = fmt.Errorf("productive task %s: %w", id, errTaskUpdateActivityUnavailable)
+		return failTaskWebhook(ctx, failure)
+	}
+
+	deliveredAt, ok := deliveryCreatedAt(ctx.Body)
+	if !ok {
+		failure.err = fmt.Errorf("productive task %s: %w: delivery has no created time", id, errTaskUpdateActivityUnavailable)
+		warnTaskListMoveUnknown(ctx, failure)
+		return nil
+	}
+	failure.deliveredAt = deliveredAt
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return err
+		failure.err = err
+		return failTaskWebhook(ctx, failure)
 	}
 
+	//
+	// Productive.io sends task.updated for changes that write no changeset
+	// activity, such as placement or status. Retrying such a delivery can
+	// never find one, so only a transient API error fails the delivery.
+	//
 	var lastErr error
-	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+	for failure.attempts < taskListFetchAttempts {
+		waitBeforeTaskFetch(failure.attempts)
+		failure.attempts++
 		changeset, found, err := client.taskUpdateChangesetAt(id, deliveredAt, document)
 		if err != nil {
-			lastErr = fmt.Errorf("%w: %v", errTaskUpdateActivityUnavailable, err)
+			lastErr = err
+			if !isRetryableProductiveError(err) {
+				break
+			}
 			continue
 		}
 		if !found {
-			lastErr = errTaskUpdateActivityUnavailable
+			lastErr = nil
 			continue
 		}
-		move, ok := taskListMoveFromChangeset(changeset)
-		if ok {
+		if move, ok := taskListMoveFromChangeset(changeset); ok {
 			setTaskListMove(envelope, move)
 		}
 		return nil
 	}
-	return fmt.Errorf("productive task %s: %w", id, lastErr)
+
+	if lastErr == nil {
+		failure.err = fmt.Errorf("productive task %s: %w", id, errTaskUpdateActivityUnavailable)
+		warnTaskListMoveUnknown(ctx, failure)
+		return nil
+	}
+
+	failure.err = fmt.Errorf("productive task %s: %w: %w", id, errTaskUpdateActivityUnavailable, lastErr)
+	if !isRetryableProductiveError(lastErr) {
+		warnTaskListMoveUnknown(ctx, failure)
+		return nil
+	}
+	return failTaskWebhook(ctx, failure)
+}
+
+// warnTaskListMoveUnknown records a task.updated delivery that is emitted
+// without meta.task_list_move. Intake ignores such an update.
+func warnTaskListMoveUnknown(ctx core.WebhookRequestContext, failure taskWebhookFailure) {
+	logging.LogProductiveWebhookWarning(
+		failure.event,
+		"task update emitted without task list move",
+		taskWebhookLogFields(ctx, failure, http.StatusOK),
+		failure.err,
+	)
 }
 
 func setTaskListMove(envelope map[string]any, move TaskListMove) {
@@ -290,9 +343,33 @@ type productiveDelivery struct {
 	} `json:"object"`
 }
 
-const taskListFetchAttempts = 3
+// taskFetchRetryDelays is the wait before each retry of a task or activity
+// fetch. Productive.io can send a webhook before the activity for that
+// change is readable.
+var taskFetchRetryDelays = []time.Duration{250 * time.Millisecond, 750 * time.Millisecond}
 
-func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) error {
+var taskListFetchAttempts = len(taskFetchRetryDelays) + 1
+
+var sleep = time.Sleep
+
+func waitBeforeTaskFetch(attempt int) {
+	if attempt <= 0 || attempt > len(taskFetchRetryDelays) {
+		return
+	}
+	sleep(taskFetchRetryDelays[attempt-1])
+}
+
+// isRetryableProductiveError reports whether a later retry of the same
+// request can succeed. A 4xx other than 429 answers the same every time.
+func isRetryableProductiveError(err error) bool {
+	status, ok := responseStatus(err)
+	if !ok {
+		return true
+	}
+	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
+}
+
+func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any, event string) error {
 	if taskListID(document) != "" || ctx.HTTP == nil || ctx.Integration == nil {
 		return nil
 	}
@@ -303,29 +380,109 @@ func ensureTaskList(ctx core.WebhookRequestContext, document map[string]any) err
 		return nil
 	}
 
+	failure := taskWebhookFailure{
+		event:     event,
+		taskID:    id,
+		projectID: taskProjectID(document),
+	}
+	if deliveredAt, ok := deliveryCreatedAt(ctx.Body); ok {
+		failure.deliveredAt = deliveredAt
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		failure.err = fmt.Errorf("error creating client: %v", err)
+		return failTaskWebhook(ctx, failure)
 	}
 
 	var lastErr error
-	for attempt := 0; attempt < taskListFetchAttempts; attempt++ {
+	for failure.attempts < taskListFetchAttempts {
+		waitBeforeTaskFetch(failure.attempts)
+		failure.attempts++
 		task, err := client.GetTask(id)
 		if err == nil {
 			setTaskListID(document, task.TaskListID)
 			return nil
 		}
 		lastErr = err
+		if !isRetryableProductiveError(err) {
+			break
+		}
 	}
 
-	if ctx.Logger != nil {
-		ctx.Logger.WithError(lastErr).Warnf(
-			"productive task %s: task list unavailable after %d attempts",
-			id,
-			taskListFetchAttempts,
+	failure.err = fmt.Errorf("productive task %s: task list unavailable: %w", id, lastErr)
+	if !isRetryableProductiveError(lastErr) {
+		logging.LogProductiveWebhookWarning(
+			failure.event,
+			"task emitted without task list",
+			taskWebhookLogFields(ctx, failure, http.StatusOK),
+			failure.err,
 		)
+		return nil
 	}
-	return fmt.Errorf("productive task %s: task list unavailable: %v", id, lastErr)
+	return failTaskWebhook(ctx, failure)
+}
+
+type taskWebhookFailure struct {
+	event       string
+	taskID      string
+	projectID   string
+	taskListID  string
+	deliveredAt time.Time
+	attempts    int
+	err         error
+}
+
+func failTaskWebhook(ctx core.WebhookRequestContext, failure taskWebhookFailure) error {
+	logTaskWebhookFailure(ctx, failure)
+	return failure.err
+}
+
+func logTaskWebhookFailure(ctx core.WebhookRequestContext, failure taskWebhookFailure) {
+	if failure.err == nil {
+		return
+	}
+	logging.LogProductiveWebhookFailure(
+		failure.event,
+		taskWebhookLogFields(ctx, failure, http.StatusInternalServerError),
+		failure.err,
+	)
+}
+
+func taskWebhookLogFields(ctx core.WebhookRequestContext, failure taskWebhookFailure, status int) log.Fields {
+	fields := log.Fields{}
+	if ctx.Logger != nil {
+		maps.Copy(fields, ctx.Logger.Data)
+	}
+	fields["status"] = status
+	fields["attempts"] = failure.attempts
+	if failure.taskID != "" {
+		fields["productive_task_id"] = failure.taskID
+	}
+	if failure.projectID != "" {
+		fields["project_id"] = failure.projectID
+	}
+	if failure.taskListID != "" {
+		fields["task_list_id"] = failure.taskListID
+	}
+	if organizationID := webhookOrganizationID(ctx); organizationID != "" {
+		fields["productive_organization_id"] = organizationID
+	}
+	if !failure.deliveredAt.IsZero() {
+		fields["delivered_at"] = failure.deliveredAt.Format(time.RFC3339Nano)
+	}
+	if status, ok := responseStatus(failure.err); ok {
+		fields["upstream_status"] = status
+	}
+	return fields
+}
+
+func responseStatus(err error) (int, bool) {
+	var httpErr *responseError
+	if err == nil || !errors.As(err, &httpErr) {
+		return 0, false
+	}
+	return httpErr.statusCode, true
 }
 
 func taskDocument(body []byte) (map[string]any, error) {
