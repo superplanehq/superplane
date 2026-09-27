@@ -61,7 +61,7 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, events.Count())
-		require.Len(t, httpCtx.Requests, 1)
+		require.Len(t, httpCtx.Requests, 2)
 		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/pulls/42/reviews/987/comments")
 	})
 
@@ -122,7 +122,8 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		page1 := mocks.GitHubResponse(http.StatusOK, `[{"id":1,"body":"page one"}]`)
 		page1.Header.Set("Link", `<https://api.github.com/repos/testhq/hello/pulls/42/reviews/987/comments?page=2>; rel="next"`)
 		page2 := mocks.GitHubResponse(http.StatusOK, `[{"id":2,"body":"@superplaneagent page two"}]`)
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{page1, page2}}
+		graphQLResponse := mocks.GitHubResponse(http.StatusOK, `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}`)
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{page1, page2, graphQLResponse}}
 
 		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
 			"repository":    "hello",
@@ -132,7 +133,7 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, events.Count())
-		require.Len(t, httpCtx.Requests, 2)
+		require.Len(t, httpCtx.Requests, 3)
 	})
 
 	t.Run("near mention does not match", func(t *testing.T) {
@@ -397,7 +398,12 @@ func reviewWebhookContext(
 }
 
 func reviewCommentsHTTPContext(body string) *contexts.HTTPContext {
+	// Add mock GraphQL response for review threads (empty)
+	graphQLResponse := mocks.GitHubResponse(http.StatusOK, `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}`)
 	return &contexts.HTTPContext{
-		Responses: []*http.Response{mocks.GitHubResponse(http.StatusOK, body)},
+		Responses: []*http.Response{
+			mocks.GitHubResponse(http.StatusOK, body),
+			graphQLResponse,
+		},
 	}
 }

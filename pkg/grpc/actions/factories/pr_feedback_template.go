@@ -113,7 +113,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		ActivityID:   prFeedbackActivityNodeID,
 		ActivityName: "Add Comment Activity",
 		RunnerID:     prFeedbackRunnerNodeID,
-		ResolveID:    "", // Regular PR comments don't have review threads
+		ResolveID:    "",
 		Title:        prFeedbackCommentActivityTitleExpression(),
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            prFeedbackCommentFlowY,
@@ -279,6 +279,16 @@ func (flow prFeedbackDiscussionFlowSpec) withResolve(node yaml.Node) prFeedbackD
 	return flow
 }
 
+func (flow prFeedbackDiscussionFlowSpec) withResolveAfter(sourceID string, node yaml.Node) prFeedbackDiscussionFlowSpec {
+	flow.nodes = append(flow.nodes, node)
+	flow.edges = append(flow.edges, yaml.Edge{
+		Channel:  "default",
+		SourceID: sourceID,
+		TargetID: node.ID,
+	})
+	return flow
+}
+
 func prFeedbackAcknowledgeReactionNode(
 	id string,
 	name string,
@@ -328,6 +338,27 @@ func prFeedbackResolveReviewThreadNode(
 	}
 }
 
+func prFeedbackResolveReviewThreadsNode(
+	id string,
+	name string,
+	threadIDs string,
+	position yaml.Position,
+	binding *intakeBinding,
+) yaml.Node {
+	return yaml.Node{
+		ID:        id,
+		Name:      name,
+		Type:      yaml.NodeTypeAction,
+		Component: "github.resolveReviewThread",
+		Configuration: map[string]any{
+			"repository": "{{ root().data.repository.full_name }}",
+			"threadIds":  threadIDs,
+		},
+		Integration: binding.integrationRef(),
+		Position:    position,
+	}
+}
+
 func prFeedbackResolvePosition(flowY int) yaml.Position {
 	return yaml.Position{X: 1200, Y: flowY}
 }
@@ -335,7 +366,18 @@ func prFeedbackResolvePosition(flowY int) yaml.Position {
 func prFeedbackResolveThreadIDExpression(triggerComponent string) string {
 	switch triggerComponent {
 	case "github.onPRReview":
-		return `{{ first(root().data.review_comments ?? [])?.pull_request_review_thread?.id ?? "" }}`
+		return `unique(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
+	case "github.onPRReviewComment":
+		return `{{ root().data.comment.pull_request_review_thread?.id ?? "" }}`
+	default:
+		return ""
+	}
+}
+
+func prFeedbackResolveThreadIDsExpression(triggerComponent string) string {
+	switch triggerComponent {
+	case "github.onPRReview":
+		return `unique(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`
 	case "github.onPRReviewComment":
 		return `{{ root().data.comment.pull_request_review_thread?.id ?? "" }}`
 	default:
@@ -395,20 +437,25 @@ func prFeedbackDiscussionFlowNodes(
 	}
 
 	if flow.ResolveID != "" {
-		resolveNode := prFeedbackResolveReviewThreadNode(
-			flow.ResolveID,
-			"Resolve Review Thread",
-			prFeedbackResolveThreadIDExpression(flow.Trigger.Component),
-			prFeedbackResolvePosition(flow.Y),
-			request.Binding,
-		)
-		spec = spec.withResolve(resolveNode)
-		for i := range spec.edges {
-			if spec.edges[i].TargetID == flow.ResolveID {
-				spec.edges[i].SourceID = flow.RunnerID
-				break
-			}
+		var resolveNode yaml.Node
+		if flow.Trigger.Component == "github.onPRReview" {
+			resolveNode = prFeedbackResolveReviewThreadsNode(
+				flow.ResolveID,
+				"Resolve Review Threads",
+				prFeedbackResolveThreadIDsExpression(flow.Trigger.Component),
+				prFeedbackResolvePosition(flow.Y),
+				request.Binding,
+			)
+		} else {
+			resolveNode = prFeedbackResolveReviewThreadNode(
+				flow.ResolveID,
+				"Resolve Review Thread",
+				prFeedbackResolveThreadIDExpression(flow.Trigger.Component),
+				prFeedbackResolvePosition(flow.Y),
+				request.Binding,
+			)
 		}
+		spec = spec.withResolveAfter(flow.RunnerID, resolveNode)
 	}
 
 	return spec

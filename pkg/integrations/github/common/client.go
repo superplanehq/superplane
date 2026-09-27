@@ -380,6 +380,82 @@ func (c *Client) ResolveReviewThread(ctx context.Context, threadID string) error
 	return c.doGraphQL(ctx, mutation, map[string]any{"threadId": threadID}, nil)
 }
 
+func (c *Client) ResolveReviewThreads(ctx context.Context, threadIDs []string) error {
+	const mutation = `mutation($threadIds: [ID!]!) {
+	  resolveReviewThreads(input: {threadIds: $threadIds}) {
+	    threads {
+	      id
+	      isResolved
+	    }
+	  }
+	}`
+
+	variables := map[string]any{"threadIds": threadIDs}
+	return c.doGraphQL(ctx, mutation, variables, nil)
+}
+
+func (c *Client) GetPullRequestReviewThreads(ctx context.Context, repository string, pullNumber int) (map[int64]string, error) {
+	owner, name := c.ownerAndName(repository)
+
+	const query = `query($owner: String!, $name: String!, $number: Int!) {
+	  repository(owner: $owner, name: $name) {
+	    pullRequest(number: $number) {
+	      reviewThreads(first: 100) {
+	        nodes {
+	          id
+	          comments(first: 100) {
+	            nodes {
+	              databaseId
+	              id
+	            }
+	          }
+	        }
+	      }
+	    }
+	  }
+}`
+
+	variables := map[string]any{
+		"owner":  owner,
+		"name":   name,
+		"number": pullNumber,
+	}
+
+	var result struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewThreads struct {
+					Nodes []struct {
+						ID       string `json:"id"`
+						Comments struct {
+							Nodes []struct {
+								DatabaseID int64  `json:"databaseId"`
+								ID         string `json:"id"`
+							} `json:"nodes"`
+						} `json:"comments"`
+					} `json:"nodes"`
+				} `json:"reviewThreads"`
+			} `json:"pullRequest"`
+		} `json:"repository"`
+	}
+
+	err := c.doGraphQL(ctx, query, variables, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch review threads: %w", err)
+	}
+
+	commentToThread := make(map[int64]string)
+	for _, thread := range result.Repository.PullRequest.ReviewThreads.Nodes {
+		for _, comment := range thread.Comments.Nodes {
+			if comment.DatabaseID != 0 {
+				commentToThread[comment.DatabaseID] = thread.ID
+			}
+		}
+	}
+
+	return commentToThread, nil
+}
+
 func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Merge(ctx, owner, name, pullNumber, commitMessage, options)

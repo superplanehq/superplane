@@ -42,7 +42,7 @@ func Test__ResolveReviewThread__Setup(t *testing.T) {
 			Configuration: validConfig(map[string]any{"threadId": ""}),
 		})
 
-		require.ErrorContains(t, err, "thread ID is required")
+		require.ErrorContains(t, err, "thread ID or thread IDs is required")
 	})
 
 	t.Run("expression thread ID is accepted at setup", func(t *testing.T) {
@@ -209,7 +209,7 @@ func Test__ResolveReviewThread__Execute(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "failed to resolve review thread")
+		require.ErrorContains(t, err, "failed to resolve any review threads")
 		require.ErrorContains(t, err, "Resource not accessible by integration")
 	})
 
