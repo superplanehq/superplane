@@ -28,7 +28,7 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   backlog: idleBoardPage(),
@@ -38,7 +38,7 @@ const useFactoryBoardWorkOrders = vi.fn(() => ({
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (...args: unknown[]) => useFactoryBoardWorkOrders(...args),
   useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -218,6 +218,46 @@ describe("LinesPage Done column", () => {
     expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
+  });
+
+  it("asks the Done page for this line when no status filter is set", () => {
+    renderBoard();
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        done: {
+          lineId: REFUND_LINE_PLAN_ID,
+          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+        },
+      }),
+    );
+  });
+
+  it("asks the Done page for this line's failed tasks when Failed is selected", () => {
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({
+        statuses: ["failed"],
+        labels: [],
+        lineIds: [],
+        sourceIds: [],
+        assigneeIds: [],
+      }),
+    );
+    renderBoard();
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        done: {
+          lineId: REFUND_LINE_PLAN_ID,
+          results: ["RESULT_FAILED"],
+        },
+      }),
+    );
   });
 
   it("collects failed tasks in the Done column", () => {

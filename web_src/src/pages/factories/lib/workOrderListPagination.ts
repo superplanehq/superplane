@@ -6,6 +6,7 @@ import type {
 } from "@/api-client";
 
 import { belongsToLineBoard } from "./linePhaseRuns";
+import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
 export const BOARD_BACKLOG_PAGE_SIZE = 20;
 export const BOARD_OPEN_PAGE_SIZE = 50;
@@ -19,6 +20,18 @@ export const BOARD_DONE_RESULTS = [
   "RESULT_COMPLETED",
   "RESULT_FAILED",
 ] as const satisfies readonly FactoriesWorkOrderResult[];
+
+/** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. */
+export function boardDoneResultsForStatuses(
+  statuses: readonly WorkOrderDisplayStatus[],
+): readonly FactoriesWorkOrderResult[] {
+  const wantsCompleted = statuses.includes("completed");
+  const wantsFailed = statuses.includes("failed");
+  if (wantsCompleted === wantsFailed) {
+    return BOARD_DONE_RESULTS;
+  }
+  return wantsFailed ? ["RESULT_FAILED"] : ["RESULT_COMPLETED"];
+}
 
 export type WorkOrdersPageCursor = {
   beforeId: string;

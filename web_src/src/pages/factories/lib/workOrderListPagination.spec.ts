@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  boardDoneResultsForStatuses,
   factoryWorkOrdersPageKey,
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
@@ -10,6 +11,22 @@ import {
   workOrdersPageFromResponse,
   workOrdersPageQueryFromKey,
 } from "./workOrderListPagination";
+
+describe("boardDoneResultsForStatuses", () => {
+  it("keeps completed and failed when the board is not narrowed to one of them", () => {
+    expect(boardDoneResultsForStatuses([])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+    expect(boardDoneResultsForStatuses(["completed", "failed"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+    expect(boardDoneResultsForStatuses(["waiting"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+  });
+
+  it("asks only for failed tasks when Failed is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["failed"])).toEqual(["RESULT_FAILED"]);
+  });
+
+  it("asks only for completed tasks when Completed is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["completed"])).toEqual(["RESULT_COMPLETED"]);
+  });
+});
 
 describe("workOrderListPagination", () => {
   it("stops when the page has no further rows", () => {
