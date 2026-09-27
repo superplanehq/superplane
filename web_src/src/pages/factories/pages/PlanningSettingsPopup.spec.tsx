@@ -22,6 +22,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
     has: () => false,
     enabledExperimentalFeatures: [],
     isLoading: false,
+    organizationReady: true,
   })),
 }));
 
@@ -72,6 +73,7 @@ describe("PlanningSettingsPopup", () => {
       has: () => false,
       enabledExperimentalFeatures: [],
       isLoading: false,
+      organizationReady: true,
     });
     vi.mocked(useFactoryAgentResources).mockReturnValue({
       data: [],
@@ -154,6 +156,7 @@ describe("PlanningSettingsPopup", () => {
       has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
       enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
+      organizationReady: true,
     });
     vi.mocked(useFactoryAgentResources).mockImplementation((_org, _factory, kind) => {
       if (kind === "KIND_SKILL") {

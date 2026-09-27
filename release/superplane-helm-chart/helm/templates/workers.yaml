@@ -48,6 +48,8 @@ spec:
             - secretRef:
                 name: {{ include "secrets.email.name" . }}
             - secretRef:
+                name: {{ include "secrets.feedback.name" . }}
+            - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
             {{- if .Values.polar.enabled }}
             - secretRef:

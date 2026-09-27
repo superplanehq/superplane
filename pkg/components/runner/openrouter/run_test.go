@@ -229,6 +229,9 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	routing, _ := options["provider"].(map[string]any)
 	assert.Equal(t, false, routing["allow_fallbacks"])
 	assert.Equal(t, "throughput", routing["sort"])
+	assert.Equal(t, true, grok["attachment"])
+	modalities, _ := grok["modalities"].(map[string]any)
+	assert.Equal(t, []any{"text", "image"}, modalities["input"])
 }
 
 func TestEnsureOpenCodeModelCatalogRefreshesOnce(t *testing.T) {

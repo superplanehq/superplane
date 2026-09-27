@@ -105,12 +105,24 @@ describe("buildLinePhaseBoard with a board Done column", () => {
 });
 
 describe("collectLineDoneOrders", () => {
-  it("returns completed, rejected, and canceled orders of this line, newest first", () => {
+  it("returns completed and failed orders of this line, newest first", () => {
     const completed = closedOrder({
       id: "wo-completed",
       result: "RESULT_COMPLETED",
       lineId: "line-1",
       updatedAt: "2026-08-11T12:00:00.000Z",
+    });
+    const olderCompleted = closedOrder({
+      id: "wo-completed-old",
+      result: "RESULT_COMPLETED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T11:00:00.000Z",
+    });
+    const failed = closedOrder({
+      id: "wo-failed",
+      result: "RESULT_FAILED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T12:30:00.000Z",
     });
     const rejected = closedOrder({
       id: "wo-rejected",
@@ -126,9 +138,9 @@ describe("collectLineDoneOrders", () => {
       updatedAt: "2026-08-11T13:00:00.000Z",
     });
 
-    const done = collectLineDoneOrders([completed, rejected, canceled], LINE);
+    const done = collectLineDoneOrders([completed, olderCompleted, failed, rejected, canceled], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-rejected", "wo-canceled", "wo-completed"]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-failed", "wo-completed", "wo-completed-old"]);
   });
 
   it("leaves out open orders and orders of another line", () => {
@@ -148,19 +160,12 @@ describe("collectLineDoneOrders", () => {
     expect(done.map((entry) => entry.id)).toEqual(["wo-backlog-closed"]);
   });
 
-  it("excludes a draft rejected straight out of the Backlog — it never dispatched", () => {
+  it("excludes a rejected draft and a rejected order that already dispatched", () => {
     const rejectedDraft = closedOrder({ id: "wo-rejected-draft", result: "RESULT_REJECTED" });
-
-    const done = collectLineDoneOrders([rejectedDraft], LINE);
-
-    expect(done).toEqual([]);
-  });
-
-  it("keeps a rejected order that already dispatched to this line", () => {
     const rejectedAfterRun = closedOrder({ id: "wo-rejected-ran", result: "RESULT_REJECTED", lineId: "line-1" });
 
-    const done = collectLineDoneOrders([rejectedAfterRun], LINE);
+    const done = collectLineDoneOrders([rejectedDraft, rejectedAfterRun], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-rejected-ran"]);
+    expect(done).toEqual([]);
   });
 });

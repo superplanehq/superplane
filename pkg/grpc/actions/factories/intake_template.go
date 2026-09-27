@@ -113,11 +113,11 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
 	models.FactoryIntakeSourceProductiveTasks: {
-		name:                 "Productive.io tasks",
-		description:          "Create a work order when a Productive.io task is created.",
+		name:                 "Productive tasks",
+		description:          "Create a work order when a Productive task is created.",
 		triggerComponent:     "productive.onTask",
 		triggerName:          "On Task",
-		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		triggerConfiguration: map[string]any{"actions": intakeProductiveTriggerActions(defaultProductiveIntakeSettings())},
 		createTitle:          "{{ root().data.data.attributes.title }}",
 		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
@@ -135,7 +135,30 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		// reports next to it.
 		createDescription: `{{ root().data.description }}`,
 	},
+	models.FactoryIntakeSourceDependabotAlerts: {
+		name:             "Dependabot alerts",
+		description:      "Create a task when GitHub reports a Dependabot alert.",
+		triggerComponent: "github.onDependabotAlert",
+		triggerName:      "On Dependabot Alert",
+		triggerConfiguration: map[string]any{
+			"actions": dependabotIntakeActions(),
+		},
+		createTitle:       dependabotAlertCreateTitle,
+		createDescription: dependabotAlertCreateDescription,
+	},
 }
+
+// dependabotAlertCreateTitle names the package, not the manifest, because
+// every alert for one package lands on one task. It must match
+// dependabot.TaskTitle.
+const dependabotAlertCreateTitle = `{{ "Fix Dependabot alerts for " + (root().data.alert.dependency.package.name ?? "a dependency") + ((root().data.alert.dependency.package.ecosystem ?? "") != "" ? " (" + root().data.alert.dependency.package.ecosystem + ")" : "") }}`
+
+// dependabotAlertCreateDescription opens the task with the fix guidance and
+// the first alert. A later alert for the same package is appended, so the
+// alert block must match dependabot.AlertSection and the guidance must match
+// dependabot.packageFixGuidance. One expression keeps a missing field from
+// failing the whole description.
+const dependabotAlertCreateDescription = `{{ "Fix every open Dependabot alert for " + (root().data.alert.dependency.package.name ?? "a dependency") + ((root().data.alert.dependency.package.ecosystem ?? "") != "" ? " (" + root().data.alert.dependency.package.ecosystem + ")" : "") + ".\nFirst check if the package is a direct dependency in the manifest.\nIf it is direct, update it to the patched version or later.\nIf it is transitive, find the direct dependency that requires it.\nUpdate that direct dependency to a release that requires the patched version.\nUse a version override or resolution only when no such release exists, and say so in the pull request.\nUpdate the lockfile so every listed manifest is fixed.\n\n## Alerts\n\n### #" + string(root().data.alert.number ?? 0) + " " + (root().data.alert.security_advisory.summary ?? "") + "\nSeverity: " + (root().data.alert.security_advisory.severity ?? "") + "\nManifest: " + (root().data.alert.dependency.manifest_path ?? "") + "\nVulnerable versions: " + (root().data.alert.security_vulnerability.vulnerable_version_range ?? "") + "\nPatched version: " + (root().data.alert.security_vulnerability.first_patched_version?.identifier ?? "") + ((root().data.alert.dependency.relationship ?? "") in ["direct", "transitive"] ? "\nRelationship: " + root().data.alert.dependency.relationship : "") + "\n" + (root().data.alert.html_url ?? "") }}`
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {
 	for source, spec := range intakeSpecsBySource {
@@ -175,7 +198,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Name:          spec.triggerName,
 			Type:          yaml.NodeTypeTrigger,
 			Component:     spec.triggerComponent,
-			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Configuration: intakeTriggerConfiguration(spec, request),
 			Metadata:      intakeTriggerMetadata(request.Source, request.Settings),
 			Integration:   request.Binding.integrationRef(),
 			Position:      yaml.Position{X: 160, Y: 80},
@@ -397,13 +420,17 @@ func ensureIntakeEdge(edges []models.Edge, expected models.Edge) []models.Edge {
 // intakeTriggerConfiguration lays the binding over the template so the trigger
 // listens on a concrete resource. The template map is shared between intakes,
 // so it is copied rather than written to.
-func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[string]any {
+func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) map[string]any {
+	binding := request.Binding
 	configuration := make(map[string]any, len(spec.triggerConfiguration)+len(binding.configuration()))
 	for name, value := range spec.triggerConfiguration {
 		configuration[name] = value
 	}
 	for name, value := range binding.configuration() {
 		configuration[name] = value
+	}
+	if request.Source == models.FactoryIntakeSourceProductiveTasks {
+		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
 
 	return configuration
@@ -428,6 +455,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		return defaultProductiveIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceDependabotAlerts {
+		return defaultDependabotIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

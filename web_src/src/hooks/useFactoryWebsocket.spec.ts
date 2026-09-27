@@ -182,6 +182,99 @@ describe("useFactoryWebsocket", () => {
     ).toBe("Newer");
   });
 
+  it("drops a missing task from the board without a warning", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error("Not Found"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { queryClient } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
+      { id: "order-1", title: "Gone" },
+      { id: "order-2", title: "Other" },
+    ]);
+    queryClient.setQueryData(factoryQueryKeys.workOrdersPage("org-1", "factory-1", ["STATE_OPEN"]), {
+      pageParams: [undefined],
+      pages: [
+        {
+          orders: [
+            { id: "order-1", title: "Gone" },
+            { id: "order-2", title: "Other" },
+          ],
+          hasNextPage: false,
+        },
+      ],
+    });
+    queryClient.setQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"), {
+      id: "order-1",
+      title: "Gone",
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual([
+      { id: "order-2", title: "Other" },
+    ]);
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrdersPage("org-1", "factory-1", ["STATE_OPEN"]))).toEqual({
+      pageParams: [undefined],
+      pages: [{ orders: [{ id: "order-2", title: "Other" }], hasNextPage: false }],
+    });
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"))).toBeUndefined();
+  });
+
+  it("warns when a live refresh fails for another reason", async () => {
+    const failure = new Error("network down");
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(failure);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { queryClient } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
+      { id: "order-1", title: "Still here" },
+    ]);
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(warn).toHaveBeenCalledWith("factory ws: failed to refresh work order", failure);
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual([
+      { id: "order-1", title: "Still here" },
+    ]);
+  });
+
+  it("keeps a newer task when an older refresh is not found", async () => {
+    let rejectOlder: (reason?: unknown) => void = () => {};
+    const older = new Promise<DescribeWorkOrderResult>((_, reject) => {
+      rejectOlder = reject;
+    });
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+    describeWorkOrder.mockImplementationOnce(() => older as ReturnType<typeof apiClient.factoriesDescribeWorkOrder>);
+    describeWorkOrder.mockResolvedValueOnce(describeResponse({ id: "order-1", title: "Newer", checks: [] }));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { queryClient } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [{ id: "order-1", title: "Old" }]);
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+    rejectOlder(new Error("Not Found"));
+    await act(async () => {
+      await older.catch(() => undefined);
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData<Array<{ title?: string }>>(factoryQueryKeys.workOrders("org-1", "factory-1"))?.[0]
+        ?.title,
+    ).toBe("Newer");
+  });
+
   it("ignores events for a different factory", async () => {
     const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
     const { invalidateSpy } = renderFactoryWebsocket();

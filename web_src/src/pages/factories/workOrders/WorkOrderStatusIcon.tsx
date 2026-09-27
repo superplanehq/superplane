@@ -6,6 +6,23 @@ import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../l
 const DISK = "inline-flex size-3.5 shrink-0 items-center justify-center rounded-full";
 const GLYPH = "size-[9px] text-white dark:text-zinc-950";
 
+export function WorkOrderStatusBadge({ status, className }: { status: WorkOrderDisplayStatus; className?: string }) {
+  const meta = getWorkOrderDisplayStatusMeta(status);
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+        meta.className,
+        className,
+      )}
+      data-testid={`work-order-status-badge-${status}`}
+    >
+      <span className={cn("size-1.5 rounded-full", meta.dotClassName)} aria-hidden />
+      {meta.label}
+    </span>
+  );
+}
+
 /**
  * Compact status mark next to a task title.
  *
@@ -69,10 +86,7 @@ function markGlyph(status: WorkOrderDisplayStatus): ReactNode {
   if (status === "failed") {
     return <XGlyph />;
   }
-  if (status === "rejected") {
-    return <BanGlyph />;
-  }
-  return <MinusGlyph />;
+  return <BanGlyph />;
 }
 
 function Glyph({ children, ...props }: SVGProps<SVGSVGElement>) {
@@ -119,14 +133,6 @@ function BanGlyph() {
   return (
     <Glyph>
       <path d="M4.2 11.8 11.8 4.2" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
-    </Glyph>
-  );
-}
-
-function MinusGlyph() {
-  return (
-    <Glyph>
-      <path d="M4.2 8 H11.8" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
     </Glyph>
   );
 }

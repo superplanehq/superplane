@@ -5,10 +5,12 @@ import {
   factoryAppRunPath,
   factoryAppSplitRunPath,
   factoryAppViewPath,
+  factoryDependabotIntakeSetupPath,
   factoryDetailPath,
   factoryHomePath,
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPlanningPath,
@@ -182,10 +184,26 @@ describe("factoryPlanningSetupPath", () => {
   });
 });
 
+describe("factoryGitHubIntakeSetupPath", () => {
+  it("opens the GitHub intake setup page on the line board", () => {
+    expect(factoryGitHubIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/github",
+    );
+  });
+});
+
 describe("factorySentryIntakeSetupPath", () => {
   it("opens the Sentry intake setup page on the line board", () => {
     expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
+    );
+  });
+});
+
+describe("factoryDependabotIntakeSetupPath", () => {
+  it("opens the Dependabot intake setup page on the line board", () => {
+    expect(factoryDependabotIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/dependabot",
     );
   });
 });

@@ -33,6 +33,9 @@ vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
 }));
 vi.mock("@/hooks/useMe", () => ({ useMe: () => ({ data: { id: "user-1" } }) }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
+}));
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
 }));
@@ -87,6 +90,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
     setJiraCompletion: vi.fn(),
+    jiraCompletionNeedsManualColumn: false,
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,

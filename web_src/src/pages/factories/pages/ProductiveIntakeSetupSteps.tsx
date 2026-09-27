@@ -54,7 +54,7 @@ function ConnectionOptions({
               selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
             )}
           >
-            <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Productive.io"}</span>
+            <span className="min-w-0 flex-1 truncate">{integration.metadata?.name || "Productive"}</span>
             {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
           </Button>
         );

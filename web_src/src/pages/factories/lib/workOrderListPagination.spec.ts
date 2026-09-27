@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  boardDoneResultsForStatuses,
   factoryWorkOrdersPageKey,
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
@@ -10,6 +11,22 @@ import {
   workOrdersPageFromResponse,
   workOrdersPageQueryFromKey,
 } from "./workOrderListPagination";
+
+describe("boardDoneResultsForStatuses", () => {
+  it("keeps completed and failed when the board is not narrowed to one of them", () => {
+    expect(boardDoneResultsForStatuses([])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+    expect(boardDoneResultsForStatuses(["completed", "failed"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+    expect(boardDoneResultsForStatuses(["waiting"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+  });
+
+  it("asks only for failed tasks when Failed is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["failed"])).toEqual(["RESULT_FAILED"]);
+  });
+
+  it("asks only for completed tasks when Completed is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["completed"])).toEqual(["RESULT_COMPLETED"]);
+  });
+});
 
 describe("workOrderListPagination", () => {
   it("stops when the page has no further rows", () => {
@@ -69,10 +86,39 @@ describe("workOrderListPagination", () => {
     expect(workOrdersPageQueryFromKey(key)).toEqual({
       userId: "user-1",
       unassigned: true,
+      results: [],
+      lineId: undefined,
     });
     expect(workOrdersPageQueryFromKey(factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_DRAFT"]))).toEqual({
       userId: undefined,
       unassigned: false,
+      results: [],
+      lineId: undefined,
+    });
+  });
+
+  it("stores results on the page key", () => {
+    const key = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_CLOSED"], {
+      results: ["RESULT_FAILED", "RESULT_COMPLETED"],
+    });
+    expect(workOrdersPageQueryFromKey(key)).toEqual({
+      userId: undefined,
+      unassigned: false,
+      results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+      lineId: undefined,
+    });
+  });
+
+  it("stores the line on the page key", () => {
+    const key = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_CLOSED"], {
+      lineId: "line-1",
+      results: ["RESULT_FAILED"],
+    });
+    expect(workOrdersPageQueryFromKey(key)).toEqual({
+      userId: undefined,
+      unassigned: false,
+      results: ["RESULT_FAILED"],
+      lineId: "line-1",
     });
   });
 
@@ -83,8 +129,12 @@ describe("workOrderListPagination", () => {
   });
 
   it("matches unassigned or the selected user", () => {
-    expect(workOrderMatchesPageQuery({ assignees: [] }, { userId: "alex", unassigned: true })).toBe(true);
-    expect(workOrderMatchesPageQuery({ assignees: [{ id: "alex" }] }, { userId: "alex", unassigned: true })).toBe(true);
-    expect(workOrderMatchesPageQuery({ assignees: [{ id: "zoe" }] }, { userId: "alex", unassigned: true })).toBe(false);
+    expect(workOrderMatchesPageQuery({ assignees: [] }, { userId: "alex", unassigned: true, results: [] })).toBe(true);
+    expect(
+      workOrderMatchesPageQuery({ assignees: [{ id: "alex" }] }, { userId: "alex", unassigned: true, results: [] }),
+    ).toBe(true);
+    expect(
+      workOrderMatchesPageQuery({ assignees: [{ id: "zoe" }] }, { userId: "alex", unassigned: true, results: [] }),
+    ).toBe(false);
   });
 });

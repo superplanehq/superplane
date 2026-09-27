@@ -1,0 +1,157 @@
+package workers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/renderedtext/go-tackle"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/services"
+)
+
+func Test__SupportFeedbackConsumer(t *testing.T) {
+	t.Run("sends email and Discord message", func(t *testing.T) {
+		emailService := services.NewNoopEmailService()
+		discordCalls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			discordCalls++
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		t.Cleanup(server.Close)
+
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(server.URL))
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:         services.FeedbackCategoryBug,
+			Details:          "The canvas did not load.",
+			UserName:         "Ada Lovelace",
+			UserEmail:        "ada@example.com",
+			OrganizationID:   "org-1",
+			OrganizationName: "Acme",
+			PagePath:         "/acme/apps/deploy",
+		})))
+		require.NoError(t, err)
+
+		sent := emailService.SentSupportFeedbackEmails()
+		require.Len(t, sent, 1)
+		assert.Equal(t, services.DefaultSupportFeedbackToEmail, sent[0].ToEmail)
+		assert.Equal(t, services.FeedbackCategoryBug, sent[0].Feedback.Category)
+		assert.Equal(t, "The canvas did not load.", sent[0].Feedback.Details)
+		assert.Equal(t, 1, discordCalls)
+	})
+
+	t.Run("skips invalid messages", func(t *testing.T) {
+		emailService := services.NewNoopEmailService()
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(""))
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category: "not-a-category",
+			Details:  "hello",
+		})))
+		require.NoError(t, err)
+		assert.Empty(t, emailService.SentSupportFeedbackEmails())
+	})
+
+	t.Run("returns email send errors", func(t *testing.T) {
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", &failingEmailService{err: errors.New("smtp unavailable")}, services.NewDiscordWebhookClient(""))
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category: services.FeedbackCategoryOther,
+			Details:  "Need help with billing.",
+		})))
+		require.ErrorContains(t, err, "smtp unavailable")
+	})
+
+	t.Run("republishes after Discord fails so the email is not sent again", func(t *testing.T) {
+		emailService := services.NewNoopEmailService()
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "discord down", http.StatusBadGateway)
+		}))
+		t.Cleanup(server.Close)
+
+		var republished *messages.SupportFeedbackRequestedMessage
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(server.URL))
+		consumer.publish = func(message messages.SupportFeedbackRequestedMessage) error {
+			republished = &message
+			return nil
+		}
+
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:  services.FeedbackCategoryBug,
+			Details:   "The canvas did not load.",
+			UserEmail: "ada@example.com",
+		})))
+		require.NoError(t, err)
+		require.Len(t, emailService.SentSupportFeedbackEmails(), 1)
+		require.NotNil(t, republished)
+		assert.True(t, republished.EmailDelivered)
+		assert.False(t, republished.DiscordDelivered)
+	})
+
+	t.Run("skips email when that channel was already delivered", func(t *testing.T) {
+		emailService := services.NewNoopEmailService()
+		discordCalls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			discordCalls++
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		t.Cleanup(server.Close)
+
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(server.URL))
+		err := consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:       services.FeedbackCategoryBug,
+			Details:        "The canvas did not load.",
+			UserEmail:      "ada@example.com",
+			EmailDelivered: true,
+		})))
+		require.NoError(t, err)
+		assert.Empty(t, emailService.SentSupportFeedbackEmails())
+		assert.Equal(t, 1, discordCalls)
+	})
+
+	t.Run("loads the attachment from blob storage and deletes it after delivery", func(t *testing.T) {
+		store, err := filesystem.New(t.TempDir())
+		require.NoError(t, err)
+		blob.SetCurrent(store)
+		t.Cleanup(func() { blob.SetCurrent(nil) })
+
+		content := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+		key := "support-feedback/shot"
+		require.NoError(t, store.Put(context.Background(), key, bytes.NewReader(content), blob.PutOptions{ContentType: "image/png"}))
+
+		emailService := services.NewNoopEmailService()
+		consumer := NewSupportFeedbackConsumer("amqp://localhost:5672", emailService, services.NewDiscordWebhookClient(""))
+		err = consumer.Consume(tackle.NewFakeDelivery(supportFeedbackPayload(t, messages.SupportFeedbackRequestedMessage{
+			Category:  services.FeedbackCategoryBug,
+			Details:   "The canvas did not load.",
+			UserEmail: "ada@example.com",
+			Attachment: &messages.SupportFeedbackAttachment{
+				Filename:    "shot.png",
+				ContentType: "image/png",
+				BlobKey:     key,
+			},
+		})))
+		require.NoError(t, err)
+
+		sent := emailService.SentSupportFeedbackEmails()
+		require.Len(t, sent, 1)
+		require.NotNil(t, sent[0].Feedback.Attachment)
+		assert.Equal(t, content, sent[0].Feedback.Attachment.Content)
+		_, err = store.Get(context.Background(), key)
+		assert.ErrorIs(t, err, blob.ErrNotFound)
+	})
+}
+
+func supportFeedbackPayload(t *testing.T, message messages.SupportFeedbackRequestedMessage) []byte {
+	t.Helper()
+
+	payload, err := json.Marshal(message)
+	require.NoError(t, err)
+	return payload
+}

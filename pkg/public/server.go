@@ -411,6 +411,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
 	).Methods(http.MethodPut)
 
+	s.Router.Handle(
+		"/api/v1/me/feedback",
+		orgAuthMiddleware(http.HandlerFunc(s.handleSubmitFeedback)),
+	).Methods(http.MethodPost)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
@@ -1579,11 +1584,12 @@ func (s *Server) Serve(host string, port int) error {
 	s.wsHub.Run()
 
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", host, port),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 70 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		Handler:      s.Router,
+		Addr:              fmt.Sprintf("%s:%d", host, port),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Minute,
+		WriteTimeout:      15 * time.Minute,
+		IdleTimeout:       60 * time.Second,
+		Handler:           s.Router,
 	}
 
 	return s.httpServer.ListenAndServe()
@@ -1653,6 +1659,77 @@ func eventNameFromPath(rawPath string) string {
 		return ""
 	}
 	return last
+}
+
+const productiveOnTaskTrigger = "productive.onTask"
+
+func isProductiveOnTaskNode(node models.CanvasNode) bool {
+	if node.Type != models.NodeTypeTrigger {
+		return false
+	}
+	trigger := node.Ref.Data().Trigger
+	return trigger != nil && trigger.Name == productiveOnTaskTrigger
+}
+
+func webhookNodeLogger(node models.CanvasNode, integration *models.Integration) *log.Entry {
+	logger := logging.ForNode(node)
+	organizationID := ""
+	if integration != nil {
+		logger = logging.WithIntegration(logger, *integration)
+		if integration.OrganizationID != uuid.Nil {
+			organizationID = integration.OrganizationID.String()
+		}
+	}
+	webhookID := ""
+	if node.WebhookID != nil {
+		webhookID = node.WebhookID.String()
+	}
+	return logging.WithWebhookNode(logger, logging.WebhookNodeFields{
+		OrganizationID: organizationID,
+		CanvasID:       node.WorkflowID.String(),
+		WebhookID:      webhookID,
+	})
+}
+
+func (s *Server) logWebhookError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error) {
+	if !isProductiveOnTaskNode(node) {
+		log.WithFields(log.Fields{
+			"webhook_id": webhook.ID.String(),
+			"path":       r.URL.Path,
+			"status":     code,
+		}).Errorf("error handling webhook: %v", err)
+		return
+	}
+
+	fields := log.Fields{
+		"workflow_id":   node.WorkflowID.String(),
+		"node_id":       node.NodeID,
+		"webhook_id":    webhook.ID.String(),
+		"webhook_state": webhook.State,
+		"status":        code,
+	}
+	if organizationID := organizationIDForWebhookNode(database.DB(r.Context()), node); organizationID != "" {
+		fields["organization_id"] = organizationID
+	}
+	if node.AppInstallationID != nil {
+		fields["app_installation_id"] = node.AppInstallationID.String()
+	}
+	logging.LogProductiveWebhookFailure(webhookDeliveryQuery(r).Get("event"), fields, err)
+}
+
+func organizationIDForWebhookNode(tx *gorm.DB, node models.CanvasNode) string {
+	if node.AppInstallationID != nil {
+		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if err == nil && integration.OrganizationID != uuid.Nil {
+			return integration.OrganizationID.String()
+		}
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+	if err != nil || canvas == nil || canvas.OrganizationID == uuid.Nil {
+		return ""
+	}
+	return canvas.OrganizationID.String()
 }
 
 func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -1729,11 +1806,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	for _, node := range nodes {
 		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"webhook_id": webhookID.String(),
-				"path":       r.URL.Path,
-				"status":     code,
-			}).Errorf("error handling webhook: %v", err)
+			s.logWebhookError(r, webhook, node, code, err)
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
@@ -1799,15 +1872,15 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		return http.StatusInternalServerError, nil, fmt.Errorf("trigger not found: %w", err)
 	}
 
-	logger := logging.ForNode(node)
 	var integrationCtx core.IntegrationContext
+	var integration *models.Integration
 	if node.AppInstallationID != nil {
-		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		loaded, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if integrationErr != nil {
 			return http.StatusInternalServerError, nil, integrationErr
 		}
 
-		logger = logging.WithIntegration(logger, *integration)
+		integration = loaded
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
@@ -1819,7 +1892,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, &node),
-		Logger:        logger,
+		Logger:        webhookNodeLogger(node, integration),
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node, nil, onNewEvents),
@@ -1834,16 +1907,16 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 		return http.StatusInternalServerError, nil, fmt.Errorf("action not found: %w", err)
 	}
 
-	logger := logging.ForNode(node)
 	tx := database.Conn()
 	var integrationCtx core.IntegrationContext
+	var integration *models.Integration
 	if node.AppInstallationID != nil {
-		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		loaded, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if integrationErr != nil {
 			return http.StatusInternalServerError, nil, integrationErr
 		}
 
-		logger = logging.WithIntegration(logger, *integration)
+		integration = loaded
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
@@ -1855,7 +1928,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, &node),
-		Logger:        logger,
+		Logger:        webhookNodeLogger(node, integration),
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node, nil, onNewEvents),

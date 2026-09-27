@@ -20,7 +20,10 @@ const (
 	// reason — it does not back a timeline event/struct. Artifact data
 	// updates re-save the row in place and this reason tells the
 	// frontend which query to invalidate.
-	EventTypeOrderArtifactUpdated    = "order.artifact.updated"
+	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// EventTypeOrderArtifactsCleared records a bulk delete of task
+	// artifacts when a person sends the task to the backlog.
+	EventTypeOrderArtifactsCleared   = "order.artifacts.cleared"
 	EventTypeOrderPullRequestAdded   = "order.pull_request.added"
 	EventTypeOrderPullRequestUpdated = "order.pull_request.updated"
 	// EventTypeOrderCheckReported records every check report, including
@@ -158,6 +161,12 @@ type WorkOrderArtifactAdded struct {
 	User       *UserRef       `json:"user,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
 	Run        *RunRef        `json:"run,omitempty"`
+}
+
+type WorkOrderArtifactsCleared struct {
+	Order *WorkOrderRef `json:"order,omitempty"`
+	Count int           `json:"count"`
+	User  *UserRef      `json:"user,omitempty"`
 }
 
 type WorkOrderPullRequestAdded struct {

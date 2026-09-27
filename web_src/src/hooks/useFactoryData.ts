@@ -15,6 +15,7 @@ import {
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
+  factoriesSendWorkOrderToBacklog,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -43,6 +44,7 @@ import {
   BOARD_BACKLOG_PAGE_SIZE,
   BOARD_BACKLOG_STATES,
   BOARD_DONE_PAGE_SIZE,
+  BOARD_DONE_RESULTS,
   BOARD_DONE_STATES,
   BOARD_OPEN_PAGE_SIZE,
   BOARD_OPEN_STATES,
@@ -204,10 +206,21 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
 
 export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & { requireUser?: boolean };
 
+export type FactoryBoardDoneQuery = {
+  lineId?: string;
+  results?: readonly FactoriesWorkOrderResult[];
+};
+
+export type FactoryBoardWorkOrdersOptions = FactoryWorkOrdersPageOptions & {
+  done?: FactoryBoardDoneQuery;
+};
+
 function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions): WorkOrdersPageQuery {
   return normalizeWorkOrdersPageQuery({
     userId: options?.userId,
     unassigned: options?.unassigned,
+    results: options?.results,
+    lineId: options?.lineId,
   });
 }
 
@@ -231,6 +244,8 @@ export function useFactoryWorkOrdersPage(
             limit: pageSize,
             ...(pageQuery.userId ? { userId: pageQuery.userId } : {}),
             ...(pageQuery.unassigned ? { unassigned: true } : {}),
+            ...(pageQuery.results.length > 0 ? { results: [...pageQuery.results] } : {}),
+            ...(pageQuery.lineId ? { lineId: pageQuery.lineId } : {}),
             ...(pageParam ? { beforeId: pageParam.beforeId } : {}),
           },
         }),
@@ -251,6 +266,7 @@ export function useFactoryWorkOrdersPage(
     hasNextPage: Boolean(query.hasNextPage),
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
   };
 }
 
@@ -287,20 +303,37 @@ export function mergeFactoryBoardWorkOrders(
   return uniqueWorkOrdersById([...backlog, ...open, ...done]);
 }
 
+function sharedBoardPageOptions(options?: FactoryBoardWorkOrdersOptions): FactoryWorkOrdersPageOptions | undefined {
+  if (!options) {
+    return undefined;
+  }
+  return {
+    userId: options.userId,
+    unassigned: options.unassigned,
+    requireUser: options.requireUser,
+  };
+}
+
 export function useFactoryBoardWorkOrders(
   organizationId: string,
   factoryId: string,
-  options?: FactoryWorkOrdersPageOptions,
+  options?: FactoryBoardWorkOrdersOptions,
 ): FactoryBoardWorkOrders {
+  const shared = sharedBoardPageOptions(options);
   const backlog = useFactoryWorkOrdersPage(
     organizationId,
     factoryId,
     BOARD_BACKLOG_STATES,
     BOARD_BACKLOG_PAGE_SIZE,
-    options,
+    shared,
   );
-  const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, options);
-  const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, options);
+  const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, shared);
+  const doneResults = options?.done?.results;
+  const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
+    ...shared,
+    lineId: options?.done?.lineId,
+    results: doneResults && doneResults.length > 0 ? doneResults : BOARD_DONE_RESULTS,
+  });
 
   return {
     workOrders: mergeFactoryBoardWorkOrders(backlog.orders, open.orders, closed.orders),
@@ -672,6 +705,41 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
       });
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useSendWorkOrderToBacklog(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; closePullRequests: boolean; clearArtifacts: boolean }) => {
+      const response = await factoriesSendWorkOrderToBacklog(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            closePullRequests: input.closePullRequests,
+            clearArtifacts: input.clearArtifacts,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to send task to the Backlog");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderArtifactsKey(organizationId, factoryId, variables.orderId),
       });
     },
   });

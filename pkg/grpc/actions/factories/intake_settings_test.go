@@ -181,6 +181,15 @@ func Test__intakeSettingsChangeTrigger(t *testing.T) {
 
 		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceGitHubIssues, current, current))
 	})
+
+	t.Run("sees a Productive task list filter turn on", func(t *testing.T) {
+		current := defaultProductiveIntakeSettings()
+		updated := current
+		updated.TaskListIDs = []string{"list-bugs"}
+
+		assert.True(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceProductiveTasks, current, updated))
+		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceProductiveTasks, updated, updated))
+	})
 }
 
 func Test__intakeFilterExpressionFor_SuperplaneLabelAdded(t *testing.T) {
@@ -414,6 +423,29 @@ func Test__intakeFilterExpressionFor_SentryLevels(t *testing.T) {
 	})
 }
 
+func Test__intakeFilterExpressionFor_DependabotSeverities(t *testing.T) {
+	t.Run("accepts every severity when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, defaultDependabotIntakeSettings())
+		assert.Equal(t, "true", expression)
+	})
+
+	t.Run("builds a severity membership check in a stable order", func(t *testing.T) {
+		settings := defaultDependabotIntakeSettings()
+		settings.DependabotSeverities = []string{"low", "critical", "unknown"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, settings)
+
+		assert.Equal(t, `(root().data.alert.security_advisory.severity ?? "") in ["critical","low"]`, expression)
+	})
+
+	t.Run("treats every known severity as all severities", func(t *testing.T) {
+		settings := defaultDependabotIntakeSettings()
+		settings.DependabotSeverities = []string{"low", "medium", "high", "critical"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDependabotAlerts, settings)
+
+		assert.Equal(t, "true", expression)
+	})
+}
+
 func Test__intakeSettingsFromGraph_Sentry(t *testing.T) {
 	newSpec := func(actions []any, expression string) models.LiveCanvasSpec {
 		return models.LiveCanvasSpec{
@@ -641,26 +673,39 @@ func Test__intakeFilterExpressionFor_ProductiveKeyTasks(t *testing.T) {
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceProductiveTasks, settings)
 		assert.Equal(
 			t,
-			`(root().data.data.relationships.task_list.data.id ?? "") in ["list-a","list-b"]`,
+			`((root().data.meta?.event ?? "") != "task.updated" && (root().data.data.relationships.task_list.data.id ?? "") in ["list-a","list-b"] || (root().data.meta?.event ?? "") == "task.updated" && (root().data.meta?.task_list_move?.to ?? "") in ["list-a","list-b"] && (root().data.meta?.task_list_move?.from ?? "") != (root().data.meta?.task_list_move?.to ?? ""))`,
 			expression,
 		)
 
-		inList := map[string]any{
-			"data": map[string]any{
-				"relationships": map[string]any{
-					"task_list": map[string]any{"data": map[string]any{"id": "list-a"}},
+		taskOnList := func(event string, listID string, move map[string]any) map[string]any {
+			meta := map[string]any{"event": event}
+			if move != nil {
+				meta["task_list_move"] = move
+			}
+			return map[string]any{
+				"meta": meta,
+				"data": map[string]any{
+					"relationships": map[string]any{
+						"task_list": map[string]any{"data": map[string]any{"id": listID}},
+					},
 				},
-			},
+			}
 		}
-		otherList := map[string]any{
-			"data": map[string]any{
-				"relationships": map[string]any{
-					"task_list": map[string]any{"data": map[string]any{"id": "list-c"}},
-				},
-			},
-		}
-		assert.Equal(t, true, evalRootDataExpression(t, expression, inList))
-		assert.Equal(t, false, evalRootDataExpression(t, expression, otherList))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, taskOnList("task.created", "list-a", nil)))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.created", "list-c", nil)))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-a", nil)))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-a", map[string]any{
+			"from": "list-c",
+			"to":   "list-a",
+		})))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-a", map[string]any{
+			"from": "list-a",
+			"to":   "list-a",
+		})))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, taskOnList("task.updated", "list-c", map[string]any{
+			"from": "list-a",
+			"to":   "list-c",
+		})))
 
 		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceProductiveTasks, intakeGraph{FilterNodeID: intakeFilterNodeID}, models.LiveCanvasSpec{
 			Nodes: []models.Node{{
@@ -741,5 +786,55 @@ func Test__applyIntakeSettingsToGraph_Productive(t *testing.T) {
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
 			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
 		}, edges)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("listens for updates when a task list is selected", func(t *testing.T) {
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceProductiveTasks,
+			legacyGraph,
+			models.LiveCanvasSpec{Nodes: legacyNodes(), Edges: legacyEdges},
+			&pb.FactoryIntake_Settings{TaskListIds: []string{"list-bugs"}},
+			legacyNodes(),
+			append([]models.Edge{}, legacyEdges...),
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("stops listening for updates when the task list filter is cleared", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"actions": []any{"created", "updated"}},
+			},
+			{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": `(root().data.data.relationships.task_list.data.id ?? "") in ["list-bugs"]`},
+			},
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		graph := intakeGraph{
+			TriggerNodeID: intakeTriggerNodeID,
+			FilterNodeID:  intakeFilterNodeID,
+			CreateNodeID:  intakeCreateNodeID,
+		}
+
+		updated, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceProductiveTasks,
+			graph,
+			models.LiveCanvasSpec{Nodes: nodes},
+			&pb.FactoryIntake_Settings{TaskListIds: []string{}},
+			append([]models.Node{}, nodes...),
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, updated, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
 	})
 }
