@@ -13,7 +13,7 @@ vi.mock("@/api-client", () => ({
   factoriesListWorkOrders,
 }));
 
-import { useFactoryWorkOrdersPage } from "./useFactoryData";
+import { useFactoryBoardWorkOrders, useFactoryWorkOrdersPage } from "./useFactoryData";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -108,5 +108,46 @@ describe("useFactoryWorkOrdersPage", () => {
         }),
       }),
     );
+  });
+});
+
+describe("useFactoryBoardWorkOrders", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("scopes only the Done page to the line and the selected close result", async () => {
+    factoriesListWorkOrders.mockResolvedValue(ordersPage([]));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(
+      () =>
+        useFactoryBoardWorkOrders("org-1", "factory-1", {
+          userId: "user-1",
+          done: { lineId: "line-1", results: ["RESULT_FAILED"] },
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(factoriesListWorkOrders).toHaveBeenCalledTimes(3));
+    const queries = factoriesListWorkOrders.mock.calls.map(
+      (call) => call[0].query as { states?: string[]; lineId?: string; results?: string[] },
+    );
+    const closed = queries.find((query) => query.states?.[0] === "STATE_CLOSED");
+    const draft = queries.find((query) => query.states?.[0] === "STATE_DRAFT");
+    const open = queries.find((query) => query.states?.[0] === "STATE_OPEN");
+
+    expect(closed).toEqual(
+      expect.objectContaining({
+        states: ["STATE_CLOSED"],
+        results: ["RESULT_FAILED"],
+        lineId: "line-1",
+        userId: "user-1",
+      }),
+    );
+    expect(draft).toEqual(expect.objectContaining({ states: ["STATE_DRAFT"], userId: "user-1" }));
+    expect(draft?.lineId).toBeUndefined();
+    expect(draft?.results).toBeUndefined();
+    expect(open?.lineId).toBeUndefined();
+    expect(open?.results).toBeUndefined();
   });
 });

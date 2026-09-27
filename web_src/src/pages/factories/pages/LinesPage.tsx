@@ -12,7 +12,7 @@ import {
   useDeleteFactoryAutomation,
   useFactoryAutomations,
   useFactoryBoardWorkOrders,
-  type FactoryWorkOrdersPageOptions,
+  type FactoryBoardWorkOrdersOptions,
   useUpdateFactoryLine,
   useWorkOrder,
   useWorkOrderArtifacts,
@@ -117,7 +117,7 @@ import {
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
@@ -231,13 +231,21 @@ function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
   return scope === "my" ? "my" : "all";
 }
 
-function boardWorkOrdersPageOptions(state: WorkOrderListState, currentUserId?: string): FactoryWorkOrdersPageOptions {
+function boardWorkOrdersPageOptions(
+  state: WorkOrderListState,
+  lineId: string | undefined,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
   const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
   const scope = lineBoardWorkOrderScope(state.scope);
   return {
     userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
     unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
     requireUser: scope === "my" && ownerIds.length !== 1,
+    done: {
+      lineId,
+      results: boardDoneResultsForStatuses(state.filters.statuses),
+    },
   };
 }
 
@@ -313,7 +321,11 @@ export function LinesPage() {
     backlog: backlogPage,
     open: openPage,
     done: donePage,
-  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, currentUserId));
+  } = useFactoryBoardWorkOrders(
+    organizationId,
+    factoryId,
+    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId),
+  );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
