@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
@@ -29,6 +30,7 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
+import { useDuplicateWorkOrder } from "../../useDuplicateWorkOrder";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -198,6 +200,7 @@ function AnalysisWorkOrderPopup({
             edits,
             fixture,
             organizationId,
+            factoryId,
             factoryKey,
             orderNumber,
             lineId,
@@ -235,10 +238,41 @@ function useAnalysisPopupEdits(args: {
   });
 }
 
+function SplitRunPopupHeaderActions({
+  organizationId,
+  factoryId,
+  factoryKey,
+  lineId,
+  title,
+  description,
+  ...actions
+}: {
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  lineId?: string;
+  title: string;
+  description?: string;
+} & ComponentProps<typeof PopupHeaderActions>) {
+  const { canAct } = usePermissions();
+  const duplicateWorkOrder = useDuplicateWorkOrder({ organizationId, factoryId, factoryKey, lineId });
+  return (
+    <PopupHeaderActions
+      {...actions}
+      canDuplicate={canAct("work_orders", "create")}
+      duplicateBusy={duplicateWorkOrder.isPending}
+      onDuplicate={() => {
+        void duplicateWorkOrder.duplicate({ title, description });
+      }}
+    />
+  );
+}
+
 function analysisPopupHeader(args: {
   edits: ReturnType<typeof useAnalysisPopupEdits>;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   organizationId?: string;
+  factoryId?: string;
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
@@ -259,11 +293,17 @@ function analysisPopupHeader(args: {
       expanded={args.fullPage}
       onToggleExpanded={args.toggleFullPage}
       actions={
-        <PopupHeaderActions
+        <SplitRunPopupHeaderActions
           copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
           onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
           archiveBusy={args.footerBusy}
           taskActions={args.reviewActions}
+          organizationId={args.organizationId}
+          factoryId={args.factoryId}
+          factoryKey={args.factoryKey}
+          lineId={args.lineId}
+          title={args.fixture.title}
+          description={args.fixture.descriptionText}
         />
       }
       accessory={views}

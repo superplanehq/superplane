@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router";
 
 import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
@@ -28,7 +29,9 @@ export function WorkOrderPopupTabsCompare() {
 
   return (
     <QueryClientProvider client={COMPARE_CLIENT}>
-      <WorkOrderSplitRunPopup fixture={compareFixture} />
+      <MemoryRouter>
+        <WorkOrderSplitRunPopup fixture={compareFixture} />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
