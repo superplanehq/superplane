@@ -61,39 +61,36 @@ describe("ProductiveIntakeFilterFields", () => {
     });
   });
 
-  it("hides the key-task filter for a GitHub intake", () => {
+  it("hides Productive.io filters for a GitHub intake", () => {
     render(<FilterHarness sourceId="github-issues" initial={DEFAULT_GITHUB_INTAKE_SETTINGS} />);
 
-    expect(screen.queryByRole("checkbox", { name: "Ignore key tasks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
   });
 
-  it("shows the key-task filter on for a Productive.io intake", () => {
+  it("shows the task list filter for a Productive.io intake", () => {
     render(<FilterHarness sourceId="productive-tasks" initial={DEFAULT_PRODUCTIVE_INTAKE_SETTINGS} />);
 
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Ignore key tasks" })).toBeChecked();
-    expect(screen.getByText("SuperPlane skips Productive key tasks (milestones).")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Ignore key tasks" })).not.toBeInTheDocument();
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskList)).toBeInTheDocument();
   });
 
-  it("puts excludeKeyTasks on the save payload", async () => {
+  it("keeps excludeKeyTasks on the save payload", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     render(<FilterHarness sourceId="productive-tasks" initial={DEFAULT_PRODUCTIVE_INTAKE_SETTINGS} onSave={onSave} />);
 
-    await user.click(screen.getByRole("checkbox", { name: "Ignore key tasks" }));
+    await user.click(screen.getByRole("checkbox", { name: "Bugs" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ excludeKeyTasks: false }));
-    expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({ excludeKeyTasks: false });
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ excludeKeyTasks: true }));
+    expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({ excludeKeyTasks: true });
   });
 
   it("loads the project task lists and saves the selected ones", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     render(<FilterHarness sourceId="productive-tasks" initial={DEFAULT_PRODUCTIVE_INTAKE_SETTINGS} onSave={onSave} />);
-
-    expect(screen.queryByRole("checkbox", { name: "Bugs" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("checkbox", { name: PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskList }));
 
     expect(useIntegrationResources).toHaveBeenLastCalledWith(
       "org-1",
@@ -102,6 +99,7 @@ describe("ProductiveIntakeFilterFields", () => {
       { project: "project-1" },
       { enabled: true },
     );
+    expect(screen.getByTestId("intake-task-list-options")).toBeInTheDocument();
     expect(screen.getByText(PRODUCTIVE_INTAKE_SETTINGS_COPY.taskListsNoneSelected)).toBeInTheDocument();
 
     await user.click(screen.getByRole("checkbox", { name: "Bugs" }));
@@ -109,24 +107,6 @@ describe("ProductiveIntakeFilterFields", () => {
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ taskListIds: ["list-bugs"] }));
     expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({ taskListIds: ["list-bugs"] });
-  });
-
-  it("clears the selected task lists when the task list filter is turned off", async () => {
-    const onSave = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <FilterHarness
-        sourceId="productive-tasks"
-        initial={{ ...DEFAULT_PRODUCTIVE_INTAKE_SETTINGS, taskListIds: ["list-backlog"] }}
-        onSave={onSave}
-      />,
-    );
-
-    expect(screen.getByRole("checkbox", { name: "Backlog" })).toBeChecked();
-    await user.click(screen.getByRole("checkbox", { name: PRODUCTIVE_INTAKE_SETTINGS_COPY.filterByTaskList }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ taskListIds: [] }));
   });
 
   it("keeps a selected task list that the project no longer returns", () => {

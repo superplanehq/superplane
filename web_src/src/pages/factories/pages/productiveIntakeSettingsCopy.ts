@@ -1,7 +1,5 @@
 export const PRODUCTIVE_INTAKE_SETTINGS_COPY = {
   filtersLabel: "Filters",
-  excludeKeyTasks: "Ignore key tasks",
-  excludeKeyTasksHelper: "SuperPlane skips Productive key tasks (milestones).",
   filterByTaskList: "Task is in one of these task lists",
   taskListsLoading: "Loading task lists from the project",
   taskListsEmpty: "No active task lists found in the project.",
