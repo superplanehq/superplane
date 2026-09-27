@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -110,6 +111,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errCannotCloseBitbucketPullRequest):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
+	case errors.Is(err, errCannotClosePullRequest):
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
+	case errors.Is(err, errWorkOrderNotClosedForBacklog):
+		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
 		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
@@ -138,6 +145,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
 		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
+	case errors.Is(err, models.ErrFactoryAgentResourceURLTaken):
+		return grpcerrors.AlreadyExists(err, "This MCP server is already connected.")
 	case errors.Is(err, models.ErrFactoryAgentResourceAuthInvalid):
 		return grpcerrors.InvalidArgument(err, "auth must be headers or oauth")
 	case errors.Is(err, models.ErrFactoryAgentResourceURLRequired):
@@ -160,6 +169,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
 		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
+	case errors.Is(err, ghdependabot.ErrAlertsDisabled):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsDisabledMessage)
+	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsUnreadableMessage)
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
@@ -201,6 +214,9 @@ var errListMCPTools = errors.New("could not list MCP tools")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
+var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
+var errCannotClosePullRequest = errors.New("could not close a previous pull request")
+var errWorkOrderNotClosedForBacklog = errors.New("only a closed task can move to the backlog")
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

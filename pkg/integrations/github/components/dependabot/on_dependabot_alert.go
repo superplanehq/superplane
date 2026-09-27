@@ -56,7 +56,7 @@ func (a *OnAlert) Documentation() string {
 
 Each alert event includes:
 - **action**: The action that triggered the event (created, reopened, reintroduced, fixed, dismissed)
-- **alert**: The Dependabot alert, including the package, manifest, severity, and advisory
+- **alert**: The Dependabot alert, including the package, manifest, severity, advisory, and whether the dependency is direct or transitive
 - **repository**: Repository information
 - **sender**: User or app that triggered the event
 
@@ -83,6 +83,7 @@ func (a *OnAlert) ExampleData() map[string]any {
 			"action": "created",
 			"alert": map[string]any{
 				"number":   7,
+				"state":    "open",
 				"html_url": "https://github.com/acme/payments/security/dependabot/7",
 				"dependency": map[string]any{
 					"package": map[string]any{
@@ -90,6 +91,8 @@ func (a *OnAlert) ExampleData() map[string]any {
 						"ecosystem": "npm",
 					},
 					"manifest_path": "package.json",
+					"scope":         "runtime",
+					"relationship":  "transitive",
 				},
 				"security_advisory": map[string]any{
 					"summary":  "Prototype pollution in lodash",

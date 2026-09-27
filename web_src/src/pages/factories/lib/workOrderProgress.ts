@@ -15,10 +15,9 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 
 /**
  * Display vocabulary for the Tasks workspace: Draft, Running, Waiting,
- * Completed, Failed, Rejected, Canceled. The idle-open key stays
- * `waiting` so stored filters keep working. Persisted state + result
- * columns in the database stay unchanged; this file is the single mapping
- * layer.
+ * Completed, Failed, Rejected, Canceled. The idle-open key stays `waiting` so
+ * stored filters keep working. Persisted state + result columns in the
+ * database stay unchanged; this file is the single mapping layer.
  */
 export type WorkOrderDisplayStatus =
   | "draft"
@@ -90,7 +89,7 @@ const DISPLAY_STATUS_META: Record<
   cancelled: {
     label: "Canceled",
     filterLabel: "Canceled",
-    summary: "This task was canceled.",
+    summary: "Stop and Close ended this task.",
     className:
       "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
     dotClassName: "bg-[color:var(--status-cancelled-dot)]",
@@ -106,6 +105,25 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "rejected",
   "cancelled",
 ];
+
+/** Statuses that stay on the board. Rejected and Canceled open the closed-tasks dialog. */
+export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = [
+  "draft",
+  "running",
+  "waiting",
+  "completed",
+  "failed",
+];
+
+export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["rejected", "cancelled"];
+
+export function isWorkOrderDialogStatus(status: string): status is "rejected" | "cancelled" {
+  return status === "rejected" || status === "cancelled";
+}
+
+export function isWorkOrderRecoveryStatus(status: string): status is "failed" | "rejected" | "cancelled" {
+  return status === "failed" || isWorkOrderDialogStatus(status);
+}
 
 /** Board lanes used across every layout. Order matters — Board renders them left-to-right. */
 export type WorkOrderBoardLaneId = "backlog" | "running" | "review" | "done";
@@ -139,8 +157,8 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
     id: "done",
     title: "Done",
-    description: "Completed, failed, rejected, or canceled work.",
-    statuses: ["completed", "failed", "rejected", "cancelled"],
+    description: "Completed and failed work.",
+    statuses: ["completed", "failed"],
   },
 ];
 

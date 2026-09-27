@@ -122,6 +122,10 @@ func newLiveIntakeItemSource(
 		productiveSource.excludeKeyTasks = settings.ExcludeKeyTasks
 		productiveSource.taskListIDs = settings.TaskListIDs
 	}
+	if dependabotSource, ok := source.(*dependabotIntakeItemSource); ok {
+		settings := liveIntakeSettings(tx, models.FactoryIntakeSourceDependabotAlerts, intake.CanvasID, defaultDependabotIntakeSettings())
+		dependabotSource.severities = settings.DependabotSeverities
+	}
 	return source, nil
 }
 
@@ -444,9 +448,14 @@ func (s *gitHubIntakeItemSource) IsItemAvailable(ctx context.Context, id string)
 	return !strings.EqualFold(issue.GetState(), "closed"), nil
 }
 
+// dependabotIntakeItemSource lists one item per vulnerable package. GitHub
+// raises one alert per advisory per manifest, and one dependency update fixes
+// them all, so the picker and the import work on packages.
 type dependabotIntakeItemSource struct {
 	github     *common.Client
 	repository string
+	// Severities that still create a task. Empty means every severity.
+	severities []string
 }
 
 func newDependabotIntakeItemSource(
@@ -472,23 +481,14 @@ func newDependabotIntakeItemSource(
 
 func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
 	query = strings.ToLower(strings.TrimSpace(query))
-	var alerts []*github.DependabotAlert
-	var err error
-	if query == "" {
-		alerts, _, err = s.github.ListOpenDependabotAlerts(ctx, s.repository, limit)
-	} else {
-		alerts, err = s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
-	}
+	groups, err := s.packageGroups(ctx)
 	if err != nil {
-		return nil, ghdependabot.UnavailableError(err)
+		return nil, err
 	}
 
-	items := make([]IntakeItem, 0, len(alerts))
-	for _, alert := range alerts {
-		item, ok := dependabotAlertItem(alert)
-		if !ok {
-			continue
-		}
+	items := make([]IntakeItem, 0, len(groups))
+	for _, group := range groups {
+		item := dependabotPackageItem(group)
 		if query != "" && !strings.Contains(strings.ToLower(item.Title+" "+item.Body), query) {
 			continue
 		}
@@ -501,42 +501,109 @@ func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, l
 }
 
 func (s *dependabotIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
-	number, err := strconv.Atoi(strings.TrimSpace(id))
-	if err != nil || number <= 0 {
-		return nil, errIntakeItemNotFound
-	}
-
-	alert, _, err := s.github.GetDependabotAlert(ctx, s.repository, number)
-	if err != nil {
-		if common.IsNotFoundError(err) {
-			return nil, errIntakeItemNotFound
-		}
-		return nil, ghdependabot.UnavailableError(err)
-	}
-
-	item, ok := dependabotAlertItem(alert)
+	ref, ok := dependabotPackageRefFromItemID(s.repository, id)
 	if !ok {
 		return nil, errIntakeItemNotFound
 	}
-	return &item, nil
+
+	groups, err := s.packageGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		if group.ref.Matches(ref) {
+			item := dependabotPackageItem(group)
+			return &item, nil
+		}
+	}
+	return nil, errIntakeItemNotFound
 }
 
-func dependabotAlertItem(alert *github.DependabotAlert) (IntakeItem, bool) {
+func (s *dependabotIntakeItemSource) packageGroups(ctx context.Context) ([]dependabotPackageGroup, error) {
+	alerts, err := s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
+	if err != nil {
+		return nil, ghdependabot.UnavailableError(err)
+	}
+	return dependabotPackageGroups(s.repository, alerts, s.severities), nil
+}
+
+// dependabotPackageGroup is every open alert of one package, newest first.
+type dependabotPackageGroup struct {
+	ref    ghdependabot.PackageRef
+	alerts []*github.DependabotAlert
+}
+
+// dependabotPackageGroups folds open alerts into one group per package. It
+// keeps the order of first appearance, so a package with a newer alert
+// lists first. Alerts outside the configured severities are dropped.
+func dependabotPackageGroups(repository string, alerts []*github.DependabotAlert, severities []string) []dependabotPackageGroup {
+	groups := []dependabotPackageGroup{}
+	for _, alert := range alerts {
+		if !dependabotAlertImportable(alert, severities) {
+			continue
+		}
+		ref, ok := ghdependabot.PackageRefFromAlert(repository, alert)
+		if !ok {
+			continue
+		}
+		index := slices.IndexFunc(groups, func(group dependabotPackageGroup) bool {
+			return group.ref.Matches(ref)
+		})
+		if index < 0 {
+			groups = append(groups, dependabotPackageGroup{ref: ref})
+			index = len(groups) - 1
+		}
+		groups[index].alerts = append(groups[index].alerts, alert)
+	}
+	return groups
+}
+
+func dependabotAlertImportable(alert *github.DependabotAlert, severities []string) bool {
 	if alert == nil || alert.GetNumber() <= 0 || !strings.EqualFold(alert.GetState(), "open") {
-		return IntakeItem{}, false
+		return false
 	}
-	copy := ghdependabot.TaskCopyFromAlert(alert)
-	page := strings.TrimSpace(alert.GetHTMLURL())
-	if page == "" {
-		return IntakeItem{}, false
+	if strings.TrimSpace(alert.GetHTMLURL()) == "" {
+		return false
 	}
-	number := strconv.Itoa(alert.GetNumber())
+	if len(severities) == 0 {
+		return true
+	}
+	severity := ""
+	if alert.SecurityAdvisory != nil {
+		severity = strings.ToLower(strings.TrimSpace(alert.SecurityAdvisory.GetSeverity()))
+	}
+	return slices.Contains(severities, severity)
+}
+
+func dependabotPackageItem(group dependabotPackageGroup) IntakeItem {
+	copy := ghdependabot.TaskCopyFromAlerts(group.ref, group.alerts)
+	key := "1 alert"
+	if len(group.alerts) != 1 {
+		key = strconv.Itoa(len(group.alerts)) + " alerts"
+	}
 	return IntakeItem{
-		ID:    number,
-		Key:   "#" + number,
+		ID:    dependabotPackageItemID(group.ref),
+		Key:   key,
 		Title: copy.Title,
 		Body:  copy.Description,
-		URL:   page,
+		URL:   group.ref.OriginURL(),
+	}
+}
+
+// dependabotPackageItemID is `ecosystem:name`, such as `npm:lodash`.
+func dependabotPackageItemID(ref ghdependabot.PackageRef) string {
+	return ref.Ecosystem + ":" + ref.Name
+}
+
+func dependabotPackageRefFromItemID(repository, id string) (ghdependabot.PackageRef, bool) {
+	ecosystem, name, ok := strings.Cut(strings.TrimSpace(id), ":")
+	if !ok || strings.TrimSpace(name) == "" {
+		return ghdependabot.PackageRef{}, false
+	}
+	return ghdependabot.PackageRef{
+		Repository: repository,
+		Ecosystem:  strings.ToLower(strings.TrimSpace(ecosystem)),
+		Name:       strings.TrimSpace(name),
 	}, true
 }
 

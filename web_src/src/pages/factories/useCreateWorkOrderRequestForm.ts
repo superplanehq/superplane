@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { showErrorToast } from "@/lib/toast";
+import { revokeWorkOrderFilePreviewUrl } from "@/lib/workOrderFiles";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import type { CreateWorkOrderRequestDraft } from "./CreateWorkOrderRequestDialog";
 import {
   appendUploadedWorkOrderImages,
   countCreateWorkOrderRequestImages,
+  isVisualUploadedWorkOrderFile,
   removeCreateWorkOrderRequestMarkdownImage,
   selectCreateWorkOrderRequestUploads,
 } from "./lib/createWorkOrderRequestImages";
@@ -88,7 +90,7 @@ export function useCreateWorkOrderRequestForm({
       countCreateWorkOrderRequestImages(description, attachedFilesRef.current),
     );
     if (selected.rejectedCount > 0) {
-      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images.`);
+      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
     }
     if (selected.accepted.length === 0) {
       return [];
@@ -105,6 +107,7 @@ export function useCreateWorkOrderRequestForm({
   };
 
   const handleRemoveAttachment = (id: string) => {
+    revokeWorkOrderFilePreviewUrl(id);
     setAttachedFiles((current) => current.filter((file) => file.id !== id));
     const nextDescription = removeCreateWorkOrderRequestMarkdownImage(description, id);
     if (nextDescription !== description) {
@@ -116,7 +119,7 @@ export function useCreateWorkOrderRequestForm({
     attachedFiles,
     busy,
     canAttach: !busy,
-    pendingFiles: attachedFiles.filter((file) => !file.isImage),
+    pendingFiles: attachedFiles.filter((file) => !isVisualUploadedWorkOrderFile(file)),
     canCreate,
     derivedTitle,
     titleDirty,

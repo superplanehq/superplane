@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -180,6 +182,27 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 	r := support.Setup(t)
 	defer r.Close()
 
+	dependabotPayload := func(number int, manifest string) map[string]any {
+		return map[string]any{
+			"type": ghdependabot.AlertPayloadType,
+			"data": map[string]any{
+				"action": "created",
+				"alert": map[string]any{
+					"number":   number,
+					"html_url": "https://github.com/acme/payments/security/dependabot/" + strconv.Itoa(number),
+					"dependency": map[string]any{
+						"package":       map[string]any{"name": "lodash", "ecosystem": "npm"},
+						"manifest_path": manifest,
+					},
+					"security_advisory": map[string]any{
+						"summary":  "Prototype pollution in lodash",
+						"severity": "high",
+					},
+				},
+			},
+		}
+	}
+
 	sentryPayload := func(issueID string) map[string]any {
 		return map[string]any{
 			"type": "sentry.issue",
@@ -329,39 +352,69 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Equal(t, 2, countOrders(factoryModel))
 	})
 
-	t.Run("skips a Dependabot alert that already has a task", func(t *testing.T) {
+	t.Run("merges a Dependabot alert into the open task for its package", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
-		_, err = factoryModel.CreateWorkOrderWithOrigin(
+		packageRef := ghdependabot.PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}
+		existing, err := factoryModel.CreateWorkOrderWithOrigin(
 			database.Conn(),
-			"Bump lodash",
-			"",
+			"Fix Dependabot alerts for lodash (npm)",
+			"## Alerts\n\n### #7 Prototype pollution\nhttps://github.com/acme/payments/security/dependabot/7",
 			nil,
 			nil,
 			nil,
-			models.WorkOrderOrigin{
-				URL:   "https://github.com/acme/payments/security/dependabot/7",
-				Label: "acme/payments dependabot #7",
-			},
+			packageRef.Origin(),
 		)
 		require.NoError(t, err)
 
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
-			"type": "github.dependabotAlert",
-			"data": map[string]any{
-				"action": "created",
-				"alert": map[string]any{
-					"html_url": "https://github.com/acme/payments/security/dependabot/7",
-				},
-			},
-		})
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, dependabotPayload(8, "package-lock.json"))
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Bump lodash"})
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Fix Dependabot alerts for lodash (npm)"})
 		require.NoError(t, err)
 		assert.False(t, created)
 		assert.Nil(t, order)
 		assert.Equal(t, 1, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		assert.Contains(t, reloaded.Description, "### #8 Prototype pollution in lodash\nSeverity: high\nManifest: package-lock.json")
+		assert.Contains(t, reloaded.Description, "https://github.com/acme/payments/security/dependabot/7\n\n### #8")
+	})
+
+	t.Run("opens a new Dependabot task when the package task is closed", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		packageRef := ghdependabot.PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}
+		closed, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Fix Dependabot alerts for lodash (npm)",
+			"",
+			nil,
+			nil,
+			nil,
+			packageRef.Origin(),
+		)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(closed).Update("state", models.FactoryWorkOrderStateClosed).Error)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, dependabotPayload(9, "package.json"))
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceDependabotAlerts)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Fix Dependabot alerts for lodash (npm)"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(order.ID))
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.OriginURL)
+		assert.Equal(t, packageRef.OriginURL(), *reloaded.OriginURL)
+		require.NotNil(t, reloaded.OriginLabel)
+		assert.Equal(t, "Dependabot: lodash", *reloaded.OriginLabel)
 	})
 
 	t.Run("serializes concurrent creates for the same Sentry issue", func(t *testing.T) {
