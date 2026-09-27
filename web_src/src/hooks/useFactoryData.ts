@@ -206,6 +206,15 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
 
 export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & { requireUser?: boolean };
 
+export type FactoryBoardDoneQuery = {
+  lineId?: string;
+  results?: readonly FactoriesWorkOrderResult[];
+};
+
+export type FactoryBoardWorkOrdersOptions = FactoryWorkOrdersPageOptions & {
+  done?: FactoryBoardDoneQuery;
+};
+
 function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions): WorkOrdersPageQuery {
   return normalizeWorkOrdersPageQuery({
     userId: options?.userId,
@@ -294,22 +303,36 @@ export function mergeFactoryBoardWorkOrders(
   return uniqueWorkOrdersById([...backlog, ...open, ...done]);
 }
 
+function sharedBoardPageOptions(options?: FactoryBoardWorkOrdersOptions): FactoryWorkOrdersPageOptions | undefined {
+  if (!options) {
+    return undefined;
+  }
+  return {
+    userId: options.userId,
+    unassigned: options.unassigned,
+    requireUser: options.requireUser,
+  };
+}
+
 export function useFactoryBoardWorkOrders(
   organizationId: string,
   factoryId: string,
-  options?: FactoryWorkOrdersPageOptions,
+  options?: FactoryBoardWorkOrdersOptions,
 ): FactoryBoardWorkOrders {
+  const shared = sharedBoardPageOptions(options);
   const backlog = useFactoryWorkOrdersPage(
     organizationId,
     factoryId,
     BOARD_BACKLOG_STATES,
     BOARD_BACKLOG_PAGE_SIZE,
-    options,
+    shared,
   );
-  const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, options);
+  const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, shared);
+  const doneResults = options?.done?.results;
   const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
-    ...options,
-    results: BOARD_DONE_RESULTS,
+    ...shared,
+    lineId: options?.done?.lineId,
+    results: doneResults && doneResults.length > 0 ? doneResults : BOARD_DONE_RESULTS,
   });
 
   return {
