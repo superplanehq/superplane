@@ -26,9 +26,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
   const helper =
     setup.step === "connection"
       ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : setup.skipInitialImport
-        ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
-        : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const onConnectionStep = setup.step === "connection" && !setup.connectedQuery.isLoading;
   const hasConnections = setup.productiveIntegrations.length > 0;
   // A broken account is only replaceable while Connect stays reachable, so the
@@ -147,8 +145,13 @@ function SetupFooter({ setup, onCreated }: { setup: ProductiveIntakeSetupModel; 
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
-        checked={setup.skipInitialImport}
-        onCheckedChange={setup.setSkipInitialImport}
+        checked={!setup.skipInitialImport}
+        onCheckedChange={(importExisting) => setup.setSkipInitialImport(!importExisting)}
+        helper={
+          setup.skipInitialImport
+            ? PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelperOff
+            : PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelper
+        }
         testId="productive-skip-initial-import"
       />
       <Button
