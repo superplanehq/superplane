@@ -50,11 +50,7 @@ func ListFactoryWorkOrderRunUsage(
 		return nil, grpcerrors.Internal(err, "failed to list factory work order run usage")
 	}
 
-	candidates, err := models.ClaudeAliasCandidateIDs(db, orgID, &factoryID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list factory work order run usage")
-	}
-	rows = resolveRunUsageModelAliases(rows, candidates)
+	rows = resolveRunUsageModelAliases(rows)
 
 	return &pb.ListFactoryWorkOrderRunUsageResponse{
 		Rows:       serializeWorkOrderRunUsageRows(factory, rows),
@@ -62,22 +58,22 @@ func ListFactoryWorkOrderRunUsage(
 	}, nil
 }
 
-func resolveRunUsageModelAliases(rows []models.WorkOrderRunUsage, candidates []string) []models.WorkOrderRunUsage {
+func resolveRunUsageModelAliases(rows []models.WorkOrderRunUsage) []models.WorkOrderRunUsage {
 	for i := range rows {
-		rows[i].Models = resolveModelNames(rows[i].Models, candidates)
-		rows[i].BYOKModels = resolveModelNames(rows[i].BYOKModels, candidates)
+		rows[i].Models = resolveModelNames(rows[i].Models)
+		rows[i].BYOKModels = resolveModelNames(rows[i].BYOKModels)
 	}
 	return rows
 }
 
-func resolveModelNames(names []string, candidates []string) []string {
+func resolveModelNames(names []string) []string {
 	if len(names) == 0 {
 		return names
 	}
 	seen := map[string]struct{}{}
 	out := make([]string, 0, len(names))
 	for _, name := range names {
-		concrete := models.ConcreteClaudeModelID(name, candidates)
+		concrete := models.ConcreteClaudeModelID(name, nil)
 		if _, dup := seen[concrete]; dup {
 			continue
 		}

@@ -247,6 +247,51 @@ func assertCanvasNodeReady(t *testing.T, db *gorm.DB, canvasID uuid.UUID, nodeID
 	assert.Nil(t, node.StateReason)
 }
 
+func Test__ProviderModelListUsesDefaults(t *testing.T) {
+	t.Parallel()
+
+	unavailable := core.NewProviderAPIError(503, "unavailable", errors.New("unavailable"))
+	rateLimited := core.NewProviderAPIError(429, "rate limited", errors.New("rate limited"))
+	transport := core.NewProviderTransportError("timeout", errors.New("timeout"))
+	unauthorized := core.NewProviderAPIError(401, "credentials are invalid", errors.New("unauthorized"))
+
+	assert.True(t, providerModelListUsesDefaults(grpcerrors.FailedPrecondition(unavailable, "list models")))
+	assert.True(t, providerModelListUsesDefaults(grpcerrors.ResourceExhausted(rateLimited, "list models")))
+	assert.True(t, providerModelListUsesDefaults(grpcerrors.FailedPrecondition(transport, "list models")))
+	assert.False(t, providerModelListUsesDefaults(grpcerrors.FailedPrecondition(unauthorized, "list models")))
+	assert.False(t, providerModelListUsesDefaults(errors.New("boom")))
+}
+
+func Test__SwitchFactoryModelSource__UsesDefaultsWhenTheModelListIsUnavailable(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	r.Registry.Integrations["claude"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			return nil, core.NewProviderAPIError(503, "unavailable", errors.New("unavailable"))
+		},
+	})
+
+	changed, integrationID, err := SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceAnthropic,
+		"sk-test",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{canvas.ID}, changed)
+	assert.NotEmpty(t, integrationID)
+	assertAgentNode(t, db, canvas.ID, "runnerClaudeCode", "claude-opus-5-5", "claude")
+
+	var integrations []models.Integration
+	require.NoError(t, db.Where("organization_id = ? AND app_name = ?", r.Organization.ID, "claude").Find(&integrations).Error)
+	assert.Len(t, integrations, 1)
+}
+
 func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

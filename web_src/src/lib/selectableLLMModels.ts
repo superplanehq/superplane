@@ -82,8 +82,8 @@ export function selectableLLMModelsForProvider(models: SelectableLLMModel[], pro
 
 const LEGACY_CLAUDE_MODEL_ALIASES = new Set(["haiku", "opus", "sonnet"]);
 const CLAUDE_OPUS_55 = "claude-opus-5-5";
-/** Models written by the previous Claude default. Opus 5.5 replaces them. */
-const PREVIOUS_CLAUDE_DEFAULTS = new Set(["claude-opus-4-6", "claude-sonnet-4-6", "sonnet", "opus", "haiku"]);
+/** Versioned ids written by the previous Claude default. */
+const PREVIOUS_CLAUDE_DEFAULTS = new Set(["claude-opus-4-6", "claude-sonnet-4-6"]);
 
 function modelLeaf(id: string): string {
   const trimmed = id.trim().toLowerCase();
@@ -96,15 +96,18 @@ export function defaultByokRunnerModel(current: string, provider: string, modelI
   const selected = current.trim();
   const leaf = modelLeaf(selected);
   const opus55 = modelIds.find((id) => modelLeaf(id) === CLAUDE_OPUS_55 || modelLeaf(id) === "claude-opus-5.5");
-  const replaceWithOpus55 =
-    provider === "anthropic" &&
-    Boolean(opus55) &&
-    (selected === "" || PREVIOUS_CLAUDE_DEFAULTS.has(leaf) || LEGACY_CLAUDE_MODEL_ALIASES.has(leaf));
-  if (replaceWithOpus55 && opus55 && opus55 !== selected) {
+  const replaceAliasOrEmpty =
+    provider === "anthropic" && Boolean(opus55) && (selected === "" || LEGACY_CLAUDE_MODEL_ALIASES.has(leaf));
+  if (replaceAliasOrEmpty && opus55 && opus55 !== selected) {
     return opus55;
   }
   if (modelIds.includes(selected)) {
     return undefined;
+  }
+  // A previous default that the key no longer offers can move to Opus 5.5.
+  // An id that is still allowed stays, even when Opus 5.5 is also allowed.
+  if (provider === "anthropic" && opus55 && PREVIOUS_CLAUDE_DEFAULTS.has(leaf) && opus55 !== selected) {
+    return opus55;
   }
   if (selected !== "" && !LEGACY_CLAUDE_MODEL_ALIASES.has(leaf)) {
     return undefined;

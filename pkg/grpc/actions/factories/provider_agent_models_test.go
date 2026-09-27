@@ -70,6 +70,21 @@ func Test__AgentModelsForSource__UsesVersionedIdsWhenTheKeyReturnsNoModels(t *te
 	assert.Equal(t, "anthropic/claude-opus-5-5", planning)
 }
 
+func Test__AgentModelsForSource__UsesDefaultsWhenNoPreferredModelMatches(t *testing.T) {
+	t.Parallel()
+
+	model, planning := agentModelsForSource(modelSourceOpenRouter, []string{
+		"meta/llama-3",
+		"openai/text-embedding-3-small",
+	})
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", model)
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", planning)
+
+	model, planning = agentModelsForSource(modelSourceAnthropic, []string{"claude-haiku-4-5"})
+	assert.Equal(t, "claude-opus-5-5", model)
+	assert.Equal(t, "claude-opus-5-5", planning)
+}
+
 func Test__CompareModelIDs__OrdersNumericRuns(t *testing.T) {
 	t.Parallel()
 

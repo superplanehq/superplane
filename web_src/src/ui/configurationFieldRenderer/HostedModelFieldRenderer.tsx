@@ -134,7 +134,7 @@ function ProviderBYOKModelField({
     <ModelThinkingSelect
       fieldName={field.name}
       model={shown}
-      committedModel={current}
+      committedModel={current.trim() === "" ? current : shown}
       thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
       placeholder={field.placeholder || "Select a model"}
       readOnly={readOnly}

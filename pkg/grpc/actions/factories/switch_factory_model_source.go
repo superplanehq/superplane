@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
@@ -353,10 +355,14 @@ func switchFactoryModelSource(
 		integrationName = integration.InstallationName
 		integrationID = integration.ID.String()
 		ids, err := organizations.ListConnectedBYOKModelIDs(tx, reg, integration)
-		if err != nil {
+		if err != nil && !providerModelListUsesDefaults(err) {
 			return nil, "", err
 		}
-		modelIDs = ids
+		if err != nil {
+			log.WithError(err).Warn("model list unavailable; switch uses default agent models")
+		} else {
+			modelIDs = ids
+		}
 	}
 	rewrite, err := workspaceAgentRewriteFor(source, integrationName, modelIDs)
 	if err != nil {
@@ -382,6 +388,17 @@ func switchFactoryModelSource(
 		return nil, "", err
 	}
 	return changed, integrationID, nil
+}
+
+// providerModelListUsesDefaults reports a temporary catalog failure.
+// An invalid key still stops the switch. A rate limit, outage, or transport
+// error uses the provider default models, the same path as an empty list.
+func providerModelListUsesDefaults(err error) bool {
+	var providerErr *core.ProviderAPIError
+	if !errors.As(err, &providerErr) {
+		return false
+	}
+	return providerErr.IsRateLimited() || providerErr.IsUnavailable() || providerErr.IsTransport()
 }
 
 func versionOwnerID(ctx context.Context) uuid.UUID {

@@ -25,6 +25,10 @@ const (
 	CanvasNodeExecutionResultReasonOk            = "ok"
 	CanvasNodeExecutionResultReasonError         = "error"
 	CanvasNodeExecutionResultReasonErrorResolved = "error_resolved"
+
+	// CanvasNodeExecutionFrozenComponentKey stores the component an execution
+	// started with when a later model-source switch replaces the runtime node.
+	CanvasNodeExecutionFrozenComponentKey = "frozenComponent"
 )
 
 var CanvasNodeExecutionActiveStates = []string{
@@ -97,8 +101,6 @@ type CanvasNodeExecution struct {
 func (e *CanvasNodeExecution) TableName() string {
 	return "workflow_node_executions"
 }
-
-const CanvasNodeExecutionFrozenComponentKey = "frozenComponent"
 
 func (e *CanvasNodeExecution) FrozenComponentName() string {
 	if e == nil {

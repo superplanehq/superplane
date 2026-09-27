@@ -2314,21 +2314,67 @@ func (b *NodeConfigurationBuilder) replaceClaudeModelAlias(resolved map[string]a
 	if !models.IsClaudeFamilyAlias(model) {
 		return resolved, nil
 	}
-	var candidates []string
-	if b.tx != nil && b.workflowID != uuid.Nil {
-		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		if err == nil {
-			candidates, err = models.ClaudeAliasCandidateIDs(b.tx, canvas.OrganizationID, canvas.FactoryID)
-			if err != nil {
-				return nil, err
-			}
-		}
+	candidates, err := b.claudeAliasCandidates(resolved)
+	if err != nil {
+		return nil, err
 	}
 	resolved["model"] = models.ConcreteClaudeModelID(model, candidates)
 	return resolved, nil
+}
+
+// claudeAliasCandidates lists models the executing node can run.
+// A Claude alias must not resolve to a model from another provider or funding source.
+func (b *NodeConfigurationBuilder) claudeAliasCandidates(resolved map[string]any) ([]string, error) {
+	if b.tx == nil || b.workflowID == uuid.Nil || b.nodeID == "" {
+		return nil, nil
+	}
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	provider, ok := claudeRunnerProvider(node.ComponentName())
+	if !ok {
+		return nil, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return models.ResolveSelectableLLMModels(
+		b.tx,
+		canvas.OrganizationID,
+		canvas.FactoryID,
+		provider,
+		llmFundingSource(resolved),
+	)
+}
+
+func claudeRunnerProvider(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func llmFundingSource(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
 }
 
 func applyLineDispatchThinking(resolved map[string]any, dispatchThinking string) map[string]any {

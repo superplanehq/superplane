@@ -329,6 +329,49 @@ describe("HostedModelFieldRenderer", () => {
     expect(screen.getByTestId("field-model-hosted-model-list")).toBeInTheDocument();
   });
 
+  it("saves the displayed model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "anthropic", "claude-opus-5-5")]);
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="opus"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "opus" }}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-opus-5-5", thinkingLevel: "high" });
+  });
+
+  it("keeps an empty BYOK model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
   it("writes thinkingLevel next to the model", async () => {
     const user = userEvent.setup();
     const onValuesChange = vi.fn();

@@ -66,10 +66,9 @@ func pickPreferredModel(preferred []string, modelIDs []string) string {
 			return match
 		}
 	}
-	if len(modelIDs) == 0 {
-		return ""
-	}
-	return modelIDs[0]
+	// An unmatched catalog entry is not an agent model. The caller uses the
+	// provider default instead of the first id in the list.
+	return ""
 }
 
 func pickModelContaining(modelIDs []string, hint string) string {

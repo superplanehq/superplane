@@ -71,12 +71,17 @@ describe("selectableLLMModelsForProvider", () => {
 describe("defaultByokRunnerModel", () => {
   const allowlist = ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"];
 
-  it("replaces a Claude alias or the previous default with Opus 5.5", () => {
+  it("replaces a Claude alias with Opus 5.5 and keeps an allowlisted previous default", () => {
     const withOpus55 = [...allowlist, "claude-opus-5-5"];
     expect(defaultByokRunnerModel("sonnet", "anthropic", withOpus55)).toBe("claude-opus-5-5");
     expect(defaultByokRunnerModel("opus", "anthropic", withOpus55)).toBe("claude-opus-5-5");
-    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", withOpus55)).toBe("claude-opus-5-5");
-    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", withOpus55)).toBe("claude-opus-5-5");
+    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", withOpus55)).toBeUndefined();
+    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", withOpus55)).toBeUndefined();
+  });
+
+  it("replaces a previous Claude default that the key no longer offers", () => {
+    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", ["claude-opus-5-5"])).toBe("claude-opus-5-5");
+    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", ["claude-opus-5-5"])).toBe("claude-opus-5-5");
   });
 
   it("prefers Claude Opus 5.5 when no model is selected", () => {
