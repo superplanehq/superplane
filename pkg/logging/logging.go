@@ -1,9 +1,55 @@
 package logging
 
 import (
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 )
+
+const (
+	// ComponentWebhookProductive is the Cloud Logging component for a
+	// Productive task webhook failure. Filter:
+	// jsonPayload.component="webhook.productive"
+	ComponentWebhookProductive = "webhook.productive"
+
+	productiveWebhookFailureMessage = "error handling webhook"
+	webhookTypeUnknown              = "unknown"
+	productiveTaskCreated           = "task.created"
+	productiveTaskUpdated           = "task.updated"
+)
+
+// WebhookNodeFields are the canvas and webhook ids added to a node logger
+// when a webhook delivery runs.
+type WebhookNodeFields struct {
+	OrganizationID string
+	CanvasID       string
+	WebhookID      string
+}
+
+// standardLogWriter sends Productive webhook JSON to the process logger
+// output. The process formatter stays text.
+type standardLogWriter struct{}
+
+func (standardLogWriter) Write(p []byte) (int, error) {
+	return log.StandardLogger().Out.Write(p)
+}
+
+func newProductiveWebhookLogger() *log.Logger {
+	logger := log.New()
+	logger.SetFormatter(&log.JSONFormatter{})
+	logger.SetOutput(standardLogWriter{})
+	logger.SetLevel(log.StandardLogger().GetLevel())
+	return logger
+}
+
+// productiveWebhookLogger writes one JSON object per Productive webhook failure.
+var productiveWebhookLogger = newProductiveWebhookLogger()
+
+// ProductiveWebhookLogger returns the JSON logger used for Productive webhook failures.
+func ProductiveWebhookLogger() *log.Logger {
+	return productiveWebhookLogger
+}
 
 func ForFactory(factory models.Factory) *log.Entry {
 	return WithFactory(log.NewEntry(log.StandardLogger()), factory)
@@ -96,4 +142,66 @@ func WithCanvas(logger *log.Entry, canvas models.Canvas) *log.Entry {
 	return logger.WithFields(log.Fields{
 		"canvas_id": canvas.ID,
 	})
+}
+
+// WithWebhookNode adds the SuperPlane organization, canvas, and webhook ids
+// to the logger passed into a webhook handler.
+func WithWebhookNode(logger *log.Entry, fields WebhookNodeFields) *log.Entry {
+	logFields := log.Fields{}
+	if fields.OrganizationID != "" {
+		logFields["organization_id"] = fields.OrganizationID
+	}
+	if fields.CanvasID != "" {
+		logFields["workflow_id"] = fields.CanvasID
+	}
+	if fields.WebhookID != "" {
+		logFields["webhook_id"] = fields.WebhookID
+	}
+	if len(logFields) == 0 {
+		return logger
+	}
+	return logger.WithFields(logFields)
+}
+
+// ProductiveWebhookType returns task.created or task.updated.
+// Any other delivery is unknown.
+func ProductiveWebhookType(event string) string {
+	switch strings.TrimSpace(event) {
+	case productiveTaskCreated, productiveTaskUpdated:
+		return strings.TrimSpace(event)
+	default:
+		return webhookTypeUnknown
+	}
+}
+
+func productiveWebhookFields(event string) log.Fields {
+	return log.Fields{
+		"component":   ComponentWebhookProductive,
+		"webhookType": ProductiveWebhookType(event),
+	}
+}
+
+// LogProductiveWebhookFailure writes one JSON failure line for a Productive
+// task webhook. component and webhookType stay set when fields repeat them.
+func LogProductiveWebhookFailure(event string, fields log.Fields, err error) {
+	productiveWebhookEntry(event, fields, err).Error(productiveWebhookFailureMessage)
+}
+
+// LogProductiveWebhookWarning writes one JSON warning line for a Productive
+// task webhook that succeeded with less data than expected.
+func LogProductiveWebhookWarning(event string, message string, fields log.Fields, err error) {
+	productiveWebhookEntry(event, fields, err).Warn(message)
+}
+
+func productiveWebhookEntry(event string, fields log.Fields, err error) *log.Entry {
+	productiveWebhookLogger.SetLevel(log.StandardLogger().GetLevel())
+	entry := log.NewEntry(productiveWebhookLogger)
+	if len(fields) > 0 {
+		entry = entry.WithFields(fields)
+	}
+	entry = entry.WithFields(productiveWebhookFields(event))
+	if err != nil {
+		entry = entry.WithError(err)
+	}
+	return entry
 }
