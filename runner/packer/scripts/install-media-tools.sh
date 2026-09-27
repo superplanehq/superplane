@@ -24,12 +24,26 @@ trap 'rm -rf "$WORKDIR"' EXIT
 cd "$WORKDIR"
 
 git clone --depth 1 --branch "$WHISPER_VERSION" "$WHISPER_REPO" whisper.cpp
-cmake -S whisper.cpp -B whisper.cpp/build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DWHISPER_BUILD_EXAMPLES=ON \
-  -DWHISPER_SDL2=OFF \
+
+# GCC 12 -mcpu=native on aarch64 reports +fp16fml and then drops dotprod,
+# i8mm, and sve when those runtime probes fail. ggml still compiles the FP16
+# NEON path, and vfmaq_f16 fails to inline. Pin a baseline that includes +fp16.
+# Apple Silicon and Graviton 2 (t4g) implement armv8.2-a+dotprod+fp16.
+CMAKE_ARGS=(
+  -DCMAKE_BUILD_TYPE=Release
+  -DBUILD_SHARED_LIBS=OFF
+  -DWHISPER_BUILD_EXAMPLES=ON
+  -DWHISPER_SDL2=OFF
   -DWHISPER_CURL=OFF
+)
+if [ "$(uname -m)" = "aarch64" ]; then
+  CMAKE_ARGS+=(
+    -DGGML_NATIVE=OFF
+    -DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16
+  )
+fi
+
+cmake -S whisper.cpp -B whisper.cpp/build "${CMAKE_ARGS[@]}"
 cmake --build whisper.cpp/build --config Release -j"$(nproc)" --target whisper-cli
 
 CLI=""
