@@ -45,6 +45,7 @@ export {
   ChecksPRFeedbackSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
+  GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
