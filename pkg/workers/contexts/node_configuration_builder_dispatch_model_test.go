@@ -309,7 +309,7 @@ func Test__Build__DoesNotOverlaySiblingCanvasModel(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "opus", resolved["model"])
+	assert.Equal(t, "claude-opus-5-5", resolved["model"])
 }
 
 func Test__Build__OverlaysLineDispatchModelOnSuperPlaneWithoutCanvasModel(t *testing.T) {
@@ -470,6 +470,55 @@ func setupRunnerAppExecution(
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
 	require.NoError(t, err)
 	return canvas, triggerEvent, run
+}
+
+func Test__Build__ResolvesClaudeAliasFromTheNodeSource(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-5"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(
+		db,
+		r.Organization.ID,
+		models.UsageProviderAnthropic,
+		datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+		_ = db.Where("organization_id = ? AND provider = ?", r.Organization.ID, models.UsageProviderAnthropic).
+			Delete(&models.OrganizationBYOKModelAllowlist{})
+	})
+
+	canvas, rootEvent, _ := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerClaudeCode")
+	builder := NewNodeConfigurationBuilder(db, canvas.ID).
+		WithNodeID("agent").
+		WithRootEvent(&rootEvent.ID)
+
+	byok, err := builder.Build(map[string]any{
+		"model": "sonnet",
+		"credentials": map[string]any{
+			"source": "integration",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "claude-sonnet-4-6", byok["model"])
+
+	hosted, err := builder.Build(map[string]any{
+		"model": "sonnet",
+		"credentials": map[string]any{
+			"source": "hosted",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "claude-sonnet-5", hosted["model"])
 }
 
 func createFactoryRunnerApp(
