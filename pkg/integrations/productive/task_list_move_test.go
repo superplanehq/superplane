@@ -2,6 +2,7 @@ package productive
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -158,15 +159,14 @@ func Test__Client__TaskUpdateChangesetAt(t *testing.T) {
 // The activity and task list bodies are Productive.io responses for a task
 // moved from Factory to Bugs.
 func Test__Client__TaskUpdateChangesetAt_ReadsProductiveTaskListLabels(t *testing.T) {
-	delivered, err := time.Parse(time.RFC3339Nano, "2026-09-27T19:29:02.000+02:00")
-	require.NoError(t, err)
+	delivered := testClock()
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"data":[
-			{"id":"312030744","type":"activities","attributes":{"event":"update","created_at":"2026-09-27T19:29:01.515+02:00",
+		jsonResponse(fmt.Sprintf(`{"data":[
+			{"id":"312030744","type":"activities","attributes":{"event":"update","created_at":%q,
 				"changeset":[{"task_list":[{"value":"Folder: Factory"},{"value":"Folder: Bugs"}]}]}},
-			{"id":"312030743","type":"activities","attributes":{"event":"update","created_at":"2026-09-27T19:28:58.610+02:00",
+			{"id":"312030743","type":"activities","attributes":{"event":"update","created_at":%q,
 				"changeset":[{"title":[{"value":"test"},{"value":"test 1 1 11"}]}]}}
-		]}`),
+		]}`, delivered.Add(-time.Second).Format(time.RFC3339Nano), delivered.Add(-4*time.Second).Format(time.RFC3339Nano))),
 		jsonResponse(`{"data":[
 			{"id":"2897278","type":"task_lists","attributes":{"name":"Bugs"},"relationships":{"folder":{"data":{"type":"folders","id":"1238177"}}}},
 			{"id":"2897297","type":"task_lists","attributes":{"name":"Factory"},"relationships":{"folder":{"data":{"type":"folders","id":"1238177"}}}}
