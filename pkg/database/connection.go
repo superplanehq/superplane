@@ -194,6 +194,12 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			runner_task_log_uploads,
+			runner_registrations,
+			runner_credentials,
+			runner_tasks,
+			runners,
+			runner_fleets,
 			secrets,
 			account_magic_codes,
 			account_password_auth,

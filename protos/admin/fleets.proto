@@ -1,0 +1,204 @@
+syntax = "proto3";
+
+package Superplane.Admin.Runners;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/admin/runners";
+
+service Runners {
+  rpc ListFleets(ListFleetsRequest) returns (ListFleetsResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/fleets"
+    };
+  }
+
+  rpc DescribeFleet(DescribeFleetRequest) returns (DescribeFleetResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/fleets/{fleet_id}"
+    };
+  }
+
+  rpc UpdateFleet(UpdateFleetRequest) returns (UpdateFleetResponse) {
+    option (google.api.http) = {
+      patch: "/admin/api/installation/fleets/{fleet_id}"
+      body: "*"
+    };
+  }
+
+  rpc GetFleetCapacity(GetFleetCapacityRequest) returns (GetFleetCapacityResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/fleets/{fleet_id}/capacity"
+    };
+  }
+
+  rpc ListFleetTasks(ListFleetTasksRequest) returns (ListFleetTasksResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/fleets/{fleet_id}/tasks"
+    };
+  }
+
+  rpc CreateRunner(CreateRunnerRequest) returns (CreateRunnerResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/fleets/{fleet_id}/runners"
+      body: "*"
+    };
+  }
+
+  rpc ListRunners(ListRunnersRequest) returns (ListRunnersResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/fleets/{fleet_id}/runners"
+    };
+  }
+
+  rpc DescribeRunner(DescribeRunnerRequest) returns (DescribeRunnerResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/fleets/{fleet_id}/runners/{runner_id}"
+    };
+  }
+
+  rpc DeleteRunner(DeleteRunnerRequest) returns (DeleteRunnerResponse) {
+    option (google.api.http) = {
+      delete: "/admin/api/installation/fleets/{fleet_id}/runners/{runner_id}"
+    };
+  }
+}
+
+message Fleet {
+  string id = 1;
+  bool enabled = 2;
+  FleetSpec spec = 3;
+  string runner_version = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message FleetSpec {
+  string operating_system = 1;
+  string architecture = 2;
+  int32 cpu_millicores = 3;
+  int32 memory_mb = 4;
+  int32 disk_gb = 5;
+  repeated string capabilities = 6;
+  int32 max_execution_timeout_seconds = 7;
+}
+
+message Runner {
+  string id = 1;
+  string fleet_id = 2;
+  string state = 3;
+  string runner_version = 4;
+  optional google.protobuf.Timestamp registered_at = 5;
+  optional google.protobuf.Timestamp last_seen_at = 6;
+  optional string termination_reason = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  optional google.protobuf.Timestamp terminated_at = 10;
+  bool ephemeral = 11;
+}
+
+message Task {
+  string id = 1;
+  string organization_id = 2;
+  string fleet_id = 3;
+  optional string runner_id = 4;
+  string state = 5;
+  google.protobuf.Timestamp queued_at = 6;
+  optional google.protobuf.Timestamp reserved_at = 7;
+  optional google.protobuf.Timestamp started_at = 8;
+  optional google.protobuf.Timestamp finished_at = 9;
+}
+
+message ListFleetsRequest {}
+
+message ListFleetsResponse {
+  repeated Fleet fleets = 1;
+}
+
+message DescribeFleetRequest {
+  string fleet_id = 1;
+}
+
+message DescribeFleetResponse {
+  Fleet fleet = 1;
+}
+
+message UpdateFleetRequest {
+  string fleet_id = 1;
+  optional string runner_version = 2;
+  optional bool enabled = 3;
+  FleetSpec spec = 4;
+}
+
+message UpdateFleetResponse {
+  Fleet fleet = 1;
+}
+
+message GetFleetCapacityRequest {
+  string fleet_id = 1;
+  optional string generation = 2;
+  optional int32 wait_seconds = 3;
+}
+
+message GetFleetCapacityResponse {
+  int64 runnable_tasks = 1;
+  int64 pending_runners = 2;
+  int64 idle_runners = 3;
+  int64 busy_runners = 4;
+  int64 terminated_runners = 5;
+  string generation = 6;
+}
+
+message ListFleetTasksRequest {
+  string fleet_id = 1;
+  repeated string states = 2;
+  optional int32 limit = 3;
+}
+
+message ListFleetTasksResponse {
+  repeated Task tasks = 1;
+}
+
+message CreateRunnerRequest {
+  string fleet_id = 1;
+  optional string task_id = 2;
+  string idempotency_key = 3;
+  bool ephemeral = 4;
+}
+
+message CreateRunnerResponse {
+  Runner runner = 1;
+  string registration_token = 2;
+  google.protobuf.Timestamp registration_expires_at = 3;
+  string runner_api_url = 4;
+  string display_name = 5;
+}
+
+message ListRunnersRequest {
+  string fleet_id = 1;
+  repeated string states = 2;
+  optional int32 limit = 3;
+}
+
+message ListRunnersResponse {
+  repeated Runner runners = 1;
+}
+
+message DescribeRunnerRequest {
+  string fleet_id = 1;
+  string runner_id = 2;
+}
+
+message DescribeRunnerResponse {
+  Runner runner = 1;
+}
+
+message DeleteRunnerRequest {
+  string fleet_id = 1;
+  string runner_id = 2;
+}
+
+message DeleteRunnerResponse {
+  Runner runner = 1;
+}

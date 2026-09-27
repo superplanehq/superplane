@@ -1,11 +1,16 @@
 package grpc
 
 import (
+	"errors"
+
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -39,6 +44,7 @@ type Services struct {
 	Files         pbFiles.FilesServer
 	APIKeys       pbAPIKeys.ApiKeysServer
 	Agents        pbAgents.AgentsServer
+	AdminRunners  pbAdminRunners.RunnersServer
 }
 
 type ServicesConfig struct {
@@ -49,9 +55,14 @@ type ServicesConfig struct {
 	Registry        *registry.Registry
 	OIDCProvider    oidc.Provider
 	AgentService    agentsActions.AgentsService
+	JWTSigner       *jwt.Signer
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
+	if cfg.JWTSigner == nil {
+		return nil, errors.New("JWT signer is required")
+	}
+
 	return &Services{
 		Users:  NewUsersService(cfg.AuthService),
 		Groups: NewGroupsService(cfg.AuthService),
@@ -84,5 +95,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		Files:   NewFilesService(cfg.AuthService),
 		APIKeys: NewAPIKeysService(cfg.AuthService),
 		Agents:  NewAgentsService(cfg.AgentService),
+		AdminRunners: NewAdminRunnersService(
+			adminRunnerActions.NewService(cfg.JWTSigner, cfg.BaseURL),
+		),
 	}, nil
 }

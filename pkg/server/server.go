@@ -374,6 +374,7 @@ func buildGRPCServices(
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
+	jwtSigner *jwt.Signer,
 ) (*grpc.Services, error) {
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:         baseURL,
@@ -383,6 +384,7 @@ func buildGRPCServices(
 		Registry:        registry,
 		OIDCProvider:    oidcProvider,
 		AgentService:    agentService,
+		JWTSigner:       jwtSigner,
 	})
 }
 
@@ -670,6 +672,7 @@ func Start() {
 			registry,
 			oidcProvider,
 			agentService,
+			jwtSigner,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
