@@ -895,6 +895,41 @@ CREATE TABLE public.group_metadata (
 
 
 --
+-- Name: hosted_app_installation_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hosted_app_installation_members (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    provider text NOT NULL,
+    installation_id text NOT NULL,
+    member_login text NOT NULL,
+    allowed boolean DEFAULT false NOT NULL,
+    checked_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    errored boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: hosted_app_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hosted_app_installations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    installation_id text NOT NULL,
+    account_login text DEFAULT ''::text NOT NULL,
+    account_type text DEFAULT ''::text NOT NULL,
+    account_id bigint DEFAULT 0 NOT NULL,
+    sender_login text DEFAULT ''::text NOT NULL,
+    last_event_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    provider text NOT NULL
+);
+
+
+--
 -- Name: hosted_llm_providers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1960,6 +1995,38 @@ ALTER TABLE ONLY public.group_metadata
 
 
 --
+-- Name: hosted_app_installation_members hosted_app_installation_membe_provider_installation_id_memb_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_app_installation_members
+    ADD CONSTRAINT hosted_app_installation_membe_provider_installation_id_memb_key UNIQUE (provider, installation_id, member_login);
+
+
+--
+-- Name: hosted_app_installation_members hosted_app_installation_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_app_installation_members
+    ADD CONSTRAINT hosted_app_installation_members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hosted_app_installations hosted_app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_app_installations
+    ADD CONSTRAINT hosted_app_installations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hosted_app_installations hosted_app_installations_provider_installation_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_app_installations
+    ADD CONSTRAINT hosted_app_installations_provider_installation_id_key UNIQUE (provider, installation_id);
+
+
+--
 -- Name: hosted_llm_providers hosted_llm_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2960,6 +3027,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_hosted_app_installations_account_login; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_hosted_app_installations_account_login ON public.hosted_app_installations USING btree (provider, lower(account_login)) WHERE (deleted_at IS NULL);
 
 
 --
@@ -4501,7 +4575,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260924170742	f
+20260928201624	f
 \.
 
 

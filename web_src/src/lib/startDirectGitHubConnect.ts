@@ -6,10 +6,10 @@ import type {
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
 
 import { followBrowserAction } from "@/lib/browserAction";
+import { redirectToGitHubIdentityLink } from "@/lib/githubIdentityLinkGate";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
-  hostedGitHubAuthorizeURL,
   hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -29,9 +29,7 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
-  /** GitHub OAuth authorize URL, to ask again which account to use. */
-  authorizeUrl: string;
-  /** GitHub login that authorized this connect. Empty when the field is absent. */
+  /** GitHub login that started this connect. Empty when the field is absent. */
   githubLogin: string;
 };
 
@@ -53,23 +51,8 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     installations: pendingGitHubInstallations(item.status?.metadata),
     state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
-    authorizeUrl: authorizeURLWithState(hostedGitHubAuthorizeURL(item.status?.metadata), state),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
   };
-}
-
-function authorizeURLWithState(authorizeURL: string, state: string): string {
-  if (!authorizeURL || !state) return authorizeURL;
-
-  try {
-    const url = new URL(authorizeURL);
-    if (url.searchParams.get("state") === state) return authorizeURL;
-
-    url.searchParams.set("state", state);
-    return url.toString();
-  } catch {
-    return authorizeURL;
-  }
 }
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -265,6 +248,8 @@ type StartDirectGitHubConnectArgs = {
   }) => Promise<OrganizationsCreateIntegrationResponse>;
   update?: (payload: { id: string; configuration: Record<string, unknown> }) => Promise<void>;
   goTo?: (path: string) => void;
+  /** Set on the automatic retry after the identity link flow returns. */
+  skipIdentityGate?: boolean;
 };
 
 async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
@@ -272,12 +257,15 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
     if (isOnboardingSetupReturnPath(args.returnTo)) {
-      // Onboarding asks again which GitHub account to use on every Connect
-      // click, so the click goes to GitHub authorization instead of the
-      // stored picker. Without a stored authorize URL the flow falls
-      // through and starts a fresh connect, which also opens authorization.
-      if (picker.authorizeUrl) {
-        return followBrowserAction({ method: "GET", url: picker.authorizeUrl });
+      // Identity discovery prefills the stored options, so onboarding shows
+      // its own account picker instead of the GitHub install page. A full
+      // load of the setup step re-reads the connection list and opens the
+      // picker; "Install on another account" still opens GitHub. Without a
+      // bind state the options cannot bind, so the flow falls through and
+      // starts a fresh connect.
+      if (picker.state && args.returnTo) {
+        window.location.assign(args.returnTo);
+        return true;
       }
       return false;
     }
@@ -307,6 +295,14 @@ export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArg
     return false;
   }
 
+  // Link the GitHub identity first, so installation discovery can
+  // prepopulate the account picker. The retry after the link flow returns
+  // skips the gate, so a failed link still falls through to the plain
+  // connect below.
+  if (!args.skipIdentityGate && (await redirectToGitHubIdentityLink(connectReturnPath(args.returnTo)))) {
+    return true;
+  }
+
   if (!args.forceNew && (await resumePendingGitHubConnect(args))) {
     return true;
   }
@@ -325,11 +321,47 @@ export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArg
   });
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  const action = result.integration?.status?.browserAction;
+
+  const created = result.integration;
+  if (openPrefilledPickerAfterCreate(args, created)) {
+    return true;
+  }
+
+  const action = created?.status?.browserAction;
   if (!action?.url) {
     throw new Error("The GitHub App install page did not open.");
   }
   return followBrowserAction(action);
+}
+
+/**
+ * Identity discovery can prefill the account picker on create. Such a
+ * connection carries no browser action, so the flow stays in the app and
+ * shows the picker instead of opening GitHub. A fresh connect with an empty
+ * picker follows the install browser action exactly as before.
+ */
+function openPrefilledPickerAfterCreate(
+  args: StartDirectGitHubConnectArgs,
+  created: OrganizationsIntegration | undefined,
+): boolean {
+  const createdId = created?.metadata?.id;
+  if (!createdId || pendingGitHubInstallations(created?.status?.metadata).length < 1) {
+    return false;
+  }
+  if (args.returnTo && isOnboardingSetupReturnPath(args.returnTo)) {
+    // Reload the setup step, so onboarding opens its picker with the
+    // prefilled options instead of waiting for a GitHub redirect.
+    window.location.assign(args.returnTo);
+    return true;
+  }
+
+  const path = githubInstallPickerPath(args.organizationId, createdId, args.integrationsBasePath);
+  if (args.goTo) {
+    args.goTo(path);
+    return true;
+  }
+  window.location.assign(path);
+  return true;
 }
 
 async function persistSetupReturnPath(
@@ -343,6 +375,13 @@ async function persistSetupReturnPath(
   }
 
   await update({ id: integrationId, configuration });
+}
+
+function connectReturnPath(returnTo?: string): string {
+  if (returnTo) {
+    return returnTo;
+  }
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 function githubInstallPickerPath(organizationId: string, integrationId: string, integrationsBasePath?: string) {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -224,6 +225,58 @@ func Test__isHostedGitHubAppBrowserCallback(t *testing.T) {
 	assert.True(t, isHostedGitHubAppBrowserCallback(setup, hosted))
 	assert.False(t, isHostedGitHubAppBrowserCallback(setup, legacy))
 	assert.False(t, isHostedGitHubAppBrowserCallback(webhook, hosted))
+}
+
+func Test__recordHostedGitHubAppEvent(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	now := time.Now().UTC().Truncate(time.Second)
+	installationID := int64(42)
+	login := "acme"
+	accountType := "Organization"
+	accountID := int64(99)
+	sender := "member"
+	action := "created"
+
+	require.NoError(t, recordHostedGitHubAppEventAt(db, &gh.InstallationEvent{
+		Action: &action,
+		Installation: &gh.Installation{
+			ID: &installationID,
+			Account: &gh.User{
+				Login: &login,
+				Type:  &accountType,
+				ID:    &accountID,
+			},
+		},
+		Sender: &gh.User{Login: &sender},
+	}, now))
+
+	found, err := models.FindHostedAppInstallation(db, models.HostedAppProviderGitHub, "42")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "acme", found.AccountLogin)
+	assert.Equal(t, "member", found.SenderLogin)
+	assert.False(t, found.DeletedAt.Valid)
+
+	require.NoError(t, recordHostedGitHubAppEventAt(db, &gh.InstallationRepositoriesEvent{
+		Installation: &gh.Installation{ID: &installationID},
+	}, now.Add(time.Minute)))
+
+	found, err = models.FindHostedAppInstallation(db, models.HostedAppProviderGitHub, "42")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.True(t, found.LastEventAt.After(now) || found.LastEventAt.Equal(now.Add(time.Minute)))
+
+	deleted := "deleted"
+	require.NoError(t, recordHostedGitHubAppEventAt(db, &gh.InstallationEvent{
+		Action:       &deleted,
+		Installation: &gh.Installation{ID: &installationID},
+	}, now.Add(2*time.Minute)))
+
+	found, err = models.FindHostedAppInstallation(db, models.HostedAppProviderGitHub, "42")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.True(t, found.DeletedAt.Valid)
 }
 
 func accountContext(account *models.Account) context.Context {

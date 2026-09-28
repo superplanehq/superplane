@@ -48,7 +48,6 @@ describe("startDirectGitHubConnect request selection", () => {
   });
 
   it("reuses an exact ready connection that has another installation request", async () => {
-    const authorizeAction = "https://github.com/login/oauth/authorize?state=csrf";
     const create = vi.fn();
 
     await startDirectGitHubConnect({
@@ -63,7 +62,7 @@ describe("startDirectGitHubConnect request selection", () => {
             metadata: {
               startedByUserID: "user-1",
               state: "csrf",
-              authorizeURL: authorizeAction,
+              githubApp: { slug: "superplane" },
               installRequested: true,
               pendingInstallations: [{ id: "11", accountLogin: "acme" }],
             },
@@ -76,10 +75,13 @@ describe("startDirectGitHubConnect request selection", () => {
     });
 
     expect(create).not.toHaveBeenCalled();
-    expect(follow).toHaveBeenCalledWith({ method: "GET", url: authorizeAction });
+    expect(follow).toHaveBeenCalledWith({
+      method: "GET",
+      url: "https://github.com/apps/superplane/installations/new?state=csrf",
+    });
   });
 
-  it("repairs a stale authorize URL after GitHub access is revoked", async () => {
+  it("opens the GitHub App install page after GitHub access is revoked", async () => {
     const create = vi.fn();
 
     const started = await startDirectGitHubConnect({
@@ -98,7 +100,7 @@ describe("startDirectGitHubConnect request selection", () => {
             metadata: {
               state: "current-state",
               startedByUserID: "user-1",
-              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=revoked-state",
+              githubApp: { slug: "superplane" },
               pendingInstallations: [{ id: "11", accountLogin: "acme" }],
             },
           },
@@ -112,7 +114,7 @@ describe("startDirectGitHubConnect request selection", () => {
     expect(create).not.toHaveBeenCalled();
     expect(follow).toHaveBeenCalledWith({
       method: "GET",
-      url: "https://github.com/login/oauth/authorize?client_id=abc&state=current-state",
+      url: "https://github.com/apps/superplane/installations/new?state=current-state",
     });
   });
 });
