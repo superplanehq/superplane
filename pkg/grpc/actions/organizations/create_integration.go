@@ -207,8 +207,7 @@ func syncIntegration(
 	}
 
 	if syncErr != nil {
-		newIntegration.State = "error"
-		newIntegration.StateDescription = syncErr.Error()
+		newIntegration.SetErrorState(syncErr.Error())
 		err = database.Conn().Save(newIntegration).Error
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to save integration after sync")
