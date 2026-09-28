@@ -114,6 +114,73 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	requireValidCanvasExpressions(t, canvas)
 }
 
+func TestMaterializeRiskScoreTemplate(t *testing.T) {
+	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
+		appID:   "app-risk",
+		appName: "Risk score",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+			"defaultBranch": "main",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+		agent: &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, "Risk score", canvas.Metadata.Name)
+
+	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
+	assert.Equal(t, map[string]any{
+		"id":      "risk-score",
+		"version": float64(factoryTemplateVersion),
+	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
+
+	gate := findYAMLNode(t, canvas, "should-assess")
+	assert.Equal(
+		t,
+		`root().data.pull_request.base.ref == "main" && root().data.pull_request.draft != true`,
+		gate.Configuration["expression"],
+	)
+
+	agent := findYAMLNode(t, canvas, "assess-risk")
+	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	assert.NotContains(t, agent.Configuration, "credentials")
+	assert.NotContains(t, agent.Configuration, "model")
+	prompt := agentPrompt(t, agent)
+	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
+	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
+	assert.NotContains(t, prompt, "install_params.riskRules")
+	assert.Contains(t, result.canvasYAML, `gh pr diff "${PR_NUMBER}" --repo "${REPO}" > /tmp/pr.diff`)
+
+	format := findYAMLNode(t, canvas, "format-risk-review")
+	assert.Contains(t, format.Configuration["script"], "Math.min(5")
+
+	report := findYAMLNode(t, canvas, "report-risk-score")
+	assert.Equal(t, "risk-review", report.Configuration["checkKey"])
+	assert.Equal(t, "5", report.Configuration["maxScore"])
+	assert.Equal(t, "lowerIsBetter", report.Configuration["direction"])
+	assert.Equal(t, float64(3), report.Configuration["cautionAt"])
+	assert.Equal(t, float64(4), report.Configuration["criticalAt"])
+
+	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
+	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")
+	assert.NotContains(t, result.canvasYAML, "superplane-pr-risk-review")
+	assert.NotContains(t, result.canvasYAML, "discord")
+	assert.NotContains(t, result.canvasYAML, "git push")
+	assert.Contains(t, result.consoleYAML, "app-risk")
+
+	requireValidCanvasExpressions(t, canvas)
+}
+
 func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
 		t.Run(visualEvidenceCaseName(enabled), func(t *testing.T) {
@@ -500,6 +567,23 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, refinement.Configuration["credentials"])
+}
+
+func agentPrompt(t *testing.T, agent *yaml.Node) string {
+	t.Helper()
+	steps, ok := agent.Configuration["steps"].([]any)
+	require.True(t, ok)
+	for _, step := range steps {
+		item, ok := step.(map[string]any)
+		if !ok || item["name"] != "Review Pull Request" {
+			continue
+		}
+		prompt, ok := item["prompt"].(string)
+		require.True(t, ok)
+		return prompt
+	}
+	t.Fatal("review prompt not found")
+	return ""
 }
 
 func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {

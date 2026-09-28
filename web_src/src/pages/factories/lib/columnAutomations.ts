@@ -17,6 +17,8 @@ import {
   EVENT_CUSTOM_ENTRY,
   PR_CLOSURE_CATALOG_ID,
   PR_CLOSURE_ENTRY,
+  RISK_SCORE_CATALOG_ID,
+  RISK_SCORE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
 import {
@@ -41,7 +43,8 @@ export type ColumnAutomationKind =
   | "custom"
   | "pr-discussion"
   | "pr-checks"
-  | "pr-closure";
+  | "pr-closure"
+  | "risk-score";
 
 export type ColumnAutomationHealth = "healthy" | "needs-repair" | "disabled";
 
@@ -148,9 +151,12 @@ function automationsForColumn(
     ];
   }
   if (key === "verify") {
+    const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
+    const skip = new Set(riskScore.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [
       ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders),
-      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, new Set()),
+      ...riskScore,
+      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip),
     ];
   }
   if (key === "done") {
@@ -282,6 +288,41 @@ function customColumnAutomations(
         health: "healthy" as const,
         runningCount: runningCountForApp(id, workOrders),
         catalogId: CUSTOM_CATALOG_ID,
+        canvasId: id,
+      },
+    ];
+  });
+}
+
+function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
+  if (app.columnKey !== "verify") {
+    return false;
+  }
+  const name = app.name?.trim() ?? "";
+  return name === RISK_SCORE_ENTRY.name || /^Risk score \(\d+\)$/.test(name);
+}
+
+function riskScoreAutomation(
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  workOrders: FactoriesWorkOrder[],
+): ColumnAutomation[] {
+  return apps.flatMap((app) => {
+    const id = app.id?.trim();
+    if (!id || !isRiskScoreApp(app)) {
+      return [];
+    }
+    return [
+      {
+        id: `risk-score-${id}`,
+        kind: "risk-score" as const,
+        name: app.name?.trim() || RISK_SCORE_ENTRY.name,
+        trigger: RISK_SCORE_ENTRY.trigger,
+        action: RISK_SCORE_ENTRY.action,
+        iconSrc: RISK_SCORE_ENTRY.iconSrc,
+        iconAlt: RISK_SCORE_ENTRY.iconAlt,
+        health: "healthy" as const,
+        runningCount: runningCountForApp(id, workOrders),
+        catalogId: RISK_SCORE_CATALOG_ID,
         canvasId: id,
       },
     ];
