@@ -360,16 +360,33 @@ func hostedDiscoveryErrorIsRetryable(err error) bool {
 		return true
 	}
 
-	var responseError *gh.ErrorResponse
-	if errors.As(err, &responseError) && responseError.Response != nil {
+	if githubResponseErrorIsRetryable(err) {
+		return true
+	}
+
+	var networkError net.Error
+	return errors.As(err, &networkError)
+}
+
+func githubResponseErrorIsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if responseError, ok := err.(*gh.ErrorResponse); ok && responseError.Response != nil {
 		status := responseError.Response.StatusCode
 		return status == http.StatusRequestTimeout ||
 			status == http.StatusTooManyRequests ||
 			status >= http.StatusInternalServerError
 	}
-
-	var networkError net.Error
-	return errors.As(err, &networkError)
+	if joinedError, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, cause := range joinedError.Unwrap() {
+			if githubResponseErrorIsRetryable(cause) {
+				return true
+			}
+		}
+		return false
+	}
+	return githubResponseErrorIsRetryable(errors.Unwrap(err))
 }
 
 func resolveHostedGitHubIdentity(

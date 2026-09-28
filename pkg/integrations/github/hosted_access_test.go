@@ -93,6 +93,14 @@ func TestHostedDiscoveryErrorIsRetryable(t *testing.T) {
 			name: "revoked installation",
 			err:  &gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusUnauthorized}},
 		},
+		{
+			name: "permanent then transient errors",
+			err: errors.Join(
+				&gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}},
+				&gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}},
+			),
+			retryable: true,
+		},
 		{name: "permanent error", err: errors.New("revoked")},
 	}
 
