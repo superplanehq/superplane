@@ -65,7 +65,6 @@ vi.mock("../planningSessionClient", () => ({
   answerPlanningSessionSurvey: vi.fn(),
 }));
 
-import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
   DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,

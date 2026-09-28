@@ -10,8 +10,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
-import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
-import { SPLIT_RUN_SUPER503_RUNNING } from "./splitRunSuper503RunningFixture";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 // The classic description tab embeds Monaco, which cannot load in Happy DOM.
 vi.mock("@monaco-editor/react", () => ({
@@ -43,7 +42,7 @@ function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
 
 describe("WorkOrderSplitRunPopup without the Task Console feature", () => {
   it("keeps the classic Task and Automations tabs instead of the console", () => {
-    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
+    renderPopup({ fixture: SPLIT_RUN_RUNNING });
 
     expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();

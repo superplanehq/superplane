@@ -70,6 +70,14 @@ export interface AgentStep {
   iconSlug?: string;
 }
 
+/** One automation with every run it made for this task, newest first. */
+export interface ConsoleAutomation {
+  id: string;
+  name: string;
+  latest: AutomationStage;
+  runs: AutomationStage[];
+}
+
 export interface PlumbingNode {
   id: string;
   at: string;

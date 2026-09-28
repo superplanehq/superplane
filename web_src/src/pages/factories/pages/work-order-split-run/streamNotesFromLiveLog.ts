@@ -56,7 +56,10 @@ function noteFromCommandSection(
 ): SplitRunStreamLine {
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
-  const output = section.kind === "prompt" ? "" : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n");
+  const output =
+    section.kind === "prompt"
+      ? ""
+      : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n");
   const command = preview && preview !== name ? preview : "";
   const detail = [command, output].filter(Boolean).join("\n\n");
   return {
