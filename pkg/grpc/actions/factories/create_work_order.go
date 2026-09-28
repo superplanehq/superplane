@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -19,7 +20,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
+func CreateWorkOrder(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	req *pb.CreateWorkOrderRequest,
+) (*pb.CreateWorkOrderResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
@@ -47,12 +53,40 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 
 	assigneeIDs := []uuid.UUID{createdByID}
+	openedIssue, hasIssue := manualTaskGitHubOrigin(ctx, deps, db, factory, title, req.GetDescription())
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
+	var reused bool
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
-		if err != nil {
-			return err
+		var created *models.FactoryWorkOrder
+		var createErr error
+		if hasIssue {
+			if lockErr := ghintegration.LockIssueWorkOrder(tx, factory, openedIssue.origin.URL); lockErr != nil {
+				return lockErr
+			}
+			existing, findErr := ghintegration.FindIssueWorkOrder(tx, factory, openedIssue.origin.URL)
+			if findErr != nil {
+				return findErr
+			}
+			if existing != nil {
+				order = existing
+				reused = true
+				return nil
+			}
+			created, createErr = factory.CreateWorkOrderWithOrigin(
+				tx,
+				title,
+				req.GetDescription(),
+				&createdByID,
+				assigneeIDs,
+				nil,
+				openedIssue.origin,
+			)
+		} else {
+			created, createErr = factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
+		}
+		if createErr != nil {
+			return createErr
 		}
 		order = created
 		result, bindErr := storedfiles.BindDescriptionFiles(
@@ -71,7 +105,17 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
 	}
 	if err != nil {
+		if hasIssue {
+			closeManualTaskGitHubIssue(deps, db, openedIssue)
+		}
 		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+	if reused {
+		serialized, serializeErr := loadAndSerializeWorkOrder(ctx, factory, order)
+		if serializeErr != nil {
+			return nil, factoryErrorToStatus(serializeErr, "failed to create work order")
+		}
+		return &pb.CreateWorkOrderResponse{Order: serialized}, nil
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)

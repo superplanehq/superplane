@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -25,6 +26,8 @@ type IntakeDependencies struct {
 	AuthService    authorization.Authorization
 	WebhookBaseURL string
 	NewItemSource  IntakeItemSourceFactory
+	// HTTP overrides the registry HTTP client. Nil uses the registry client.
+	HTTP core.HTTPContext
 }
 
 type IntakeItem struct {

@@ -45,6 +45,19 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
   });
 
+  it("defaults GitHub issue creation for manual tasks to off", () => {
+    expect(DEFAULT_GITHUB_INTAKE_SETTINGS.githubCreateIssueForManualTasks).toBe(false);
+    expect(intakeSettingsFromApi("GitHub issues", undefined).githubCreateIssueForManualTasks).toBe(false);
+    expect(intakeSettingsFromApi("GitHub issues", {}).githubCreateIssueForManualTasks).toBe(false);
+  });
+
+  it("round-trips GitHub issue creation for manual tasks through the API shape", () => {
+    const settings = intakeSettingsFromApi("GitHub issues", { githubCreateIssueForManualTasks: true });
+
+    expect(settings.githubCreateIssueForManualTasks).toBe(true);
+    expect(intakeSettingsToApi(settings).githubCreateIssueForManualTasks).toBe(true);
+  });
+
   it("defaults the authors filter to off", () => {
     expect(DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess).toBe(false);
     expect(intakeSettingsFromApi("GitHub issues", undefined).authorsWithAccess).toBe(false);

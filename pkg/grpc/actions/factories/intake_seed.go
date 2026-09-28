@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
@@ -605,12 +606,22 @@ func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *mo
 	}
 
 	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
-	client, err := common.NewClient(integrationContext, deps.Registry.HTTPContext())
+	client, err := common.NewClient(integrationContext, intakeHTTPContext(deps))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build GitHub client: %w", err)
 	}
 
 	return client, nil
+}
+
+func intakeHTTPContext(deps IntakeDependencies) core.HTTPContext {
+	if deps.HTTP != nil {
+		return deps.HTTP
+	}
+	if deps.Registry == nil {
+		return nil
+	}
+	return deps.Registry.HTTPContext()
 }
 
 func newIntakeJiraClient(

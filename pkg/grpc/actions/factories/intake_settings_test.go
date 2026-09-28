@@ -838,3 +838,55 @@ func Test__applyIntakeSettingsToGraph_Productive(t *testing.T) {
 		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
 	})
 }
+
+func Test__intakeSettings_GitHubCreateIssueForManualTasks(t *testing.T) {
+	graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID}
+	trigger := func(metadata map[string]any) models.Node {
+		return models.Node{
+			ID:            intakeTriggerNodeID,
+			Configuration: map[string]any{"actions": []any{"opened", "reopened", "labeled"}},
+			Metadata:      metadata,
+		}
+	}
+	filter := models.Node{
+		ID:            intakeFilterNodeID,
+		Configuration: map[string]any{"expression": intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, defaultIntakeSettings())},
+	}
+	spec := func(metadata map[string]any) models.LiveCanvasSpec {
+		return models.LiveCanvasSpec{Nodes: []models.Node{trigger(metadata), filter}}
+	}
+
+	t.Run("defaults to false", func(t *testing.T) {
+		settings := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, spec(nil))
+		assert.False(t, settings.GitHubCreateIssueForManualTasks)
+
+		serialized := serializeIntakeSettings(models.FactoryIntakeSourceGitHubIssues, settings)
+		assert.False(t, serialized.GetGithubCreateIssueForManualTasks())
+	})
+
+	t.Run("round-trips through the graph", func(t *testing.T) {
+		enabled := true
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceGitHubIssues,
+			graph,
+			spec(nil),
+			&pb.FactoryIntake_Settings{GithubCreateIssueForManualTasks: &enabled},
+			[]models.Node{trigger(nil), filter},
+			nil,
+		)
+		require.NoError(t, err)
+
+		updatedTrigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, true, updatedTrigger.Metadata[intakeMetadataGitHubCreateIssueForManualTasks])
+
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, models.LiveCanvasSpec{Nodes: nodes})
+		assert.True(t, parsed.GitHubCreateIssueForManualTasks)
+
+		serialized := serializeIntakeSettings(models.FactoryIntakeSourceGitHubIssues, parsed)
+		assert.True(t, serialized.GetGithubCreateIssueForManualTasks())
+
+		disabled := false
+		updated := parseIntakeSettings(parsed, &pb.FactoryIntake_Settings{GithubCreateIssueForManualTasks: &disabled})
+		assert.False(t, updated.GitHubCreateIssueForManualTasks)
+	})
+}
