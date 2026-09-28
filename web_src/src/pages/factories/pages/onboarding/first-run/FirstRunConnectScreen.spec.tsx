@@ -403,6 +403,26 @@ describe("FirstRunConnectScreen", () => {
     expect(onRetrySync).toHaveBeenCalledTimes(1);
   });
 
+  it("always offers installation while account discovery continues", () => {
+    render(
+      <FirstRunConnectScreen
+        discoveringAccounts
+        pickerExpected
+        pendingInstallations={[{ id: "11", accountLogin: "acme", repositories: [{ id: "101", name: "acme/api" }] }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.connect.checkingMoreAccounts)).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toHaveAttribute(
+      "href",
+      "https://github.com/apps/superplane/installations/new?state=csrf",
+    );
+  });
+
   it("offers manual installation after an incomplete empty scan", async () => {
     const user = userEvent.setup();
     const onInstallOther = vi.fn();

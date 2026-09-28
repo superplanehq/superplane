@@ -146,6 +146,31 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
   });
 
+  it("offers GitHub installation while the first account is still loading", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: githubConnections([
+          githubConnection("github-1", {
+            startedByUserID: "user-1",
+            state: "csrf",
+            githubApp: { slug: "superplane" },
+            installationDiscovery: { active: true, complete: false },
+          }),
+        ]),
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-connect-loading")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toHaveAttribute(
+      "href",
+      "https://github.com/apps/superplane/installations/new?state=csrf",
+    );
+    expect(screen.getByTestId("first-run-back")).toBeEnabled();
+    expect(screen.getByTestId("first-run-log-out")).toBeEnabled();
+  });
+
   it("keeps the connect screen locked while GitHub navigation starts", async () => {
     const user = userEvent.setup();
     const navigation = deferred<boolean>();
