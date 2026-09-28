@@ -5,6 +5,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 )
 
 func TestManualTaskMarkerFromEventData(t *testing.T) {
@@ -56,6 +60,26 @@ func TestIssueAuthorFromEventData(t *testing.T) {
 		},
 	})
 	assert.False(t, ok)
+}
+
+func TestAppBotLogin(t *testing.T) {
+	assert.Equal(t, "", AppBotLogin(nil))
+
+	pat := &models.Integration{
+		Properties: datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+			{Name: common.PropertyAuthMethod, Value: common.AuthMethodPAT},
+			{Name: common.PropertyAppSlug, Value: "superplane"},
+		}),
+	}
+	assert.Equal(t, "", AppBotLogin(pat))
+
+	app := &models.Integration{
+		Properties: datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+			{Name: common.PropertyAuthMethod, Value: common.AuthMethodApp},
+			{Name: common.PropertyAppSlug, Value: "superplane"},
+		}),
+	}
+	assert.Equal(t, "superplane[bot]", AppBotLogin(app))
 }
 
 func TestIssueURLFromEventData_NormalizesOwnerAndRepositoryCase(t *testing.T) {

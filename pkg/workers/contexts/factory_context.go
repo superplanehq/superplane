@@ -317,6 +317,14 @@ func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.
 
 	expected := ghintegration.ManualTaskActorFromLabel(*order.OriginLabel)
 	author, authorOK := ghintegration.IssueAuthorFromEventData(event.Data.Data())
+	if expected == "" {
+		expected = c.githubInstallationLogin()
+		if expected != "" {
+			if markErr := order.SetPendingGitHubMarker(c.tx, ghintegration.PendingManualTaskLabel(marker, expected)); markErr != nil {
+				return false, markErr
+			}
+		}
+	}
 	if expected == "" || !authorOK || !strings.EqualFold(expected, author) {
 		log.Warnf("GitHub issue %s carries a manual-task marker but its author does not match", issueURL)
 		return false, nil
@@ -539,7 +547,10 @@ func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) er
 	return err
 }
 
-func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+func (c *FactoryContext) githubIssueIntegration() *models.Integration {
+	if c == nil || c.canvas == nil || c.tx == nil {
+		return nil
+	}
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(c.tx, []uuid.UUID{c.canvas.ID})
 	if err != nil {
 		return nil
@@ -561,16 +572,46 @@ func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
 		if err != nil || integration.State != models.IntegrationStateReady {
 			continue
 		}
-		client, err := githubcommon.NewClient(
-			NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
-			c.registry.HTTPContextInTransaction(c.tx),
-		)
-		if err != nil {
-			continue
-		}
-		return client
+		return integration
 	}
 	return nil
+}
+
+func (c *FactoryContext) githubClient(integration *models.Integration) *githubcommon.Client {
+	if integration == nil || c.registry == nil || c.encryptor == nil {
+		return nil
+	}
+	client, err := githubcommon.NewClient(
+		NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
+		c.registry.HTTPContextInTransaction(c.tx),
+	)
+	if err != nil {
+		return nil
+	}
+	return client
+}
+
+func (c *FactoryContext) githubInstallationLogin() string {
+	integration := c.githubIssueIntegration()
+	if login := ghintegration.AppBotLogin(integration); login != "" {
+		return login
+	}
+	client := c.githubClient(integration)
+	if client == nil {
+		return ""
+	}
+	lookupCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	login, err := client.AuthenticatedLogin(lookupCtx)
+	if err != nil {
+		log.WithError(err).Warn("failed to read the GitHub login for a manual task issue")
+		return ""
+	}
+	return strings.TrimSpace(login)
+}
+
+func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+	return c.githubClient(c.githubIssueIntegration())
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {

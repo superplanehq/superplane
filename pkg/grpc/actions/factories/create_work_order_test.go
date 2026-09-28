@@ -413,28 +413,83 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.Len(t, orders, 1)
 	})
 
-	t.Run("returns the saved task when the same create is retried", func(t *testing.T) {
-		httpCtx := githubIssueHTTP(http.StatusCreated, `{
-			"number": 42,
-			"html_url": "https://github.com/acme/payments/issues/42"
-		}`)
+	t.Run("creates another task when the same title is submitted again", func(t *testing.T) {
+		httpCtx := githubIssueResponses(
+			githubIssueResponse(http.StatusCreated, `{
+				"number": 42,
+				"html_url": "https://github.com/acme/payments/issues/42"
+			}`),
+			githubIssueResponse(http.StatusCreated, `{
+				"number": 43,
+				"html_url": "https://github.com/acme/payments/issues/43"
+			}`),
+		)
 		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
 		request := &pb.CreateWorkOrderRequest{
 			FactoryId:   factoryModel.ID.String(),
 			Title:       "Ship the refunds line",
 			Description: "Stop double charges.",
+			AssigneeIds: []string{r.User.String()},
 		}
 
 		first, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), request)
 		require.NoError(t, err)
-		second, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), request)
+		secondRequest := &pb.CreateWorkOrderRequest{
+			FactoryId:   request.FactoryId,
+			Title:       request.Title,
+			Description: request.Description,
+			AssigneeIds: []string{uuid.NewString()},
+		}
+		second, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), secondRequest)
 		require.NoError(t, err)
-		assert.Equal(t, first.Order.GetId(), second.Order.GetId())
+		assert.NotEqual(t, first.Order.GetId(), second.Order.GetId())
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 2)
+		assert.Equal(t, 2, countGitHubIssueCreates(httpCtx.Requests))
+	})
+
+	t.Run("does not open an issue when the GitHub login cannot be read", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		deps := githubIssueDeps(r, httpCtx)
+		deps.HTTP = &flakyActorRouter{inner: httpCtx, login: githubIssueTestActor, failures: manualTaskGitHubActorAttempts}
+
+		resp, err := CreateWorkOrder(ctx, deps, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Nil(t, resp.Order.GetOrigin())
+		assert.Empty(t, httpCtx.Requests)
 
 		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
 		require.NoError(t, err)
 		require.Len(t, orders, 1)
-		assert.Equal(t, 1, countGitHubIssueCreates(httpCtx.Requests))
+		assert.Nil(t, orders[0].OriginURL)
+		assert.Nil(t, orders[0].OriginLabel)
+	})
+
+	t.Run("opens an issue when a later login lookup succeeds", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		deps := githubIssueDeps(r, httpCtx)
+		deps.HTTP = &flakyActorRouter{inner: httpCtx, login: githubIssueTestActor, failures: 1}
+
+		resp, err := CreateWorkOrder(ctx, deps, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
+		require.Len(t, httpCtx.Requests, 1)
 	})
 }
 
@@ -481,6 +536,24 @@ func Test__CreateWorkOrder__SkipsBrokenManualTaskIntakes(t *testing.T) {
 		seedGitHubIssueIntake(t, r, factoryModel, true, false, "acme/newer", nil)
 		assertUsesNewerIntake(t, factoryModel, httpCtx)
 	})
+}
+
+type flakyActorRouter struct {
+	inner    core.HTTPContext
+	login    string
+	failures int
+	calls    int
+}
+
+func (r *flakyActorRouter) Do(request *http.Request) (*http.Response, error) {
+	if request.URL.Path == "/user" {
+		r.calls++
+		if r.calls <= r.failures {
+			return githubIssueResponse(http.StatusInternalServerError, `{"message":"unavailable"}`), nil
+		}
+		return githubIssueResponse(http.StatusOK, `{"login":"`+r.login+`"}`), nil
+	}
+	return r.inner.Do(request)
 }
 
 func githubIssueDeps(r *support.ResourceRegistry, httpCtx core.HTTPContext) IntakeDependencies {
@@ -557,11 +630,15 @@ type lateIssueHTTP struct {
 }
 
 func (h *lateIssueHTTP) Do(request *http.Request) (*http.Response, error) {
-	body, err := io.ReadAll(request.Body)
-	if err != nil {
-		return nil, err
+	var body []byte
+	if request.Body != nil {
+		var err error
+		body, err = io.ReadAll(request.Body)
+		if err != nil {
+			return nil, err
+		}
+		request.Body = io.NopCloser(bytes.NewReader(body))
 	}
-	request.Body = io.NopCloser(bytes.NewReader(body))
 	h.mu.Lock()
 	h.requests = append(h.requests, request)
 	h.mu.Unlock()

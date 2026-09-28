@@ -23,6 +23,7 @@ import (
 const manualTaskGitHubIssueTimeout = 10 * time.Second
 const manualTaskGitHubIssueReconcileTimeout = 8 * time.Second
 const manualTaskGitHubActorTimeout = 3 * time.Second
+const manualTaskGitHubActorAttempts = 2
 const manualTaskGitHubIssueListLimit = 100
 
 var manualTaskGitHubIssueReconcileAttempts = 4
@@ -60,7 +61,11 @@ func attachManualTaskGitHubIssue(
 		return
 	}
 
-	actor := rememberManualTaskGitHubActor(ctx, client, db, factory, order, target, marker)
+	actor, persisted := persistManualTaskGitHubActor(ctx, client, db, factory, order, target, marker)
+	if !persisted {
+		clearPendingManualTaskMarker(db, factory, order, marker)
+		return
+	}
 	opened, err := createManualTaskGitHubIssue(ctx, client, target, title, description, marker, actor, order.CreatedAt)
 	if err != nil {
 		if errors.Is(err, errManualTaskGitHubIssueUnconfirmed) {
@@ -216,47 +221,6 @@ func createManualTaskGitHubIssue(
 	return manualTaskIssueFromGitHub(issue)
 }
 
-func reconcileManualTaskGitHubIssue(
-	ctx context.Context,
-	deps IntakeDependencies,
-	db *gorm.DB,
-	factory *models.Factory,
-	order *models.FactoryWorkOrder,
-	target *manualTaskIssueTarget,
-	marker string,
-) {
-	if order == nil || order.Origin() != nil {
-		return
-	}
-	client, err := newIntakeGitHubClient(deps, db, target.integration)
-	if err != nil {
-		log.WithError(err).Warnf("factory %s: failed to reconcile the GitHub issue for task %s", factory.ID, order.ID)
-		return
-	}
-	actor := ""
-	if order.OriginLabel != nil {
-		actor = ghintegration.ManualTaskActorFromLabel(*order.OriginLabel)
-	}
-	if actor == "" {
-		actor = rememberManualTaskGitHubActor(ctx, client, db, factory, order, target, marker)
-	}
-	found, err := findCreatedManualTaskIssue(client, target.repository, marker, actor, order.CreatedAt)
-	if err != nil || found == nil {
-		if err != nil {
-			log.WithError(err).Warnf("factory %s: failed to list GitHub issues for task %s", factory.ID, order.ID)
-		}
-		return
-	}
-	opened, err := manualTaskIssueFromGitHub(found)
-	if err != nil {
-		log.WithError(err).Warnf("factory %s: GitHub issue for task %s has no URL", factory.ID, order.ID)
-		return
-	}
-	if err := storeManualTaskGitHubOrigin(db, factory, order, opened); err != nil {
-		log.WithError(err).Warnf("factory %s: failed to store GitHub issue %s on task %s", factory.ID, opened.URL, order.ID)
-	}
-}
-
 func scheduleManualTaskIssueReconcile(
 	deps IntakeDependencies,
 	factory *models.Factory,
@@ -285,10 +249,11 @@ func scheduleManualTaskIssueReconcile(
 				log.WithError(clientErr).Warnf("factory %s: failed to reconcile the GitHub issue for task %s", factoryID, orderID)
 				return
 			}
-			login := actorLogin
-			if login == "" && current.OriginLabel != nil {
-				login = ghintegration.ManualTaskActorFromLabel(*current.OriginLabel)
+			login := resolveManualTaskGitHubActor(context.Background(), client, db, factory, current, &targetCopy, marker, actorLogin)
+			if login == "" {
+				continue
 			}
+			actorLogin = login
 			found, findErr := listCreatedManualTaskIssue(client, targetCopy.repository, marker, login, since)
 			if findErr != nil || found == nil {
 				continue
@@ -313,7 +278,7 @@ func scheduleManualTaskIssueReconcile(
 	}()
 }
 
-func rememberManualTaskGitHubActor(
+func persistManualTaskGitHubActor(
 	ctx context.Context,
 	client *ghcommon.Client,
 	db *gorm.DB,
@@ -321,51 +286,78 @@ func rememberManualTaskGitHubActor(
 	order *models.FactoryWorkOrder,
 	target *manualTaskIssueTarget,
 	marker string,
-) string {
+) (string, bool) {
 	actor, err := manualTaskGitHubActor(ctx, client, target.integration)
-	if err != nil {
+	if err != nil || actor == "" {
 		log.WithError(err).Warnf("factory %s: failed to read the GitHub login for manual task %s", factory.ID, order.ID)
-		return ""
-	}
-	if actor == "" {
-		return ""
+		return "", false
 	}
 	if err := order.SetPendingGitHubMarker(db, ghintegration.PendingManualTaskLabel(marker, actor)); err != nil {
 		log.WithError(err).Warnf("factory %s: failed to store the GitHub login on task %s", factory.ID, order.ID)
+		return "", false
+	}
+	return actor, true
+}
+
+func resolveManualTaskGitHubActor(
+	ctx context.Context,
+	client *ghcommon.Client,
+	db *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	target *manualTaskIssueTarget,
+	marker, actor string,
+) string {
+	if strings.TrimSpace(actor) != "" {
 		return actor
 	}
-	return actor
+	if order != nil && order.OriginLabel != nil {
+		if login := ghintegration.ManualTaskActorFromLabel(*order.OriginLabel); login != "" {
+			return login
+		}
+	}
+	if client == nil || target == nil || order == nil {
+		return ""
+	}
+	login, err := manualTaskGitHubActor(ctx, client, target.integration)
+	if err != nil || login == "" {
+		if err != nil {
+			log.WithError(err).Warnf("factory %s: failed to read the GitHub login for task %s", factory.ID, order.ID)
+		}
+		return ""
+	}
+	if db != nil {
+		if markErr := order.SetPendingGitHubMarker(db, ghintegration.PendingManualTaskLabel(marker, login)); markErr != nil {
+			log.WithError(markErr).Warnf("factory %s: failed to store the GitHub login on task %s", factory.ID, order.ID)
+		}
+	}
+	return login
 }
 
 func manualTaskGitHubActor(ctx context.Context, client *ghcommon.Client, integration *models.Integration) (string, error) {
-	if login := githubAppBotLogin(integration); login != "" {
+	if login := ghintegration.AppBotLogin(integration); login != "" {
 		return login, nil
 	}
 	lookupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), manualTaskGitHubActorTimeout)
 	defer cancel()
-	return client.AuthenticatedLogin(lookupCtx)
-}
-
-func githubAppBotLogin(integration *models.Integration) string {
-	if integration == nil || integrationProperty(integration, ghcommon.PropertyAuthMethod) != ghcommon.AuthMethodApp {
-		return ""
-	}
-	slug := integrationProperty(integration, ghcommon.PropertyAppSlug)
-	if slug == "" {
-		return ""
-	}
-	return slug + "[bot]"
-}
-
-func integrationProperty(integration *models.Integration, name string) string {
-	for _, property := range integration.Properties {
-		if property.Name != name {
-			continue
+	var lastErr error
+	for attempt := 0; attempt < manualTaskGitHubActorAttempts; attempt++ {
+		if lookupCtx.Err() != nil {
+			break
 		}
-		value, _ := property.Value.(string)
-		return strings.TrimSpace(value)
+		login, err := client.AuthenticatedLogin(lookupCtx)
+		if err == nil && strings.TrimSpace(login) != "" {
+			return strings.TrimSpace(login), nil
+		}
+		if err == nil {
+			err = fmt.Errorf("github user login is empty")
+		}
+		lastErr = err
 	}
-	return ""
+	if lastErr == nil {
+		lastErr = lookupCtx.Err()
+	}
+	return "", lastErr
 }
 
 func clearPendingManualTaskMarker(db *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder, marker string) {

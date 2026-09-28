@@ -3,7 +3,6 @@ package factories
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -20,8 +19,6 @@ import (
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
-
-const manualTaskCreateReplayWindow = 2 * time.Minute
 
 func CreateWorkOrder(
 	ctx context.Context,
@@ -59,22 +56,6 @@ func CreateWorkOrder(
 	if err != nil {
 		log.WithError(err).Warnf("factory %s: failed to resolve a GitHub issue for a manual task", factory.ID)
 		target = nil
-	}
-
-	if target != nil {
-		existing, findErr := factory.FindRecentIdenticalManualWorkOrder(
-			db,
-			createdByID,
-			title,
-			req.GetDescription(),
-			time.Now().Add(-manualTaskCreateReplayWindow),
-		)
-		if findErr != nil {
-			return nil, factoryErrorToStatus(findErr, "failed to create work order")
-		}
-		if existing != nil {
-			return finishReplayedManualWorkOrder(ctx, deps, factory, existing)
-		}
 	}
 
 	marker := ""
@@ -145,36 +126,4 @@ func CreateWorkOrder(
 	return &pb.CreateWorkOrderResponse{
 		Order: serialized,
 	}, nil
-}
-
-func finishReplayedManualWorkOrder(
-	ctx context.Context,
-	deps IntakeDependencies,
-	factory *models.Factory,
-	order *models.FactoryWorkOrder,
-) (*pb.CreateWorkOrderResponse, error) {
-	workCtx := context.WithoutCancel(ctx)
-	workDB := database.DB(workCtx)
-	if order.Origin() == nil && order.OriginLabel != nil {
-		if marker, ok := ghintegration.ManualTaskMarkerFromLabel(*order.OriginLabel); ok {
-			target, targetErr := oldestManualTaskIssueIntake(workDB, factory)
-			if targetErr != nil {
-				log.WithError(targetErr).Warnf("factory %s: failed to resolve a GitHub issue for replayed task %s", factory.ID, order.ID)
-			} else if target != nil {
-				reconcileManualTaskGitHubIssue(workCtx, deps, workDB, factory, order, target, marker)
-				reloaded, reloadErr := factory.FindWorkOrder(workDB, order.ID)
-				if reloadErr != nil {
-					log.WithError(reloadErr).Warnf("factory %s: failed to reload replayed task %s", factory.ID, order.ID)
-				} else {
-					order = reloaded
-				}
-			}
-		}
-	}
-
-	serialized, err := loadAndSerializeWorkOrder(workCtx, factory, order)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order")
-	}
-	return &pb.CreateWorkOrderResponse{Order: serialized}, nil
 }

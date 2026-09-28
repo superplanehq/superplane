@@ -3,9 +3,7 @@ package models
 import (
 	"errors"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -47,40 +45,6 @@ func (f *Factory) FindWorkOrderByPendingGitHubMarker(tx *gorm.DB, marker string)
 		Where("origin_url IS NULL OR origin_url = ''").
 		Where("origin_label = ? OR origin_label LIKE ?", marker, marker+"\x1f%").
 		Order("created_at ASC").
-		First(&order).
-		Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &order, nil
-}
-
-// FindRecentIdenticalManualWorkOrder returns a manual task with the same
-// title and description created by the same user at or after since. A client
-// retry after a canceled create uses this so it does not open a second task.
-func (f *Factory) FindRecentIdenticalManualWorkOrder(
-	tx *gorm.DB,
-	createdBy uuid.UUID,
-	title, description string,
-	since time.Time,
-) (*FactoryWorkOrder, error) {
-	title = strings.TrimSpace(title)
-	if tx == nil || f == nil || createdBy == uuid.Nil || title == "" || since.IsZero() {
-		return nil, nil
-	}
-
-	var order FactoryWorkOrder
-	err := tx.
-		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
-		Where("created_by_id = ?", createdBy).
-		Where("source_run_id IS NULL").
-		Where("title = ?", title).
-		Where("description = ?", description).
-		Where("created_at >= ?", since).
-		Order("created_at DESC").
 		First(&order).
 		Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

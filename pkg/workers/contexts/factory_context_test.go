@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
+	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
@@ -480,6 +481,51 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Nil(t, reloaded.OriginURL)
 		require.NotNil(t, reloaded.OriginLabel)
 		assert.Contains(t, *reloaded.OriginLabel, marker)
+	})
+
+	t.Run("attaches a timed-out issue when the stored actor is missing", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		marker := ghintegration.NewManualTaskMarker()
+		existing, err := factoryModel.CreateWorkOrder(
+			database.Conn(),
+			"Ship the refunds line",
+			"Stop double charges.",
+			&r.User,
+			[]uuid.UUID{r.User},
+			nil,
+		)
+		require.NoError(t, err)
+		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), marker))
+
+		issueURL := "https://github.com/acme/payments/issues/42"
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": issueURL,
+					"title":    "Ship the refunds line",
+					"body":     ghintegration.AppendManualTaskMarker("Stop double charges.", marker),
+					"user":     map[string]any{"login": "superplane[bot]"},
+				},
+			},
+		})
+		attachGitHubAppIssueTrigger(t, r, canvas, "superplane")
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Ship the refunds line"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.OriginURL)
+		assert.Equal(t, issueURL, *reloaded.OriginURL)
 	})
 
 	t.Run("merges a Dependabot alert into the open task for its package", func(t *testing.T) {
@@ -2222,6 +2268,38 @@ func setupFactoryAppExecution(
 ) (*models.Canvas, *models.CanvasNodeExecution, *models.CanvasRun) {
 	t.Helper()
 	return setupFactoryAppExecutionWithPayload(t, r, factoryID, map[string]any{"key": "value"})
+}
+
+func attachGitHubAppIssueTrigger(t *testing.T, r *support.ResourceRegistry, canvas *models.Canvas, slug string) {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	setup := datatypes.NewJSONType(models.SetupState{})
+	integration.State = models.IntegrationStateReady
+	integration.SetupState = &setup
+	integration.Properties = datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+		{Name: ghcommon.PropertyAuthMethod, Value: ghcommon.AuthMethodApp},
+		{Name: ghcommon.PropertyAppSlug, Value: slug},
+	})
+	require.NoError(t, database.Conn().Save(integration).Error)
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
+	nodes := append([]models.Node(nil), liveVersion.Nodes...)
+	nodes = append(nodes, models.Node{
+		ID:            "github-issue",
+		Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
+		IntegrationID: &integrationID,
+	})
+	require.NoError(t, database.Conn().Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
 }
 
 func setupFactoryAppExecutionWithPayload(

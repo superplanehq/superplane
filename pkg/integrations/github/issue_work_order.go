@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -35,6 +36,30 @@ func PendingManualTaskLabel(marker, actor string) string {
 		return marker
 	}
 	return marker + manualTaskActorSeparator + actor
+}
+
+// AppBotLogin returns the GitHub login that opens issues for an app installation.
+// A manual-task issue is attached only when its author is this login.
+func AppBotLogin(integration *models.Integration) string {
+	if integration == nil || integrationProperty(integration, common.PropertyAuthMethod) != common.AuthMethodApp {
+		return ""
+	}
+	slug := integrationProperty(integration, common.PropertyAppSlug)
+	if slug == "" {
+		return ""
+	}
+	return slug + "[bot]"
+}
+
+func integrationProperty(integration *models.Integration, name string) string {
+	for _, property := range integration.Properties {
+		if property.Name != name {
+			continue
+		}
+		value, _ := property.Value.(string)
+		return strings.TrimSpace(value)
+	}
+	return ""
 }
 
 // ManualTaskActorFromLabel returns the GitHub login stored with a pending marker.
