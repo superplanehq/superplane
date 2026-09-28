@@ -21,6 +21,10 @@ func (g *GitHub) refreshHostedInitialInstallations(
 	app common.HostedApp,
 	metadata *common.Metadata,
 ) error {
+	if !supportsHostedInitialDiscovery(metadata.SetupReturnPath) {
+		completeHostedInitialDiscovery(metadata)
+		return nil
+	}
 	if metadata.InstallationID != "" ||
 		strings.TrimSpace(metadata.StartedByUserID) == "" ||
 		strings.TrimSpace(metadata.StartedByGitHubLogin) == "" {
@@ -147,7 +151,7 @@ func (g *GitHub) refreshHostedInitialInstallationPage(
 	metadata.SetPendingInstallations(mergeVerifiedInstallations(verified, metadata.PendingInstallations))
 	metadata.InstallationDiscovery.NextPage = nextPage
 	metadata.InstallationDiscovery.RetryCandidates = uniqueDiscoveryCandidates(retries)
-	if nextPage == 0 && len(retries) == 0 {
+	if nextPage == 0 && len(metadata.InstallationDiscovery.RetryCandidates) == 0 {
 		completeHostedInitialDiscovery(metadata)
 	}
 	logHostedDiscovery(ctx, "initial_page", len(candidates), len(verified), verificationErr, startedAt)
@@ -163,7 +167,7 @@ func (g *GitHub) retryHostedInitialInstallations(
 	startedAt time.Time,
 ) {
 	candidates := slices.Clone(metadata.InstallationDiscovery.RetryCandidates)
-	verified, retries, err := verifyAccessibleInstallationsWithFailures(
+	verified, _, err := verifyAccessibleInstallationsWithFailures(
 		requestContext,
 		ctx.Integration,
 		app,
@@ -172,11 +176,19 @@ func (g *GitHub) retryHostedInitialInstallations(
 		nil,
 	)
 	metadata.SetPendingInstallations(mergeVerifiedInstallations(verified, metadata.PendingInstallations))
-	metadata.InstallationDiscovery.RetryCandidates = uniqueDiscoveryCandidates(retries)
-	if metadata.InstallationDiscovery.NextPage == 0 && len(retries) == 0 {
+	// Discard failures after this one retry. A persistent GitHub error must not
+	// block the next installation page or keep discovery active forever.
+	metadata.InstallationDiscovery.RetryCandidates = nil
+	if metadata.InstallationDiscovery.NextPage == 0 {
 		completeHostedInitialDiscovery(metadata)
 	}
 	logHostedDiscovery(ctx, "initial_retry", len(candidates), len(verified), err, startedAt)
+}
+
+func supportsHostedInitialDiscovery(returnPath string) bool {
+	pathname, _, _ := strings.Cut(returnPath, "?")
+	return pathname == "/onboarding" ||
+		(strings.Contains(pathname, "/workspaces/") && strings.HasSuffix(pathname, "/setup"))
 }
 
 func ensureHostedInitialDiscovery(metadata *common.Metadata) {

@@ -30,11 +30,15 @@ func TestFilterWritableRepositories(t *testing.T) {
 		context.Background(),
 		"acme",
 		"member",
+		7,
 		repositories,
 		func(_ context.Context, owner, repository, username string) (*gh.RepositoryPermissionLevel, error) {
 			assert.Equal(t, "acme", owner)
 			assert.Equal(t, "member", username)
-			return &gh.RepositoryPermissionLevel{Permission: gh.Ptr(permissions[repository])}, nil
+			return &gh.RepositoryPermissionLevel{
+				Permission: gh.Ptr(permissions[repository]),
+				User:       &gh.User{ID: gh.Ptr(int64(7))},
+			}, nil
 		},
 	)
 
@@ -52,6 +56,7 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 		context.Background(),
 		"acme",
 		"member",
+		7,
 		repositories,
 		func(context.Context, string, string, string) (*gh.RepositoryPermissionLevel, error) {
 			return nil, errors.New("GitHub unavailable")
@@ -59,6 +64,27 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 	)
 
 	assert.Error(t, err)
+	assert.Empty(t, writable)
+}
+
+func TestFilterWritableRepositoriesRejectsReusedLogin(t *testing.T) {
+	repositories := []common.Repository{{ID: 1, Name: "api"}}
+
+	writable, err := filterWritableRepositories(
+		context.Background(),
+		"acme",
+		"former-login",
+		7,
+		repositories,
+		func(context.Context, string, string, string) (*gh.RepositoryPermissionLevel, error) {
+			return &gh.RepositoryPermissionLevel{
+				Permission: gh.Ptr("admin"),
+				User:       &gh.User{ID: gh.Ptr(int64(8))},
+			}, nil
+		},
+	)
+
+	require.NoError(t, err)
 	assert.Empty(t, writable)
 }
 
@@ -304,7 +330,10 @@ func TestDiscoverAccessibleInstallationsUsesLinkedLoginForPermissionChecks(t *te
 	}
 	getRepositoryPermission = func(_ context.Context, _ *gh.Client, _, _, username string) (*gh.RepositoryPermissionLevel, error) {
 		assert.Equal(t, "linked-member", username)
-		return &gh.RepositoryPermissionLevel{Permission: gh.Ptr("write")}, nil
+		return &gh.RepositoryPermissionLevel{
+			Permission: gh.Ptr("write"),
+			User:       &gh.User{ID: gh.Ptr(int64(7))},
+		}, nil
 	}
 
 	installations, err := discoverAccessibleInstallations(

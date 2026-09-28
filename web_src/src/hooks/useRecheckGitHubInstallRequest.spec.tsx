@@ -124,7 +124,7 @@ describe("useRecheckGitHubInstallRequest", () => {
     expect(updateIntegration).toHaveBeenCalledTimes(2);
   });
 
-  it("stops after an error and retries on demand", async () => {
+  it("continues polling after a transient error", async () => {
     vi.useFakeTimers();
     updateIntegration.mockRejectedValueOnce(new Error("unavailable")).mockResolvedValue(successfulSync);
 
@@ -132,8 +132,20 @@ describe("useRecheckGitHubInstallRequest", () => {
     await act(async () => Promise.resolve());
     expect(result.current.failed).toBe(true);
 
-    await act(async () => vi.advanceTimersByTimeAsync(10_000));
+    await act(async () => vi.advanceTimersByTimeAsync(4_999));
     expect(updateIntegration).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(updateIntegration).toHaveBeenCalledTimes(2);
+    expect(result.current.failed).toBe(false);
+  });
+
+  it("retries a failed recheck on demand", async () => {
+    vi.useFakeTimers();
+    updateIntegration.mockRejectedValueOnce(new Error("unavailable")).mockResolvedValue(successfulSync);
+
+    const { result } = renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1"), { wrapper });
+    await act(async () => Promise.resolve());
+    expect(result.current.failed).toBe(true);
 
     act(() => result.current.retry());
     await act(async () => Promise.resolve());

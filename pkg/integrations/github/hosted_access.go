@@ -409,6 +409,7 @@ func verifyAccessibleInstallation(
 		ctx,
 		installation.AccountLogin,
 		identity.Login,
+		identity.ID,
 		repositories,
 		func(ctx context.Context, owner, repository, username string) (*gh.RepositoryPermissionLevel, error) {
 			return getRepositoryPermission(ctx, client, owner, repository, username)
@@ -483,6 +484,7 @@ func filterWritableRepositories(
 	ctx context.Context,
 	owner string,
 	username string,
+	userID int64,
 	repositories []common.Repository,
 	lookup repositoryPermissionLookup,
 ) ([]common.Repository, error) {
@@ -495,7 +497,9 @@ func filterWritableRepositories(
 		if err != nil {
 			return nil, err
 		}
-		if permission == nil || !hasRepositoryWritePermission(permission.GetPermission()) {
+		if permission == nil ||
+			permission.GetUser().GetID() != userID ||
+			!hasRepositoryWritePermission(permission.GetPermission()) {
 			continue
 		}
 

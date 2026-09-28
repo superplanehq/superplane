@@ -51,7 +51,9 @@ export function useRecheckGitHubInstallRequest(
       try {
         await syncGitHubConnection(integrationId);
       } catch {
-        if (!cancelled) setFailed(true);
+        if (cancelled) return;
+        setFailed(true);
+        timeout = setTimeout(() => void recheck(), intervalMs);
         return;
       }
       if (cancelled) return;
