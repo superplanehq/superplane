@@ -146,6 +146,17 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       dependabotAlertCreateTitle,
 		createDescription: dependabotAlertCreateDescription,
 	},
+	models.FactoryIntakeSourceDatadog: {
+		name:             "Datadog errors",
+		description:      "Create a work order when Datadog reports a new Error Tracking issue.",
+		triggerComponent: "datadog.onErrorTrackingAlert",
+		triggerName:      "On Error Tracking Alert",
+		triggerConfiguration: map[string]any{
+			"alertTransitions": intakeDatadogAlertTransitions(defaultDatadogIntakeSettings()),
+		},
+		createTitle:       "{{ root().data.title }}",
+		createDescription: "{{ root().data.description }}",
+	},
 }
 
 // dependabotAlertCreateTitle names the package, not the manifest, because
@@ -458,6 +469,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		return defaultDependabotIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return defaultDatadogIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

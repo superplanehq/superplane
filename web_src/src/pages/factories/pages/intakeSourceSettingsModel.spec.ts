@@ -4,6 +4,7 @@ import {
   addIntakeLabel,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
+  DEFAULT_DATADOG_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
   intakeSettingsFromApi,
@@ -173,12 +174,48 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsFromApi("Productive tasks", {}).taskListIds).toEqual([]);
   });
 
-  it("offers delete for GitHub, Sentry, Jira, and Productive.io intakes", () => {
+  it("round-trips Datadog alert types and environments through the API shape", () => {
+    const settings = intakeSettingsFromApi("Datadog errors", {
+      datadogTriggeredAlerts: false,
+      datadogRetriggeredAlerts: true,
+      datadogEnvironments: [" Prod ", "prod", "", "staging"],
+    });
+
+    expect(settings.datadogTriggeredAlerts).toBe(false);
+    expect(settings.datadogRetriggeredAlerts).toBe(true);
+    expect(settings.datadogEnvironments).toEqual(["prod", "staging"]);
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      datadogTriggeredAlerts: false,
+      datadogRetriggeredAlerts: true,
+      datadogEnvironments: ["prod", "staging"],
+    });
+  });
+
+  it("defaults omitted Datadog toggles from the Datadog intake defaults", () => {
+    const settings = intakeSettingsFromApi("Datadog errors", {});
+
+    expect(settings.datadogTriggeredAlerts).toBe(DEFAULT_DATADOG_INTAKE_SETTINGS.datadogTriggeredAlerts);
+    expect(settings.datadogRetriggeredAlerts).toBe(DEFAULT_DATADOG_INTAKE_SETTINGS.datadogRetriggeredAlerts);
+    expect(settings.datadogEnvironments).toEqual([]);
+  });
+
+  it("keeps datadogService off the API payload", () => {
+    const settings = normalizeIntakeSourceSettings({
+      ...DEFAULT_DATADOG_INTAKE_SETTINGS,
+      datadogService: "  checkout  ",
+    });
+
+    expect(settings.datadogService).toBe("checkout");
+    expect(intakeSettingsToApi(settings)).not.toHaveProperty("datadogService");
+  });
+
+  it("offers delete for GitHub, Sentry, Jira, Productive.io, and Datadog intakes", () => {
     expect(intakeSupportsDelete("github-issues")).toBe(true);
     expect(intakeSupportsDelete("dependabot-alerts")).toBe(true);
     expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
     expect(intakeSupportsDelete("jira-issues")).toBe(true);
     expect(intakeSupportsDelete("productive-tasks")).toBe(true);
+    expect(intakeSupportsDelete("datadog")).toBe(true);
     expect(intakeSupportsDelete("pagerduty-incidents")).toBe(false);
   });
 });

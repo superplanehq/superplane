@@ -46,7 +46,7 @@ export function IntakeSettingsHost({
   const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
   const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
   const actions = useIntakeSettingsActions({
-    intakeId: intake.intakeId,
+    intake,
     updateIntake,
     deleteIntake,
     automationRefetch: automation.refetch,
@@ -118,13 +118,13 @@ export function IntakeSettingsHost({
 }
 
 function useIntakeSettingsActions({
-  intakeId,
+  intake,
   updateIntake,
   deleteIntake,
   automationRefetch,
   onClose,
 }: {
-  intakeId: string;
+  intake: ConfiguredLineIntakeSource;
   updateIntake: ReturnType<typeof useUpdateFactoryIntake>;
   deleteIntake: ReturnType<typeof useDeleteFactoryIntake>;
   automationRefetch: () => Promise<unknown>;
@@ -135,24 +135,40 @@ function useIntakeSettingsActions({
   const saveSettings = useCallback(
     async (next: IntakeSourceSettings) => {
       await updateIntake.mutateAsync({
-        intakeId,
+        intakeId: intake.intakeId,
         settings: intakeSettingsToApi(next),
+        ...datadogServiceRebind(intake, next),
       });
       await automationRefetch();
     },
-    [automationRefetch, intakeId, updateIntake],
+    [automationRefetch, intake, updateIntake],
   );
 
   const removeIntake = useCallback(async () => {
     setDeleteError(undefined);
     try {
-      await deleteIntake.mutateAsync(intakeId);
+      await deleteIntake.mutateAsync(intake.intakeId);
       onClose();
     } catch (error) {
       setDeleteError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.deleteError));
       throw error;
     }
-  }, [deleteIntake, intakeId, onClose]);
+  }, [deleteIntake, intake.intakeId, onClose]);
 
   return { deleteError, saveSettings, removeIntake };
+}
+
+function datadogServiceRebind(
+  intake: ConfiguredLineIntakeSource,
+  next: IntakeSourceSettings,
+): { integrationId?: string; resourceId?: string } {
+  if (intake.source.id !== "datadog") {
+    return {};
+  }
+  const service = next.datadogService.trim();
+  const current = intake.resourceId?.trim() ?? "";
+  if (!service || service === current || !intake.integrationId) {
+    return {};
+  }
+  return { integrationId: intake.integrationId, resourceId: service };
 }

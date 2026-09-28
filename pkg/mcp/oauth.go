@@ -96,13 +96,9 @@ func Discover(ctx context.Context, httpClient HTTPDoer, mcpURL string) (*Discove
 	}
 	canonical := canonicalResource(parsed)
 
-	metadataURL, err := probeResourceMetadataURL(ctx, httpClient, canonical)
+	protected, err := loadProtectedResourceMetadata(ctx, httpClient, canonical)
 	if err != nil {
 		return nil, err
-	}
-	var protected ProtectedResourceMetadata
-	if err := getJSON(ctx, httpClient, metadataURL, &protected); err != nil {
-		return nil, fmt.Errorf("load protected resource metadata: %w", err)
 	}
 	if strings.TrimSpace(protected.Resource) == "" {
 		protected.Resource = canonical
@@ -279,38 +275,84 @@ func DoerFromCore(httpCtx core.HTTPContext) HTTPDoer {
 	return httpCtx
 }
 
-func probeResourceMetadataURL(ctx context.Context, httpClient HTTPDoer, mcpURL string) (string, error) {
+func loadProtectedResourceMetadata(ctx context.Context, httpClient HTTPDoer, mcpURL string) (ProtectedResourceMetadata, error) {
+	candidates, explicit, err := probeResourceMetadataURLs(ctx, httpClient, mcpURL)
+	if err != nil {
+		return ProtectedResourceMetadata{}, err
+	}
+	var lastErr error
+	for _, metadataURL := range candidates {
+		var protected ProtectedResourceMetadata
+		if err := getJSON(ctx, httpClient, metadataURL, &protected); err != nil {
+			lastErr = err
+			if explicit {
+				break
+			}
+			continue
+		}
+		return protected, nil
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("protected resource metadata not found")
+	}
+	return ProtectedResourceMetadata{}, fmt.Errorf("load protected resource metadata: %w", lastErr)
+}
+
+func probeResourceMetadataURLs(ctx context.Context, httpClient HTTPDoer, mcpURL string) ([]string, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, mcpURL, nil)
 	if err != nil {
-		return "", err
+		return nil, false, err
 	}
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("probe MCP URL: %w", err)
+		return nil, false, fmt.Errorf("probe MCP URL: %w", err)
 	}
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 
 	if headerURL := resourceMetadataFromWWWAuthenticate(resp.Header.Get("WWW-Authenticate")); headerURL != "" {
 		if err := ValidatePublicHTTPSURL(headerURL); err != nil {
-			return "", fmt.Errorf("resource metadata URL is not valid")
+			return nil, true, fmt.Errorf("resource metadata URL is not valid")
 		}
-		return headerURL, nil
+		return []string{headerURL}, true, nil
 	}
 
+	candidates, err := protectedResourceMetadataURLs(mcpURL)
+	if err != nil {
+		return nil, false, err
+	}
+	return candidates, false, nil
+}
+
+// protectedResourceMetadataURLs returns RFC 9728 metadata URLs.
+// The path form inserts /.well-known/oauth-protected-resource before the resource path.
+// The host root is the fallback when a server only publishes metadata there.
+func protectedResourceMetadataURLs(mcpURL string) ([]string, error) {
 	parsed, err := url.Parse(mcpURL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	parsed.Path = "/.well-known/oauth-protected-resource"
-	parsed.RawQuery = ""
-	parsed.Fragment = ""
-	fallback := parsed.String()
-	if err := ValidatePublicHTTPSURL(fallback); err != nil {
-		return "", err
+	path := strings.Trim(parsed.Path, "/")
+	candidates := make([]string, 0, 2)
+	if path != "" {
+		withPath := *parsed
+		withPath.Path = "/.well-known/oauth-protected-resource/" + path
+		withPath.RawQuery = ""
+		withPath.Fragment = ""
+		candidates = append(candidates, withPath.String())
 	}
-	return fallback, nil
+	root := *parsed
+	root.Path = "/.well-known/oauth-protected-resource"
+	root.RawQuery = ""
+	root.Fragment = ""
+	candidates = append(candidates, root.String())
+	for _, candidate := range candidates {
+		if err := ValidatePublicHTTPSURL(candidate); err != nil {
+			return nil, err
+		}
+	}
+	return candidates, nil
 }
 
 func resourceMetadataFromWWWAuthenticate(header string) string {

@@ -19,7 +19,7 @@ import (
 
 const (
 	workOrderTitleMaxLength       = 256
-	workOrderDescriptionMaxLength = 5000
+	workOrderDescriptionMaxLength = 20000
 )
 
 func UpdateWorkOrder(

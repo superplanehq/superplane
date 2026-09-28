@@ -85,6 +85,10 @@ export function LinesBoardSpecHarness({
                     element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
                   />
                   <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/datadog"
+                    element={<div data-testid="datadog-intake-setup">Datadog setup page</div>}
+                  />
+                  <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/dependabot"
                     element={<div data-testid="dependabot-intake-setup">Dependabot setup page</div>}
                   />
