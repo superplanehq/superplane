@@ -399,6 +399,7 @@ function totalMergedOf(person: VelocityPerson): number {
 
 const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => number>> = {
   PEOPLE_SORT_FACTORY_MERGED: (person) => person.factoryMerged ?? 0,
+  PEOPLE_SORT_FACTORY_WASTE: (person) => person.factoryWaste ?? 0,
   PEOPLE_SORT_AUTHORED_MERGED: (person) => person.authoredMerged ?? 0,
   PEOPLE_SORT_MEDIAN_CYCLE_HOURS: (person) => person.medianCycleHours ?? 0,
   PEOPLE_SORT_COST_USD: (person) => Number(person.costCents ?? 0),

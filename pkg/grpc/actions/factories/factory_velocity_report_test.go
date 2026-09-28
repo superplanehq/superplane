@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
 func testWindow(t *testing.T) velocityWindow {
@@ -451,6 +452,49 @@ func TestVelocityPeopleBuilder_RowsSorted_EveryKeyAndDirection(t *testing.T) {
 		assert.Equal(t, "Bob", rows[1].name)
 		assert.Equal(t, "Carol", rows[2].name, "carol spent the most, so she is last")
 	})
+}
+
+func TestVelocityPeopleBuilder_RowsSorted_FactoryWaste(t *testing.T) {
+	alice, bob, carol := uuid.New(), uuid.New(), uuid.New()
+
+	// Alice: 1 wasted task. Bob and Carol: 3 each, so the name tie-break decides.
+	build := func() *velocityPeopleBuilder {
+		builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+			{UserID: alice, Name: "Alice"},
+			{UserID: bob, Name: "Bob"},
+			{UserID: carol, Name: "Carol"},
+		})
+		builder.addFactoryOrder(&velocityOrder{createdByID: &alice, merged: false})
+		for i := 0; i < 3; i++ {
+			builder.addFactoryOrder(&velocityOrder{createdByID: &bob, merged: false})
+			builder.addFactoryOrder(&velocityOrder{createdByID: &carol, merged: false})
+		}
+		return builder
+	}
+
+	t.Run("desc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortFactoryWaste, velocitySortDesc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Bob", rows[0].name, "bob and carol tie on waste; name breaks the tie")
+		assert.Equal(t, "Carol", rows[1].name)
+		assert.Equal(t, "Alice", rows[2].name, "alice closed the fewest tasks without a merge")
+	})
+
+	t.Run("asc", func(t *testing.T) {
+		rows := build().rowsSorted(velocitySortFactoryWaste, velocitySortAsc)
+		require.Len(t, rows, 3)
+		assert.Equal(t, "Alice", rows[0].name, "alice closed the fewest tasks without a merge")
+		assert.Equal(t, "Bob", rows[1].name, "the tie-break stays name-ascending even in ASC order")
+		assert.Equal(t, "Carol", rows[2].name)
+	})
+}
+
+func TestVelocityPeopleSortKeyFromProto_FactoryWaste(t *testing.T) {
+	assert.Equal(
+		t,
+		velocitySortFactoryWaste,
+		velocityPeopleSortKeyFromProto(pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_FACTORY_WASTE),
+	)
 }
 
 func TestVelocityPeopleBuilder_MedianCycleOfMemberOrders(t *testing.T) {
