@@ -64,7 +64,14 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		http.Error(ctx.Response, "hosted GitHub App is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	installations, discoveryErr := discoverAccessibleInstallations(ctx.Request.Context(), ctx.Integration, app, *identity)
+	installations, discoveryErr := discoverAccessibleInstallationByID(
+		ctx.Request.Context(),
+		ctx.Integration,
+		app,
+		*identity,
+		installationID,
+		repositoryIDs,
+	)
 	metadata.SetPendingInstallations(installations)
 	repositories, allowed := metadata.SelectPendingRepositories(installationID, repositoryIDs)
 	if !allowed {
