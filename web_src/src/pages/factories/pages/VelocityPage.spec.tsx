@@ -262,6 +262,11 @@ describe("VelocityPage shell", () => {
     const people = screen.getByTestId("velocity-people");
     expect(people).toHaveTextContent("Ada Lovelace");
     expect(people).toHaveTextContent("1 person with activity in this period");
+    expect(within(people).getByRole("button", { name: "Task waste" })).toHaveAttribute(
+      "title",
+      "SuperPlane tasks credited to this person that closed without a merge",
+    );
+    expect(people).toHaveTextContent("1 (25%)");
   });
 
   it("shows only the first page of people and the true total, with a Show more control", () => {
