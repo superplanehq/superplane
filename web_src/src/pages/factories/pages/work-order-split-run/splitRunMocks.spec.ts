@@ -691,6 +691,148 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
+  it("warns that an open trial with no credit cannot run the failed step", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Failed job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              failureReason: "no_hosted_credit",
+            },
+          ]),
+        ],
+      }),
+      {
+        credit: {
+          plan: "trial",
+          remainingCreditCents: 0,
+          trialEndsAt: "2026-10-12T12:00:00.000Z",
+          billingHref: "/demo/organization/billing",
+        },
+      },
+    );
+
+    expect(fixture.footer.attentionTone).toBe("warning");
+    expect(fixture.footer.note).toMatchObject({
+      headline: "No credit",
+      text: "This organization is out of credit.",
+      cta: { label: "Open billing", href: "/demo/organization/billing" },
+    });
+    expect(fixture.footer.actions.find((action) => action.kind === "rerun")).toEqual({
+      id: "rerun",
+      kind: "rerun",
+      label: "Rerun",
+      emphasis: "primary",
+      disabled: true,
+      tooltip: "This organization is out of credit.",
+    });
+    expect(fixture.footer.actions.find((action) => action.kind === "reject")?.disabled).toBeUndefined();
+  });
+
+  it("keeps Rerun enabled when the organization still has credit", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              failureReason: "provider_error",
+            },
+          ]),
+        ],
+      }),
+      { credit: { plan: "business", remainingCreditCents: 5000, billingHref: "/demo/organization/billing" } },
+    );
+
+    expect(fixture.footer.actions.find((action) => action.kind === "rerun")).toEqual({
+      id: "rerun",
+      kind: "rerun",
+      label: "Rerun",
+      emphasis: "primary",
+    });
+  });
+
+  it("disables Start on a draft when the organization is out of credit", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      credit: { plan: "trial", remainingCreditCents: 0, billingHref: "/demo/organization/billing" },
+    });
+
+    expect(fixture.footer.attentionTone).toBe("warning");
+    expect(fixture.footer.note).toMatchObject({
+      headline: "No credit",
+      text: "This organization is out of credit.",
+      cta: { label: "Open billing", href: "/demo/organization/billing" },
+    });
+    expect(fixture.footer.creditNotice).toMatchObject({
+      headline: "No credit",
+      warning: true,
+      href: "/demo/organization/billing",
+    });
+    expect(fixture.footer.actions.find((action) => action.kind === "start")).toEqual({
+      id: "start",
+      kind: "start",
+      label: "Start",
+      emphasis: "primary",
+      disabled: true,
+      tooltip: "This organization is out of credit.",
+    });
+    expect(fixture.footer.actions.find((action) => action.kind === "archive")?.disabled).toBeUndefined();
+  });
+
+  it("keeps Start enabled on a draft when credit remains", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      credit: { plan: "business", remainingCreditCents: 1200 },
+    });
+
+    expect(fixture.footer.actions.find((action) => action.kind === "start")).toEqual({
+      id: "start",
+      kind: "start",
+      label: "Start",
+      emphasis: "primary",
+    });
+  });
+
+  it("says the organization is out of credit when the failure is not a trial", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              failureReason: "no_hosted_credit",
+            },
+          ]),
+        ],
+      }),
+      { credit: { plan: "business", remainingCreditCents: 0, billingHref: "/demo/organization/billing" } },
+    );
+
+    expect(fixture.footer.attentionTone).toBeUndefined();
+    expect(fixture.footer.note?.headline).toBe("No credit");
+    expect(fixture.footer.note?.text).toBe(
+      "This organization has no hosted credit. Add credit, then run this step again.",
+    );
+    expect(fixture.footer.note?.cta).toEqual({ label: "Add credits", href: "/demo/organization/billing" });
+    expect(fixture.footer.actions.find((action) => action.kind === "rerun")?.disabled).toBe(true);
+  });
+
   it("marks a cancelled implement step as canceled, not waiting", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

@@ -58,6 +58,12 @@ const TONE = {
     icon: "text-[color:var(--status-waiting-fg)]",
     Icon: Hourglass,
   },
+  warning: {
+    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
+    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
+    icon: "text-[color:var(--status-waiting-fg)]",
+    Icon: TriangleAlert,
+  },
   failed: {
     strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
     iconWrap: "bg-[color:var(--status-failed-dot)]/15",

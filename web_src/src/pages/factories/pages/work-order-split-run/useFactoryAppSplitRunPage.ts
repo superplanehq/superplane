@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { useHostedCreditRunContext } from "../../lib/useHostedCreditEmptyBanner";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
@@ -80,6 +81,7 @@ export function useFactoryAppSplitRunPage() {
     liveWorkOrder.data,
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const credit = useHostedCreditRunContext(organizationId, factoryKey);
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
@@ -88,8 +90,9 @@ export function useFactoryAppSplitRunPage() {
         artifacts,
         isAnalyzing,
         resolveUser,
+        credit,
       }),
-    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser, credit],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(

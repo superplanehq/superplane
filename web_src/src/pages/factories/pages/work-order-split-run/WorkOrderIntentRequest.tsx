@@ -16,6 +16,7 @@ import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestA
 import { DictateButton } from "../../DictateButton";
 import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
+import type { HostedCreditBlockNotice } from "../../lib/workOrderFailureReason";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
@@ -62,6 +63,8 @@ export type IntentAnalysisChat = {
   closedDecision?: ReactNode;
   /** Model select for Start. The strip shows it on the settings row. */
   modelSelect?: ReactNode;
+  /** Replaces the readiness verdict when the organization cannot start the task. */
+  creditNotice?: HostedCreditBlockNotice;
   /** Permalink for a task the agent split off this draft. */
   taskHref?: CreatedTaskHref;
 };
@@ -259,6 +262,7 @@ function AnalysisComposer({
             onToggle={analysis.onTogglePlan}
             actions={analysis.closedDecision}
             modelSelect={analysis.modelSelect}
+            creditNotice={analysis.creditNotice}
           />
           <AnalysisComposerField
             analysis={analysis}

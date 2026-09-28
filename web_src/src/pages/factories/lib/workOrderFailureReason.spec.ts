@@ -1,10 +1,26 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  failedStepCreditNote,
+  hostedCreditBlockNote,
+  isOutOfHostedCredit,
   isWorkOrderCreditFailureReason,
   workOrderCreditFailureCopy,
   workOrderExecutionCreditFailure,
 } from "./workOrderFailureReason";
+
+describe("isOutOfHostedCredit", () => {
+  it("is true when remaining credit is zero or negative", () => {
+    expect(isOutOfHostedCredit({ remainingCreditCents: 0 })).toBe(true);
+    expect(isOutOfHostedCredit({ remainingCreditCents: -1 })).toBe(true);
+  });
+
+  it("is false when credit remains or the balance is still loading", () => {
+    expect(isOutOfHostedCredit({ remainingCreditCents: 1 })).toBe(false);
+    expect(isOutOfHostedCredit({})).toBe(false);
+    expect(isOutOfHostedCredit(undefined)).toBe(false);
+  });
+});
 
 describe("workOrderCreditFailureCopy", () => {
   it("maps no hosted credit to No credit and Add credits", () => {
@@ -47,5 +63,75 @@ describe("workOrderExecutionCreditFailure", () => {
     expect(workOrderExecutionCreditFailure({ result: "RESULT_PASSED", failureReason: "no_hosted_credit" })).toBeNull();
     expect(workOrderExecutionCreditFailure({ result: "RESULT_FAILED" })).toBeNull();
     expect(workOrderExecutionCreditFailure(null)).toBeNull();
+  });
+});
+
+describe("failedStepCreditNote", () => {
+  const now = new Date("2026-09-28T12:00:00.000Z");
+  const openTrial = {
+    plan: "trial",
+    remainingCreditCents: 0,
+    trialEndsAt: "2026-10-12T12:00:00.000Z",
+    billingHref: "/demo/organization/billing",
+  };
+
+  it("warns that an open trial with no credit cannot run tasks", () => {
+    expect(failedStepCreditNote("no_hosted_credit", openTrial, now)).toEqual({
+      headline: "No credit",
+      text: "This organization is out of credit.",
+      actionLabel: "Open billing",
+      warning: true,
+    });
+  });
+
+  it("warns when the failure reason is missing on an empty trial", () => {
+    expect(failedStepCreditNote(undefined, openTrial, now)?.warning).toBe(true);
+  });
+
+  it("keeps a real error on an empty trial", () => {
+    expect(failedStepCreditNote("provider_error", openTrial, now)).toBeNull();
+  });
+
+  it("names missing credit when the organization is not on a trial", () => {
+    expect(failedStepCreditNote("no_hosted_credit", { plan: "business", remainingCreditCents: 0 }, now)).toEqual({
+      headline: "No credit",
+      text: "This organization has no hosted credit. Add credit, then run this step again.",
+      actionLabel: "Add credits",
+      warning: false,
+    });
+  });
+
+  it("warns on a draft when an open trial has no credit", () => {
+    expect(hostedCreditBlockNote(openTrial, now)).toEqual({
+      headline: "No credit",
+      text: "This organization is out of credit.",
+      actionLabel: "Open billing",
+      href: "/demo/organization/billing",
+      warning: true,
+    });
+  });
+
+  it("asks for credit on a draft when the organization is not on a trial", () => {
+    expect(hostedCreditBlockNote({ plan: "business", remainingCreditCents: 0, billingHref: "/billing" }, now)).toEqual({
+      headline: "No credit",
+      text: "This organization has no hosted credit. Add credit, then run this step again.",
+      actionLabel: "Add credits",
+      href: "/billing",
+      warning: false,
+    });
+  });
+
+  it("does not block a draft while credit is still loading", () => {
+    expect(hostedCreditBlockNote({ plan: "trial" }, now)).toBeNull();
+  });
+
+  it("does not treat an expired trial as an open trial", () => {
+    expect(
+      failedStepCreditNote(
+        "no_hosted_credit",
+        { plan: "trial", remainingCreditCents: 0, trialEndsAt: "2026-09-01T12:00:00.000Z" },
+        now,
+      )?.warning,
+    ).toBe(false);
   });
 });

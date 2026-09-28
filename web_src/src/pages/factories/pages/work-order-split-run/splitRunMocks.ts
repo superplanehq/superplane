@@ -43,6 +43,12 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import {
+  failedStepCreditNote,
+  hostedCreditBlockNote,
+  isOutOfHostedCredit,
+  type HostedCreditRunContext,
+} from "../../lib/workOrderFailureReason";
+import {
   parseWorkOrderMetric,
   type WorkOrderUsageByMachineType,
   type WorkOrderUsageByModel,
@@ -225,13 +231,34 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
   return workOrderOwnerDisplay(order, UNKNOWN_OWNER, resolveUser);
 }
 
-function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
+function failedFooterNote(
+  current: FactoriesWorkOrderExecution | undefined,
+  credit?: HostedCreditRunContext,
+): { note: WorkOrderStatusNotePresentation; warning: boolean } {
+  const creditNote = failedStepCreditNote(current?.failureReason, credit);
+  if (creditNote) {
+    return {
+      warning: creditNote.warning,
+      note: {
+        key: "step-failed",
+        headline: creditNote.headline,
+        text: creditNote.text,
+        cta: credit?.billingHref
+          ? { label: creditNote.actionLabel, href: credit.billingHref }
+          : { label: "Debug", icon: "bug" },
+      },
+    };
+  }
+
   const step = current?.step?.trim();
   return {
-    key: "step-failed",
-    headline: step ? `${step} did not pass` : "The run did not pass",
-    text: SPLIT_RUN_FAILED_NOTE_TEXT,
-    cta: { label: "Debug", icon: "bug" },
+    warning: false,
+    note: {
+      key: "step-failed",
+      headline: step ? `${step} did not pass` : "The run did not pass",
+      text: SPLIT_RUN_FAILED_NOTE_TEXT,
+      cta: { label: "Debug", icon: "bug" },
+    },
   };
 }
 
@@ -364,6 +391,8 @@ export type SplitRunFixtureOptions = {
   isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
+  /** Organization credit used to explain a step that credit blocked. */
+  credit?: HostedCreditRunContext;
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -417,6 +446,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       closer: options?.closer,
       analysisRuns: options?.analysisRuns,
       isAnalyzing: options?.isAnalyzing,
+      credit: options?.credit,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -439,6 +469,7 @@ function reviewSurfaces(
     closer?: { actor?: OrgUserDisplay; automationName?: string };
     analysisRuns?: BacklogAnalysisRun[];
     isAnalyzing?: boolean;
+    credit?: HostedCreditRunContext;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -448,6 +479,7 @@ function reviewSurfaces(
   const checks = overviewChecks(input.phases, input.apiChecks, demoArtifacts);
 
   if (displayStatus === "draft") {
+    const creditNotice = hostedCreditBlockNote(input.credit) ?? undefined;
     return surfaces(
       buildSplitRunFooter({
         kind: "draft",
@@ -456,6 +488,8 @@ function reviewSurfaces(
         isAnalyzing: draftIsAnalyzing(input),
         clarityScore: clarityScoreFromChecks(checks),
         confidenceScore: confidenceScoreFromChecks(checks),
+        outOfCredit: isOutOfHostedCredit(input.credit),
+        creditNotice,
       }),
       [],
       checks,
@@ -465,10 +499,10 @@ function reviewSurfaces(
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {
-    return failedReviewSurface(current, displayStatus, checks);
+    return failedReviewSurface(current, displayStatus, checks, input.credit);
   }
   if (current?.result === "RESULT_CANCELLED") {
-    return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
+    return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy, input.credit);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
     return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
@@ -502,6 +536,7 @@ function stoppedReviewSurface(
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
   stoppedBy?: OrgUserDisplay,
+  credit?: HostedCreditRunContext,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   return surfaces(
     buildSplitRunFooter({
@@ -509,6 +544,7 @@ function stoppedReviewSurface(
       actor: stoppedBy,
       run: footerRun(current),
       status: displayStatus,
+      outOfCredit: isOutOfHostedCredit(credit),
     }),
     [],
     checks,
@@ -519,16 +555,19 @@ function failedReviewSurface(
   current: FactoriesWorkOrderExecution | undefined,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
+  credit?: HostedCreditRunContext,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  const note = failedFooterNote(current);
+  const failed = failedFooterNote(current, credit);
   return surfaces(
     buildSplitRunFooter({
       kind: "failed",
-      note,
+      note: failed.note,
       run: footerRun(current),
       status: displayStatus,
+      attentionTone: failed.warning ? "warning" : undefined,
+      outOfCredit: isOutOfHostedCredit(credit),
     }),
-    [note],
+    [failed.note],
     checks,
   );
 }

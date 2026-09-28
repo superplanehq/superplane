@@ -3,6 +3,7 @@ import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
 import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import type { HostedCreditRunContext } from "../../lib/workOrderFailureReason";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } from "./splitRunCanvases";
 import {
@@ -49,6 +50,7 @@ export type FixtureForSplitRunPageOptions = {
   isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
+  credit?: HostedCreditRunContext;
 };
 
 export function fixtureForSplitRunPage(
@@ -69,6 +71,7 @@ export function fixtureForSplitRunPage(
     artifacts: options?.artifacts,
     isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,
+    credit: options?.credit,
   });
 }
 
