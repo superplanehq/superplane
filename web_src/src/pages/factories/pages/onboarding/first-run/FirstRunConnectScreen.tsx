@@ -23,6 +23,39 @@ function SignedInAsLine({ login }: { login: string }) {
   );
 }
 
+function FirstRunGitHubInstallLink({
+  githubAppSlug,
+  githubState,
+  disabled = false,
+  onInstallOther,
+}: {
+  githubAppSlug: string;
+  githubState: string;
+  disabled?: boolean;
+  onInstallOther?: () => void;
+}) {
+  if (githubAppSlug === "") return null;
+
+  return (
+    <p className="text-[13px] text-muted-foreground">
+      {copy.missingAccount}{" "}
+      <a
+        href={hostedGitHubInstallURL(githubAppSlug, githubState)}
+        data-testid="first-run-github-install-other"
+        aria-disabled={disabled || undefined}
+        tabIndex={disabled ? -1 : undefined}
+        onClick={(event) => {
+          if (disabled || onInstallOther) event.preventDefault();
+          if (!disabled) onInstallOther?.();
+        }}
+        className={`font-medium text-foreground underline underline-offset-2 hover:no-underline ${disabled ? "pointer-events-none opacity-50" : ""}`}
+      >
+        {copy.installThere}
+      </a>
+    </p>
+  );
+}
+
 /**
  * Requested organizations as rows in the organization list, so a pending
  * approval reads as one more organization instead of a separate panel. The
@@ -66,7 +99,6 @@ function FirstRunGitHubAccountPicker({
   bindingInstallationId,
   disabled,
   discoveringAccounts,
-  installAvailable,
   syncError,
   onUseInstallation,
   onInstallOther,
@@ -78,7 +110,6 @@ function FirstRunGitHubAccountPicker({
   bindingInstallationId?: string;
   disabled?: boolean;
   discoveringAccounts?: boolean;
-  installAvailable?: boolean;
   syncError?: string;
   onUseInstallation: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
@@ -120,24 +151,12 @@ function FirstRunGitHubAccountPicker({
           ) : null}
         </div>
       ) : null}
-      {(!discoveringAccounts || syncError || installAvailable) && githubAppSlug !== "" ? (
-        <p className="text-[13px] text-muted-foreground">
-          {copy.missingAccount}{" "}
-          <a
-            href={hostedGitHubInstallURL(githubAppSlug, githubState)}
-            data-testid="first-run-github-install-other"
-            aria-disabled={binding || undefined}
-            tabIndex={binding ? -1 : undefined}
-            onClick={(event) => {
-              if (binding || onInstallOther) event.preventDefault();
-              if (!binding) onInstallOther?.();
-            }}
-            className={`font-medium text-foreground underline underline-offset-2 hover:no-underline ${binding ? "pointer-events-none opacity-50" : ""}`}
-          >
-            {copy.installThere}
-          </a>
-        </p>
-      ) : null}
+      <FirstRunGitHubInstallLink
+        githubAppSlug={githubAppSlug}
+        githubState={githubState}
+        disabled={binding}
+        onInstallOther={onInstallOther}
+      />
       {disabled ? (
         <p className="text-[13px] text-muted-foreground" role="status">
           {copy.openingGitHub}
@@ -248,14 +267,18 @@ export function FirstRunConnectScreen({
     <FirstRunShell
       testId="first-run-connect"
       chrome={chrome}
-      busy={loading || connecting || bindingInstallationId !== undefined}
+      busy={connecting || bindingInstallationId !== undefined}
       sphere={sphere}
     >
       <ConnectScreenHeading showAccountPicker={showAccountPicker || pickerExpected} githubLogin={githubLogin} />
 
       <div className="mt-8 space-y-6">
         {loading ? (
-          <ConnectScreenLoading />
+          <ConnectScreenLoading
+            githubAppSlug={githubAppSlug}
+            githubState={githubState}
+            onInstallOther={onInstallOther}
+          />
         ) : syncError && pickerExpected && !showAccountPicker ? (
           <ConnectScreenSyncError error={syncError} onRetry={onRetrySync} />
         ) : (
@@ -267,7 +290,6 @@ export function FirstRunConnectScreen({
             bindingInstallationId={bindingInstallationId}
             connecting={connecting}
             discoveringAccounts={discoveringAccounts}
-            installAvailable={installAvailable}
             syncError={syncError}
             showAccountPicker={showAccountPicker}
             waitingForApproval={waitingForApproval}
@@ -315,14 +337,29 @@ function ConnectScreenError({ error, waitingForApproval }: { error?: string; wai
  * Placeholder while the picker data loads after a GitHub round trip, so the
  * screen does not flash the connect button before the picker.
  */
-function ConnectScreenLoading() {
+function ConnectScreenLoading({
+  githubAppSlug,
+  githubState,
+  onInstallOther,
+}: {
+  githubAppSlug: string;
+  githubState: string;
+  onInstallOther?: () => void;
+}) {
   return (
-    <div className="space-y-3" data-testid="first-run-connect-loading" role="status">
-      <p className="text-[13px] text-muted-foreground">{copy.loadingAccounts}</p>
+    <div className="space-y-3" data-testid="first-run-connect-loading">
+      <p className="text-[13px] text-muted-foreground" role="status">
+        {copy.loadingAccounts}
+      </p>
       <div aria-hidden>
         <div className="h-14 animate-pulse rounded-md bg-accent/40" />
         <div className="mt-3 h-9 w-40 animate-pulse rounded-md bg-accent/40" />
       </div>
+      <FirstRunGitHubInstallLink
+        githubAppSlug={githubAppSlug}
+        githubState={githubState}
+        onInstallOther={onInstallOther}
+      />
     </div>
   );
 }
@@ -352,7 +389,6 @@ function ConnectScreenBody({
   bindingInstallationId,
   connecting,
   discoveringAccounts,
-  installAvailable,
   syncError,
   showAccountPicker,
   waitingForApproval,
@@ -368,7 +404,6 @@ function ConnectScreenBody({
   bindingInstallationId?: string;
   connecting: boolean;
   discoveringAccounts: boolean;
-  installAvailable: boolean;
   syncError?: string;
   showAccountPicker: boolean;
   waitingForApproval: boolean;
@@ -391,7 +426,6 @@ function ConnectScreenBody({
           bindingInstallationId={bindingInstallationId}
           disabled={connecting}
           discoveringAccounts={discoveringAccounts}
-          installAvailable={installAvailable}
           syncError={syncError}
           onUseInstallation={onUseInstallation}
           onInstallOther={onInstallOther}
