@@ -152,6 +152,9 @@ func DispatchWorkOrderOnLine(
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
 			return err
 		}
+		if _, err := order.ClearAutoStart(tx); err != nil {
+			return err
+		}
 
 		if replaceActive && startIndex > 0 {
 			_, started, err := order.RetryLineStep(tx, currentLine, startIndex)
