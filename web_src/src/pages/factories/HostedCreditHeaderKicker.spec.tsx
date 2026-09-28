@@ -66,6 +66,29 @@ describe("HostedCreditHeaderKicker", () => {
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
   });
 
+  it("shows an amber no-credit chip while the trial is still open", () => {
+    const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
+    render(
+      <MemoryRouter>
+        <HostedCreditHeaderKicker
+          kind="trial-empty"
+          spendingHref={billingHref}
+          welcomeCreditExpiresAt={expiresAt.toISOString()}
+          remainingCreditCents={0}
+        />
+      </MemoryRouter>,
+    );
+
+    const kicker = screen.getByTestId("hosted-credit-header-kicker");
+    expect(kicker).toHaveAttribute("data-kind", "trial-empty");
+    expect(kicker).toHaveTextContent("No credit");
+    expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
+    expect(kicker).toHaveTextContent("$0.00");
+    expect(kicker).toHaveTextContent("Open billing");
+    expect(kicker.className).toContain("bg-amber-100");
+    expect(screen.getByRole("link", { name: "Open billing" })).toHaveAttribute("href", billingHref);
+  });
+
   it("shows a trial-ended chip with a Subscribe action", () => {
     render(
       <MemoryRouter>
@@ -124,7 +147,7 @@ describe("HostedCreditHeaderKicker", () => {
     expect(kicker.className).toContain("bg-amber-100");
   });
 
-  it.each(["trial-expired", "lapsed"] as const)("uses the amber palette for the %s chip", (kind) => {
+  it.each(["trial-empty", "trial-expired", "lapsed"] as const)("uses the amber palette for the %s chip", (kind) => {
     render(
       <MemoryRouter>
         <HostedCreditHeaderKicker kind={kind} spendingHref={billingHref} />

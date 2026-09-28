@@ -453,6 +453,7 @@ function analysisDraftChrome(args: {
         showClarity: factoryShowsClarity(args.factory),
         showConfidence: factoryShowsConfidence(args.factory),
       },
+      args.fixture.footer.creditNotice,
     ),
   };
 }
@@ -508,11 +509,12 @@ function draftStripAnalysis(
   modelSelect: ReactNode | undefined,
   taskHref: CreatedTaskHref,
   scores: { showClarity: boolean; showConfidence: boolean },
+  creditNotice: WorkOrderSplitRunPopupProps["fixture"]["footer"]["creditNotice"],
 ) {
   if (footerKind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref, ...scores };
+  return { ...analysis, modelSelect, taskHref, ...scores, creditNotice };
 }
 
 /**
