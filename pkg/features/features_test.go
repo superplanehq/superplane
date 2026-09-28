@@ -88,6 +88,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add skills for workspace agents", f.Description)
 	})
 
+	t.Run("known id returns factory risk score feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryRiskScore)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryRiskScore, f.ID)
+		assert.Equal(t, "Factory Risk Score", f.Label)
+		assert.Equal(t, "Add a risk score automation to the Verify column", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryPullRequestMerge)
 		assert.True(t, ok)
@@ -122,6 +131,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
+	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))

@@ -11,7 +11,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -25,6 +25,7 @@ import {
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
+  RiskScoreSetupPage,
   SentryIntakeSetupPage,
   FactoriesIndexPage,
   FactoriesLayout,
@@ -302,6 +303,14 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
                 <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
                 <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+                <Route
+                  path=":lineId/setup/risk-score"
+                  element={
+                    <RequireExperimentalFeature featureId={FEATURE_FACTORY_RISK_SCORE}>
+                      <RiskScoreSetupPage />
+                    </RequireExperimentalFeature>
+                  }
+                />
                 <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
                 <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
                 <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />

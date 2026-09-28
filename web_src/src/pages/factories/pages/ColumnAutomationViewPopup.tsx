@@ -1,5 +1,7 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -12,6 +14,8 @@ import {
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import { riskScoreCategoriesFromDraft } from "./riskScoreCategories";
+import { RiskScoreSettingsForm } from "./RiskScoreSettingsForm";
 import {
   SettingsAutomationCanvasEdit,
   SettingsAutomationHeaderRow,
@@ -210,7 +214,7 @@ function ColumnAutomationViewBody({
   if (tab === "agent" && agent) {
     return (
       <PlanningReviewEditor
-        key={agent.draft?.components[0]?.id ?? "agent"}
+        key={`${agent.draft?.components[0]?.id ?? "agent"}:${JSON.stringify(agent.draft?.components[0]?.configuration.steps ?? [])}`}
         initialDraft={agent.draft}
         onSave={agent.onSave}
         organizationId={agent.organizationId}
@@ -263,6 +267,11 @@ export function ColumnAutomationViewHost({
 }) {
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
+  const allowRiskScore = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_RISK_SCORE);
+  const riskScoreGeneral =
+    allowRiskScore && agent.draft && riskScoreCategoriesFromDraft(agent.draft) ? (
+      <RiskScoreSettingsForm draft={agent.draft} onSave={agent.save} />
+    ) : undefined;
   return (
     <ColumnAutomationViewPopup
       title={automation.name?.trim() || title}
@@ -274,7 +283,7 @@ export function ColumnAutomationViewHost({
       canvasId={canvasId}
       runHrefFor={(runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })}
       onClose={onClose}
-      general={general}
+      general={general ?? riskScoreGeneral}
       agent={
         agent.agentNode
           ? {
