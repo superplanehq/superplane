@@ -88,6 +88,7 @@ const STATUS_TEXT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
   failed: "text-[color:var(--status-failed-fg)]",
   rejected: "text-[color:var(--status-failed-fg)]",
   cancelled: "text-[color:var(--status-cancelled-fg)]",
+  archived: "text-[color:var(--status-cancelled-fg)]",
   waiting: "text-[color:var(--status-waiting-fg)]",
   draft: "text-[color:var(--status-draft-fg)]",
 };
@@ -98,6 +99,7 @@ const STATUS_DOT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
   failed: "bg-[color:var(--status-failed-dot)]",
   rejected: "bg-[color:var(--status-failed-dot)]",
   cancelled: "bg-[color:var(--status-cancelled-dot)]",
+  archived: "bg-[color:var(--status-cancelled-dot)]",
   waiting: "bg-[color:var(--status-waiting-dot)]",
   draft: "bg-[color:var(--status-draft-dot)]",
 };

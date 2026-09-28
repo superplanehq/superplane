@@ -31,6 +31,7 @@ describe("WorkOrderClosedStatusDialog", () => {
           key: "RF-107",
           state: "STATE_CLOSED",
           result: "RESULT_REJECTED",
+          lineDispatches: [{ id: "d-rejected", state: "STATE_FINISHED", line: { id: "line-1" } }],
         },
         {
           id: "wo-cancelled",
@@ -92,6 +93,7 @@ describe("WorkOrderClosedStatusDialog", () => {
           key: "RF-107",
           state: "STATE_CLOSED",
           result: "RESULT_REJECTED",
+          lineDispatches: [{ id: "d-rejected", state: "STATE_FINISHED", line: { id: "line-1" } }],
         },
       ],
       isLoading: false,

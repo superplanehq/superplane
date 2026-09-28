@@ -320,10 +320,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
-			ToState: FactoryWorkOrderStateDraft,
-			Actor:   &userID,
-		})
+		changed, err := order.SendClosedToDraft(database.Conn(), &userID)
 		require.NoError(t, err)
 		assert.True(t, changed)
 		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
@@ -338,6 +335,71 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 		assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
 		assert.Equal(t, FactoryWorkOrderResultFailed, payload.FromResult)
 		assert.Equal(t, "", payload.ToResult)
+	})
+
+	t.Run("restore an archived reject to draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Archived", "", &userID, nil, nil)
+		require.NoError(t, err)
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateClosed,
+			Result:  FactoryWorkOrderResultRejected,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
+		assert.Equal(t, "", order.Result)
+	})
+
+	t.Run("closed completed cannot return to draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Completed", "", &userID, nil, nil)
+		require.NoError(t, err)
+		for _, step := range []FactoryWorkOrderStatusUpdate{
+			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
+			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultCompleted, Actor: &userID},
+		} {
+			_, err := order.UpdateStatus(database.Conn(), step)
+			require.NoError(t, err)
+		}
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.Error(t, err)
+		assert.False(t, changed)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+		assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
+		assert.Equal(t, FactoryWorkOrderResultCompleted, order.Result)
+	})
+
+	t.Run("rejected order that ran on a line cannot return to draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Ran then rejected", "", &userID, nil, nil)
+		require.NoError(t, err)
+		for _, step := range []FactoryWorkOrderStatusUpdate{
+			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
+			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultRejected, Actor: &userID},
+		} {
+			_, err := order.UpdateStatus(database.Conn(), step)
+			require.NoError(t, err)
+		}
+		require.NoError(t, insertFinishedLineDispatch(t, factoryModel, order))
+
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.Error(t, err)
+		assert.False(t, changed)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+		assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
+		assert.Equal(t, FactoryWorkOrderResultRejected, order.Result)
 	})
 }
 
@@ -1252,6 +1314,28 @@ func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 		_, err := otherFactory.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/example/repo/pull/42")
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
 	})
+}
+
+func insertFinishedLineDispatch(t *testing.T, factoryModel *Factory, order *FactoryWorkOrder) error {
+	t.Helper()
+	line, err := factoryModel.CreateLine(database.Conn(), "ship", nil)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	return database.Conn().Create(&FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineName:       line.Name,
+		Steps:          datatypes.JSONSlice[FactoryLineStep]{},
+		State:          FactoryWorkOrderLineDispatchStateFinished,
+		Result:         FactoryWorkOrderResultRejected,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error
 }
 
 func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userID uuid.UUID, factoryModel *Factory) {

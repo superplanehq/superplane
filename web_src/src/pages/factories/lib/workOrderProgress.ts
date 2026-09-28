@@ -15,7 +15,7 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 
 /**
  * Display vocabulary for the Tasks workspace: Draft, Running, Waiting,
- * Completed, Failed, Rejected, Canceled. The idle-open key stays `waiting` so
+ * Completed, Failed, Rejected, Canceled, Archived. The idle-open key stays `waiting` so
  * stored filters keep working. Persisted state + result columns in the
  * database stay unchanged; this file is the single mapping layer.
  */
@@ -26,7 +26,8 @@ export type WorkOrderDisplayStatus =
   | "completed"
   | "failed"
   | "rejected"
-  | "cancelled";
+  | "cancelled"
+  | "archived";
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
@@ -94,6 +95,14 @@ const DISPLAY_STATUS_META: Record<
       "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
     dotClassName: "bg-[color:var(--status-cancelled-dot)]",
   },
+  archived: {
+    label: "Archived",
+    filterLabel: "Archived",
+    summary: "Archived before a line run.",
+    className:
+      "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
+    dotClassName: "bg-[color:var(--status-cancelled-dot)]",
+  },
 };
 
 export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
@@ -104,6 +113,7 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "failed",
   "rejected",
   "cancelled",
+  "archived",
 ];
 
 /** Statuses that stay on the board. Rejected and Canceled open the closed-tasks dialog. */
@@ -113,6 +123,7 @@ export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = [
   "waiting",
   "completed",
   "failed",
+  "archived",
 ];
 
 export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["rejected", "cancelled"];
@@ -184,8 +195,17 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
   return "—";
 }
 
+export function isArchivedWorkOrder(order: Pick<FactoriesWorkOrder, "state" | "result" | "lineDispatches">): boolean {
+  return (
+    order.state === "STATE_CLOSED" && order.result === "RESULT_REJECTED" && (order.lineDispatches ?? []).length === 0
+  );
+}
+
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
+    if (isArchivedWorkOrder(order)) {
+      return "archived";
+    }
     if (order.result === "RESULT_REJECTED") {
       return "rejected";
     }

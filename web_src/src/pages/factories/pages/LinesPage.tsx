@@ -732,6 +732,7 @@ export function LinesPage() {
             apps={factoryApps}
             workOrders={visibleWorkOrders}
             cardsPending={Boolean(isPlaceholderData)}
+            includeArchived={listState.filters.statuses.includes("archived")}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
@@ -958,6 +959,7 @@ function LineDetail({
   apps,
   workOrders,
   cardsPending,
+  includeArchived,
   canCreateWorkOrder,
   canUpdate,
   onCreateWorkOrder,
@@ -989,6 +991,7 @@ function LineDetail({
   apps: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders: FactoriesWorkOrder[];
   cardsPending: boolean;
+  includeArchived: boolean;
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
@@ -1017,7 +1020,10 @@ function LineDetail({
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
   const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
-  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const backlogOrders = useMemo(
+    () => collectLineBacklogOrders(workOrders ?? [], { includeArchived }),
+    [includeArchived, workOrders],
+  );
   const doneOrders = useMemo(
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
     [workOrders, line, fullBoard],
