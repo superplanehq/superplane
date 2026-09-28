@@ -18,6 +18,31 @@ export function parseHostedLLMModelKey(value: string): { provider: string; model
   return { provider: value.slice(0, separator), model: value.slice(separator + 2) };
 }
 
+const CLAUDE_FAMILY_MODEL = /^claude-([a-z0-9]+)-(.+)$/i;
+
+/** "claude-opus-5-5" and "anthropic/claude-opus-5-5" display as "opus 5-5". */
+export function displayModelName(id: string): string {
+  const trimmed = id.trim();
+  if (trimmed === "") {
+    return "";
+  }
+  const concrete = concreteClaudeModelId(trimmed);
+  const slash = concrete.lastIndexOf("/");
+  const leaf = slash >= 0 && slash < concrete.length - 1 ? concrete.slice(slash + 1) : concrete;
+  return shortClaudeModelLabel(leaf) ?? leaf;
+}
+
+/** "claude-opus-5-5" displays as "opus 5-5". "claude-fable-5" displays as "fable 5". */
+export function shortClaudeModelLabel(modelId: string): string | undefined {
+  const match = CLAUDE_FAMILY_MODEL.exec(modelId.trim());
+  const family = match?.[1];
+  const version = match?.[2];
+  if (!family || !version) {
+    return undefined;
+  }
+  return `${family.toLowerCase()} ${version}`;
+}
+
 export function hostedLLMTechnicalName(provider: string, model: string): string {
   const trimmedProvider = provider.trim();
   const trimmedModel = model.trim();
@@ -81,9 +106,111 @@ export function pickHostedModel(provider: string, modelIds: string[]): string | 
  * fall back to an unrelated one.
  */
 export function pickModelMatching(modelIds: string[], hint: string): string | undefined {
+  return pickModelMatchingAt(modelIds, hint, false);
+}
+
+/** Last sorted allowlisted id that contains the hint. */
+export function pickNewestModelMatching(modelIds: string[], hint: string): string | undefined {
+  return pickModelMatchingAt(modelIds, hint, true);
+}
+
+function pickModelMatchingAt(modelIds: string[], hint: string, newest: boolean): string | undefined {
   const needle = hint.trim().toLowerCase();
   if (needle === "") return undefined;
-  return uniqueSortedModelIds(modelIds).find((id) => id.toLowerCase().includes(needle));
+  const matches = uniqueSortedModelIds(modelIds).filter((id) => id.toLowerCase().includes(needle));
+  return newest ? matches.at(-1) : matches[0];
+}
+
+type ClaudeModelVersion = { version: number[]; date: number };
+
+// An 8-digit segment is a snapshot date, such as the 20250514 in
+// "claude-sonnet-4-20250514". It is not part of the version.
+const CLAUDE_SNAPSHOT_DATE = /^\d{8}$/;
+
+/**
+ * Newest Claude id in a family, compared by version and then snapshot date.
+ * "claude-sonnet-4-6" beats "claude-sonnet-4-20250514" and "claude-3-7-sonnet-20250219".
+ */
+export function newestClaudeModelInFamily(modelIds: readonly string[], family: string): string | undefined {
+  const needle = family.trim().toLowerCase();
+  let newest: { id: string; version: ClaudeModelVersion } | undefined;
+  for (const id of uniqueSortedModelIds([...modelIds])) {
+    const version = claudeModelVersion(id, needle);
+    if (!version) continue;
+    if (!newest || compareClaudeModelVersions(version, newest.version) > 0) {
+      newest = { id, version };
+    }
+  }
+  return newest?.id;
+}
+
+function claudeModelVersion(id: string, family: string): ClaudeModelVersion | undefined {
+  const slash = id.lastIndexOf("/");
+  const segments = (slash >= 0 ? id.slice(slash + 1) : id).toLowerCase().split(/[-.]/);
+  if (segments[0] !== "claude" || !segments.includes(family)) return undefined;
+  const version: number[] = [];
+  // An undated id is the current alias, so it sorts after any dated snapshot.
+  let date = Number.MAX_SAFE_INTEGER;
+  for (const segment of segments) {
+    if (CLAUDE_SNAPSHOT_DATE.test(segment)) {
+      date = Number(segment);
+    } else if (/^\d+$/.test(segment)) {
+      version.push(Number(segment));
+    }
+  }
+  return { version, date };
+}
+
+function compareClaudeModelVersions(left: ClaudeModelVersion, right: ClaudeModelVersion): number {
+  const length = Math.max(left.version.length, right.version.length);
+  for (let i = 0; i < length; i++) {
+    const diff = (left.version[i] ?? 0) - (right.version[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return left.date - right.date;
+}
+
+const CLAUDE_MODEL_ALIAS = /^(?:anthropic\/)?(haiku|opus|sonnet)$/i;
+
+const CLAUDE_ALIAS_FALLBACK: Record<string, string> = {
+  haiku: "claude-haiku-4-5",
+  opus: "claude-opus-5-5",
+  sonnet: "claude-sonnet-4-6",
+};
+
+/** Newest allowlisted id in the same Claude family. "sonnet" becomes "claude-sonnet-4-6". */
+export function specificModelId(stored: string, modelIds: readonly string[]): string | undefined {
+  const alias = claudeModelAlias(stored);
+  if (!alias) {
+    return undefined;
+  }
+  const matches = uniqueSortedModelIds([...modelIds]).filter((id) => modelIdHasFamily(id, alias));
+  return matches.at(-1);
+}
+
+/** Versioned id for a stored model. A bare Claude alias never comes back unchanged. */
+export function concreteClaudeModelId(stored: string, modelIds: readonly string[] = []): string {
+  const trimmed = stored.trim();
+  const specific = specificModelId(trimmed, modelIds);
+  if (specific) {
+    return specific;
+  }
+  const alias = claudeModelAlias(trimmed);
+  if (!alias) {
+    return trimmed;
+  }
+  return CLAUDE_ALIAS_FALLBACK[alias] ?? trimmed;
+}
+
+function claudeModelAlias(stored: string): string | undefined {
+  const match = CLAUDE_MODEL_ALIAS.exec(stored.trim());
+  return match?.[1]?.toLowerCase();
+}
+
+function modelIdHasFamily(id: string, family: string): boolean {
+  const slash = id.lastIndexOf("/");
+  const leaf = (slash >= 0 ? id.slice(slash + 1) : id).toLowerCase();
+  return leaf.split("-").includes(family);
 }
 
 /** Prefer Claude Opus 5.5, then a Sonnet id; otherwise use the first id. */

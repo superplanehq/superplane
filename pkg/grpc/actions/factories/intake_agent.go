@@ -23,7 +23,7 @@ var intakeAgentSpecs = []intakeAgentSpec{
 	{
 		component:      "runnerClaudeCode",
 		integrationApp: "claude",
-		model:          "opus",
+		model:          "claude-opus-5-5",
 	},
 	{
 		component:      "runnerCodex",

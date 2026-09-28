@@ -91,7 +91,7 @@ func serializeFactoryLLMModels(ids []string) []*pb.FactoryLLMModel {
 
 func serializeLineRunnerModels(ids []string) []*pb.FactoryLLMModel {
 	out := make([]*pb.FactoryLLMModel, 0, len(ids))
-	for _, id := range models.CompactModelIDs(ids) {
+	for _, id := range models.CompactModelIDs(concreteLineRunnerModels(ids)) {
 		name := id
 		if parsed, err := models.ParseSelectableLLMModelKey(id); err == nil {
 			name = parsed.Label

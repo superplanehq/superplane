@@ -108,7 +108,7 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 	if stored := storedRunnerModel(node.Configuration); stored != "" {
 		ids = append(ids, stored)
 	}
-	return ids, nil
+	return concreteLineRunnerModels(ids), nil
 }
 
 func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, stored string) ([]string, error) {
@@ -126,7 +126,21 @@ func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, s
 	if stored != "" {
 		ids = append(ids, stored)
 	}
-	return ids, nil
+	return concreteLineRunnerModels(ids), nil
+}
+
+func concreteLineRunnerModels(ids []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		resolved := models.ConcreteClaudeModelID(id, ids)
+		if _, dup := seen[resolved]; dup {
+			continue
+		}
+		seen[resolved] = struct{}{}
+		out = append(out, resolved)
+	}
+	return out
 }
 
 func runnerComponentProvider(component string) (string, bool) {

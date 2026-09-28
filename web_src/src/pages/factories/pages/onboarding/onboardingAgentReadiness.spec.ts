@@ -74,8 +74,7 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  // With no allowlist to read, the agent CLI resolves the alias itself.
-  it("gives planning the Opus alias when no allowlist applies", () => {
+  it("uses versioned model ids when no allowlist applies", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("claude"),
@@ -83,8 +82,43 @@ describe("resolveOnboardingAgent", () => {
       }),
     ).toMatchObject({
       credentialsSource: "integration",
-      model: "sonnet",
-      planningModel: "opus",
+      model: "claude-sonnet-4-6",
+      planningModel: "claude-opus-5-5",
+    });
+  });
+
+  it("gives a Claude key the newest Sonnet for implementation and the newest Opus for planning", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: {
+          ...noHostedModels,
+          anthropic: [
+            "claude-sonnet-4-20250514",
+            "claude-sonnet-4-5-20250929",
+            "claude-sonnet-4-6",
+            "claude-opus-4-1-20250805",
+            "claude-opus-5-5",
+            "claude-haiku-4-5-20251001",
+          ],
+        },
+      }),
+    ).toMatchObject({
+      providerId: "claude",
+      model: "claude-sonnet-4-6",
+      planningModel: "claude-opus-5-5",
+    });
+  });
+
+  it("falls back to another model when a Claude key has no Sonnet or Opus", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: { ...noHostedModels, anthropic: ["claude-haiku-4-5-20251001"] },
+      }),
+    ).toMatchObject({
+      model: "claude-haiku-4-5-20251001",
+      planningModel: "claude-haiku-4-5-20251001",
     });
   });
 
@@ -135,7 +169,7 @@ describe("resolveOnboardingAgent", () => {
     ).toMatchObject({
       providerId: "claude",
       credentialsSource: "integration",
-      model: "sonnet",
+      model: "claude-sonnet-4-6",
     });
   });
 

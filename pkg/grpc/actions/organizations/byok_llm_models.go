@@ -158,6 +158,28 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 	return out, nil
 }
 
+// ListConnectedBYOKModelIDs returns the model ids that the integration key can use.
+func ListConnectedBYOKModelIDs(tx *gorm.DB, reg *registry.Registry, integration *models.Integration) ([]string, error) {
+	if integration == nil {
+		return nil, grpcerrors.Internal(fmt.Errorf("integration is required"), "failed to list byok models")
+	}
+
+	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	if err != nil {
+		return nil, classifyBYOKListError(err)
+	}
+
+	ids := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		id := strings.TrimSpace(candidate.GetId())
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // classifyBYOKListError maps a failure from listBYOKCandidateModels to a
 // client-safe gRPC error. Provider auth failures, transport errors, timeouts,
 // and provider outages are user-fixable or transient, so they are reported as
