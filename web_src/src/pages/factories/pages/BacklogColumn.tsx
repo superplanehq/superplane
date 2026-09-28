@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -13,11 +15,14 @@ import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
-import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import { BacklogColumnSortMenu, ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
+import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
+import { workOrderListSource } from "../lib/workOrderCardSource";
+import { buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
+import type { BacklogColumnQuery } from "../lib/workOrderListPagination";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardColumnCardList, LineBoardOrderCard } from "./LineBoardOrderCard";
-import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
 import { lineBoardColumnLaneProps, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
@@ -62,6 +67,8 @@ export type BacklogColumnProps = {
     onLoadMore: () => void;
   };
   cardsPending?: boolean;
+  columnQuery: BacklogColumnQuery;
+  onColumnQueryChange: (query: BacklogColumnQuery) => void;
 };
 
 export type BacklogIntakePanel = {
@@ -101,6 +108,8 @@ export function BacklogColumn({
   onAutomationRowAction,
   paging,
   cardsPending = false,
+  columnQuery,
+  onColumnQueryChange,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
@@ -110,6 +119,14 @@ export function BacklogColumn({
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
+  const sourceOptions = useMemo(
+    () =>
+      buildSourceFilterOptions(
+        intakesQuery.data ?? [],
+        orders.map((order) => ({ sourceId: workOrderListSource(order).id })),
+      ),
+    [intakesQuery.data, orders],
+  );
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
@@ -151,6 +168,9 @@ export function BacklogColumn({
             refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
+            columnQuery={columnQuery}
+            sourceOptions={sourceOptions}
+            onColumnQueryChange={onColumnQueryChange}
           />
         }
         subheader={columnAutomationRowsSubheader({
@@ -198,6 +218,9 @@ function BacklogColumnHeaderActions({
   refreshBacklogPending,
   colorId,
   onColorChange,
+  columnQuery,
+  sourceOptions,
+  onColumnQueryChange,
 }: Pick<
   BacklogColumnProps,
   | "title"
@@ -208,10 +231,13 @@ function BacklogColumnHeaderActions({
   | "onAddIntake"
   | "colorId"
   | "onColorChange"
+  | "columnQuery"
+  | "onColumnQueryChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
   onRefreshBacklog?: () => void;
   refreshBacklogPending?: boolean;
+  sourceOptions: ReturnType<typeof buildSourceFilterOptions>;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
@@ -224,6 +250,12 @@ function BacklogColumnHeaderActions({
         />
       )}
       <BacklogCreatePopover {...createPopover} />
+      <BacklogColumnSortMenu
+        title={title}
+        query={columnQuery}
+        sourceOptions={sourceOptions}
+        onChange={onColumnQueryChange}
+      />
       <ColumnLaneMenu
         title={title}
         testId="lines-backlog-menu"

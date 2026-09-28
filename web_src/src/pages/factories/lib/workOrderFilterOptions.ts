@@ -85,7 +85,7 @@ export function buildAssigneeFilterOptions(
  */
 export function buildSourceFilterOptions(
   intakes: FactoriesFactoryIntake[],
-  entries: WorkOrderListEntry[],
+  entries: Array<{ sourceId: string }>,
 ): WorkOrderFilterOption[] {
   const ids = new Set<string>();
   for (const intake of intakes) {

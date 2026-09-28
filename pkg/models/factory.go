@@ -813,6 +813,29 @@ func (f *Factory) FindWorkOrderByRef(tx *gorm.DB, ref string) (*FactoryWorkOrder
 	return f.findWorkOrderByKey(tx, trimmed)
 }
 
+const (
+	FactoryWorkOrderListSortUpdated    = "updated"
+	FactoryWorkOrderListSortConfidence = "confidence"
+	FactoryWorkOrderListSortSource     = "source"
+	FactoryWorkOrderListSortCreated    = "created"
+
+	FactoryWorkOrderListSortDirectionAsc  = "asc"
+	FactoryWorkOrderListSortDirectionDesc = "desc"
+
+	FactoryWorkOrderListAgeLast7Days       = "last_7_days"
+	FactoryWorkOrderListAgeLast30Days      = "last_30_days"
+	FactoryWorkOrderListAgeLast90Days      = "last_90_days"
+	FactoryWorkOrderListAgeOlderThan90Days = "older_than_90_days"
+
+	FactoryWorkOrderSourceManual             = "manual"
+	FactoryWorkOrderSourceGitHubIssues       = "github-issues"
+	FactoryWorkOrderSourceJiraIssues         = "jira-issues"
+	FactoryWorkOrderSourceSentryExceptions   = "sentry-exceptions"
+	FactoryWorkOrderSourcePagerDutyIncidents = "pagerduty-incidents"
+	FactoryWorkOrderSourceProductiveTasks    = "productive-tasks"
+	FactoryWorkOrderSourceSlack              = "slack"
+)
+
 type ListFactoryWorkOrdersFilters struct {
 	States     []string
 	Results    []string
@@ -820,11 +843,23 @@ type ListFactoryWorkOrdersFilters struct {
 	UserID     *uuid.UUID
 	// Limit pages the result. Zero uses DefaultFactoryWorkOrderListLimit.
 	Limit int
-	// BeforeID is a keyset cursor. The query returns rows older than that
-	// order in updated_at DESC, id DESC order.
+	// BeforeID is a keyset cursor. The next page follows the active sort key
+	// plus id, not a fixed updated_at order.
 	BeforeID *uuid.UUID
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
+	// Sort is updated, confidence, source, or created. Empty means updated.
+	Sort string
+	// SortDirection is asc or desc. Empty uses the default for Sort.
+	SortDirection string
+	// Sources keeps orders in these source groups. Empty means any source.
+	Sources []string
+	// MinConfidence hides orders below this score, including orders with no score.
+	MinConfidence *float64
+	// ConfidenceMissing keeps only orders with no confidence score.
+	ConfidenceMissing bool
+	// Age limits created_at. Empty means any age.
+	Age string
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
@@ -850,29 +885,22 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 
 	query = applyWorkOrderUserFilters(query, filters)
 	query = applyWorkOrderLineFilter(query, filters.LineID)
+	query = joinWorkOrderListRelations(query, filters)
 
-	if filters.BeforeID != nil {
-		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return []FactoryWorkOrder{}, nil
-			}
-			return nil, err
+	var err error
+	query, err = applyWorkOrderListCursor(tx, f, query, filters)
+	if err != nil {
+		if errors.Is(err, errWorkOrderListCursorMissing) {
+			return []FactoryWorkOrder{}, nil
 		}
-		query = query.Where(
-			"(factory_work_orders.updated_at, factory_work_orders.id) < (?, ?)",
-			cursor.UpdatedAt,
-			cursor.ID,
-		)
+		return nil, err
 	}
 
-	query = query.
-		Order("factory_work_orders.updated_at DESC").
-		Order("factory_work_orders.id DESC").
-		Limit(filters.Limit)
+	query = applyWorkOrderColumnFilters(query, filters)
+	query = applyWorkOrderListOrder(query, filters).Limit(filters.Limit)
 
 	var orders []FactoryWorkOrder
-	err := query.Find(&orders).Error
+	err = query.Find(&orders).Error
 	if err != nil {
 		return nil, err
 	}
@@ -939,19 +967,7 @@ func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
 		)`, *lineID)
 }
 
-func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
-	var cursor FactoryWorkOrder
-	err := tx.
-		Select("id", "updated_at").
-		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
-		Where("factory_work_orders.factory_id = ?", f.ID).
-		Where("factory_work_orders.id = ?", beforeID).
-		Take(&cursor).Error
-	if err != nil {
-		return nil, err
-	}
-	return &cursor, nil
-}
+
 
 func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
 	prefix := f.Key + "-"

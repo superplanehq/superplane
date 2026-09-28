@@ -150,4 +150,50 @@ describe("useFactoryBoardWorkOrders", () => {
     expect(open?.lineId).toBeUndefined();
     expect(open?.results).toBeUndefined();
   });
+
+  it("sends backlog sort and filters only on the draft page", async () => {
+    factoriesListWorkOrders.mockResolvedValue(ordersPage([]));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(
+      () =>
+        useFactoryBoardWorkOrders("org-1", "factory-1", {
+          backlog: {
+            sort: "confidence",
+            sortDirection: "asc",
+            sources: ["github-issues", "manual"],
+            minConfidence: 3,
+            confidenceMissing: false,
+            age: "last30",
+          },
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(factoriesListWorkOrders).toHaveBeenCalledTimes(3));
+    const queries = factoriesListWorkOrders.mock.calls.map(
+      (call) =>
+        call[0].query as {
+          states?: string[];
+          sort?: string;
+          sortDirection?: string;
+          sources?: string[];
+          minConfidence?: number;
+          age?: string;
+        },
+    );
+    const draft = queries.find((query) => query.states?.[0] === "STATE_DRAFT");
+    const open = queries.find((query) => query.states?.[0] === "STATE_OPEN");
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        sort: "SORT_CONFIDENCE",
+        sortDirection: "SORT_DIRECTION_ASC",
+        sources: ["github-issues", "manual"],
+        minConfidence: 3,
+        age: "AGE_LAST_30_DAYS",
+      }),
+    );
+    expect(open?.sort).toBeUndefined();
+    expect(open?.sources).toBeUndefined();
+  });
 });

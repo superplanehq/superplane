@@ -113,7 +113,61 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		}
 	}
 
+	filters.Sort = workOrderListSortFromProto(req.GetSort())
+	filters.SortDirection = workOrderListSortDirectionFromProto(req.GetSortDirection())
+	if len(req.GetSources()) > 0 {
+		filters.Sources = append([]string(nil), req.GetSources()...)
+	}
+	if req.ConfidenceMissing != nil && *req.ConfidenceMissing {
+		filters.ConfidenceMissing = true
+	} else if req.MinConfidence != nil {
+		minConfidence := float64(*req.MinConfidence)
+		filters.MinConfidence = &minConfidence
+	}
+	filters.Age = workOrderListAgeFromProto(req.GetAge())
+
 	return filters
+}
+
+func workOrderListSortFromProto(sort pb.ListWorkOrdersRequest_Sort) string {
+	switch sort {
+	case pb.ListWorkOrdersRequest_SORT_CONFIDENCE:
+		return models.FactoryWorkOrderListSortConfidence
+	case pb.ListWorkOrdersRequest_SORT_SOURCE:
+		return models.FactoryWorkOrderListSortSource
+	case pb.ListWorkOrdersRequest_SORT_CREATED:
+		return models.FactoryWorkOrderListSortCreated
+	case pb.ListWorkOrdersRequest_SORT_UPDATED:
+		return models.FactoryWorkOrderListSortUpdated
+	default:
+		return ""
+	}
+}
+
+func workOrderListSortDirectionFromProto(direction pb.ListWorkOrdersRequest_SortDirection) string {
+	switch direction {
+	case pb.ListWorkOrdersRequest_SORT_DIRECTION_ASC:
+		return models.FactoryWorkOrderListSortDirectionAsc
+	case pb.ListWorkOrdersRequest_SORT_DIRECTION_DESC:
+		return models.FactoryWorkOrderListSortDirectionDesc
+	default:
+		return ""
+	}
+}
+
+func workOrderListAgeFromProto(age pb.ListWorkOrdersRequest_Age) string {
+	switch age {
+	case pb.ListWorkOrdersRequest_AGE_LAST_7_DAYS:
+		return models.FactoryWorkOrderListAgeLast7Days
+	case pb.ListWorkOrdersRequest_AGE_LAST_30_DAYS:
+		return models.FactoryWorkOrderListAgeLast30Days
+	case pb.ListWorkOrdersRequest_AGE_LAST_90_DAYS:
+		return models.FactoryWorkOrderListAgeLast90Days
+	case pb.ListWorkOrdersRequest_AGE_OLDER_THAN_90_DAYS:
+		return models.FactoryWorkOrderListAgeOlderThan90Days
+	default:
+		return ""
+	}
 }
 
 func closeWorkOrderResult(result pb.WorkOrder_Result) (string, error) {

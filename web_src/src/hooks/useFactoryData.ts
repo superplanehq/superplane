@@ -56,6 +56,7 @@ import {
   uniqueWorkOrdersById,
   WORK_ORDER_LIST_PAGE_SIZE,
   workOrdersPageFromResponse,
+  type BacklogColumnQuery,
   type WorkOrdersPageCursor,
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
@@ -204,7 +205,10 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
   });
 }
 
-export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & { requireUser?: boolean };
+export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & {
+  requireUser?: boolean;
+  backlog?: BacklogColumnQuery;
+};
 
 export type FactoryBoardDoneQuery = {
   lineId?: string;
@@ -221,6 +225,7 @@ function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions):
     unassigned: options?.unassigned,
     results: options?.results,
     lineId: options?.lineId,
+    backlog: options?.backlog,
   });
 }
 
@@ -235,6 +240,7 @@ export function useFactoryWorkOrdersPage(
   const query = useInfiniteQuery({
     queryKey: factoryQueryKeys.workOrdersPage(organizationId, factoryId, states, pageQuery),
     queryFn: async ({ pageParam }: { pageParam?: WorkOrdersPageCursor }) => {
+      const backlog = backlogListQuery(pageQuery.backlog);
       const response = await factoriesListWorkOrders(
         withOrganizationHeader({
           organizationId,
@@ -246,6 +252,12 @@ export function useFactoryWorkOrdersPage(
             ...(pageQuery.unassigned ? { unassigned: true } : {}),
             ...(pageQuery.results.length > 0 ? { results: [...pageQuery.results] } : {}),
             ...(pageQuery.lineId ? { lineId: pageQuery.lineId } : {}),
+            ...(backlog.sort ? { sort: backlog.sort } : {}),
+            ...(backlog.sortDirection ? { sortDirection: backlog.sortDirection } : {}),
+            ...(backlog.sources ? { sources: backlog.sources } : {}),
+            ...(backlog.minConfidence != null ? { minConfidence: backlog.minConfidence } : {}),
+            ...(backlog.confidenceMissing ? { confidenceMissing: true } : {}),
+            ...(backlog.age ? { age: backlog.age } : {}),
             ...(pageParam ? { beforeId: pageParam.beforeId } : {}),
           },
         }),
@@ -324,8 +336,12 @@ export function useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
     BOARD_BACKLOG_STATES,
-    BOARD_BACKLOG_PAGE_SIZE,
-    shared,
+  backlogListQuery,
+  BOARD_BACKLOG_PAGE_SIZE,
+    {
+      ...shared,
+      backlog: options?.backlog,
+    },
   );
   const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, shared);
   const doneResults = options?.done?.results;

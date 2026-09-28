@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -211,4 +212,129 @@ func Test__ListWorkOrders_LineFilterKeepsFactoryAndState(t *testing.T) {
 	assert.Equal(t, closedOnLine.ID.String(), resp.Orders[0].GetId())
 	assert.NotEqual(t, draftHere.ID.String(), resp.Orders[0].GetId())
 	assert.NotEqual(t, otherDraft.ID.String(), resp.Orders[0].GetId())
+}
+
+func Test__ListWorkOrders_PagesByConfidenceCursor(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "Confidence Page", "", "CP")
+	require.NoError(t, err)
+
+	low := createScoredListOrder(t, factoryModel, r.User, "Low", 1)
+	high := createScoredListOrder(t, factoryModel, r.User, "High", 5)
+	missing, err := factoryModel.CreateWorkOrder(db, "Missing", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	page, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		Limit:     1,
+		Sort:      pb.ListWorkOrdersRequest_SORT_CONFIDENCE,
+	})
+	require.NoError(t, err)
+	require.Len(t, page.Orders, 1)
+	assert.True(t, page.HasNextPage)
+	assert.Equal(t, high.ID.String(), page.Orders[0].GetId())
+
+	next, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		Limit:     1,
+		Sort:      pb.ListWorkOrdersRequest_SORT_CONFIDENCE,
+		BeforeId:  high.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, next.Orders, 1)
+	assert.True(t, next.HasNextPage)
+	assert.Equal(t, low.ID.String(), next.Orders[0].GetId())
+
+	last, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		Limit:     1,
+		Sort:      pb.ListWorkOrdersRequest_SORT_CONFIDENCE,
+		BeforeId:  low.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, last.Orders, 1)
+	assert.False(t, last.HasNextPage)
+	assert.Equal(t, missing.ID.String(), last.Orders[0].GetId())
+}
+
+func Test__ListWorkOrders_FiltersSourceConfidenceAndAge(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "Column Filters", "", "CF")
+	require.NoError(t, err)
+
+	github, err := factoryModel.CreateWorkOrder(db, "GitHub", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("id = ?", github.ID).Update("origin_url", "https://github.com/acme/pay/issues/4").Error)
+	_, err = github.ReportCheck(db, models.FactoryWorkOrderCheckParams{
+		Key:      models.PlanningConfidenceCheckKey,
+		Name:     models.PlanningConfidenceCheckName,
+		Score:    4,
+		MaxScore: 5,
+		Level:    models.FactoryWorkOrderCheckLevelPositive,
+	})
+	require.NoError(t, err)
+
+	sentry, err := factoryModel.CreateWorkOrder(db, "Sentry", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("id = ?", sentry.ID).Update("origin_url", "https://acme.sentry.io/issues/4").Error)
+
+	old, err := factoryModel.CreateWorkOrder(db, "Old", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("id = ?", old.ID).UpdateColumn("created_at", time.Now().UTC().Add(-100*24*time.Hour)).Error)
+
+	min := int32(3)
+	bySource, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		Sources:   []string{models.FactoryWorkOrderSourceGitHubIssues},
+	})
+	require.NoError(t, err)
+	require.Len(t, bySource.Orders, 1)
+	assert.Equal(t, github.ID.String(), bySource.Orders[0].GetId())
+
+	byScore, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId:     factoryModel.ID.String(),
+		MinConfidence: &min,
+	})
+	require.NoError(t, err)
+	require.Len(t, byScore.Orders, 1)
+	assert.Equal(t, github.ID.String(), byScore.Orders[0].GetId())
+
+	missing := true
+	byMissing, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId:         factoryModel.ID.String(),
+		ConfidenceMissing: &missing,
+		Age:               pb.ListWorkOrdersRequest_AGE_LAST_7_DAYS,
+	})
+	require.NoError(t, err)
+	require.Len(t, byMissing.Orders, 1)
+	assert.Equal(t, sentry.ID.String(), byMissing.Orders[0].GetId())
+
+	byAge, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factoryModel.ID.String(),
+		Age:       pb.ListWorkOrdersRequest_AGE_OLDER_THAN_90_DAYS,
+	})
+	require.NoError(t, err)
+	require.Len(t, byAge.Orders, 1)
+	assert.Equal(t, old.ID.String(), byAge.Orders[0].GetId())
+}
+
+func createScoredListOrder(t *testing.T, factoryModel *models.Factory, userID uuid.UUID, title string, score float64) *models.FactoryWorkOrder {
+	t.Helper()
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), title, "", &userID, nil, nil)
+	require.NoError(t, err)
+	_, err = order.ReportCheck(database.Conn(), models.FactoryWorkOrderCheckParams{
+		Key:      models.PlanningConfidenceCheckKey,
+		Name:     models.PlanningConfidenceCheckName,
+		Score:    score,
+		MaxScore: 5,
+		Level:    models.FactoryWorkOrderCheckLevelNeutral,
+	})
+	require.NoError(t, err)
+	return order
 }

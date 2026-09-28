@@ -10,6 +10,7 @@ import {
   workOrderMatchesUser,
   workOrdersPageFromResponse,
   workOrdersPageQueryFromKey,
+  DEFAULT_BACKLOG_COLUMN_QUERY,
 } from "./workOrderListPagination";
 
 describe("boardDoneResultsForStatuses", () => {
@@ -88,12 +89,14 @@ describe("workOrderListPagination", () => {
       unassigned: true,
       results: [],
       lineId: undefined,
+      backlog: DEFAULT_BACKLOG_COLUMN_QUERY,
     });
     expect(workOrdersPageQueryFromKey(factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_DRAFT"]))).toEqual({
       userId: undefined,
       unassigned: false,
       results: [],
       lineId: undefined,
+      backlog: DEFAULT_BACKLOG_COLUMN_QUERY,
     });
   });
 
@@ -106,6 +109,7 @@ describe("workOrderListPagination", () => {
       unassigned: false,
       results: ["RESULT_COMPLETED", "RESULT_FAILED"],
       lineId: undefined,
+      backlog: DEFAULT_BACKLOG_COLUMN_QUERY,
     });
   });
 
@@ -119,6 +123,7 @@ describe("workOrderListPagination", () => {
       unassigned: false,
       results: ["RESULT_FAILED"],
       lineId: "line-1",
+      backlog: DEFAULT_BACKLOG_COLUMN_QUERY,
     });
   });
 
@@ -129,12 +134,23 @@ describe("workOrderListPagination", () => {
   });
 
   it("matches unassigned or the selected user", () => {
-    expect(workOrderMatchesPageQuery({ assignees: [] }, { userId: "alex", unassigned: true, results: [] })).toBe(true);
     expect(
-      workOrderMatchesPageQuery({ assignees: [{ id: "alex" }] }, { userId: "alex", unassigned: true, results: [] }),
+      workOrderMatchesPageQuery(
+        { assignees: [] },
+        { userId: "alex", unassigned: true, results: [], backlog: DEFAULT_BACKLOG_COLUMN_QUERY },
+      ),
     ).toBe(true);
     expect(
-      workOrderMatchesPageQuery({ assignees: [{ id: "zoe" }] }, { userId: "alex", unassigned: true, results: [] }),
+      workOrderMatchesPageQuery(
+        { assignees: [{ id: "alex" }] },
+        { userId: "alex", unassigned: true, results: [], backlog: DEFAULT_BACKLOG_COLUMN_QUERY },
+      ),
+    ).toBe(true);
+    expect(
+      workOrderMatchesPageQuery(
+        { assignees: [{ id: "zoe" }] },
+        { userId: "alex", unassigned: true, results: [], backlog: DEFAULT_BACKLOG_COLUMN_QUERY },
+      ),
     ).toBe(false);
   });
 });

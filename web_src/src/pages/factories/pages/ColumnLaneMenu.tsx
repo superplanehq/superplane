@@ -1,4 +1,4 @@
-import { Check, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, XIcon } from "lucide-react";
+import { Check, ListFilter, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -7,12 +7,26 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
+import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
+import type { WorkOrderFilterOption } from "../lib/workOrderFilterOptions";
+import {
+  DEFAULT_BACKLOG_COLUMN_QUERY,
+  isDefaultBacklogColumnQuery,
+  type BacklogColumnAge,
+  type BacklogColumnQuery,
+  type BacklogColumnSort,
+  type BacklogColumnSortDirection,
+} from "../lib/workOrderListPagination";
 import { BACKLOG_REFRESH_COPY } from "./backlogRefresh";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
@@ -104,6 +118,217 @@ export function ColumnLaneMenu({
         <ColumnLaneColorPicker title={title} testId={testId} colorId={colorId} onColorChange={onColorChange} />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+const SORT_OPTIONS: Array<{ value: BacklogColumnSort; label: string }> = [
+  { value: "updated", label: "Updated" },
+  { value: "confidence", label: "Confidence" },
+  { value: "source", label: "Source" },
+  { value: "created", label: "Created" },
+];
+
+const AGE_OPTIONS: Array<{ value: BacklogColumnAge; label: string }> = [
+  { value: "any", label: "Any age" },
+  { value: "last7", label: "Last 7 days" },
+  { value: "last30", label: "Last 30 days" },
+  { value: "last90", label: "Last 90 days" },
+  { value: "older90", label: "Older than 90 days" },
+];
+
+const CONFIDENCE_OPTIONS = [
+  { value: "any", label: "Any score" },
+  { value: "missing", label: "No score" },
+  { value: "1", label: "1 or higher" },
+  { value: "2", label: "2 or higher" },
+  { value: "3", label: "3 or higher" },
+  { value: "4", label: "4 or higher" },
+  { value: "5", label: "5" },
+];
+
+/**
+ * Backlog column sort and filter. Choices apply to the whole column and clear on reload.
+ */
+export function BacklogColumnSortMenu({
+  title,
+  query,
+  sourceOptions,
+  onChange,
+}: {
+  title: string;
+  query: BacklogColumnQuery;
+  sourceOptions: WorkOrderFilterOption[];
+  onChange: (query: BacklogColumnQuery) => void;
+}) {
+  const active = !isDefaultBacklogColumnQuery(query);
+  const confidenceValue = query.confidenceMissing
+    ? "missing"
+    : query.minConfidence == null
+      ? "any"
+      : String(query.minConfidence);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Sort and filter ${title}`}
+          className={cn(
+            "relative flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            active && "text-foreground",
+          )}
+          data-testid="lines-backlog-sort-filter"
+        >
+          <ListFilter className="size-3.5" aria-hidden />
+          {active ? <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-foreground" /> : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56" data-testid="lines-backlog-sort-filter-content">
+        <DropdownMenuLabel className="text-[11px] font-medium tracking-[0.04em] text-muted-foreground">
+          Sort and filter
+        </DropdownMenuLabel>
+        <DropdownMenuValueSub
+          label="Sort"
+          value={query.sort}
+          testId="lines-backlog-sort"
+          options={SORT_OPTIONS.map((option) => ({
+            ...option,
+            testId: `lines-backlog-sort-${option.value}`,
+          }))}
+          onValueChange={(value) => onChange(withSort(query, value as BacklogColumnSort))}
+        />
+        <DropdownMenuValueSub
+          label="Order"
+          value={query.sortDirection}
+          testId="lines-backlog-direction"
+          options={directionOptions(query.sort)}
+          onValueChange={(value) => onChange({ ...query, sortDirection: value as BacklogColumnSortDirection })}
+        />
+        <BacklogSourceSubmenu
+          options={sourceOptions}
+          selected={query.sources}
+          onChange={(sources) => onChange({ ...query, sources })}
+        />
+        <DropdownMenuValueSub
+          label="Confidence"
+          value={confidenceValue}
+          testId="lines-backlog-confidence"
+          options={CONFIDENCE_OPTIONS.map((option) => ({
+            ...option,
+            testId: `lines-backlog-confidence-${option.value}`,
+          }))}
+          onValueChange={(value) => onChange(withConfidence(query, value))}
+        />
+        <DropdownMenuValueSub
+          label="Age"
+          value={query.age}
+          testId="lines-backlog-age"
+          options={AGE_OPTIONS.map((option) => ({
+            ...option,
+            testId: `lines-backlog-age-${option.value}`,
+          }))}
+          onValueChange={(value) => onChange({ ...query, age: value as BacklogColumnAge })}
+        />
+        {active ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              data-testid="lines-backlog-sort-filter-clear"
+              onSelect={() => onChange(DEFAULT_BACKLOG_COLUMN_QUERY)}
+            >
+              Clear sort and filter
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function withSort(query: BacklogColumnQuery, sort: BacklogColumnSort): BacklogColumnQuery {
+  return {
+    ...query,
+    sort,
+    sortDirection: sort === "source" ? "asc" : "desc",
+  };
+}
+
+function withConfidence(query: BacklogColumnQuery, value: string): BacklogColumnQuery {
+  if (value === "missing") {
+    return { ...query, confidenceMissing: true, minConfidence: undefined };
+  }
+  if (value === "any") {
+    return { ...query, confidenceMissing: false, minConfidence: undefined };
+  }
+  return { ...query, confidenceMissing: false, minConfidence: Number(value) };
+}
+
+function directionOptions(
+  sort: BacklogColumnSort,
+): Array<{ value: BacklogColumnSortDirection; label: string; testId: string }> {
+  if (sort === "confidence") {
+    return [
+      { value: "desc", label: "Highest first", testId: "lines-backlog-direction-desc" },
+      { value: "asc", label: "Lowest first", testId: "lines-backlog-direction-asc" },
+    ];
+  }
+  if (sort === "source") {
+    return [
+      { value: "asc", label: "A to Z", testId: "lines-backlog-direction-asc" },
+      { value: "desc", label: "Z to A", testId: "lines-backlog-direction-desc" },
+    ];
+  }
+  return [
+    { value: "desc", label: "Newest first", testId: "lines-backlog-direction-desc" },
+    { value: "asc", label: "Oldest first", testId: "lines-backlog-direction-asc" },
+  ];
+}
+
+function BacklogSourceSubmenu({
+  options,
+  selected,
+  onChange,
+}: {
+  options: WorkOrderFilterOption[];
+  selected: string[];
+  onChange: (sources: string[]) => void;
+}) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="cursor-pointer text-[13px]" data-testid="lines-backlog-source">
+        Source
+      </DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent className="w-52">
+          <DropdownMenuItem
+            data-testid="lines-backlog-source-any"
+            onSelect={(event) => {
+              event.preventDefault();
+              onChange([]);
+            }}
+          >
+            <span className="flex-1">Any source</span>
+            {selected.length === 0 ? <Check className="size-3.5" aria-hidden /> : null}
+          </DropdownMenuItem>
+          {options.map((option) => {
+            const checked = selected.includes(option.value);
+            return (
+              <DropdownMenuItem
+                key={option.value}
+                data-testid={`lines-backlog-source-${option.value}`}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onChange(checked ? selected.filter((value) => value !== option.value) : [...selected, option.value]);
+                }}
+              >
+                <span className="flex-1">{option.label}</span>
+                {checked ? <Check className="size-3.5" aria-hidden /> : null}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
   );
 }
 

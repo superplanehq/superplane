@@ -6,6 +6,7 @@ import {
   flattenWorkOrdersPages,
   workOrderMatchesPageQuery,
   workOrdersPageQueryFromKey,
+  DEFAULT_BACKLOG_COLUMN_QUERY,
   type WorkOrdersPage,
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
@@ -100,7 +101,7 @@ export function patchCachedWorkOrderPages(
   orderId: string,
   described: FactoriesWorkOrder,
   states: readonly FactoriesWorkOrderState[],
-  query: WorkOrdersPageQuery = { unassigned: false, results: [] },
+  query: WorkOrdersPageQuery = { unassigned: false, results: [], backlog: DEFAULT_BACKLOG_COLUMN_QUERY },
 ): InfiniteData<WorkOrdersPage> | undefined {
   if (!data) {
     return data;

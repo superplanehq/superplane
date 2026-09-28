@@ -4,8 +4,9 @@ import { describe, expect, it } from "bun:test";
 
 import {
   factoryWorkOrdersPageKey,
+  flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
-  type WorkOrdersPage,
+  DEFAULT_BACKLOG_COLUMN_QUERY,
 } from "@/pages/factories/lib/workOrderListPagination";
 
 import {
@@ -109,7 +110,7 @@ describe("patchCachedWorkOrderPages", () => {
       "wo-1",
       { id: "wo-1", title: "Other", state: "STATE_DRAFT", checks: [], assignees: [{ id: "other" }] },
       ["STATE_DRAFT"],
-      { userId: "me", unassigned: false, results: [] },
+      { userId: "me", unassigned: false, results: [], backlog: DEFAULT_BACKLOG_COLUMN_QUERY },
     );
     expect(next?.pages[0]?.orders.map((order) => order.id)).toEqual(["wo-2"]);
   });
@@ -130,7 +131,7 @@ describe("patchCachedWorkOrderPages", () => {
       "wo-1",
       { id: "wo-1", title: "New", state: "STATE_CLOSED", result: "RESULT_FAILED", checks: [] },
       ["STATE_CLOSED"],
-      { unassigned: false, results: ["RESULT_COMPLETED"] },
+      { unassigned: false, results: ["RESULT_COMPLETED"], backlog: DEFAULT_BACKLOG_COLUMN_QUERY },
     );
     expect(next?.pages[0]?.orders).toEqual([]);
   });

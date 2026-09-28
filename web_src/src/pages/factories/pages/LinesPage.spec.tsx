@@ -112,7 +112,7 @@ const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   isPlaceholderData: false,
@@ -178,7 +178,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
   useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (...args: unknown[]) => useFactoryBoardWorkOrders(...args),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
@@ -1738,6 +1738,80 @@ describe("LinesPage board editing", () => {
     expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
     expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
+  });
+
+  it("sorts and filters the backlog column without saving the choice", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryWorkOrders.mockReturnValue({
+      data: withBoardChecks([DRAFT_WORK_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER]),
+    });
+    const view = renderLinesBoard();
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(within(backlog).getByTestId("lines-backlog-sort-filter")).toHaveAccessibleName("Sort and filter Backlog");
+    expect(
+      within(screen.getByTestId("lines-verify-column")).queryByTestId("lines-backlog-sort-filter"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-done-column")).queryByTestId("lines-backlog-sort-filter"),
+    ).not.toBeInTheDocument();
+    expect(useFactoryBoardWorkOrders).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        backlog: expect.objectContaining({ sort: "updated", sortDirection: "desc", sources: [], age: "any" }),
+      }),
+    );
+
+    await user.click(within(backlog).getByTestId("lines-backlog-sort-filter"));
+    await user.hover(screen.getByTestId("lines-backlog-sort"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-sort-confidence"));
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        backlog: expect.objectContaining({ sort: "confidence", sortDirection: "desc" }),
+      }),
+    );
+
+    await user.hover(screen.getByTestId("lines-backlog-source"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-source-github-issues"));
+    await user.hover(screen.getByTestId("lines-backlog-confidence"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-confidence-missing"));
+    await user.hover(screen.getByTestId("lines-backlog-age"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-age-last7"));
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        backlog: expect.objectContaining({
+          sort: "confidence",
+          sources: ["github-issues"],
+          confidenceMissing: true,
+          age: "last7",
+        }),
+      }),
+    );
+    expect(window.localStorage.getItem("sp:backlog-column-query")).toBeNull();
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
+
+    view.unmount();
+    useFactoryBoardWorkOrders.mockClear();
+    renderLinesBoard();
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        backlog: expect.objectContaining({ sort: "updated", sources: [], confidenceMissing: false, age: "any" }),
+      }),
+    );
   });
 
   it("narrows the board when a Review label filter is selected", async () => {
