@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
+import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
+
 import { ComponentStoryShell } from "../../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
 import { SPLIT_RUN_SUPER503 } from "./splitRunSuper503Fixture";
@@ -8,6 +11,18 @@ import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 
 const STORY_CLIENT = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+});
+
+// The console is an experimental feature; turn it on for the story.
+STORY_CLIENT.setQueryData(experimentalFeaturesKeys.registry(), {
+  features: [
+    {
+      id: FEATURE_FACTORY_TASK_CONSOLE,
+      label: "Task Console",
+      description: "Unified task popup with one console timeline",
+      released: true,
+    },
+  ],
 });
 
 /**

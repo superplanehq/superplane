@@ -37,6 +37,14 @@ vi.mock("@/hooks/useFactoryData", () => {
   };
 });
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 function renderRunningPopup() {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

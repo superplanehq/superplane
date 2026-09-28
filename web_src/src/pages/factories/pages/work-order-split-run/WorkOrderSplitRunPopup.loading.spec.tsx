@@ -34,6 +34,14 @@ vi.mock("@/hooks/useFactoryData", () => {
   };
 });
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
     organizationId: "organization-1",
