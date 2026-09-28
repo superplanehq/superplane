@@ -1,4 +1,17 @@
+import { FileImage, FileText, FileVideo } from "lucide-react";
+
 export type ArtifactData = Record<string, unknown> | undefined;
+
+/** Image, video, or document icon. Same choice the artifact row already uses. */
+export function fileArtifactIcon(contentType?: string): typeof FileText {
+  if (contentType?.startsWith("image/")) {
+    return FileImage;
+  }
+  if (contentType?.startsWith("video/")) {
+    return FileVideo;
+  }
+  return FileText;
+}
 
 /** GitHub-style pull request lifecycle states a PR artifact's chip can render. */
 export type PrArtifactState = "open" | "draft" | "closed" | "merged";
