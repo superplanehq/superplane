@@ -1,0 +1,222 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Risk score
+  description: Score a pull request when it opens or updates, then report that score on the task.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-pr-risk
+      targetId: should-assess
+    - channel: "true"
+      sourceId: should-assess
+      targetId: find-pull-request
+    - channel: found
+      sourceId: find-pull-request
+      targetId: assess-risk
+    - channel: passed
+      sourceId: assess-risk
+      targetId: format-risk-review
+    - channel: passed
+      sourceId: format-risk-review
+      targetId: report-risk-score
+  nodes:
+    - id: on-pr-risk
+      name: On Pull Request
+      type: TYPE_TRIGGER
+      component: github.onPullRequest
+      configuration:
+        actions:
+          - opened
+          - synchronize
+          - reopened
+          - ready_for_review
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 80
+        "y": 80
+      isCollapsed: true
+    - id: should-assess
+      name: Should Assess?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: 'root().data.pull_request.base.ref == "{{ install_params.defaultBranch }}" && root().data.pull_request.draft != true'
+      position:
+        x: 360
+        "y": 80
+      isCollapsed: true
+    - id: find-pull-request
+      name: Find Pull Request
+      type: TYPE_ACTION
+      component: findPullRequest
+      configuration:
+        provider: github
+        repository: "{{ root().data.repository.full_name }}"
+        number: "{{ root().data.pull_request.number }}"
+        url: "{{ root().data.pull_request.html_url }}"
+      position:
+        x: 640
+        "y": 80
+      isCollapsed: true
+    - id: assess-risk
+      name: Assess Risk
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        executionTimeoutSeconds: 1800
+        includeVisualEvidence: false
+        machineType: e1-large-amd64
+        model: sonnet
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: "{{ root().data.repository.full_name }}"
+            valueSource: literal
+          - name: PR_NUMBER
+            value: "{{ root().data.pull_request.number }}"
+            valueSource: literal
+          - name: PR_REVISION
+            value: "{{ root().data.pull_request.head.sha }}"
+            valueSource: literal
+          - name: BASE
+            value: "{{ root().data.pull_request.base.ref }}"
+            valueSource: literal
+        steps:
+          - name: Checkout Pull Request
+            type: bash
+            command: |-
+              set -euo pipefail
+              gh auth setup-git --hostname github.com --force
+              git clone --depth 1 --branch "${BASE}" "https://github.com/${REPO}.git" repo
+              cd repo
+              git fetch --depth 1 origin "pull/${PR_NUMBER}/head"
+              if [ -n "${PR_REVISION:-}" ]; then
+                git checkout --detach "${PR_REVISION}" || git checkout --detach FETCH_HEAD
+              else
+                git checkout --detach FETCH_HEAD
+              fi
+              revision="$(git rev-parse HEAD)"
+              base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
+              gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
+          - name: Review Pull Request
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Review this pull request. The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
+              Do not change files. Do not commit. Do not push.
+
+              Repository: {{ root().data.repository.full_name }}
+              Pull request: #{{ root().data.pull_request.number }}
+              Title: {{ root().data.pull_request.title }}
+              Author: {{ root().data.pull_request.user.login }}
+              Base branch: {{ root().data.pull_request.base.ref }}
+              Head SHA: {{ root().data.pull_request.head.sha }}
+
+              Write ONLY valid JSON to /tmp/risk.json. No markdown fences.
+
+              JSON schema:
+              {
+                "repository": "owner/repo",
+                "pr_number": "123",
+                "title": "PR title",
+                "author": "github-username",
+                "risk_score": 1,
+                "risk_level": "very_low",
+                "summary": "one sentence",
+                "concerns": ["..."]
+              }
+
+              risk_score is an integer from 1 to 5. A higher score means more risk.
+              risk_level must match the score:
+              1 very_low, 2 low, 3 medium, 4 high, 5 critical.
+
+              Apply these category rules. If a change matches a category, the score is at least that category score.
+              If several categories match, use the highest score.
+              If no category matches, judge the diff and choose a score from 1 to 5.
+
+              {{ install_params.riskRules }}
+
+              Write each concern as a short direct sentence, ideally under 15 words.
+          - name: Emit Review
+            type: bash
+            command: |-
+              set -euo pipefail
+              if [ ! -s /tmp/risk.json ]; then
+                echo "Missing /tmp/risk.json" >&2
+                exit 1
+              fi
+              jq -e 'has("risk_score") and has("summary") and has("risk_level")' /tmp/risk.json >/dev/null
+              cp /tmp/risk.json "$SUPERPLANE_RESULT_FILE"
+      position:
+        x: 920
+        "y": 80
+      isCollapsed: true
+    - id: format-risk-review
+      name: Format Risk Review
+      type: TYPE_ACTION
+      component: runnerJS
+      configuration:
+        execution_mode: host
+        execution_timeout_seconds: 120
+        machine_type: e1-tiny-amd64
+        script: |-
+          function main() {
+            const review = ($["Assess Risk"] && $["Assess Risk"].data && $["Assess Risk"].data.result) || {};
+            const score = clampScore(review.risk_score);
+            const summary = String(review.summary || "").trim();
+            const concerns = asStrings(review.concerns);
+            const lines = [summary || "No summary."];
+            if (concerns.length > 0) {
+              lines.push("", ...concerns.map((concern) => `- ${concern}`));
+            }
+            return {
+              risk_score: score,
+              summary: summary || `Risk ${score}/5`,
+              analysis: lines.join("\n"),
+            };
+          }
+
+          function clampScore(value) {
+            const score = Number(value);
+            if (!Number.isFinite(score)) return 1;
+            return Math.max(1, Math.min(5, Math.round(score)));
+          }
+
+          function asStrings(value) {
+            if (!Array.isArray(value)) return [];
+            return value.map((item) => String(item || "").trim()).filter(Boolean);
+          }
+      position:
+        x: 1200
+        "y": 80
+      isCollapsed: true
+    - id: report-risk-score
+      name: Report Risk Score
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        checkKey: risk-review
+        name: Risk score
+        format: fraction
+        score: '{{ string($["Format Risk Review"].data.result.risk_score) }}'
+        maxScore: "5"
+        direction: lowerIsBetter
+        cautionAt: 3
+        criticalAt: 4
+        summary: '{{ $["Format Risk Review"].data.result.summary }}'
+        analysis: '{{ $["Format Risk Review"].data.result.analysis }}'
+      position:
+        x: 1480
+        "y": 460
+      isCollapsed: true

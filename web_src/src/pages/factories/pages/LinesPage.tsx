@@ -32,7 +32,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -367,7 +367,6 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
@@ -761,11 +760,7 @@ export function LinesPage() {
             onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
-              showColumnAutomations && customAutomationsEnabled
-                ? undefined
-                : canAddPRFeedback
-                  ? () => setAddPRFeedbackOpen(true)
-                  : undefined
+              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
             }
             factoryIntakes={factoryIntakes}
             prFeedbackHandlers={prFeedbackHandlers}
@@ -1080,6 +1075,7 @@ function LineDetail({
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
+  const canAddVerifyAutomation = showColumnAutomations && canUpdate;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -1141,7 +1137,7 @@ function LineDetail({
           colorView={colorView}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
-          onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
         />
       )}

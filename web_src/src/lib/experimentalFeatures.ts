@@ -33,3 +33,6 @@ export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
 export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
+
+/** Organization experimental feature: Risk score automation on the Verify column. */
+export const FEATURE_FACTORY_RISK_SCORE = "factory_risk_score";
