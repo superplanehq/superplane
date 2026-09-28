@@ -101,6 +101,7 @@ import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExe
 import {
   latestDispatchForLine,
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   peekOrderFromNavigationState,
   resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
@@ -299,6 +300,7 @@ export function LinesPage() {
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -315,6 +317,17 @@ export function LinesPage() {
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
+  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
+  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const { data: taskForBoardLine } = useWorkOrder(organizationId, factoryId, taskLineOrderId);
+  const selectedLineId = displayedBoardLineId(
+    routeLineId,
+    boardLineId,
+    lines,
+    taskForBoardLine,
+    firstFactoryLineId(factory),
+  );
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -325,7 +338,7 @@ export function LinesPage() {
   } = useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
-    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId),
+    boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
   );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
@@ -374,7 +387,6 @@ export function LinesPage() {
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
-  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
     () => resolveWorkOrderByNumber(workOrders, routeOrderNumber, workOrdersLoading),
     [routeOrderNumber, workOrders, workOrdersLoading],
@@ -400,13 +412,6 @@ export function LinesPage() {
     }
     return listPermalink;
   }, [describePermalinkId, describedPermalink, describedPermalinkLoading, listPermalink]);
-  const boardLineId = workOrderBoardLineIdFromSearch(search);
-  const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
-  const selectedLineId =
-    routeLineId ??
-    searchLineId ??
-    latestDispatchForLine(permalink.order ?? undefined)?.line?.id ??
-    firstFactoryLineId(factory);
   const selectedLine = useMemo(
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
