@@ -32,7 +32,10 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useWorkOrder = vi.fn(() => ({ data: undefined, isLoading: false }));
+const useWorkOrder = vi.fn((..._args: unknown[]) => ({
+  data: undefined as FactoriesWorkOrder | undefined,
+  isLoading: false,
+}));
 function boardPageResult(isLoading = false, workOrders: FactoriesWorkOrder[] = []) {
   return {
     workOrders,

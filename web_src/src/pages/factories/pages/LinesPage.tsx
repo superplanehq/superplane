@@ -474,7 +474,7 @@ export function LinesPage() {
   if (!selectedLine) {
     if (taskLinePending || (routeOrderNumber && permalink.status === "loading")) {
       return (
-        <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        <div className="flex h-full min-h-0 min-w-0 w-full">
           <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
         </div>
       );
