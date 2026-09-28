@@ -299,8 +299,31 @@ func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.
 	}
 	if hasOrder {
 		log.Infof("skipping GitHub issue %s: work order already exists", issueURL)
+		return true, nil
 	}
-	return hasOrder, nil
+
+	marker, ok := ghintegration.ManualTaskMarkerFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	order, err := factoryModel.FindWorkOrderByOriginLabel(c.tx, marker)
+	if err != nil {
+		return false, err
+	}
+	if order == nil {
+		return false, nil
+	}
+
+	if err := order.SetOrigin(c.tx, models.WorkOrderOrigin{
+		URL:   issueURL,
+		Label: models.OriginLabelFromURL(issueURL),
+	}); err != nil {
+		return false, err
+	}
+	c.notifyWorkOrderUpdated(factoryModel.ID, order.ID, factory.EventTypeOrderUpdated)
+	log.Infof("skipping GitHub issue %s: manual task %s already exists", issueURL, order.ID)
+	return true, nil
 }
 
 func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.Factory) (bool, error) {

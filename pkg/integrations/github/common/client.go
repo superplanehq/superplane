@@ -469,6 +469,27 @@ func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber in
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
 }
 
+// ListRecentIssues returns the newest issues in a repository, including
+// issues that were just created. A timed-out create uses this to recover
+// the issue number when GitHub accepted the request but the response was late.
+func (c *Client) ListRecentIssues(ctx context.Context, repository string, limit int) ([]*github.Issue, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	return c.underlying.Issues.ListByRepo(ctx, owner, name, &github.IssueListByRepoOptions{
+		State:     "all",
+		Sort:      "created",
+		Direction: "desc",
+		ListOptions: github.ListOptions{
+			PerPage: limit,
+		},
+	})
+}
+
 // ListOpenDependabotAlerts reads open Dependabot alerts for a repository,
 // newest first. GitHub returns 403 when alerts are turned off or the app
 // cannot read them.

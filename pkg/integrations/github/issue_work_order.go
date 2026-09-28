@@ -11,7 +11,79 @@ import (
 	"gorm.io/gorm"
 )
 
+// ManualTaskMarkerPrefix identifies a GitHub issue opened for a manual task.
+// The issue body carries the marker so a late webhook can find the task even
+// when the create response never arrived.
+const ManualTaskMarkerPrefix = "superplane-manual-task:"
+
 const IssueEventPayloadType = "github.issue"
+
+func NewManualTaskMarker() string {
+	return ManualTaskMarkerPrefix + uuid.NewString()
+}
+
+func ManualTaskMarkerComment(marker string) string {
+	return "<!-- " + marker + " -->"
+}
+
+func AppendManualTaskMarker(body, marker string) string {
+	comment := ManualTaskMarkerComment(marker)
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return comment
+	}
+	return body + "\n\n" + comment
+}
+
+func ManualTaskMarkerFromBody(body string) (string, bool) {
+	index := strings.Index(body, ManualTaskMarkerPrefix)
+	if index < 0 {
+		return "", false
+	}
+
+	rest := body[index:]
+	end := strings.IndexAny(rest, " \t\r\n>")
+	if end < 0 {
+		end = len(rest)
+	}
+	marker := rest[:end]
+	if _, err := uuid.Parse(strings.TrimPrefix(marker, ManualTaskMarkerPrefix)); err != nil {
+		return "", false
+	}
+	return marker, true
+}
+
+func ManualTaskMarkerFromEventData(eventData any) (string, bool) {
+	body, ok := issueBodyFromEventData(eventData)
+	if !ok {
+		return "", false
+	}
+	return ManualTaskMarkerFromBody(body)
+}
+
+func issueBodyFromEventData(eventData any) (string, bool) {
+	envelope, ok := eventData.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	if typeName, _ := envelope["type"].(string); typeName != IssueEventPayloadType {
+		return "", false
+	}
+
+	data, ok := envelope["data"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	issue, ok := data["issue"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	body, _ := issue["body"].(string)
+	if strings.TrimSpace(body) == "" {
+		return "", false
+	}
+	return body, true
+}
 
 func IssueURLFromEventData(eventData any) (string, bool) {
 	envelope, ok := eventData.(map[string]any)

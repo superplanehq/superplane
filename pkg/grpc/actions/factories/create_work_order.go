@@ -52,41 +52,29 @@ func CreateWorkOrder(
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
+	target, err := oldestManualTaskIssueIntake(db, factory)
+	if err != nil {
+		log.WithError(err).Warnf("factory %s: failed to resolve a GitHub issue for a manual task", factory.ID)
+		target = nil
+	}
+
+	marker := ""
+	if target != nil {
+		marker = ghintegration.NewManualTaskMarker()
+	}
+
 	assigneeIDs := []uuid.UUID{createdByID}
-	openedIssue, hasIssue := manualTaskGitHubOrigin(ctx, deps, db, factory, title, req.GetDescription())
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
-	var reused bool
 	err = db.Transaction(func(tx *gorm.DB) error {
-		var created *models.FactoryWorkOrder
-		var createErr error
-		if hasIssue {
-			if lockErr := ghintegration.LockIssueWorkOrder(tx, factory, openedIssue.origin.URL); lockErr != nil {
-				return lockErr
-			}
-			existing, findErr := ghintegration.FindIssueWorkOrder(tx, factory, openedIssue.origin.URL)
-			if findErr != nil {
-				return findErr
-			}
-			if existing != nil {
-				order = existing
-				reused = true
-				return nil
-			}
-			created, createErr = factory.CreateWorkOrderWithOrigin(
-				tx,
-				title,
-				req.GetDescription(),
-				&createdByID,
-				assigneeIDs,
-				nil,
-				openedIssue.origin,
-			)
-		} else {
-			created, createErr = factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
-		}
+		created, createErr := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 		if createErr != nil {
 			return createErr
+		}
+		if marker != "" {
+			if markErr := created.SetPendingGitHubMarker(tx, marker); markErr != nil {
+				return markErr
+			}
 		}
 		order = created
 		result, bindErr := storedfiles.BindDescriptionFiles(
@@ -105,17 +93,16 @@ func CreateWorkOrder(
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
 	}
 	if err != nil {
-		if hasIssue {
-			closeManualTaskGitHubIssue(deps, db, openedIssue)
-		}
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
-	if reused {
-		serialized, serializeErr := loadAndSerializeWorkOrder(ctx, factory, order)
-		if serializeErr != nil {
-			return nil, factoryErrorToStatus(serializeErr, "failed to create work order")
+
+	if target != nil {
+		attachManualTaskGitHubIssue(ctx, deps, db, factory, order, target, marker, title, req.GetDescription())
+		reloaded, reloadErr := factory.FindWorkOrder(db, order.ID)
+		if reloadErr != nil {
+			return nil, factoryErrorToStatus(reloadErr, "failed to create work order")
 		}
-		return &pb.CreateWorkOrderResponse{Order: serialized}, nil
+		order = reloaded
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)

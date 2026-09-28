@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +117,44 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(body), "Ship the refunds line")
 		assert.Contains(t, string(body), "Stop double charges.")
+		assert.Contains(t, string(body), "superplane-manual-task:")
+		assert.Equal(t, r.User.String(), resp.Order.GetCreatedBy().GetUser().GetId())
+	})
+
+	t.Run("keeps attached files on the manual task", func(t *testing.T) {
+		t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+		t.Setenv("BASE_URL", "http://files.test")
+		store, err := filesystem.New(t.TempDir())
+		require.NoError(t, err)
+		blob.SetCurrent(store)
+		t.Cleanup(func() { blob.SetCurrent(nil) })
+
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		file, err := models.CreatePendingFile(database.Conn(), models.CreateFileParams{
+			Scope:          blob.ScopeWorkspace,
+			OrganizationID: r.Organization.ID,
+			FactoryID:      factoryModel.ID,
+			Filename:       "bug.png",
+			ContentType:    "image/png",
+			CreatedByID:    r.User,
+		})
+		require.NoError(t, err)
+		require.NoError(t, storedfiles.CompleteUpload(ctx, database.Conn(), store, file, bytes.NewReader([]byte("png-bytes"))))
+
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Login screenshot",
+			Description: "See ![bug](" + blob.FileRef(file.ID) + ")",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Order.Files, 1)
+		assert.Equal(t, file.ID.String(), resp.Order.Files[0].Id)
+		assert.Equal(t, r.User.String(), resp.Order.GetCreatedBy().GetUser().GetId())
+		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
 	})
 
 	t.Run("does not call GitHub when the setting is off", func(t *testing.T) {
@@ -161,6 +200,9 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, orders, 1)
 		assert.Nil(t, orders[0].OriginURL)
+		assert.Nil(t, orders[0].OriginLabel)
+		require.NotNil(t, orders[0].CreatedByID)
+		assert.Equal(t, r.User, *orders[0].CreatedByID)
 	})
 
 	t.Run("uses the oldest enabled intake", func(t *testing.T) {
@@ -184,7 +226,7 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		assert.Equal(t, "/repos/acme/older/issues", httpCtx.Requests[0].URL.Path)
 	})
 
-	t.Run("returns the existing task when the issue already has one", func(t *testing.T) {
+	t.Run("keeps the manual creator when a late webhook already opened a task", func(t *testing.T) {
 		httpCtx := githubIssueHTTP(http.StatusCreated, `{
 			"number": 42,
 			"html_url": "https://github.com/acme/payments/issues/42"
@@ -202,32 +244,28 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.NoError(t, err)
 
 		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
-			FactoryId: factoryModel.ID.String(),
-			Title:     "Ship the refunds line",
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line",
+			Description: "Stop double charges.",
 		})
 		require.NoError(t, err)
-		assert.Equal(t, existing.ID.String(), resp.Order.GetId())
+		assert.NotEqual(t, existing.ID.String(), resp.Order.GetId())
+		assert.Equal(t, r.User.String(), resp.Order.GetCreatedBy().GetUser().GetId())
 		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
-		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 
-		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		saved, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(resp.Order.GetId()))
 		require.NoError(t, err)
-		require.Len(t, orders, 1)
+		require.NotNil(t, saved.CreatedByID)
+		assert.Equal(t, r.User, *saved.CreatedByID)
+		require.NotNil(t, saved.OriginURL)
+		assert.Equal(t, issueURL, *saved.OriginURL)
 	})
 
-	t.Run("closes the GitHub issue when the task save fails", func(t *testing.T) {
-		httpCtx := githubIssueResponses(
-			githubIssueResponse(http.StatusCreated, `{
-				"number": 42,
-				"html_url": "https://github.com/acme/payments/issues/42"
-			}`),
-			githubIssueResponse(http.StatusOK, `{
-				"number": 42,
-				"state": "closed",
-				"html_url": "https://github.com/acme/payments/issues/42"
-			}`),
-		)
+	t.Run("does not open a GitHub issue when the task save fails", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
 		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
 
 		_, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
@@ -240,14 +278,48 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
 		require.NoError(t, err)
 		assert.Empty(t, orders)
-		require.Len(t, httpCtx.Requests, 2)
-		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-		assert.Equal(t, http.MethodPatch, httpCtx.Requests[1].Method)
-		assert.Equal(t, "/repos/acme/payments/issues/42", httpCtx.Requests[1].URL.Path)
-		body, err := io.ReadAll(httpCtx.Requests[1].Body)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("recovers the issue when the create response is late", func(t *testing.T) {
+		httpCtx := &lateIssueHTTP{found: true}
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line",
+			Description: "Stop double charges.",
+		})
 		require.NoError(t, err)
-		assert.Contains(t, string(body), `"state":"closed"`)
-		assert.Contains(t, string(body), `"state_reason":"not_planned"`)
+		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
+		assert.Equal(t, r.User.String(), resp.Order.GetCreatedBy().GetUser().GetId())
+		require.Len(t, httpCtx.requests, 2)
+		assert.Equal(t, http.MethodPost, httpCtx.requests[0].Method)
+		assert.Equal(t, http.MethodGet, httpCtx.requests[1].Method)
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 1)
+	})
+
+	t.Run("keeps a marker when a timed-out create cannot be confirmed", func(t *testing.T) {
+		httpCtx := &lateIssueHTTP{found: false}
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Nil(t, resp.Order.GetOrigin())
+		assert.Equal(t, r.User.String(), resp.Order.GetCreatedBy().GetUser().GetId())
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 1)
+		assert.Nil(t, orders[0].OriginURL)
+		require.NotNil(t, orders[0].OriginLabel)
+		assert.Contains(t, *orders[0].OriginLabel, "superplane-manual-task:")
 	})
 
 	t.Run("bounds the GitHub call", func(t *testing.T) {
@@ -351,6 +423,35 @@ type deadlineHTTP struct {
 func (d *deadlineHTTP) Do(request *http.Request) (*http.Response, error) {
 	d.deadline, d.hasDeadline = request.Context().Deadline()
 	return d.inner.Do(request)
+}
+
+type lateIssueHTTP struct {
+	found    bool
+	requests []*http.Request
+	marker   string
+}
+
+func (h *lateIssueHTTP) Do(request *http.Request) (*http.Response, error) {
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		return nil, err
+	}
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	h.requests = append(h.requests, request)
+	if request.Method == http.MethodPost {
+		h.marker = string(body)
+		return nil, context.DeadlineExceeded
+	}
+
+	if !h.found {
+		return githubIssueResponse(http.StatusOK, `[]`), nil
+	}
+	payload := `[{
+		"number": 42,
+		"html_url": "https://github.com/acme/payments/issues/42",
+		"body": ` + strconv.Quote(h.marker) + `
+	}]`
+	return githubIssueResponse(http.StatusOK, payload), nil
 }
 
 func githubIssueFactory(

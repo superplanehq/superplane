@@ -4,17 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
+	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
 const manualTaskGitHubIssueTimeout = 10 * time.Second
+const manualTaskGitHubIssueReconcileTimeout = 3 * time.Second
+
+var errManualTaskGitHubIssueUnconfirmed = errors.New("github issue creation was not confirmed")
 
 type manualTaskIssueTarget struct {
 	intake      models.FactoryIntake
@@ -22,40 +28,84 @@ type manualTaskIssueTarget struct {
 	repository  string
 }
 
-type manualTaskIssue struct {
-	origin models.WorkOrderOrigin
-	target *manualTaskIssueTarget
-	number int
-}
-
-func manualTaskGitHubOrigin(
+func attachManualTaskGitHubIssue(
 	ctx context.Context,
 	deps IntakeDependencies,
 	db *gorm.DB,
 	factory *models.Factory,
-	title, description string,
-) (manualTaskIssue, bool) {
-	target, err := oldestManualTaskIssueIntake(db, factory)
+	order *models.FactoryWorkOrder,
+	target *manualTaskIssueTarget,
+	marker, title, description string,
+) {
+	opened, err := createManualTaskGitHubIssue(ctx, deps, db, target, title, description, marker)
 	if err != nil {
-		log.WithError(err).Warnf("factory %s: failed to resolve a GitHub issue for a manual task", factory.ID)
-		return manualTaskIssue{}, false
-	}
-	if target == nil {
-		return manualTaskIssue{}, false
-	}
-
-	opened, err := createManualTaskGitHubIssue(ctx, deps, db, target, title, description)
-	if err != nil {
+		if errors.Is(err, errManualTaskGitHubIssueUnconfirmed) {
+			log.WithError(err).Warnf(
+				"factory %s: intake %s: GitHub did not confirm the issue for manual task %s",
+				factory.ID,
+				target.intake.ID,
+				order.ID,
+			)
+			return
+		}
 		log.WithError(err).Warnf(
 			"factory %s: intake %s: failed to create a GitHub issue in %s for a manual task",
 			factory.ID,
 			target.intake.ID,
 			target.repository,
 		)
-		return manualTaskIssue{}, false
+		if clearErr := order.ClearPendingGitHubMarker(db, marker); clearErr != nil {
+			log.WithError(clearErr).Warnf("factory %s: failed to clear the pending GitHub marker on task %s", factory.ID, order.ID)
+		}
+		return
 	}
 
-	return opened, true
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if lockErr := ghintegration.LockIssueWorkOrder(tx, factory, opened.URL); lockErr != nil {
+			return lockErr
+		}
+		existing, findErr := ghintegration.FindIssueWorkOrder(tx, factory, opened.URL)
+		if findErr != nil {
+			return findErr
+		}
+		if existing != nil && existing.ID != order.ID {
+			if claimErr := claimManualTaskDetails(tx, existing, order); claimErr != nil {
+				return claimErr
+			}
+		}
+		return order.SetOrigin(tx, opened)
+	}); err != nil {
+		log.WithError(err).Warnf(
+			"factory %s: failed to store GitHub issue %s on manual task %s",
+			factory.ID,
+			opened.URL,
+			order.ID,
+		)
+	}
+}
+
+func claimManualTaskDetails(tx *gorm.DB, existing, manual *models.FactoryWorkOrder) error {
+	if manual.CreatedByID != nil {
+		if err := existing.AssignCreator(tx, *manual.CreatedByID); err != nil {
+			return err
+		}
+		if _, err := existing.AddAssignee(tx, *manual.CreatedByID, *manual.CreatedByID); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(manual.Description) != "" && strings.TrimSpace(existing.Description) == "" {
+		description := manual.Description
+		if err := existing.UpdateContent(tx, nil, &description); err != nil {
+			return err
+		}
+	}
+	log.Warnf(
+		"factory %s: GitHub issue already has task %s; manual task %s keeps the creator and files",
+		manual.FactoryID,
+		existing.ID,
+		manual.ID,
+	)
+	return nil
 }
 
 func oldestManualTaskIssueIntake(tx *gorm.DB, factory *models.Factory) (*manualTaskIssueTarget, error) {
@@ -131,70 +181,75 @@ func createManualTaskGitHubIssue(
 	deps IntakeDependencies,
 	db *gorm.DB,
 	target *manualTaskIssueTarget,
-	title, description string,
-) (manualTaskIssue, error) {
+	title, description, marker string,
+) (models.WorkOrderOrigin, error) {
 	client, err := newIntakeGitHubClient(deps, db, target.integration)
 	if err != nil {
-		return manualTaskIssue{}, err
+		return models.WorkOrderOrigin{}, err
 	}
 
-	request := &github.IssueRequest{Title: github.Ptr(title)}
-	if strings.TrimSpace(description) != "" {
-		request.Body = github.Ptr(description)
+	request := &github.IssueRequest{
+		Title: github.Ptr(title),
+		Body:  github.Ptr(ghintegration.AppendManualTaskMarker(description, marker)),
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, manualTaskGitHubIssueTimeout)
 	defer cancel()
 	issue, _, err := client.CreateIssue(callCtx, target.repository, request)
 	if err != nil {
-		return manualTaskIssue{}, err
+		if !githubIssueCreateOutcomeUnknown(err) {
+			return models.WorkOrderOrigin{}, err
+		}
+		found, findErr := findCreatedManualTaskIssue(client, target.repository, marker)
+		if findErr != nil || found == nil {
+			if findErr != nil {
+				err = fmt.Errorf("%w: %w", err, findErr)
+			}
+			return models.WorkOrderOrigin{}, fmt.Errorf("%w: %w", errManualTaskGitHubIssueUnconfirmed, err)
+		}
+		issue = found
 	}
+	return manualTaskIssueFromGitHub(issue)
+}
+
+func findCreatedManualTaskIssue(client *ghcommon.Client, repository, marker string) (*github.Issue, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), manualTaskGitHubIssueReconcileTimeout)
+	defer cancel()
+
+	issues, _, err := client.ListRecentIssues(ctx, repository, 30)
+	if err != nil {
+		return nil, err
+	}
+	for _, issue := range issues {
+		if issue == nil || issue.GetNumber() == 0 || issue.PullRequestLinks != nil {
+			continue
+		}
+		if strings.Contains(issue.GetBody(), marker) && strings.TrimSpace(issue.GetHTMLURL()) != "" {
+			return issue, nil
+		}
+	}
+	return nil, nil
+}
+
+func manualTaskIssueFromGitHub(issue *github.Issue) (models.WorkOrderOrigin, error) {
 	if issue == nil || strings.TrimSpace(issue.GetHTMLURL()) == "" || issue.GetNumber() == 0 {
-		return manualTaskIssue{}, fmt.Errorf("github issue response is missing html_url or number")
+		return models.WorkOrderOrigin{}, fmt.Errorf("github issue response is missing html_url or number")
 	}
 
 	issueURL := strings.TrimSpace(issue.GetHTMLURL())
-	return manualTaskIssue{
-		origin: models.WorkOrderOrigin{
-			URL:   issueURL,
-			Label: models.OriginLabelFromURL(issueURL),
-		},
-		target: target,
-		number: issue.GetNumber(),
+	return models.WorkOrderOrigin{
+		URL:   issueURL,
+		Label: models.OriginLabelFromURL(issueURL),
 	}, nil
 }
 
-func closeManualTaskGitHubIssue(deps IntakeDependencies, db *gorm.DB, opened manualTaskIssue) {
-	if opened.target == nil || opened.number == 0 {
-		return
+func githubIssueCreateOutcomeUnknown(err error) bool {
+	if err == nil {
+		return false
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), manualTaskGitHubIssueTimeout)
-	defer cancel()
-
-	client, err := newIntakeGitHubClient(deps, db, opened.target.integration)
-	if err != nil {
-		log.WithError(err).Warnf(
-			"factory %s: intake %s: failed to close GitHub issue %d after the task save failed",
-			opened.target.intake.FactoryID,
-			opened.target.intake.ID,
-			opened.number,
-		)
-		return
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
 	}
-
-	state := "closed"
-	reason := "not_planned"
-	_, _, err = client.EditIssue(ctx, opened.target.repository, opened.number, &github.IssueRequest{
-		State:       &state,
-		StateReason: &reason,
-	})
-	if err != nil {
-		log.WithError(err).Warnf(
-			"factory %s: intake %s: failed to close GitHub issue %d after the task save failed",
-			opened.target.intake.FactoryID,
-			opened.target.intake.ID,
-			opened.number,
-		)
-	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
