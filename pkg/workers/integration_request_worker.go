@@ -171,7 +171,8 @@ func (w *IntegrationRequestWorker) syncIntegration(request *models.IntegrationRe
 	})
 
 	if syncErr != nil {
-		instance.SetErrorState(fmt.Sprintf("Sync failed: %v", syncErr))
+		instance.State = models.IntegrationStateError
+		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
 	} else if !integrationCtx.StateChanged() {
 		if instance.State == models.IntegrationStateError {
 			instance.State = models.IntegrationStatePending

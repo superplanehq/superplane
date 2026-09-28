@@ -27,10 +27,6 @@ type Metadata struct {
 	// PendingInstallations is the server-verified list of installations and
 	// writable repositories available to the linked GitHub identity.
 	PendingInstallations []PendingInstallation `mapstructure:"pendingInstallations" json:"pendingInstallations,omitempty"`
-	// SetupInstallationID is an untrusted installation ID from GitHub's setup
-	// callback. Sync verifies it with App credentials before it can become a
-	// pending or bound installation.
-	SetupInstallationID string `mapstructure:"setupInstallationId" json:"setupInstallationId,omitempty"`
 	// InstallationsRefreshedAt limits full App installation discovery while the
 	// picker polls, without making the verified list permanent.
 	InstallationsRefreshedAt string `mapstructure:"installationsRefreshedAt" json:"installationsRefreshedAt,omitempty"`
@@ -52,20 +48,6 @@ type Metadata struct {
 	// after a closed request leaves the waiting UI. This covers an approval
 	// that becomes visible after GitHub removes it from the open request list.
 	InstallRequestDiscoveryUntil string `mapstructure:"installRequestDiscoveryUntil" json:"installRequestDiscoveryUntil,omitempty"`
-	// InstallRequestDiscoveryAccounts preserves closed request accounts during
-	// the follow-up window so Sync can verify them directly without showing a
-	// waiting row or scanning every App installation.
-	InstallRequestDiscoveryAccounts []string `mapstructure:"installRequestDiscoveryAccounts" json:"installRequestDiscoveryAccounts,omitempty"`
-	// InstallRequestFallbackSince and InstallRequestFallbackPage resume bounded
-	// compatibility scans for follow-up windows saved before account tracking.
-	InstallRequestFallbackSince string `mapstructure:"installRequestFallbackSince" json:"installRequestFallbackSince,omitempty"`
-	InstallRequestFallbackPage  int    `mapstructure:"installRequestFallbackPage" json:"installRequestFallbackPage,omitempty"`
-	// InstallRequestFallbackRetries keeps candidates whose access check failed
-	// so a transient GitHub error cannot skip an approved installation.
-	InstallRequestFallbackRetries []PendingInstallation `mapstructure:"installRequestFallbackRetries" json:"installRequestFallbackRetries,omitempty"`
-	// InstallRequestFallbackRefreshedAt limits how often a completed scan starts
-	// again while GitHub can still make a late approval visible.
-	InstallRequestFallbackRefreshedAt string `mapstructure:"installRequestFallbackRefreshedAt" json:"installRequestFallbackRefreshedAt,omitempty"`
 	// ObservedInstallRequestIDs records App requests visible before the local
 	// development flow opens GitHub. The request callback uses this baseline to
 	// exclude requests that belong to another developer.

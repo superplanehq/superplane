@@ -414,7 +414,8 @@ func (c *IntegrationContext) Ready() {
 
 func (c *IntegrationContext) Error(message string) {
 	c.stateChanged = true
-	c.integration.SetErrorState(message)
+	c.integration.State = models.IntegrationStateError
+	c.integration.StateDescription = message
 }
 
 func (c *IntegrationContext) StateChanged() bool {
