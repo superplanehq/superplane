@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { ArchiveRestore, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,22 @@ const HEADER_ICON_BUTTON =
 export function PopupHeaderActions({
   copyUrl,
   onArchive,
+  onRestore,
   archiveBusy = false,
+  restoreBusy = false,
   taskActions,
 }: {
   copyUrl?: string;
   onArchive?: () => void | Promise<void>;
+  onRestore?: () => void | Promise<void>;
   archiveBusy?: boolean;
+  restoreBusy?: boolean;
   taskActions?: ReactNode;
 }) {
   return (
     <>
       {taskActions}
+      {onRestore ? <PopupRestoreButton onRestore={onRestore} busy={restoreBusy} /> : null}
       {onArchive ? <PopupArchiveButton onArchive={onArchive} busy={archiveBusy} /> : null}
       <CopyLinkButton
         url={copyUrl}
@@ -31,6 +36,30 @@ export function PopupHeaderActions({
         testId="popup-work-order-copy-link-button"
       />
     </>
+  );
+}
+
+function PopupRestoreButton({ onRestore, busy }: { onRestore: () => void | Promise<void>; busy: boolean }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void onRestore()}
+            disabled={busy}
+            className={HEADER_ICON_BUTTON}
+            aria-label="Restore"
+            data-testid="popup-work-order-restore-button"
+          >
+            <ArchiveRestore className="h-4 w-4" aria-hidden />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Restore</TooltipContent>
+    </Tooltip>
   );
 }
 

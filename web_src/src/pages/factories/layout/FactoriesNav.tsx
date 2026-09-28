@@ -20,6 +20,7 @@ const RECENT_STATUS_DOT_CLASS: Record<WorkOrderDisplayStatus, string> = {
   failed: "bg-[color:var(--status-failed-dot)]",
   rejected: "bg-[color:var(--status-failed-dot)]",
   cancelled: "bg-[color:var(--status-cancelled-dot)]",
+  archived: "bg-[color:var(--status-cancelled-dot)]",
   completed: "bg-[color:var(--status-completed-dot)]",
 };
 

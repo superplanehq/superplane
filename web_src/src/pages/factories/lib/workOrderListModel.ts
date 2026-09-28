@@ -436,6 +436,22 @@ export function applyWorkOrderFilters(
   return result;
 }
 
+/**
+ * Search, source, labels, and a multi-person assignee filter run in the
+ * browser. The closed-task page query does not apply them. Auto-paging while
+ * they hide every archived task would read the full closed history.
+ */
+export function clientFilterSkipsArchivedAutoPage(filters: WorkOrderFilters, search: string): boolean {
+  if (search.trim() !== "") {
+    return true;
+  }
+  if (filters.sourceIds.length > 0 || filters.labels.length > 0) {
+    return true;
+  }
+  const people = filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+  return people.length > 1;
+}
+
 export function applyWorkOrderSearch(entries: WorkOrderListEntry[], query: string): WorkOrderListEntry[] {
   const needle = query.trim().toLowerCase();
   if (!needle) {

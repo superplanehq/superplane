@@ -6,7 +6,7 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
-import { getWorkOrderDisplayStatus } from "./workOrderProgress";
+import { getWorkOrderDisplayStatus, isArchivedWorkOrder } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 
@@ -127,11 +127,27 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft tasks. A draft that already ran on a line still belongs
- * here. Newest updated drafts come first.
+ * Draft tasks, plus archived rejects when the Archived filter is on.
+ * A draft that already ran on a line still belongs here. Newest updated
+ * drafts come first.
  */
-export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+export function collectLineBacklogOrders(
+  workOrders: FactoriesWorkOrder[],
+  options?: { includeArchived?: boolean },
+): FactoriesWorkOrder[] {
+  return workOrders
+    .filter((order) => isLineBacklogOrder(order, options?.includeArchived))
+    .sort(compareOrdersNewestFirst);
+}
+
+/** Archived means a draft was rejected before any line run. */
+export function isArchivedBacklogReject(order: FactoriesWorkOrder): boolean {
+  return isArchivedWorkOrder(order);
+}
+
+/** Archived tasks appear in Backlog, but they do not fill the column size limit. */
+export function backlogCapacityOrderCount(orders: readonly FactoriesWorkOrder[]): number {
+  return orders.reduce((count, order) => (isArchivedWorkOrder(order) ? count : count + 1), 0);
 }
 
 /**
@@ -262,8 +278,14 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
   return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
 }
 
-function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
-  return Boolean(order.id) && order.state === "STATE_DRAFT";
+function isLineBacklogOrder(order: FactoriesWorkOrder, includeArchived = false): boolean {
+  if (!order.id) {
+    return false;
+  }
+  if (order.state === "STATE_DRAFT") {
+    return true;
+  }
+  return includeArchived && isArchivedBacklogReject(order);
 }
 
 // A finished task belongs on this board when it ran on this line, or

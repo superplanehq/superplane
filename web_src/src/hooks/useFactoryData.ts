@@ -273,6 +273,7 @@ export function useFactoryWorkOrdersPage(
 export type FactoryBoardColumnPage = {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
   fetchNextPage: () => void;
 };
 
@@ -289,6 +290,7 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
   return {
     hasNextPage: page.hasNextPage,
     isFetchingNextPage: page.isFetchingNextPage,
+    isFetchNextPageError: page.isFetchNextPageError,
     fetchNextPage: () => {
       void page.fetchNextPage();
     },

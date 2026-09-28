@@ -284,7 +284,9 @@ function analysisPopupHeader(args: {
         <PopupHeaderActions
           copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
           onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
+          onRestore={args.fixture.footer.status === "archived" ? args.mutations.onRestore : undefined}
           archiveBusy={args.footerBusy}
+          restoreBusy={args.footerBusy}
           taskActions={args.reviewActions}
         />
       }

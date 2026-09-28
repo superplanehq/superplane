@@ -92,10 +92,7 @@ func SendWorkOrderToBacklog(
 				return err
 			}
 		}
-		_, err = order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
-			ToState: models.FactoryWorkOrderStateDraft,
-			Actor:   &actor,
-		})
+		_, err = order.SendClosedToDraft(tx, &actor)
 		return err
 	})
 	if err != nil {

@@ -2,9 +2,12 @@ import { describe, expect, it } from "bun:test";
 
 import {
   boardDoneResultsForStatuses,
+  backlogColumnPaging,
+  draftsVisibleForStatusFilter,
   factoryWorkOrdersPageKey,
   flattenWorkOrdersPages,
   getWorkOrdersNextPageParam,
+  shouldLoadHiddenArchivedPage,
   uniqueWorkOrdersById,
   workOrderMatchesPageQuery,
   workOrderMatchesUser,
@@ -25,6 +28,19 @@ describe("boardDoneResultsForStatuses", () => {
 
   it("asks only for completed tasks when Completed is the status filter", () => {
     expect(boardDoneResultsForStatuses(["completed"])).toEqual(["RESULT_COMPLETED"]);
+  });
+
+  it("asks only for rejected tasks when Archived is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["archived"])).toEqual(["RESULT_REJECTED"]);
+  });
+
+  it("keeps the selected done result when Archived is also selected", () => {
+    expect(boardDoneResultsForStatuses(["failed", "archived"])).toEqual(["RESULT_FAILED", "RESULT_REJECTED"]);
+    expect(boardDoneResultsForStatuses(["completed", "failed", "archived"])).toEqual([
+      "RESULT_COMPLETED",
+      "RESULT_FAILED",
+      "RESULT_REJECTED",
+    ]);
   });
 });
 
@@ -136,5 +152,132 @@ describe("workOrderListPagination", () => {
     expect(
       workOrderMatchesPageQuery({ assignees: [{ id: "zoe" }] }, { userId: "alex", unassigned: true, results: [] }),
     ).toBe(false);
+  });
+});
+
+describe("backlogColumnPaging", () => {
+  const drafts = { hasMore: true, isLoading: false, onLoadMore: () => undefined };
+  const closed = { hasMore: true, isLoading: false, onLoadMore: () => undefined };
+
+  it("pages drafts only when Archived is off", () => {
+    expect(backlogColumnPaging({ includeArchived: false, showDrafts: true, drafts, closed })).toBe(drafts);
+  });
+
+  it("pages the closed query from Backlog when Archived is on", () => {
+    let draftLoads = 0;
+    let closedLoads = 0;
+    const paging = backlogColumnPaging({
+      includeArchived: true,
+      showDrafts: false,
+      drafts: {
+        ...drafts,
+        onLoadMore: () => {
+          draftLoads += 1;
+        },
+      },
+      closed: {
+        ...closed,
+        onLoadMore: () => {
+          closedLoads += 1;
+        },
+      },
+    });
+
+    paging.onLoadMore();
+
+    expect(draftLoads).toBe(0);
+    expect(closedLoads).toBe(1);
+    expect(paging.hasMore).toBe(true);
+  });
+
+  it("loads draft and closed pages together when both are visible", () => {
+    let draftLoads = 0;
+    let closedLoads = 0;
+    const paging = backlogColumnPaging({
+      includeArchived: true,
+      showDrafts: true,
+      drafts: {
+        hasMore: true,
+        isLoading: false,
+        onLoadMore: () => {
+          draftLoads += 1;
+        },
+      },
+      closed: {
+        hasMore: false,
+        isLoading: true,
+        onLoadMore: () => {
+          closedLoads += 1;
+        },
+      },
+    });
+
+    paging.onLoadMore();
+
+    expect(draftLoads).toBe(1);
+    expect(closedLoads).toBe(0);
+    expect(paging.hasMore).toBe(true);
+    expect(paging.isLoading).toBe(true);
+  });
+});
+
+describe("shouldLoadHiddenArchivedPage", () => {
+  it("loads the next closed page while no archived task is loaded", () => {
+    expect(
+      shouldLoadHiddenArchivedPage({
+        includeArchived: true,
+        loadedArchivedCount: 0,
+        hasNextPage: true,
+        isLoading: false,
+        isError: false,
+        clientFilterHidesTasks: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("stops when an archived task is loaded, a filter hides tasks, a page is in flight, or the query failed", () => {
+    expect(
+      shouldLoadHiddenArchivedPage({
+        includeArchived: true,
+        loadedArchivedCount: 1,
+        hasNextPage: true,
+        isLoading: false,
+        isError: false,
+        clientFilterHidesTasks: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldLoadHiddenArchivedPage({
+        includeArchived: true,
+        loadedArchivedCount: 0,
+        hasNextPage: true,
+        isLoading: false,
+        isError: false,
+        clientFilterHidesTasks: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldLoadHiddenArchivedPage({
+        includeArchived: true,
+        loadedArchivedCount: 0,
+        hasNextPage: true,
+        isLoading: true,
+        isError: false,
+        clientFilterHidesTasks: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldLoadHiddenArchivedPage({
+        includeArchived: true,
+        loadedArchivedCount: 0,
+        hasNextPage: true,
+        isLoading: false,
+        isError: true,
+        clientFilterHidesTasks: false,
+      }),
+    ).toBe(false);
+    expect(draftsVisibleForStatusFilter([])).toBe(true);
+    expect(draftsVisibleForStatusFilter(["archived"])).toBe(false);
+    expect(draftsVisibleForStatusFilter(["archived", "draft"])).toBe(true);
   });
 });

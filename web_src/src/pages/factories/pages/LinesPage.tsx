@@ -70,6 +70,8 @@ type BoardColumnPaging = {
   hasMore: boolean;
   isLoading: boolean;
   onLoadMore: () => void;
+  /** Load the next page when the lane does not overflow. Archived pages use this because Done can be empty. */
+  loadWhenShort?: boolean;
 };
 
 type BoardPaging = {
@@ -111,14 +113,22 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  clientFilterSkipsArchivedAutoPage,
   countWorkOrderFilters,
   UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import {
+  boardDoneResultsForStatuses,
+  backlogColumnPaging,
+  draftsVisibleForStatusFilter,
+  shouldLoadHiddenArchivedPage,
+  uniqueWorkOrdersById,
+} from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
+import { isArchivedWorkOrder } from "../lib/workOrderProgress";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
@@ -373,6 +383,75 @@ export function LinesPage() {
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
+  );
+  const includeArchived = listState.filters.statuses.includes("archived");
+  const loadedArchivedCount = useMemo(
+    () => workOrders.filter((order) => isArchivedWorkOrder(order)).length,
+    [workOrders],
+  );
+  const clientFilterHidesArchivedTasks = clientFilterSkipsArchivedAutoPage(listState.filters, listState.search);
+  const fetchNextBacklogPageRef = useRef(backlogPage.fetchNextPage);
+  const fetchNextClosedPageRef = useRef(donePage.fetchNextPage);
+  fetchNextBacklogPageRef.current = backlogPage.fetchNextPage;
+  fetchNextClosedPageRef.current = donePage.fetchNextPage;
+  const loadNextBacklogPage = useCallback(() => {
+    fetchNextBacklogPageRef.current();
+  }, []);
+  const loadNextClosedPage = useCallback(() => {
+    fetchNextClosedPageRef.current();
+  }, []);
+  useEffect(() => {
+    if (
+      !shouldLoadHiddenArchivedPage({
+        includeArchived,
+        loadedArchivedCount,
+        hasNextPage: !isPlaceholderData && donePage.hasNextPage,
+        isLoading: donePage.isFetchingNextPage || workOrdersLoading,
+        isError: donePage.isFetchNextPageError,
+        clientFilterHidesTasks: clientFilterHidesArchivedTasks,
+      })
+    ) {
+      return;
+    }
+    loadNextClosedPage();
+  }, [
+    donePage.hasNextPage,
+    donePage.isFetchNextPageError,
+    donePage.isFetchingNextPage,
+    clientFilterHidesArchivedTasks,
+    includeArchived,
+    isPlaceholderData,
+    loadNextClosedPage,
+    loadedArchivedCount,
+    workOrdersLoading,
+  ]);
+  const backlogPaging = useMemo(
+    () =>
+      backlogColumnPaging({
+        includeArchived,
+        showDrafts: draftsVisibleForStatusFilter(listState.filters.statuses),
+        drafts: {
+          hasMore: !isPlaceholderData && backlogPage.hasNextPage,
+          isLoading: backlogPage.isFetchingNextPage,
+          onLoadMore: loadNextBacklogPage,
+        },
+        closed: {
+          hasMore: !isPlaceholderData && donePage.hasNextPage,
+          isLoading: donePage.isFetchingNextPage,
+          onLoadMore: loadNextClosedPage,
+        },
+      }),
+    [
+      backlogPage.hasNextPage,
+      backlogPage.isFetchingNextPage,
+      donePage.hasNextPage,
+      donePage.isFetchingNextPage,
+      includeArchived,
+      isPlaceholderData,
+      listState.filters.statuses,
+      loadNextBacklogPage,
+      loadNextClosedPage,
+    ],
   );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
@@ -732,6 +811,7 @@ export function LinesPage() {
             apps={factoryApps}
             workOrders={visibleWorkOrders}
             cardsPending={Boolean(isPlaceholderData)}
+            includeArchived={includeArchived}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
@@ -756,9 +836,8 @@ export function LinesPage() {
             colorView={columnColorView}
             columnPaging={{
               backlog: {
-                hasMore: !isPlaceholderData && backlogPage.hasNextPage,
-                isLoading: backlogPage.isFetchingNextPage,
-                onLoadMore: backlogPage.fetchNextPage,
+                ...backlogPaging,
+                loadWhenShort: includeArchived && !isPlaceholderData && !clientFilterHidesArchivedTasks,
               },
               open: {
                 hasMore: !isPlaceholderData && openPage.hasNextPage,
@@ -958,6 +1037,7 @@ function LineDetail({
   apps,
   workOrders,
   cardsPending,
+  includeArchived,
   canCreateWorkOrder,
   canUpdate,
   onCreateWorkOrder,
@@ -989,6 +1069,7 @@ function LineDetail({
   apps: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders: FactoriesWorkOrder[];
   cardsPending: boolean;
+  includeArchived: boolean;
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
@@ -1017,7 +1098,10 @@ function LineDetail({
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
   const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
-  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const backlogOrders = useMemo(
+    () => collectLineBacklogOrders(workOrders ?? [], { includeArchived }),
+    [includeArchived, workOrders],
+  );
   const doneOrders = useMemo(
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
     [workOrders, line, fullBoard],

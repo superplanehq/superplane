@@ -240,7 +240,7 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.kind === "stopped" || footer.status === "rejected") {
+  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "archived") {
     return "rejected";
   }
   return "done";
@@ -260,6 +260,12 @@ function closedDecisionNote(
   status?: WorkOrderDisplayStatus,
   closer?: { actor?: OrgUserDisplay; automationName?: string },
 ): SplitRunFooterNote {
+  if (status === "archived") {
+    return {
+      headline: "This task is archived",
+      text: "Restore it to the Backlog to work on it again.",
+    };
+  }
   if (status === "rejected") {
     const headline =
       closerHeadline(SPLIT_RUN_REJECTED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||

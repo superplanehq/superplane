@@ -1,3 +1,5 @@
+import { useLayoutEffect } from "react";
+
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -6,7 +8,10 @@ import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from 
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
+import { backlogCapacityOrderCount } from "../lib/linePhaseRuns";
+import { isArchivedWorkOrder } from "../lib/workOrderProgress";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
+import { WorkOrderStatusBadge } from "../workOrders/WorkOrderStatusIcon";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
@@ -60,6 +65,7 @@ export type BacklogColumnProps = {
     hasMore: boolean;
     isLoading: boolean;
     onLoadMore: () => void;
+    loadWhenShort?: boolean;
   };
   cardsPending?: boolean;
 };
@@ -103,7 +109,7 @@ export function BacklogColumn({
   cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const atCapacity = size != null && orders.length >= size;
+  const atCapacity = size != null && backlogCapacityOrderCount(orders) >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
   const { canAct } = usePermissions();
@@ -277,6 +283,12 @@ function BacklogColumnOrderList({
     isLoading: paging?.isLoading,
     onLoadMore: paging?.onLoadMore,
   });
+  useLayoutEffect(() => {
+    if (!paging?.loadWhenShort) {
+      return;
+    }
+    loadMoreIfNeeded(scrollRef.current);
+  }, [loadMoreIfNeeded, orders.length, paging?.loadWhenShort]);
 
   return (
     <LineBoardColumnCardList
@@ -291,6 +303,11 @@ function BacklogColumnOrderList({
     >
       {orders.map((order) => (
         <li key={order.id}>
+          {isArchivedWorkOrder(order) ? (
+            <div className="mb-1">
+              <WorkOrderStatusBadge status="archived" />
+            </div>
+          ) : null}
           <LineBoardOrderCard
             order={order}
             workOrderCardContext={workOrderCardContext}

@@ -461,6 +461,9 @@ function reviewSurfaces(
       checks,
     );
   }
+  if (displayStatus === "archived") {
+    return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
+  }
   if (displayStatus === "completed" || displayStatus === "rejected") {
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
