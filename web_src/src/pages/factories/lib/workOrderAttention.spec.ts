@@ -5,6 +5,7 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import {
   getWorkOrderAttentionReason,
   getWorkOrderAttentionReasons,
+  getWorkOrderFailedAttentionLabel,
   WORK_ORDER_ATTENTION_LABEL,
 } from "./workOrderAttention";
 
@@ -214,5 +215,56 @@ describe("getWorkOrderAttentionReason", () => {
   it("does not label idle waiting work as an attention reason", () => {
     expect(getWorkOrderAttentionReason(order())).toBeNull();
     expect(getWorkOrderAttentionReasons(order())).toEqual([]);
+  });
+});
+
+describe("getWorkOrderFailedAttentionLabel", () => {
+  function orderWithLatestStep(result: "RESULT_FAILED" | "RESULT_PASSED", failureReason?: string) {
+    return order({
+      lineDispatches: [
+        {
+          id: "d1",
+          state: "STATE_FINISHED",
+          stepExecutions: [
+            {
+              id: "e0",
+              step: "plan",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              updatedAt: "2024-06-01T00:00:00Z",
+            },
+            {
+              id: "e1",
+              step: "implement",
+              state: "STATE_FINISHED",
+              result,
+              failureReason,
+              updatedAt: "2024-06-02T00:00:00Z",
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  it("returns the credit label for a failed step with a credit reason", () => {
+    expect(getWorkOrderFailedAttentionLabel(orderWithLatestStep("RESULT_FAILED", "no_hosted_credit"))).toBe(
+      "No credit",
+    );
+    expect(getWorkOrderFailedAttentionLabel(orderWithLatestStep("RESULT_FAILED", "hosted_subscription_required"))).toBe(
+      "No plan",
+    );
+    expect(getWorkOrderFailedAttentionLabel(orderWithLatestStep("RESULT_FAILED", "workspace_budget_empty"))).toBe(
+      "No workspace budget",
+    );
+  });
+
+  it("returns Run failed for other failures", () => {
+    expect(getWorkOrderFailedAttentionLabel(orderWithLatestStep("RESULT_FAILED"))).toBe("Run failed");
+    expect(getWorkOrderFailedAttentionLabel(orderWithLatestStep("RESULT_FAILED", "unknown"))).toBe("Run failed");
+    expect(getWorkOrderFailedAttentionLabel(orderWithLatestStep("RESULT_PASSED", "no_hosted_credit"))).toBe(
+      "Run failed",
+    );
+    expect(getWorkOrderFailedAttentionLabel(order())).toBe("Run failed");
   });
 });

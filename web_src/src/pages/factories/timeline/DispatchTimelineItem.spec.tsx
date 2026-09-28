@@ -1,10 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "bun:test";
+import { MemoryRouter } from "react-router";
 
-import type { WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
+import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import type { WorkOrderTimelineEvent, WorkOrderTimelineStep } from "../lib/workOrderTimelineEvents";
 import { DispatchTimelineItem } from "./DispatchTimelineItem";
 
-function dispatchEvent(comments: Array<{ body: string }>): WorkOrderTimelineEvent {
+function dispatchEvent(
+  comments: Array<{ body: string }>,
+  execution: WorkOrderTimelineStep["execution"] = {
+    id: "run-1",
+    step: "Build",
+    state: "STATE_STARTED",
+    result: "RESULT_UNKNOWN",
+  },
+): WorkOrderTimelineEvent {
   return {
     id: "dispatch-1",
     kind: "dispatched",
@@ -19,12 +29,7 @@ function dispatchEvent(comments: Array<{ body: string }>): WorkOrderTimelineEven
         at: "2026-08-04T12:00:00.000Z",
         startedAt: "2026-08-04T12:00:00.000Z",
         comments,
-        execution: {
-          id: "run-1",
-          step: "Build",
-          state: "STATE_STARTED",
-          result: "RESULT_UNKNOWN",
-        },
+        execution,
       },
     ],
   };
@@ -48,5 +53,35 @@ describe("DispatchTimelineItem", () => {
     expect(screen.getByText("Applying the fix now.")).toBeInTheDocument();
     expect(screen.queryByText("CI")).not.toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("explains a hosted credit failure and links to billing", () => {
+    render(
+      <MemoryRouter>
+        <DispatchTimelineItem
+          event={dispatchEvent([], {
+            id: "run-1",
+            step: "Build",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            failureReason: "no_hosted_credit",
+          })}
+          organizationId="org-1"
+          factoryKey="factory-1"
+          orderNumber="1"
+          isLatestDispatch
+        />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText("This step did not start. The organization has no SuperPlane hosted credit.", {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath("org-1", "factory-1", "organization", "billing"),
+    );
   });
 });

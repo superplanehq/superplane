@@ -44,9 +44,54 @@ type FactoryWorkOrderExecution struct {
 	TotalTokens     int64
 	DurationSeconds int64
 	CostCents       int64
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	FinishedAt      *time.Time
+	// FailureReason explains why the step failed before it could run.
+	// Only SuperPlane hosted credit failures set it; see
+	// WorkOrderExecutionFailureReasonFor.
+	FailureReason *string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	FinishedAt    *time.Time
+}
+
+// Failure reasons stored on a factory step. The UI maps each code to copy
+// and a billing action.
+const (
+	WorkOrderExecutionFailureReasonNoHostedCredit             = "no_hosted_credit"
+	WorkOrderExecutionFailureReasonHostedSubscriptionRequired = "hosted_subscription_required"
+	WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty       = "workspace_budget_empty"
+)
+
+// WorkOrderExecutionFailureReasonFor maps a SuperPlane hosted credit error
+// to a stored failure reason. Other errors return an empty string.
+func WorkOrderExecutionFailureReasonFor(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrHostedSubscriptionRequired):
+		return WorkOrderExecutionFailureReasonHostedSubscriptionRequired
+	case errors.Is(err, ErrHostedCreditEmpty), errors.Is(err, ErrSuperPlaneRunnerNoCredit):
+		return WorkOrderExecutionFailureReasonNoHostedCredit
+	case errors.Is(err, ErrFactoryHostedBudgetEmpty), errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget):
+		return WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty
+	default:
+		return ""
+	}
+}
+
+// RecordWorkOrderExecutionFailureReason stores the failure reason on the
+// factory step for the run. Runs outside a factory line have no step, so
+// they are ignored.
+func RecordWorkOrderExecutionFailureReason(tx *gorm.DB, runID uuid.UUID, reason string) error {
+	execution, err := FindWorkOrderExecutionForRun(tx, runID)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	execution.FailureReason = &reason
+	return tx.Model(execution).Update("failure_reason", reason).Error
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
