@@ -46,6 +46,8 @@ const (
 	intakeMetadataJiraMoveOnComplete   = "jiraMoveOnComplete"
 	intakeMetadataJiraCompletionColumn = "jiraCompletionColumn"
 
+	intakeMetadataGitHubCreateIssueForManualTasks = "githubCreateIssueForManualTasks"
+
 	intakeSentryActionCreated    = "created"
 	intakeSentryActionUnresolved = "unresolved"
 	intakeSentryActionAssigned   = "assigned"
@@ -66,6 +68,8 @@ type intakeSettings struct {
 	SuperplaneLabelAdded bool
 	// Move the originating Jira issue when the work order completes.
 	JiraMoveOnComplete bool
+	// Open a GitHub issue when a user creates a task by hand.
+	GitHubCreateIssueForManualTasks bool
 	// Jira status name to move the issue to. Empty means the Done column.
 	JiraCompletionColumn string
 	// Listen for created Sentry issues.
@@ -507,6 +511,12 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.SentryNewIssues = slices.Contains(actions, intakeSentryActionCreated)
 			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
 			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
+		case models.FactoryIntakeSourceGitHubIssues:
+			actions := configurationStrings(trigger.Configuration["actions"])
+			settings.NewIssues = slices.Contains(actions, "opened")
+			settings.ReopenedIssues = slices.Contains(actions, "reopened")
+			settings.SuperplaneLabelAdded = slices.Contains(actions, "labeled")
+			settings = githubManualTaskSettingsFromMetadata(trigger.Metadata, settings)
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -617,6 +627,9 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		ReopenedIssues:       proto.Bool(settings.ReopenedIssues),
 		SuperplaneLabelAdded: proto.Bool(settings.SuperplaneLabelAdded),
 	}
+	if source == models.FactoryIntakeSourceGitHubIssues {
+		serialized.GithubCreateIssueForManualTasks = proto.Bool(settings.GitHubCreateIssueForManualTasks)
+	}
 	if source == models.FactoryIntakeSourceJiraIssues {
 		serialized.JiraMoveOnComplete = proto.Bool(settings.JiraMoveOnComplete)
 		serialized.JiraCompletionColumn = settings.JiraCompletionColumn
@@ -664,6 +677,9 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	if requested.SuperplaneLabelAdded != nil {
 		updated.SuperplaneLabelAdded = requested.GetSuperplaneLabelAdded()
 	}
+	if requested.GithubCreateIssueForManualTasks != nil {
+		updated.GitHubCreateIssueForManualTasks = requested.GetGithubCreateIssueForManualTasks()
+	}
 	if requested.JiraMoveOnComplete != nil {
 		updated.JiraMoveOnComplete = requested.GetJiraMoveOnComplete()
 	}
@@ -707,6 +723,34 @@ func jiraCompletionMetadata(settings intakeSettings) map[string]any {
 		intakeMetadataJiraMoveOnComplete:   settings.JiraMoveOnComplete,
 		intakeMetadataJiraCompletionColumn: settings.JiraCompletionColumn,
 	}
+}
+
+func githubManualTaskSettingsFromMetadata(metadata map[string]any, settings intakeSettings) intakeSettings {
+	if metadata == nil {
+		return settings
+	}
+	if value, ok := metadata[intakeMetadataGitHubCreateIssueForManualTasks]; ok {
+		settings.GitHubCreateIssueForManualTasks = metadataBool(value, settings.GitHubCreateIssueForManualTasks)
+	}
+	return settings
+}
+
+func githubManualTaskMetadata(settings intakeSettings) map[string]any {
+	return map[string]any{
+		intakeMetadataGitHubCreateIssueForManualTasks: settings.GitHubCreateIssueForManualTasks,
+	}
+}
+
+func mergeGitHubManualTaskMetadata(metadata map[string]any, settings intakeSettings) map[string]any {
+	if metadata == nil {
+		metadata = map[string]any{}
+	} else {
+		metadata = maps.Clone(metadata)
+	}
+	for key, value := range githubManualTaskMetadata(settings) {
+		metadata[key] = value
+	}
+	return metadata
 }
 
 func mergeJiraCompletionMetadata(metadata map[string]any, settings intakeSettings) map[string]any {

@@ -19,7 +19,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
+func CreateWorkOrder(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	req *pb.CreateWorkOrderRequest,
+) (*pb.CreateWorkOrderResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
@@ -47,12 +52,27 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 
 	assigneeIDs := []uuid.UUID{createdByID}
+	origin, hasOrigin := manualTaskGitHubOrigin(ctx, deps, db, factory, title, req.GetDescription())
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
-		if err != nil {
-			return err
+		var created *models.FactoryWorkOrder
+		var createErr error
+		if hasOrigin {
+			created, createErr = factory.CreateWorkOrderWithOrigin(
+				tx,
+				title,
+				req.GetDescription(),
+				&createdByID,
+				assigneeIDs,
+				nil,
+				origin,
+			)
+		} else {
+			created, createErr = factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
+		}
+		if createErr != nil {
+			return createErr
 		}
 		order = created
 		result, bindErr := storedfiles.BindDescriptionFiles(

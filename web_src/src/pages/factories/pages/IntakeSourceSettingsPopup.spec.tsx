@@ -390,6 +390,26 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("maps the manual task issue checkbox to the API field", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({ onSave });
+
+    expect(screen.getByText(INTAKE_SETTINGS_COPY.createIssueForManualTasksHelp)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: INTAKE_SETTINGS_COPY.createIssueForManualTasks })).not.toBeChecked();
+
+    await user.click(screen.getByRole("checkbox", { name: INTAKE_SETTINGS_COPY.createIssueForManualTasks }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          githubCreateIssueForManualTasks: true,
+        }),
+      ),
+    );
+  });
+
   it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "hides connection, project, and pause controls for a %s intake",
     (sourceId) => {

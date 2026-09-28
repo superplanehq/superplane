@@ -1205,6 +1205,9 @@ message FactoryIntake {
     // Severities that still create a task. Empty means every severity.
     // Dependabot alert intakes only. Values: critical, high, medium, low.
     repeated string dependabot_severities = 17;
+    // When true, a task created by hand also opens a GitHub issue in this
+    // repository. GitHub issue intakes only. Off by default.
+    optional bool github_create_issue_for_manual_tasks = 18;
   }
 
   string id = 1;
