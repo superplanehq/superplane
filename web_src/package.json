@@ -26,6 +26,7 @@
     "format:check": "prettier --check --log-level warn '**/*.{ts,tsx}'"
   },
   "dependencies": {
+    "@base-ui/react": "^1.8.0",
     "@dash0/sdk-web": "^0.22.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
