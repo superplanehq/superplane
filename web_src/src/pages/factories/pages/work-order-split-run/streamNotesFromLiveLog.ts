@@ -54,18 +54,23 @@ function noteFromCommandSection(
   orderKey: number | undefined,
   section: CommandSection,
 ): SplitRunStreamLine {
+  const name = section.text.trim();
+  const preview = section.preview?.trim() ?? "";
+  const output =
+    section.kind === "prompt"
+      ? ""
+      : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n");
+  const command = preview && preview !== name ? preview : "";
+  const detail = [command, output].filter(Boolean).join("\n\n");
   return {
     id: stepId,
     nodeId,
     at: "",
     note: true,
     componentType: section.kind,
-    componentName: section.preview?.trim() || section.text,
+    componentName: name || preview,
     status: streamStatus(section.status),
-    detail:
-      section.kind === "prompt"
-        ? undefined
-        : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n"),
+    detail: detail || undefined,
     ...orderKeyProps(orderKey),
   };
 }

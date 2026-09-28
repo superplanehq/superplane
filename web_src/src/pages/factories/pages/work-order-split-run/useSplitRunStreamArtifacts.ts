@@ -9,6 +9,7 @@ const EMPTY_INDEX: StreamArtifactIndex = {
   byNodeName: new Map(),
   pullRequestsByNodeId: new Map(),
   pullRequestsByNodeName: new Map(),
+  byRunId: new Map(),
 };
 
 export function useSplitRunStreamArtifacts(

@@ -13,6 +13,7 @@ import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../__fixtures__/lineMetricsBoar
 import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import {
+  classicSplitRunFixture,
   collectSplitRunArtifacts,
   collectSplitRunPullRequests,
   defaultSplitRunPopupTab,
@@ -356,5 +357,21 @@ describe("splitRunPopupModel", () => {
     ]);
 
     expect(artifacts.map((artifact) => artifact.id)).toEqual(["older", "newer", "undated"]);
+  });
+});
+
+describe("classicSplitRunFixture", () => {
+  it("drops the console-only closure and history phases", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER);
+    expect(fixture.phases.some((phase) => phase.id === "done-closure")).toBe(true);
+
+    const classic = classicSplitRunFixture(fixture);
+
+    expect(classic.phases.some((phase) => phase.id === "done-closure")).toBe(false);
+    expect(classic.phases.some((phase) => phase.historyRun)).toBe(false);
+  });
+
+  it("returns the same fixture when nothing needs filtering", () => {
+    expect(classicSplitRunFixture(SPLIT_RUN_RUNNING)).toBe(SPLIT_RUN_RUNNING);
   });
 });

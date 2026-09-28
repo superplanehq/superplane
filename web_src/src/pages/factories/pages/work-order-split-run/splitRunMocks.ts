@@ -31,7 +31,6 @@ import {
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
   clarityScoreFromChecks,
-  CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   confidenceScoreFromChecks,
@@ -40,7 +39,11 @@ import {
   isScoreCheckName,
 } from "../../lib/confidenceScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import {
+  getWorkOrderDisplayStatus,
+  getWorkOrderDisplayStatusMeta,
+  type WorkOrderDisplayStatus,
+} from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import {
   parseWorkOrderMetric,
@@ -149,6 +152,8 @@ export interface SplitRunPhase {
   canvas?: SplitRunCanvasModel;
   /** Line step index used to rerun this automation. */
   stepIndex?: number;
+  /** Run from an earlier dispatch. Console run history; hidden in the classic tabs. */
+  historyRun?: boolean;
   /** Ledger cost for this phase, in USD cents. Hidden when zero. */
   costCents?: string;
   /** Ledger token count for this phase. Hidden when zero. */
@@ -158,10 +163,20 @@ export interface SplitRunPhase {
   /** Pull request and revision that started this activity. */
   pullRequestActivity?: {
     pullRequest?: FactoriesFactoryPullRequest;
-    revision?: FactoriesFactoryPullRequestRevision;
+    revision?: SplitRunRevision;
     startedAt?: string;
     waitingForAccess?: boolean;
   };
+}
+
+/**
+ * Pushed commit. The API sends only `sha` and `createdAt`; `message` is the
+ * commit subject and is not yet persisted by the backend.
+ */
+export interface SplitRunRevision extends FactoriesFactoryPullRequestRevision {
+  message?: string;
+  /** Automation that pushed this commit. Not yet persisted by the backend. */
+  pushedBy?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -381,7 +396,10 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
   const demoArtifacts = options?.demoArtifacts !== false;
-  const phases = phasesForOrder(order, executions, options, demoArtifacts);
+  const phases = [
+    ...phasesForOrder(order, executions, options, demoArtifacts),
+    ...closurePhaseForOrder(order, displayStatus, options?.closer),
+  ];
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
@@ -646,12 +664,86 @@ function phasesForOrder(
   demoArtifacts: boolean,
 ): SplitRunPhase[] {
   const apiChecks = options?.checks;
+  const prior = priorLineExecutions(order, options?.lineId, executions);
+  const peers = [...prior, ...executions];
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
+    ...prior.map((execution) => ({
+      ...executionToPhase(order, execution, apiChecks, demoArtifacts, peers),
+      historyRun: true,
+    })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
+}
+
+export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
+
+const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>(["completed", "rejected", "cancelled", "failed"]);
+
+/**
+ * The decision that closed the task, as a Done stage. Mirrors the
+ * creation stage in Backlog. The console shows it in Done when no
+ * closer automation run sits there.
+ */
+function closurePhaseForOrder(
+  order: FactoriesWorkOrder,
+  displayStatus: WorkOrderDisplayStatus,
+  closer?: { actor?: OrgUserDisplay; automationName?: string },
+): SplitRunPhase[] {
+  if (!CLOSED_DISPLAY_STATUSES.has(displayStatus)) {
+    return [];
+  }
+  const note = doneFooterForStatus(displayStatus, closer).note;
+  const sentence = note ? `${note.actor?.name ? `${note.actor.name} ` : ""}${note.headline}.` : undefined;
+  return [
+    {
+      id: SPLIT_RUN_CLOSURE_PHASE_ID,
+      name: "Done",
+      description: sentence,
+      status: closureStatus(displayStatus),
+      duration: "",
+      startedAt: order.updatedAt,
+      componentName: getWorkOrderDisplayStatusMeta(displayStatus).label,
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: null,
+    },
+  ];
+}
+
+function closureStatus(displayStatus: WorkOrderDisplayStatus): SplitRunPhaseStatus {
+  if (displayStatus === "completed") {
+    return "passed";
+  }
+  if (displayStatus === "cancelled") {
+    return "cancelled";
+  }
+  return "failed";
+}
+
+/**
+ * Executions from earlier dispatches of this line. A stop-and-rerun makes a
+ * new dispatch, so these are the earlier runs of the same steps. The console
+ * groups them with the current run as run history.
+ */
+function priorLineExecutions(
+  order: FactoriesWorkOrder,
+  lineId: string | null | undefined,
+  current: FactoriesWorkOrderExecution[],
+): FactoriesWorkOrderExecution[] {
+  const visible = visibleDispatchForLine(order, lineId);
+  if (!visible) {
+    return [];
+  }
+  const shown = new Set(current.map((execution) => execution.id));
+  return (order.lineDispatches ?? [])
+    .filter((dispatch) => dispatch.id !== visible.id && (!lineId || dispatch.line?.id === lineId))
+    .flatMap((dispatch) => dispatch.stepExecutions ?? [])
+    .filter((execution) => !shown.has(execution.id))
+    .sort((left, right) => (Date.parse(left.createdAt ?? "") || 0) - (Date.parse(right.createdAt ?? "") || 0));
 }
 
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
@@ -693,7 +785,8 @@ function analysisAttemptsToPhase(
 
   const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
   const durationRunning = latest.run.state === "STATE_STARTED";
-  const componentName = CONFIDENCE_CHECK_NAME;
+  // The card title is the Backlog automation. The score stays on the check.
+  const componentName = "Backlog";
   const latestDuration = analysisAttemptsDuration([latest], durationRunning);
   const line: SplitRunStreamLine = {
     id: latest.run.id ?? componentName,
@@ -1006,6 +1099,12 @@ const EXAMPLE_CONFIDENCE_BY_ORDER_ID: Record<string, number> = {
   "wo-board-done-canceled": 3,
 };
 
+/** Card title: the factory automation name, or the template label when the run has none. */
+function automationCardName(appName: string | undefined, fallback: string): string {
+  const name = appName?.trim();
+  return name || fallback;
+}
+
 function exampleConfidenceScore(order: FactoriesWorkOrder): number {
   if (order.id && EXAMPLE_CONFIDENCE_BY_ORDER_ID[order.id] != null) {
     return EXAMPLE_CONFIDENCE_BY_ORDER_ID[order.id];
@@ -1019,6 +1118,9 @@ function backlogSourcePhase(order: FactoriesWorkOrder): SplitRunPhase {
   if (automation) {
     return automationBacklogPhase(order, automation, description);
   }
+  if (order.origin?.url?.trim()) {
+    return importedBacklogPhase(order, description);
+  }
   return manualBacklogPhase(order, description);
 }
 
@@ -1028,15 +1130,17 @@ function automationBacklogPhase(
   description: FactoriesWorkOrderArtifact,
 ): SplitRunPhase {
   const app = { id: automation.appId, name: automation.appName };
-  const { name, componentName } = lineAutomationPresentation(app);
+  const presentation = lineAutomationPresentation(app);
+  const componentName = automation.appName?.trim() || presentation.componentName;
   const at = clockLabel(order.createdAt);
   return {
     id: "backlog",
-    name,
+    name: "Backlog",
     status: "passed",
     duration: "2s",
     startedAt: order.createdAt,
     componentName,
+    description: intakeCreationDescription(order),
     artifacts: [description],
     stream: [
       {
@@ -1059,12 +1163,73 @@ function automationBacklogPhase(
   };
 }
 
+function importedBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWorkOrderArtifact): SplitRunPhase {
+  const source = splitRunSourceForOrder(order);
+  if (source.kind !== "intake") {
+    return manualBacklogPhase(order, description);
+  }
+  const at = clockLabel(order.createdAt);
+  const sentence = importedSourceSentence(order, source.iconAlt, source.ticket);
+  return {
+    id: "backlog",
+    name: "Backlog",
+    description: sentence.markdown,
+    status: "passed",
+    duration: "2s",
+    startedAt: order.createdAt,
+    componentName: `Imported from ${source.iconAlt}`,
+    artifacts: [description],
+    stream: [
+      {
+        id: "backlog-imported",
+        at,
+        componentName: sentence.plain,
+        status: "passed",
+        duration: "2s",
+        artifact: description,
+        kind: "action",
+        componentType: "Create Task",
+        action: "passed",
+        iconSlug: "user",
+      },
+    ],
+    canvasSteps: [],
+    canvasKey: null,
+  };
+}
+
+function intakeCreationDescription(order: FactoriesWorkOrder): string {
+  const source = splitRunSourceForOrder(order);
+  const ticket = source.kind === "intake" ? source.ticket : undefined;
+  if (!ticket) {
+    return "Created this task.";
+  }
+  return `Created this task from [${ticket.label}](${ticket.href}).`;
+}
+
+function importedSourceSentence(
+  order: FactoriesWorkOrder,
+  product: string,
+  ticket?: { label: string; href: string },
+): { plain: string; markdown: string } {
+  const person = order.createdBy?.user?.name?.trim() || "A person";
+  if (!ticket) {
+    const text = `${person} imported this task from ${product}.`;
+    return { plain: text, markdown: text };
+  }
+  return {
+    plain: `${person} imported this task from ${ticket.label}.`,
+    markdown: `${person} imported this task from [${ticket.label}](${ticket.href}).`,
+  };
+}
+
 function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWorkOrderArtifact): SplitRunPhase {
   const at = clockLabel(order.createdAt);
   const line = draftSourceSentence(order);
   return {
     id: "backlog",
     name: "Backlog",
+    description: line,
     status: "passed",
     duration: "2s",
     startedAt: order.createdAt,
@@ -1117,7 +1282,9 @@ function executionToPhase(
   peers: FactoriesWorkOrderExecution[] = [],
 ): SplitRunPhase {
   const status = statusForExecution(execution);
-  const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
+  const presentation = lineAutomationPresentation(execution.run, execution.step);
+  const name = presentation.name;
+  const componentName = automationCardName(execution.run?.appName, presentation.componentName);
   const duration = durationForExecution(execution, status);
   const artifacts = demoArtifacts ? artifactsForLineExecution(order, execution) : [];
   const pullRequest = demoArtifacts ? pullRequestForLineExecution(order, execution) : undefined;
