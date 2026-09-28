@@ -6,6 +6,7 @@ import {
   hostedGitHubBindPath,
   hostedGitHubInstallRequested,
   hostedGitHubInstallRequestedAccount,
+  hostedGitHubInstallationDiscoveryActive,
   hostedGitHubInstallURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -121,6 +122,16 @@ describe("hosted GitHub URLs", () => {
     expect(hostedGitHubStartedByLogin({ startedByGitHubLogin: "forestileao" })).toBe("forestileao");
     expect(hostedGitHubStartedByLogin({})).toBe("");
     expect(hostedGitHubStartedByLogin(undefined)).toBe("");
+  });
+
+  it("reads active installation discovery", () => {
+    expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: true } })).toBe(true);
+    expect(hostedGitHubInstallationDiscoveryActive({ setupInstallationId: "22" })).toBe(true);
+    expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: true, complete: true } })).toBe(
+      false,
+    );
+    expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: false } })).toBe(false);
+    expect(hostedGitHubInstallationDiscoveryActive({})).toBe(false);
   });
 
   it("reads a pending GitHub install request", () => {
