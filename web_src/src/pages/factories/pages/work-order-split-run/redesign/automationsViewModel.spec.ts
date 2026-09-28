@@ -1,13 +1,17 @@
 import { describe, expect, it } from "bun:test";
 
 import { DRAFT_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
-import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../../__fixtures__/lineMetricsFactoriesFixture";
-import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks";
+import {
+  LINE_BOARD_DONE_RECEIPTS_ORDER,
+  LINE_BOARD_VERIFY_ENUM_ORDER,
+} from "../../../__fixtures__/lineMetricsFactoriesFixture";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunPhase } from "../splitRunMocks";
 import {
   allStages,
   isConsoleTaskStage,
   outcomeSummary,
   settleStoppedSteps,
+  stagesByConsoleColumn,
   stagesFromFixture,
   type AgentStep,
 } from "./automationsViewModel";
@@ -116,5 +120,52 @@ describe("Backlog column stages", () => {
       .map((stage) => stage.componentName);
 
     expect(names).toEqual(["GitHub issues", "Backlog"]);
+  });
+});
+
+function columnStageIds(fixture: ReturnType<typeof splitRunFixtureForWorkOrder>) {
+  const columns = stagesByConsoleColumn(stagesFromFixture(fixture));
+  return {
+    backlog: columns.backlog.map((stage) => stage.id),
+    implement: columns.implement.map((stage) => stage.id),
+    verify: columns.verify.map((stage) => stage.id),
+    done: columns.done.map((stage) => stage.id),
+  };
+}
+
+describe("console column placement", () => {
+  it("puts a Verify line step in Verify, not off the timeline", () => {
+    const ids = columnStageIds(splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER));
+
+    expect(ids.verify).toContain("verify-1");
+    expect(ids.implement).toContain("implement-0");
+  });
+
+  it("puts a Done line step in Done", () => {
+    const ids = columnStageIds(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER));
+
+    expect(ids.done).toContain("done-2");
+    expect(ids.verify).toContain("verify-1");
+  });
+
+  it("keeps a custom-named line step on the timeline", () => {
+    const qa: SplitRunPhase = {
+      id: "qa-custom",
+      name: "QA",
+      status: "passed",
+      duration: "1m",
+      componentName: "Quality Gate",
+      appId: "app-qa",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+    };
+    const fixture = {
+      ...SPLIT_RUN_RUNNING,
+      phases: [...SPLIT_RUN_RUNNING.phases, qa],
+    };
+    const ids = columnStageIds(fixture);
+
+    expect([...ids.backlog, ...ids.implement, ...ids.verify, ...ids.done]).toContain("qa-custom");
   });
 });

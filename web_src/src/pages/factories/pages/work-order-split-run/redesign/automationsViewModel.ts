@@ -12,6 +12,7 @@ import {
   type StreamNodeGroup,
 } from "../phaseLogStream";
 import {
+  SPLIT_RUN_CLOSURE_PHASE_ID,
   splitRunStatusLabel,
   type SplitRunFixture,
   type SplitRunPhase,
@@ -175,6 +176,49 @@ export function isConsoleTaskStage(stage: Pick<AutomationStage, "id" | "appId">)
 
 export function allStages(groups: AutomationStageGroups): AutomationStage[] {
   return [...groups.taskStages, ...groups.pullRequestGroups.flatMap((group) => group.stages)];
+}
+
+export type ConsoleColumnId = "backlog" | "implement" | "verify" | "done";
+
+/**
+ * Task stages sit in the column named after them. The creation stage
+ * sits in Backlog even when no automation ran. Pull request activity
+ * sits in Verify, except the runs of the automation that closed the
+ * task: those sit in Done. A custom step name still appears, in
+ * Implement, so the run does not drop off the timeline.
+ */
+export function consoleColumnIdForStage(stage: Pick<AutomationStage, "id" | "name">): ConsoleColumnId {
+  if (stage.id === SPLIT_RUN_CLOSURE_PHASE_ID || stage.name === "Done") {
+    return "done";
+  }
+  if (stage.name === "Verify") {
+    return "verify";
+  }
+  if (stage.name === "Backlog" || stage.name === "Analysis") {
+    return "backlog";
+  }
+  return "implement";
+}
+
+export function stagesByConsoleColumn(
+  groups: AutomationStageGroups,
+  closerAppId?: string,
+): Record<ConsoleColumnId, AutomationStage[]> {
+  const pullRequestStages = groups.pullRequestGroups.flatMap((group) => group.stages).filter((stage) => stage.appId);
+  const closedBy = (stage: AutomationStage) => Boolean(closerAppId) && stage.appId === closerAppId;
+  const columns: Record<ConsoleColumnId, AutomationStage[]> = {
+    backlog: [],
+    implement: [],
+    verify: [],
+    done: [],
+  };
+  for (const stage of groups.taskStages.filter(isConsoleTaskStage)) {
+    columns[consoleColumnIdForStage(stage)].push(stage);
+  }
+  for (const stage of pullRequestStages) {
+    columns[closedBy(stage) ? "done" : "verify"].push(stage);
+  }
+  return columns;
 }
 
 export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
