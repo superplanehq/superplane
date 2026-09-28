@@ -17,11 +17,7 @@ const (
 	IntegrationStatePending = "pending"
 	IntegrationStateReady   = "ready"
 	IntegrationStateError   = "error"
-
-	IntegrationStateDescriptionMaxLength = 1024
 )
-
-const truncatedStateDescriptionSuffix = "..."
 
 type Integration struct {
 	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -65,11 +61,6 @@ type CapabilityState struct {
 
 func (a *Integration) TableName() string {
 	return "app_installations"
-}
-
-func (a *Integration) SetErrorState(description string) {
-	a.State = IntegrationStateError
-	a.StateDescription = truncateIntegrationStateDescription(description)
 }
 
 type IntegrationSecret struct {
@@ -633,14 +624,4 @@ func ListSentryIntegrationsByInstallationUUID(tx *gorm.DB, installationUUID stri
 		return nil, err
 	}
 	return integrations, nil
-}
-
-func truncateIntegrationStateDescription(description string) string {
-	runes := []rune(description)
-	if len(runes) <= IntegrationStateDescriptionMaxLength {
-		return description
-	}
-
-	limit := IntegrationStateDescriptionMaxLength - len([]rune(truncatedStateDescriptionSuffix))
-	return string(runes[:limit]) + truncatedStateDescriptionSuffix
 }

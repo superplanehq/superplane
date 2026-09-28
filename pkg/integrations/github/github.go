@@ -53,12 +53,14 @@ To complete the GitHub app setup:
 `
 
 	hostedInstallDescription = `
-	Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
-	`
-	hostedInstallationDiscoveryInterval    = time.Minute
-	installRequestResolutionGracePeriod    = 2 * time.Minute
-	installRequestFollowUpDiscoveryPeriod  = 2 * hostedInstallationDiscoveryInterval
-	setupInstallationVisibilityGracePeriod = 2 * time.Minute
+Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
+`
+
+	hostedOAuthDescription = `
+Authorize SuperPlane to list GitHub accounts where the SuperPlane GitHub App is already installed.
+
+If no account has the App, GitHub will ask you to install it.
+`
 )
 
 func init() {
@@ -224,9 +226,17 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
-		if err := g.refreshHostedSetup(ctx, app, &existing); err != nil {
-			g.clearHostedPendingAction(ctx, existing)
-			return err
+		// A member can request an installation without the request callback
+		// reaching this server, so a known GitHub login is enough to ask
+		// GitHub for that member's open install requests.
+		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
+			// Adopt records the requested account it found on GitHub and
+			// moves an approved installation into the account picker;
+			// refreshHostedPendingAction below persists both.
+			if err := g.adoptRequestedInstallation(ctx, app, &existing); err != nil {
+				// The connection stays pending; the next sync retries.
+				ctx.Logger.Errorf("failed to adopt requested GitHub App installation: %v", err)
+			}
 		}
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
@@ -242,7 +252,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 		startedBy = existing.StartedByUserID
 	}
 
-	metadata := common.Metadata{
+	g.refreshHostedPendingAction(ctx, app, common.Metadata{
 		State:           state,
 		HostedApp:       true,
 		StartedByUserID: startedBy,
@@ -251,494 +261,34 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 			ID:   app.ID,
 			Slug: app.Slug,
 		},
-	}
-	if err := g.refreshHostedSetup(ctx, app, &metadata); err != nil {
-		g.clearHostedPendingAction(ctx, metadata)
-		return err
-	}
-	g.refreshHostedPendingAction(ctx, app, metadata)
+	})
+
 	return nil
-}
-
-type hostedInstallRequestDiscovery struct {
-	accounts []string
-	fallback bool
-}
-
-func (d hostedInstallRequestDiscovery) required() bool {
-	return d.fallback || len(d.accounts) > 0
-}
-
-func (g *GitHub) refreshHostedSetup(
-	ctx core.SyncContext,
-	app common.HostedApp,
-	metadata *common.Metadata,
-) error {
-	refreshHostedStarterIdentity(ctx, metadata)
-
-	discoveryPerformed := false
-	if metadata.SetupInstallationID != "" {
-		discoveryPerformed = true
-		if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {
-			return err
-		}
-	}
-
-	now := time.Now().UTC()
-	if installRequestFollowUpDiscoveryActive(*metadata, now) &&
-		len(metadata.InstallRequestDiscoveryAccounts) == 0 {
-		ensureHostedInstallRequestFallback(metadata, now)
-	}
-	requestDiscovery := g.refreshHostedInstallRequests(ctx, app, metadata)
-	if installRequestFollowUpDiscoveryActive(*metadata, now) {
-		if len(requestDiscovery.accounts) == 0 {
-			requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
-		}
-	}
-	requestDiscovery.fallback = requestDiscovery.fallback ||
-		requiresHostedInstallRequestFallback(*metadata, now)
-	if requestDiscovery.required() {
-		discoveryPerformed = true
-		if err := g.refreshHostedRequestedInstallations(ctx, app, metadata, requestDiscovery); err != nil {
-			return err
-		}
-		if metadata.HasInstallRequests() {
-			g.refreshHostedInstallRequests(ctx, app, metadata)
-		}
-	}
-
-	if discoveryPerformed || metadata.HasInstallRequests() {
-		return nil
-	}
-	if metadata.InstallationID != "" {
-		return nil
-	}
-	return g.refreshHostedInitialInstallations(ctx, app, metadata)
-}
-
-func refreshHostedStarterIdentity(ctx core.SyncContext, metadata *common.Metadata) {
-	requestContext := ctx.Context
-	if requestContext == nil {
-		requestContext = context.Background()
-	}
-	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
-	if err == nil {
-		metadata.StartedByGitHubLogin = identity.Login
-	}
-}
-
-func (g *GitHub) refreshHostedInstallRequests(
-	ctx core.SyncContext,
-	app common.HostedApp,
-	metadata *common.Metadata,
-) hostedInstallRequestDiscovery {
-	// A member can request an installation without the request callback
-	// reaching this server, so a known GitHub login is enough to ask GitHub for
-	// that member's open install requests. The first call also records the local
-	// development baseline before the browser opens GitHub.
-	if !metadata.HasInstallRequests() && strings.TrimSpace(metadata.StartedByGitHubLogin) == "" {
-		return hostedInstallRequestDiscovery{}
-	}
-
-	discovery, err := g.reconcileInstallRequests(ctx, app, metadata)
-	if err != nil {
-		// The connection stays pending; the next sync retries.
-		if ctx.Logger != nil {
-			ctx.Logger.Errorf("failed to reconcile GitHub App install requests: %v", err)
-		}
-		return hostedInstallRequestDiscovery{}
-	}
-
-	return discovery
-}
-
-func (g *GitHub) refreshHostedAccessibleInstallations(
-	ctx core.SyncContext,
-	app common.HostedApp,
-	metadata *common.Metadata,
-) error {
-	now := time.Now().UTC()
-	targetID := strings.TrimSpace(metadata.SetupInstallationID)
-	if targetID != "" {
-		ensureSetupInstallationReceivedAt(metadata, now)
-	}
-	if targetID == "" && !requiresHostedInstallationDiscovery(*metadata, now) {
-		return nil
-	}
-
-	requestContext := ctx.Context
-	if requestContext == nil {
-		requestContext = context.Background()
-	}
-	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
-	if err != nil {
-		return nil
-	}
-	metadata.StartedByGitHubLogin = identity.Login
-
-	mode := "full"
-	candidateCount := -1
-	var installations []common.PendingInstallation
-	if targetID != "" {
-		mode = "callback"
-		candidateCount = 1
-		installations, err = discoverAccessibleInstallationByID(
-			requestContext,
-			ctx.Integration,
-			app,
-			*identity,
-			targetID,
-			nil,
-		)
-	} else {
-		installations, err = discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
-	}
-	logHostedDiscovery(ctx, mode, candidateCount, len(installations), err, now)
-	if err != nil {
-		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
-		if targetID != "" && githubErrorIsNotFound(err) {
-			if setupInstallationVisibilityPending(*metadata, now) {
-				metadata.InstallationsRefreshedAt = ""
-				return nil
-			}
-			clearSetupInstallation(metadata)
-			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
-			return nil
-		}
-		if ctx.Logger != nil {
-			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
-		}
-		if targetID != "" || len(metadata.PendingInstallations) == 0 {
-			metadata.InstallationsRefreshedAt = ""
-			return fmt.Errorf("failed to discover GitHub App installations: %w", err)
-		}
-		metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
-		return nil
-	}
-	if targetID != "" {
-		if len(installations) == 0 {
-			if setupInstallationVisibilityPending(*metadata, now) {
-				metadata.InstallationsRefreshedAt = ""
-				return nil
-			}
-			clearSetupInstallation(metadata)
-			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
-			return nil
-		}
-		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
-		clearSetupInstallation(metadata)
-	} else {
-		metadata.SetPendingInstallations(installations)
-	}
-	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
-	return nil
-}
-
-func ensureSetupInstallationReceivedAt(metadata *common.Metadata, now time.Time) {
-	if _, err := time.Parse(time.RFC3339Nano, metadata.SetupInstallationReceivedAt); err == nil {
-		return
-	}
-	metadata.SetupInstallationReceivedAt = now.Format(time.RFC3339Nano)
-}
-
-func setupInstallationVisibilityPending(metadata common.Metadata, now time.Time) bool {
-	receivedAt, err := time.Parse(time.RFC3339Nano, metadata.SetupInstallationReceivedAt)
-	return err == nil && now.Before(receivedAt.Add(setupInstallationVisibilityGracePeriod))
-}
-
-func clearSetupInstallation(metadata *common.Metadata) {
-	metadata.SetupInstallationID = ""
-	metadata.SetupInstallationReceivedAt = ""
-}
-
-func (g *GitHub) refreshHostedRequestedInstallations(
-	ctx core.SyncContext,
-	app common.HostedApp,
-	metadata *common.Metadata,
-	discovery hostedInstallRequestDiscovery,
-) error {
-	requestContext := ctx.Context
-	if requestContext == nil {
-		requestContext = context.Background()
-	}
-	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
-	if err != nil {
-		return nil
-	}
-	metadata.StartedByGitHubLogin = identity.Login
-
-	startedAt := time.Now().UTC()
-	mode := "approval"
-	candidateCount := len(discovery.accounts)
-	installations := []common.PendingInstallation{}
-	failures := []error{}
-	var fallbackErr error
-	if len(discovery.accounts) > 0 {
-		requested, discoveryErr := discoverAccessibleInstallationsByAccount(
-			requestContext,
-			ctx.Integration,
-			app,
-			*identity,
-			discovery.accounts,
-		)
-		installations = append(installations, requested...)
-		if discoveryErr != nil {
-			failures = append(failures, discoveryErr)
-		}
-	}
-	if discovery.fallback {
-		mode = "approval_fallback"
-		if len(discovery.accounts) > 0 {
-			mode = "approval_and_fallback"
-		}
-		if metadata.InstallRequestFallbackPage > 0 {
-			candidateCount += hostedInstallRequestFallbackPageSize
-			since, parseErr := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackSince)
-			if parseErr != nil {
-				fallbackErr = fmt.Errorf("parse GitHub App fallback time: %w", parseErr)
-			} else {
-				var recent []common.PendingInstallation
-				var retries []common.PendingInstallation
-				var nextPage int
-				recent, retries, nextPage, fallbackErr = discoverAccessibleRecentInstallations(
-					requestContext,
-					ctx.Integration,
-					app,
-					*identity,
-					since,
-					metadata.InstallRequestFallbackPage,
-				)
-				installations = append(installations, recent...)
-				if nextPage >= 0 {
-					addHostedInstallRequestFallbackRetries(metadata, retries)
-					advanceHostedInstallRequestFallback(metadata, nextPage, startedAt)
-				}
-			}
-		} else {
-			retryCount := min(len(metadata.InstallRequestFallbackRetries), hostedInstallRequestFallbackPageSize)
-			candidateCount += retryCount
-			retryBatch := slices.Clone(metadata.InstallRequestFallbackRetries[:retryCount])
-			remaining := slices.Clone(metadata.InstallRequestFallbackRetries[retryCount:])
-			var retried []common.PendingInstallation
-			var retries []common.PendingInstallation
-			retried, retries, fallbackErr = verifyAccessibleInstallationsWithFailures(
-				requestContext,
-				ctx.Integration,
-				app,
-				*identity,
-				retryBatch,
-				nil,
-			)
-			installations = append(installations, retried...)
-			metadata.InstallRequestFallbackRetries = remaining
-			addHostedInstallRequestFallbackRetries(metadata, retries)
-			if len(metadata.InstallRequestFallbackRetries) == 0 {
-				completeHostedInstallRequestFallback(metadata, startedAt)
-			}
-		}
-	}
-	err = summarizeHostedDiscoveryErrors(failures)
-	logErr := err
-	if fallbackErr != nil {
-		logErr = summarizeHostedDiscoveryErrors([]error{err, fallbackErr})
-	}
-	logHostedDiscovery(ctx, mode, candidateCount, len(installations), logErr, startedAt)
-	metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
-	if err != nil {
-		return fmt.Errorf("failed to discover requested GitHub App installations: %w", err)
-	}
-	if !metadata.HasInstallRequests() && requestedAccountsAreVerified(metadata.PendingInstallations, discovery.accounts) {
-		metadata.InstallRequestDiscoveryAccounts = nil
-		if !hostedInstallRequestFallbackScanIncomplete(*metadata) {
-			metadata.InstallRequestDiscoveryUntil = ""
-		}
-	}
-	if !metadata.HasInstallRequests() &&
-		!installRequestFollowUpDiscoveryActive(*metadata, startedAt) &&
-		!hostedInstallRequestFallbackScanIncomplete(*metadata) {
-		clearHostedInstallRequestDiscovery(metadata)
-	}
-	return nil
-}
-
-func requestedAccountsAreVerified(installations []common.PendingInstallation, accounts []string) bool {
-	if len(accounts) == 0 {
-		return false
-	}
-	for _, account := range accounts {
-		if !slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
-			return strings.EqualFold(account, installation.AccountLogin) && len(installation.Repositories) > 0
-		}) {
-			return false
-		}
-	}
-	return true
-}
-
-func logHostedDiscovery(
-	ctx core.SyncContext,
-	mode string,
-	candidateCount int,
-	verifiedCount int,
-	err error,
-	startedAt time.Time,
-) {
-	if ctx.Logger == nil {
-		return
-	}
-	entry := ctx.Logger.
-		WithField("discovery_mode", mode).
-		WithField("verified_count", verifiedCount).
-		WithField("duration", time.Since(startedAt))
-	if candidateCount >= 0 {
-		entry = entry.WithField("candidate_count", candidateCount)
-	}
-	if err != nil {
-		entry.WithError(err).Warn("GitHub App installation discovery completed with failures")
-		return
-	}
-	entry.Info("GitHub App installation discovery completed")
-}
-
-func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation) []common.PendingInstallation {
-	merged := slices.Clone(refreshed)
-	for _, installation := range existing {
-		if slices.ContainsFunc(merged, func(candidate common.PendingInstallation) bool {
-			return candidate.ID == installation.ID
-		}) {
-			continue
-		}
-		merged = append(merged, installation)
-	}
-	return merged
-}
-
-func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time) bool {
-	if metadata.InstallationID != "" && !metadata.HasInstallRequests() && !installRequestFollowUpDiscoveryActive(metadata, now) {
-		return false
-	}
-
-	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallationsRefreshedAt)
-	if err != nil {
-		return true
-	}
-	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
-}
-
-func installRequestFollowUpDiscoveryActive(metadata common.Metadata, now time.Time) bool {
-	discoverUntil, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestDiscoveryUntil)
-	return err == nil && now.Before(discoverUntil)
-}
-
-func requiresHostedInstallRequestFallback(metadata common.Metadata, now time.Time) bool {
-	if hostedInstallRequestFallbackScanIncomplete(metadata) {
-		return true
-	}
-	if metadata.InstallRequestFallbackPage <= 0 ||
-		!installRequestFollowUpDiscoveryActive(metadata, now) {
-		return false
-	}
-	if metadata.InstallRequestFallbackPage > 1 {
-		return true
-	}
-	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackRefreshedAt)
-	if err != nil {
-		return true
-	}
-	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
-}
-
-func ensureHostedInstallRequestFallback(metadata *common.Metadata, now time.Time) {
-	if metadata.InstallRequestFallbackPage > 0 || len(metadata.InstallRequestFallbackRetries) > 0 {
-		return
-	}
-
-	since := now.Add(-installRequestResolutionGracePeriod - installRequestFollowUpDiscoveryPeriod)
-	discoverUntil, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestDiscoveryUntil)
-	if err == nil {
-		since = discoverUntil.Add(-installRequestFollowUpDiscoveryPeriod - installRequestResolutionGracePeriod)
-	}
-	metadata.InstallRequestFallbackSince = since.Format(time.RFC3339Nano)
-	metadata.InstallRequestFallbackPage = 1
-	metadata.InstallRequestFallbackRefreshedAt = ""
-}
-
-func advanceHostedInstallRequestFallback(metadata *common.Metadata, nextPage int, now time.Time) {
-	if nextPage > 0 {
-		metadata.InstallRequestFallbackPage = nextPage
-		return
-	}
-
-	if len(metadata.InstallRequestFallbackRetries) > 0 {
-		metadata.InstallRequestFallbackPage = 0
-		return
-	}
-	completeHostedInstallRequestFallback(metadata, now)
-}
-
-func completeHostedInstallRequestFallback(metadata *common.Metadata, now time.Time) {
-	metadata.InstallRequestFallbackPage = 1
-	metadata.InstallRequestFallbackRefreshedAt = now.Format(time.RFC3339Nano)
-}
-
-func hostedInstallRequestFallbackScanIncomplete(metadata common.Metadata) bool {
-	if len(metadata.InstallRequestFallbackRetries) > 0 || metadata.InstallRequestFallbackPage > 1 {
-		return true
-	}
-	return metadata.InstallRequestFallbackPage == 1 && metadata.InstallRequestFallbackRefreshedAt == ""
-}
-
-func addHostedInstallRequestFallbackRetries(
-	metadata *common.Metadata,
-	additional []common.PendingInstallation,
-) {
-	for _, installation := range additional {
-		if slices.ContainsFunc(metadata.InstallRequestFallbackRetries, func(candidate common.PendingInstallation) bool {
-			return candidate.ID == installation.ID
-		}) {
-			continue
-		}
-		metadata.InstallRequestFallbackRetries = append(metadata.InstallRequestFallbackRetries, installation)
-	}
-}
-
-func clearHostedInstallRequestDiscovery(metadata *common.Metadata) {
-	metadata.InstallRequestDiscoveryUntil = ""
-	metadata.InstallRequestDiscoveryAccounts = nil
-	metadata.InstallRequestFallbackSince = ""
-	metadata.InstallRequestFallbackPage = 0
-	metadata.InstallRequestFallbackRetries = nil
-	metadata.InstallRequestFallbackRefreshedAt = ""
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
+	// The OAuth callback removes the browser action once installations load,
+	// so the connect screen keeps the authorize URL from metadata to ask
+	// again which GitHub account to use.
+	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
+	if oauthEnabled {
+		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	}
 	if metadata.InstallationID != "" {
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
 
 	if len(metadata.PendingInstallations) >= 1 {
-		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
-	if hostedInitialDiscoveryActive(metadata) {
-		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.SetMetadata(metadata)
-		return
-	}
-	if metadata.SetupInstallationID != "" {
-		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.SetMetadata(metadata)
-		return
-	}
+
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
-	if metadata.StartedByGitHubLogin == "" {
-		if identityURL := hostedIdentityConnectURL(ctx.BaseURL, metadata.SetupReturnPath); identityURL != "" {
-			actionURL = identityURL
-			description = "Confirm your GitHub identity before choosing repositories"
-		}
+	if oauthEnabled {
+		actionURL = metadata.AuthorizeURL
+		description = hostedOAuthDescription
 	}
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
@@ -749,14 +299,14 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 	ctx.Integration.SetMetadata(metadata)
 }
 
-func (g *GitHub) clearHostedPendingAction(ctx core.SyncContext, metadata common.Metadata) {
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.SetMetadata(metadata)
-}
-
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	if strings.HasSuffix(ctx.Request.URL.Path, "/redirect") {
 		g.afterAppCreation(ctx)
+		return
+	}
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "/oauth/callback") {
+		g.afterHostedAppOAuth(ctx)
 		return
 	}
 
@@ -916,13 +466,23 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 
 		metadata.InstallationID = ""
 		metadata.Repositories = []common.Repository{}
-		metadata.RepositoryScoped = false
 		metadata.State = state
 		metadata.PendingInstallations = slices.DeleteFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
 			return installation.ID == installationID
 		})
+		metadata.AuthorizeURL = ""
+
 		actionURL := common.HostedAppInstallURL(metadata.GitHubApp.Slug, state)
 		actionDescription := appInstallationDescription
+		if app, ok := common.HostedAppFromEnv(); metadata.HostedApp && ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
+			metadata.AuthorizeURL = common.HostedAppAuthorizeURL(
+				app.ClientID,
+				common.HostedAppOAuthCallbackURL(ctx.BaseURL),
+				state,
+			)
+			actionURL = metadata.AuthorizeURL
+			actionDescription = hostedOAuthDescription
+		}
 
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
@@ -1026,14 +586,14 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		return
 	}
 
-	client, err := newInstallationClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	repos, err := listInstallationRepos(context.Background(), client)
+	repos, err := listInstallationRepositories(context.Background(), client)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -1053,19 +613,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		metadata.Owner = resolveInstallationOwner(context.Background(), appClient, metadata.InstallationID, repos)
 	}
 
-	if metadata.RepositoryScoped {
-		if len(metadata.SelectedRepositories) == 0 {
-			metadata.SelectedRepositories = slices.Clone(metadata.Repositories)
-		}
-		metadata.Repositories = retainInstalledRepositories(metadata.SelectedRepositories, repos)
-		if len(metadata.Repositories) == 0 {
-			ctx.Integration.Error("No authorized repositories remain in the GitHub App installation")
-		} else {
-			ctx.Integration.Ready()
-		}
-	} else {
-		metadata.Repositories = repos
-	}
+	metadata.Repositories = repos
 	ctx.Integration.SetMetadata(metadata)
 }
 
@@ -1399,41 +947,11 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
 
-	// GitHub documents installation_id on the setup callback as spoofable.
-	// Hosted connections use the state only for navigation, then rediscover
-	// installations with the App credential and verify repository access for
-	// the linked GitHub identity before binding.
-	if metadata.HostedApp {
-		if state == "" || state != metadata.State {
-			http.Error(ctx.Response, "invalid state", http.StatusBadRequest)
-			return
-		}
-		if isInstallationRequestSetupAction(setupAction) {
-			persistInstallRequested(ctx)
-			redirectToIntegrationSettingsRequested(ctx)
-			return
-		}
-		if !isPendingInstallationSetupAction(setupAction) {
-			http.Error(ctx.Response, "invalid setup action", http.StatusBadRequest)
-			return
-		}
-		parsedInstallationID, err := strconv.ParseInt(installationID, 10, 64)
-		if err != nil || parsedInstallationID <= 0 {
-			http.Error(ctx.Response, "invalid installation ID", http.StatusBadRequest)
-			return
-		}
-		metadata.SetupInstallationID = installationID
-		metadata.SetupInstallationReceivedAt = time.Now().UTC().Format(time.RFC3339Nano)
-		metadata.InstallationsRefreshedAt = ""
-		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.SetMetadata(metadata)
-		redirectToIntegrationSettingsCompleted(ctx)
-		return
-	}
-
 	//
-	// App installation has already been set up. Every later callback redirects
-	// to the SuperPlane integration page. Hosted callbacks returned above.
+	// App installation has already been set up. A hosted connection with a
+	// valid state accepts an install on another account (the onboarding
+	// picker offers it); every other callback redirects to the SuperPlane
+	// app installation page.
 	//
 	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
@@ -1469,6 +987,22 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	if !isPendingInstallationSetupAction(setupAction) {
 		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
 		redirectToIntegrationSettings(ctx)
+		return
+	}
+
+	if metadata.HostedApp && !metadata.AllowsPendingInstallation(installationID) {
+		app, ok := common.HostedAppFromEnv()
+		if ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
+			http.Redirect(
+				ctx.Response,
+				ctx.Request,
+				common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State),
+				http.StatusSeeOther,
+			)
+			return
+		}
+		ctx.Logger.Errorf("installation %s is not in the pending allowlist", installationID)
+		http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
 		return
 	}
 
@@ -1576,11 +1110,9 @@ func persistInstallRequested(ctx core.HTTPRequestContext) {
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	requests := metadata.CurrentInstallRequests()
 	requests = append(requests, common.InstallRequest{
-		AccountLogin:       requestedInstallAccount(ctx),
-		RequesterLogin:     metadata.StartedByGitHubLogin,
-		CreatedAt:          time.Now().UTC().Format(time.RFC3339Nano),
-		ExistingRequestIDs: slices.Clone(metadata.ObservedInstallRequestIDs),
-		BaselineCaptured:   metadata.InstallRequestBaselineCaptured,
+		AccountLogin:   requestedInstallAccount(ctx),
+		RequesterLogin: metadata.StartedByGitHubLogin,
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339Nano),
 	})
 	metadata.SetInstallRequests(requests)
 	ctx.Integration.SetMetadata(metadata)
@@ -1624,11 +1156,6 @@ func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
 	if metadata.InstallRequestedAccount != "" {
 		query += "&githubOrg=" + url.QueryEscape(metadata.InstallRequestedAccount)
 	}
-	redirectToIntegrationSettingsURL(ctx, query)
-}
-
-func redirectToIntegrationSettingsCompleted(ctx core.HTTPRequestContext) {
-	query := "githubSetup=complete&githubIntegrationId=" + url.QueryEscape(ctx.Integration.ID().String())
 	redirectToIntegrationSettingsURL(ctx, query)
 }
 
