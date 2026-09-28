@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { FilesFile } from "@/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,16 +6,16 @@ import { useWorkOrder } from "@/hooks/useFactoryData";
 
 import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
-import { runningSplitRunPhaseId } from "./followLogScroll";
+import { phasesWithRunArtifacts } from "./attachStreamArtifacts";
+import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
+import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { splitRunStatusLabel, type SplitRunFixture } from "./splitRunMocks";
 import { hasActivePullRequestActivity, refinePopupShowsAutomations, type SplitRunPopupTab } from "./splitRunPopupModel";
 import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
-import { useFollowLogScroll } from "./useFollowLogScroll";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import type { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
-import { WorkOrderSplitRunBody } from "./WorkOrderSplitRunBody";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 type SplitRunPopupTabsProps = {
@@ -123,10 +123,6 @@ export function SplitRunPopupTabs({
 }: SplitRunPopupTabsProps) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const files = liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined;
-  const [streamTick, setStreamTick] = useState("");
-  const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
-    resumeOnBottom: true,
-  });
   const description = (
     <SplitRunPopupOverview
       fixture={fixture}
@@ -144,6 +140,11 @@ export function SplitRunPopupTabs({
       sourceOnly={sourceOnly}
     />
   );
+  const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
+  const consoleFixture = useMemo(() => {
+    const phases = phasesWithRunArtifacts(fixture.phases, artifactIndex);
+    return phases === fixture.phases ? fixture : { ...fixture, phases };
+  }, [artifactIndex, fixture]);
   const showAutomations = refinePopupShowsAutomations({ footerKind: fixture.footer.kind, sourceOnly });
   const lookupErrorNote = sessionLookupErrorNote(sessionLookupError);
   if (!showAutomations) {
@@ -183,20 +184,18 @@ export function SplitRunPopupTabs({
         forceMount
         className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
       >
-        <WorkOrderSplitRunBody
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          orderId={orderId}
-          orderNumber={orderNumber}
-          lineId={lineId}
-          fixture={fixture}
-          canUpdate={canUpdate}
-          footerActions={footerActions}
-          follow={follow}
-          onStreamTick={setStreamTick}
-          files={files}
-        />
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-4">
+          <AutomationsConsoleVariant
+            fixture={consoleFixture}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+            lineId={lineId}
+            canStopRun={Boolean(canUpdate && organizationId && factoryId && orderId)}
+            actionBusy={footerActions.busy}
+            onStopRun={(run) => void footerActions.handleStopAutomation(run)}
+          />
+        </div>
       </TabsContent>
     </Tabs>
   );

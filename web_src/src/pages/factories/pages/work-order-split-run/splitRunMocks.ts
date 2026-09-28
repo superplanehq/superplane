@@ -31,7 +31,6 @@ import {
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
   clarityScoreFromChecks,
-  CONFIDENCE_CHECK_NAME,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   confidenceScoreFromChecks,
@@ -703,7 +702,8 @@ function analysisAttemptsToPhase(
 
   const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
   const durationRunning = latest.run.state === "STATE_STARTED";
-  const componentName = CONFIDENCE_CHECK_NAME;
+  // The card title is the Backlog automation. The score stays on the check.
+  const componentName = "Backlog";
   const latestDuration = analysisAttemptsDuration([latest], durationRunning);
   const line: SplitRunStreamLine = {
     id: latest.run.id ?? componentName,
@@ -1016,6 +1016,12 @@ const EXAMPLE_CONFIDENCE_BY_ORDER_ID: Record<string, number> = {
   "wo-board-done-canceled": 3,
 };
 
+/** Card title: the factory automation name, or the template label when the run has none. */
+function automationCardName(appName: string | undefined, fallback: string): string {
+  const name = appName?.trim();
+  return name || fallback;
+}
+
 function exampleConfidenceScore(order: FactoriesWorkOrder): number {
   if (order.id && EXAMPLE_CONFIDENCE_BY_ORDER_ID[order.id] != null) {
     return EXAMPLE_CONFIDENCE_BY_ORDER_ID[order.id];
@@ -1029,6 +1035,9 @@ function backlogSourcePhase(order: FactoriesWorkOrder): SplitRunPhase {
   if (automation) {
     return automationBacklogPhase(order, automation, description);
   }
+  if (order.origin?.url?.trim()) {
+    return importedBacklogPhase(order, description);
+  }
   return manualBacklogPhase(order, description);
 }
 
@@ -1038,15 +1047,17 @@ function automationBacklogPhase(
   description: FactoriesWorkOrderArtifact,
 ): SplitRunPhase {
   const app = { id: automation.appId, name: automation.appName };
-  const { name, componentName } = lineAutomationPresentation(app);
+  const presentation = lineAutomationPresentation(app);
+  const componentName = automation.appName?.trim() || presentation.componentName;
   const at = clockLabel(order.createdAt);
   return {
     id: "backlog",
-    name,
+    name: "Backlog",
     status: "passed",
     duration: "2s",
     startedAt: order.createdAt,
     componentName,
+    description: intakeCreationDescription(order),
     artifacts: [description],
     stream: [
       {
@@ -1069,12 +1080,73 @@ function automationBacklogPhase(
   };
 }
 
+function importedBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWorkOrderArtifact): SplitRunPhase {
+  const source = splitRunSourceForOrder(order);
+  if (source.kind !== "intake") {
+    return manualBacklogPhase(order, description);
+  }
+  const at = clockLabel(order.createdAt);
+  const sentence = importedSourceSentence(order, source.iconAlt, source.ticket);
+  return {
+    id: "backlog",
+    name: "Backlog",
+    description: sentence.markdown,
+    status: "passed",
+    duration: "2s",
+    startedAt: order.createdAt,
+    componentName: `Imported from ${source.iconAlt}`,
+    artifacts: [description],
+    stream: [
+      {
+        id: "backlog-imported",
+        at,
+        componentName: sentence.plain,
+        status: "passed",
+        duration: "2s",
+        artifact: description,
+        kind: "action",
+        componentType: "Create Task",
+        action: "passed",
+        iconSlug: "user",
+      },
+    ],
+    canvasSteps: [],
+    canvasKey: null,
+  };
+}
+
+function intakeCreationDescription(order: FactoriesWorkOrder): string {
+  const source = splitRunSourceForOrder(order);
+  const ticket = source.kind === "intake" ? source.ticket : undefined;
+  if (!ticket) {
+    return "Created this task.";
+  }
+  return `Created this task from [${ticket.label}](${ticket.href}).`;
+}
+
+function importedSourceSentence(
+  order: FactoriesWorkOrder,
+  product: string,
+  ticket?: { label: string; href: string },
+): { plain: string; markdown: string } {
+  const person = order.createdBy?.user?.name?.trim() || "A person";
+  if (!ticket) {
+    const text = `${person} imported this task from ${product}.`;
+    return { plain: text, markdown: text };
+  }
+  return {
+    plain: `${person} imported this task from ${ticket.label}.`,
+    markdown: `${person} imported this task from [${ticket.label}](${ticket.href}).`,
+  };
+}
+
 function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWorkOrderArtifact): SplitRunPhase {
   const at = clockLabel(order.createdAt);
   const line = draftSourceSentence(order);
   return {
     id: "backlog",
     name: "Backlog",
+    description: line,
     status: "passed",
     duration: "2s",
     startedAt: order.createdAt,
@@ -1127,7 +1199,9 @@ function executionToPhase(
   peers: FactoriesWorkOrderExecution[] = [],
 ): SplitRunPhase {
   const status = statusForExecution(execution);
-  const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
+  const presentation = lineAutomationPresentation(execution.run, execution.step);
+  const name = presentation.name;
+  const componentName = automationCardName(execution.run?.appName, presentation.componentName);
   const duration = durationForExecution(execution, status);
   const artifacts = demoArtifacts ? artifactsForLineExecution(order, execution) : [];
   const pullRequest = demoArtifacts ? pullRequestForLineExecution(order, execution) : undefined;

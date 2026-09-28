@@ -10,45 +10,99 @@ import {
   TimelineTitle,
 } from "@/components/reui/timeline";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/reui/badge";
+import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
-import { ChevronRight, CircleX, ExternalLink, History, RotateCw } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import {
+  ChevronRight,
+  CircleX,
+  Download,
+  ExternalLink,
+  FileText,
+  GitBranch,
+  CircleStop,
+  History,
+  Link2,
+  Maximize2,
+  RotateCw,
+} from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { OrgUserReference } from "../../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../../WorkOrderPullRequestInline";
-import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
-import { SplitRunCheckPills } from "../SplitRunReview";
-import type { SplitRunFixture } from "../splitRunMocks";
-import { splitRunLinkedArtifacts } from "../splitRunPopupModel";
-import { AgentStepList } from "./AgentStepList";
+import { formatCheckScore, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import {
-  activeAgentStep,
-  activeStepProgress,
+  extractArtifactContentType,
+  extractArtifactFilename,
+  extractArtifactMarkdownBody,
+  extractArtifactName,
+  extractArtifactTitle,
+  extractArtifactUrl,
+  toArtifactDataRecord,
+  branchTreeUrl,
+} from "../../../lib/workOrderArtifact";
+import { WorkOrderMarkdownArtifactDialog } from "../../../WorkOrderMarkdownArtifactDialog";
+import { fileArtifactIcon } from "../../../WorkOrderArtifactInline";
+import { SplitRunCheckPills } from "../SplitRunReview";
+import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "../splitRunMocks";
+import { splitRunLinkedArtifacts, splitRunPhaseRunHref } from "../splitRunPopupModel";
+import { AgentStepList } from "./AgentStepList";
+import { LiveAgentSteps } from "./LiveAgentSteps";
+import {
+  outputCountLabel,
   runFooterLine,
   runMetaLine,
-  runResultLine,
   showDescriptionInBody,
+  stepOutputSummary,
 } from "./consoleCardText";
-import { allStages, outcomeSummary, stagesFromFixture, type AutomationStage } from "./automationsViewModel";
+import {
+  allStages,
+  isConsoleTaskStage,
+  outcomeSummary,
+  stagesFromFixture,
+  type AutomationStage,
+} from "./automationsViewModel";
 import { META_TEXT_CLASSNAME, formatClock } from "./redesignFormat";
-import { StageStatusGlyph, ToolKindIcon } from "./redesignShared";
+import { StageStatusGlyph } from "./redesignShared";
 
 /**
  * Variant B: automation console. Backlog, Implement, Verify, and Done sit
  * on a timeline. Each card is the latest run of one automation, seen
- * through its agent: the header carries status, a one-line outcome, and
- * this run's spend; the body carries what the run produced (passed) or
- * what the agent does now (running); the footer carries start time,
- * model, and the way into the runs drawer. Canvas nodes are not shown on
- * this tab. Columns the task has not reached read "Not started". A sticky
- * Frame holds the task status, spend, checks, and outputs.
+ * through its agent. The header carries status and this run's spend. The
+ * body is the same marker list on a finished run and on a running one. A
+ * running step is the live row. The footer carries start time, model, and
+ * the way into the runs drawer. Canvas nodes are not shown on this tab.
+ * Columns the task has not reached read "Not started". A sticky Frame
+ * holds the task status, spend, checks, and outputs.
  */
-export function AutomationsConsoleVariant({ fixture }: { fixture: SplitRunFixture }) {
+export function AutomationsConsoleVariant({
+  fixture,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  lineId,
+  canStopRun = false,
+  actionBusy = false,
+  onStopRun,
+}: {
+  fixture: SplitRunFixture;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
+  /** True when this person can cancel a live canvas run. */
+  canStopRun?: boolean;
+  actionBusy?: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+}) {
   const outcome = outcomeSummary(fixture);
   const groups = stagesFromFixture(fixture);
   const stages = allStages(groups);
@@ -79,6 +133,14 @@ export function AutomationsConsoleVariant({ fixture }: { fixture: SplitRunFixtur
                     <ConsoleAutomationCard
                       key={automation.id}
                       automation={automation}
+                      phase={fixture.phases.find((phase) => phase.id === automation.latest.id)}
+                      organizationId={organizationId}
+                      factoryKey={factoryKey}
+                      orderNumber={orderNumber}
+                      lineId={lineId}
+                      canStopRun={canStopRun}
+                      actionBusy={actionBusy}
+                      onStopRun={onStopRun}
                       onOpen={() => setOpenAutomation(automation)}
                     />
                   ))
@@ -120,12 +182,13 @@ interface ConsoleColumn {
 }
 
 /**
- * Only automation runs make cards. Task stages sit in the column named
- * after them. Pull request activity sits in Verify, except the runs of
- * the automation that closed the task: those sit in Done.
+ * Task stages sit in the column named after them. The creation stage
+ * sits in Backlog even when no automation ran. Pull request activity
+ * sits in Verify, except the runs of the automation that closed the
+ * task: those sit in Done.
  */
 function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
-  const pullRequestStages = groups.pullRequestGroups.flatMap((group) => group.stages).filter(isAutomationRun);
+  const pullRequestStages = groups.pullRequestGroups.flatMap((group) => group.stages).filter((stage) => stage.appId);
   const closedBy = (stage: AutomationStage) => Boolean(closerAppId) && stage.appId === closerAppId;
   return CONSOLE_COLUMNS.map((column) => {
     const stages =
@@ -134,14 +197,10 @@ function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppI
         : column.id === "done"
           ? pullRequestStages.filter(closedBy)
           : groups.taskStages
-              .filter(isAutomationRun)
+              .filter(isConsoleTaskStage)
               .filter((stage) => (column.names as readonly string[]).includes(stage.name));
     return { id: column.id, title: column.title, automations: automationsFromStages(stages) };
   });
-}
-
-function isAutomationRun(stage: AutomationStage): boolean {
-  return Boolean(stage.appId);
 }
 
 /** Timeline steps to fill: through the last column that has a run. */
@@ -151,28 +210,70 @@ function reachedColumns(columns: ConsoleColumn[]): number {
 }
 
 function automationsFromStages(stages: AutomationStage[]): ConsoleAutomation[] {
-  const byName = new Map<string, AutomationStage[]>();
+  const byKey = new Map<string, AutomationStage[]>();
   for (const stage of stages) {
-    const runs = byName.get(stage.componentName) ?? [];
+    const key = stage.appId || stage.componentName;
+    const runs = byKey.get(key) ?? [];
     runs.push(stage);
-    byName.set(stage.componentName, runs);
+    byKey.set(key, runs);
   }
-  return [...byName.entries()].map(([componentName, runs]) => {
+  return [...byKey.entries()].map(([key, runs]) => {
     const newestFirst = [...runs].sort(
       (left, right) => Date.parse(right.startedAt ?? "") - Date.parse(left.startedAt ?? ""),
     );
+    const name = newestFirst[0]?.componentName ?? key;
     return {
-      id: componentName.toLowerCase().replace(/\W+/g, "-"),
-      name: componentName,
+      id: automationDomId(name, key),
+      name,
       latest: newestFirst[0],
       runs: newestFirst,
     };
   });
 }
 
-function ConsoleAutomationCard({ automation, onOpen }: { automation: ConsoleAutomation; onOpen: () => void }) {
+function automationDomId(name: string, key: string): string {
+  const slug = `${name}-${key}`.toLowerCase().replace(/\W+/g, "-").replace(/^-|-$/g, "");
+  return slug || "automation";
+}
+
+function ConsoleAutomationCard({
+  automation,
+  phase,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  lineId,
+  canStopRun,
+  actionBusy,
+  onStopRun,
+  onOpen,
+}: {
+  automation: ConsoleAutomation;
+  phase?: SplitRunPhase;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
+  canStopRun: boolean;
+  actionBusy: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+  onOpen: () => void;
+}) {
   const { latest } = automation;
-  const finished = latest.status === "passed";
+  const stopping = useStopRequested(latest.status, actionBusy);
+  const shownStatus: SplitRunPhaseStatus = stopping.active && latest.status === "running" ? "cancelled" : latest.status;
+  const shownPhase = phase && shownStatus !== phase.status ? { ...phase, status: shownStatus } : phase;
+  const finished = shownStatus === "passed" || shownStatus === "cancelled";
+  const runHref = shownPhase
+    ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: shownPhase })
+    : undefined;
+  const stopRun =
+    canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
+      ? () => {
+          stopping.request();
+          onStopRun({ appId: shownPhase.appId ?? "", runId: shownPhase.runId ?? "" });
+        }
+      : undefined;
   return (
     <Frame
       variant="default"
@@ -183,23 +284,37 @@ function ConsoleAutomationCard({ automation, onOpen }: { automation: ConsoleAuto
       data-testid={`redesign-console-automation-${automation.id}`}
     >
       <Collapsible defaultOpen={!finished} className="group/collapsible">
-        <CollapsibleTrigger className="flex w-full min-w-0" aria-label={`Toggle ${automation.name} details`}>
-          <FrameHeader className="flex min-w-0 grow flex-row items-center gap-2 py-2">
-            <StageStatusGlyph status={latest.status} />
+        <FrameHeader className="flex min-w-0 flex-row items-center gap-2 py-2">
+          <CollapsibleTrigger
+            className="flex min-w-0 shrink-0 items-center gap-2"
+            aria-label={`Toggle ${automation.name} details`}
+          >
+            <StageStatusGlyph status={shownStatus} />
             <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
-            <span className={cn(META_TEXT_CLASSNAME, "min-w-0 flex-1 truncate text-left")}>
-              {runResultLine(latest)}
-            </span>
-            <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{runMetaLine(latest)}</span>
+          </CollapsibleTrigger>
+          <StepOutputCounts stage={latest} />
+          <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{runMetaLine(latest)}</span>
+          {stopRun ? <StageStopButton onStop={stopRun} /> : null}
+          {runHref ? <ViewRunLink href={runHref} /> : null}
+          <CollapsibleTrigger
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            tabIndex={-1}
+            aria-hidden
+          >
             <ChevronRight
-              className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+              className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
               aria-hidden
             />
-          </FrameHeader>
-        </CollapsibleTrigger>
+          </CollapsibleTrigger>
+        </FrameHeader>
         <CollapsibleContent>
           <FramePanel className="space-y-3">
-            <AutomationCardBody automation={automation} onOpen={onOpen} />
+            <AutomationCardBody
+              automation={automation}
+              phase={shownPhase}
+              organizationId={organizationId}
+              onOpen={onOpen}
+            />
           </FramePanel>
         </CollapsibleContent>
       </Collapsible>
@@ -207,10 +322,348 @@ function ConsoleAutomationCard({ automation, onOpen }: { automation: ConsoleAuto
   );
 }
 
-function AutomationCardBody({ automation, onOpen }: { automation: ConsoleAutomation; onOpen: () => void }) {
+const HEADER_ICON_BUTTON =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground";
+
+function useStopRequested(status: SplitRunPhaseStatus, actionBusy: boolean) {
+  const [stopping, setStopping] = useState(false);
+  const sawBusy = useRef(false);
+  useEffect(() => {
+    if (status !== "running") {
+      sawBusy.current = false;
+      setStopping(false);
+      return;
+    }
+    if (actionBusy) {
+      sawBusy.current = true;
+      return;
+    }
+    if (sawBusy.current) {
+      sawBusy.current = false;
+      setStopping(false);
+    }
+  }, [actionBusy, status]);
+  return { active: stopping, request: () => setStopping(true) };
+}
+
+function StageStopButton({ onStop }: { onStop: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label="Stop" onClick={onStop} className={HEADER_ICON_BUTTON}>
+          <CircleStop className="size-3.5" aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Stop</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ViewRunLink({ href }: { href: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link href={href} aria-label="View run" className={HEADER_ICON_BUTTON}>
+          <Maximize2 className="size-3.5" aria-hidden />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="top">View run</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function StepOutputCounts({ stage }: { stage: AutomationStage }) {
+  const summary = stepOutputSummary(stage);
+  if (summary.artifactCount === 0 && summary.checkCount === 0) {
+    return null;
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      {summary.artifactCount > 0 ? (
+        <OutputCountHover
+          stageId={stage.id}
+          kind="artifacts"
+          label={outputCountLabel(summary.artifactCount, "artifact", "artifacts")}
+        >
+          <div className="flex flex-col gap-2">
+            {stage.outputs.artifacts.map((artifact) => (
+              <ArtifactChip key={artifact.id} artifact={artifact} />
+            ))}
+          </div>
+        </OutputCountHover>
+      ) : null}
+      {summary.checkCount > 0 ? (
+        <OutputCountHover
+          stageId={stage.id}
+          kind="checks"
+          label={outputCountLabel(summary.checkCount, "check", "checks")}
+        >
+          <div className="flex flex-col gap-2">
+            {stage.checks.map((check) => (
+              <CheckBadgeRow key={check.id} check={check} />
+            ))}
+          </div>
+        </OutputCountHover>
+      ) : null}
+    </div>
+  );
+}
+
+function OutputCountHover({
+  stageId,
+  kind,
+  label,
+  children,
+}: {
+  stageId: string;
+  kind: "artifacts" | "checks";
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <HoverCard openDelay={0} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <button type="button" data-testid={`redesign-console-${kind}-trigger-${stageId}`}>
+          <Badge variant="outline" className="h-5 px-1.5 text-[12px] font-normal">
+            {label}
+          </Badge>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        className="w-auto max-w-sm p-3"
+        data-testid={`redesign-console-${kind}-hover-${stageId}`}
+      >
+        {children}
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+function ArtifactChip({ artifact }: { artifact: AutomationStage["outputs"]["artifacts"][number] }) {
+  const kind = artifact.type.replace(/^TYPE_/i, "").toLowerCase();
+  if (kind === "markdown") {
+    return <MarkdownArtifactChip artifact={artifact} />;
+  }
+  if (kind === "branch") {
+    return <BranchArtifactChip artifact={artifact} />;
+  }
+  if (kind === "link") {
+    return <LinkArtifactChip artifact={artifact} />;
+  }
+  return <FileArtifactChip artifact={artifact} />;
+}
+
+function FileArtifactChip({ artifact }: { artifact: AutomationStage["outputs"]["artifacts"][number] }) {
+  const data = toArtifactDataRecord(artifact.data);
+  const name = extractArtifactFilename(data) ?? extractArtifactName(data) ?? extractArtifactTitle(data) ?? "File";
+  const size = typeof data?.size === "string" ? data.size : undefined;
+  const url = safeExternalUrl(extractArtifactUrl(data));
+  const Icon = fileArtifactIcon(extractArtifactContentType(data));
+  return (
+    <ArtifactActionGroup
+      icon={<Icon aria-hidden />}
+      name={name}
+      size={size}
+      openHref={url}
+      openLabel={`Open ${name}`}
+      downloadHref={url}
+      downloadName={name}
+    />
+  );
+}
+
+function MarkdownArtifactChip({ artifact }: { artifact: AutomationStage["outputs"]["artifacts"][number] }) {
+  const data = toArtifactDataRecord(artifact.data);
+  const name = extractArtifactTitle(data) ?? extractArtifactName(data) ?? "Note";
+  const size = typeof data?.size === "string" ? data.size : undefined;
+  const body = extractArtifactMarkdownBody(data) ?? "";
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ArtifactActionGroup
+        icon={<FileText aria-hidden />}
+        name={name}
+        size={size}
+        onOpen={() => setOpen(true)}
+        openLabel={`Open ${name}`}
+        onDownload={() => downloadTextFile(name.endsWith(".md") ? name : `${name}.md`, body)}
+        downloadName={name}
+      />
+      <WorkOrderMarkdownArtifactDialog open={open} onClose={() => setOpen(false)} title={name} body={body} />
+    </>
+  );
+}
+
+function BranchArtifactChip({ artifact }: { artifact: AutomationStage["outputs"]["artifacts"][number] }) {
+  const data = toArtifactDataRecord(artifact.data);
+  const name = extractArtifactName(data) ?? extractArtifactTitle(data) ?? "Branch";
+  const href = safeExternalUrl(extractArtifactUrl(data) ?? branchTreeUrl(data));
+  return <SingleOpenChip icon={<GitBranch aria-hidden />} name={name} href={href} />;
+}
+
+function LinkArtifactChip({ artifact }: { artifact: AutomationStage["outputs"]["artifacts"][number] }) {
+  const data = toArtifactDataRecord(artifact.data);
+  const name = extractArtifactTitle(data) ?? extractArtifactName(data) ?? extractArtifactUrl(data) ?? "Link";
+  const href = safeExternalUrl(extractArtifactUrl(data));
+  return <SingleOpenChip icon={<Link2 aria-hidden />} name={name} href={href} />;
+}
+
+function SingleOpenChip({ icon, name, href }: { icon: ReactNode; name: string; href?: string }) {
+  const label = (
+    <>
+      {icon}
+      {name}
+    </>
+  );
+  if (!href) {
+    return (
+      <Button type="button" variant="outline" size="sm" className={FILE_CHIP_BUTTON}>
+        {label}
+      </Button>
+    );
+  }
+  return (
+    <Button type="button" variant="outline" size="sm" className={FILE_CHIP_BUTTON} asChild>
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {label}
+      </a>
+    </Button>
+  );
+}
+
+const CHIP_GROUP =
+  "[&>*:first-child]:rounded-l-md! [&>*:last-child]:rounded-r-md! [&>*:not(:first-child)]:rounded-l-none! [&>*:not(:last-child)]:rounded-r-none!";
+
+const FILE_CHIP_BUTTON =
+  "h-7 gap-1.5 rounded-md px-2 text-xs font-normal shadow-none [&_svg]:size-3.5 dark:bg-background dark:hover:bg-accent";
+
+function ArtifactActionGroup({
+  icon,
+  name,
+  size,
+  openHref,
+  onOpen,
+  openLabel,
+  downloadHref,
+  downloadName,
+  onDownload,
+}: {
+  icon: ReactNode;
+  name: string;
+  size?: string;
+  openHref?: string;
+  onOpen?: () => void;
+  openLabel: string;
+  downloadHref?: string;
+  downloadName: string;
+  onDownload?: () => void;
+}) {
+  const label = (
+    <>
+      {icon}
+      {name}
+      {size ? <span className="opacity-60">({size})</span> : null}
+    </>
+  );
+  return (
+    <ButtonGroup className={CHIP_GROUP}>
+      {openHref ? (
+        <Button type="button" variant="outline" size="sm" className={FILE_CHIP_BUTTON} asChild>
+          <a href={openHref} target="_blank" rel="noopener noreferrer" aria-label={openLabel}>
+            {label}
+          </a>
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={FILE_CHIP_BUTTON}
+          onClick={onOpen}
+          aria-label={openLabel}
+        >
+          {label}
+        </Button>
+      )}
+      {downloadHref || onDownload ? (
+        downloadHref ? (
+          <Button type="button" variant="outline" size="icon-xs" className={cn(FILE_CHIP_BUTTON, "w-7 px-0")} asChild>
+            <a href={downloadHref} download={downloadName} aria-label={`Download ${downloadName}`}>
+              <Download aria-hidden />
+            </a>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            className={cn(FILE_CHIP_BUTTON, "w-7 px-0")}
+            aria-label={`Download ${downloadName}`}
+            onClick={onDownload}
+          >
+            <Download aria-hidden />
+          </Button>
+        )
+      ) : null}
+    </ButtonGroup>
+  );
+}
+
+function downloadTextFile(filename: string, body: string) {
+  const url = URL.createObjectURL(new Blob([body], { type: "text/markdown" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+const CHECK_BADGE: Record<
+  WorkOrderCheckPresentation["level"],
+  { variant: BadgeProps["variant"]; dotClassName: string }
+> = {
+  positive: { variant: "success-light", dotClassName: "bg-success" },
+  neutral: { variant: "secondary", dotClassName: "bg-muted-foreground" },
+  caution: { variant: "warning-light", dotClassName: "bg-warning" },
+  critical: { variant: "destructive-light", dotClassName: "bg-destructive" },
+};
+
+function CheckBadgeRow({ check }: { check: WorkOrderCheckPresentation }) {
+  const tone = CHECK_BADGE[check.level];
+  const score = formatCheckScore(check);
+  const scoreLabel = `${score.value}${score.scale}`;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge variant={tone.variant}>{check.name}</Badge>
+      {scoreLabel ? <DotBadge label={scoreLabel} dotClassName={tone.dotClassName} /> : null}
+    </div>
+  );
+}
+
+/** Status dot from the timeline-2 block. */
+function DotBadge({ label, dotClassName }: { label: string; dotClassName: string }) {
+  return (
+    <Badge variant="outline" className="gap-1.5">
+      <span className={cn("size-1.5 rounded-full", dotClassName)} aria-hidden />
+      {label}
+    </Badge>
+  );
+}
+
+function AutomationCardBody({
+  automation,
+  phase,
+  organizationId,
+  onOpen,
+}: {
+  automation: ConsoleAutomation;
+  phase?: SplitRunPhase;
+  organizationId?: string;
+  onOpen: () => void;
+}) {
   const { latest, runs } = automation;
   const failed = latest.status === "failed" || latest.status === "cancelled";
-  const running = latest.status === "running";
   const pullRequest = latest.outputs.pullRequests[0];
   const hasOutputs = Boolean(pullRequest) || latest.outputs.artifacts.length > 0;
   const showDescription = showDescriptionInBody(latest);
@@ -221,18 +674,26 @@ function AutomationCardBody({ automation, onOpen }: { automation: ConsoleAutomat
           <MarkdownContent content={latest.description ?? ""} variant="workspace" />
         </div>
       ) : null}
-      {running ? <LiveActivity stage={latest} /> : null}
-      {hasOutputs ? (
-        <div className="flex flex-col gap-1.5" data-testid={`redesign-console-outputs-${automation.id}`}>
+      <LiveAgentSteps stage={latest} phase={phase} organizationId={organizationId} />
+      {hasOutputs || latest.checks.length > 0 ? (
+        <div className="flex flex-col gap-2" data-testid={`redesign-console-outputs-${automation.id}`}>
           {pullRequest ? (
             <WorkOrderPullRequestInline pullRequest={pullRequest} showTitle className="text-[12px]" />
           ) : null}
-          {latest.outputs.artifacts.map((artifact) => (
-            <WorkOrderArtifactInline
-              key={artifact.id}
-              artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
-            />
-          ))}
+          {latest.outputs.artifacts.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {latest.outputs.artifacts.map((artifact) => (
+                <ArtifactChip key={artifact.id} artifact={artifact} />
+              ))}
+            </div>
+          ) : null}
+          {latest.checks.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {latest.checks.map((check) => (
+                <CheckBadgeRow key={check.id} check={check} />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {failed ? (
@@ -250,60 +711,19 @@ function AutomationCardBody({ automation, onOpen }: { automation: ConsoleAutomat
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
         <span className={META_TEXT_CLASSNAME}>{runFooterLine(latest)}</span>
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onOpen}>
-          {runs.length === 1 ? (
-            "Open run"
-          ) : (
-            <>
-              <History className="size-3.5" aria-hidden />
-              View {runs.length} runs
-            </>
-          )}
-        </Button>
+        {latest.appId ? (
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onOpen}>
+            {runs.length === 1 ? (
+              "Open run"
+            ) : (
+              <>
+                <History className="size-3.5" aria-hidden />
+                View {runs.length} runs
+              </>
+            )}
+          </Button>
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-const LIVE_TAIL_LENGTH = 3;
-
-/**
- * What the agent does right now: its active step, the last thing it said,
- * and its last few tool calls. Only events that already happened; the
- * canvas branches, so nothing after the current node is known. Canvas
- * nodes are not shown; the canvas run page has those. The full transcript
- * stays in the runs drawer.
- */
-function LiveActivity({ stage }: { stage: AutomationStage }) {
-  const active = activeAgentStep(stage);
-  if (!active) {
-    return null;
-  }
-  const lastNote = [...active.events].reverse().find((event) => event.kind === "note");
-  const tools = active.events.flatMap((event) => (event.kind === "tools" ? event.tools : []));
-  const tail = tools.slice(-LIVE_TAIL_LENGTH);
-  return (
-    <div className="flex flex-col gap-1.5" data-testid={`redesign-console-live-${stage.id}`}>
-      <div className="flex items-center gap-2">
-        <StageStatusGlyph status="running" className="size-3.5" />
-        <span className="text-[13px] font-medium text-foreground">{active.title}</span>
-        <span className={META_TEXT_CLASSNAME}>{activeStepProgress(active)}</span>
-      </div>
-      {lastNote?.kind === "note" ? (
-        <p className="line-clamp-2 text-[12.5px] leading-5 text-foreground/90">{lastNote.text}</p>
-      ) : null}
-      {tail.length > 0 ? (
-        <ul className="flex flex-col gap-1 border-l border-border/70 pl-3">
-          {tail.map((tool) => (
-            <li key={tool.id} className="flex min-w-0 items-center gap-2">
-              <ToolKindIcon type={tool.type} />
-              <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground/90" title={tool.name}>
-                {tool.name}
-              </code>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
