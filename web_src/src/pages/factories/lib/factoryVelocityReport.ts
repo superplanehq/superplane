@@ -195,6 +195,62 @@ function sharePct(part: number, whole: number): number {
   return Math.round((part / whole) * 100);
 }
 
+interface SharePart {
+  index: number;
+  value: number;
+  floor: number;
+  /** Leftover after the floor, scaled by the total so equal parts stay equal. */
+  remainder: number;
+}
+
+/**
+ * Whole-number shares of 100. Uses the largest-remainder method so the shares
+ * add up to 100 whenever the total is positive.
+ */
+export function roundedShares(values: number[]): number[] {
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) {
+    return values.map(() => 0);
+  }
+
+  const parts = values.map((value, index) => sharePart(value, total, index));
+  const shares = parts.map((part) => part.floor);
+  const remaining = 100 - shares.reduce((sum, share) => sum + share, 0);
+  const byRemainder = [...parts].sort(compareShareRemainder);
+
+  for (let point = 0; point < remaining; point += 1) {
+    shares[byRemainder[point].index] += 1;
+  }
+
+  return shares;
+}
+
+function sharePart(value: number, total: number, index: number): SharePart {
+  const scaled = value * 100;
+  const floor = Math.floor(scaled / total);
+
+  return { index, value, floor, remainder: scaled - floor * total };
+}
+
+/** Largest fractional part first. A tie prefers the larger count, then the earlier index. */
+function compareShareRemainder(left: SharePart, right: SharePart): number {
+  if (left.remainder !== right.remainder) {
+    return right.remainder - left.remainder;
+  }
+  if (left.value !== right.value) {
+    return right.value - left.value;
+  }
+  return left.index - right.index;
+}
+
+/** Legend name with its period share, or the plain name when the period is empty. */
+export function velocityLegendLabel(label: string, share: number | undefined): string {
+  if (share === undefined) {
+    return label;
+  }
+  return `${label} (${share}%)`;
+}
+
 function toTotals(totals: FactoriesDescribeFactoryVelocityTotals | undefined): VelocityTotals {
   const superplaneMerged = totals?.superplaneMerged ?? 0;
   const peopleMerged = totals?.peopleMerged ?? 0;
