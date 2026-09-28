@@ -2,9 +2,9 @@
 name: superplane-new-intake
 description: >-
   Use when adding a new factory intake source, such as Linear, Notion, or
-  Datadog. Ask which source, then collect the product decisions and API facts
-  required before implementation. Covers trigger, binding, seed, search,
-  settings, and the Backlog Add intake flow.
+  Datadog. Ask which source, then collect branding, the existing integration,
+  delete-intake behavior, the task-card source, and the other facts required
+  before implementation.
 ---
 
 # New factory intake
@@ -34,6 +34,12 @@ Tell the human what already exists, in two or three sentences. Then walk the
 checklist. Skip a question when the repo already answers it, and say the fact
 you will use.
 
+An intake needs an integration. Most external services already have one under
+`pkg/integrations/<name>/` and have no factory intake yet. Reuse that
+integration. Do not build a second client inside the intake code. When no
+integration exists, stop. Collect what the integration needs, and build the
+integration before the intake. The intake cannot ship alone.
+
 PagerDuty is not a finished intake. It has a source enum and a canvas
 template, and it is not in the Add intake picker. Do not copy it as the
 pattern for a new source.
@@ -62,6 +68,10 @@ second way to register a source.
 
 Required before any code:
 
+- Integration to reuse, or confirmation that you will build the integration first
+- Branding: product name, icon file, and whether the logo is one color
+- Task-card source: display name, icon, site host, and ticket label
+- Delete intake is included. It removes the intake only. It does not remove the integration.
 - Events that create a task
 - One task per what (one issue, one package, one alert)
 - Title fields, body fields, and the browse URL field
@@ -75,10 +85,72 @@ You may propose, and the human confirms:
 
 - Source id, kebab-case, such as `linear-issues`
 - Picker name and one-sentence description
-- Pause, resume, and delete (default: yes, same as current intakes)
-- Icon (reuse the integration icon when one exists)
+- Pause and resume (default: yes, same as current intakes)
 
 ## Checklist
+
+These four are required for every intake. Do not treat them as optional.
+
+### Branding
+
+Find the mark before you ask the human to supply one.
+
+- Icon: `web_src/src/assets/icons/integrations/<name>.svg`. Linear already has
+  `linear.svg`. Notion has `notion.svg`. Datadog has `datadog.svg`.
+- Use that same file in the Add intake picker, intake settings, and the task
+  card. Do not use a letter glyph when an icon exists.
+- When no icon exists, ask the human for an SVG. Do not draw a new logo.
+- Product name, as the human writes it (Linear, Jira, Sentry).
+- `isMonochromeSourceLogo` in `splitRunSource.ts` is true only for one-color
+  marks (GitHub, SuperPlane). Ask when you cannot tell from the file.
+
+### Delete intake
+
+Every new source gets **Delete intake** in intake settings. Deleting an
+intake removes that intake and soft-deletes its canvas. Tasks that the intake
+already created stay. The integration installation stays. Do not delete the
+connection, its credentials, or webhooks that another canvas still uses.
+
+`DeleteFactoryIntake` in `pkg/grpc/actions/factories/delete_factory_intake.go`
+already does this. The new source only needs `intakeSupportsDelete` in
+`web_src/src/pages/factories/pages/intakeSourceSettingsModel.ts` to return
+true. PagerDuty returns false. Do not copy that.
+
+Keep the existing delete copy. It says SuperPlane stops new items and removes
+the intake from Backlog. It does not say the integration is removed.
+
+### Task card source
+
+A task from this intake shows the source on the card, the same way a GitHub
+task, a Sentry task, or a manually created task does. A missing registration
+falls through to GitHub, because `intakeKindFromLabel` defaults to
+`github-issues`.
+
+Register the source in
+`web_src/src/pages/factories/pages/work-order-split-run/splitRunSource.ts`:
+
+- Add the id to `SplitRunIntakeKind` and `INTAKE_PRESENTATION` (name, icon,
+  alt text).
+- Match the browse-URL host in `intakeKindFromHref`. Linear uses `linear.app`.
+- Add a hint in `INTAKE_KIND_HINTS` when the canvas name identifies the source.
+- Format the ticket chip in `sourceTicketLabel` when the default
+  `org#id` label is wrong. GitHub uses `owner/repo#n`. Jira uses the issue
+  key. Sentry uses the issue title.
+
+The card reads `workOrderCardSource` in
+`web_src/src/pages/factories/lib/workOrderCardSource.ts`. The work-order
+filter reads `INTAKE_PRESENTATION` in `workOrderFilterOptions.ts`. Store a
+browse URL on the work order (`OriginFromIntakePayload` in
+`pkg/models/factory_work_order_origin.go`) or the card shows **Created
+manually**.
+
+### Integration
+
+State which integration the intake uses. When `pkg/integrations/<name>/`
+exists, name the trigger you will reuse and continue the checklist. When it
+does not exist, the next work is the integration, not the intake. Follow
+`docs/contributing/component-implementations.md`. Come back to this skill
+after the trigger can emit an event.
 
 ### 1. What becomes a task
 
@@ -175,10 +247,11 @@ either unless the human says yes.
 
 ## Confirm, then implement
 
-Repeat the answers as a short spec. Include the trigger component, source id,
-events, title, body, origin URL, resource key, filters, seed cap, feature
-flag, and write-back. Ask the human to confirm. Start code only after they
-confirm.
+Repeat the answers as a short spec. Include the integration, icon file,
+task-card name and host, trigger component, source id, events, title, body,
+origin URL, resource key, filters, seed cap, feature flag, and write-back.
+Say that delete removes the intake and keeps the integration. Ask the human
+to confirm. Start code only after they confirm.
 
 Generated files stay gitignored. Edit `protos/factories.proto`, then run
 `make pb.gen`. Do not hand-edit `pkg/protos/`, `web_src/src/api-client/`, or
@@ -247,17 +320,20 @@ example payload, and update `docs/components/<Name>.mdx`. Follow
   map, listen and evaluate copy.
 - `web_src/src/pages/factories/pages/lineIntakeCanvas.ts`.
 - `web_src/src/pages/factories/pages/intakeSourceSettingsModel.ts`: settings,
-  pause, and delete.
+  pause, and `intakeSupportsDelete` (must return true).
 - `web_src/src/pages/factories/pages/IntakeSourceSettingsPopup.tsx` and a
   filter-fields component for this source.
 - Setup wizard, page, copy, and route. Wire the picker in `LinesPage.tsx`.
   Add the path in `web_src/src/pages/factories/lib/factoryPagePaths.ts` and
   the route in `web_src/src/App.tsx`. Export the page from
   `web_src/src/pages/factories/index.ts`.
-- `web_src/src/pages/factories/pages/work-order-split-run/splitRunSource.ts`
-  when task cards should show this source.
-- Icon in `web_src/src/assets/icons/integrations/` when the integration has
-  none.
+- `web_src/src/pages/factories/pages/work-order-split-run/splitRunSource.ts`:
+  presentation, host match, and ticket label. Cover it in
+  `splitRunSource.spec.ts`. A task with this origin URL must not render as
+  GitHub or as **Created manually**.
+- The same icon in the picker, settings, and the task card. Add an SVG under
+  `web_src/src/assets/icons/integrations/` only when the human supplied one
+  and the folder has none.
 
 Match the newest setup wizard (Dependabot or Jira). Use shadcn form
 components. Put copy in a `*IntakeSetupCopy.ts` file next to the wizard.
@@ -278,9 +354,12 @@ Add the source to the tests that already switch on source:
 
 Re-read `pkg/integrations/linear/on_issue.go` before you quote field paths.
 
-The repo already has the Linear integration and `linear.onIssue`. There is
-no `linear-issues` intake. Reuse that trigger. Do not ask the human to
-describe Linear auth.
+The repo already has the Linear integration, `linear.onIssue`, and
+`web_src/src/assets/icons/integrations/linear.svg`. There is no
+`linear-issues` intake. Reuse that trigger and that icon. Do not ask the
+human to describe Linear auth or to supply a logo. Do ask them to confirm
+the product name on the task card. A Linear URL on `linear.app` must map to
+that card source. Without that match the card shows GitHub.
 
 Facts you can state, then still confirm the product choices:
 

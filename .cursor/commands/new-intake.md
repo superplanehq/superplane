@@ -16,7 +16,8 @@ then you implement only after they confirm the spec.
 2. Look up the integration, trigger, and any existing intake for that source.
    Say what already exists.
 3. Walk the skill checklist one group at a time. Skip facts the repo already
-   answers.
+   answers. Branding, delete intake, the integration, and the task-card
+   source are required. Delete removes the intake only.
 4. Repeat the spec and wait for confirmation.
 5. Implement from the skill's file map. Reuse the closest finished intake.
    Do not add write-back, attachment copy, or merge-into-one-task unless the
