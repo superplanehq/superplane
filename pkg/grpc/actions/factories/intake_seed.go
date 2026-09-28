@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -89,6 +90,8 @@ func seedIntake(
 		return seedSentryIssues(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceJiraIssues:
 		return seedJiraIssues(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return seedDependabotAlerts(ctx, deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -199,6 +202,41 @@ func seedGitHubIssues(
 	}
 
 	if err := emitIntakeEvents(tx, canvasID, intakeGitHubIssuePayloadType, payloads); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(payloads)}, nil
+}
+
+func seedDependabotAlerts(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeGitHubClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	repository, _ := binding.Configuration["repository"].(string)
+	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeSeedSize)
+	if err != nil {
+		return intakeSeedResult{}, ghdependabot.UnavailableError(fmt.Errorf("failed to list Dependabot alerts of %s: %w", repository, err))
+	}
+
+	payloads := make([]map[string]any, 0, len(alerts))
+	for _, alert := range alerts {
+		event, err := ghdependabot.AlertEvent(alert)
+		if err != nil {
+			return intakeSeedResult{}, err
+		}
+		payloads = append(payloads, event)
+	}
+	slices.Reverse(payloads)
+
+	if err := emitIntakeEvents(tx, canvasID, ghdependabot.AlertPayloadType, payloads); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(payloads)}, nil
@@ -344,7 +382,7 @@ func seedProductiveTasks(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents, client.OrganizationID)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(documents)}, nil
@@ -362,10 +400,10 @@ func newestProductiveSeedDocuments(
 // productiveTaskEvents shapes each task of a newest-first page like the event
 // the trigger emits when it polls, so the rest of the graph cannot tell a
 // seeded task from a polled one.
-func productiveTaskEvents(documents []map[string]any) []map[string]any {
+func productiveTaskEvents(documents []map[string]any, organizationID string) []map[string]any {
 	events := make([]map[string]any, 0, len(documents))
 	for _, document := range documents {
-		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document))
+		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document, organizationID))
 	}
 
 	// The intake lists its runs newest first. Emitting the oldest task first
@@ -376,16 +414,20 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 }
 
 func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
-	settings := defaultProductiveIntakeSettings()
+	return liveIntakeSettings(tx, models.FactoryIntakeSourceProductiveTasks, canvasID, defaultProductiveIntakeSettings())
+}
+
+// liveIntakeSettings reads the settings out of the intake's live canvas. It
+// returns fallback when the canvas cannot be read.
+func liveIntakeSettings(tx *gorm.DB, source string, canvasID uuid.UUID, fallback intakeSettings) intakeSettings {
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{canvasID})
 	if err != nil {
-		return settings
+		return fallback
 	}
 	spec, ok := specs[canvasID]
 	if !ok {
-		return settings
+		return fallback
 	}
-	source := models.FactoryIntakeSourceProductiveTasks
 	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 }
 
@@ -609,7 +651,7 @@ func newIntakeProductiveClient(
 	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
 	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
+		return nil, fmt.Errorf("failed to build Productive client: %w", err)
 	}
 
 	return client, nil

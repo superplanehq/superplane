@@ -64,7 +64,7 @@ export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
   appId: "app-productive-intake",
   healthy: true,
   paused: false,
-  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Productive.io tasks" },
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Productive tasks" },
   source: lineIntakeSourceById("productive-tasks")!,
 };
 

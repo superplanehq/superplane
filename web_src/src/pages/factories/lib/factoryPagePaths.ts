@@ -368,9 +368,19 @@ export function factoryPlanningSetupPath(organizationId: string, factoryKey: str
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
 }
 
+/** Dedicated setup page for GitHub issue intake. */
+export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/github`;
+}
+
 /** Dedicated setup page for Sentry exception intake. */
 export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
+/** Dedicated setup page for Dependabot alert intake. */
+export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/dependabot`;
 }
 
 /** Dedicated setup page for Productive.io task intake. */

@@ -21,20 +21,20 @@ export function FirstRunModelSourceChoice({
       <legend className="mb-3 text-[13px] font-medium">{copy.modelSourceHeading}</legend>
       <div className="space-y-3">
         <ConnectOptionRow
-          icon={<KeyRound className="size-5" aria-hidden />}
-          title={copy.ownKey}
-          detail={copy.ownKeyHelper}
-          selected={modelSource === "own-key"}
-          disabled={disabled}
-          onSelect={() => onSelectModelSource("own-key")}
-        />
-        <ConnectOptionRow
           icon={<img src={SuperplaneLogo} alt="" className="size-5 dark:brightness-0 dark:invert" />}
           title={copy.hostedModels}
           detail={copy.hostedModelsHelper}
           selected={modelSource === "hosted"}
           disabled={disabled}
           onSelect={() => onSelectModelSource("hosted")}
+        />
+        <ConnectOptionRow
+          icon={<KeyRound className="size-5" aria-hidden />}
+          title={copy.ownKey}
+          detail={copy.ownKeyHelper}
+          selected={modelSource === "own-key"}
+          disabled={disabled}
+          onSelect={() => onSelectModelSource("own-key")}
         />
       </div>
     </fieldset>

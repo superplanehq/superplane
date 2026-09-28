@@ -9,12 +9,21 @@ export interface ExperimentalFeatureAccess {
   isLoading: boolean;
   /** True when the feature registry request failed. */
   lookupFailed?: boolean;
+  /**
+   * True only after the organization request succeeds and returns an organization.
+   * A failed or empty organization lookup does not confirm that a feature is off.
+   */
+  organizationReady: boolean;
 }
 
 export function useExperimentalFeature(organizationId?: string): ExperimentalFeatureAccess {
   const _organizationId = useOrganizationId();
   const resolvedOrganizationId = organizationId || _organizationId || "";
-  const { data: organization, isLoading: organizationLoading } = useOrganization(resolvedOrganizationId);
+  const {
+    data: organization,
+    isLoading: organizationLoading,
+    isSuccess: organizationLoaded,
+  } = useOrganization(resolvedOrganizationId);
   const {
     data: features,
     isLoading: registryLoading,
@@ -53,5 +62,6 @@ export function useExperimentalFeature(organizationId?: string): ExperimentalFea
     enabledExperimentalFeatures: [...availableFeatureIds],
     isLoading,
     lookupFailed: registryLookupFailed,
+    organizationReady: organizationLoaded && organization != null,
   };
 }

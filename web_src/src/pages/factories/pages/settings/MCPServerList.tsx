@@ -9,12 +9,7 @@ import { ChevronDown, MoreHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import {
-  connectionAuthLabel,
-  connectionIsEstablished,
-  connectionNeedsOAuthAction,
-  connectionStatusLabel,
-} from "./agentResourceDisplay";
+import { connectionIsEstablished, connectionNeedsOAuthAction } from "./agentResourceDisplay";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
 import { MCPToolsList } from "./MCPToolsList";
 import { enabledToolCount, mcpToolItems, nextDisabledTools, workspaceDisabledTools } from "./mcpTools";
@@ -88,7 +83,6 @@ function MCPServerRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const name = resource.name?.trim() || AGENT_RESOURCES_COPY.unnamedResource;
-  const status = connectionStatusLabel(resource);
   const needsOAuth = connectionNeedsOAuthAction(resource);
   const reconnect =
     resource.oauthStatus === "OAUTH_STATUS_NEEDS_RECONNECT" || resource.oauthStatus === "OAUTH_STATUS_VENDOR_REJECTED";
@@ -103,7 +97,7 @@ function MCPServerRow({
 
   return (
     <li data-testid={`agent-resource-row-${resource.id}`}>
-      <div className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-3 py-3">
         <ConnectionStatusDot resource={resource} />
         <div className="min-w-0 flex-1">
           <button
@@ -120,8 +114,6 @@ function MCPServerRow({
           {resource.oauthError ? <p className="mt-1 text-[12px] text-destructive">{resource.oauthError}</p> : null}
         </div>
         {countLabel ? <span className="text-[12px] tabular-nums text-muted-foreground">{countLabel}</span> : null}
-        <span className="text-[12px] text-muted-foreground">{connectionAuthLabel(resource.auth)}</span>
-        <span className={cn("text-[12px]", reconnect ? "text-destructive" : "text-muted-foreground")}>{status}</span>
         <Switch
           checked={resource.enabled !== false}
           disabled={!canUpdate}

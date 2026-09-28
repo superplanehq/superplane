@@ -1,10 +1,13 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	dependabotcomp "github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -17,6 +20,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
 			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
+			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
 			models.FactoryIntakeSourceDatadog:            "datadog.onErrorTrackingAlert",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
@@ -126,6 +130,31 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, "{{ root().data.body }}\n\n{{ root().data.link }}", create.Configuration["description"])
 	})
 
+	t.Run("a Dependabot work order matches the Go copy so later alerts merge in", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceDependabotAlerts})
+		require.NoError(t, err)
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+
+		example := (&dependabotcomp.OnAlert{}).ExampleData()
+		data, ok := example["data"].(map[string]any)
+		require.True(t, ok)
+		alert, ok := data["alert"].(map[string]any)
+		require.True(t, ok)
+		ref, ok := ghdependabot.PackageRefFromEventData(example)
+		require.True(t, ok)
+
+		title := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["title"].(string)), data)
+		assert.Equal(t, ghdependabot.TaskTitle(ref), title)
+
+		description := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["description"].(string)), data)
+		require.IsType(t, "", description)
+		text := description.(string)
+		assert.True(t, strings.HasSuffix(text, "\n\n"+ghdependabot.AlertSection(alert)), text)
+		assert.Contains(t, text, "Relationship: transitive")
+		assert.Contains(t, text, "find the direct dependency that requires it")
+		assert.Less(t, strings.Index(text, "find the direct dependency"), strings.Index(text, "## Alerts"))
+	})
+
 	t.Run("PagerDuty creates a work order without a filter", func(t *testing.T) {
 		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourcePagerDutyIncidents})
 		require.NoError(t, err)
@@ -144,6 +173,22 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		}, canvas.Spec.Edges)
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("a Productive.io task list filter also listens for updates", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source: models.FactoryIntakeSourceProductiveTasks,
+			Settings: intakeSettings{
+				ExcludeKeyTasks: true,
+				TaskListIDs:     []string{"list-bugs"},
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("every action node works on a whole batch at once", func(t *testing.T) {

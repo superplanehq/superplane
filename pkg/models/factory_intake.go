@@ -17,6 +17,7 @@ const (
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
 	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
 	FactoryIntakeSourceJiraIssues         = "jira-issues"
+	FactoryIntakeSourceDependabotAlerts   = "dependabot-alerts"
 	FactoryIntakeSourceDatadog            = "datadog"
 
 	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
@@ -41,6 +42,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourcePagerDutyIncidents,
 	FactoryIntakeSourceProductiveTasks,
 	FactoryIntakeSourceJiraIssues,
+	FactoryIntakeSourceDependabotAlerts,
 	FactoryIntakeSourceDatadog,
 }
 

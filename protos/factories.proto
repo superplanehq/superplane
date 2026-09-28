@@ -86,6 +86,18 @@ service Factories {
     };
   }
 
+  rpc SwitchFactoryModelSource(SwitchFactoryModelSourceRequest) returns (SwitchFactoryModelSourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/model-source"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Switch factory model source";
+      description: "Saves a provider key, updates the workspace agent harness, and rewrites agent nodes on workspace canvases";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{id}/repository"
@@ -389,6 +401,17 @@ service Factories {
     };
   }
 
+  rpc SearchDependabotIntakeSetupItems(SearchDependabotIntakeSetupItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/dependabot-intake-setup-items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview Dependabot packages for intake setup";
+      description: "Lists open alert packages before the Dependabot intake exists";
+      tags: "Factory";
+    };
+  }
+
   rpc ImportFactoryIntakeItem(ImportFactoryIntakeItemRequest) returns (ImportFactoryIntakeItemResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/intakes/{intake_id}/imports"
@@ -516,6 +539,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update work order status";
       description: "Transitions a work order between lifecycle states";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendWorkOrderToBacklog(SendWorkOrderToBacklogRequest) returns (SendWorkOrderToBacklogResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/backlog"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send work order to backlog";
+      description: "Moves a closed work order to draft and optionally closes pull requests and clears artifacts";
       tags: "Factory";
     };
   }
@@ -861,6 +896,19 @@ message UpdateFactoryOnboardingResponse {
   Factory factory = 1;
 }
 
+message SwitchFactoryModelSourceRequest {
+  string id = 1;
+  // hosted, anthropic, openai, or openrouter.
+  string source = 2;
+  // Provider API key. Required when this organization has no ready integration for the source.
+  string api_key = 3;
+}
+
+message SwitchFactoryModelSourceResponse {
+  Factory factory = 1;
+  string integration_id = 2;
+}
+
 message UpdateFactoryRepositoryRequest {
   string id = 1;
   // Repository slug in owner/name form.
@@ -1074,7 +1122,8 @@ message FactoryIntake {
     SOURCE_PAGERDUTY_INCIDENTS = 3;
     SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
-    SOURCE_DATADOG = 6;
+    SOURCE_DEPENDABOT_ALERTS = 6;
+    SOURCE_DATADOG = 7;
   }
 
   enum InitialImportStatus {
@@ -1154,6 +1203,9 @@ message FactoryIntake {
     // Task list ids that still create a task. Empty means every task list.
     // Productive task intakes only.
     repeated string task_list_ids = 16;
+    // Severities that still create a task. Empty means every severity.
+    // Dependabot alert intakes only. Values: critical, high, medium, low.
+    repeated string dependabot_severities = 17;
   }
 
   string id = 1;
@@ -1534,6 +1586,12 @@ message SearchFactoryIntakeItemsRequest {
   int32 limit = 4;
 }
 
+message SearchDependabotIntakeSetupItemsRequest {
+  string factory_id = 1;
+  repeated string dependabot_severities = 2;
+  int32 limit = 3;
+}
+
 message SearchFactoryIntakeItemsResponse {
   repeated FactoryIntakeItem items = 1;
 }
@@ -1571,6 +1629,8 @@ message ListWorkOrdersRequest {
   uint32 limit = 6;
   // Return orders older than this id in updated_at DESC, id DESC order.
   string before_id = 7;
+  // When set, return orders that ran on this line, plus orders with no line.
+  string line_id = 8;
 }
 
 message ListWorkOrdersResponse {
@@ -1938,6 +1998,17 @@ message UpdateWorkOrderStatusRequest {
 }
 
 message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message SendWorkOrderToBacklogRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  bool close_pull_requests = 3;
+  bool clear_artifacts = 4;
+}
+
+message SendWorkOrderToBacklogResponse {
   WorkOrder order = 1;
 }
 

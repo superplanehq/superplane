@@ -111,7 +111,7 @@ func Test__ListLineRunnerModels__IncludesCanvasModelsWhenAllowlistEmpty(t *testi
 
 	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"opus", "sonnet"}, ids)
+	assert.Equal(t, []string{"claude-opus-5-5", "claude-sonnet-4-6"}, ids)
 }
 
 func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testing.T) {
@@ -144,8 +144,8 @@ func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	require.Len(t, modelsProto, 2)
 	assert.Equal(t, "hosted::openrouter::x-ai/grok-4.6", modelsProto[0].GetId())
 	assert.Equal(t, "x-ai/grok-4.6", modelsProto[0].GetName())
-	assert.Equal(t, "opus", modelsProto[1].GetId())
-	assert.Equal(t, "opus", modelsProto[1].GetName())
+	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetId())
+	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
 }
 
 func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {

@@ -513,7 +513,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(trigger).toHaveClass("underline");
     await user.hover(trigger);
     const card = await screen.findByTestId("popup-spend-breakdown");
-    expect(card).toHaveTextContent("claude-sonnet-4-6");
+    expect(card).toHaveTextContent("sonnet 4-6");
     expect(card).toHaveTextContent("2.7k tokens · $0.45");
     expect(card).toHaveTextContent("Machine time");
     expect(card).toHaveTextContent("1 min 30 s · $0.28");
@@ -583,9 +583,7 @@ describe("WorkOrderSplitRunPopup", () => {
   it("shows tokens and cost on a line-step phase", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
 
-    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent(
-      "$0.28 · 900 · claude-sonnet-4-6 ·",
-    );
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 · sonnet 4-6 ·");
   });
 
   it("does not put an Open task link next to close", () => {
@@ -1069,6 +1067,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
     expect(within(note).getByText("Reopen this task to start the line again.")).toBeInTheDocument();
     expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Send to backlog" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
@@ -1528,7 +1527,8 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = within(sidebar).getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task did not succeed" })).toBeInTheDocument();
     expect(within(note).getByText("The work is done. The result did not meet the goal.")).toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Send to backlog" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
 
     await openLogTab(user);
     expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();

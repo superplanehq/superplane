@@ -20,6 +20,19 @@ func TestOriginFromIntakePayload_ReadsNestedHTTPURL(t *testing.T) {
 	}, origin)
 }
 
+func TestOriginFromIntakePayload_LabelsDependabotAlert(t *testing.T) {
+	origin := OriginFromIntakePayload(map[string]any{
+		"alert": map[string]any{
+			"html_url": "https://github.com/acme/payments/security/dependabot/7",
+		},
+	})
+
+	assert.Equal(t, &WorkOrderOrigin{
+		URL:   "https://github.com/acme/payments/security/dependabot/7",
+		Label: "acme/payments dependabot #7",
+	}, origin)
+}
+
 func TestOriginFromIntakePayload_PrefersPermalinkOverOtherURLs(t *testing.T) {
 	origin := OriginFromIntakePayload(map[string]any{
 		"data": map[string]any{

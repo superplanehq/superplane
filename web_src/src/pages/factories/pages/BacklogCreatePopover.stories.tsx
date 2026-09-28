@@ -17,9 +17,9 @@ const GITHUB_SOURCE: BacklogIntakeSource = {
 
 const PRODUCTIVE_SOURCE: BacklogIntakeSource = {
   intakeId: "intake-productive",
-  name: "Productive.io tasks",
+  name: "Productive tasks",
   iconSrc: productiveIcon,
-  iconAlt: "Productive.io",
+  iconAlt: "Productive",
 };
 
 const GITHUB_ITEMS: BacklogIntakeItem[] = [
