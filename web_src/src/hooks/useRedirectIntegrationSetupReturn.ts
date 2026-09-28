@@ -4,9 +4,8 @@ import { useLocation, useNavigate } from "react-router";
 import {
   consumeIntegrationSetupReturn,
   hasIntegrationSetupStay,
-  isOnboardingSetupReturnPath,
   peekIntegrationSetupReturn,
-  withGitHubSetupReturn,
+  withGitHubSetupRequest,
 } from "@/lib/integrationSetupReturn";
 
 function isLegacyIntegrationDetailsPath(organizationId: string, pathname: string): boolean {
@@ -37,15 +36,15 @@ export function useRedirectIntegrationSetupReturn(
     // never comes back.
     if (routeOrganizationId !== storageOrganizationId) return;
     if (!isLegacyIntegrationDetailsPath(routeOrganizationId, location.pathname)) return;
+    if (hasIntegrationSetupStay(location.search)) return;
 
     const storedReturn = peekIntegrationSetupReturn(storageOrganizationId);
     if (!storedReturn) return;
-    if (hasIntegrationSetupStay(location.search) && !isOnboardingSetupReturnPath(storedReturn)) return;
 
     // The provider can finish on a later callback after setup has already
     // completed. Consume this one-shot return before navigating so that late
     // callbacks cannot reopen the setup wizard.
     consumeIntegrationSetupReturn(storageOrganizationId);
-    navigate(withGitHubSetupReturn(storedReturn, location.search), { replace: true });
+    navigate(withGitHubSetupRequest(storedReturn, location.search), { replace: true });
   }, [location.pathname, location.search, navigate, routeOrganizationId, storageOrganizationId]);
 }

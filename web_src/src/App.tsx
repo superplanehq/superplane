@@ -25,7 +25,7 @@ import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
-import { OrganizationOnboardingAttemptBoundary } from "./pages/auth/OrganizationOnboardingRedirect";
+import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
@@ -270,7 +270,7 @@ function AppRouter() {
 
 function OrganizationOnboardingRoute() {
   return (
-    <OrganizationOnboardingAttemptBoundary
+    <OrganizationOnboardingRedirect
       renderWorkspace={(workspace, entryPath, reresolveWorkspace) => (
         <OnboardingEntryPathProvider path={entryPath}>
           <OnboardingWorkspaceResolutionProvider resolve={reresolveWorkspace}>

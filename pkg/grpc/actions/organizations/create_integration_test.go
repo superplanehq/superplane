@@ -269,6 +269,8 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
@@ -282,8 +284,7 @@ func Test__CreateIntegration(t *testing.T) {
 		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 	})
 
-	t.Run("github requests a linked identity before hosted install", func(t *testing.T) {
-		t.Setenv("APP_ENV", "production")
+	t.Run("github uses hosted install when factories and app env are set even if new setup flow is on", func(t *testing.T) {
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
@@ -293,6 +294,8 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		name := support.RandomName("integration")
 		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
@@ -301,7 +304,7 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Nil(t, response.Integration.Status.SetupState)
 		require.NotNil(t, response.Integration.Status.BrowserAction)
 		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
-		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/auth/github?intent=connect")
+		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
 	})
 
 	t.Run("sentry uses hosted install when the public app env is set", func(t *testing.T) {
@@ -332,6 +335,8 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
 		require.NoError(t, err)
@@ -355,6 +360,8 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
 		require.NoError(t, err)

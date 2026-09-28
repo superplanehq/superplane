@@ -6,8 +6,6 @@ import {
   hostedGitHubBindPath,
   hostedGitHubInstallRequested,
   hostedGitHubInstallRequestedAccount,
-  hostedGitHubInstallationDiscoveryActive,
-  hostedGitHubInstallationDiscoveryInstallAvailable,
   hostedGitHubInstallURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -26,30 +24,26 @@ describe("bindHostedGitHubInstallation", () => {
     return fetchSpy;
   }
 
-  it("posts the selected installation and repository", async () => {
-    const fetchSpy = stubFetch({ type: "basic", ok: true, status: 204 });
+  it("does not follow the success redirect, which can leave the page origin", async () => {
+    const fetchSpy = stubFetch({ type: "opaqueredirect", ok: false, status: 0 });
 
-    await expect(bindHostedGitHubInstallation("csrf", "11", "22")).resolves.toBeUndefined();
-    expect(fetchSpy).toHaveBeenCalledWith("/api/v1/github/app/bind", {
-      method: "POST",
+    await expect(bindHostedGitHubInstallation("csrf", "11")).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith("/api/v1/github/app/bind?state=csrf&installation_id=11", {
       credentials: "same-origin",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: "state=csrf&installation_id=11&repository_id=22",
+      redirect: "manual",
     });
   });
 
   it("accepts a plain success answer", async () => {
     stubFetch({ type: "basic", ok: true, status: 200 });
 
-    await expect(bindHostedGitHubInstallation("csrf", "11", "22")).resolves.toBeUndefined();
+    await expect(bindHostedGitHubInstallation("csrf", "11")).resolves.toBeUndefined();
   });
 
   it("throws on an error status", async () => {
     stubFetch({ type: "basic", ok: false, status: 404 });
 
-    await expect(bindHostedGitHubInstallation("csrf", "11", "22")).rejects.toThrow(
-      "Failed to connect the GitHub account",
-    );
+    await expect(bindHostedGitHubInstallation("csrf", "11")).rejects.toThrow("Failed to connect the GitHub account");
   });
 });
 
@@ -58,23 +52,13 @@ describe("pendingGitHubInstallations", () => {
     expect(
       pendingGitHubInstallations({
         pendingInstallations: [
-          {
-            id: "11",
-            accountLogin: "acme",
-            accountType: "Organization",
-            repositories: [{ id: 7, name: "acme/api", url: "https://github.com/acme/api" }],
-          },
+          { id: "11", accountLogin: "acme", accountType: "Organization" },
           { id: 22, accountLogin: "octo" },
         ],
       }),
     ).toEqual([
-      {
-        id: "11",
-        accountLogin: "acme",
-        accountType: "Organization",
-        repositories: [{ id: "7", name: "acme/api", url: "https://github.com/acme/api" }],
-      },
-      { id: "22", accountLogin: "octo", repositories: [] },
+      { id: "11", accountLogin: "acme", accountType: "Organization" },
+      { id: "22", accountLogin: "octo" },
     ]);
   });
 
@@ -105,7 +89,7 @@ describe("pendingGitHubInstallRequests", () => {
 
 describe("hosted GitHub URLs", () => {
   it("builds the public bind path", () => {
-    expect(hostedGitHubBindPath()).toBe("/api/v1/github/app/bind");
+    expect(hostedGitHubBindPath("csrf", "11")).toBe("/api/v1/github/app/bind?state=csrf&installation_id=11");
   });
 
   it("builds the GitHub install URL", () => {
@@ -123,26 +107,6 @@ describe("hosted GitHub URLs", () => {
     expect(hostedGitHubStartedByLogin({ startedByGitHubLogin: "forestileao" })).toBe("forestileao");
     expect(hostedGitHubStartedByLogin({})).toBe("");
     expect(hostedGitHubStartedByLogin(undefined)).toBe("");
-  });
-
-  it("reads active installation discovery", () => {
-    expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: true } })).toBe(true);
-    expect(hostedGitHubInstallationDiscoveryActive({ setupInstallationId: "22" })).toBe(true);
-    expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: true, complete: true } })).toBe(
-      false,
-    );
-    expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: false } })).toBe(false);
-    expect(hostedGitHubInstallationDiscoveryActive({})).toBe(false);
-  });
-
-  it("reads manual installation availability", () => {
-    expect(
-      hostedGitHubInstallationDiscoveryInstallAvailable({ installationDiscovery: { installAvailable: true } }),
-    ).toBe(true);
-    expect(
-      hostedGitHubInstallationDiscoveryInstallAvailable({ installationDiscovery: { installAvailable: false } }),
-    ).toBe(false);
-    expect(hostedGitHubInstallationDiscoveryInstallAvailable({})).toBe(false);
   });
 
   it("reads a pending GitHub install request", () => {

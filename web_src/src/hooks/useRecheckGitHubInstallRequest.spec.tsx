@@ -7,10 +7,7 @@ import type { OrganizationsIntegration } from "@/api-client";
 
 import { pendingGitHubInstallRequestId, useRecheckGitHubInstallRequest } from "./useRecheckGitHubInstallRequest";
 
-const successfulSync = {
-  data: { integration: { metadata: { id: "int-1", integrationName: "github" }, status: { state: "pending" } } },
-};
-const updateIntegration = vi.hoisted(() => vi.fn());
+const updateIntegration = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@/api-client/sdk.gen", () => ({
   organizationsUpdateIntegration: updateIntegration,
 }));
@@ -66,11 +63,10 @@ describe("pendingGitHubInstallRequestId", () => {
 describe("useRecheckGitHubInstallRequest", () => {
   afterEach(() => {
     vi.useRealTimers();
-    updateIntegration.mockReset();
+    updateIntegration.mockReset().mockResolvedValue({});
   });
 
   it("rechecks the pending install request on page access", async () => {
-    updateIntegration.mockResolvedValue(successfulSync);
     renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1"), { wrapper });
 
     await waitFor(() => expect(updateIntegration).toHaveBeenCalledTimes(1));
@@ -79,14 +75,12 @@ describe("useRecheckGitHubInstallRequest", () => {
   });
 
   it("does nothing without a pending install request", () => {
-    updateIntegration.mockResolvedValue(successfulSync);
     renderHook(() => useRecheckGitHubInstallRequest("org-1", undefined), { wrapper });
 
     expect(updateIntegration).not.toHaveBeenCalled();
   });
 
   it("does nothing when polling is disabled", () => {
-    updateIntegration.mockResolvedValue(successfulSync);
     renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1", false), { wrapper });
 
     expect(updateIntegration).not.toHaveBeenCalled();
@@ -98,10 +92,9 @@ describe("useRecheckGitHubInstallRequest", () => {
     updateIntegration.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          finishFirst = () => resolve(successfulSync);
+          finishFirst = () => resolve({});
         }),
     );
-    updateIntegration.mockResolvedValue(successfulSync);
 
     const { unmount } = renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1"), { wrapper });
     await act(async () => Promise.resolve());
@@ -121,47 +114,6 @@ describe("useRecheckGitHubInstallRequest", () => {
 
     unmount();
     await act(async () => vi.advanceTimersByTimeAsync(5_000));
-    expect(updateIntegration).toHaveBeenCalledTimes(2);
-  });
-
-  it("continues polling after a transient error", async () => {
-    vi.useFakeTimers();
-    updateIntegration.mockRejectedValueOnce(new Error("unavailable")).mockResolvedValue(successfulSync);
-
-    const { result } = renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1"), { wrapper });
-    await act(async () => Promise.resolve());
-    expect(result.current.failed).toBe(true);
-
-    await act(async () => vi.advanceTimersByTimeAsync(4_999));
-    expect(updateIntegration).toHaveBeenCalledTimes(1);
-    await act(async () => vi.advanceTimersByTimeAsync(1));
-    expect(updateIntegration).toHaveBeenCalledTimes(2);
-    expect(result.current.failed).toBe(false);
-  });
-
-  it("retries a failed recheck on demand", async () => {
-    vi.useFakeTimers();
-    updateIntegration.mockRejectedValueOnce(new Error("unavailable")).mockResolvedValue(successfulSync);
-
-    const { result } = renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1"), { wrapper });
-    await act(async () => Promise.resolve());
-    expect(result.current.failed).toBe(true);
-
-    act(() => result.current.retry());
-    await act(async () => Promise.resolve());
-    expect(updateIntegration).toHaveBeenCalledTimes(2);
-    expect(result.current.failed).toBe(false);
-  });
-
-  it("uses the requested polling interval", async () => {
-    vi.useFakeTimers();
-    updateIntegration.mockResolvedValue(successfulSync);
-    renderHook(() => useRecheckGitHubInstallRequest("org-1", "int-1", true, 1_000), { wrapper });
-    await act(async () => Promise.resolve());
-
-    await act(async () => vi.advanceTimersByTimeAsync(999));
-    expect(updateIntegration).toHaveBeenCalledTimes(1);
-    await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(updateIntegration).toHaveBeenCalledTimes(2);
   });
 });

@@ -105,7 +105,7 @@ func CreateIntegration(
 	}
 
 	userID, _ := authentication.GetUserIdFromMetadata(ctx)
-	return syncIntegration(ctx, registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
+	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
 }
 
 func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {
@@ -164,7 +164,6 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 }
 
 func syncIntegration(
-	ctx context.Context,
 	registry *registry.Registry,
 	baseURL string,
 	webhooksBaseURL string,
@@ -189,7 +188,6 @@ func syncIntegration(
 
 	logging.ForIntegration(*newIntegration).WithField("source", "integration_create_sync").Info("Integration operation may write secrets")
 	syncErr := integrationImpl.Sync(core.SyncContext{
-		Context:         ctx,
 		Logger:          logging.ForIntegration(*newIntegration),
 		HTTP:            registry.HTTPContext(),
 		Integration:     integrationCtx,
@@ -207,7 +205,8 @@ func syncIntegration(
 	}
 
 	if syncErr != nil {
-		newIntegration.SetErrorState(syncErr.Error())
+		newIntegration.State = "error"
+		newIntegration.StateDescription = syncErr.Error()
 		err = database.Conn().Save(newIntegration).Error
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to save integration after sync")

@@ -13,16 +13,8 @@ export function useBindGitHubInstallation(organizationId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      state,
-      installationId,
-      repositoryId,
-    }: {
-      state: string;
-      installationId: string;
-      repositoryId: string;
-    }) => {
-      await bindHostedGitHubInstallation(state, installationId, repositoryId);
+    mutationFn: async ({ state, installationId }: { state: string; installationId: string }) => {
+      await bindHostedGitHubInstallation(state, installationId);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });

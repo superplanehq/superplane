@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+
 import type { OrganizationsIntegration } from "@/api-client";
+import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
+import { integrationKeys } from "@/hooks/useIntegrations";
 import { pendingGitHubRequestConnection } from "@/lib/startDirectGitHubConnect";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-import { useSyncGitHubConnection } from "./useSyncGitHubConnection";
-
-export const INSTALL_REQUEST_RECHECK_INTERVAL_MS = 5_000;
-export const INSTALLATION_DISCOVERY_RECHECK_INTERVAL_MS = 1_000;
+const RECHECK_INTERVAL_MS = 5_000;
 
 export function pendingGitHubInstallRequestId(
   instances: OrganizationsIntegration[],
@@ -25,40 +27,29 @@ export function pendingGitHubInstallRequestId(
  * the user picks it. Runs on page access and then every five seconds until the
  * request resolves or the page closes.
  */
-export function useRecheckGitHubInstallRequest(
-  organizationId: string,
-  integrationId?: string,
-  enabled = true,
-  intervalMs = INSTALL_REQUEST_RECHECK_INTERVAL_MS,
-) {
-  const syncGitHubConnection = useSyncGitHubConnection(organizationId);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const retry = useCallback(() => {
-    setFailed(false);
-    setAttempt((value) => value + 1);
-  }, []);
+export function useRecheckGitHubInstallRequest(organizationId: string, integrationId?: string, enabled = true) {
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!organizationId || !integrationId || !enabled) {
-      setFailed(false);
-      return;
-    }
+    if (!organizationId || !integrationId || !enabled) return;
 
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const recheck = async () => {
       try {
-        await syncGitHubConnection(integrationId);
+        await organizationsUpdateIntegration(
+          withOrganizationHeader({
+            organizationId,
+            path: { id: organizationId, integrationId },
+            body: {},
+          }),
+        );
       } catch {
-        if (cancelled) return;
-        setFailed(true);
-        timeout = setTimeout(() => void recheck(), intervalMs);
-        return;
+        // The connection stays in the waiting state; the next tick retries.
       }
       if (cancelled) return;
-      setFailed(false);
-      timeout = setTimeout(() => void recheck(), intervalMs);
+      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+      if (!cancelled) timeout = setTimeout(() => void recheck(), RECHECK_INTERVAL_MS);
     };
 
     void recheck();
@@ -66,7 +57,5 @@ export function useRecheckGitHubInstallRequest(
       cancelled = true;
       if (timeout) clearTimeout(timeout);
     };
-  }, [attempt, enabled, integrationId, intervalMs, organizationId, syncGitHubConnection]);
-
-  return { failed, retry };
+  }, [enabled, organizationId, integrationId, queryClient]);
 }
