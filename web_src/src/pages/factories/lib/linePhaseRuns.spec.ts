@@ -486,6 +486,25 @@ describe("collectLineBacklogOrders", () => {
     expect(workOrderIds(board)).toEqual([]);
     expect(collectLineBacklogOrders([returned]).map((entry) => entry.id)).toEqual(["wo-returned"]);
   });
+
+  it("keeps the given order when the server already sorted the column", () => {
+    const older = {
+      ...order("wo-older", "Older", []),
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      state: "STATE_DRAFT" as const,
+    };
+    const newer = {
+      ...order("wo-newer", "Newer", []),
+      updatedAt: "2026-08-11T00:00:00.000Z",
+      state: "STATE_DRAFT" as const,
+    };
+
+    expect(collectLineBacklogOrders([older, newer]).map((entry) => entry.id)).toEqual(["wo-newer", "wo-older"]);
+    expect(collectLineBacklogOrders([older, newer], { preserveOrder: true }).map((entry) => entry.id)).toEqual([
+      "wo-older",
+      "wo-newer",
+    ]);
+  });
 });
 
 describe("findBacklogAutomationApp", () => {
