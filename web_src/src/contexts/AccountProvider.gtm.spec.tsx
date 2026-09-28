@@ -8,11 +8,13 @@ import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference 
 let accountID = 0;
 describe("signup conversion after account confirmation", () => {
   afterEach(() => {
+    delete window.SUPERPLANE_GTM_CONTAINER_ID;
     Reflect.deleteProperty(window.location, "hostname");
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
   beforeEach(() => {
+    window.SUPERPLANE_GTM_CONTAINER_ID = "GTM-TEST123";
     delete window.dataLayer;
     localStorage.clear();
     Object.defineProperty(window.location, "hostname", { configurable: true, value: "app.superplane.com" });

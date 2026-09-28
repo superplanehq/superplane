@@ -13,10 +13,12 @@ const invoice = {
 
 describe("Google Tag Manager", () => {
   afterEach(() => {
+    delete window.SUPERPLANE_GTM_CONTAINER_ID;
     Reflect.deleteProperty(window.location, "hostname");
   });
   beforeEach(() => {
     Object.defineProperty(window.location, "hostname", { configurable: true, value: "app.superplane.com" });
+    window.SUPERPLANE_GTM_CONTAINER_ID = "GTM-TEST123";
     delete window.dataLayer;
     document.getElementById("superplane-gtm")?.remove();
     localStorage.clear();
@@ -29,7 +31,7 @@ describe("Google Tag Manager", () => {
     expect(window.dataLayer.map((event) => event.event)).toEqual(["queued", "gtm.js"]);
     expect(document.querySelectorAll("#superplane-gtm")).toHaveLength(1);
     expect((document.getElementById("superplane-gtm") as HTMLScriptElement).src).toBe(
-      "https://www.googletagmanager.com/gtm.js?id=GTM-TKMMDB5T",
+      "https://www.googletagmanager.com/gtm.js?id=GTM-TEST123",
     );
   });
 
@@ -39,6 +41,18 @@ describe("Google Tag Manager", () => {
       Object.defineProperty(window.location, "hostname", { configurable: true, value: hostname });
       initGoogleTagManager();
       trackGoogleSignup(`nonproduction-${hostname}`);
+      trackGooglePurchase("checkout-1", [invoice]);
+      expect(window.dataLayer).toBeUndefined();
+      expect(document.getElementById("superplane-gtm")).toBeNull();
+    },
+  );
+
+  it.each([undefined, "", "   ", "{{ .GTMContainerID }}", "invalid"])(
+    "does nothing without a valid configured ID: %s",
+    (containerID) => {
+      window.SUPERPLANE_GTM_CONTAINER_ID = containerID;
+      initGoogleTagManager();
+      trackGoogleSignup("unconfigured");
       trackGooglePurchase("checkout-1", [invoice]);
       expect(window.dataLayer).toBeUndefined();
       expect(document.getElementById("superplane-gtm")).toBeNull();

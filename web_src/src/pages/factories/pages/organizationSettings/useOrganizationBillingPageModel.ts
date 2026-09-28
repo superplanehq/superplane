@@ -116,10 +116,9 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const grantsQuery = useOrganizationCreditGrants(organizationId);
   const { account } = useAccount();
   const metrics = creditMetricsFromSpend(spend.data);
-  useGooglePurchaseTracking({
+  const purchasePending = useGooglePurchaseTracking({
     checkoutID: searchParams.get("checkout_id") ?? "",
     invoices: metrics.invoices,
-    refetch: spend.refetch,
     enabled: (creditAdded || subscribed) && canManageBilling && !account?.impersonation?.active,
   });
   const flags = billingFlags(orgBilling.data);
@@ -134,9 +133,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     organizationId,
     creditAdded,
     grantTotalCents: metrics.grantTotalCents,
-    refetch: async () => {
-      await Promise.all([spend.refetch(), grantsQuery.refetch(), orgBilling.refetch()]);
-    },
+    pollingEnabled: false,
   });
   const billingContactMessage = useHostedCreditOwnerContactMessage(organizationId, billingEnabled && !canManageBilling);
 
@@ -158,6 +155,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     organizationId,
     subscribed,
     creditPurchaseAllowed: flags.creditPurchaseAllowed,
+    returnRefreshPending: purchasePending || creditRefreshStatus === "refreshing",
     sync: syncFromPolar,
     refetch: refetchBillingState,
   });

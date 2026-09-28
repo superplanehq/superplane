@@ -1,15 +1,19 @@
 const productionHostname = "app.superplane.com";
-const containerID = "GTM-TKMMDB5T";
+function googleTagManagerContainerID() {
+  const value = window.SUPERPLANE_GTM_CONTAINER_ID?.trim() ?? "";
+  return /^GTM-[A-Z0-9]+$/.test(value) ? value : "";
+}
 const emittedEvents = new Set<string>();
 
 declare global {
   interface Window {
+    SUPERPLANE_GTM_CONTAINER_ID?: string;
     dataLayer?: Record<string, unknown>[];
   }
 }
 
 export function isGoogleTagManagerEnabled() {
-  return window.location.hostname === productionHostname;
+  return window.location.hostname === productionHostname && Boolean(googleTagManagerContainerID());
 }
 
 export function initGoogleTagManager() {
@@ -19,7 +23,7 @@ export function initGoogleTagManager() {
   const script = document.createElement("script");
   script.id = "superplane-gtm";
   script.async = true;
-  script.src = `https://www.googletagmanager.com/gtm.js?id=${containerID}`;
+  script.src = `https://www.googletagmanager.com/gtm.js?id=${googleTagManagerContainerID()}`;
   document.head.appendChild(script);
 }
 
